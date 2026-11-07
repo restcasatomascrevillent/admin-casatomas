@@ -75,6 +75,11 @@ export interface MapaSalaServicioProps {
   uniones?: readonly UnionDibujo[];
   /** Piezas y pico de cada mesa por piezas, para pintar las ranuras entre piezas. */
   piezas?: ReadonlyMap<string, PiezasDibujo>;
+  /**
+   * Plano FIJO (07/11/2026, «Hoy» de escritorio): la sala entera escalada al hueco y quieta: sin pellizco,
+   * sin rueda, sin arrastrar el plano y sin los botones de zoom. Tocar una mesa sigue igual.
+   */
+  fijo?: boolean;
 }
 
 export function MapaSalaServicio({
@@ -92,6 +97,7 @@ export function MapaSalaServicio({
   mesaPropuesta = null,
   uniones = [],
   piezas,
+  fijo = false,
 }: MapaSalaServicioProps) {
   const [contenedor, setContenedor] = useState<HTMLDivElement | null>(null);
   const tamano = useTamanoElemento(contenedor);
@@ -113,7 +119,7 @@ export function MapaSalaServicio({
     );
     return escala > 0 ? escala : 1;
   }, [tamano, limites.width, limites.height]);
-  const escala = zoomManual ?? escalaAuto;
+  const escala = (fijo ? null : zoomManual) ?? escalaAuto;
 
 
   // ── Gestos (mismo controlador que el plano de reparto) ─────────────────────
@@ -127,7 +133,7 @@ export function MapaSalaServicio({
   const ratonSobreVacio = useRef(false);
 
   useEffect(() => {
-    if (!contenedor) return;
+    if (!contenedor || fijo) return;
     const vptActual = (): Vpt => {
       const r = contenedor.getBoundingClientRect();
       const z = escalaViva.current;
@@ -178,7 +184,7 @@ export function MapaSalaServicio({
       controlador.current?.destruir();
       controlador.current = null;
     };
-  }, [contenedor]);
+  }, [contenedor, fijo]);
 
   const acercar = () => setZoomManual(Math.min(escala * 1.25, ZOOM_MAX));
   const alejar = () => setZoomManual(Math.max(escala * 0.8, ZOOM_MIN));
@@ -204,7 +210,11 @@ export function MapaSalaServicio({
     <div
       ref={setContenedor}
       data-testid="mapa-sala"
-      className="relative h-full w-full cursor-grab touch-none select-none overflow-hidden active:cursor-grabbing"
+      data-fijo={fijo ? "true" : undefined}
+      className={cn(
+        "relative h-full w-full touch-none select-none overflow-hidden",
+        !fijo && "cursor-grab active:cursor-grabbing",
+      )}
       style={{
         backgroundImage: `
           linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
@@ -281,7 +291,7 @@ export function MapaSalaServicio({
       )}
 
       {/* Zoom: 44 px (además del pellizco y la rueda) y «Ajustar» para volver al encuadre. */}
-      {!sinNada && (
+      {!sinNada && !fijo && (
         <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg border border-border bg-background/90 p-1 shadow-sm backdrop-blur-sm">
           <Button variant="ghost" size="icon" className="h-11 w-11 touch-manipulation" onClick={alejar} aria-label="Alejar el plano">
             <ZoomOut className="h-5 w-5" />

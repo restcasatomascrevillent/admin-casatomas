@@ -158,7 +158,9 @@ function Plano({
   reservas = RESERVAS,
   reservasError,
   onReintentarReservas,
+  fijo,
 }: {
+  fijo?: boolean;
   busqueda?: string;
   filtroTurno?: FiltroTurnoHoy;
   salaInicial?: string | null;
@@ -182,6 +184,7 @@ function Plano({
         setSala(id);
       }}
       onAbrirReparto={onAbrirReparto}
+      fijo={fijo}
     />
   );
 }
@@ -686,5 +689,69 @@ describe("Plano de Hoy · por debajo de 1280 px la lista va en hojas (el plano, 
     fireEvent.click(mesaBoton("4"));
     const hojaMesa = await screen.findByRole("dialog", { name: "Mesa 4" });
     expect(within(hojaMesa).getByRole("button", { name: /Liberar mesa/ })).toBeInTheDocument();
+  });
+});
+
+// 07/11/2026 (petición del dueño): en «Hoy» de escritorio el plano es FIJO, una sala a la vez, con flechas.
+describe("Plano de Hoy · fijo (escritorio): una sala a la vez con flechas", () => {
+  const titulo = () => screen.getByTestId("plano-fijo-sala");
+
+  it("sin pestañas: el nombre de la sala en grande con su posición («Comedor 1/4»)", () => {
+    montar({ fijo: true });
+    expect(screen.queryByRole("tablist", { name: "Salas" })).toBeNull();
+    expect(titulo()).toHaveTextContent("Comedor");
+    expect(titulo()).toHaveTextContent("1/4");
+  });
+
+  it("las flechas pasan a la sala siguiente y a la anterior (dando la vuelta)", () => {
+    const onCambiarSala = vi.fn();
+    montar({ fijo: true, onCambiarSala });
+    fireEvent.click(screen.getByRole("button", { name: /^Sala siguiente/ }));
+    expect(onCambiarSala).toHaveBeenLastCalledWith("salon");
+    expect(titulo()).toHaveTextContent("2/4");
+    fireEvent.click(screen.getByRole("button", { name: /^Sala anterior/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Sala anterior/ }));
+    // Desde la primera, la anterior es la última: el Reservado.
+    expect(onCambiarSala).toHaveBeenLastCalledWith("reservado");
+    expect(titulo()).toHaveTextContent("Reservado");
+  });
+
+  it("las teclas ← → cambian de sala, pero no mientras se escribe", () => {
+    const onCambiarSala = vi.fn();
+    montar({ fijo: true, onCambiarSala });
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(onCambiarSala).toHaveBeenLastCalledWith("salon");
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    expect(onCambiarSala).toHaveBeenLastCalledWith("comedor");
+
+    const campo = document.createElement("input");
+    document.body.appendChild(campo);
+    onCambiarSala.mockClear();
+    fireEvent.keyDown(campo, { key: "ArrowRight" });
+    expect(onCambiarSala).not.toHaveBeenCalled();
+    campo.remove();
+  });
+
+  it("las flechas miden al menos 44 px", () => {
+    montar({ fijo: true });
+    for (const nombre of [/^Sala anterior/, /^Sala siguiente/]) {
+      expect(screen.getByRole("button", { name: nombre }).className).toMatch(/(^|\s)w-14(\s|$)/);
+    }
+  });
+
+  it("el plano no se acerca ni se mueve: sin botones de zoom", async () => {
+    montar({ fijo: true });
+    const mapa = await screen.findByTestId("mapa-sala");
+    expect(mapa).toHaveAttribute("data-fijo", "true");
+    expect(screen.queryByRole("button", { name: "Acercar el plano" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Alejar el plano" })).toBeNull();
+  });
+
+  it("sin «fijo» siguen las pestañas y el zoom (tablet y el resto)", async () => {
+    montar();
+    expect(screen.getByRole("tablist", { name: "Salas" })).toBeInTheDocument();
+    expect(screen.queryByTestId("plano-fijo")).toBeNull();
+    await screen.findByTestId("mapa-sala");
+    expect(screen.getByRole("button", { name: "Acercar el plano" })).toBeInTheDocument();
   });
 });

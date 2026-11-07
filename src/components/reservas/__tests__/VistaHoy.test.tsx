@@ -55,8 +55,11 @@ vi.mock("@/integrations/supabase/client", () => {
 });
 
 vi.mock("@/components/reservas/GestorReservasKanban", () => ({
-  GestorReservasKanban: () => null,
+  GestorReservasKanban: () => <div data-testid="vista-kanban" />,
 }));
+// 07/11/2026: en escritorio, la lista del móvil y el plano fijo (cada uno con sus tests): aquí, dobles.
+vi.mock("@/components/reservas/movil/VistaHoyMovil", () => ({ VistaHoyMovil: () => <div data-testid="vista-lista" /> }));
+vi.mock("@/components/reservas/servicio/VistaPlanoHoy", () => ({ VistaPlanoHoy: () => <div data-testid="vista-plano" /> }));
 vi.mock("@/hooks/useOcupacionHoy", () => ({ useResumenOcupacionHoy: vi.fn() }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: vi.fn() }));
 // Las tarjetas del desplegable del Reservado (mismas del kanban): sin asignaciones, con permiso de edición,
@@ -199,7 +202,7 @@ describe("VistaHoy — lo que ya NO hay (retirado el 04/10/2026 a petición del 
   });
 });
 
-describe("VistaHoy — disponibilidad por cuartos de hora (reservas-sin-salas)", () => {
+describe("VistaHoy — sin kanban ni cuartos de hora en escritorio (07/11/2026)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.store.reservas = [];
@@ -216,24 +219,14 @@ describe("VistaHoy — disponibilidad por cuartos de hora (reservas-sin-salas)",
     >);
   });
 
-  it("va plegada: no monta ninguna rejilla hasta que se despliega", () => {
+  // 07/11/2026: los cuartos de hora plegados iban con el kanban; en Hoy de escritorio ya no hay ninguno de los dos.
+  it("en escritorio ya no salen ni el kanban ni los cuartos de hora", () => {
     montar();
-    expect(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /disponibilidad por cuartos de hora/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId("rejilla-cuartos")).not.toBeInTheDocument();
-  });
-
-  // Touza no admite reservas (decisión del dueño 2026-10-01): antes salía una rejilla por negocio (Casa Tomás y Touza).
-  it("al desplegarla enseña UNA rejilla de hoy, la de Casa Tomás", () => {
-    montar();
-    fireEvent.click(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i }));
-    const rejillas = screen.getAllByTestId("rejilla-cuartos").map((r) => r.textContent);
-    expect(rejillas).toEqual([HOY]);
-  });
-
-  it("el título no sale dos veces seguidas: el botón del plegable ya lo dice y la rejilla lo oculta", () => {
-    montar();
-    fireEvent.click(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i }));
-    expect(screen.getByTestId("rejilla-cuartos")).toHaveAttribute("data-ocultar-titulo", "true");
+    expect(screen.queryByTestId("vista-kanban")).not.toBeInTheDocument();
+    expect(screen.getByTestId("vista-lista")).toBeInTheDocument();
+    expect(screen.getByTestId("vista-plano")).toBeInTheDocument();
   });
 });
 
@@ -270,12 +263,6 @@ describe("VistaHoy — lo que cambia en OTRO dispositivo (realtime y su respaldo
       refetchInterval: 60_000,
       refetchIntervalInBackground: false,
     });
-  });
-
-  it("la rejilla por cuartos queda dentro de `ReservasEnVivoContexto`: no abre un segundo canal a `reservas`", () => {
-    montar();
-    fireEvent.click(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i }));
-    expect(screen.getByTestId("rejilla-cuartos")).toHaveAttribute("data-en-vivo", "true");
   });
 });
 

@@ -42,8 +42,8 @@
 // el kanban): sin scroll de página; solo la lista de al lado se desplaza por dentro.
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, ListChecks, Loader2, Lock, LogOut, MessageSquareText, RotateCcw, Star, Users, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ListChecks, Loader2, Lock, LogOut, MessageSquareText, RotateCcw, Star, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -166,6 +166,13 @@ export interface VistaPlanoHoyProps {
   /** Falló la consulta de reservas de hoy (la de `VistaHoy`): se dice, con «Reintentar», en vez de «Cargando…» para siempre. */
   reservasError?: boolean;
   onReintentarReservas?: () => void;
+  /**
+   * «Hoy» de ESCRITORIO (07/11/2026, petición del dueño): plano grande y FIJO, una sala a la vez. En vez de
+   * las pestañas, el nombre de la sala en grande («Comedor 1/3») y flechas grandes a los lados del plano (y
+   * las teclas ← →) para pasar de sala. El plano no se acerca ni se mueve (`MapaSalaServicio` `fijo`) y la
+   * mesa tocada y «Por sentar» van en hojas, para dejarle al plano todo el sitio.
+   */
+  fijo?: boolean;
 }
 
 /**
@@ -204,11 +211,12 @@ export function VistaPlanoHoy({
   organizar = null,
   reservasError = false,
   onReintentarReservas,
+  fijo = false,
 }: VistaPlanoHoyProps) {
   // Cambia a medianoche: la tablet se queda en «Hoy» toda la noche.
   const hoy = useHoyLocal();
   const esMovil = useIsMobile();
-  const enHojas = useIsBelow(ANCHO_PANEL_LATERAL);
+  const enHojas = useIsBelow(ANCHO_PANEL_LATERAL) || fijo;
   const ahora = useAhora();
   const turno: TurnoServicio = organizar?.turno ?? turnoDelPlano(filtroTurno, ahora);
   const proponiendo = !!organizar;
@@ -221,6 +229,30 @@ export function VistaPlanoHoy({
     return [...deVerdad.filter((c) => !c.privada), ...deVerdad.filter((c) => c.privada)];
   }, [columnas]);
   const sala = salas.find((s) => s.id === salaId) ?? salas[0] ?? null;
+  const indiceSala = sala ? salas.findIndex((s) => s.id === sala.id) : -1;
+  /** Plano fijo: la sala anterior o la siguiente (da la vuelta). */
+  const irSala = useCallback(
+    (paso: number) => {
+      if (salas.length < 2 || indiceSala < 0) return;
+      onCambiarSala(salas[(indiceSala + paso + salas.length) % salas.length].id);
+    },
+    [salas, indiceSala, onCambiarSala],
+  );
+  // Teclas ← → (solo el plano fijo), salvo escribiendo o con un diálogo u hoja abiertos.
+  useEffect(() => {
+    if (!fijo) return;
+    const alPulsar = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const destino = e.target as HTMLElement | null;
+      if (destino?.closest?.("input, textarea, select, [contenteditable='true'], [role='slider'], [role='tablist'], [role='radiogroup'], [role='group']")) return;
+      if (document.querySelector("[role='dialog'], [role='alertdialog'], [role='menu'], [role='listbox']")) return;
+      e.preventDefault();
+      irSala(e.key === "ArrowLeft" ? -1 : 1);
+    };
+    window.addEventListener("keydown", alPulsar);
+    return () => window.removeEventListener("keydown", alPulsar);
+  }, [fijo, irSala]);
 
   // ── Datos (consultas ya existentes; ningún canal realtime nuevo) ───────────
   const asignacionesQuery = useAsignacionesMesa(hoy, undefined, undefined, REFRESCO_PERIODICO);
@@ -1074,6 +1106,23 @@ export function VistaPlanoHoy({
           className="flex min-h-0 flex-1 flex-col gap-2"
         >
           <div className="flex min-w-0 items-center gap-2">
+            {fijo && sala ? (
+              <h2 className="flex min-w-0 items-center gap-2 text-2xl font-bold" data-testid="plano-fijo-sala" aria-live="polite">
+                {sala.privada && <Lock className="h-5 w-5 shrink-0" aria-hidden="true" />}
+                <span className="truncate">{sala.title}</span>
+                <span className="shrink-0 text-lg font-semibold tabular-nums text-muted-foreground">
+                  {indiceSala + 1}/{salas.length}
+                </span>
+                {listo && (
+                  <span className="shrink-0 text-sm font-normal tabular-nums text-muted-foreground">
+                    {(() => {
+                      const c = resumenPorSala.get(sala.id) ?? { total: 0, sinMesa: 0 };
+                      return `· ${c.total} ${c.total === 1 ? "reserva" : "reservas"}${c.sinMesa ? ` · ${c.sinMesa} sin mesa` : ""}`;
+                    })()}
+                  </span>
+                )}
+              </h2>
+            ) : (
             <TabsList aria-label="Salas" className="h-auto min-h-10 min-w-0 justify-start">
               {salas.map((s) => {
                 const cuenta = resumenPorSala.get(s.id) ?? { total: 0, sinMesa: 0 };
@@ -1110,6 +1159,7 @@ export function VistaPlanoHoy({
                 );
               })}
             </TabsList>
+            )}
             {/* «Reparto de mesas» ya no se ofrece desde Hoy (10/10/2026): lo esencial está aquí. */}
             {!proponiendo && sala && (
               <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -1152,7 +1202,14 @@ export function VistaPlanoHoy({
                 enHojas ? "grid-cols-1 grid-rows-[minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_23rem] gap-3",
               )}
             >
-              {/* El plano: no se desplaza (se ajusta, y se acerca o se mueve con los dedos). */}
+              {/* El plano: no se desplaza (se ajusta, y se acerca o se mueve con los dedos; fijo, ni eso). */}
+              <ConFlechasSala
+                activo={fijo && salas.length > 1}
+                anterior={indiceSala >= 0 ? salas[(indiceSala - 1 + salas.length) % salas.length]?.title : undefined}
+                siguiente={indiceSala >= 0 ? salas[(indiceSala + 1) % salas.length]?.title : undefined}
+                onAnterior={() => irSala(-1)}
+                onSiguiente={() => irSala(1)}
+              >
               <section
                 aria-label={`Plano de ${sala.title}`}
                 className="relative min-h-0 overflow-hidden rounded-xl border bg-card"
@@ -1188,6 +1245,7 @@ export function VistaPlanoHoy({
                     mesaPropuesta={mesaPropuesta}
                     uniones={unionesMapa}
                     piezas={piezasMapa}
+                    fijo={fijo}
                   />
                 )}
                 {eligiendoPara && (
@@ -1211,6 +1269,7 @@ export function VistaPlanoHoy({
                   {etiquetaTurno}
                 </p>
               </section>
+              </ConFlechasSala>
 
               {enHojas ? (
                 <div className="flex min-w-0 items-center gap-2">
@@ -1334,6 +1393,51 @@ export function VistaPlanoHoy({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+/**
+ * Plano fijo de escritorio: flechas grandes (64×56 px) a izquierda y derecha del plano para pasar de sala.
+ * Sin `activo` (o con una sola sala) deja el plano tal cual.
+ */
+function ConFlechasSala({
+  activo,
+  anterior,
+  siguiente,
+  onAnterior,
+  onSiguiente,
+  children,
+}: {
+  activo: boolean;
+  anterior?: string;
+  siguiente?: string;
+  onAnterior: () => void;
+  onSiguiente: () => void;
+  children: ReactNode;
+}) {
+  if (!activo) return <>{children}</>;
+  return (
+    <div className="flex min-h-0 min-w-0 items-stretch gap-2" data-testid="plano-fijo">
+      <Button
+        variant="outline"
+        className="h-auto min-h-14 w-14 shrink-0 self-center py-6"
+        onClick={onAnterior}
+        aria-label={anterior ? `Sala anterior: ${anterior}` : "Sala anterior"}
+        title={anterior ? `${anterior} (←)` : "Sala anterior (←)"}
+      >
+        <ChevronLeft className="!h-9 !w-9" aria-hidden="true" />
+      </Button>
+      <div className="grid min-h-0 min-w-0 flex-1">{children}</div>
+      <Button
+        variant="outline"
+        className="h-auto min-h-14 w-14 shrink-0 self-center py-6"
+        onClick={onSiguiente}
+        aria-label={siguiente ? `Sala siguiente: ${siguiente}` : "Sala siguiente"}
+        title={siguiente ? `${siguiente} (→)` : "Sala siguiente (→)"}
+      >
+        <ChevronRight className="!h-9 !w-9" aria-hidden="true" />
+      </Button>
     </div>
   );
 }

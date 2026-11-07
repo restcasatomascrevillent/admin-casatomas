@@ -156,13 +156,34 @@ function refrescarTrasError(qc: QueryClient) {
   for (const clave of CLAVES_POR_CAMBIO.ocupacion) void qc.invalidateQueries({ queryKey: [clave] });
 }
 
-export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | undefined; fecha: string }) {
+/**
+ * «Hoy» de ESCRITORIO (07/11/2026, petición del dueño): la MISMA lista, como columna a la izquierda del plano.
+ * El buscador y el turno los manda la fila de filtros de `VistaHoy`; sin la fila de controles del móvil ni
+ * la vista «Mesas» (las mesas están en el plano). La ficha se abre en una hoja lateral.
+ */
+export interface ColumnaHoy {
+  busqueda: string;
+  filtroTurno: FiltroTurnoHoy;
+}
+
+export function VistaHoyMovil({
+  reservas,
+  fecha,
+  columna,
+}: {
+  reservas: ReservaMovil[] | undefined;
+  fecha: string;
+  columna?: ColumnaHoy;
+}) {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, 240);
-  const [vista, setVista] = useState<Vista>("reservas");
+  const [vistaPropia, setVista] = useState<Vista>("reservas");
+  const vista: Vista = columna ? "reservas" : vistaPropia;
   // El turno del reloj por defecto: la lista sale corta (solo el servicio en curso). Se puede cambiar.
-  const [filtroTurno, setFiltroTurno] = useState<FiltroTurnoHoy>(() => turnoDeHora(horaActual()));
-  const [busqueda, setBusqueda] = useState("");
+  const [filtroTurnoPropio, setFiltroTurno] = useState<FiltroTurnoHoy>(() => turnoDeHora(horaActual()));
+  const [busquedaPropia, setBusqueda] = useState("");
+  const filtroTurno = columna?.filtroTurno ?? filtroTurnoPropio;
+  const busqueda = columna?.busqueda ?? busquedaPropia;
   const [buscando, setBuscando] = useState(false);
   const [abiertaId, setAbiertaId] = useState<string | null>(null);
   const [inicioFicha, setInicioFicha] = useState<InicioFicha>("normal");
@@ -259,8 +280,13 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
   const pax = (filas: Array<{ reserva: ReservaMovil }>) => filas.reduce((s, f) => s + (f.reserva.numero_comensales || 0), 0);
 
   return (
-    <div ref={setRaiz} className="flex min-h-0 flex-col gap-2" style={alto ? { height: alto } : undefined}>
-      {buscando && (
+    <div
+      ref={setRaiz}
+      className="flex min-h-0 flex-col gap-2"
+      style={alto ? { height: alto } : undefined}
+      data-testid={columna ? "hoy-columna" : undefined}
+    >
+      {!columna && buscando && (
         <div className="relative shrink-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
@@ -287,6 +313,7 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
         </div>
       )}
 
+      {!columna && (
       <div className="flex shrink-0 items-center gap-1" data-testid="hoy-movil-controles">
         {hayMenu && <SidebarTrigger className="shrink-0" />}
         <ToggleGroup
@@ -331,6 +358,7 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
         </Button>
         <BotonSentarSinReserva soloIcono className="shrink-0" />
       </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border bg-card" data-testid="hoy-movil-lista">
         {reservas === undefined ? (
@@ -392,7 +420,10 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
       </div>
 
       <Sheet open={!!abierta} onOpenChange={(o) => !o && setAbiertaId(null)}>
-        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl">
+        <SheetContent
+          side={columna ? "left" : "bottom"}
+          className={columna ? "w-[min(92vw,28rem)] overflow-y-auto sm:max-w-none" : "max-h-[85dvh] overflow-y-auto rounded-t-2xl"}
+        >
           {abierta && (
             <PanelReservaMovil
               key={abierta.id}
