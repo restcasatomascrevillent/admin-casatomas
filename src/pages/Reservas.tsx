@@ -141,8 +141,7 @@ function ChipConfiguracion({ children }: { children: ReactNode }) {
 
 export default function Reservas() {
   const [searchParams, setSearchParams] = useSearchParams();
-  // Móvil (< 768 px, 07/11/2026): avisos y «Nueva reserva» como iconos en la MISMA fila que las pestañas
-  // (antes bajaban a una fila propia que se comía ~48 px de la lista de Hoy). En tablet siguen debajo.
+  // Móvil (< 768 px): solo «Hoy» para sentar (ver más abajo).
   const esMovil = useIsMobile();
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedEspacio, setSelectedEspacio] = useState<{ id: string; nombre: string } | null>(null);
@@ -351,6 +350,17 @@ export default function Reservas() {
     );
   }
 
+  // Móvil (< 768 px, 07/11/2026, petición del dueño): el teléfono del camarero es SOLO para sentar. Solo
+  // «Hoy», sin pestañas, sin «Nueva reserva» ni avisos, y sin la barra superior del panel (el botón de menú
+  // va en la fila de controles de `VistaHoyMovil`). Un `?tab=otra` también cae aquí. Tablet y escritorio, igual.
+  if (esMovil) {
+    return (
+      <DashboardLayout sinCabeceraMovil>
+        <VistaHoy onAbrirSala={handleEspacioClick} />
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <Tabs value={pestanaVisible} onValueChange={handleTabChange} className="w-full">
@@ -365,7 +375,7 @@ export default function Reservas() {
             todo el día. Sin título de página: la pestaña "Reservas" del menú lateral ya dice dónde
             estás. */}
         <PestanasPagina
-          accionesDebajoEnMovil={esMovil ? undefined : "lg"}
+          accionesDebajoEnMovil="lg"
           pestanas={[
             { valor: "hoy", etiqueta: "Hoy" },
             { valor: "reservas", etiqueta: "Lista" },
@@ -381,18 +391,14 @@ export default function Reservas() {
                dueño: lo que no se puede usar se oculta, no se desactiva). */
             <>
             {/* Avisos de reservas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral). */}
-            <BotonAvisosSeccion seccion="reservas" className={esMovil ? "h-11 px-2.5 pointer-coarse:h-11" : undefined} />
+            <BotonAvisosSeccion seccion="reservas" />
             {soloLectura && <EtiquetaSoloLectura />}
             {puedeEditarReservas && (
               <Dialog open={openDialog} onOpenChange={setOpenDialog}>
                 <DialogTrigger asChild>
-                  <Button
-                    size={esMovil ? "icon" : "default"}
-                    className={esMovil ? "h-11 w-11 shrink-0" : "touch-hit h-9 shrink-0 pointer-coarse:h-9"}
-                    title={esMovil ? "Nueva reserva" : undefined}
-                  >
-                    <Plus className={esMovil ? "h-5 w-5" : "mr-2 h-4 w-4"} />
-                    <span className={esMovil ? "sr-only" : undefined}>Nueva Reserva</span>
+                  <Button className="touch-hit h-9 shrink-0 pointer-coarse:h-9">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nueva Reserva
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
