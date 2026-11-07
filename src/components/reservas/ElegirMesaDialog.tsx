@@ -48,7 +48,7 @@
 //   El plano está pensado como pantalla (`min-h-[calc(100vh-220px)]` en su raíz): dentro del
 //   diálogo manda la altura del diálogo. Ver `AJUSTES_DEL_PLANO`.
 // ============================================================================
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Clock, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -59,7 +59,10 @@ import { useMesas } from "@/hooks/useMesas";
 import { horaCorta } from "@/lib/reservas/ocupacionSalas";
 import { resolverSaltoAsignacion } from "@/lib/reservas/saltoAsignacion";
 import { nombreMesasJuntas, useReservasDeSala } from "./asignacionPlano";
-import { PlanoEspacio2D } from "./PlanoEspacio2D";
+
+// El editor de plano (el fichero más pesado de Reservas) se pide al ABRIR el diálogo (07/11/2026, «Hoy»
+// ligera): este diálogo lo importan las tarjetas de «Hoy», y antes el plano viajaba entero con «Hoy».
+const PlanoEspacio2D = lazy(() => import("./PlanoEspacio2D").then((m) => ({ default: m.PlanoEspacio2D })));
 
 /** Lo que hace falta saber de la reserva: sale tal cual de la tarjeta del kanban. */
 export interface ReservaParaElegirMesa {
@@ -260,15 +263,23 @@ export function ElegirMesaDialog({ reserva, fecha, espacioId, espacioNombre, onC
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
           <div className={AJUSTES_DEL_PLANO}>
             {/* `key`: otra reserva u otra sala monta un plano nuevo, con su estado limpio. */}
-            <PlanoEspacio2D
-              key={`${reserva.id}|${espacioId}`}
-              espacioId={espacioId}
-              espacioNombre={espacioNombre}
-              onBack={cerrar}
-              fecha={destino.fecha}
-              turno={destino.turno}
-              reservaId={destino.reservaId}
-            />
+            <Suspense
+              fallback={
+                <div role="status" className="h-64 animate-pulse rounded-xl bg-muted/40">
+                  <span className="sr-only">Cargando el plano…</span>
+                </div>
+              }
+            >
+              <PlanoEspacio2D
+                key={`${reserva.id}|${espacioId}`}
+                espacioId={espacioId}
+                espacioNombre={espacioNombre}
+                onBack={cerrar}
+                fecha={destino.fecha}
+                turno={destino.turno}
+                reservaId={destino.reservaId}
+              />
+            </Suspense>
           </div>
         </div>
       </DialogContent>

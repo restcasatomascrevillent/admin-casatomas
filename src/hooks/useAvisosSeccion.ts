@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { tiposDeSeccion, type SeccionAvisos } from "@/lib/avisos";
+import { programarSondeo } from "@/lib/realtimeCanal";
 
 export const TAMANO_PAGINA_AVISOS_SECCION = 30;
 /** Evento para que los contadores se relean al marcar avisos (en el modal o donde sea). */
@@ -27,14 +28,16 @@ export function useContadorAvisosSeccion(seccion: SeccionAvisos) {
       if (vigente && !error) setPendientes(count ?? 0);
     };
     void leer();
-    const intervalo = window.setInterval(() => void leer(), 60_000);
+    // Cada minuto SOLO con la pestaña a la vista (07/11/2026: antes seguía pidiendo con el móvil
+    // bloqueado o la pestaña oculta). Al volver a verla se relee al momento (`alVolver`).
+    const pararSondeo = programarSondeo(() => void leer(), 60_000);
     const alVolver = () => { if (document.visibilityState === "visible") void leer(); };
     const alCambiar = () => void leer();
     document.addEventListener("visibilitychange", alVolver);
     window.addEventListener(EVENTO_AVISOS_CAMBIADOS, alCambiar);
     return () => {
       vigente = false;
-      window.clearInterval(intervalo);
+      pararSondeo();
       document.removeEventListener("visibilitychange", alVolver);
       window.removeEventListener(EVENTO_AVISOS_CAMBIADOS, alCambiar);
     };

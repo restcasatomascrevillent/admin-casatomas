@@ -278,3 +278,53 @@ describe("VistaHoy — lo que cambia en OTRO dispositivo (realtime y su respaldo
     expect(screen.getByTestId("rejilla-cuartos")).toHaveAttribute("data-en-vivo", "true");
   });
 });
+
+// 07/11/2026, «Hoy» con poca cobertura: la pestaña ya no espera al resumen de ocupación (bloqueaba todo
+// con un esqueleto) y avisa con una banda fina cuando la lectura falla por red.
+describe("VistaHoy — con poca cobertura", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.store.reservas = [];
+    h.store.error = null;
+    vi.mocked(useEspaciosReserva).mockReturnValue({ data: SALAS } as unknown as ReturnType<
+      typeof useEspaciosReserva
+    >);
+  });
+
+  it("no monta el resumen de ocupación (ni espera por él)", () => {
+    montar();
+    expect(vi.mocked(useResumenOcupacionHoy)).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Buscar reservas")).toBeInTheDocument();
+  });
+
+  it("con red no hay banda de «Sin conexión»", async () => {
+    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" })];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+    expect(screen.queryByTestId("aviso-sin-conexion")).not.toBeInTheDocument();
+  });
+
+  it("si la lectura falla por red sale «Sin conexión»", async () => {
+    h.store.error = { message: "TypeError: Failed to fetch" };
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+    expect(await screen.findByTestId("aviso-sin-conexion")).toHaveTextContent("Sin conexión");
+  });
+
+  it("un error que no es de red no se disfraza de «Sin conexión»", async () => {
+    h.store.error = { message: "permission denied for table reservas" };
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+    expect(screen.queryByTestId("aviso-sin-conexion")).not.toBeInTheDocument();
+  });
+
+  it("pide columnas por nombre (`COLUMNAS_RESERVAS_HOY`), no `*`", async () => {
+    h.store.reservas = [reserva({ id: "r1", nombre: "Ana", marca: "casa_tomas", notas_cliente: "trona", sobra: "x" })];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+    const filas = queryClient.getQueryData<Record<string, unknown>[]>(["reservas-hoy", "pendientes-mesa", HOY])!;
+    // El doble devuelve solo lo pedido: lo que no está en la lista no llega.
+    expect(filas[0]).toMatchObject({ id: "r1", nombre: "Ana", notas_cliente: "trona", llegada_at: null, salida_at: null });
+    expect(filas[0]).not.toHaveProperty("sobra");
+  });
+});

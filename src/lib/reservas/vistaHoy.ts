@@ -15,6 +15,17 @@
 
 import { turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
 
+/**
+ * Columnas de `reservas` que pide «Hoy» (kanban, plano y vista de móvil), en vez de `select("*")`
+ * (07/11/2026, «Hoy» ligera con poca cobertura). Son las que leen las tarjetas (`ReservaCard`), el plano
+ * (`VistaPlanoHoy`, `MapaSalaServicio`), el móvil (`VistaHoyMovil`) y las acciones de servicio (parche
+ * optimista de `estado`/`llegada_at`/`salida_at`). El editor de una reserva relee la fila entera por id
+ * (`EditarReservaDialog`), así que aquí no hace falta nada más. `llegada_at` y `salida_at` ya se piden
+ * por nombre en `useReservasServicioDia`: las dos migraciones están en todos los proyectos.
+ */
+export const COLUMNAS_RESERVAS_HOY =
+  "id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, importante, en_blacklist, notas_cliente, marca, llegada_at, salida_at";
+
 /** Las dos vistas de «Hoy». Por defecto, el kanban (la de siempre). */
 export type ModoVistaHoy = "kanban" | "plano";
 export const VISTA_HOY_POR_DEFECTO: ModoVistaHoy = "kanban";

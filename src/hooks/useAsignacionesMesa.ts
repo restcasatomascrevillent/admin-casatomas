@@ -100,10 +100,11 @@ export function useAsignacionesMesa(
       ? [CLAVE_ASIGNACIONES_MESA, fecha, espacioId, turno]
       : [CLAVE_ASIGNACIONES_MESA, fecha, espacioId],
     queryFn: async () => {
+      // Columnas por nombre (07/11/2026; antes `*`): son todas las de la tabla, sin sorpresas si crece.
       let query = supabase
         .from("asignaciones_mesa")
         .select(`
-          *,
+          id, reserva_id, mesa_id, created_at, fecha, turno, espacio_id, asignada_por,
           reservas!inner (
             id,
             nombre,
