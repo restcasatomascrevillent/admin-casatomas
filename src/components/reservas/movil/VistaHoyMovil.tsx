@@ -19,8 +19,13 @@
 //   · «Sentar en mesa X»  → la MISMA acción «Ha llegado» del panel.
 //   · «Cambiar mesa» / «Elegir mesa» → selector con las mesas de TODAS las salas
 //     donde cabe: libre (verde), prevista para otra reserva (ámbar: se puede
-//     elegir, avisando de que esa otra se queda sin ella) u ocupada por alguien
-//     sentado (no se puede). Lógica en `src/lib/reservas/confirmarMesa.ts`.
+//     elegir; a esa otra se le busca la mejor mesa libre de su sala, o se queda
+//     sin mesa si no hay, y se avisa), FIJADA para otra (candado, no se puede) u
+//     ocupada por alguien sentado (no se puede). Si la propia reserva tiene la
+//     mesa fijada, cambiarla se pregunta y quita la fijación (07/11/2026).
+//     Lógica en `src/lib/reservas/confirmarMesa.ts` y `recalcularMesas.ts`.
+//   · «Recalcular mesas» (vista Mesas): recoloca las por llegar no fijadas cuya
+//     mesa prevista está ocupada ahora o choca, con resumen y Confirmar.
 //   · «Liberar mesa» (sentadas): la mesa queda libre para otros; con Deshacer.
 //   · «No vino».
 // Con solo «Ver» en Reservas (06/11/2026, decisión del dueño) las fichas enseñan los datos
@@ -39,8 +44,10 @@ import {
   DoorOpen,
   LayoutGrid,
   List,
+  Lock,
   MapPin,
   Phone,
+  RefreshCw,
   Search,
   StickyNote,
   Undo2,
@@ -108,6 +115,8 @@ import {
   type SelectorMesas,
 } from "@/lib/reservas/confirmarMesa";
 import type { ConfigOcupacionMesa } from "@/lib/reservas/ocupacionMesa";
+import { proponerRecalculo, recolocarDesplazadas, textoSinSitio } from "@/lib/reservas/recalcularMesas";
+import { useFijarMesa } from "@/hooks/useMesaFijada";
 import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
 import { cn } from "@/lib/utils";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
@@ -327,6 +336,19 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
         {reservas === undefined ? (
           <p className="p-4 text-sm text-muted-foreground">Cargando reservas…</p>
         ) : vista === "mesas" ? (
+          <>
+          {puedeEditar && (
+            <RecalcularMesasMovil
+              fecha={fecha}
+              turno={turno}
+              salas={salas}
+              mesas={mesas ?? []}
+              asignaciones={asignacionesDia}
+              ajustesDia={ajustesDia ?? []}
+              mesasExcluidas={configAsignacionDesde(config).mesasExcluidas}
+              configOcupacion={configOcupacion}
+            />
+          )}
           <CuadriculaMesas
             salas={salas}
             mesas={mesas ?? []}
@@ -338,6 +360,7 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
             onLibre={(mesa, prevista) => setMesaLibre({ mesa, prevista })}
             onOcupada={(id) => abrirFicha(id)}
           />
+          </>
         ) : vacia ? (
           <p className="p-4 text-sm text-muted-foreground">No hay reservas para este filtro.</p>
         ) : (
@@ -403,6 +426,9 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
               asignaciones={asignacionesDia}
               configOcupacion={configOcupacion}
               minutoAhora={minutoAhora}
+              salas={salas}
+              ajustesDia={ajustesDia ?? []}
+              mesasExcluidas={configAsignacionDesde(config).mesasExcluidas}
               onVerReserva={(id) => {
                 setMesaLibre(null);
                 abrirFicha(id);
@@ -457,6 +483,7 @@ export function FilaReservaMovil({
   const botonDirecto = !!onSentar && directo;
   const sentada = reserva.estado === "completada";
   const textoMesa = textoMesaConfirmada(nombresMesa, sentada);
+  const fijada = !!reserva.mesa_fijada && nombresMesa.length > 0;
   const notas = (reserva.notas_cliente ?? "").trim();
   return (
     <li className="relative">
@@ -503,6 +530,7 @@ export function FilaReservaMovil({
                         : "bg-sky-100 text-sky-900 dark:bg-sky-950/60 dark:text-sky-200",
                   )}
                 >
+                  {fijada && <Lock className="mr-1 h-4 w-4" aria-label="Mesa fijada" />}
                   {textoMesa}
                 </span>
               </span>
@@ -528,8 +556,9 @@ export function FilaReservaMovil({
                 <Armchair className="h-3.5 w-3.5" aria-hidden="true" />
                 Sentar
               </span>
-              <span className="max-w-full truncate text-lg font-bold leading-tight" data-testid="boton-mesa">
-                {directo ? `${sala ? `${sala} · ` : ""}${textoMesas(nombresMesa)}` : "Elegir mesa"}
+              <span className="flex max-w-full items-center gap-1 truncate text-lg font-bold leading-tight" data-testid="boton-mesa">
+                {directo && fijada && <Lock className="h-4 w-4 shrink-0" aria-label="Mesa fijada" />}
+                <span className="truncate">{directo ? `${sala ? `${sala} · ` : ""}${textoMesas(nombresMesa)}` : "Elegir mesa"}</span>
               </span>
             </Button>
           )}
@@ -552,6 +581,8 @@ export interface PrevistaMesa {
   reservaId: string;
   nombre: string;
   hora: string;
+  /** Esa reserva tiene la mesa fijada (candado). */
+  fijada?: boolean;
 }
 
 function CuadriculaMesas({
@@ -577,6 +608,7 @@ function CuadriculaMesas({
   onOcupada: (reservaId: string) => void;
 }) {
   const estados = useMemo(() => estadoMesasHoy(asignaciones, reservas, turno, turnoDeHora), [asignaciones, reservas, turno]);
+  const fijadas = useMemo(() => new Set(reservas.filter((r) => r.mesa_fijada).map((r) => r.id)), [reservas]);
 
   const porSala = useMemo(
     () =>
@@ -632,6 +664,7 @@ function CuadriculaMesas({
                       opcion={opcion}
                       junta={junta}
                       estado={estados.get(opcion.id) ?? { tipo: "libre" }}
+                      fijadas={fijadas}
                       onLibre={onLibre}
                       onOcupada={onOcupada}
                     />
@@ -649,18 +682,22 @@ function CasillaMesa({
   opcion,
   junta,
   estado,
+  fijadas,
   onLibre,
   onOcupada,
 }: {
   opcion: MesaOpcion;
   junta: string[];
   estado: EstadoMesaHoy;
+  /** Reservas con la mesa fijada: su casilla lleva candado. */
+  fijadas?: ReadonlySet<string>;
   onLibre: (m: MesaOpcion, prevista: PrevistaMesa | null) => void;
   onOcupada: (reservaId: string) => void;
 }) {
+  const fijada = estado.tipo !== "libre" && !!fijadas?.has(estado.reservaId);
   const pulsar = () => {
     if (estado.tipo === "libre") onLibre(opcion, null);
-    else if (estado.tipo === "reservada") onLibre(opcion, { reservaId: estado.reservaId, nombre: estado.nombre, hora: estado.hora });
+    else if (estado.tipo === "reservada") onLibre(opcion, { reservaId: estado.reservaId, nombre: estado.nombre, hora: estado.hora, fijada });
     else onOcupada(estado.reservaId);
   };
   return (
@@ -673,10 +710,13 @@ function CasillaMesa({
         estado.tipo === "sentada" && "border-amber-500 bg-amber-50 dark:bg-amber-950/40",
         estado.tipo === "reservada" && "border-sky-500 bg-sky-50 dark:bg-sky-950/40",
       )}
-      aria-label={`Mesa ${opcion.nombre}, ${opcion.plazas} plazas, ${estado.tipo === "libre" ? "libre" : estado.tipo === "sentada" ? `sentada: ${estado.nombre}` : `prevista a las ${horaCorta(estado.hora)} para ${estado.nombre || "una reserva"}`}`}
+      aria-label={`Mesa ${opcion.nombre}, ${opcion.plazas} plazas, ${estado.tipo === "libre" ? "libre" : estado.tipo === "sentada" ? `sentada: ${estado.nombre}` : `${fijada ? "fijada" : "prevista"} a las ${horaCorta(estado.hora)} para ${estado.nombre || "una reserva"}`}`}
     >
       <span className="flex w-full items-baseline justify-between gap-1">
-        <span className="text-lg font-bold leading-none">{opcion.nombre}</span>
+        <span className="flex items-center gap-1 text-lg font-bold leading-none">
+          {opcion.nombre}
+          {fijada && <Lock className="h-3.5 w-3.5" aria-hidden="true" data-testid="candado-mesa" />}
+        </span>
         <span className="flex items-center gap-0.5 text-xs text-muted-foreground tabular-nums">
           <Users className="h-3 w-3" aria-hidden />
           {opcion.plazas}
@@ -691,6 +731,107 @@ function CasillaMesa({
       </span>
       {junta.length > 0 && <span className="text-[11px] pointer-coarse:text-xs text-muted-foreground">+ {junta.join(", ")}</span>}
     </button>
+  );
+}
+
+// ─── «Recalcular mesas» (vista Mesas) ────────────────────────────────────────
+
+/**
+ * Botón discreto encima de la cuadrícula (07/11/2026): recoloca las reservas POR LLEGAR y NO fijadas del turno
+ * cuya mesa prevista está ocupada ahora o choca, a la mejor mesa libre de su sala (`proponerRecalculo`). Antes
+ * enseña el resumen («Se moverán 3 reservas: García 7→9, …») con Confirmar/Cancelar. No toca las fijadas ni las
+ * sentadas. Se aplica una a una; si una falla, se para y se avisa (las anteriores quedan hechas).
+ */
+function RecalcularMesasMovil({
+  fecha,
+  turno,
+  salas,
+  mesas,
+  asignaciones,
+  ajustesDia,
+  mesasExcluidas,
+  configOcupacion,
+}: {
+  fecha: string;
+  turno: TurnoServicio;
+  salas: Array<{ id: string; nombre: string }>;
+  mesas: Mesa[];
+  asignaciones: AsignacionConDetalles[];
+  ajustesDia: AjusteDia[];
+  mesasExcluidas: readonly string[];
+  configOcupacion: ConfigOcupacionMesa;
+}) {
+  const asignarLocal = useAsignarConCambioLocal(fecha, mesas);
+  const [propuesta, setPropuesta] = useState<ReturnType<typeof proponerRecalculo> | null>(null);
+  const [aplicando, setAplicando] = useState(false);
+
+  const calcular = () =>
+    setPropuesta(
+      proponerRecalculo({
+        opciones: opcionesMesasServicio({ salas, mesas, ajustesDia, turno }),
+        asignaciones,
+        turno,
+        excluidas: new Set(mesasExcluidas),
+        config: configOcupacion,
+      }),
+    );
+
+  const aplicar = async () => {
+    if (!propuesta) return;
+    setAplicando(true);
+    let hechas = 0;
+    try {
+      for (const m of propuesta.movimientos) {
+        await asignarLocal(m.reservaId, [m.hacia.id]);
+        hechas++;
+      }
+      toast.success(hechas === 1 ? "1 reserva cambiada de mesa" : `${hechas} reservas cambiadas de mesa`, {
+        description: propuesta.movimientos.map((m) => m.texto).join(", "),
+      });
+      setPropuesta(null);
+    } catch (e) {
+      toast.error(`Se han cambiado ${hechas} de ${propuesta.movimientos.length}. ${mensajeUsuario(e)}`);
+      setPropuesta(null);
+    } finally {
+      setAplicando(false);
+    }
+  };
+
+  if (!propuesta) {
+    return (
+      <div className="flex justify-end px-2 pt-2">
+        <Button variant="ghost" size="sm" className="h-11 text-muted-foreground" onClick={calcular}>
+          <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden="true" />
+          Recalcular mesas
+        </Button>
+      </div>
+    );
+  }
+  const nada = propuesta.movimientos.length === 0;
+  return (
+    <div role="status" className="m-2 space-y-2 rounded-lg border-2 border-sky-400 bg-sky-50 p-3 dark:bg-sky-950/40" data-testid="recalcular-mesas">
+      <p className="text-sm font-medium">{propuesta.resumen}</p>
+      {propuesta.sinSitio.map((s) => (
+        <p key={s.reservaId} className="text-xs text-muted-foreground">
+          {textoSinSitio(s)}
+        </p>
+      ))}
+      <p className="text-xs text-muted-foreground">No se tocan las sentadas ni las que tienen la mesa fijada.</p>
+      {nada ? (
+        <Button variant="outline" className="h-11 w-full" onClick={() => setPropuesta(null)}>
+          Cerrar
+        </Button>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" className="h-12" disabled={aplicando} onClick={() => setPropuesta(null)}>
+            Cancelar
+          </Button>
+          <Button className="h-12" disabled={aplicando} onClick={() => void aplicar()}>
+            Confirmar
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -755,9 +896,11 @@ function textoDesplazadas(desplazadas: readonly Desplazamiento[], nombreMesa: (i
   if (desplazadas.length === 0) return undefined;
   return desplazadas
     .map((d) =>
-      d.mesaIdsQuedan.length === 0
-        ? `${d.nombre} (${horaCorta(d.hora)}) se queda sin mesa prevista.`
-        : `${d.nombre} (${horaCorta(d.hora)}) sigue con ${textoMesas(d.mesaIdsQuedan.map(nombreMesa)).toLowerCase()}.`,
+      d.recolocadaEn
+        ? `${d.nombre} (${horaCorta(d.hora)}) pasa a la mesa ${d.recolocadaEn.mesaNombre}.`
+        : d.mesaIdsQuedan.length === 0
+          ? `${d.nombre} (${horaCorta(d.hora)}) se queda sin mesa${d.recolocadaEn === null ? ": no hay ninguna libre" : " prevista"}.`
+          : `${d.nombre} (${horaCorta(d.hora)}) sigue con ${textoMesas(d.mesaIdsQuedan.map(nombreMesa)).toLowerCase()}.`,
     )
     .join(" ");
 }
@@ -767,11 +910,12 @@ function useSentarReservaEnMesa(fecha: string, mesas: readonly Mesa[]) {
   const { marcarLlegada, moverEspacio } = useAccionesServicioReserva();
   const asignarLocal = useAsignarConCambioLocal(fecha, mesas);
   const desplazar = useDesplazar(asignarLocal);
+  const fijarMesa = useFijarMesa();
   const nombreMesa = (id: string) => mesas.find((m) => m.id === id)?.nombre ?? "?";
   return async (
     reserva: ReservaMovil,
     mesa: MesaOpcion,
-    opciones: { antes?: () => Promise<void>; desplazadas?: readonly Desplazamiento[] } = {},
+    opciones: { antes?: () => Promise<void>; desplazadas?: readonly Desplazamiento[]; quitarFijacion?: boolean } = {},
   ) => {
     let actual = reserva;
     if (mesa.espacioId !== reserva.espacio_id) {
@@ -787,8 +931,12 @@ function useSentarReservaEnMesa(fecha: string, mesas: readonly Mesa[]) {
       await deshacer();
       throw e;
     }
+    // Cambiada de mesa a sabiendas («¿Cambiarla igualmente?»): ya no está fijada.
+    if (opciones.quitarFijacion) await fijarMesa(reserva, false, { silencioso: true });
     toast.success(`${reserva.nombre || "Reserva"} → mesa ${mesa.nombre}`, {
-      description: textoDesplazadas(opciones.desplazadas ?? [], nombreMesa),
+      description: [opciones.quitarFijacion ? "Ya no tiene la mesa fijada." : "", textoDesplazadas(opciones.desplazadas ?? [], nombreMesa) ?? ""]
+        .filter(Boolean)
+        .join(" ") || undefined,
     });
     if (!estaTerminada(reserva.estado)) await marcarLlegada(actual);
   };
@@ -799,7 +947,11 @@ function useSentarReservaEnMesa(fecha: string, mesas: readonly Mesa[]) {
 interface Pendiente {
   texto: string;
   ejecutar: () => Promise<unknown>;
+  /** Texto del botón de confirmar (por defecto «Sentar igualmente»). */
+  boton?: string;
 }
+
+const AVISO_FIJADA = "Esta reserva tiene la mesa fijada. ¿Cambiarla igualmente?";
 
 function ConfirmarDesplazamiento({
   pendiente,
@@ -820,7 +972,7 @@ function ConfirmarDesplazamiento({
           Cancelar
         </Button>
         <Button className="h-12" disabled={ocupado} onClick={onConfirmar}>
-          Sentar igualmente
+          {pendiente.boton ?? "Sentar igualmente"}
         </Button>
       </div>
     </div>
@@ -841,6 +993,9 @@ export function PanelMesaLibre({
   asignaciones = [],
   configOcupacion,
   minutoAhora,
+  salas,
+  ajustesDia = [],
+  mesasExcluidas = [],
   onVerReserva,
   onCerrar,
 }: {
@@ -854,6 +1009,10 @@ export function PanelMesaLibre({
   asignaciones?: AsignacionConDetalles[];
   configOcupacion?: ConfigOcupacionMesa;
   minutoAhora: number;
+  /** Con las salas (y los ajustes del día) se recoloca a quien pierde su mesa prevista; sin ellas, se queda sin mesa. */
+  salas?: Array<{ id: string; nombre: string }>;
+  ajustesDia?: AjusteDia[];
+  mesasExcluidas?: readonly string[];
   onVerReserva?: (reservaId: string) => void;
   onCerrar: () => void;
 }) {
@@ -865,6 +1024,22 @@ export function PanelMesaLibre({
   // Sentar (con o sin reserva) escribe: solo con «Editar» en Reservas.
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const nombreMesa = (id: string) => mesas.find((m) => m.id === id)?.nombre ?? "?";
+  const opciones = useMemo(
+    () => (salas ? opcionesMesasServicio({ salas, mesas, ajustesDia, turno }) : null),
+    [salas, mesas, ajustesDia, turno],
+  );
+  /** A quien pierde su única mesa prevista se le busca la mejor libre de su sala (07/11/2026). */
+  const recolocar = (desplazadas: readonly Desplazamiento[]): Desplazamiento[] =>
+    opciones
+      ? recolocarDesplazadas({
+          desplazadas,
+          opciones,
+          asignaciones,
+          mesasElegidas: [mesa.id],
+          excluidas: new Set(mesasExcluidas),
+          config: configOcupacion,
+        })
+      : [...desplazadas];
 
   // Las que aún no han llegado en este turno y caben: la que tiene esta mesa prevista primero y luego la más cercana a ahora.
   const candidatas = useMemo(() => {
@@ -918,9 +1093,9 @@ export function PanelMesaLibre({
 
   const sinReserva = (personas: number) => {
     if (estadoSinReserva.tipo === "prevista") {
-      const desplazadas = estadoSinReserva.desplazadas;
+      const desplazadas = recolocar(estadoSinReserva.desplazadas);
       setPendiente({ texto: textoDesplazamiento(mesa.nombre, desplazadas, nombreMesa), ejecutar: () => sinReservaYa(personas, desplazadas) });
-    } else void sinReservaYa(personas, []);
+    } else if (estadoSinReserva.tipo === "libre") void sinReservaYa(personas, []);
   };
 
   const sentarUna = (r: ReservaMovil) => {
@@ -929,13 +1104,21 @@ export function PanelMesaLibre({
       toast.error(`La mesa ${mesa.nombre} está ocupada por ${estado.nombre}.`);
       return;
     }
-    const desplazadas = estado.tipo === "prevista" ? estado.desplazadas : [];
-    const hacer = () => ejecutar(() => sentarReserva(r, mesa, { desplazadas }));
-    if (desplazadas.length > 0) setPendiente({ texto: textoDesplazamiento(mesa.nombre, desplazadas, nombreMesa), ejecutar: hacer });
+    if (estado.tipo === "fijada") {
+      toast.error(`La mesa ${mesa.nombre} está fijada para ${estado.nombre} (${horaCorta(estado.hora)}).`);
+      return;
+    }
+    const desplazadas = estado.tipo === "prevista" ? recolocar(estado.desplazadas) : [];
+    // Su mesa fijada es OTRA: se pregunta antes y, al cambiarla, se quita la fijación.
+    const propias = asignaciones.filter((a) => a.reserva_id === r.id).map((a) => a.mesa_id);
+    const quitarFijacion = !!r.mesa_fijada && propias.length > 0 && !propias.includes(mesa.id);
+    const hacer = () => ejecutar(() => sentarReserva(r, mesa, { desplazadas, quitarFijacion }));
+    const textos = [quitarFijacion ? AVISO_FIJADA : "", desplazadas.length > 0 ? textoDesplazamiento(mesa.nombre, desplazadas, nombreMesa) : ""].filter(Boolean);
+    if (textos.length > 0) setPendiente({ texto: textos.join(" "), ejecutar: hacer, boton: quitarFijacion ? "Cambiar igualmente" : undefined });
     else void hacer();
   };
 
-  const ocupadaAhora = estadoSinReserva.tipo === "ocupada";
+  const ocupadaAhora = estadoSinReserva.tipo === "ocupada" || estadoSinReserva.tipo === "fijada";
 
   return (
     <div className="space-y-4 pb-2">
@@ -944,9 +1127,18 @@ export function PanelMesaLibre({
           Mesa {mesa.nombre} · {mesa.salaNombre}
         </SheetTitle>
         <SheetDescription>
-          {prevista ? `Prevista para ${prevista.nombre || "una reserva"} (${horaCorta(prevista.hora)}) · ${mesa.plazas} plazas` : `Libre · ${mesa.plazas} plazas`}
+          {prevista
+            ? `${prevista.fijada ? "Fijada" : "Prevista"} para ${prevista.nombre || "una reserva"} (${horaCorta(prevista.hora)}) · ${mesa.plazas} plazas`
+            : `Libre · ${mesa.plazas} plazas`}
         </SheetDescription>
       </SheetHeader>
+
+      {estadoSinReserva.tipo === "fijada" && (
+        <p className="flex items-center gap-2 rounded-md bg-muted p-2 text-sm">
+          <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Mesa fijada para {estadoSinReserva.nombre} ({horaCorta(estadoSinReserva.hora)}): no se puede sentar a otro aquí.
+        </p>
+      )}
 
       {prevista && onVerReserva && (
         <Button variant="outline" className="h-11 w-full" onClick={() => onVerReserva(prevista.reservaId)}>
@@ -1030,24 +1222,34 @@ export function SelectorMesaMovil({
   sentada,
   ocupado,
   onElegir,
+  fijadaPropia = false,
 }: {
   selector: SelectorMesas;
   /** La reserva ya está sentada: su mesa actual no se vuelve a ofrecer. */
   sentada: boolean;
   ocupado: boolean;
   onElegir: (m: MesaParaConfirmar) => void;
+  /** La propia reserva tiene la mesa fijada: candado en «Su mesa». */
+  fijadaPropia?: boolean;
 }) {
   const casilla = (m: MesaParaConfirmar) => {
-    const deshabilitada = ocupado || m.estado.tipo === "ocupada" || (m.propia && sentada);
-    const detalle = m.propia && (sentada || m.estado.tipo !== "ocupada")
+    // Fijada para OTRA reserva (07/11/2026): se ve, con candado, pero no se puede elegir.
+    const fijadaOtra = !m.propia && m.estado.tipo === "fijada";
+    const deshabilitada = ocupado || m.estado.tipo === "ocupada" || fijadaOtra || (m.propia && sentada);
+    const detalle = m.propia && (sentada || (m.estado.tipo !== "ocupada" && m.estado.tipo !== "fijada"))
       ? sentada
         ? "Aquí está"
-        : "Su mesa prevista"
+        : fijadaPropia
+          ? "Su mesa (fijada)"
+          : "Su mesa prevista"
       : m.estado.tipo === "ocupada"
         ? `Ocupada · ${m.estado.nombre}`
-        : m.estado.tipo === "prevista"
-          ? `Prevista: ${m.estado.desplazadas.map((d) => `${d.nombre} ${horaCorta(d.hora)}`).join(", ")}`
-          : "Libre";
+        : m.estado.tipo === "fijada"
+          ? `Fijada · ${m.estado.nombre} ${horaCorta(m.estado.hora)}`
+          : m.estado.tipo === "prevista"
+            ? `Prevista: ${m.estado.desplazadas.map((d) => `${d.nombre} ${horaCorta(d.hora)}`).join(", ")}`
+            : "Libre";
+    const candado = fijadaOtra || (m.propia && fijadaPropia);
     return (
       <li key={m.id}>
         <button
@@ -1060,11 +1262,14 @@ export function SelectorMesaMovil({
             m.propia && "border-primary bg-primary/10",
             !m.propia && m.estado.tipo === "libre" && "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40",
             !m.propia && m.estado.tipo === "prevista" && "border-amber-500 bg-amber-50 dark:bg-amber-950/40",
-            !m.propia && m.estado.tipo === "ocupada" && "border-muted bg-muted/60 text-muted-foreground opacity-70",
+            !m.propia && (m.estado.tipo === "ocupada" || m.estado.tipo === "fijada") && "border-muted bg-muted/60 text-muted-foreground opacity-70",
           )}
         >
           <span className="flex w-full items-baseline justify-between gap-1">
-            <span className="text-lg font-bold leading-none">{m.nombre}</span>
+            <span className="flex items-center gap-1 text-lg font-bold leading-none">
+              {m.nombre}
+              {candado && <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
+            </span>
             <span className="flex items-center gap-0.5 text-xs text-muted-foreground tabular-nums">
               <Users className="h-3 w-3" aria-hidden />
               {m.plazas}
@@ -1159,18 +1364,28 @@ export function PanelReservaMovil({
     [salas, mesas, ajustesDia, asignaciones, excluidas, configOcupacion, reserva],
   );
 
+  const opciones = useMemo(() => opcionesMesasServicio({ salas, mesas, ajustesDia, turno }), [salas, mesas, ajustesDia, turno]);
+  const propiasIds = useMemo(
+    () => asignaciones.filter((a) => a.reserva_id === reserva.id).map((a) => a.mesa_id),
+    [asignaciones, reserva.id],
+  );
+  const fijada = !!reserva.mesa_fijada && propiasIds.length > 0;
+  /** A quien pierde su única mesa prevista se le busca la mejor libre de su sala (07/11/2026). */
+  const recolocar = (desplazadas: readonly Desplazamiento[], mesasElegidas: readonly string[]) =>
+    recolocarDesplazadas({ desplazadas, opciones, asignaciones, mesasElegidas, excluidas, config: configOcupacion });
+
   // El selector: todas las mesas donde cabe, de todas las salas, con su estado para la franja de la reserva.
   const selector = useMemo(
     () =>
       clasificarMesasParaSentar({
-        opciones: opcionesMesasServicio({ salas, mesas, ajustesDia, turno }),
+        opciones,
         asignaciones,
         reserva: { id: reserva.id, hora: reserva.hora, comensales: reserva.numero_comensales, espacioId: reserva.espacio_id },
         propias: asignaciones.filter((a) => a.reserva_id === reserva.id).map((a) => a.mesa_id),
         excluidas,
         config: configOcupacion,
       }),
-    [salas, mesas, ajustesDia, turno, asignaciones, reserva, excluidas, configOcupacion],
+    [opciones, asignaciones, reserva, excluidas, configOcupacion],
   );
   const hayMesas = selector.propias.length + selector.salas.length > 0;
 
@@ -1187,11 +1402,12 @@ export function PanelReservaMovil({
     }
   };
 
-  /** Mover de sala si hace falta, asignar la mesa y sentar. */
+  /** Mover de sala si hace falta, asignar la mesa y sentar. Si tenía la mesa fijada, se le quita la fijación. */
   const sentarEn = (mesa: MesaOpcion, cambios?: AjusteMesa[], desplazadas?: readonly Desplazamiento[]) =>
     ejecutar(() =>
       sentarReserva(reserva, mesa, {
         desplazadas,
+        quitarFijacion: fijada && !propiasIds.includes(mesa.id),
         antes: cambios?.length
           ? async () => {
               await guardarAjustes.mutateAsync(cambios);
@@ -1211,11 +1427,13 @@ export function PanelReservaMovil({
       }
     });
 
-  const confirmarPrevista = (desplazadas: readonly Desplazamiento[]) =>
+  const confirmarPrevista = (desplazadasAntes: readonly Desplazamiento[]) => {
+    const desplazadas = recolocar(desplazadasAntes, propiasIds);
     setPendiente({
       texto: textoDesplazamiento(textoMesas(nombresMesa).replace(/^Mesas? /, ""), desplazadas, nombreMesa),
       ejecutar: () => sentarEnPrevista(desplazadas),
     });
+  };
 
   // Desde el botón «Sentar · Mesa 7» de la fila con la prevista pisada por otra reserva: la confirmación directamente.
   useEffect(() => {
@@ -1228,15 +1446,21 @@ export function PanelReservaMovil({
 
   const elegir = (m: MesaParaConfirmar) => {
     if (m.propia) {
-      if (terminada || m.estado.tipo === "ocupada") return;
+      if (terminada || m.estado.tipo === "ocupada" || m.estado.tipo === "fijada") return;
       if (m.estado.tipo === "prevista") confirmarPrevista(m.estado.desplazadas);
       else void ejecutar(() => marcarLlegada(reserva));
       return;
     }
-    if (m.estado.tipo === "ocupada") return;
-    if (m.estado.tipo === "prevista") {
-      const desplazadas = m.estado.desplazadas;
-      setPendiente({ texto: textoDesplazamiento(m.nombre, desplazadas, nombreMesa), ejecutar: () => sentarEn(m, undefined, desplazadas) });
+    if (m.estado.tipo === "ocupada" || m.estado.tipo === "fijada") return;
+    const desplazadas = m.estado.tipo === "prevista" ? recolocar(m.estado.desplazadas, [m.id]) : [];
+    // Con su mesa fijada, cambiarla se pregunta antes (y al hacerlo se quita la fijación).
+    const textos = [fijada ? AVISO_FIJADA : "", desplazadas.length > 0 ? textoDesplazamiento(m.nombre, desplazadas, nombreMesa) : ""].filter(Boolean);
+    if (textos.length > 0) {
+      setPendiente({
+        texto: textos.join(" "),
+        ejecutar: () => sentarEn(m, undefined, desplazadas),
+        boton: fijada ? "Cambiar igualmente" : undefined,
+      });
       return;
     }
     void sentarEn(m);
@@ -1255,7 +1479,15 @@ export function PanelReservaMovil({
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-1"><Clock className="h-4 w-4" aria-hidden />{horaCorta(reserva.hora)}</span>
             <span className="flex items-center gap-1"><Users className="h-4 w-4" aria-hidden />{reserva.numero_comensales} pax</span>
-            <span className="flex items-center gap-1"><MapPin className="h-4 w-4" aria-hidden />{salaNombre(reserva.espacio_id)} · {textoMesaConfirmada(nombresMesa, sentada)}</span>
+            <span className="flex items-center gap-1">
+              <MapPin className="h-4 w-4" aria-hidden />
+              {salaNombre(reserva.espacio_id)} · {textoMesaConfirmada(nombresMesa, sentada)}
+              {fijada && (
+                <span className="inline-flex items-center gap-0.5 font-medium text-foreground">
+                  <Lock className="h-3.5 w-3.5" aria-hidden /> fijada
+                </span>
+              )}
+            </span>
           </div>
         </SheetDescription>
       </SheetHeader>
@@ -1355,7 +1587,7 @@ export function PanelReservaMovil({
                   No hay ninguna mesa donde quepan {reserva.numero_comensales}. Júntalas desde el plano.
                 </p>
               ) : (
-                <SelectorMesaMovil selector={selector} sentada={sentada} ocupado={ocupado} onElegir={elegir} />
+                <SelectorMesaMovil selector={selector} sentada={sentada} ocupado={ocupado} onElegir={elegir} fijadaPropia={fijada} />
               )}
             </div>
           )}
