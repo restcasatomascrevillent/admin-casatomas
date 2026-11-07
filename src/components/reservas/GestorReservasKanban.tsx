@@ -46,6 +46,7 @@ import {
   type Columna,
 } from "@/lib/reservas/columnasServicio";
 import { useCanAccessSection } from "@/hooks/useUserRole";
+import { useFijarMesa } from "@/hooks/useMesaFijada";
 import { useIsCoarsePointer } from "@/hooks/use-mobile";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import {
@@ -490,6 +491,8 @@ export function GestorReservasKanban({
   // desactiva; `accionesDisponibles` y `ReservaCard`). Las tarjetas no se arrastran.
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
+  // «Fijar mesa» del menú «⋮» (07/11/2026): Organizar y Recalcular no la mueven.
+  const fijarMesa = useFijarMesa();
   const dedo = useIsCoarsePointer();
   const [activeReserva, setActiveReserva] = useState<ReservaServicio | null>(null);
   // Columnas plegadas a carril, SIEMPRE por decisión del usuario: ya no hay
@@ -775,6 +778,7 @@ export function GestorReservasKanban({
                         mesas={mesasPorReserva.get(reserva.id)}
                         puedeEditar={puedeEditar}
                         anchoColumna={disposicion.anchoColumna}
+                        onFijarMesa={(r, fijar) => void fijarMesa(r, fijar)}
                       />
                     ))}
                   </KanbanColumn>

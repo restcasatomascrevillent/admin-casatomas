@@ -77,6 +77,8 @@ export interface ReservaOrg {
   espacioId: string | null;
   /** Mesas que tiene asignadas ahora en este servicio. */
   mesaIds: string[];
+  /** «Fijar mesa» (07/11/2026): con mesa, no se mueve nunca (ni sus mesas prestan piezas). */
+  fijada?: boolean;
   /** «Liberar mesa»: ya se fue; su mesa no cuenta como ocupada. */
   salidaAt?: string | null;
 }
@@ -510,6 +512,8 @@ export function organizarServicio(entrada: EntradaOrg): ResultadoOrg {
   );
   const inamovible = (r: ReservaOrg) => {
     if (ESTADOS_FIJOS.has(r.estado)) return true;
+    // Mesa fijada (07/11/2026): ni «Organizar» ni «Terraza cerrada» la mueven.
+    if (r.fijada && r.mesaIds.length > 0) return true;
     if (!empezado || r.mesaIds.length === 0) return false;
     const m = minutosDeHora(r.hora);
     return m != null && m <= (entrada.minutoAhora as number) + MINUTOS_INMINENTE;

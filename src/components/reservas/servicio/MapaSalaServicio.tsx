@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { Maximize2, MessageSquareText, Move, Star, ZoomIn, ZoomOut } from "lucide-react";
+import { Lock, Maximize2, MessageSquareText, Move, Star, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Mesa } from "@/hooks/useMesas";
@@ -354,6 +354,7 @@ function MesaServicio({
   const conCartel = !!reserva && cartel && (lado >= UMBRAL_CARTEL_PX || seleccionada || resaltada);
   const detalle = resultado ? textoMinutosMesa(estado, resultado.minutos) : null;
   const importante = !!reserva?.importante;
+  const fijada = !!reserva?.mesa_fijada;
   const nota = (reserva?.notas_cliente ?? "").trim();
   const etiquetaAccesible =
     `Mesa ${mesa.nombre}, ${mesa.capacidad} plazas, ${etiqueta}` +
@@ -362,6 +363,7 @@ function MesaServicio({
       : "") +
     (detalle ? `, ${detalle}` : "") +
     (importante ? ", importante" : "") +
+    (fijada ? ", mesa fijada" : "") +
     (nota ? `, nota del cliente: ${nota}` : "");
   // Se puede SOLTAR una reserva encima (Plano de Hoy, 10/10/2026). Sin `DndContext` alrededor no hace nada.
   const { setNodeRef, isOver } = useDroppable({ id: `mesa-${mesa.id}`, data: { mesaId: mesa.id } });
@@ -419,8 +421,9 @@ function MesaServicio({
         >
           <Icono className="h-3 w-3" />
         </span>
-        {(importante || nota) && (
+        {(importante || nota || fijada) && (
           <span className="absolute -left-1.5 -top-1.5 flex items-center gap-px rounded-full bg-background px-0.5 shadow ring-1 ring-border">
+            {fijada && <Lock data-marca="fijada" className="h-3 w-3 text-foreground" />}
             {importante && <Star data-marca="importante" className="h-3 w-3 fill-amber-400 text-amber-600" />}
             {nota && <MessageSquareText data-marca="nota" className="h-3 w-3 text-foreground" />}
           </span>

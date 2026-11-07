@@ -244,6 +244,8 @@ export interface ReservaServicio {
   llegada_at?: string | null;
   /** Lo que escribió el cliente (alergias, trona, celebración…): Hoy lo enseña en la tarjeta y en la mesa. */
   notas_cliente?: string | null;
+  /** «Fijar mesa» (20261107120000): los recálculos no la mueven ni se le quita al sentar a otro. */
+  mesa_fijada?: boolean | null;
 }
 
 export const haLlegado = (estado: string) => estado === ESTADO_LLEGADA;

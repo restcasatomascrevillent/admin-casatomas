@@ -30,6 +30,12 @@ vi.mock("@/hooks/useAccionesServicioReserva", () => ({
     },
   }),
 }));
+vi.mock("@/hooks/useMesaFijada", () => ({
+  useFijarMesa: () => async (r: { id: string }, fijar: boolean) => {
+    h.llamadas.push(`fijar:${r.id}:${fijar}`);
+    return true;
+  },
+}));
 vi.mock("@/hooks/useAccionesModoServicio", () => ({ useAccionesModoServicio: () => ({ liberarMesa: async () => true }) }));
 vi.mock("@/hooks/useAsignacionesMesa", () => ({
   useAsignacionesMesa: () => ({ data: [] }),
@@ -137,15 +143,15 @@ describe("Selector de mesa al sentar (móvil)", () => {
     await waitFor(() => expect(h.llamadas).toEqual(["asignar:r1:[m3]", "llegada:r1"]));
   });
 
-  it("prevista para otra: avisa en la ficha y, con «Sentar igualmente», primero se la quita a García", async () => {
+  it("prevista para otra: avisa en la ficha y, con «Sentar igualmente», primero pasa a García a otra mesa libre", async () => {
     fichaAna();
     fireEvent.click(screen.getByRole("button", { name: /Mesa 7, / }));
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "La mesa 7 estaba prevista para García (21:30). García se quedará sin mesa prevista.",
+      "La mesa 7 estaba prevista para García (21:30). García pasa a la mesa 3.",
     );
     expect(h.llamadas).toEqual([]);
     fireEvent.click(screen.getByRole("button", { name: "Sentar igualmente" }));
-    await waitFor(() => expect(h.llamadas).toEqual(["asignar:g:[]", "asignar:r1:[m7]", "llegada:r1"]));
+    await waitFor(() => expect(h.llamadas).toEqual(["asignar:g:[m3]", "asignar:r1:[m7]", "llegada:r1"]));
   });
 
   it("«Cancelar» no escribe nada y vuelve al selector", () => {
@@ -196,14 +202,14 @@ describe("«Sentar · Mesa 3» de la fila comprueba la prevista (ficha con `inic
     expect(selector.getByRole("button", { name: /Mesa 3, .*Ocupada · Pérez/ })).toBeDisabled();
   });
 
-  it("pisada por otra reserva por llegar: confirmación en la ficha; al aceptar se la quita y sienta en la suya", async () => {
+  it("pisada por otra reserva por llegar: confirmación en la ficha; al aceptar la pasa a otra libre y sienta en la suya", async () => {
     fichaConPrevista(
       [asig("m3", "r1", "Ana López", "21:00:00", "confirmada"), asig("m3", "g", "García", "21:30:00", "confirmada")] as never[],
       "confirmar",
     );
-    expect(await screen.findByRole("alert")).toHaveTextContent("La mesa 3 estaba prevista para García (21:30).");
+    expect(await screen.findByRole("alert")).toHaveTextContent("La mesa 3 estaba prevista para García (21:30). García pasa a la mesa 7.");
     fireEvent.click(screen.getByRole("button", { name: "Sentar igualmente" }));
-    await waitFor(() => expect(h.llamadas).toEqual(["asignar:g:[]", "llegada:r1"]));
+    await waitFor(() => expect(h.llamadas).toEqual(["asignar:g:[m7]", "llegada:r1"]));
   });
 });
 
@@ -229,6 +235,107 @@ describe("Sin reserva en una mesa prevista para otro (móvil)", () => {
       expect(screen.getByText("Prevista para García (21:30) · 4 plazas")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "2" }));
       expect(screen.getByRole("alert")).toHaveTextContent("García se quedará sin mesa prevista.");
+      fireEvent.click(screen.getByRole("button", { name: "Sentar igualmente" }));
+      await waitFor(() => expect(h.llamadas).toEqual(["asignar:g:[]", "sinReserva:2:m7"]));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("Mesa fijada y recolocar al sentar (07/11/2026)", () => {
+  const conFijada = () => ({
+    ...asig("m7", "g", "García", "21:30:00", "confirmada"),
+    reservas: { id: "g", nombre: "García", hora: "21:30:00", numero_comensales: 2, estado: "confirmada", salida_at: null, mesa_fijada: true },
+  });
+
+  it("una mesa fijada para otra sale con «Fijada · García 21:30» y no se puede pulsar", () => {
+    enHoja(
+      <PanelReservaMovil
+        reserva={ana}
+        fecha="2026-11-07"
+        salas={SALAS}
+        mesas={MESAS}
+        asignaciones={[conFijada(), asig("m9", "p", "Pérez", "20:30:00", "completada")] as never[]}
+        ajustesDia={[]}
+        mesasExcluidas={[]}
+        configOcupacion={configServicioSalaDesde(undefined)}
+        nombresMesa={[]}
+        onCerrar={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /Mesa 7, .*Fijada · García 21:30/ })).toBeDisabled();
+  });
+
+  it("si la propia reserva tiene la mesa fijada, cambiarla pide confirmación y quita la fijación", async () => {
+    const anaFijada = { ...(ana as object), mesa_fijada: true } as never;
+    enHoja(
+      <PanelReservaMovil
+        reserva={anaFijada}
+        fecha="2026-11-07"
+        salas={SALAS}
+        mesas={MESAS}
+        asignaciones={[asig("m3", "r1", "Ana López", "21:00:00", "confirmada")] as never[]}
+        ajustesDia={[]}
+        mesasExcluidas={[]}
+        configOcupacion={configServicioSalaDesde(undefined)}
+        nombresMesa={["3"]}
+        inicio="elegir"
+        onCerrar={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Mesa 7, / }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Esta reserva tiene la mesa fijada. ¿Cambiarla igualmente?");
+    expect(h.llamadas).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar igualmente" }));
+    await waitFor(() => expect(h.llamadas).toEqual(["asignar:r1:[m7]", "fijar:r1:false", "llegada:r1"]));
+  });
+
+  it("sin reserva en una mesa fijada para otro: no deja sentar", () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 10, 7, 21, 5));
+    try {
+      enHoja(
+        <PanelMesaLibre
+          mesa={{ id: "m7", nombre: "7", espacioId: "s1", salaNombre: "Comedor", plazas: 4 }}
+          prevista={{ reservaId: "g", nombre: "García", hora: "21:30:00", fijada: true }}
+          fecha="2026-11-07"
+          turno="cena"
+          reservas={[]}
+          mesas={MESAS}
+          asignaciones={[conFijada()] as never[]}
+          minutoAhora={21 * 60 + 5}
+          onCerrar={vi.fn()}
+        />,
+      );
+      expect(screen.getByText(/Mesa fijada para García \(21:30\)/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "2" })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sin reserva con las salas: a García se le busca otra mesa y, si no hay, se dice", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 10, 7, 21, 5));
+    try {
+      enHoja(
+        <PanelMesaLibre
+          mesa={{ id: "m7", nombre: "7", espacioId: "s1", salaNombre: "Comedor", plazas: 4 }}
+          prevista={{ reservaId: "g", nombre: "García", hora: "21:30:00" }}
+          fecha="2026-11-07"
+          turno="cena"
+          reservas={[]}
+          mesas={MESAS}
+          asignaciones={ASIGNACIONES}
+          salas={SALAS}
+          mesasExcluidas={["m3"]}
+          minutoAhora={21 * 60 + 5}
+          onCerrar={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "2" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("García se queda sin mesa: no hay ninguna libre.");
       fireEvent.click(screen.getByRole("button", { name: "Sentar igualmente" }));
       await waitFor(() => expect(h.llamadas).toEqual(["asignar:g:[]", "sinReserva:2:m7"]));
     } finally {

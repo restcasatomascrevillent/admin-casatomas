@@ -33,6 +33,8 @@ export interface AsignacionConfirmar {
     estado?: string | null;
     salida_at?: string | null;
     numero_comensales?: number | null;
+    /** «Fijar mesa» (07/11/2026): nadie se la quita al sentar a otro. */
+    mesa_fijada?: boolean | null;
   } | null;
 }
 
@@ -45,11 +47,18 @@ export interface Desplazamiento {
   mesaIdsAntes: string[];
   /** Las mesas con las que se queda (vacío = se queda sin mesa prevista). */
   mesaIdsQuedan: string[];
+  /**
+   * Solo tras `recolocarDesplazadas` (recalcularMesas.ts): la mesa libre a la que pasa (y que ya va en
+   * `mesaIdsQuedan`), o `null` si no hay ninguna libre y se queda sin mesa.
+   */
+  recolocadaEn?: { mesaId: string; mesaNombre: string } | null;
 }
 
 export type EstadoConfirmar =
   | { tipo: "libre" }
   | { tipo: "ocupada"; nombre: string; hora: string }
+  /** Prevista para otra reserva que tiene la mesa FIJADA: no se puede elegir. */
+  | { tipo: "fijada"; reservaId: string; nombre: string; hora: string }
   | { tipo: "prevista"; desplazadas: Desplazamiento[] };
 
 export interface MesaParaConfirmar extends MesaOpcion {
@@ -108,6 +117,16 @@ export function estadoParaConfirmar(
   if (sentadaAhi) {
     return { tipo: "ocupada", nombre: sentadaAhi.reservas?.nombre?.trim() || "otra mesa", hora: sentadaAhi.reservas?.hora ?? "" };
   }
+  // Prevista para alguien que tiene la mesa FIJADA (07/11/2026): no se le quita.
+  const fijadaAhi = pisan.find((a) => !!a.reservas?.mesa_fijada);
+  if (fijadaAhi) {
+    return {
+      tipo: "fijada",
+      reservaId: fijadaAhi.reserva_id,
+      nombre: fijadaAhi.reservas?.nombre?.trim() || "otra reserva",
+      hora: fijadaAhi.reservas?.hora ?? "",
+    };
+  }
 
   const vistas = new Set<string>();
   const desplazadas: Desplazamiento[] = [];
@@ -148,13 +167,13 @@ export function decidirSentarPrevista(
   const desplazadas: Desplazamiento[] = [];
   for (const mesaId of propias) {
     const e = estadoParaConfirmar(asignaciones, mesaId, reserva, config);
-    if (e.tipo === "ocupada") return { tipo: "elegir" };
+    if (e.tipo === "ocupada" || e.tipo === "fijada") return { tipo: "elegir" };
     if (e.tipo === "prevista") for (const d of e.desplazadas) if (!desplazadas.some((x) => x.reservaId === d.reservaId)) desplazadas.push(d);
   }
   return desplazadas.length > 0 ? { tipo: "confirmar", desplazadas } : { tipo: "sentar" };
 }
 
-const RANGO: Record<EstadoConfirmar["tipo"], number> = { libre: 0, prevista: 1, ocupada: 2 };
+const RANGO: Record<EstadoConfirmar["tipo"], number> = { libre: 0, prevista: 1, fijada: 2, ocupada: 3 };
 
 function numeroMesa(nombre: string): number {
   const v = parseInt(nombre, 10);
@@ -227,9 +246,13 @@ export function textoDesplazamiento(
   const quienes = desplazadas.map((d) => `${d.nombre} (${horaCorta(d.hora)})`).join(" y ");
   const restos = desplazadas
     .map((d) =>
-      d.mesaIdsQuedan.length === 0
-        ? `${d.nombre} se quedará sin mesa prevista.`
-        : `${d.nombre} sigue con la ${d.mesaIdsQuedan.length === 1 ? "mesa" : "mesas"} ${d.mesaIdsQuedan.map(nombreMesa).join(" + ")}.`,
+      d.recolocadaEn
+        ? `${d.nombre} pasa a la mesa ${d.recolocadaEn.mesaNombre}.`
+        : d.recolocadaEn === null
+          ? `${d.nombre} se queda sin mesa: no hay ninguna libre.`
+          : d.mesaIdsQuedan.length === 0
+            ? `${d.nombre} se quedará sin mesa prevista.`
+            : `${d.nombre} sigue con la ${d.mesaIdsQuedan.length === 1 ? "mesa" : "mesas"} ${d.mesaIdsQuedan.map(nombreMesa).join(" + ")}.`,
     )
     .join(" ");
   return `La mesa ${mesaNombre} estaba prevista para ${quienes}. ${restos}`;
