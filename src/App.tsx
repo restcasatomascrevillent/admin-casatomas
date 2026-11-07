@@ -45,7 +45,26 @@ const SuperAdminBotWeb = lazy(() => import("./pages/SuperAdminBotWeb"));
 const SuperAdminAuditoria = lazy(() => import("./pages/SuperAdminAuditoria"));
 const SuperAdminServicios = lazy(() => import("./pages/SuperAdminServicios"));
 
-const queryClient = new QueryClient();
+/**
+ * Valores por defecto pensados para la red mala del local (07/11/2026, «Hoy» desde el móvil):
+ *   · `staleTime` 30 s: volver a una pantalla (o cambiar Kanban ↔ Plano) no repite lo que se acaba de pedir.
+ *   · `retry` 2 con espera creciente y acotada (1 s, 2 s… máx. 8 s), en vez de 3.
+ *   · `refetchOnWindowFocus`: sí, pero solo lo que ya está viejo (respeta `staleTime`).
+ *   · `networkMode: "offlineFirst"`: sin red se pinta lo que hay en caché (o la copia del día,
+ *     `lib/cacheOffline.ts`) y la petición espera a que vuelva la red en vez de quedarse colgada.
+ * Las pruebas crean su propio `QueryClient`: esto no las afecta.
+ */
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 2,
+      retryDelay: (intento) => Math.min(1_000 * 2 ** intento, 8_000),
+      refetchOnWindowFocus: true,
+      networkMode: "offlineFirst",
+    },
+  },
+});
 
 /**
  * Páginas bajo demanda (01-11-2026): antes App importaba las ~25 páginas y

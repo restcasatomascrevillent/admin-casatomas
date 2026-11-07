@@ -16,6 +16,7 @@ import { z } from "zod";
 import type { QueryClient } from "@tanstack/react-query";
 import { emitirRevalidacionSesion } from "@/lib/revalidacion-sesion";
 import { borrarCopiasLista } from "@/lib/facturas/copiaListaCompras";
+import { activarCopiaHoy, borrarCopiaHoy } from "@/lib/cacheOffline";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
 import {
   limpiarAvisoSesionCaducada,
@@ -159,8 +160,9 @@ export function AuthProvider({
   const idPintado = useRef<string | null>(null);
   /** Cancela y VACÍA la caché: invalidar no basta, serviría datos viejos en el primer render. */
   const vaciarCache = useCallback(() => {
-    // También la copia de la lista de Compras guardada en el dispositivo.
+    // También la copia de la lista de Compras guardada en el dispositivo, y la de «Hoy» (cacheOffline.ts).
     borrarCopiasLista();
+    borrarCopiaHoy();
     const qc = clienteConsultas.current;
     if (!qc) return;
     void qc.cancelQueries();
@@ -189,6 +191,16 @@ export function AuthProvider({
   // Mientras se averigua si una sesión muerta es caducidad o bloqueo, el
   // SIGNED_OUT que emite Auth al fallar la renovación no decide el aviso.
   const decidiendoCierre = useRef(false);
+
+  // «Hoy» sin cobertura (07/11/2026): con la sesión ya CONFIRMADA (no antes, para que otra cuenta no
+  // vea la copia de la anterior) se carga la copia del día de este usuario y se mantiene al día. Al
+  // salir o cambiar de usuario, `vaciarCache` la borra y esto deja de escribirla.
+  const idUsuario = user?.id ?? null;
+  useEffect(() => {
+    const qc = clienteConsultas.current;
+    if (!qc || !idUsuario) return;
+    return activarCopiaHoy(qc, idUsuario);
+  }, [idUsuario]);
 
   useEffect(() => {
     let isMounted = true;

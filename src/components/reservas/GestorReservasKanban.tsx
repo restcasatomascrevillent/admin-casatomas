@@ -18,7 +18,7 @@ import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { coincideFiltroHoy, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
+import { COLUMNAS_RESERVAS_HOY, coincideFiltroHoy, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
 import { admiteReservas } from "@/lib/reservas/negocios";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
@@ -543,9 +543,8 @@ export function GestorReservasKanban({
   // 2026-10-01): las de otro negocio que queden en la base de datos se
   // descartan aquí (`admiteReservas`), así que ni se pintan ni se cuentan.
   //
-  // `select("*")`: trae `llegada_at` si la migración 20260923_reservas_llegada
-  // está aplicada, sin romper si no lo está (nombrarla en la lista fallaría),
-  // y `marca`. `as any`: `marca` no está en los tipos generados.
+  // Columnas explícitas (`COLUMNAS_RESERVAS_HOY`, 07/11/2026; antes `select("*")`): las
+  // mismas que pide `VistaHoy`. `as any`: `marca` no está en los tipos generados.
   //
   // La clave empieza por "reservas-kanban": useAccionesServicioReserva hace el
   // update optimista por prefijo. Lo que cambie otro dispositivo llega por
@@ -563,7 +562,7 @@ export function GestorReservasKanban({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservas" as any)
-        .select("*")
+        .select(COLUMNAS_RESERVAS_HOY)
         .eq("fecha", hoy)
         .neq("estado", "cancelada")
         .order("hora", { ascending: true });
@@ -681,7 +680,8 @@ export function GestorReservasKanban({
     );
   }
 
-  if (isError) {
+  // Sin red pero con las reservas ya cargadas (o guardadas en el dispositivo), se siguen enseñando.
+  if (isError && !reservas) {
     return <EstadoErrorCarga titulo="las reservas de hoy" error={error} onReintentar={() => refetch()} />;
   }
 
