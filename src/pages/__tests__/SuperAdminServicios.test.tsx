@@ -199,10 +199,10 @@ beforeEach(() => {
 });
 
 describe("Super Admin › Servicios · pestañas y URL", () => {
-  it("cuatro pestañas; sin `?tab=` abre Estado y cada pestaña queda en la URL", async () => {
+  it("cinco pestañas; sin `?tab=` abre Estado y cada pestaña queda en la URL", async () => {
     pintar();
     expect(screen.getByRole("heading", { level: 1, name: "Servicios" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((x) => x.textContent?.replace(/\d+$/, ""))).toEqual(["Estado", "Servicios", "Costes", "Configurar"]);
+    expect(screen.getAllByRole("tab").map((x) => x.textContent?.replace(/\d+$/, ""))).toEqual(["Estado", "Servicios", "Costes", "Modelos", "Configurar"]);
     expect(pestana("Estado")).toHaveAttribute("aria-selected", "true");
     await screen.findByRole("list", { name: "Estado de cada servicio" });
 

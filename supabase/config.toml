@@ -112,6 +112,12 @@ verify_jwt = false
 [functions.clasificar-productos]
 verify_jwt = false
 
+# Centro de modelos de IA (20261107500000): la llama pg_cron a diario (pg_net,
+# sin JWT, con x-ocr-secret) o un SUPER ADMIN con su JWT (lo comprueba ella con
+# exigirSuperAdmin). Ver supabase/functions/ia-modelos-openai/index.ts.
+[functions.ia-modelos-openai]
+verify_jwt = false
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — autenticación propia REAL + filtro barato encima

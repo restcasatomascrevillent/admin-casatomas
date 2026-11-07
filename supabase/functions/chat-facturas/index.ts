@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
+import { configModeloFuncion, esErrorDeModelo } from "../_shared/modelo-funcion.ts";
 import {
   type Adjunto,
   type DocRef,
@@ -74,7 +75,9 @@ const OPENAI_KEY = claveOpenAI("chat");
 const OPENAI = "https://api.openai.com/v1";
 // Modelo configurable con el secreto CHAT_FACTURAS_MODELO (07/11/2026; por
 // defecto gpt-4.1-mini). Los de razonamiento (gpt-5*) llevan otros parametros:
-// parametrosModelo en herramientas.ts.
+// parametrosModelo en herramientas.ts. Desde el 07/11/2026 manda la tabla
+// ia_modelo_funcion (Super Admin › Servicios › Modelos, _shared/modelo-funcion.ts):
+// si su fila no tiene modelo, se usa este (secreto o por defecto), como antes.
 const MODELO = modeloChat(Deno.env.get("CHAT_FACTURAS_MODELO"));
 const MAX_HISTORIAL = 10;   // mismo valor que el contextWindowLength de n8n
 const MAX_PASOS = 6;
@@ -361,7 +364,12 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
     // ── Contabilidad de consumo (migracion 20260928193000) ──
     // Se declaran ANTES del try para que el `finally` los vea. Una peticion que
     // acaba en error tambien ha gastado tokens: OpenAI ya los facturo.
-    const usoChat = new AcumuladorUso("chat-facturas", MODELO, "chat");
+    const elegido = await configModeloFuncion("chat-facturas", MODELO, { cliente: supabase });
+    let modelo = elegido.modelo;
+    const usoChat = new AcumuladorUso("chat-facturas", modelo, "chat");
+    // Si el modelo elegido falla por ser el modelo (retirado, sin acceso), se
+    // reintenta UNA vez con el de respaldo; su gasto va en otro acumulador.
+    const usosChat: AcumuladorUso[] = [usoChat];
     const usoEmbed = new AcumuladorUso("chat-facturas", "text-embedding-3-small", "embedding");
     const inicioMs = Date.now();
 
@@ -459,14 +467,26 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
           body: JSON.stringify({
-            model: MODELO,
+            model: modelo,
             messages,
-            ...parametrosModelo(MODELO, MAX_TOKENS_RESPUESTA),
+            ...parametrosModelo(modelo, MAX_TOKENS_RESPUESTA),
             ...(esUltimo ? {} : { tools: TOOLS }),
           }),
         }, msRestantes(ctx));
 
-        if (!res.ok) throw new Error(`OpenAI chat ${res.status}: ${await res.text()}`);
+        if (!res.ok) {
+          const cuerpo = await res.text();
+          if (paso === 0 && elegido.respaldo && elegido.respaldo !== modelo && esErrorDeModelo(res.status, cuerpo)) {
+            console.warn(`[chat-facturas] ${modelo} rechazado (${res.status}); se usa el respaldo ${elegido.respaldo}`);
+            ctx.usoChat.sumar(undefined);
+            modelo = elegido.respaldo;
+            ctx.usoChat = new AcumuladorUso("chat-facturas", modelo, "chat");
+            usosChat.push(ctx.usoChat);
+            paso--;
+            continue;
+          }
+          throw new Error(`OpenAI chat ${res.status}: ${cuerpo}`);
+        }
         // Antes esto era `const msg = (await res.json()).choices[0].message;`. Se
         // parte en dos para poder leer `usage`, que en la version de una linea se
         // tiraba con el objeto temporal. El comportamiento es identico.
@@ -524,7 +544,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       return json({ success: true, respuesta, ...(adjuntos.length > 0 ? { adjuntos } : {}) }, 200);
     } catch (error) {
       console.error("[chat-facturas] Error:", error);
-      usoChat.marcarError();
+      usosChat[usosChat.length - 1].marcarError();
       usoEmbed.marcarError();
       const msg = error instanceof Error ? error.message : "Error desconocido";
 
@@ -547,7 +567,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       // lanza (ver _shared/registrar-uso-ia.ts), asi que no puede convertir una
       // respuesta buena en un 500. Se reutiliza el cliente de service role que
       // ya existe en lugar de crear otro.
-      await registrarUso([usoChat, usoEmbed], {
+      await registrarUso([...usosChat, usoEmbed], {
         disparador: `usuario:${user.id}`,
         duracionMs: Date.now() - inicioMs,
         cliente: supabase,

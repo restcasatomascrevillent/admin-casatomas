@@ -213,5 +213,7 @@ describe("modelo configurable (CHAT_FACTURAS_MODELO)", () => {
     expect(parametrosModelo("gpt-4.1-mini", 800)).toEqual({ temperature: 0.2, max_tokens: 800 });
     expect(parametrosModelo("gpt-5.6-luna", 800)).toEqual({ max_completion_tokens: 4000 });
     expect(parametrosModelo("o4-mini", 800)).toEqual({ max_completion_tokens: 4000 });
+    // GPT-6: herramientas por Chat Completions solo con reasoning_effort "none"
+    expect(parametrosModelo("gpt-6-luna", 800)).toEqual({ reasoning_effort: "none", max_completion_tokens: 4000 });
   });
 });

@@ -1172,11 +1172,14 @@ export function modeloChat(pedido: string | undefined | null): string {
 }
 
 /**
- * Parametros de chat/completions segun el modelo: los de razonamiento (gpt-5*,
+ * Parametros de chat/completions segun el modelo: los de razonamiento (gpt-5*, gpt-6*,
  * o1/o3/o4…) no aceptan temperature ni max_tokens; max_completion_tokens incluye
- * el razonamiento, por eso lleva mas margen.
+ * el razonamiento, por eso lleva mas margen. La familia GPT-6 exige
+ * reasoning_effort "none" para usar herramientas por Chat Completions (ver la
+ * cabecera de chat-web/index.ts), asi que va siempre con "none".
  */
 export function parametrosModelo(modelo: string, maxTokens: number): Record<string, unknown> {
+  if (/^gpt-6/i.test(modelo)) return { reasoning_effort: "none", max_completion_tokens: Math.max(maxTokens * 5, 4000) };
   if (/^(gpt-5|o\d)/i.test(modelo)) return { max_completion_tokens: Math.max(maxTokens * 5, 4000) };
   return { temperature: 0.2, max_tokens: maxTokens };
 }
