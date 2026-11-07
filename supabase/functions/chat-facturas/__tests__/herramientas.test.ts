@@ -33,6 +33,16 @@ import {
   TOOLS,
 } from "../herramientas.ts";
 
+/**
+ * Tope del prompt de sistema: 6.400 (antes 5.990). Sube ~370 caracteres el
+ * 07/11/2026 (migracion 20261107100000) por las reglas que el dueño pidio tras
+ * fallos reales en la demo: precio del litro en la 15, no preguntar «¿quieres
+ * que consulte…?» (16), seguimiento con el mismo tema (17) y «ultimo mes» (18).
+ * El prompt va en cache (≈5.600 de 8.200 tokens de entrada, 0,10 $/M en
+ * gpt-4.1-mini): ~+90 tokens ≈ +0,00001 $ por ronda.
+ */
+const LIMITE_PROMPT = 6_400;
+
 // deno-lint-ignore no-explicit-any
 type Esquema = any;
 
@@ -277,7 +287,7 @@ describe("systemPrompt", () => {
     // IVA por tipo y unidades distintas suman 384 (~95 tokens por ronda).
     // 5.727 antes de bebidas (13/11/2026): la linea de volumen_comprado y la regla 15 suman 256
     // (~65 tokens por ronda); la guia de redaccion va en el resultado (nota_respuesta).
-    expect(p.length).toBeLessThan(5_990);
+    expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT);
   });
 });
 
@@ -714,7 +724,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     const p = systemPrompt("2026-10-08");
     expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
     expect(p).toMatch(/Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg»/);
-    expect(p.length).toBeLessThanOrEqual(5990); // 5.730 + bebidas (13/11/2026)
+    expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
     expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_560); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026)
   });
 });
@@ -748,7 +758,7 @@ describe("ronda 9 (10/10/2026, migracion 20261010170000)", () => {
   });
 
   it("tamaños: el prompt y TOOLS no crecen respecto a la ronda 8 (5.728 y 9.620 caracteres)", () => {
-    expect(p.length).toBeLessThanOrEqual(5990); // 5.730 + bebidas (13/11/2026)
+    expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
     expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_560); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026)
   });
 });
@@ -787,7 +797,7 @@ describe("volumen_comprado (06/11/2026, migracion 20261106400000)", () => {
     expect(t.description).toMatch(/cuantos barriles/);
     expect(t.description).toMatch(/lineas_sin_convertir/);
     expect(Object.keys((t.parameters as Esquema).properties)).toEqual(["categoria", "producto", "desde", "hasta", "unidad", "orden"]);
-    expect(systemPrompt("2026-11-06").length).toBeLessThanOrEqual(5990);
+    expect(systemPrompt("2026-11-06").length).toBeLessThanOrEqual(LIMITE_PROMPT);
   });
 });
 
@@ -875,7 +885,8 @@ describe("bebidas por familia (13/11/2026, migracion 20261113100000)", () => {
 
   it("el prompt manda las bebidas a volumen_comprado y la lista la nombra", () => {
     const p = systemPrompt("2026-11-13");
-    expect(p).toMatch(/- volumen_comprado: bebidas \(regla 15\)/);
-    expect(p).toMatch(/15\. Bebidas \(cerveza, vino, licor, refresco\): volumen_comprado con categoria \(botellas: orden envases\), nunca buscar_productos ni ranking/);
+    expect(p).toMatch(/- volumen_comprado: familias \(regla 15\)/);
+    expect(p).toMatch(/15\. Familias \(cerveza, vino, marisco…\), precio del litro\/kilo y comparativas: volumen_comprado con categoria \(botellas: orden envases\)/);
+    expect(p).toMatch(/Nunca buscar_productos ni historial_precios/);
   });
 });

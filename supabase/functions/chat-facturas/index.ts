@@ -10,6 +10,13 @@ import {
   unirReferencias,
   esErrorCorregible,
   marcarResultado,
+  mesesIncompletosRecientes,
+  modeloChat,
+  parametrosModelo,
+  pistaPregunta,
+  textoAsociable,
+  type Asociacion,
+  type PalabraAsociada,
   necesitaRespaldoSemantico,
   prepararLlamada,
   recortar,
@@ -65,7 +72,10 @@ const corsHeaders = {
 
 const OPENAI_KEY = claveOpenAI("chat");
 const OPENAI = "https://api.openai.com/v1";
-const MODELO = "gpt-4.1-mini";
+// Modelo configurable con el secreto CHAT_FACTURAS_MODELO (07/11/2026; por
+// defecto gpt-4.1-mini). Los de razonamiento (gpt-5*) llevan otros parametros:
+// parametrosModelo en herramientas.ts.
+const MODELO = modeloChat(Deno.env.get("CHAT_FACTURAS_MODELO"));
 const MAX_HISTORIAL = 10;   // mismo valor que el contextWindowLength de n8n
 const MAX_PASOS = 6;
 const TIMEOUT_OPENAI_MS = 45_000;
@@ -225,7 +235,15 @@ async function referenciasVariacion(data: any, supabase: any): Promise<DocRef[]>
 // deno-lint-ignore no-explicit-any
 async function ejecutarTool(nombre: string, args: any, supabase: any, ctx: Ctx): Promise<ResultadoTool> {
   try {
-    const ll = prepararLlamada(nombre, args, ctx.pregunta);
+    // Asociacion del texto (familia, producto, formato: 20261107100000). Si la
+    // RPC falla (BD sin migrar) se sigue sin ella (lista corta de bebidas).
+    let asoc: Asociacion | null = null;
+    const txt = textoAsociable(nombre, args);
+    if (txt) {
+      const a = await supabase.rpc("asociar_termino_agente", { p_texto: txt });
+      if (!a.error && a.data && typeof a.data === "object") asoc = a.data as Asociacion;
+    }
+    const ll = prepararLlamada(nombre, args, ctx.pregunta, asoc);
     let data: unknown;
 
     if (ll.tipo === "rpc") {
@@ -387,6 +405,31 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
         messages.push({ role: "user", content: mensaje });
       }
 
+      // ── Pista de la pregunta (20261107100000) ──
+      //  Que es cada palabra en el catalogo («vino» = familia Vinos), el tema del
+      //  turno anterior si esta no trae ninguno («hazme la comparativa») y los
+      //  meses recientes incompletos. Va como sistema justo antes de la pregunta.
+      //  Si falla, se sigue sin pista.
+      try {
+        const [actualR, incR] = await Promise.all([
+          supabase.rpc("asociar_pregunta_agente", { p_texto: String(mensaje) }),
+          supabase.rpc("meses_compras_incompletos", { p_local: null }),
+        ]);
+        const actual = (actualR.error ? null : actualR.data) as PalabraAsociada[] | null;
+        let anterior: PalabraAsociada[] | null = null;
+        if (!actual || actual.length === 0) {
+          const previa = messages.slice(0, -1).reverse().find((m) => m.role === "user");
+          if (previa?.content) {
+            const r = await supabase.rpc("asociar_pregunta_agente", { p_texto: String(previa.content) });
+            if (!r.error) anterior = r.data as PalabraAsociada[];
+          }
+        }
+        const pista = pistaPregunta(actual, anterior, incR.error ? [] : mesesIncompletosRecientes(incR.data));
+        if (pista) messages.splice(messages.length - 1, 0, { role: "system", content: pista });
+      } catch (e) {
+        console.warn("[chat-facturas] pista de la pregunta fallida:", e instanceof Error ? e.message : e);
+      }
+
       // ── Bucle de function-calling ──
       //  Acotado por tres lados: MAX_PASOS rondas, MAX_TOOL_CALLS_POR_RONDA
       //  herramientas por ronda y un deadline global. Los dos ultimos son nuevos:
@@ -418,8 +461,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
           body: JSON.stringify({
             model: MODELO,
             messages,
-            temperature: 0.2,
-            max_tokens: MAX_TOKENS_RESPUESTA,
+            ...parametrosModelo(MODELO, MAX_TOKENS_RESPUESTA),
             ...(esUltimo ? {} : { tools: TOOLS }),
           }),
         }, msRestantes(ctx));

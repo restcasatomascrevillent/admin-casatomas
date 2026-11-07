@@ -166,6 +166,53 @@ Cifras de la demo con la versión nueva (2026):
   720 (120 cajas de 6), Laurent-Perrier La Cuvée 598 (99 cajas de 6 y 4 sueltas), Viña
   Lanzar 564 brick, Marqués de Murrieta Reserva 402.
 
+## Asociación de términos y precio por litro (20261107100000)
+
+Fallos del dueño en la demo v0.332: «comparativa de a cuánto compro el litro de cerveza
+por proveedor» → «no hay cerveza en litros, solo mostaza de cerveza»; «hazme la
+comparativa» → lo mismo; «cuánto me he gastado en vino en el último mes» → «el vino no
+está separado». Test: `supabase/tests/chat_facturas_asociacion_test.sql`.
+
+- **`terminos_agente`** (tabla, ampliable): palabra o sinónimo → familia del catálogo
+  (`categoria_clave`), `nivel` (`familia`: cerveza, birra, caña, tercio, barril, vino,
+  licor, marisco, pescado, carne, embutido, conserva…; `producto`: cava, tinto, ginebra,
+  agua, gamba, merluza, jamón, aceite…) y `formato` (barril, tercio, quinto, botellín,
+  lata, botella, magnum). `categoria_agente` lee de aquí sus sinónimos.
+- **`asociar_termino_agente(texto)`**: `tipo` familia / producto / formato / texto. Una
+  marca se asocia por el catálogo («cruzcampo» → Cervezas; sin Servicios, donde están
+  los envases retornables). El catálogo manda sobre la palabra suelta: «mostaza de
+  cerveza» es de Despensa, «vinagre de vino» de Despensa, «croqueta de gambas» de
+  Congelados.
+- **`lineas_producto_agente`** (compras_producto, historial_precios, serie_precios,
+  variacion_precios, volumen_comprado): familia → todas las líneas de la familia
+  (`metodo = 'familia'`); producto → la búsqueda de siempre, quedándose con las líneas de
+  su familia raíz y apartando las de otras familias en `subproductos` («Croqueta de rape
+  y gambas», «Extracto de gamba roja»), salvo que no quede ninguna (pedir «mostaza de
+  cerveza» sigue dando la mostaza).
+- **`asociar_pregunta_agente(pregunta)`**: chat-facturas añade al modelo una PISTA con
+  las palabras del catálogo de la pregunta («vino» = familia Vinos), el tema del turno
+  anterior si la pregunta no trae ninguno («hazme la comparativa») y los meses recientes
+  incompletos (`meses_compras_incompletos`).
+- **`volumen_comprado_agente`** (misma firma): formato pedido («cerveza de barril»,
+  «tercios»; «botellín» = tercio, quinto o botellín) y **precio** = importe base SIN IVA
+  ÷ litros (o kilos) de las líneas convertidas, con `precio_min`/`precio_max` (la compra
+  más barata y más cara), en el total, `por_producto`, `por_envase`, `por_proveedor`
+  (con `importe`), `por_mes` (con `incompleto`), `por_proveedor_formato` (si hay 2+
+  proveedores) y `comparables` (productos de 2+ proveedores con el precio de cada uno,
+  6 como mucho; `n_proveedores` = todos). `proveedores` = cuántos.
+
+En chat-facturas, cualquier herramienta por producto que reciba una familia
+(compras_producto, historial_precios, grafico_precio, buscar_productos, ranking) va a
+`volumen_comprado` por categoría, y una pregunta de precio por litro/kilo
+(`pidePrecioPorVolumen`) también con un producto concreto. Limpieza, Menaje y Servicios
+no (no son litros ni kilos). variacion_precios con una familia como producto pasa a
+categoría.
+
+€/l de cerveza, 07/11/2025-07/11/2026 (todo de Distribuciones de Bebidas Catral):
+4,61 €/l de media (4,08-13,39). Barril 50 l 4,08; barril 20 l 4,85 (4,62-5,07); tercio
+33 cl 5,16 (4,38-10,51); botella 50 cl 7,84; botellín 25 cl 13,39. Cruzcampo: barril
+50 l 4,08, barril 20 l 4,62, tercio 4,97.
+
 ## Cifras de la demo (06/11/2026, 2026 hasta octubre)
 
 Cerveza: **20.520,88 l**, 459 de 459 líneas convertidas.

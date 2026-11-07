@@ -88,7 +88,7 @@ HERRAMIENTAS (usa la especifica)
 - ficha_proveedor: todo de UN proveedor.
 - gasto_por_categoria: gasto en vinos, marisco, limpieza... o reparto por categorias; "que X compro mas" con X categoria (licor, vino): sus top_productos.
 - variacion_precios: que ha subido o bajado de precio.
-- volumen_comprado: bebidas (regla 15) y litros/kilos aunque vaya en cajas o barriles.
+- volumen_comprado: familias (regla 15), litros/kilos, botellas y precio del litro/kilo.
 - buscar_productos / buscar_facturas: por nombre o tema en lenguaje libre.
 
 REGLAS
@@ -107,7 +107,10 @@ REGLAS
 12. compras_producto: di unidad, periodo y variantes contadas (productos_coincidentes); nunca sumes unidades distintas. Con por_variante da cada variante con su precio, no una media. coincidencia "aproximada": avisa de que no es el nombre exacto. sin_datos: dilo y da ultimo_dato (fecha, cantidad, proveedor) si viene; con sugerencias pregunta si es alguna. una_compra: solo hubo una, no hay evolucion.
 13. gasto_por_categoria: di periodo, base SIN IVA y sin_clasificar. variacion_precios: da precio y ref_precio; cambio_proveedor = otro proveedor, no subida del mismo: dilo; pocas_compras/ref_antigua: comparacion debil; sin_comparar: da su ultima compra.
 14. Mas barato/comparar: lista TODOS los proveedores, cada uno con su precio en SU unidad ("Osborne la caja a 519,40 €; Luga el kilo a 20,50 €"); sin ganador si avisos.unidades_mezcladas o productos_coincidentes > 1 (cebo vs bellota). Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg».
-15. Bebidas (cerveza, vino, licor, refresco): volumen_comprado con categoria (botellas: orden envases), nunca buscar_productos ni ranking (texto: «mostaza de cerveza»).
+15. Familias (cerveza, vino, marisco…), precio del litro/kilo y comparativas: volumen_comprado con categoria (botellas: orden envases); su gasto: gasto_por_categoria. Nunca buscar_productos ni historial_precios («mostaza de cerveza»).
+16. Nunca preguntes «¿quieres que consulte…?»: llama a las herramientas que falten y da la cifra.
+17. Seguimiento («hazme la comparativa», «y en cerveza?»): mismo tema, unidad y periodo que el turno anterior.
+18. «Ultimo mes» = mes natural anterior: di el periodo («octubre de 2026») y si esta incompleto.
 Formato: español, 1.234,56 €, fechas 15/01/2026. Viñetas o tabla, sin saludos ni relleno. Maximo 6 lineas salvo listados.`;
 }
 
@@ -243,8 +246,8 @@ export const TOOLS = [
     "Grafica y evolucion del precio de UN producto.",
     { producto: { type: "string" }, desde: FECHA_NULL, hasta: FECHA_NULL, unidad: UNIDAD }),
   fn("volumen_comprado",
-    "Litros/kilos, botellas/latas/barriles (cajas ya abiertas), formatos y proveedores aunque vaya en cajas " +
-    "o barriles ('hay cerveza?', 'litros de cerveza', 'botellas por vino', 'cuantos barriles'). Di lineas_sin_convertir.",
+    "Litros/kilos, botellas y barriles (cajas abiertas), formatos, proveedores y precio del litro/kilo " +
+    "('litros de cerveza', 'cuantos barriles', 'a cuanto compro el litro', 'comparar proveedores'). Di lineas_sin_convertir.",
     {
       categoria: { type: ["string", "null"], description: "cerveza, vino" },
       producto: { type: ["string", "null"], description: "agua, aceite, tinto" },
@@ -462,7 +465,11 @@ export const NOTA_RESPUESTA_VOLUMEN =
   "usando envases y compra, nunca «4 botellas y 99 cajas». Tipos de envase (barril, tercio, magnum…): " +
   "por_envase.formato. Da proveedores de por_proveedor. Si lineas_sin_convertir > 0, dilo con sus ejemplos " +
   "(no suman). Con productos_truncado: «los N con mas de M productos». Solo son productos de la categoria: " +
-  "nada de comida que lleve el nombre de la bebida.";
+  "nada de comida que lleve el nombre de la bebida. " +
+  "PRECIO: «precio» es € por litro/kilo SIN IVA (precio_min/precio_max = compra mas barata/cara). Comparativa: " +
+  "tabla por proveedor (por_proveedor) y por formato (por_envase, por_proveedor_formato); mismo producto en " +
+  "varios proveedores: comparables (mas caro/barato). Si proveedores = 1, dilo («todo es de X») y compara por " +
+  "formato, por producto y por mes (por_mes); avisa de los meses con incompleto.";
 
 const FAMILIAS_BEBIDA: Record<string, string> = {
   cerveza: "cerveza", cervezas: "cerveza",
@@ -487,6 +494,62 @@ export function familiaDeBebida(v: unknown): string | null {
   const concretas = [...new Set(familias.filter((f) => f !== "bebida"))];
   if (concretas.length > 1) return null;
   return concretas[0] ?? "bebida";
+}
+
+// ─── Asociacion de terminos (migracion 20261107100000) ──────────────────────
+//  «Tiene que asociar las cosas» (dueño, 06/11/2026). La BD decide si un texto
+//  es una FAMILIA del catalogo (cerveza, birra, vino, marisco…), un producto de
+//  una familia (gamba, cruzcampo) o un formato (barril, tercio):
+//  asociar_termino_agente. index.ts la consulta con el texto de la herramienta
+//  y la pasa aqui; sin ella (tests, BD sin migrar) vale familiaDeBebida.
+
+/** Resultado de asociar_termino_agente (solo lo que se usa aqui). */
+export interface Asociacion {
+  tipo: "familia" | "producto" | "texto" | "formato" | "ninguno";
+  categoria?: string | null;
+  /** Familia raiz (Bebidas, Pescado y marisco…). */
+  familia?: string | null;
+  formato?: string | null;
+}
+
+/** Texto de la herramienta que conviene asociar antes de traducirla (o null). */
+// deno-lint-ignore no-explicit-any
+export function textoAsociable(nombre: string, args: any): string | null {
+  const a = args ?? {};
+  switch (nombre) {
+    case "compras_producto":
+    case "historial_precios":
+    case "grafico_precio":
+      return texto(a.producto);
+    case "variacion_precios":
+      return texto(a.producto);
+    case "buscar_productos":
+      return texto(a.consulta);
+    case "ranking":
+      return texto(a.categoria);
+    default:
+      return null;
+  }
+}
+
+/** Familia del texto: la de la BD si la hay; si no, la lista corta de bebidas. */
+function familiaDe(v: unknown, asoc?: Asociacion | null): string | null {
+  if (asoc) return asoc.tipo === "familia" && asoc.categoria ? asoc.categoria : null;
+  return familiaDeBebida(v);
+}
+
+/**
+ * «precio del litro», «a cuanto compro el litro», «€/kg», «precio por kilo»,
+ * «el litro de cerveza por proveedor»: se contesta con volumen_comprado (€/l
+ * con las cajas y barriles pasados a litros), nunca con el precio por unidad
+ * facturada (prueba del dueño, 06/11: «no hay datos en litros»).
+ */
+export function pidePrecioPorVolumen(pregunta?: string): boolean {
+  const p = (pregunta ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (!p) return false;
+  if (/€\s*\/\s*(l|kg|litro|kilo)\b/.test(p)) return true;
+  if (/(^|[^a-z])(el|del|por|al|cada)\s+(litro|kilo)([^a-z]|$)/.test(p)) return true;
+  return /(^|[^a-z])(litros?|kilos?)([^a-z]|$)/.test(p) && /(precio|cuest|sale|car[oa]s?|barat|compar|€)/.test(p);
 }
 
 /** Llamada a volumen_comprado_agente. `nota` explica al modelo un desvio desde otra herramienta. */
@@ -516,8 +579,37 @@ function llamadaVolumen(p: {
 }
 
 const nota_desvio = (herramienta: string, familia: string) =>
-  `${herramienta}('${familia}') se ha contestado con volumen_comprado por categoria (familia de bebidas del ` +
-  `catalogo; la busqueda por texto mezclaba comida como 'mostaza de cerveza'). Responde con estos datos (regla 15).`;
+  `${herramienta}('${familia}') se ha contestado con volumen_comprado por categoria (familia del catalogo; ` +
+  `la busqueda por texto mezclaba comida como 'mostaza de cerveza'). Responde con estos datos (regla 15).`;
+
+/** Familias que no estan en volumen_lineas (no son litros ni kilos): van por gasto_por_categoria. */
+const FAMILIAS_SIN_VOLUMEN = new Set(["Servicios", "Limpieza y desechables", "Menaje y equipamiento"]);
+
+/** Familia del texto si se puede contestar en litros/kilos (volumen_comprado). */
+function familiaVolumen(v: unknown, asoc?: Asociacion | null): string | null {
+  if (asoc && (FAMILIAS_SIN_VOLUMEN.has(asoc.familia ?? "") || FAMILIAS_SIN_VOLUMEN.has(asoc.categoria ?? ""))) return null;
+  return familiaDe(v, asoc);
+}
+
+/**
+ * Herramienta por producto (compras_producto, historial_precios, grafico_precio)
+ * que se contesta con volumen_comprado: el texto es una FAMILIA (cerveza, vino,
+ * marisco: por categoria, sin la mostaza de cerveza) o la pregunta es de precio
+ * por litro/kilo (`porVolumen`: «a cuanto compro el litro de cruzcampo»).
+ */
+function desvioVolumen(
+  herramienta: string, producto: string, asoc: Asociacion | null | undefined, porVolumen: boolean,
+  desde: string | null, hasta: string | null,
+): Llamada | null {
+  const familia = familiaVolumen(producto, asoc);
+  if (familia) return llamadaVolumen({ categoria: familia, producto: null, desde, hasta, nota: nota_desvio(herramienta, familia) });
+  if (!porVolumen) return null;
+  return llamadaVolumen({
+    categoria: null, producto, desde, hasta,
+    nota: `${herramienta}('${producto}') se ha contestado con volumen_comprado: la pregunta es de precio por litro/kilo ` +
+      `(cajas y barriles ya pasados a litros). Responde con precio, por_proveedor y por_envase.`,
+  });
+}
 
 /** Parametros opcionales que solo existen desde 20261008120000: solo se mandan si vienen. */
 function opcionales(p: Record<string, string | null>): Record<string, string> {
@@ -530,11 +622,13 @@ function opcionales(p: Record<string, string | null>): Record<string, string> {
  * Traduce la llamada del modelo a la RPC y sus parametros. Lanza con un
  * mensaje "corregible" (fecha, rango, parametro, Falta…) si los argumentos no
  * valen: index.ts se lo devuelve al modelo para que reintente. `pregunta` es
- * el mensaje del usuario (tipoDeProducto).
+ * el mensaje del usuario (tipoDeProducto, pidePrecioPorVolumen). `asoc` es la
+ * asociacion de la BD del texto de la herramienta (textoAsociable).
  */
 // deno-lint-ignore no-explicit-any
-export function prepararLlamada(nombre: string, args: any, pregunta?: string): Llamada {
+export function prepararLlamada(nombre: string, args: any, pregunta?: string, asoc?: Asociacion | null): Llamada {
   args = args ?? {};
+  const porVolumen = pidePrecioPorVolumen(pregunta);
   switch (nombre) {
     case "estadisticas_globales":
       return { tipo: "rpc", rpc: "estadisticas_globales_agente", params: {}, limite: null };
@@ -557,11 +651,13 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
       const { desde, hasta } = rangoOpcional(args);
       // «Botellas por vino», «que cerveza compramos mas»: por cantidad, una
       // familia de bebidas mezclaba cajas y botellas (suma por unidad).
-      const familia = criterio === "cantidad" ? familiaDeBebida(args.categoria) : null;
+      const familia = criterio === "cantidad" || (criterio === "precio_unitario" && porVolumen)
+        ? familiaDe(args.categoria, asoc) : null;
       if (familia) {
         return llamadaVolumen({
-          categoria: familia, producto: null, desde, hasta, orden: "envases", limite: entero(args.limite),
-          nota: nota_desvio("ranking cantidad", familia),
+          categoria: familia, producto: null, desde, hasta,
+          orden: criterio === "cantidad" ? "envases" : null, limite: entero(args.limite),
+          nota: nota_desvio(`ranking ${criterio}`, familia),
         });
       }
       return {
@@ -609,6 +705,8 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
     case "historial_precios": {
       const producto = texto(args.producto);
       if (!producto) throw new Error("Falta el nombre del producto");
+      const desvio = desvioVolumen("historial_precios", producto, asoc, porVolumen, null, null);
+      if (desvio) return desvio;
       // La RPC marca su propio truncado sobre el total real de filas.
       return {
         tipo: "rpc",
@@ -622,12 +720,8 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
       const producto = texto(args.producto);
       if (!producto) throw new Error("Falta el nombre del producto");
       const { desde, hasta } = rangoOpcional(args);
-      const familia = familiaDeBebida(producto);
-      if (familia) {
-        return llamadaVolumen({
-          categoria: familia, producto: null, desde, hasta, nota: nota_desvio("compras_producto", familia),
-        });
-      }
+      const desvio = desvioVolumen("compras_producto", producto, asoc, porVolumen, desde, hasta);
+      if (desvio) return desvio;
       return {
         tipo: "rpc",
         rpc: "compras_producto_agente",
@@ -664,6 +758,9 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
 
     case "variacion_precios": {
       const { desde, hasta } = rangoOpcional(args);
+      // «¿ha subido la cerveza?»: una familia puesta como producto va como categoria.
+      const famVar = texto(args.producto) ? familiaDe(args.producto, asoc) : null;
+      if (famVar) { args = { ...args, categoria: texto(args.categoria) ?? famVar, producto: null }; }
       return {
         tipo: "rpc",
         rpc: "variacion_precios_agente",
@@ -700,6 +797,9 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
       const producto = texto(args.producto);
       if (!producto) throw new Error("Falta el nombre del producto");
       const { desde, hasta } = rangoOpcional(args);
+      // Una familia no tiene una serie de precio (mezcla barriles y cajas): €/l por mes.
+      const desvio = desvioVolumen("grafico_precio", producto, asoc, false, desde, hasta);
+      if (desvio) return desvio;
       return {
         tipo: "rpc",
         rpc: "serie_precios_agente",
@@ -714,7 +814,7 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
       if (!categoria && !producto) throw new Error('Falta el parametro "categoria" o "producto".');
       // «cerveza» puesta como producto es la familia (la RPC tambien lo hace,
       // pero «la bebida cerveza» no lo reconoceria).
-      const familia = !categoria ? familiaDeBebida(producto) : null;
+      const familia = !categoria ? familiaDe(producto, asoc) : null;
       if (familia) { categoria = familia; producto = null; }
       const { desde, hasta } = rangoOpcional(args);
       return llamadaVolumen({
@@ -726,7 +826,7 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
     case "buscar_productos": {
       const consulta = texto(args.consulta);
       if (!consulta) throw new Error("Falta la consulta");
-      const familia = familiaDeBebida(consulta);
+      const familia = familiaVolumen(consulta, asoc);
       if (familia) {
         return llamadaVolumen({
           categoria: familia, producto: null, desde: null, hasta: null, limite: 15,
@@ -1016,4 +1116,67 @@ export async function sinDuplicar(
 /** Solo para tests. */
 export function _vaciarDuplicados(): void {
   enCurso.clear();
+}
+
+// ─── Pista de la pregunta (asociar_pregunta_agente, 20261107100000) ─────────
+
+/** Una palabra de la pregunta asociada por la BD. */
+export interface PalabraAsociada { palabra: string; tipo: string; categoria?: string | null; formato?: string | null }
+
+function describirPalabras(ps: PalabraAsociada[]): string {
+  return ps.slice(0, 6).map((p) => {
+    const que = p.tipo === "familia" ? `familia ${p.categoria}` : p.tipo === "producto" ? `producto de ${p.categoria}` : "formato";
+    return `«${p.palabra}» = ${que}${p.formato ? ` (formato ${p.formato})` : ""}`;
+  }).join("; ");
+}
+
+/**
+ * Mensaje de sistema corto que acompaña a la pregunta: que es cada palabra en el
+ * catalogo («vino» = familia Vinos → herramienta por categoria), el tema del
+ * turno anterior si la pregunta no trae ninguno («hazme la comparativa») y los
+ * meses recientes incompletos. null si no hay nada que decir.
+ */
+export function pistaPregunta(
+  actual: PalabraAsociada[] | null, anterior: PalabraAsociada[] | null, mesesIncompletos: string[],
+): string | null {
+  const partes: string[] = [];
+  if (actual && actual.length > 0) {
+    partes.push(`Catalogo: ${describirPalabras(actual)}. Familia = herramienta por categoria.`);
+  } else if (anterior && anterior.length > 0) {
+    partes.push(`Pregunta de seguimiento: el tema anterior era ${describirPalabras(anterior)}; manten tema, unidad y periodo.`);
+  }
+  if (mesesIncompletos.length > 0) {
+    partes.push(`Meses con pocos documentos subidos (incompletos): ${mesesIncompletos.join(", ")}.`);
+  }
+  return partes.length > 0 ? `PISTA: ${partes.join(" ")}` : null;
+}
+
+/** Meses incompletos (meses_compras_incompletos) de los 3 ultimos meses y el actual, 'AAAA-MM'. */
+// deno-lint-ignore no-explicit-any
+export function mesesIncompletosRecientes(filas: any, hoy: string = hoyMadrid()): string[] {
+  if (!Array.isArray(filas)) return [];
+  const [y, m] = hoy.split("-").map(Number);
+  const corte = new Date(Date.UTC(y, m - 1 - 3, 1)).toISOString().slice(0, 7);
+  const meses = filas.map((f) => String(f?.mes ?? "").slice(0, 7)).filter((s) => /^\d{4}-\d{2}$/.test(s) && s >= corte);
+  return [...new Set(meses)].sort();
+}
+
+// ─── Modelo (secreto CHAT_FACTURAS_MODELO) ──────────────────────────────────
+
+export const MODELO_POR_DEFECTO = "gpt-4.1-mini";
+
+/** Modelo pedido por secreto si tiene forma de nombre de modelo; si no, el de por defecto. */
+export function modeloChat(pedido: string | undefined | null): string {
+  const p = (pedido ?? "").trim();
+  return /^[a-z0-9][a-z0-9.\-]{2,60}$/i.test(p) ? p : MODELO_POR_DEFECTO;
+}
+
+/**
+ * Parametros de chat/completions segun el modelo: los de razonamiento (gpt-5*,
+ * o1/o3/o4…) no aceptan temperature ni max_tokens; max_completion_tokens incluye
+ * el razonamiento, por eso lleva mas margen.
+ */
+export function parametrosModelo(modelo: string, maxTokens: number): Record<string, unknown> {
+  if (/^(gpt-5|o\d)/i.test(modelo)) return { max_completion_tokens: Math.max(maxTokens * 5, 4000) };
+  return { temperature: 0.2, max_tokens: maxTokens };
 }
