@@ -142,12 +142,16 @@ export function peticionEvaluar(body: Record<string, unknown>): PeticionEval {
 export interface PrecioModelo {
   usd_por_m_input: number;
   usd_por_m_cached: number | null;
+  /** Escritura en caché (GPT-6 la cobra aparte; null = precio de entrada). */
+  usd_por_m_cache_write?: number | null;
   usd_por_m_output: number;
 }
 
 export interface TokensEval {
   entrada: number;
   cacheados: number;
+  /** Tokens de entrada escritos en caché (GPT-6: prompt_tokens_details.cache_write_tokens). */
+  escritos_cache: number;
   salida: number;
   razonamiento: number;
 }
@@ -159,18 +163,20 @@ const n0 = (v: unknown): number => {
 
 /** Suma los `usage` de chat/completions (prompt_tokens incluye los cacheados; completion, el razonamiento). */
 export function sumarUsage(usos: unknown[]): TokensEval {
-  const t: TokensEval = { entrada: 0, cacheados: 0, salida: 0, razonamiento: 0 };
+  const t: TokensEval = { entrada: 0, cacheados: 0, escritos_cache: 0, salida: 0, razonamiento: 0 };
   for (const x of usos) {
     if (!x || typeof x !== "object") continue;
     const u = x as {
       prompt_tokens?: unknown; completion_tokens?: unknown;
-      prompt_tokens_details?: { cached_tokens?: unknown } | null;
+      prompt_tokens_details?: { cached_tokens?: unknown; cache_write_tokens?: unknown } | null;
       completion_tokens_details?: { reasoning_tokens?: unknown } | null;
     };
     const p = n0(u.prompt_tokens);
     const c = n0(u.completion_tokens);
     t.entrada += p;
-    t.cacheados += Math.min(n0(u.prompt_tokens_details?.cached_tokens), p);
+    const cache = Math.min(n0(u.prompt_tokens_details?.cached_tokens), p);
+    t.cacheados += cache;
+    t.escritos_cache += Math.min(n0(u.prompt_tokens_details?.cache_write_tokens), p - cache);
     t.salida += c;
     t.razonamiento += Math.min(n0(u.completion_tokens_details?.reasoning_tokens), c);
   }
@@ -180,14 +186,17 @@ export function sumarUsage(usos: unknown[]): TokensEval {
 /**
  * Coste en USD con la tarifa de ia_precios (misma regla que ia_registrar_uso):
  * entrada no cacheada a precio de entrada, cacheada a su precio (o al de
- * entrada si no tiene), salida (con el razonamiento dentro) a precio de salida.
+ * entrada si no tiene), escrita en caché a su precio (o al de entrada) y
+ * salida (con el razonamiento dentro) a precio de salida.
  * null si no hay precio.
  */
 export function costeUsd(precio: PrecioModelo | null | undefined, t: TokensEval): number | null {
   if (!precio) return null;
   const pin = n0(precio.usd_por_m_input);
   const pcache = precio.usd_por_m_cached === null || precio.usd_por_m_cached === undefined ? pin : n0(precio.usd_por_m_cached);
+  const pwrite = precio.usd_por_m_cache_write === null || precio.usd_por_m_cache_write === undefined ? pin : n0(precio.usd_por_m_cache_write);
   const pout = n0(precio.usd_por_m_output);
-  const usd = ((t.entrada - t.cacheados) * pin + t.cacheados * pcache + t.salida * pout) / 1_000_000;
+  const normal = t.entrada - t.cacheados - t.escritos_cache;
+  const usd = (normal * pin + t.cacheados * pcache + t.escritos_cache * pwrite + t.salida * pout) / 1_000_000;
   return Math.round(usd * 1e6) / 1e6;
 }

@@ -189,7 +189,7 @@ serve(conAuditoriaDePeticion("ia-modelos-openai", createClientBase, async (req) 
     }
 
     const { data: precios } = await supabase.from("ia_precios")
-      .select("modelo, usd_por_m_input, usd_por_m_cached, usd_por_m_output").in("modelo", [pet.modelo, "text-embedding-3-small"]);
+      .select("modelo, usd_por_m_input, usd_por_m_cached, usd_por_m_cache_write, usd_por_m_output").in("modelo", [pet.modelo, "text-embedding-3-small"]);
     const precio = (m: string) => ((precios ?? []) as (PrecioModelo & { modelo: string })[]).find((p) => p.modelo === m) ?? null;
 
     const clave = claveOpenAI("chat");
@@ -223,7 +223,7 @@ serve(conAuditoriaDePeticion("ia-modelos-openai", createClientBase, async (req) 
       });
       const tokens = sumarUsage(traza.llamadas.map((l) => l.usage));
       const cChat = costeUsd(precio(pet.modelo), tokens);
-      const cEmb = costeUsd(precio("text-embedding-3-small"), { entrada: usoEmbed.prompt, cacheados: 0, salida: 0, razonamiento: 0 });
+      const cEmb = costeUsd(precio("text-embedding-3-small"), { entrada: usoEmbed.prompt, cacheados: 0, escritos_cache: 0, salida: 0, razonamiento: 0 });
       resultados.push({
         id: p.id,
         respuesta,

@@ -79,15 +79,19 @@ describe("ia-modelos-openai · evaluar", () => {
     const t = sumarUsage([
       { prompt_tokens: 1000, completion_tokens: 50, prompt_tokens_details: { cached_tokens: 800 }, completion_tokens_details: { reasoning_tokens: 10 } },
       { prompt_tokens: 100, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 999 } },
+      { prompt_tokens: 9208, completion_tokens: 118, prompt_tokens_details: { cached_tokens: 3502, cache_write_tokens: 5700 } },
       null,
     ]);
-    expect(t).toEqual({ entrada: 1100, cacheados: 900, salida: 55, razonamiento: 10 });
+    expect(t).toEqual({ entrada: 10308, cacheados: 4402, escritos_cache: 5700, salida: 173, razonamiento: 10 });
   });
 
   it("coste con la tarifa de ia_precios (cacheada al precio de entrada si no tiene)", () => {
-    const t = { entrada: 1_000_000, cacheados: 500_000, salida: 100_000, razonamiento: 0 };
+    const t = { entrada: 1_000_000, cacheados: 500_000, escritos_cache: 0, salida: 100_000, razonamiento: 0 };
     expect(costeUsd({ usd_por_m_input: 2, usd_por_m_cached: 0.2, usd_por_m_output: 10 }, t)).toBeCloseTo(1 + 0.1 + 1, 6);
     expect(costeUsd({ usd_por_m_input: 2, usd_por_m_cached: null, usd_por_m_output: 10 }, t)).toBeCloseTo(2 + 1, 6);
     expect(costeUsd(null, t)).toBeNull();
+    // Fila real de ia_uso (gpt-6-sol, q01): 0,016142 $ con la escritura en caché a 2,5 $/M.
+    const sol = { usd_por_m_input: 2, usd_por_m_cached: 0.2, usd_por_m_cache_write: 2.5, usd_por_m_output: 10 };
+    expect(costeUsd(sol, { entrada: 9208, cacheados: 3502, escritos_cache: 5700, salida: 118, razonamiento: 0 })).toBeCloseTo(0.016142, 6);
   });
 });
