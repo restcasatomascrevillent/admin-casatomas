@@ -1,7 +1,8 @@
-// Facturas › Análisis (06/11/2026): tablero tipo widgets.
-//   · rejilla «bento» y tamaños (pequeño/mediano/grande);
-//   · «Personalizar»: activar, quitar, reordenar, tamaño, restablecer y
-//     guardar (localStorage y `dashboard_config` por usuario);
+// Facturas › Análisis (06/11/2026): tablero tipo widgets; desde el 07/11/2026,
+// en una pantalla con una vista a la vez.
+//   · cada módulo del configurador vive en su vista;
+//   · «Personalizar»: activar, quitar, reordenar, restablecer y guardar
+//     (localStorage y `dashboard_config` por usuario);
 //   · ampliar una tarjeta (también con teclado) → detalle en grande con
 //     filtros, orden, CSV y «Ver documentos»;
 //   · cifras que nunca se cortan.
@@ -121,9 +122,21 @@ function montar() {
 }
 
 const tablero = () => screen.getByRole("region", { name: "Tablero de compras" });
-/** Módulos en el orden en que salen (data-modulo de cada celda de la rejilla). */
+/** Módulos de la vista que se ve, en orden (data-modulo de cada celda). */
 const ordenModulos = () => [...tablero().querySelectorAll<HTMLElement>("[data-modulo]")].map((e) => e.dataset.modulo);
-const celda = (id: string) => tablero().querySelector<HTMLElement>(`[data-modulo="${id}"]`);
+/** Abre una vista del tablero (una a la vez, 07/11/2026). */
+function verVista(nombre: string) {
+  fireEvent.click(within(screen.getByRole("group", { name: "Vista del análisis" })).getByRole("button", { name: nombre }));
+}
+/** Los módulos de cada vista. */
+function modulosPorVista() {
+  const salida: Record<string, (string | undefined)[]> = {};
+  for (const v of ["Qué decidir hoy", "Precios", "Gasto", "Proveedores", "Explorar", "Por revisar"]) {
+    verVista(v);
+    salida[v] = ordenModulos();
+  }
+  return salida;
+}
 
 /** Lo que hace el navegador con un <button> al pulsar Intro o Espacio (jsdom no lo hace). */
 function pulsar(el: HTMLElement, tecla: "Enter" | " ") {
@@ -162,47 +175,41 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("rejilla «bento» y tamaños", () => {
-  it("por defecto: las preguntas antes de Explorar y el resto después, en una rejilla por el ancho del TABLERO", async () => {
+describe("cada módulo en su vista (Análisis en una pantalla)", () => {
+  it("por defecto: gasto por mes junto a «Qué decidir hoy», subidas en Precios, familias, fijos y abonos en Gasto…", async () => {
     montar();
     await screen.findByText("1.362.491,57 €");
-    // Sin facturas_decision (aquí no responde) no salen «precios_top» ni «ahorro»: nada de celdas vacías.
-    expect(ordenModulos()).toEqual(["subidas", "familias", "proveedores", "fijos", "abonos", "locales"]);
-    const [rejilla, despues] = screen.getAllByTestId("rejilla-modulos");
-    // Container queries: la rejilla mira el ancho del tablero (que se estrecha con la IA), no el de la pantalla.
-    expect(rejilla.className).toMatch(/@\[34rem\]\/tablero:grid-cols-2/);
-    expect(rejilla.className).toMatch(/@\[60rem\]\/tablero:grid-cols-3/);
-    expect(rejilla.className).toContain("[grid-auto-flow:row_dense]");
-    expect(rejilla.closest(".\\@container\\/tablero")).not.toBeNull();
-    expect(celda("proveedores")).toHaveAttribute("data-tamano", "s");
-    expect(celda("proveedores")?.className).toContain("col-span-1");
-    // Explorar va entre las dos rejillas.
-    const ex = screen.getByRole("region", { name: "Explorar" });
-    expect(rejilla.compareDocumentPosition(ex) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(ex.compareDocumentPosition(despues) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Sin facturas_decision (aquí no responde): las tarjetas de antes en Precios y Gasto.
+    expect(modulosPorVista()).toEqual({
+      "Qué decidir hoy": ["gasto_mes"],
+      Precios: ["subidas"],
+      Gasto: ["familias", "fijos", "abonos"],
+      Proveedores: ["proveedores", "locales"],
+      Explorar: [],
+      "Por revisar": ["por_revisar"],
+    });
+    // Container queries: la vista mira el ancho del tablero (que se estrecha con la IA), no el de la pantalla.
+    expect(screen.getByTestId("vista-analisis").closest(".\\@container\\/tablero")).not.toBeNull();
+    verVista("Explorar");
+    expect(screen.getByRole("region", { name: "Explorar" })).toBeInTheDocument();
   });
 
-  it("mediano = 2 columnas, grande = 3 (sin pasarse de las que hay); Explorar puede ir en medio", async () => {
+  it("lo que se quita en «Personalizar» no sale en su vista; una vista sin módulos lo dice", async () => {
     window.localStorage.setItem(
       "facturas-analisis-tablero",
-      JSON.stringify({ v: 2, cifras: ["gasto"], modulos: [{ id: "familias", tamano: "l" }, { id: "explorar" }, { id: "proveedores", tamano: "m" }, { id: "abonos", tamano: "s" }] }),
+      JSON.stringify({ v: 3, cifras: ["gasto"], modulos: [{ id: "familias", tamano: "l" }, { id: "explorar" }, { id: "abonos", tamano: "s" }] }),
     );
     montar();
     await screen.findByText("1.362.491,57 €");
-    expect(ordenModulos()).toEqual(["familias", "proveedores", "abonos"]);
-    expect(celda("familias")?.className).toMatch(/col-span-1 .*@\[34rem\]\/tablero:col-span-2 .*@\[60rem\]\/tablero:col-span-3/);
-    expect(celda("proveedores")?.className).toMatch(/col-span-1 .*@\[34rem\]\/tablero:col-span-2/);
-    expect(celda("proveedores")?.className).not.toContain("col-span-3");
-    // Dos rejillas: antes y después de Explorar.
-    const [antes, despues] = screen.getAllByTestId("rejilla-modulos");
-    const ex = screen.getByRole("region", { name: "Explorar" });
-    expect(antes.compareDocumentPosition(ex) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(ex.compareDocumentPosition(despues) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // Un módulo mediano enseña más filas (8): el de proveedores, los 7.
-    const prov = within(tablero()).getByRole("region", { name: "Proveedores con más gasto" });
-    expect(within(within(prov).getByRole("list", { name: "Proveedores por gasto" })).getAllByRole("button")).toHaveLength(7);
-    // Solo la cifra elegida.
-    expect(within(screen.getByLabelText("Indicadores del periodo")).getAllByRole("button")).toHaveLength(1);
+    verVista("Gasto");
+    expect(ordenModulos()).toEqual(["familias", "abonos"]);
+    // Ninguna cifra de más: no hay franja de cifras.
+    expect(screen.queryByLabelText("Más cifras del periodo")).not.toBeInTheDocument();
+    verVista("Proveedores");
+    expect(ordenModulos()).toEqual([]);
+    expect(screen.getByText(/Has quitado los módulos de esta vista/)).toBeInTheDocument();
+    // Las cuatro cifras de arriba no se quitan: son la navegación.
+    expect(within(screen.getByLabelText("Indicadores del periodo")).getAllByRole("button")).toHaveLength(4);
   });
 });
 
@@ -212,6 +219,9 @@ describe("Personalizar el tablero", () => {
     await screen.findByText("1.362.491,57 €");
     const d = await abrirPersonalizar();
     const modulos = within(d).getByRole("list", { name: "Módulos, en orden" });
+    // Cada módulo dice en qué vista sale; ya no hay tamaños.
+    expect(within(modulos).getByText(/Ranking con IVA y su % del total · en «Proveedores»/)).toBeInTheDocument();
+    expect(within(modulos).queryByRole("group", { name: /^Tamaño de/ })).not.toBeInTheDocument();
     // Quitar «Abonos por proveedor».
     fireEvent.click(within(modulos).getByRole("button", { name: "Quitar «Abonos por proveedor»" }));
     expect(within(modulos).queryByText("Abonos por proveedor")).not.toBeInTheDocument();
@@ -220,31 +230,31 @@ describe("Personalizar el tablero", () => {
     fireEvent.click(within(d).getByRole("switch", { name: "Mostrar «Media al mes»" }));
     // Subir «Proveedores con más gasto» por encima de las familias (con botones: también con teclado o dedo).
     pulsar(within(modulos).getByRole("button", { name: "Subir «Proveedores con más gasto»" }), "Enter");
-    // Tamaño grande a «¿En qué se va el dinero?».
-    const tam = within(modulos).getByRole("group", { name: "Tamaño de «¿En qué se va el dinero?»" });
-    fireEvent.click(within(tam).getByRole("button", { name: /^Grande/ }));
-    expect(within(tam).getByRole("button", { name: /^Grande/ })).toHaveAttribute("aria-pressed", "true");
     // Aún no ha cambiado el tablero.
-    expect(ordenModulos()).toEqual(["subidas", "familias", "proveedores", "fijos", "abonos", "locales"]);
+    expect(screen.queryByLabelText("Más cifras del periodo")).not.toBeInTheDocument();
 
     fireEvent.click(within(d).getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Personalizar el tablero" })).not.toBeInTheDocument());
-    expect(ordenModulos()).toEqual(["subidas", "proveedores", "familias", "fijos", "locales", "productos"]);
-    expect(celda("familias")).toHaveAttribute("data-tamano", "l");
-    expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Media al mes/ })).toBeInTheDocument();
+    verVista("Gasto");
+    expect(ordenModulos()).toEqual(["familias", "fijos", "productos"]);
+    // La cifra nueva sale en «Gasto».
+    expect(within(screen.getByLabelText("Más cifras del periodo")).getByRole("button", { name: /^Media al mes/ })).toBeInTheDocument();
     // El módulo nuevo pide sus datos (productos, base sin IVA).
     await waitFor(() => expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_medida: "base", p_agrupar: "producto" })));
     expect(await within(tablero()).findByRole("region", { name: "Productos más comprados" })).toBeInTheDocument();
     // Sin sesión se guarda en este navegador (y se dice).
     expect(toastMock.info).toHaveBeenCalledWith("Tablero guardado en este navegador", expect.anything());
     const guardada = JSON.parse(window.localStorage.getItem("facturas-analisis-tablero") ?? "null");
-    expect(guardada.modulos.map((m: { id: string }) => m.id)).toEqual(["subidas", "ahorro", "proveedores", "familias", "precios_top", "explorar", "fijos", "locales", "productos"]);
+    expect(guardada.modulos.map((m: { id: string }) => m.id)).toEqual(["subidas", "ahorro", "proveedores", "familias", "precios_top", "explorar", "fijos", "locales", "gasto_mes", "productos"]);
   });
 
   it("se recuerda al volver; «Restablecer» deja el de siempre y «Cancelar» no cambia nada", async () => {
-    window.localStorage.setItem("facturas-analisis-tablero", JSON.stringify({ v: 2, cifras: ["abonos"], modulos: [{ id: "explorar" }, { id: "locales", tamano: "l" }] }));
+    window.localStorage.setItem("facturas-analisis-tablero", JSON.stringify({ v: 3, cifras: ["abonos"], modulos: [{ id: "explorar" }, { id: "locales", tamano: "l" }] }));
     montar();
-    await screen.findByText(/14\.376,94/);
+    await screen.findByText("1.362.491,57 €");
+    verVista("Gasto");
+    expect(screen.getByLabelText("Más cifras del periodo")).toHaveTextContent(/14\.376,94/);
+    verVista("Proveedores");
     expect(ordenModulos()).toEqual(["locales"]);
 
     let d = await abrirPersonalizar();
@@ -257,9 +267,10 @@ describe("Personalizar el tablero", () => {
     fireEvent.click(within(d).getByRole("button", { name: "Restablecer el tablero de siempre" }));
     expect(within(d).getByRole("button", { name: "Restablecer el tablero de siempre" })).toBeDisabled();
     fireEvent.click(within(d).getByRole("button", { name: "Guardar" }));
-    await waitFor(() => expect(ordenModulos()).toEqual(["subidas", "familias", "proveedores", "fijos", "abonos", "locales"]));
-    // Sin facturas_decision, de las 5 cifras por defecto quedan «Gasto» y «Por revisar».
-    expect(within(screen.getByLabelText("Indicadores del periodo")).getAllByRole("button")).toHaveLength(2);
+    await waitFor(() => expect(ordenModulos()).toEqual(["proveedores", "locales"]));
+    // Las cifras por defecto son las cuatro de arriba (y «familias fuera», en «Qué decidir hoy»): «Gasto» no lleva de más.
+    verVista("Gasto");
+    expect(screen.queryByLabelText("Más cifras del periodo")).not.toBeInTheDocument();
     expect(JSON.parse(window.localStorage.getItem("facturas-analisis-tablero") ?? "null")).toEqual(CONFIG_TABLERO_POR_DEFECTO);
   });
 
@@ -274,7 +285,9 @@ describe("Personalizar el tablero", () => {
     expect(within(modulos).getByRole("button", { name: "Arrastrar «Explorar»" })).toBeInTheDocument();
     fireEvent.click(within(modulos).getByRole("button", { name: "Bajar «Explorar»" }));
     fireEvent.click(within(d).getByRole("button", { name: "Guardar" }));
-    await waitFor(() => expect(screen.getAllByTestId("rejilla-modulos")).toHaveLength(2));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Personalizar el tablero" })).not.toBeInTheDocument());
+    verVista("Explorar");
+    expect(screen.getByRole("region", { name: "Explorar" })).toBeInTheDocument();
   });
 
   it("con sesión: lee y guarda la configuración del usuario en dashboard_config", async () => {
@@ -284,9 +297,10 @@ describe("Personalizar el tablero", () => {
       orden_widgets: ["cifra:documentos", "modulo:explorar", "modulo:fijos"],
     };
     montar();
-    await waitFor(() => expect(ordenModulos()).toEqual(["fijos"]));
-    expect(celda("fijos")).toHaveAttribute("data-tamano", "m");
-    expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Documentos1\.884/ })).toBeInTheDocument();
+    await screen.findByText("1.362.491,57 €");
+    verVista("Gasto");
+    await waitFor(() => expect(ordenModulos()).toEqual(["familias", "fijos"]));
+    expect(within(screen.getByLabelText("Más cifras del periodo")).getByRole("button", { name: /^Documentos1\.884/ })).toBeInTheDocument();
     // Solo SU fila: por usuario y vista.
     expect(doble.estado.lecturasConfig[0]).toEqual(expect.arrayContaining(["eq", "user_id", "u-1", "eq", "nombre_vista", "facturas_analisis"]));
 
@@ -297,7 +311,8 @@ describe("Personalizar el tablero", () => {
     const { fila, opciones } = doble.estado.upserts[0];
     expect(opciones).toEqual({ onConflict: "user_id,nombre_vista" });
     expect(fila).toMatchObject({ user_id: "u-1", nombre_vista: "facturas_analisis" });
-    expect(fila.orden_widgets).toEqual(["cifra:documentos", "modulo:explorar", "modulo:fijos", "modulo:abonos", "version:2"]);
+    // La versión 2 guardada se pone al día (3: «Gasto por mes» en «Qué decidir hoy»).
+    expect(fila.orden_widgets).toEqual(["cifra:documentos", "modulo:explorar", "modulo:fijos", "modulo:gasto_mes", "modulo:abonos", "version:3"]);
     await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Tablero guardado en tu cuenta"));
     expect(JSON.parse(window.localStorage.getItem("facturas-analisis-tablero:u-1") ?? "null").modulos.at(-1)).toEqual({ id: "abonos", tamano: "s" });
   });
@@ -306,8 +321,11 @@ describe("Personalizar el tablero", () => {
 describe("«Evolución de un producto»", () => {
   it("se elige el producto en la propia tarjeta, se guarda y su detalle es el precio por proveedor", async () => {
     doble.rpcs.buscar_productos_texto_agente = () => [{ producto: "MERLUZA" }, { producto: "MERLUZA DE PINCHO" }];
-    window.localStorage.setItem("facturas-analisis-tablero", JSON.stringify({ v: 2, cifras: ["gasto"], modulos: [{ id: "explorar" }, { id: "precio_producto", tamano: "m" }] }));
+    window.localStorage.setItem("facturas-analisis-tablero", JSON.stringify({ v: 3, cifras: ["gasto"], modulos: [{ id: "explorar" }, { id: "precio_producto", tamano: "m" }] }));
     montar();
+    await screen.findByText("1.362.491,57 €");
+    // Vive en la vista «Explorar», debajo del explorador.
+    verVista("Explorar");
     const tarjeta = await screen.findByRole("region", { name: "Evolución de un producto" });
     // Sin producto no hay nada que ampliar.
     expect(within(tarjeta).queryByRole("button", { name: /^Ampliar/ })).not.toBeInTheDocument();
@@ -327,6 +345,8 @@ describe("«Evolución de un producto»", () => {
 describe("detalle en grande de un módulo", () => {
   it("se abre con el teclado desde la cabecera de la tarjeta y, al cerrar, el foco vuelve a ella", async () => {
     montar();
+    await screen.findByText("1.362.491,57 €");
+    verVista("Proveedores");
     const tarjeta = await screen.findByRole("region", { name: "Proveedores con más gasto" });
     const ampliar = within(tarjeta).getByRole("button", { name: "Ampliar: Proveedores con más gasto" });
     expect(ampliar.tagName).toBe("BUTTON");
@@ -341,6 +361,8 @@ describe("detalle en grande de un módulo", () => {
 
   it("proveedores: tabla ordenable y filtros (periodo, local, IVA, buscador, importe, proveedor), CSV y documentos", async () => {
     montar();
+    await screen.findByText("1.362.491,57 €");
+    verVista("Proveedores");
     const tarjeta = await screen.findByRole("region", { name: "Proveedores con más gasto" });
     fireEvent.click(within(tarjeta).getByRole("button", { name: "Ampliar: Proveedores con más gasto" }));
     const d = await screen.findByRole("dialog", { name: "Proveedores con más gasto" });
@@ -423,6 +445,8 @@ describe("detalle en grande de un módulo", () => {
 
   it("lo que más ha subido: filas del tablero, buscador y proveedor en el navegador", async () => {
     montar();
+    await screen.findByText("1.362.491,57 €");
+    verVista("Precios");
     const tarjeta = await screen.findByRole("region", { name: "Lo que más ha subido" });
     fireEvent.click(within(tarjeta).getByRole("button", { name: "Ampliar: Lo que más ha subido" }));
     const d = await screen.findByRole("dialog", { name: "Lo que más ha subido" });
@@ -491,7 +515,7 @@ describe("cifras que nunca se cortan", () => {
     conSitio(90);
     montar();
     const ind = await screen.findByLabelText("Indicadores del periodo");
-    const gasto = await within(ind).findByRole("button", { name: /^Gasto con IVA.*1\.362\.491,57\s€/ });
+    const gasto = await within(ind).findByRole("button", { name: /^Gasto del periodo.*1\.362\.491,57\s€/ });
     await waitFor(() => expect(gasto.querySelector("[title]")).toHaveAttribute("title", "1.362.491,57 €"));
     act(() => undefined);
   });

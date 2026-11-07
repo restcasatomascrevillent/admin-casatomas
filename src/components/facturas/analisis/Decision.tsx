@@ -30,6 +30,7 @@ import type { DocumentoCifra } from "@/lib/facturas/documentosCifra";
 import { FILTROS_VACIOS, type ConfigExplorador } from "@/lib/facturas/explorador";
 import type { Tamano } from "@/lib/facturas/widgetsTablero";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
+import { nombreMes as nombreMesLargo } from "@/lib/facturas/vistasAnalisis";
 import { useAccionDecision } from "@/hooks/useDecisionFacturas";
 import { usePuedeEditarFacturas } from "./edicionFacturas";
 import { VisorDocumento } from "./VisorDocumento";
@@ -54,7 +55,7 @@ export function Chip({ tono, children, title }: { tono: keyof typeof TONO_CHIP; 
   );
 }
 
-const BOTON =
+export const BOTON =
   "inline-flex min-h-9 items-center gap-1 rounded-md border border-border/70 bg-background px-2.5 text-xs font-medium text-foreground hover:border-primary/50 hover:text-primary disabled:opacity-50 pointer-coarse:min-h-11";
 
 interface Comunes {
@@ -67,7 +68,7 @@ interface Comunes {
 const nombreMes = (mes: string) => mesCorto(mes, false);
 
 /** El visor de un documento (o dos, para comparar) dentro de una tarjeta. */
-function useVisor(onIrA?: (enlace: string) => void) {
+export function useVisor(onIrA?: (enlace: string) => void) {
   const [docs, setDocs] = useState<DocumentoCifra[]>([]);
   const [indice, setIndice] = useState<number | null>(null);
   const abrir = (d: (DocumentoCifra | null)[]) => {
@@ -120,13 +121,19 @@ export function FamiliasFrenteMedia({
   const ref = textoMesesReferencia(decision.referencia.meses);
   const pct = decision.umbrales.familiaPct;
   const fuera = fams.filter((f) => f.aviso);
+  // Con «Año» o «Todo» no suele haber meses completos ANTES del periodo (20261115300000):
+  // entonces se compara su último mes completo con la media de los anteriores del periodo.
+  const comparado = decision.periodo.comparado;
+  const ultimoMes = comparado?.modo === "ultimo_mes" ? nombreMesLargo(comparado.desde) : null;
   return (
     <Tarjeta
       titulo="¿En qué se va el dinero?"
       subtitulo={
-        ref
-          ? `Base sin IVA por familia. La barra es el periodo; la raya, la media de ${ref}. Aviso si se sale más de un ${pct} %.`
-          : "Base sin IVA por familia (aún no hay meses completos anteriores para comparar)."
+        ref && ultimoMes
+          ? `Base sin IVA. Barra: ${ultimoMes}, el último mes completo (no hay meses anteriores al periodo); raya: media de ${ref}. Aviso si se sale más de un ${pct} %.`
+          : ref
+            ? `Base sin IVA por familia. La barra es el periodo; la raya, la media de ${ref}. Aviso si se sale más de un ${pct} %.`
+            : "Base sin IVA por familia (aún no hay meses completos para comparar)."
       }
       resumen={
         fams.length
@@ -148,7 +155,7 @@ export function FamiliasFrenteMedia({
           )}
         </div>
       )}
-      {decision.periodo.enCurso && (
+      {decision.periodo.enCurso && !ultimoMes && (
         <p className="mb-1.5 text-xs text-muted-foreground">Periodo en curso: la media se cuenta hasta hoy.</p>
       )}
       {fams.length === 0 ? (
@@ -194,7 +201,7 @@ export function FamiliasFrenteMedia({
           </ul>
           <BotonVerMas total={fams.length} visibles={limite} abierto={todas} onCambio={setTodas} controla={idLista} femenino />
           <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-hidden>
-            <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-3.5 rounded-sm bg-primary/80" />Periodo</span>
+            <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-3.5 rounded-sm bg-primary/80" />{ultimoMes ? ultimoMes.charAt(0).toUpperCase() + ultimoMes.slice(1) : "Periodo"}</span>
             {ref && <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-0.5 bg-foreground/60" />Media {ref}</span>}
           </p>
         </>

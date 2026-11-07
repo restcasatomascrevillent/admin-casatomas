@@ -65,7 +65,20 @@ export interface RevisarUnidades {
 }
 
 export interface DecisionFacturas {
-  periodo: { desde: string; hasta: string; enCurso: boolean; mesesEquivalentes: number; mesesIncompletos: string[] };
+  periodo: {
+    desde: string;
+    hasta: string;
+    enCurso: boolean;
+    mesesEquivalentes: number;
+    mesesIncompletos: string[];
+    /**
+     * Tramo que comparan las familias (20261115300000): el periodo entero frente a los
+     * meses anteriores («anteriores») o, si no los hay (Año, Todo), su último mes
+     * completo frente a la media de los anteriores del propio periodo («ultimo_mes»).
+     * null con la RPC de antes.
+     */
+    comparado: { modo: "anteriores" | "ultimo_mes"; desde: string; hasta: string } | null;
+  };
   referencia: { meses: string[]; desde: string | null; hasta: string | null };
   resumen: { gasto: number; documentos: number; base: number; baseReferencia: number };
   familias: FamiliaDecision[];
@@ -153,6 +166,12 @@ export function normalizarDecision(data: unknown): DecisionFacturas {
       enCurso: p.en_curso === true,
       mesesEquivalentes: num(p.meses_equivalentes) ?? 1,
       mesesIncompletos: arr(p.meses_incompletos).filter((x): x is string => typeof x === "string"),
+      comparado: (() => {
+        const c = obj(p.comparado);
+        const desde = txt(c.desde);
+        const hasta = txt(c.hasta);
+        return desde && hasta ? { modo: c.modo === "ultimo_mes" ? ("ultimo_mes" as const) : ("anteriores" as const), desde, hasta } : null;
+      })(),
     },
     referencia: {
       meses: arr(r.meses).filter((x): x is string => typeof x === "string"),
@@ -336,11 +355,3 @@ export function geometriaMini(meses: MesPrecio[], mesesAlerta: string[], ancho =
 }
 
 export type PestanaCambios = "sube" | "mejor" | "baja";
-
-/** Para las cifras de arriba: lleva la vista a una tarjeta del tablero (false si no está). */
-export function irAModulo(id: string): boolean {
-  const el = typeof document !== "undefined" ? document.querySelector<HTMLElement>(`[data-modulo="${id}"]`) : null;
-  if (!el) return false;
-  el.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
-  return true;
-}

@@ -1,11 +1,11 @@
 // «Personalizar el tablero» de Facturas › Análisis (06/11/2026), tipo widgets:
 //
-//   · TU TABLERO: las cifras de arriba y los módulos, en orden. Se reordenan
-//     arrastrando desde el asa (ratón, dedo o teclado: Espacio y flechas) o
-//     con «Subir»/«Bajar»; cada módulo tiene su tamaño (pequeño, mediano,
-//     grande = 1, 2 o 3 columnas) y se quita con «×». «Explorar» se mueve pero
-//     no se quita. Debajo, una vista previa de cómo se empaquetan (los
-//     pequeños van juntos).
+//   · TU TABLERO: las cifras y los módulos, en orden. Se reordenan arrastrando
+//     desde el asa (ratón, dedo o teclado: Espacio y flechas) o con
+//     «Subir»/«Bajar» y se quitan con «×». «Explorar» se mueve pero no se quita.
+//     Desde el 07/11/2026 (Análisis en una pantalla) cada módulo vive en su
+//     vista (lo dice su descripción) y ya no hay tamaños ni vista previa; las
+//     cifras que no son de las cuatro de arriba salen en la vista «Gasto».
 //   · AÑADIR: el catálogo con un interruptor por cifra y por módulo.
 //   · «Restablecer» vuelve al tablero de siempre; nada se aplica hasta
 //     «Guardar» (se guarda en la cuenta: dashboard_config).
@@ -17,10 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ListaOrdenable } from "@/components/ui/lista-ordenable";
 import { cn } from "@/lib/utils";
+import { VISTAS, VISTA_DE_MODULO } from "@/lib/facturas/vistasAnalisis";
 import {
   activarCifra,
   activarModulo,
-  cambiarTamano,
   CIFRAS,
   CONFIG_TABLERO_POR_DEFECTO,
   infoCifra,
@@ -31,11 +31,9 @@ import {
   moverCifra,
   moverEnLista,
   moverModulo,
-  TAMANOS,
   type ConfigTablero,
   type IdCifra,
   type IdModulo,
-  type Tamano,
 } from "@/lib/facturas/widgetsTablero";
 import { DIALOGO_GRANDE, FOCO, Segmentado } from "./piezas";
 import { useFocoAlCerrar } from "./desplazar";
@@ -46,6 +44,12 @@ interface Props {
   onCerrar: () => void;
   onGuardar: (c: ConfigTablero) => Promise<unknown> | void;
 }
+
+/** La vista donde sale un módulo («Gasto», «Proveedores»…). */
+const nombreVista = (id: IdModulo): string => {
+  const v = VISTA_DE_MODULO[id] ?? (id === "subidas" ? "precios" : id === "ahorro" ? "ahorro" : id === "familias" ? "gasto" : "explorar");
+  return VISTAS.find((x) => x.id === v)?.etiqueta ?? v;
+};
 
 export function ConfiguradorTablero({ abierto, config, onCerrar, onGuardar }: Props) {
   const focoAlCerrar = useFocoAlCerrar(abierto);
@@ -95,7 +99,7 @@ function Contenido({ config, onCerrar, onGuardar }: Omit<Props, "abierto">) {
         <div className="min-w-0 flex-1">
           <DialogTitle className="text-lg font-semibold leading-tight tracking-tight sm:text-xl">Personalizar el tablero</DialogTitle>
           <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
-            Elige qué cifras y módulos se ven, en qué orden y de qué tamaño. Se guarda en tu cuenta.
+            Elige qué módulos salen en cada vista y qué cifras de más salen en «Gasto». Se guarda en tu cuenta.
           </DialogDescription>
         </div>
         <DialogClose className={cn("-mr-2 -mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground", FOCO)} aria-label="Cerrar">
@@ -128,7 +132,7 @@ function Contenido({ config, onCerrar, onGuardar }: Omit<Props, "abierto">) {
               Tu tablero
             </h3>
 
-            <Subtitulo>Cifras de arriba</Subtitulo>
+            <Subtitulo>Cifras de «Gasto»</Subtitulo>
             {borrador.cifras.length === 0 ? (
               <Vacio>Sin cifras arriba. Añádelas desde «Añadir».</Vacio>
             ) : (
@@ -136,7 +140,7 @@ function Contenido({ config, onCerrar, onGuardar }: Omit<Props, "abierto">) {
                 ids={borrador.cifras}
                 nombre={(id) => infoCifra(id as IdCifra).titulo}
                 onMover={(d, h) => setBorrador((c) => ({ ...c, cifras: moverEnLista(c.cifras, d, h) }))}
-                aria-label="Cifras de arriba, en orden"
+                aria-label="Cifras de «Gasto», en orden"
                 className="space-y-1"
               >
                 {(id, i, { asa }) => {
@@ -170,27 +174,7 @@ function Contenido({ config, onCerrar, onGuardar }: Omit<Props, "abierto">) {
                 const m = borrador.modulos[i];
                 const info = infoModulo(id as IdModulo);
                 return (
-                  <Fila asa={asa} titulo={info.titulo} descripcion={info.fijo ? "Siempre a todo lo ancho; se puede mover, no quitar" : info.descripcion}>
-                    {!info.soloTamano && (
-                      <div role="group" aria-label={`Tamaño de «${info.titulo}»`} className="inline-flex shrink-0 gap-0.5 rounded-lg bg-muted/50 p-0.5">
-                        {TAMANOS.map((t) => (
-                          <button
-                            key={t.valor}
-                            type="button"
-                            aria-pressed={m.tamano === t.valor}
-                            aria-label={`${t.etiqueta} (${t.columnas} ${t.columnas === 1 ? "columna" : "columnas"})`}
-                            title={`${t.etiqueta}: ${t.columnas} ${t.columnas === 1 ? "columna" : "columnas"}`}
-                            onClick={() => setBorrador((c) => cambiarTamano(c, m.id, t.valor as Tamano))}
-                            className={cn(
-                              "inline-flex h-8 min-w-8 items-center justify-center rounded-md px-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm pointer-coarse:h-10 pointer-coarse:min-w-10",
-                              FOCO,
-                            )}
-                          >
-                            {t.corta}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  <Fila asa={asa} titulo={info.titulo} descripcion={info.fijo ? "La vista «Explorar»: se puede mover, no quitar" : `${info.descripcion} · en «${nombreVista(info.id)}»`}>
                     <SubirBajar
                       nombre={info.titulo}
                       primero={i === 0}
@@ -209,9 +193,7 @@ function Contenido({ config, onCerrar, onGuardar }: Omit<Props, "abierto">) {
               }}
             </ListaOrdenable>
 
-            <Subtitulo className="mt-5">Vista previa en pantalla ancha</Subtitulo>
-            <p className="mb-2 text-xs text-muted-foreground">Pequeño = 1 columna, mediano = 2, grande = 3. Los pequeños se colocan juntos en los huecos.</p>
-            <VistaPrevia config={borrador} />
+
           </section>
 
           {/* ── Añadir ── */}
@@ -350,33 +332,3 @@ function ItemCatalogo({
   );
 }
 
-/** Cómo se empaquetan los módulos en 3 columnas (la misma rejilla `dense` del tablero). */
-function VistaPrevia({ config }: { config: ConfigTablero }) {
-  return (
-    <div aria-hidden className="w-full max-w-xl rounded-lg border border-dashed border-border bg-muted/20 p-2">
-      {config.cifras.length > 0 && (
-        <div className="mb-1.5 grid grid-cols-4 gap-1">
-          {config.cifras.map((c) => (
-            <span key={c} className="truncate rounded bg-muted px-1.5 py-1 text-xs font-medium text-muted-foreground">
-              {infoCifra(c).titulo}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="grid grid-cols-3 gap-1 [grid-auto-flow:row_dense]">
-        {config.modulos.map((m) => (
-          <span
-            key={m.id}
-            className={cn(
-              "flex min-h-10 min-w-0 items-center truncate rounded px-1.5 text-xs font-medium",
-              m.id === "explorar" ? "bg-primary/10 text-primary" : "bg-card text-foreground ring-1 ring-border",
-              m.tamano === "s" ? "col-span-1" : m.tamano === "m" ? "col-span-2" : "col-span-3",
-            )}
-          >
-            {infoModulo(m.id).titulo}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}

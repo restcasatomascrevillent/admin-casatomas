@@ -3,7 +3,7 @@
 // revisar», «Regalado por proveedor» y «Evolución de un producto». Leen las RPC de siempre: el tablero
 // (meses), `explorar_compras` (rankings) y `documentos_de_cifra`
 // (albaranes). Solo piden datos si están en el tablero (si no, no se montan).
-import { useId, useMemo, useState } from "react";
+import { useContext, useId, useMemo, useState } from "react";
 import { BarChart3, FileText, LineChart, Search, ShoppingCart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ import {
   FOCO,
   SinDatos,
   Tarjeta,
+  TarjetaLlena,
   type AccionMenu,
 } from "./piezas";
 import { GraficaExplorador } from "./GraficaExplorador";
@@ -83,6 +84,8 @@ export function GastoPorMesModulo({
   onIrA?: (enlace: string) => void;
 }) {
   const con = meses.filter((m) => m.documentos > 0 || m.total !== 0);
+  // En una vista de Análisis la gráfica llena su caja (piezas › TarjetaLlena).
+  const llena = useContext(TarjetaLlena);
   const porMes = useMemo(() => alertasPorClave(alertasDelPeriodo(alertas, periodo, local), "mes"), [alertas, periodo, local]);
   const hayMarcas = con.some((m) => porMes.has(m.mes));
   const max = Math.max(1, ...con.map((m) => Math.max(0, m.casa_tomas) + Math.max(0, m.touza)));
@@ -110,7 +113,7 @@ export function GastoPorMesModulo({
               </span>
             </p>
           )}
-          <ol className={cn("flex items-stretch gap-1 @[28rem]:gap-1.5", tamano === "s" ? "h-36" : "h-44")} aria-label="Gasto de cada mes">
+          <ol className={cn("flex items-stretch gap-1 @[28rem]:gap-1.5", llena ? "min-h-36 flex-1" : tamano === "s" ? "h-36" : "h-44")} aria-label="Gasto de cada mes">
             {con.map((m) => {
               const ct = Math.max(0, m.casa_tomas);
               const tz = conTouza ? Math.max(0, m.touza) : 0;

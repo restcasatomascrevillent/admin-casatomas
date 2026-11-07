@@ -1,6 +1,8 @@
-// Periodo del tablero: Mes · Trimestre · Año · Todo · Personalizado.
-// «Personalizado» abre un calendario táctil (rango desde–hasta) con atajos de
-// un toque (últimos 7/30/90 días, este mes, mes anterior, este año, año pasado).
+// Periodo del tablero: Mes · Trimestre · Año · Todo · y un icono de calendario
+// («Elegir fechas», antes «Personalizado»; 07/11/2026, barra única de Análisis)
+// que abre un calendario táctil (rango desde–hasta) con atajos de un toque
+// (últimos 7/30/90 días, este mes, mes anterior, este año, año pasado). Con un
+// rango elegido, el icono lleva al lado sus fechas.
 import { useState } from "react";
 import { CalendarRange } from "lucide-react";
 import type { DateRange } from "react-day-picker";
@@ -15,9 +17,22 @@ import { FOCO, useEscapeCierra } from "./piezas";
 const aFecha = (iso: string) => new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
 
 const BOTON =
-  "min-h-11 whitespace-nowrap rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm";
+  "whitespace-nowrap rounded-md font-medium text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm";
+const TAMANO = { normal: "min-h-11 px-3 text-sm", compacto: "min-h-8 px-2 text-[0.8125rem] pointer-coarse:min-h-11 2xl:px-2.5" } as const;
 
-export function SelectorPeriodo({ valor, onCambio, hoy }: { valor: SeleccionPeriodo; onCambio: (v: SeleccionPeriodo) => void; hoy: Date }) {
+export function SelectorPeriodo({
+  valor,
+  onCambio,
+  hoy,
+  compacto = false,
+}: {
+  valor: SeleccionPeriodo;
+  onCambio: (v: SeleccionPeriodo) => void;
+  hoy: Date;
+  /** Más bajo, para la barra única de Análisis. */
+  compacto?: boolean;
+}) {
+  const tam = TAMANO[compacto ? "compacto" : "normal"];
   const [abierto, setAbierto] = useState(false);
   const [rango, setRango] = useState<DateRange | undefined>();
   const personalizado = valor.tipo === "personalizado" ? valor : null;
@@ -35,23 +50,38 @@ export function SelectorPeriodo({ valor, onCambio, hoy }: { valor: SeleccionPeri
   const listo = rango?.from && rango?.to;
 
   return (
-    <div role="group" aria-label="Periodo" className="inline-flex max-w-full shrink-0 flex-wrap gap-1 rounded-lg bg-muted/40 p-1">
+    <div role="group" aria-label="Periodo" className={cn("inline-flex max-w-full shrink-0 flex-wrap rounded-lg bg-muted/40", compacto ? "gap-0.5 p-0.5" : "gap-1 p-1")}>
       {periodosAnalisis(hoy).map((o) => (
         <button
           key={o.valor}
           type="button"
           aria-pressed={valor.tipo === o.valor}
+          aria-label={compacto && o.valor === "anio" ? o.etiqueta : undefined}
           onClick={() => onCambio({ tipo: o.valor as PeriodoAnalisis })}
-          className={cn(BOTON, FOCO)}
+          className={cn(BOTON, tam, FOCO)}
         >
-          {o.etiqueta}
+          {/* En la barra única, «Año» a secas salvo en pantallas muy anchas (el año sigue en el nombre accesible). */}
+          {compacto && o.valor === "anio" ? (
+            <>
+              Año<span className="hidden 2xl:inline">{o.etiqueta.slice(3)}</span>
+            </>
+          ) : (
+            o.etiqueta
+          )}
         </button>
       ))}
       <Popover open={abierto} onOpenChange={abrir}>
         <PopoverTrigger asChild>
-          <button type="button" aria-pressed={!!personalizado} className={cn(BOTON, FOCO, "inline-flex items-center gap-1.5")} data-testid="periodo-personalizado">
+          <button
+            type="button"
+            aria-pressed={!!personalizado}
+            aria-label={personalizado ? `Elegir fechas (ahora, ${textoRango(personalizado.desde, personalizado.hasta)})` : "Elegir fechas"}
+            title="Elegir fechas"
+            className={cn(BOTON, tam, FOCO, "inline-flex items-center gap-1.5", !personalizado && (compacto ? "px-2" : "px-2.5"))}
+            data-testid="periodo-personalizado"
+          >
             <CalendarRange className="h-4 w-4" aria-hidden />
-            {personalizado ? <span className="tabular-nums">{textoRango(personalizado.desde, personalizado.hasta)}</span> : "Personalizado"}
+            {personalizado && <span className="tabular-nums">{textoRango(personalizado.desde, personalizado.hasta)}</span>}
           </button>
         </PopoverTrigger>
         {/* En el móvil no cabía (QA 05/11/2026): se ajusta al alto que queda (sin pegarse al borde),
