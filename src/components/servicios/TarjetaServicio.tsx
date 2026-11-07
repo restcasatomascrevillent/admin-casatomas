@@ -1,7 +1,8 @@
-import { AlertTriangle, ExternalLink, Info, Loader2, Pencil, RefreshCw } from "lucide-react";
+import { AlertTriangle, ChevronDown, ExternalLink, Info, Loader2, Pencil, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { iconoCategoria } from "./iconosServicio";
 import {
   type LecturaServicio,
   type ServicioContratado,
@@ -16,6 +17,7 @@ import {
   formatearEur,
   haceCuanto,
   peorSemaforo,
+  sinAclaracion,
   textoImporteConEur,
   textoPrecio,
 } from "@/lib/servicios";
@@ -37,12 +39,10 @@ interface Props {
 const textoLista = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 const esObjeto = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-function textoRenovacion(s: ServicioContratado): string {
+/** La fecha de renovación con su ciclo; null si no hay fecha (gratis, por uso o sin apuntar). */
+function textoRenovacion(s: ServicioContratado): string | null {
   const f = fechaCorta(s.renovacion);
-  if (f) return `${f} (${TEXTO_CICLO[s.ciclo] ?? s.ciclo})`;
-  if (s.ciclo === "gratuito") return "No hay que renovar (plan gratis)";
-  if (s.ciclo === "por_uso") return "No hay cuota: se paga lo que se usa";
-  return "Sin fecha (apúntala en «Editar»)";
+  return f ? `${f} (${TEXTO_CICLO[s.ciclo] ?? s.ciclo})` : null;
 }
 
 /** «20,00 US$ al mes (≈ 17,88 €)»: el precio del plan y, si no es en euros, su equivalente. */
@@ -79,6 +79,16 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, sin
   const fecha = lectura?.tomado_en ? new Date(lectura.tomado_en) : null;
   const variable = costeVariableDe(lectura);
   const categoria = TEXTO_CATEGORIA[servicio.categoria] ?? null;
+  const IconoCat = iconoCategoria(servicio.categoria);
+  const renovacion = textoRenovacion(servicio);
+  const notasMetricas = filas.filter((f) => f.nota).map((f) => ({ clave: f.clave, texto: `${f.etiqueta}: ${f.nota}` }));
+  // A la vista, solo lo que tiene dato; los límites del plan aún sin leer, en «Más detalles».
+  const conDato = filas.filter((f) => f.textoValor != null);
+  const sinDato = filas.filter((f) => f.textoValor == null);
+  // Lo secundario va plegado en «Más detalles» (06/11/2026, «mucho texto»).
+  const hayDetalles = Boolean(
+    servicio.cuenta || planDetectado || costeDetectado || dominios.length || secretoOpcional || avisos.length || servicio.notas || servicio.fuente_precio || notasMetricas.length || sinDato.length,
+  );
 
   return (
     // tabIndex -1: «Ver» del Resumen la enfoca (borde dorado) tras llevar la vista hasta ella.
@@ -92,8 +102,10 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, sin
       <CardHeader className="space-y-2 p-4 sm:p-5">
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            {categoria && <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{categoria}</p>}
-            <h2 id={idTitulo} className="text-lg font-semibold leading-tight text-foreground">{servicio.nombre}</h2>
+            <h2 id={idTitulo} className="flex min-w-0 items-center gap-2 text-lg font-semibold leading-tight text-foreground">
+              <IconoCat className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true">{categoria && <title>{categoria}</title>}</IconoCat>
+              <span className="min-w-0 break-words">{servicio.nombre}</span>
+            </h2>
             <p className="mt-0.5 break-words text-sm text-muted-foreground">
               Plan <span className="font-medium text-foreground">{servicio.plan || "sin dato"}</span> · {textoPrecioConEur(servicio, eurPorUsd)}
             </p>
@@ -117,43 +129,25 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, sin
             ) : null}
           </div>
         </div>
-        <dl className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
-          <dt className="text-muted-foreground">Renovación</dt>
-          <dd className="min-w-0 break-words">{textoRenovacion(servicio)}</dd>
-          {variable && (
-            <>
-              <dt className="text-muted-foreground">Gasto por uso este mes</dt>
-              <dd className="min-w-0 break-words">
-                <span className="font-medium tabular-nums text-foreground">{textoImporteConEur(variable, eurPorUsd)}</span>
-                {variable.origen === "estimado" && <span className="text-muted-foreground"> · en parte estimado</span>}
-              </dd>
-            </>
-          )}
-          {servicio.cuenta && (
-            <>
-              <dt className="text-muted-foreground">Cuenta</dt>
-              <dd className="min-w-0 break-words">{servicio.cuenta}</dd>
-            </>
-          )}
-          {(planDetectado || costeDetectado) && (
-            <>
-              <dt className="text-muted-foreground">Según la API</dt>
-              <dd className="min-w-0 break-words">
-                {planDetectado && <>plan {planDetectado}</>}
-                {planDetectado && costeDetectado && " · "}
-                {costeDetectado && <>renovaciones: {textoImporteConEur(costeDetectado, eurPorUsd)} al mes</>}
-              </dd>
-            </>
-          )}
-          {dominios.length > 0 && (
-            <>
-              <dt className="text-muted-foreground">Dominios</dt>
-              <dd className="min-w-0 break-words">
-                {dominios.map((d) => `${d.dominio}${d.caduca ? ` (caduca el ${d.caduca})` : ""}`).join(" · ")}
-              </dd>
-            </>
-          )}
-        </dl>
+        {(renovacion || variable) && (
+          <dl className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+            {renovacion && (
+              <>
+                <dt className="text-muted-foreground">Renovación</dt>
+                <dd className="min-w-0 break-words">{renovacion}</dd>
+              </>
+            )}
+            {variable && (
+              <>
+                <dt className="text-muted-foreground">Gasto por uso este mes</dt>
+                <dd className="min-w-0 break-words">
+                  <span className="font-medium tabular-nums text-foreground">{textoImporteConEur(variable, eurPorUsd)}</span>
+                  {variable.origen === "estimado" && <span className="text-muted-foreground"> · en parte estimado</span>}
+                </dd>
+              </>
+            )}
+          </dl>
+        )}
       </CardHeader>
 
       <CardContent className="flex min-w-0 flex-1 flex-col gap-3 px-4 pb-3 pt-0 sm:px-5">
@@ -167,37 +161,82 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, sin
         {sinLector && !lectura && (
           <p className="flex items-start gap-2 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
             <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>Sin lectura automática: este proveedor no da el consumo por una API sencilla. Míralo en su panel; aquí quedan el plan y sus límites.</span>
+            <span>Sin lectura automática: el consumo se mira en su panel.</span>
           </p>
         )}
         {cargando && !lectura && !sinLector ? (
           <p className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Leyendo el consumo…
           </p>
-        ) : filas.length > 0 ? (
+        ) : conDato.length > 0 ? (
           <ul className="min-w-0 divide-y divide-border/60" aria-label={`Consumo de ${servicio.nombre}`}>
-            {filas.map((f) => <BarraConsumo key={f.clave} fila={f} />)}
+            {conDato.map((f) => <BarraConsumo key={f.clave} fila={f} compacto />)}
           </ul>
         ) : (
           <p className="py-2 text-sm text-muted-foreground">
-            {faltaClave ? "Sin datos de consumo hasta que se configure la clave." : "No hay límites de uso apuntados para este servicio."}
+            {faltaClave ? "Sin datos de consumo hasta que se configure la clave." : sinDato.length > 0 ? "Aún sin datos de consumo." : "No hay límites de uso apuntados para este servicio."}
           </p>
         )}
-        {secretoOpcional && <AvisoClave secreto={secretoOpcional} opcional />}
-        {avisos.length > 0 && (
-          <ul className="space-y-1 text-xs text-muted-foreground" aria-label={`Avisos de ${servicio.nombre}`}>
-            {avisos.map((a) => <li key={a}>· {a}</li>)}
-          </ul>
-        )}
-        {servicio.notas && <p className="break-words text-xs text-muted-foreground">{servicio.notas}</p>}
-        {servicio.fuente_precio && (
-          <p className="text-xs text-muted-foreground">
-            <a href={servicio.fuente_precio} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">
-              Precios oficiales de {servicio.nombre}
-              <ExternalLink className="h-3 w-3" aria-hidden="true" />
-              <span className="sr-only">(se abre en otra pestaña)</span>
-            </a>
-          </p>
+        {hayDetalles && (
+          <details className="group min-w-0 rounded-md border bg-muted/20" data-testid={`detalles-${servicio.proveedor}`}>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-medium text-foreground [&::-webkit-details-marker]:hidden">
+              Más detalles
+              <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="min-w-0 space-y-3 border-t px-3 py-3">
+              {(servicio.cuenta || planDetectado || costeDetectado || dominios.length > 0) && (
+                <dl className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+                  {servicio.cuenta && (
+                    <>
+                      <dt className="text-muted-foreground">Cuenta</dt>
+                      <dd className="min-w-0 break-words">{servicio.cuenta}</dd>
+                    </>
+                  )}
+                  {(planDetectado || costeDetectado) && (
+                    <>
+                      <dt className="text-muted-foreground">Según la API</dt>
+                      <dd className="min-w-0 break-words">
+                        {planDetectado && <>plan {planDetectado}</>}
+                        {planDetectado && costeDetectado && " · "}
+                        {costeDetectado && <>renovaciones: {textoImporteConEur(costeDetectado, eurPorUsd)} al mes</>}
+                      </dd>
+                    </>
+                  )}
+                  {dominios.length > 0 && (
+                    <>
+                      <dt className="text-muted-foreground">Dominios</dt>
+                      <dd className="min-w-0 break-words">
+                        {dominios.map((d) => `${d.dominio}${d.caduca ? ` (caduca el ${d.caduca})` : ""}`).join(" · ")}
+                      </dd>
+                    </>
+                  )}
+                </dl>
+              )}
+              {secretoOpcional && <AvisoClave secreto={secretoOpcional} opcional />}
+              {sinDato.length > 0 && (
+                <p className="break-words text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Sin dato todavía:</span>{" "}
+                  {sinDato.map((f) => `${sinAclaracion(f.etiqueta)}${f.textoLimite ? ` (límite ${f.textoLimite})` : ""}`).join(" · ")}
+                </p>
+              )}
+              {(avisos.length > 0 || notasMetricas.length > 0) && (
+                <ul className="space-y-1 text-xs text-muted-foreground" aria-label={`Avisos y notas de ${servicio.nombre}`}>
+                  {avisos.map((a) => <li key={a}>· {a}</li>)}
+                  {notasMetricas.map((n) => <li key={n.clave}>· {n.texto}</li>)}
+                </ul>
+              )}
+              {servicio.notas && <p className="break-words text-xs text-muted-foreground">{servicio.notas}</p>}
+              {servicio.fuente_precio && (
+                <p className="text-xs text-muted-foreground">
+                  <a href={servicio.fuente_precio} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">
+                    Precios oficiales de {servicio.nombre}
+                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                    <span className="sr-only">(se abre en otra pestaña)</span>
+                  </a>
+                </p>
+              )}
+            </div>
+          </details>
         )}
       </CardContent>
 
@@ -207,7 +246,7 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, sin
             "Sin lectura automática"
           ) : (
             <>
-              Última lectura:{" "}
+              Leído{" "}
               {fecha ? (
                 <time dateTime={lectura!.tomado_en} title={fecha.toLocaleString("es-ES")}>{haceCuanto(lectura!.tomado_en)}</time>
               ) : (

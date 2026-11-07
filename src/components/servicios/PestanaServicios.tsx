@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { LecturaServicio, ServicioContratado } from "@/lib/servicios";
-import { ChipSemaforo } from "./BarraConsumo";
 import { TarjetaServicio } from "./TarjetaServicio";
 
 interface Props {
@@ -45,13 +44,6 @@ export function PestanaServicios({
 
   return (
     <div className="flex min-w-0 flex-col gap-4 pb-2">
-      <p className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>Semáforo del consumo:</span>
-        <ChipSemaforo estado="verde">Bien: menos del 70 %</ChipSemaforo>
-        <ChipSemaforo estado="ambar">Cerca del límite: 70–90 %</ChipSemaforo>
-        <ChipSemaforo estado="rojo">Al límite: más del 90 %</ChipSemaforo>
-      </p>
-
       {enUso.length === 0 ? (
         <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">No hay ningún servicio en uso. Añádelos o vuelve a ponerlos en «Configurar».</p>
       ) : (

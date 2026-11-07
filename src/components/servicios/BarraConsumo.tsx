@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { type FilaMetrica, type Semaforo, TEXTO_SEMAFORO, formatearPorcentaje } from "@/lib/servicios";
+import { type FilaMetrica, type Semaforo, TEXTO_SEMAFORO, formatearPorcentaje, sinAclaracion } from "@/lib/servicios";
 
 /**
  * Colores del semáforo. Relleno de la barra en tono 700 (contraste ≥ 3:1 con
@@ -22,6 +22,12 @@ const COLOR_SEMAFORO: Record<Semaforo, { barra: string; chip: string; punto: str
     chip: "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200",
     punto: "bg-red-700",
   },
+};
+
+const TONO_TEXTO: Record<Semaforo, string> = {
+  verde: "text-emerald-800 dark:text-emerald-300",
+  ambar: "text-amber-900 dark:text-amber-300",
+  rojo: "text-red-800 dark:text-red-300",
 };
 
 export function ChipSemaforo({ estado, children, className }: { estado: Semaforo; children?: React.ReactNode; className?: string }) {
@@ -53,10 +59,39 @@ export function BarraPorcentaje({ porcentaje, estado, etiqueta, className }: { p
   );
 }
 
-/** Una métrica: cifra frente al límite, barra con % y semáforo, periodo y nota. */
-export function BarraConsumo({ fila }: { fila: FilaMetrica }) {
+/**
+ * Una métrica: cifra frente al límite, barra con % y semáforo, periodo y nota.
+ * `compacto` (tarjetas de Servicios, 06/11/2026): sin la nota ni «dato informativo»;
+ * la nota va en «Más detalles» de la tarjeta.
+ */
+export function BarraConsumo({ fila, compacto = false }: { fila: FilaMetrica; compacto?: boolean }) {
   const { porcentaje, semaforo: estado } = fila;
   const sinDato = fila.textoValor == null;
+  if (compacto) {
+    // Una línea: nombre corto y cifra; debajo, barra fina con el %. El nombre entero y el
+    // periodo, al pasar el ratón (y para el lector de pantalla, en la barra).
+    const nombre = sinAclaracion(fila.etiqueta);
+    const ayuda = [fila.etiqueta, fila.periodo].filter(Boolean).join(" · ");
+    return (
+      <li className="min-w-0 py-2" data-metrica={fila.clave}>
+        <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
+          <span className="min-w-0 break-words font-medium text-foreground" title={ayuda}>{nombre}</span>
+          <span className="ml-auto tabular-nums text-muted-foreground">
+            <span className="text-foreground">{fila.textoValor ?? "sin dato"}</span>
+            {fila.textoLimite && ` / ${fila.textoLimite}`}
+          </span>
+        </div>
+        {porcentaje != null && estado && (
+          <div className="mt-1.5 flex min-w-0 items-center gap-2">
+            <BarraPorcentaje porcentaje={porcentaje} estado={estado} etiqueta={fila.etiqueta} className="h-2" />
+            <span className={cn("w-12 shrink-0 text-right text-xs font-semibold tabular-nums", TONO_TEXTO[estado])}>
+              {porcentaje > 0 && porcentaje < 1 ? "<1 %" : `${Math.round(porcentaje)} %`}
+            </span>
+          </div>
+        )}
+      </li>
+    );
+  }
   return (
     <li className="min-w-0 space-y-1.5 py-2.5" data-metrica={fila.clave}>
       <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
@@ -74,9 +109,9 @@ export function BarraConsumo({ fila }: { fila: FilaMetrica }) {
           </ChipSemaforo>
         )}
         {fila.periodo && <span>{fila.periodo}</span>}
-        {fila.limite == null && !sinDato && <span>· dato informativo, sin límite en el plan</span>}
+        {!compacto && fila.limite == null && !sinDato && <span>· dato informativo, sin límite en el plan</span>}
       </div>
-      {fila.nota && <p className="break-words text-xs text-muted-foreground">{fila.nota}</p>}
+      {!compacto && fila.nota && <p className="break-words text-xs text-muted-foreground">{fila.nota}</p>}
     </li>
   );
 }

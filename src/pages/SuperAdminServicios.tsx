@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, LayoutDashboard, Loader2, RefreshCw, Server, Settings2, Wallet } from "lucide-react";
+import { Activity, AlertTriangle, Loader2, RefreshCw, Server, Settings2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { useVentanaModelos } from "@/components/costes/CostesIa";
 import { DialogoEditarServicio } from "@/components/servicios/DialogoEditarServicio";
 import { PestanaConfigurar } from "@/components/servicios/PestanaConfigurar";
 import { PestanaCostes } from "@/components/servicios/PestanaCostes";
-import { PestanaResumen } from "@/components/servicios/PestanaResumen";
+import { PestanaEstado } from "@/components/servicios/PestanaEstado";
 import { PestanaServicios } from "@/components/servicios/PestanaServicios";
 import { PESTANA_POR_DEFECTO, type PestanaServicios as Pestana, pestanaDeUrl } from "@/components/servicios/pestanas";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
@@ -22,8 +22,8 @@ import {
   type DestinoPendiente,
   type LecturaServicio,
   type ServicioContratado,
+  estadoInstalacion,
   haceCuanto,
-  masCercaDelLimite,
   ordenarServicios,
   pendientesServicios,
   proximasRenovaciones,
@@ -46,14 +46,14 @@ const CONTENIDO_PESTANA = "mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contai
  * Super Admin › Servicios: el sitio único de lo contratado y de lo que cuesta
  * (desde el 04/11/2026 también la antigua pantalla «Costes»; su ruta redirige
  * a la pestaña Costes). Cuatro pestañas, en la URL (`?tab=`):
- *   · Resumen: gasto del mes y del año, lo que requiere atención, lo más cerca
- *     del límite y las próximas renovaciones.
+ *   · Estado (06/11/2026, antes «Resumen»): el semáforo de toda la instalación,
+ *     una ficha visual por servicio y, si hay algo, una línea por cosa que mirar.
  *   · Servicios: una tarjeta por servicio en uso con su consumo.
  *   · Costes: coste del mes por proveedor y la IA por proceso (tope, mes
  *     anterior, sincronizar con OpenAI).
  *   · Configurar: añadir, quitar, borrar y editar servicios; tipo de cambio.
  * Las lecturas las hace la Edge Function `servicios-uso` (caché de 15 min);
- * «Actualizar todo ahora» la fuerza.
+ * «Actualizar» (arriba) la fuerza para todos.
  */
 export default function SuperAdminServicios() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -105,7 +105,7 @@ export default function SuperAdminServicios() {
   const eurPorUsd = config.data?.eurPorUsd ?? CAMBIO_POR_DEFECTO;
   const resumen = useMemo(() => resumirCostes(enUso, porProveedor, eurPorUsd), [enUso, porProveedor, eurPorUsd]);
   const renovaciones = useMemo(() => proximasRenovaciones(enUso, porProveedor), [enUso, porProveedor]);
-  const cercanos = useMemo(() => masCercaDelLimite(enUso, porProveedor), [enUso, porProveedor]);
+  const estadoGeneral = useMemo(() => estadoInstalacion({ servicios: enUso, lecturas: porProveedor, renovaciones, sinLector }), [enUso, porProveedor, renovaciones, sinLector]);
   const avisosIa = useMemo(() => {
     const a = calcularAvisosCostes({ sinRegistro: sinRegistroQ.data, modelos: porModeloQ.data, fijos: [], fijosSinVerificarRpc: null });
     return { sinRegistro: a.sinInstrumentar.length + a.instrumentadasMudas.length, modelosSinTarifa: a.modelosSinTarifa.length };
@@ -137,6 +137,7 @@ export default function SuperAdminServicios() {
     cambiarPestana(d.pestana);
     setFoco(d.pestana === "servicios" && d.proveedor ? d.proveedor : null);
   };
+  const abrirServicio = (proveedor: string) => irA({ pestana: "servicios", proveedor });
   const anadir = () => setCreando(servicioNuevo(Math.max(0, ...todos.map((s) => s.orden ?? 0)) + 10));
 
   // Cargando, error o sin migración: lo dicen las pestañas que dependen de los servicios.
@@ -168,27 +169,20 @@ export default function SuperAdminServicios() {
         <header className="flex min-w-0 shrink-0 flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Server className="h-6 w-6 shrink-0 text-destructive sm:h-8 sm:w-8" aria-hidden="true" />
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-foreground">Servicios</h1>
-              <p className="hidden text-sm text-muted-foreground sm:block">Lo contratado, cuánto cuesta y cuánto llevamos gastado de cada plan.</p>
-            </div>
+            <h1 className="min-w-0 text-2xl font-bold text-foreground">Servicios</h1>
           </div>
           {disponible && (
-            <div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto sm:items-end">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 w-full gap-2 sm:w-auto"
-                onClick={() => void pedirActualizacion()}
-                disabled={actualizando !== null || lecturas.isLoading}
-              >
-                <RefreshCw className={cn("h-4 w-4", actualizando === "todos" && "animate-spin")} aria-hidden="true" />
-                Actualizar todo ahora
-              </Button>
-              <p className="text-xs text-muted-foreground" role="status">
-                {lecturas.isLoading ? "Leyendo el consumo…" : `Última lectura: ${haceCuanto(ultima)}`}
-              </p>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 gap-2"
+              onClick={() => void pedirActualizacion()}
+              disabled={actualizando !== null || lecturas.isLoading}
+              title={lecturas.isLoading ? "Leyendo el consumo…" : `Última lectura ${haceCuanto(ultima)}`}
+            >
+              <RefreshCw className={cn("h-4 w-4", actualizando === "todos" && "animate-spin")} aria-hidden="true" />
+              Actualizar
+            </Button>
           )}
         </header>
 
@@ -207,20 +201,21 @@ export default function SuperAdminServicios() {
           <PestanasPagina
             iconosSoloEscritorio
             pestanas={[
-              { valor: "resumen", etiqueta: "Resumen", icono: <LayoutDashboard />, contador: urgentes, tonoContador: "dorado", etiquetaContador: `${urgentes} ${urgentes === 1 ? "urgente" : "urgentes"}` },
+              { valor: "estado", etiqueta: "Estado", icono: <Activity />, contador: urgentes, tonoContador: "dorado", etiquetaContador: `${urgentes} ${urgentes === 1 ? "urgente" : "urgentes"}` },
               { valor: "servicios", etiqueta: "Servicios", icono: <Server />, contador: disponible ? enUso.length : undefined },
               { valor: "costes", etiqueta: "Costes", icono: <Wallet /> },
               { valor: "configurar", etiqueta: "Configurar", icono: <Settings2 /> },
             ]}
           />
-          <TabsContent value="resumen" className={CONTENIDO_PESTANA}>
+          <TabsContent value="estado" className={CONTENIDO_PESTANA}>
             {estado ?? (
-              <PestanaResumen
+              <PestanaEstado
+                estado={estadoGeneral}
                 resumen={resumen}
                 pendientes={pendientes}
-                cercanos={cercanos}
-                renovaciones={renovaciones}
+                ultima={ultima}
                 cargandoLecturas={lecturas.isLoading}
+                onAbrir={abrirServicio}
                 onIr={irA}
               />
             )}
