@@ -88,3 +88,58 @@ describe("VistaHoyMovil · solo para sentar", () => {
     expect(screen.getByTestId("hoy-movil-controles").querySelector("[data-sidebar=trigger]")).toBeNull();
   });
 });
+
+// 07/11/2026: en «Hoy» de escritorio esta MISMA lista va de columna a la izquierda del plano. El buscador y el
+// turno los manda la fila de filtros de la pestaña; sin la fila de controles del móvil ni la vista «Mesas».
+describe("VistaHoyMovil · como columna de escritorio", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 7, 13, 5));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const montarColumna = (busqueda: string, filtroTurno: "todo" | "comida" | "cena") => {
+    const cliente = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const reservas = [res("a", "Ana Espera", "confirmada"), { ...res("c", "Carla Cena", "confirmada"), hora: "21:30:00" }] as never[];
+    return render(
+      <QueryClientProvider client={cliente}>
+        <VistaHoyMovil reservas={reservas} fecha="2026-11-07" columna={{ busqueda, filtroTurno }} />
+      </QueryClientProvider>,
+    );
+  };
+
+  it("sin la fila de controles del móvil (ni «Reservas | Mesas», ni su buscador)", () => {
+    montarColumna("", "todo");
+    expect(screen.getByTestId("hoy-columna")).toBeInTheDocument();
+    expect(screen.queryByTestId("hoy-movil-controles")).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Mesas" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Buscar reservas" })).toBeNull();
+  });
+
+  it("filtra con el buscador y el turno que recibe", () => {
+    const { rerender } = montarColumna("", "todo");
+    expect(screen.getByText("Ana Espera")).toBeInTheDocument();
+    expect(screen.getByText("Carla Cena")).toBeInTheDocument();
+    const cliente = new QueryClient();
+    const reservas = [res("a", "Ana Espera", "confirmada"), { ...res("c", "Carla Cena", "confirmada"), hora: "21:30:00" }] as never[];
+    rerender(
+      <QueryClientProvider client={cliente}>
+        <VistaHoyMovil reservas={reservas} fecha="2026-11-07" columna={{ busqueda: "", filtroTurno: "cena" }} />
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByText("Ana Espera")).toBeNull();
+    expect(screen.getByText("Carla Cena")).toBeInTheDocument();
+    rerender(
+      <QueryClientProvider client={cliente}>
+        <VistaHoyMovil reservas={reservas} fecha="2026-11-07" columna={{ busqueda: "ana", filtroTurno: "todo" }} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText("Ana Espera")).toBeInTheDocument();
+    expect(screen.queryByText("Carla Cena")).toBeNull();
+  });
+
+  it("cada fila conserva su botón «Sentar»", () => {
+    montarColumna("", "todo");
+    expect(screen.getAllByRole("button", { name: /Sentar/ }).length).toBeGreaterThan(0);
+  });
+});
