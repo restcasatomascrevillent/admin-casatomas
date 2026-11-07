@@ -4,6 +4,11 @@ Migración `supabase/migrations/20261106400000_facturas_volumenes.sql` (06/11/20
 Test: `supabase/tests/facturas_volumenes_test.sql`. Deshacer:
 `supabase/rollbacks/20261106400000_facturas_volumenes_ROLLBACK.sql`.
 
+Bebidas en el chatbot (formatos, botellas por producto, familias por categoría):
+`20261113100000_chat_facturas_bebidas.sql`, test `tests/chat_facturas_bebidas_test.sql`,
+rollback `rollbacks/20261113100000_chat_facturas_bebidas_ROLLBACK.sql`. Ver
+[Bebidas en el chatbot](#bebidas-en-el-chatbot-20261113100000).
+
 Responde a «¿cuántos litros de cerveza he comprado?», «¿cuántas cervezas?»,
 «¿cuántos barriles?», «litros de vino tinto», «litros de aceite», «kilos de gamba»
 aunque se compre en cajas, packs, barriles o botellines. Antes respondía «no hay
@@ -14,7 +19,7 @@ el contenido del catálogo estaba vacío y ninguna RPC sumaba volumen.
 
 | Sitio | Qué |
 |---|---|
-| Chatbot (`chat-facturas`) | Herramienta `volumen_comprado` → RPC `volumen_comprado_agente(p_texto, p_categoria, p_desde, p_hasta, p_local, p_medida)` |
+| Chatbot (`chat-facturas`) | Herramienta `volumen_comprado` → RPC `volumen_comprado_agente(p_texto, p_categoria, p_desde, p_hasta, p_local, p_medida, p_limite, p_orden)`. También le llegan las familias de bebidas pedidas por `buscar_productos`, `compras_producto` o `ranking` por cantidad |
 | Análisis › Explorador | Medidas **Litros** y **Kilos** (`explorar_compras` con `p_medida = 'litros' | 'kilos'`) |
 | SQL | Vista `volumen_lineas` (security_invoker: la misma RLS que facturas) |
 
@@ -112,10 +117,101 @@ explorador, `total.lineas_sin_convertir` («N sin convertir» junto al total).
   vino sin «tinto» en el nombre: el catálogo no distingue tinto/blanco).
 - `p_medida`: `l` / `kg`; null = la que tenga más líneas convertidas (el resto va en
   `otra_unidad`).
-- Devuelve `total`, `unidad`, `envases`, `importe_base` (sin IVA), `lineas_convertidas`,
-  `lineas_sin_convertir`, `por_producto` (12: total, envases, envase, `compra` = «380 caja
-  de 7.92 l»), `por_envase` («50 l»: 192 envases = barriles), `por_proveedor`, `por_mes`,
-  `sin_convertir` y `nota`.
+- `p_limite` (1-40, por defecto 12) y `p_orden` (`envases`/`botellas` = más botellas
+  primero; si no, por litros).
+- Devuelve `total`, `unidad`, `envases` (botellas/latas/barriles con las cajas abiertas),
+  `cajas`, `importe_base` (sin IVA), `lineas_convertidas`, `lineas_sin_convertir`,
+  `por_producto` (total, envases, envase «33 cl», `formato` «tercio 33 cl», `compra` = «380
+  caja de 24» o «99 caja de 6, 4 botella», `proveedor` principal «… (+1)»), `productos`,
+  `productos_truncado`, `por_envase` (`formato` «barril 50 l», `envase` «50 l», envases,
+  total), `por_proveedor` (total, envases, productos), `por_mes`, `sin_convertir` (con
+  cantidad en los ejemplos) y `nota`.
+
+## Bebidas en el chatbot (20261113100000)
+
+Prueba del dueño en la demo (06/11/2026, 08:43) que salió mal:
+
+| Pregunta | Qué contestaba | Por qué |
+|---|---|---|
+| «¿Tenemos registros de cerveza?» (y «la bebida cerveza») | «CERVEZA EL ALCAZAR» y «MOSTAZA DE CERVEZA» | `buscar_productos` busca el **texto**: Heineken o los barriles de Cruzcampo no llevan la palabra y la mostaza (Despensa) sí |
+| «¿Cuántos litros de cerveza en 2026?» | «No hay datos» | `volumen_comprado` aún no estaba desplegado (lo estuvo a las 10:04) |
+| «Botellas por vino» | «Laurent-Perrier La Cuvée: 4 botellas y 99 cajas» | Sumaba la cantidad por unidad; son 598 botellas (99 × 6 + 4) |
+
+Arreglo, sin IA y sin tocar datos:
+
+1. **Familias por categoría** (`chat-facturas/herramientas.ts`, `familiaDeBebida`): «cerveza»,
+   «los vinos», «la bebida cerveza», «licores», «refrescos», «bebidas» pedidos a
+   `buscar_productos`, `compras_producto` o `ranking` por cantidad van a
+   `volumen_comprado_agente` **por categoría del catálogo** (nada de comida). El resultado
+   lleva `nota_ruta` explicándolo. No entran «agua», «cava» ni «champán» (como categoría
+   serían todos los refrescos o todos los vinos) ni un producto concreto («mostaza de
+   cerveza», «vino blanco», «heineken»).
+2. **Formato con nombre** (`volumen_tipo_envase`): `barril` (texto «barril»/«keg», o cerveza
+   ≥ 5 l), `lata` («lata», «LT 33CL»), `brick`, `bidón`, `garrafa`; en cerveza `tercio` 33 cl,
+   `quinto` 20 cl, `botellín` 25 cl; en vino `magnum` 1,5 l, `doble magnum` 3 l, `media
+   botella` 37,5 cl; si no, `botella`. Mira el producto, el texto de la línea y la unidad.
+3. **Botellas por producto**: `p_orden = 'envases'` (25 productos si el modelo no dice otro
+   número) y `compra` legible. El resultado de esta herramienta puede llegar a 12.000
+   caracteres (30 vinos ≈ 9.200; el tope general es 6.000).
+4. **Cómo contestar** va en `nota_respuesta` del resultado (solo viaja si se usa): «598
+   botellas (99 cajas de 6 y 4 sueltas)», nunca «4 botellas y 99 cajas»; tipos con
+   `por_envase.formato`; proveedores; líneas sin convertir. En el prompt solo hay una línea en
+   HERRAMIENTAS y la regla 15 (+256 caracteres, ~65 tokens por ronda).
+
+Cifras de la demo con la versión nueva (2026):
+
+- Cerveza: 20.520,88 l; 192 barriles de 50 l, 176 de 20 l, 22.236 tercios, 120 botellas de
+  50 cl y 12 botellines de 25 cl; 1.038 cajas; todo de Distribuciones de Bebidas Catral.
+- Vino: 214 vinos, 7.709 botellas (6.006 de 75 cl, 764 magnum, 698 brick de 1 l…). Arienzo
+  720 (120 cajas de 6), Laurent-Perrier La Cuvée 598 (99 cajas de 6 y 4 sueltas), Viña
+  Lanzar 564 brick, Marqués de Murrieta Reserva 402.
+
+## Asociación de términos y precio por litro (20261107100000)
+
+Fallos del dueño en la demo v0.332: «comparativa de a cuánto compro el litro de cerveza
+por proveedor» → «no hay cerveza en litros, solo mostaza de cerveza»; «hazme la
+comparativa» → lo mismo; «cuánto me he gastado en vino en el último mes» → «el vino no
+está separado». Test: `supabase/tests/chat_facturas_asociacion_test.sql`.
+
+- **`terminos_agente`** (tabla, ampliable): palabra o sinónimo → familia del catálogo
+  (`categoria_clave`), `nivel` (`familia`: cerveza, birra, caña, tercio, barril, vino,
+  licor, marisco, pescado, carne, embutido, conserva…; `producto`: cava, tinto, ginebra,
+  agua, gamba, merluza, jamón, aceite…) y `formato` (barril, tercio, quinto, botellín,
+  lata, botella, magnum). `categoria_agente` lee de aquí sus sinónimos.
+- **`asociar_termino_agente(texto)`**: `tipo` familia / producto / formato / texto. Una
+  marca se asocia por el catálogo («cruzcampo» → Cervezas; sin Servicios, donde están
+  los envases retornables). El catálogo manda sobre la palabra suelta: «mostaza de
+  cerveza» es de Despensa, «vinagre de vino» de Despensa, «croqueta de gambas» de
+  Congelados.
+- **`lineas_producto_agente`** (compras_producto, historial_precios, serie_precios,
+  variacion_precios, volumen_comprado): familia → todas las líneas de la familia
+  (`metodo = 'familia'`); producto → la búsqueda de siempre, quedándose con las líneas de
+  su familia raíz y apartando las de otras familias en `subproductos` («Croqueta de rape
+  y gambas», «Extracto de gamba roja»), salvo que no quede ninguna (pedir «mostaza de
+  cerveza» sigue dando la mostaza).
+- **`asociar_pregunta_agente(pregunta)`**: chat-facturas añade al modelo una PISTA con
+  las palabras del catálogo de la pregunta («vino» = familia Vinos), el tema del turno
+  anterior si la pregunta no trae ninguno («hazme la comparativa») y los meses recientes
+  incompletos (`meses_compras_incompletos`).
+- **`volumen_comprado_agente`** (misma firma): formato pedido («cerveza de barril»,
+  «tercios»; «botellín» = tercio, quinto o botellín) y **precio** = importe base SIN IVA
+  ÷ litros (o kilos) de las líneas convertidas, con `precio_min`/`precio_max` (la compra
+  más barata y más cara), en el total, `por_producto`, `por_envase`, `por_proveedor`
+  (con `importe`), `por_mes` (con `incompleto`), `por_proveedor_formato` (si hay 2+
+  proveedores) y `comparables` (productos de 2+ proveedores con el precio de cada uno,
+  6 como mucho; `n_proveedores` = todos). `proveedores` = cuántos.
+
+En chat-facturas, cualquier herramienta por producto que reciba una familia
+(compras_producto, historial_precios, grafico_precio, buscar_productos, ranking) va a
+`volumen_comprado` por categoría, y una pregunta de precio por litro/kilo
+(`pidePrecioPorVolumen`) también con un producto concreto. Limpieza, Menaje y Servicios
+no (no son litros ni kilos). variacion_precios con una familia como producto pasa a
+categoría.
+
+€/l de cerveza, 07/11/2025-07/11/2026 (todo de Distribuciones de Bebidas Catral):
+4,61 €/l de media (4,08-13,39). Barril 50 l 4,08; barril 20 l 4,85 (4,62-5,07); tercio
+33 cl 5,16 (4,38-10,51); botella 50 cl 7,84; botellín 25 cl 13,39. Cruzcampo: barril
+50 l 4,08, barril 20 l 4,62, tercio 4,97.
 
 ## Cifras de la demo (06/11/2026, 2026 hasta octubre)
 
