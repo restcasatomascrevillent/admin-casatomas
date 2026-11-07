@@ -7,6 +7,7 @@ import { useIsCompactNav } from "@/hooks/use-mobile";
 import { NavAutoCollapse, defaultSidebarOpen } from "@/components/NavAutoCollapse";
 import { PrecargaRecorte } from "@/components/carta/recorte/PrecargaRecorte";
 import { VersionPanel } from "@/components/panel/VersionPanel";
+import { AvisoInstalarApp } from "@/components/panel/InstalarApp";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -34,6 +35,8 @@ export function DashboardLayout({ children, fixedHeight = false }: DashboardLayo
       <NavAutoCollapse />
       {/* Baja en segundo plano el modelo del recorte de fotos de la carta. */}
       <PrecargaRecorte />
+      {/* Primera vez en el móvil: «Instalar app» flotante y descartable (no ocupa alto). */}
+      <AvisoInstalarApp />
       {/* `h-app`/`min-h-app` (index.css): en iPad/Android el alto de `100vh` incluye la barra del
           navegador y cortaba el pie de la página; `dvh` la descuenta (con `vh` de respaldo). */}
       <div
