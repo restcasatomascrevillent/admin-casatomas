@@ -72,6 +72,26 @@ export function cuerpoPrueba(modelo: string): Record<string, unknown> {
   };
 }
 
+/**
+ * ¿Admite el modelo Chat Completions + herramientas con nuestros parámetros?
+ * (20261107620000_ia_modelos_herramientas). A partir de la respuesta de
+ * «Probar» (que lleva una herramienta y los parámetros de parametrosChat):
+ *   · 2xx → compatible.
+ *   · 400 que habla de herramientas, reasoning_effort, parámetros no admitidos o
+ *     de /v1/responses → incompatible, con el mensaje de OpenAI como motivo
+ *     (gpt-6.1-sol: «does not support 'none'», «Function tools with
+ *     reasoning_effort are not supported … use /v1/responses»).
+ *   · Cualquier otra cosa (429, 5xx, 401, modelo inexistente…) → null: la prueba
+ *     no dice nada de la compatibilidad y no se guarda.
+ */
+export function compatibilidadHerramientas(status: number, mensaje: string | null): { compatible: boolean; motivo: string | null } | null {
+  if (status >= 200 && status < 300) return { compatible: true, motivo: null };
+  if (status !== 400) return null;
+  const m = (mensaje ?? "").trim();
+  if (!/(tool|function|reasoning_effort|reasoning|v1\/responses|not supported|unsupported|does not support)/i.test(m)) return null;
+  return { compatible: false, motivo: `OpenAI 400: ${m}`.slice(0, 400) };
+}
+
 /** Texto de la respuesta de chat/completions, recortado. */
 export function textoRespuesta(json: unknown): string {
   type Choice = { message?: { content?: unknown }; finish_reason?: string };

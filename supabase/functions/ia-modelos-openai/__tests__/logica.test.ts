@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  costeUsd, cuerpoPrueba, esDeInteres, esModeloDeChat, MAX_PREGUNTAS_EVAL, modelosDeRespuesta, peticionEvaluar, PRESUPUESTO_EVAL_MAX_USD,
+  compatibilidadHerramientas, costeUsd, cuerpoPrueba, esDeInteres, esModeloDeChat, MAX_PREGUNTAS_EVAL, modelosDeRespuesta, peticionEvaluar, PRESUPUESTO_EVAL_MAX_USD,
   procesoDeFuncion, sumarUsage, textoRespuesta,
 } from "../logica";
 
@@ -93,5 +93,29 @@ describe("ia-modelos-openai · evaluar", () => {
     // Fila real de ia_uso (gpt-6-sol, q01): 0,016142 $ con la escritura en caché a 2,5 $/M.
     const sol = { usd_por_m_input: 2, usd_por_m_cached: 0.2, usd_por_m_cache_write: 2.5, usd_por_m_output: 10 };
     expect(costeUsd(sol, { entrada: 9208, cacheados: 3502, escritos_cache: 5700, salida: 118, razonamiento: 0 })).toBeCloseTo(0.016142, 6);
+  });
+});
+
+describe("compatibilidadHerramientas (20261107620000)", () => {
+  it("2xx = compatible", () => {
+    expect(compatibilidadHerramientas(200, null)).toEqual({ compatible: true, motivo: null });
+  });
+  it("los 400 de gpt-6.1-sol = incompatible con el motivo de OpenAI", () => {
+    const a = compatibilidadHerramientas(400, "Unsupported value: 'reasoning_effort' does not support 'none' with this model.");
+    expect(a?.compatible).toBe(false);
+    expect(a?.motivo).toMatch(/^OpenAI 400: .*does not support 'none'/);
+    const b = compatibilidadHerramientas(400, "Function tools with reasoning_effort are not supported for gpt-6.1-sol in /v1/chat/completions. To use function tools, use /v1/responses.");
+    expect(b?.compatible).toBe(false);
+    expect(compatibilidadHerramientas(400, "x".repeat(900))).toBeNull();
+    expect(compatibilidadHerramientas(400, "tools " + "x".repeat(900))!.motivo!.length).toBe(400);
+  });
+  it("otros errores no dicen nada (no se guarda)", () => {
+    expect(compatibilidadHerramientas(429, "Rate limit reached for tools")).toBeNull();
+    expect(compatibilidadHerramientas(500, null)).toBeNull();
+    expect(compatibilidadHerramientas(401, "Incorrect API key")).toBeNull();
+    expect(compatibilidadHerramientas(400, "Invalid 'messages[0].content'")).toBeNull();
+  });
+  it("la prueba lleva una herramienta (si no, no detectaría nada)", () => {
+    expect((cuerpoPrueba("gpt-6.1-terra").tools as unknown[]).length).toBe(1);
   });
 });

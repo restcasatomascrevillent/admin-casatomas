@@ -6,7 +6,7 @@ import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { compararTiempoConstante } from "../_shared/tiempo-constante.ts";
 import {
-  costeUsd, cuerpoPrueba, esModeloDeChat, modelosDeRespuesta, peticionEvaluar, type PrecioModelo, procesoDeFuncion, sumarUsage,
+  compatibilidadHerramientas, costeUsd, cuerpoPrueba, esModeloDeChat, modelosDeRespuesta, peticionEvaluar, type PrecioModelo, procesoDeFuncion, sumarUsage,
   textoRespuesta,
 } from "./logica.ts";
 import { ejecutarConversacion, type Traza } from "../chat-facturas/bucle.ts";
@@ -24,6 +24,10 @@ const createClient = clienteConAuditoria(createClientBase, "ia-modelos-openai");
 //       Una llamada mínima a chat/completions con ese modelo y la clave del
 //       proyecto de esa función. → { ok, modelo, latencia_ms, respuesta, tokens }
 //       Su gasto queda en ia_uso (función ia-modelos-openai).
+//       La llamada lleva una herramienta: el resultado (admite o no Chat
+//       Completions + herramientas con nuestros parámetros) se guarda en
+//       ia_modelos_disponibles.compatible_herramientas/_motivo/_probado_en
+//       (20261107620000) y la respuesta trae compatible_herramientas.
 //  POST { accion: "evaluar", modelo, preguntas: [{ id, mensaje, historial? }], presupuesto_usd?, reasoning_effort? }
 //       (07/11/2026, docs/facturas/EVAL-MODELOS.md) Ejecuta el MISMO bucle de
 //       chat-facturas (chat-facturas/bucle.ts: prompt, herramientas y RPC
@@ -147,11 +151,22 @@ serve(conAuditoriaDePeticion("ia-modelos-openai", createClientBase, async (req) 
       const cuerpo = await res.json().catch(() => null);
       const latencia = Date.now() - t0;
       uso.sumar(cuerpo?.usage);
+      const compat = compatibilidadHerramientas(res.status, res.ok ? null : errorSaneado(cuerpo, res.status));
+      if (compat) {
+        const { error: eCompat } = await supabase.from("ia_modelos_disponibles").update({
+          compatible_herramientas: compat.compatible, compatible_motivo: compat.motivo, compatible_probado_en: new Date().toISOString(),
+        }).eq("id", modelo);
+        if (eCompat) console.error("[ia-modelos-openai] compatibilidad:", eCompat.message);
+      }
       if (!res.ok) {
         uso.marcarError();
-        return json({ ok: false, modelo, latencia_ms: latencia, error: `OpenAI ${res.status}: ${errorSaneado(cuerpo, res.status)}` }, 200);
+        return json({
+          ok: false, modelo, latencia_ms: latencia, error: `OpenAI ${res.status}: ${errorSaneado(cuerpo, res.status)}`,
+          compatible_herramientas: compat ? compat.compatible : null,
+        }, 200);
       }
       return json({
+        compatible_herramientas: true,
         ok: true,
         modelo,
         modelo_respondido: typeof cuerpo?.model === "string" ? cuerpo.model : null,

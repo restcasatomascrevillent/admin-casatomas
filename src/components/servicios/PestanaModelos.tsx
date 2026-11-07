@@ -23,6 +23,7 @@ import {
   formatoUsd,
   modeloActual,
   modelosSeleccionables,
+  motivoNoElegible,
 } from "@/lib/modelosIa";
 import { Bloque } from "./Bloque";
 
@@ -45,6 +46,16 @@ function LineaPrueba({ r }: { r: ResultadoPrueba }) {
       <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="min-w-0 break-words">{r.modelo}: {r.error}</span>
     </p>
+  );
+}
+
+/** Opción del selector; deshabilitada con el motivo si la función usa herramientas y el modelo no las admite. */
+function OpcionModelo({ f, o }: { f: FuncionModelo; o: ModeloDisponible }) {
+  const motivo = motivoNoElegible(f, o);
+  return (
+    <SelectItem value={o.id} disabled={motivo != null} title={motivo ?? undefined}>
+      {o.id} · {motivo ? "no admite herramientas (ver «Probar»)" : formatoPrecio(o)}
+    </SelectItem>
   );
 }
 
@@ -119,7 +130,7 @@ function FilaFuncion({ f, opciones, disponibles }: { f: FuncionModelo; opciones:
               <SelectContent>
                 <SelectItem value={DEL_CODIGO}>El del código</SelectItem>
                 {conActual(f.modelo).map((o) => (
-                  <SelectItem key={o.id} value={o.id}>{o.id} · {formatoPrecio(o)}</SelectItem>
+                  <OpcionModelo key={o.id} f={f} o={o} />
                 ))}
               </SelectContent>
             </Select>
@@ -131,7 +142,7 @@ function FilaFuncion({ f, opciones, disponibles }: { f: FuncionModelo; opciones:
               <SelectContent>
                 <SelectItem value={DEL_CODIGO}>Sin respaldo</SelectItem>
                 {conActual(f.modelo_respaldo).map((o) => (
-                  <SelectItem key={o.id} value={o.id}>{o.id} · {formatoPrecio(o)}</SelectItem>
+                  <OpcionModelo key={o.id} f={f} o={o} />
                 ))}
               </SelectContent>
             </Select>
