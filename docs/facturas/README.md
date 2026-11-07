@@ -9,6 +9,7 @@ Documentos hermanos:
 - [PROMPT-COMPANERO.md](PROMPT-COMPANERO.md): prompt para arrancar el agente de un compañero.
 - [../PROCESO-DE-CAMBIOS.md](../PROCESO-DE-CAMBIOS.md): de staging a producción (obligatorio).
 - [../tests-chatbot-facturas.md](../tests-chatbot-facturas.md): rondas de prueba del chatbot.
+- [EVAL-MODELOS.md](EVAL-MODELOS.md): coste y calidad de modelos para el copiloto (07/11/2026) y cómo repetir la evaluación.
 - [../../supabase/functions/DEPLOY-facturas.md](../../supabase/functions/DEPLOY-facturas.md): secretos y despliegue de las funciones.
 - [../../supabase/rollbacks/README.md](../../supabase/rollbacks/README.md): un rollback por migración.
 - [../../conocimiento-facturas/](../../conocimiento-facturas/): base de conocimiento (fichas de proveedor, scripts, clasificación, correcciones y paquete de importación sin PDF).
