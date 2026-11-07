@@ -9,6 +9,7 @@ import { useEdicionMargenes } from "@/hooks/useMargenesCarta";
 import type { ConfigMargenes } from "@/lib/analisis/margenesCarta";
 
 const CAMPOS: { clave: keyof ConfigMargenes; etiqueta: string; ayuda: string; paso: string }[] = [
+  { clave: "multiplicadorMinPeso", etiqueta: "Al peso en rojo si el multiplicador baja de (×)", ayuda: "Precio del kilo en carta sin IVA entre lo que cuesta el kilo comprado sin IVA.", paso: "0.1" },
   { clave: "costeMaxPlatoPct", etiqueta: "Plato en rojo si el coste pasa del (%)", ayuda: "Del precio sin IVA.", paso: "1" },
   { clave: "multiplicadorMinVino", etiqueta: "Vino en rojo si el multiplicador baja de (×)", ayuda: "Precio de carta (con IVA) entre el coste de la botella.", paso: "0.1" },
   { clave: "subidaCostePct", etiqueta: "Avisar si el coste sube más del (%)", ayuda: "Frente a hace 6 meses, si el precio de la carta no se ha subido.", paso: "1" },

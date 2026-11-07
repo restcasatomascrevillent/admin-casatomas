@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   CONFIG_POR_DEFECTO,
+  dominioLog,
+  marcasLog,
   normalizarCompras,
   normalizarMargenes,
   pctDeMultiplicador,
+  pctDeMultiplicadorPeso,
+  platosBorrador,
   problemas,
   puntosDispersion,
   razon,
+  resumenFiable,
 } from "../margenesCarta";
 
 // Forma del jsonb de margenes_carta (datos reales de la demo, recortados).
@@ -105,5 +110,70 @@ describe("normalizarCompras", () => {
     });
     expect(filas).toHaveLength(1);
     expect(filas[0]).toMatchObject({ id: 33, aporta: 220, archivoPath: "a/b.pdf", eurBase: 110, tipo: "factura" });
+  });
+});
+
+// ─── «Por peso» (20261115410000_margenes_por_peso) ────────────────────────
+const RPC_PESO = {
+  ...RPC,
+  config: { ...RPC.config, multiplicador_min_peso: 2 },
+  peso: [
+    {
+      id: "p1", nombre: "Percebes", categoria: "MARISCOS", precio: 19, unidad: "100 g", gramos_venta: 100,
+      venta_kg_iva: 190, venta_kg: 172.73, producto_id: 301, producto: "Percebe", compra_kg: 110, medida: "kg", lineas: 8,
+      ultimo_proveedor: "CETAREA ANGELMAR S.L.", ultima_fecha: "2026-10-03", multiplicador: 1.57, pct: 63.68, banderas: ["multiplicador_bajo"],
+    },
+    {
+      id: "pb", nombre: "Bogavante de la ría", categoria: "MARISCOS", precio: 95, unidad: "kg", gramos_venta: 1000,
+      venta_kg_iva: 95, venta_kg: 86.36, producto_id: 218, producto: "Bogavante", compra_kg: 25, multiplicador: 3.45, pct: 28.95, banderas: [],
+    },
+    { id: "p3", nombre: "Santiaguiño gallego", precio: 22, unidad: "100 g", gramos_venta: 100, venta_kg_iva: 220, venta_kg: 200,
+      motivo: "No hay compras de santiaguiño", banderas: ["sin_mapear"] },
+    { id: "pc", nombre: "Caviar", precio: 26, unidad: "10 g", gramos_venta: 10, venta_kg_iva: 2600, venta_kg: 2363.64, producto_id: 9,
+      producto: "Caviar lata", motivo: "Las compras de «Caviar lata» no traen el peso (se compran por pieza o unidad)", banderas: ["sin_datos"] },
+  ],
+};
+
+describe("Por peso", () => {
+  const d = normalizarMargenes(RPC_PESO);
+  it("lee la lista al peso y el umbral (por defecto ×2 si no viene)", () => {
+    expect(d.peso).toHaveLength(4);
+    expect(d.peso[0]).toMatchObject({ tipo: "peso", compraKg: 110, ventaKg: 172.73, ventaKgIva: 190, multiplicador: 1.57, ultimoProveedor: "CETAREA ANGELMAR S.L." });
+    expect(d.config.multiplicadorMinPeso).toBe(2);
+    expect(normalizarMargenes(RPC).config.multiplicadorMinPeso).toBe(2);
+    expect(normalizarMargenes(RPC).peso).toEqual([]);
+  });
+  it("el porqué en €/kg, con el precio de carta", () => {
+    expect(razon(d.peso[0], d.config)).toBe(
+      "Percebes: lo compras a 110,00 €/kg y lo vendes a 172,73 €/kg sin IVA (190 €/kg en carta) → ×1,57, 64 % de coste.",
+    );
+  });
+  it("sin datos: el motivo (pieza sin peso, sin compras)", () => {
+    expect(razon(d.peso[3], d.config)).toBe("Caviar: Las compras de «Caviar lata» no traen el peso (se compran por pieza o unidad).");
+    expect(razon(d.peso[2], d.config)).toBe("Santiaguiño gallego: No hay compras de santiaguiño.");
+  });
+  it("problemas: solo los que bajan del multiplicador", () => {
+    expect(problemas(d.peso, d.config).map((p) => p.id)).toEqual(["p1"]);
+  });
+  it("la gráfica usa el precio del kilo con IVA", () => {
+    const puntos = puntosDispersion(d.peso, pctDeMultiplicadorPeso(2));
+    expect(puntos.map((p) => [p.id, p.precio, p.rojo])).toEqual([["p1", 190, true], ["pb", 95, false]]);
+  });
+  it("las cifras de arriba: peso + vinos; los platos del borrador solo si están revisados", () => {
+    const r = resumenFiable(d);
+    expect(r.peso).toMatchObject({ total: 4, conDatos: 2, multiplicadorMediana: 2.51, enRojo: 1, sinDatos: 2 });
+    expect(r.vinos).toMatchObject({ total: 1, conDatos: 1, multiplicadorMediana: 1.37, enRojo: 1 });
+    // p1 y p3 tienen gramos de venta: el borrador es solo «Mejillones al vapor».
+    expect(platosBorrador(d).map((p) => p.id)).toEqual(["p2"]);
+    expect(r.borrador).toEqual({ total: 1, revisados: 0, enRojoRevisados: 0 });
+  });
+});
+
+describe("eje X logarítmico", () => {
+  it("las marcas llegan hasta el máximo real", () => {
+    expect(marcasLog(2.5, 180)).toEqual([2, 5, 10, 20, 50, 100, 200]);
+    expect(marcasLog(60, 2600)).toEqual([50, 100, 200, 500, 1000, 2000, 5000]);
+    expect(dominioLog([2.5, 180])).toEqual([2, 200]);
+    expect(marcasLog(0, 10)).toEqual([]);
   });
 });
