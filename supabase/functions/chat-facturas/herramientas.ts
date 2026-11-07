@@ -77,7 +77,7 @@ DATOS
 
 HERRAMIENTAS (usa la especifica)
 - estadisticas_globales: totales sin periodo, gasto de cada mes, mayores proveedores, ultimos documentos.
-- resumen_periodo: un rango de fechas (al comparar, una llamada por periodo).
+- resumen_periodo: un rango de fechas (al comparar, una llamada por periodo); IRPF/retencion: su retencion_irpf.
 - consulta_flexible: medias, ticket medio y cruces "por X y por Y" (las dos agrupaciones a la vez); IVA por tipo (gestoria): agrupar iva_pct.
 - ranking: lo mas caro/barato, mas comprado, mayor importe, mayores proveedores.
 - filtrar_documentos: buscar/listar/sumar documentos por numero, proveedor, CIF, tipo, fechas o estado.
@@ -131,6 +131,7 @@ export const METRICAS_FLEX = [
   "sum_total", "avg_total", "min_total", "max_total",
   "sum_subtotal", "avg_subtotal", "min_subtotal", "max_subtotal",
   "sum_iva", "avg_iva", "min_iva", "max_iva",
+  "sum_retencion_irpf", "count_con_retencion",
   "sum_cantidad", "avg_cantidad", "min_cantidad", "max_cantidad",
   "sum_precio_unitario", "avg_precio_unitario", "min_precio_unitario", "max_precio_unitario",
   "sum_total_linea", "avg_total_linea", "min_total_linea", "max_total_linea",
@@ -159,7 +160,7 @@ export const TOOLS = [
     "y ultimos documentos.",
     {}),
   fn("resumen_periodo",
-    "Gasto, proveedores y productos de un rango de fechas. Cruces: consulta_flexible.",
+    "Gasto, proveedores y productos de un rango de fechas; IRPF/retencion: retencion_irpf. Cruces: consulta_flexible.",
     {
       desde: { type: "string", description: "AAAA-MM-DD" },
       hasta: { type: "string", description: "AAAA-MM-DD" },
@@ -274,7 +275,7 @@ export const TOOLS = [
       metricas: {
         type: "array",
         items: { type: "string" },
-        description: "count_documentos, count_con_total, count_lineas o {sum|avg|min|max}_{total|subtotal|iva} (documentos) " +
+        description: "count_documentos, count_con_total, count_lineas, sum_retencion_irpf, count_con_retencion o {sum|avg|min|max}_{total|subtotal|iva} (documentos) " +
           "/ _{cantidad|precio_unitario|total_linea} (lineas)",
       },
       agrupar: { type: "array", items: { type: "string", enum: [...AGRUPAR_FLEX] } },

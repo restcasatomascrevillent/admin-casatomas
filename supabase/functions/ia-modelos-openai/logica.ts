@@ -72,6 +72,26 @@ export function cuerpoPrueba(modelo: string): Record<string, unknown> {
   };
 }
 
+/**
+ * ¿Admite el modelo Chat Completions + herramientas con nuestros parámetros?
+ * (20261107620000_ia_modelos_herramientas). A partir de la respuesta de
+ * «Probar» (que lleva una herramienta y los parámetros de parametrosChat):
+ *   · 2xx → compatible.
+ *   · 400 que habla de herramientas, reasoning_effort, parámetros no admitidos o
+ *     de /v1/responses → incompatible, con el mensaje de OpenAI como motivo
+ *     (gpt-6.1-sol: «does not support 'none'», «Function tools with
+ *     reasoning_effort are not supported … use /v1/responses»).
+ *   · Cualquier otra cosa (429, 5xx, 401, modelo inexistente…) → null: la prueba
+ *     no dice nada de la compatibilidad y no se guarda.
+ */
+export function compatibilidadHerramientas(status: number, mensaje: string | null): { compatible: boolean; motivo: string | null } | null {
+  if (status >= 200 && status < 300) return { compatible: true, motivo: null };
+  if (status !== 400) return null;
+  const m = (mensaje ?? "").trim();
+  if (!/(tool|function|reasoning_effort|reasoning|v1\/responses|not supported|unsupported|does not support)/i.test(m)) return null;
+  return { compatible: false, motivo: `OpenAI 400: ${m}`.slice(0, 400) };
+}
+
 /** Texto de la respuesta de chat/completions, recortado. */
 export function textoRespuesta(json: unknown): string {
   type Choice = { message?: { content?: unknown }; finish_reason?: string };
@@ -81,4 +101,122 @@ export function textoRespuesta(json: unknown): string {
   if (t) return t.slice(0, 200);
   if (c?.finish_reason) return `(sin texto; finish_reason=${c.finish_reason})`;
   return "(sin texto)";
+}
+
+// ─── Acción «evaluar» (07/11/2026, docs/facturas/EVAL-MODELOS.md) ───────────
+
+/** Turnos de una pregunta de la batería (los seguimientos llevan el turno anterior). */
+export interface PreguntaEval {
+  id: string;
+  mensaje: string;
+  historial: { role: "user" | "assistant"; content: string }[];
+}
+
+export interface PeticionEval {
+  modelo: string;
+  preguntas: PreguntaEval[];
+  /** Tope de gasto ACUMULADO de todas las evaluaciones (ia_uso), en USD. */
+  presupuestoUsd: number;
+  /**
+   * reasoning_effort a forzar SOLO en la evaluación (null = el de chat-facturas,
+   * "none" en GPT-6). Para modelos que no admiten "none" (gpt-6.1-sol).
+   */
+  esfuerzo: "low" | "medium" | null;
+}
+
+/** Máximo de preguntas por llamada: cada una puede tardar hasta 110 s (PRESUPUESTO_MS del bucle). */
+export const MAX_PREGUNTAS_EVAL = 3;
+/** Tope duro del presupuesto de evaluación (pedido del dueño: 3 $ en total). */
+export const PRESUPUESTO_EVAL_MAX_USD = 3;
+
+/** Valida el cuerpo de «evaluar». Lanza Error con un mensaje en español. */
+export function peticionEvaluar(body: Record<string, unknown>): PeticionEval {
+  const modelo = typeof body.modelo === "string" ? body.modelo.trim() : "";
+  if (!esNombreDeModelo(modelo) || !esModeloDeChat(modelo)) throw new Error("Modelo no válido para evaluar");
+  const lista = Array.isArray(body.preguntas) ? body.preguntas : [];
+  if (lista.length === 0) throw new Error("Faltan preguntas");
+  if (lista.length > MAX_PREGUNTAS_EVAL) throw new Error(`Como máximo ${MAX_PREGUNTAS_EVAL} preguntas por llamada`);
+  const preguntas = lista.map((p, i): PreguntaEval => {
+    const o = (p ?? {}) as Record<string, unknown>;
+    const mensaje = typeof o.mensaje === "string" ? o.mensaje.trim() : "";
+    if (!mensaje || mensaje.length > 2000) throw new Error(`Pregunta ${i + 1}: mensaje vacío o demasiado largo`);
+    const id = typeof o.id === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(o.id) ? o.id : `p${i + 1}`;
+    const hist = Array.isArray(o.historial) ? o.historial : [];
+    if (hist.length > 6) throw new Error(`Pregunta ${i + 1}: historial de más de 6 turnos`);
+    const historial = hist.map((t) => {
+      const r = (t ?? {}) as Record<string, unknown>;
+      const role: "user" | "assistant" = r.rol === "user" || r.role === "user" ? "user" : "assistant";
+      const content = typeof r.contenido === "string" ? r.contenido : typeof r.content === "string" ? r.content : "";
+      if (!content || content.length > 4000) throw new Error(`Pregunta ${i + 1}: turno de historial vacío o demasiado largo`);
+      return { role, content };
+    });
+    return { id, mensaje, historial };
+  });
+  const pedido = Number(body.presupuesto_usd);
+  const presupuestoUsd = Number.isFinite(pedido) && pedido > 0 ? Math.min(pedido, PRESUPUESTO_EVAL_MAX_USD) : PRESUPUESTO_EVAL_MAX_USD;
+  const esfuerzo = body.reasoning_effort === "low" || body.reasoning_effort === "medium" ? body.reasoning_effort : null;
+  if (body.reasoning_effort != null && !esfuerzo) throw new Error("reasoning_effort solo admite low o medium");
+  return { modelo, preguntas, presupuestoUsd, esfuerzo };
+}
+
+export interface PrecioModelo {
+  usd_por_m_input: number;
+  usd_por_m_cached: number | null;
+  /** Escritura en caché (GPT-6 la cobra aparte; null = precio de entrada). */
+  usd_por_m_cache_write?: number | null;
+  usd_por_m_output: number;
+}
+
+export interface TokensEval {
+  entrada: number;
+  cacheados: number;
+  /** Tokens de entrada escritos en caché (GPT-6: prompt_tokens_details.cache_write_tokens). */
+  escritos_cache: number;
+  salida: number;
+  razonamiento: number;
+}
+
+const n0 = (v: unknown): number => {
+  const x = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(x) && x > 0 ? x : 0;
+};
+
+/** Suma los `usage` de chat/completions (prompt_tokens incluye los cacheados; completion, el razonamiento). */
+export function sumarUsage(usos: unknown[]): TokensEval {
+  const t: TokensEval = { entrada: 0, cacheados: 0, escritos_cache: 0, salida: 0, razonamiento: 0 };
+  for (const x of usos) {
+    if (!x || typeof x !== "object") continue;
+    const u = x as {
+      prompt_tokens?: unknown; completion_tokens?: unknown;
+      prompt_tokens_details?: { cached_tokens?: unknown; cache_write_tokens?: unknown } | null;
+      completion_tokens_details?: { reasoning_tokens?: unknown } | null;
+    };
+    const p = n0(u.prompt_tokens);
+    const c = n0(u.completion_tokens);
+    t.entrada += p;
+    const cache = Math.min(n0(u.prompt_tokens_details?.cached_tokens), p);
+    t.cacheados += cache;
+    t.escritos_cache += Math.min(n0(u.prompt_tokens_details?.cache_write_tokens), p - cache);
+    t.salida += c;
+    t.razonamiento += Math.min(n0(u.completion_tokens_details?.reasoning_tokens), c);
+  }
+  return t;
+}
+
+/**
+ * Coste en USD con la tarifa de ia_precios (misma regla que ia_registrar_uso):
+ * entrada no cacheada a precio de entrada, cacheada a su precio (o al de
+ * entrada si no tiene), escrita en caché a su precio (o al de entrada) y
+ * salida (con el razonamiento dentro) a precio de salida.
+ * null si no hay precio.
+ */
+export function costeUsd(precio: PrecioModelo | null | undefined, t: TokensEval): number | null {
+  if (!precio) return null;
+  const pin = n0(precio.usd_por_m_input);
+  const pcache = precio.usd_por_m_cached === null || precio.usd_por_m_cached === undefined ? pin : n0(precio.usd_por_m_cached);
+  const pwrite = precio.usd_por_m_cache_write === null || precio.usd_por_m_cache_write === undefined ? pin : n0(precio.usd_por_m_cache_write);
+  const pout = n0(precio.usd_por_m_output);
+  const normal = t.entrada - t.cacheados - t.escritos_cache;
+  const usd = (normal * pin + t.cacheados * pcache + t.escritos_cache * pwrite + t.salida * pout) / 1_000_000;
+  return Math.round(usd * 1e6) / 1e6;
 }

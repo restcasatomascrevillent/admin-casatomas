@@ -13,6 +13,8 @@ export interface FuncionModelo {
   modelo_codigo: string | null;
   /** true = la función ya lee ia_modelo_funcion (se puede cambiar aquí). */
   centralizado: boolean;
+  /** Llama a Chat Completions con herramientas (chat-facturas, chat-web): 20261107620000. */
+  usa_herramientas: boolean;
   notas: string | null;
   cambiado_por_email: string | null;
   cambiado_en: string | null;
@@ -35,6 +37,10 @@ export interface ModeloDisponible {
   usd_por_m_input: number | null;
   usd_por_m_output: number | null;
   precio_fuente: string | null;
+  /** Resultado de «Probar» con una herramienta: null = sin probar (20261107620000). */
+  compatible_herramientas: boolean | null;
+  compatible_motivo: string | null;
+  compatible_probado_en: string | null;
 }
 
 export interface CambioModelo {
@@ -67,6 +73,7 @@ export function normalizarCentro(raw: unknown): CentroModelos {
     funciones: lista<FuncionModelo>(r.funciones).map((f) => ({
       ...f,
       centralizado: f.centralizado === true,
+      usa_herramientas: f.usa_herramientas === true,
       coste_usd: num(f.coste_usd),
       llamadas: num(f.llamadas),
       coste_sin_tarifa: f.coste_sin_tarifa === true,
@@ -75,6 +82,9 @@ export function normalizarCentro(raw: unknown): CentroModelos {
       ...d,
       de_interes: d.de_interes === true,
       nuevo: d.nuevo === true,
+      compatible_herramientas: typeof d.compatible_herramientas === "boolean" ? d.compatible_herramientas : null,
+      compatible_motivo: typeof d.compatible_motivo === "string" ? d.compatible_motivo : null,
+      compatible_probado_en: typeof d.compatible_probado_en === "string" ? d.compatible_probado_en : null,
       usd_por_m_input: num(d.usd_por_m_input),
       usd_por_m_output: num(d.usd_por_m_output),
     })),
@@ -96,6 +106,16 @@ export function modelosSeleccionables(disponibles: ModeloDisponible[]): ModeloDi
     .sort((a, b) => (a.usd_por_m_input! - b.usd_por_m_input!) || a.id.localeCompare(b.id));
 }
 
+/**
+ * ¿Se puede elegir este modelo en la función? Si la función usa herramientas y
+ * «Probar» marcó el modelo como incompatible, no (la BD también lo rechaza:
+ * ia_modelo_funcion_antes). Devuelve el motivo para enseñarlo deshabilitado.
+ */
+export function motivoNoElegible(f: Pick<FuncionModelo, "usa_herramientas">, d: Pick<ModeloDisponible, "compatible_herramientas" | "compatible_motivo">): string | null {
+  if (!f.usa_herramientas || d.compatible_herramientas !== false) return null;
+  return d.compatible_motivo || "No admite Chat Completions con herramientas";
+}
+
 /** Modelo que usa hoy la función (el elegido o el del código). */
 export function modeloActual(f: FuncionModelo): { modelo: string; desdeTabla: boolean } {
   if (f.modelo) return { modelo: f.modelo, desdeTabla: true };
@@ -112,6 +132,7 @@ export function avisosFuncion(f: FuncionModelo, disponibles: ModeloDisponible[])
     const d = porId.get(m);
     if (!d || d.retirado_en) avisos.push(`${etiqueta} ${m} ya no está en la cuenta de OpenAI.`);
     else if (d.usd_por_m_input == null) avisos.push(`${etiqueta} ${m} no tiene precio: su gasto sale sin datos.`);
+    else if (motivoNoElegible(f, d)) avisos.push(`${etiqueta} ${m} no sirve para esta función: ${motivoNoElegible(f, d)}`);
   }
   return avisos;
 }

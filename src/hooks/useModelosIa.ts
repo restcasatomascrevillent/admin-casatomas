@@ -101,9 +101,12 @@ export interface ResultadoPrueba {
   respuesta?: string;
   error?: string;
   tokens?: { entrada: number | null; salida: number | null };
+  /** Chat Completions + herramientas (20261107620000): null = la prueba no lo aclara. */
+  compatible_herramientas?: boolean | null;
 }
 
 export function useProbarModelo() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ modelo, funcion }: { modelo: string; funcion?: string }): Promise<ResultadoPrueba> => {
       const { data, error } = await supabase.functions.invoke<ResultadoPrueba>("ia-modelos-openai", {
@@ -112,5 +115,7 @@ export function useProbarModelo() {
       if (error) return { ok: false, modelo, error: await mensajeFuncion(error, "La prueba no ha podido hacerse.") };
       return data ?? { ok: false, modelo, error: "Respuesta vacía" };
     },
+    // La prueba guarda si el modelo admite herramientas: refresca el selector.
+    onSuccess: () => void qc.invalidateQueries({ queryKey: CLAVE_MODELOS_IA }),
   });
 }
