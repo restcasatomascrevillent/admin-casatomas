@@ -107,6 +107,33 @@ async function registrarAccesoAuditoria(accion: "acceso" | "logout") {
 }
 
 /**
+ * getUser() compartido (07/11/2026, login más rápido): al entrar se pedía 2-3
+ * veces seguidas (INITIAL_SESSION + getSession, SIGNED_IN y la comprobación
+ * inicial de bloqueo). Quien llega mientras hay una en vuelo espera a la misma;
+ * no se guarda el resultado más allá de eso, salvo `ultimaValidacion`, que solo
+ * usa la PRIMERA comprobación tras abrir la sesión (ver `comprobar`).
+ */
+type RespuestaGetUser = Awaited<ReturnType<typeof supabase.auth.getUser>>;
+let getUserEnVuelo: Promise<RespuestaGetUser> | null = null;
+let ultimaValidacion: { userId: string; t: number } | null = null;
+/** Margen en el que la comprobación inicial reutiliza la validación recién hecha. */
+const MARGEN_VALIDACION_MS = 2000;
+
+function getUserCompartido(): Promise<RespuestaGetUser> {
+  if (getUserEnVuelo) return getUserEnVuelo;
+  const promesa = supabase.auth.getUser().then((r) => {
+    if (r && !r.error && r.data?.user) ultimaValidacion = { userId: r.data.user.id, t: Date.now() };
+    return r;
+  });
+  getUserEnVuelo = promesa;
+  const soltar = () => {
+    if (getUserEnVuelo === promesa) getUserEnVuelo = null;
+  };
+  promesa.then(soltar, soltar);
+  return promesa;
+}
+
+/**
  * Conserva la REFERENCIA del usuario previo si es la misma persona (mismo id).
  *
  * supabase-js emite SIGNED_IN / TOKEN_REFRESHED cada vez que la pestaña o la
@@ -244,8 +271,7 @@ export function AuthProvider({
         return;
       }
 
-      const { data: userData, error: userError } =
-        await supabase.auth.getUser();
+      const { data: userData, error: userError } = await getUserCompartido();
       if (!esVigente()) return;
       const status =
         typeof userError === "object" &&
@@ -403,7 +429,18 @@ export function AuthProvider({
         return;
       comprobando = true;
       try {
-        const { error, data } = await supabase.auth.getUser();
+        // La primera comprobación llega justo después de que syncValidatedSession validara a este
+        // mismo usuario: si fue hace menos de 2 s, no se repite la petición (el canal de bloqueos ya
+        // está suscrito y el sondeo de 15 s sigue igual).
+        if (
+          inicial &&
+          ultimaValidacion?.userId === userId &&
+          Date.now() - ultimaValidacion.t < MARGEN_VALIDACION_MS
+        ) {
+          inicial = false;
+          return;
+        }
+        const { error, data } = await getUserCompartido();
         if (esBloqueoExplicito(error as ErrorAuth)) {
           await cerrarPorBloqueo();
         } else if (

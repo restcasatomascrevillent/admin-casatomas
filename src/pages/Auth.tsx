@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UtensilsCrossed } from "lucide-react";
+import { precargarAlMontarLogin } from "@/lib/precargaLogin";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -16,6 +17,11 @@ export default function Auth() {
   // Login form
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+
+  // Mientras se escribe: versión de auditoría, panel-auth despierto y chunks del inicio (lib/precargaLogin.ts).
+  useEffect(() => {
+    precargarAlMontarLogin();
+  }, []);
 
   useEffect(() => {
     if (user) {
