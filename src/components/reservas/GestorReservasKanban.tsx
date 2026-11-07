@@ -636,6 +636,27 @@ export function GestorReservasKanban({
   });
 
   /**
+   * Las mesas cambian constantemente (07/11/2026, idea del dueño): la asignada es solo la previsión. Al marcar
+   * «Llegó» en una reserva con mesa, el aviso de siempre trae también «Cambiar mesa», que abre el mapa para
+   * confirmar la mesa donde se han sentado de verdad. `darMesa` va por ref: cambia en cada render.
+   */
+  const darMesaRef = useRef(darMesa);
+  darMesaRef.current = darMesa;
+  const accionesTarjeta = useMemo(
+    () => ({
+      ...acciones,
+      marcarLlegada: (reserva: ReservaServicio) =>
+        acciones.marcarLlegada(
+          reserva,
+          puedeEditar && mesasPorReserva.get(reserva.id)?.length
+            ? { accionAviso: { label: "Cambiar mesa", onClick: () => darMesaRef.current(reserva) } }
+            : undefined,
+        ),
+    }),
+    [acciones, mesasPorReserva, puedeEditar],
+  );
+
+  /**
    * Con sala, que ocupe sitio (pendiente/verificada/confirmada/completada) y sin ninguna mesa
    * asignada. Mientras las asignaciones no han llegado NO se marca nada: mejor callar que acusar en falso.
    */
@@ -743,12 +764,13 @@ export function GestorReservasKanban({
                         key={reserva.id}
                         reserva={reserva}
                         columnas={columnas}
-                        acciones={acciones}
+                        acciones={accionesTarjeta}
                         onMover={solicitarMovimiento}
                         onToggleImportante={toggleImportante}
                         onBlacklist={setBlacklistReserva}
                         onEditar={(r) => editarReserva(r.id)}
                         onDarMesa={darMesa}
+                        textoCambiarMesa={mesasPorReserva.get(reserva.id)?.length ? "Cambiar mesa" : undefined}
                         sinMesa={estaSinMesa(reserva)}
                         mesas={mesasPorReserva.get(reserva.id)}
                         puedeEditar={puedeEditar}
