@@ -401,6 +401,7 @@ export function VistaHoyMovil({
               asignaciones={asignacionesDia}
               ajustesDia={ajustesDia ?? []}
               mesasExcluidas={configAsignacionDesde(config).mesasExcluidas}
+              mesasAlFinal={configAsignacionDesde(config).mesasAlFinal}
               configOcupacion={configOcupacion}
             />
           )}
@@ -473,6 +474,7 @@ export function VistaHoyMovil({
               asignaciones={asignacionesDia}
               ajustesDia={ajustesDia ?? []}
               mesasExcluidas={configAsignacionDesde(config).mesasExcluidas}
+              mesasAlFinal={configAsignacionDesde(config).mesasAlFinal}
               configOcupacion={configOcupacion}
               nombresMesa={mesasDe(abierta.id)}
               inicio={inicioFicha}
@@ -499,6 +501,7 @@ export function VistaHoyMovil({
               salas={salas}
               ajustesDia={ajustesDia ?? []}
               mesasExcluidas={configAsignacionDesde(config).mesasExcluidas}
+              mesasAlFinal={configAsignacionDesde(config).mesasAlFinal}
               onVerReserva={(id) => {
                 setMesaLibre(null);
                 abrirFicha(id);
@@ -820,6 +823,7 @@ function RecalcularMesasMovil({
   asignaciones,
   ajustesDia,
   mesasExcluidas,
+  mesasAlFinal = [],
   configOcupacion,
 }: {
   fecha: string;
@@ -829,6 +833,8 @@ function RecalcularMesasMovil({
   asignaciones: AsignacionConDetalles[];
   ajustesDia: AjusteDia[];
   mesasExcluidas: readonly string[];
+  /** Mesas que se usan solo como último recurso (para dejar paso). */
+  mesasAlFinal?: readonly string[];
   configOcupacion: ConfigOcupacionMesa;
 }) {
   const asignarLocal = useAsignarConCambioLocal(fecha, mesas);
@@ -842,6 +848,7 @@ function RecalcularMesasMovil({
         asignaciones,
         turno,
         excluidas: new Set(mesasExcluidas),
+        alFinal: new Set(mesasAlFinal),
         config: configOcupacion,
       }),
     );
@@ -1066,6 +1073,7 @@ export function PanelMesaLibre({
   salas,
   ajustesDia = [],
   mesasExcluidas = [],
+  mesasAlFinal = [],
   onVerReserva,
   onCerrar,
 }: {
@@ -1083,6 +1091,7 @@ export function PanelMesaLibre({
   salas?: Array<{ id: string; nombre: string }>;
   ajustesDia?: AjusteDia[];
   mesasExcluidas?: readonly string[];
+  mesasAlFinal?: readonly string[];
   onVerReserva?: (reservaId: string) => void;
   onCerrar: () => void;
 }) {
@@ -1107,6 +1116,7 @@ export function PanelMesaLibre({
           asignaciones,
           mesasElegidas: [mesa.id],
           excluidas: new Set(mesasExcluidas),
+          alFinal: new Set(mesasAlFinal),
           config: configOcupacion,
         })
       : [...desplazadas];
@@ -1416,7 +1426,9 @@ export function SelectorMesaMovil({
           ? `Fijada · ${m.estado.nombre} ${horaCorta(m.estado.hora)}`
           : m.estado.tipo === "prevista"
             ? `Prevista: ${m.estado.desplazadas.map((d) => `${d.nombre} ${horaCorta(d.hora)}`).join(", ")}`
-            : "Libre";
+            : m.alFinal
+              ? "Libre · Mejor dejar libre"
+              : "Libre";
     const candado = fijadaOtra || (m.propia && fijadaPropia);
     return (
       <li key={m.id}>
@@ -1477,6 +1489,7 @@ export function PanelReservaMovil({
   asignaciones,
   ajustesDia,
   mesasExcluidas,
+  mesasAlFinal = [],
   configOcupacion,
   nombresMesa,
   inicio = "normal",
@@ -1489,6 +1502,7 @@ export function PanelReservaMovil({
   asignaciones: AsignacionConDetalles[];
   ajustesDia: AjusteDia[];
   mesasExcluidas: readonly string[];
+  mesasAlFinal?: readonly string[];
   configOcupacion: ReturnType<typeof configServicioSalaDesde>;
   nombresMesa: string[];
   /** Desde el botón «Sentar» de la fila: con el selector abierto o con la confirmación de quitar la prevista a otra. */
@@ -1515,6 +1529,7 @@ export function PanelReservaMovil({
   const sentada = reserva.estado === "completada";
   const puedeLiberar = sentada && nombresMesa.length > 0 && !reserva.salida_at;
   const excluidas = useMemo(() => new Set(mesasExcluidas), [mesasExcluidas]);
+  const alFinal = useMemo(() => new Set(mesasAlFinal), [mesasAlFinal]);
   const nombreMesa = (id: string) => mesas.find((m) => m.id === id)?.nombre ?? "?";
 
   // Si no cabe en ninguna mesa de su sala, la propuesta de piezas (juntar/separar) de siempre.
@@ -1526,10 +1541,11 @@ export function PanelReservaMovil({
         ajustesDia,
         asignaciones,
         excluidas,
+        alFinal,
         configOcupacion,
         reserva: { id: reserva.id, hora: reserva.hora, comensales: reserva.numero_comensales, espacioId: reserva.espacio_id },
       }),
-    [salas, mesas, ajustesDia, asignaciones, excluidas, configOcupacion, reserva],
+    [salas, mesas, ajustesDia, asignaciones, excluidas, alFinal, configOcupacion, reserva],
   );
 
   const opciones = useMemo(() => opcionesMesasServicio({ salas, mesas, ajustesDia, turno }), [salas, mesas, ajustesDia, turno]);
@@ -1540,7 +1556,7 @@ export function PanelReservaMovil({
   const fijada = !!reserva.mesa_fijada && propiasIds.length > 0;
   /** A quien pierde su única mesa prevista se le busca la mejor libre de su sala (07/11/2026). */
   const recolocar = (desplazadas: readonly Desplazamiento[], mesasElegidas: readonly string[]) =>
-    recolocarDesplazadas({ desplazadas, opciones, asignaciones, mesasElegidas, excluidas, config: configOcupacion });
+    recolocarDesplazadas({ desplazadas, opciones, asignaciones, mesasElegidas, excluidas, alFinal, config: configOcupacion });
 
   // El selector: todas las mesas donde cabe, de todas las salas, con su estado para la franja de la reserva.
   const selector = useMemo(
@@ -1551,9 +1567,10 @@ export function PanelReservaMovil({
         reserva: { id: reserva.id, hora: reserva.hora, comensales: reserva.numero_comensales, espacioId: reserva.espacio_id },
         propias: asignaciones.filter((a) => a.reserva_id === reserva.id).map((a) => a.mesa_id),
         excluidas,
+        alFinal,
         config: configOcupacion,
       }),
-    [opciones, asignaciones, reserva, excluidas, configOcupacion],
+    [opciones, asignaciones, reserva, excluidas, alFinal, configOcupacion],
   );
   const hayMesas = selector.propias.length + selector.salas.length > 0;
 

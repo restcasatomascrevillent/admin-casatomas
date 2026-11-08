@@ -1183,6 +1183,7 @@ export type Database = {
           asignacion_aviso_activo: boolean
           asignacion_espacios_excluidos: string[]
           asignacion_mesas_excluidas: string[]
+          asignacion_mesas_al_final: string[]
           asignacion_ventana_horas: number
           auto_confirmar: boolean
           created_at: string
@@ -1204,6 +1205,7 @@ export type Database = {
           asignacion_aviso_activo?: boolean
           asignacion_espacios_excluidos?: string[]
           asignacion_mesas_excluidas?: string[]
+          asignacion_mesas_al_final?: string[]
           asignacion_ventana_horas?: number
           auto_confirmar?: boolean
           created_at?: string
@@ -1225,6 +1227,7 @@ export type Database = {
           asignacion_aviso_activo?: boolean
           asignacion_espacios_excluidos?: string[]
           asignacion_mesas_excluidas?: string[]
+          asignacion_mesas_al_final?: string[]
           asignacion_ventana_horas?: number
           auto_confirmar?: boolean
           created_at?: string

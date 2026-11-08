@@ -191,6 +191,7 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
       terrazaCerrada: cierre.cerrada,
       minutoAhora: empezado ? minutosDeHora(ahora.toTimeString().slice(0, 5)) : null,
       excluidas: new Set(configAsignacionDesde(config).mesasExcluidas),
+      alFinal: new Set(configAsignacionDesde(config).mesasAlFinal),
       sugerirGrupo: (r) => sugerencias.get(r.id)?.texto ?? null,
     });
   }, [cargando, activo, salas, mesasDe, reservas, mesas, ajustesDia, turno, fecha, cierre.cerrada, config, sugerencias]);

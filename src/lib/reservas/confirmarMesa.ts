@@ -65,6 +65,8 @@ export interface MesaParaConfirmar extends MesaOpcion {
   estado: EstadoConfirmar;
   /** Es (una de) la mesa(s) que ya tiene la propia reserva. */
   propia: boolean;
+  /** Mesa «al final» (para dejar paso): se puede elegir, pero mejor dejarla libre. */
+  alFinal?: boolean;
 }
 
 export interface GrupoSalaConfirmar {
@@ -184,7 +186,8 @@ function numeroMesa(nombre: string): number {
  * Las mesas para el selector «¿Dónde se sientan?»: arriba las que ya tiene la reserva; después, por sala (la
  * de la reserva primero y luego en el orden de las salas), las mesas donde CABEN sus comensales, cada una con
  * su estado. Dentro de cada sala: libres, previstas para otros y ocupadas; y entre iguales, la más justa
- * (menos sillas vacías) y luego por número. Las mesas excluidas del reparto no salen (salvo la propia).
+ * (menos sillas vacías) y luego por número. Las mesas excluidas del reparto no salen (salvo la propia). Las
+ * mesas «al final» (para dejar paso) van detrás de las de su mismo estado.
  */
 export function clasificarMesasParaSentar(p: {
   opciones: readonly MesaOpcion[];
@@ -193,6 +196,8 @@ export function clasificarMesasParaSentar(p: {
   reserva: { id: string; hora: string; comensales: number; espacioId: string | null };
   propias: readonly string[];
   excluidas?: ReadonlySet<string>;
+  /** Mesas que se usan solo como último recurso (para dejar paso). */
+  alFinal?: ReadonlySet<string>;
   config?: ConfigOcupacionMesa;
 }): SelectorMesas {
   const { opciones, asignaciones, reserva, config } = p;
@@ -201,6 +206,7 @@ export function clasificarMesasParaSentar(p: {
     ...m,
     propia: propias.has(m.id),
     estado: estadoParaConfirmar(asignaciones, m.id, reserva, config),
+    ...(p.alFinal?.has(m.id) ? { alFinal: true } : {}),
   });
 
   const listaPropias = p.propias
@@ -223,6 +229,7 @@ export function clasificarMesasParaSentar(p: {
       .sort(
         (a, b) =>
           RANGO[a.estado.tipo] - RANGO[b.estado.tipo] ||
+          Number(!!a.alFinal) - Number(!!b.alFinal) ||
           a.plazas - b.plazas ||
           numeroMesa(a.nombre) - numeroMesa(b.nombre) ||
           a.nombre.localeCompare(b.nombre, "es"),

@@ -93,6 +93,7 @@ const PARTE_DE_CAMPO: Record<keyof ConfigFormValues, ParteConfiguracionGeneral> 
   asignacion_aviso_activo: "servicio",
   asignacion_espacios_excluidos: "servicio",
   asignacion_mesas_excluidas: "servicio",
+  asignacion_mesas_al_final: "servicio",
 };
 
 /** Cabecera de la tarjeta de cada chip. */
@@ -162,6 +163,7 @@ export function ConfiguracionGeneralReservas({ parte }: { parte: ParteConfigurac
       asignacion_aviso_activo: true,
       asignacion_espacios_excluidos: [],
       asignacion_mesas_excluidas: [],
+      asignacion_mesas_al_final: [],
     },
   });
 
@@ -188,6 +190,7 @@ export function ConfiguracionGeneralReservas({ parte }: { parte: ParteConfigurac
         asignacion_aviso_activo: asignacion.avisoActivo,
         asignacion_espacios_excluidos: asignacion.espaciosExcluidos,
         asignacion_mesas_excluidas: asignacion.mesasExcluidas,
+        asignacion_mesas_al_final: asignacion.mesasAlFinal,
       });
     }
   }, [config, form]);
@@ -666,6 +669,8 @@ function SeccionAsignacion({
   const mesasExcluidas = form.watch("asignacion_mesas_excluidas");
   const salasFuera = new Set(espaciosExcluidos);
   const mesasFuera = new Set(mesasExcluidas);
+  const mesasAlFinal = form.watch("asignacion_mesas_al_final") ?? [];
+  const alFinal = new Set(mesasAlFinal);
 
   const alternarSala = (espacioId: string, usable: boolean) => {
     const actuales = { espaciosExcluidos, mesasExcluidas };
@@ -677,6 +682,11 @@ function SeccionAsignacion({
   const alternarMesa = (mesaId: string, usable: boolean) => {
     const siguiente = usable ? mesasExcluidas.filter((id) => id !== mesaId) : [...mesasExcluidas, mesaId];
     form.setValue("asignacion_mesas_excluidas", siguiente, { shouldDirty: true, shouldValidate: true });
+  };
+
+  const alternarAlFinal = (mesaId: string, marcada: boolean) => {
+    const siguiente = marcada ? [...mesasAlFinal.filter((id) => id !== mesaId), mesaId] : mesasAlFinal.filter((id) => id !== mesaId);
+    form.setValue("asignacion_mesas_al_final", siguiente, { shouldDirty: true });
   };
 
   return (
@@ -805,6 +815,54 @@ function SeccionAsignacion({
                 </div>
               )}
               <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="asignacion_mesas_al_final"
+          render={() => (
+            <FormItem className="space-y-3">
+              <div className="space-y-0.5">
+                <FormLabel>Mesas que se usan al final (para dejar paso)</FormLabel>
+                <FormDescription>
+                  Al organizar, recalcular o proponer mesa, estas solo se usan si no queda otra. Se pueden elegir a
+                  mano, y una reserva que ya esté en ellas se respeta.
+                </FormDescription>
+              </div>
+              {espacios.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay salas activas.</p>
+              ) : (
+                <div className="space-y-2">
+                  {espacios.map((espacio) => {
+                    const mesasSala = mesas.filter((m) => m.espacio_id === espacio.id);
+                    if (mesasSala.length === 0) return null;
+                    return (
+                      <div key={espacio.id} className="space-y-2 rounded-lg border p-3">
+                        <div className="text-sm font-medium">{espacio.nombre}</div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2 pl-6">
+                          {mesasSala.map((mesa) => {
+                            const idMesa = `al-final-mesa-${mesa.id}`;
+                            return (
+                              <div key={mesa.id} className="flex items-center gap-1.5">
+                                <Checkbox
+                                  id={idMesa}
+                                  checked={alFinal.has(mesa.id)}
+                                  onCheckedChange={(v) => alternarAlFinal(mesa.id, v === true)}
+                                />
+                                <label htmlFor={idMesa} className="text-sm tabular-nums">
+                                  {mesa.nombre}
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </FormItem>
           )}
         />
