@@ -135,7 +135,7 @@ describe("Ficha de una reserva (móvil)", () => {
 describe("Ficha de una mesa libre (móvil)", () => {
   it("con «Editar»: sentar sin reserva (1–8) y sentar una reserva", () => {
     panelMesaLibre();
-    expect(screen.getByText("Sentar sin reserva aquí: ¿cuántos son?")).toBeInTheDocument();
+    expect(screen.getByText("Sin reserva: ¿cuántos son?")).toBeInTheDocument();
     expect(screen.getByText("Sentar una reserva")).toBeInTheDocument();
   });
 

@@ -343,3 +343,70 @@ describe("Mesa fijada y recolocar al sentar (07/11/2026)", () => {
     }
   });
 });
+
+// 08/11/2026 (petición del dueño: «hay que mejorar este desplegable para que sea grande y claro»).
+describe("Hoja de una mesa libre (móvil): a quién sentar, grande y ordenado", () => {
+  const res = (id: string, nombre: string, hora: string, pax: number, extra: Record<string, unknown> = {}) =>
+    ({ ...(ana as object), id, nombre, hora, numero_comensales: pax, ...extra }) as never;
+  const RESERVAS = [
+    res("rubio", "Rubio", "14:30:00", 2),
+    res("castillo", "Castillo", "14:15:00", 4),
+    res("sanchez", "Sánchez", "14:45:00", 4, { mesa_fijada: true }),
+    res("lopez", "López", "13:45:00", 2),
+    res("grupo", "Grupo", "14:00:00", 6),
+    res("prev", "Previsto", "14:20:00", 2),
+  ];
+  const ASIG = [
+    { ...asig("m7", "sanchez", "Sánchez", "14:45:00", "confirmada"), reservas: { id: "sanchez", nombre: "Sánchez", hora: "14:45:00", numero_comensales: 4, estado: "confirmada", salida_at: null, mesa_fijada: true } },
+    asig("m9", "prev", "Previsto", "14:20:00", "confirmada"),
+  ] as never[];
+  const montar = () =>
+    enHoja(
+      <PanelMesaLibre
+        mesa={{ id: "t1", nombre: "11", espacioId: "s2", salaNombre: "Terraza", plazas: 4 }}
+        fecha="2026-11-08"
+        turno="comida"
+        reservas={RESERVAS}
+        mesas={MESAS}
+        asignaciones={ASIG}
+        salas={SALAS}
+        minutoAhora={14 * 60 + 5}
+        onCerrar={vi.fn()}
+      />,
+    );
+  const grupo = (titulo: string) => document.querySelector(`[data-grupo="${titulo}"]`) as HTMLElement;
+  const ids = (g: HTMLElement) => Array.from(g.querySelectorAll("li[data-reserva-id]")).map((li) => li.getAttribute("data-reserva-id"));
+
+  it("«Encajan aquí» por hora con las retrasadas arriba; «Otras» por hora; la fijada en otra mesa al final y atenuada", () => {
+    montar();
+    expect(ids(grupo("Encajan aquí"))).toEqual(["lopez", "castillo", "rubio"]);
+    expect(ids(grupo("Otras"))).toEqual(["grupo", "prev"]);
+    expect(ids(grupo("Con otra mesa fijada"))).toEqual(["sanchez"]);
+    expect(grupo("Con otra mesa fijada").querySelector("li")).toHaveAttribute("data-atenuada", "true");
+  });
+
+  it("cada fila dice su situación y avisa si no caben; la hoja tiene un solo scroll", () => {
+    montar();
+    const linea = (id: string) => within(document.querySelector(`li[data-reserva-id="${id}"]`) as HTMLElement).getByTestId("situacion-reserva");
+    expect(linea("rubio")).toHaveTextContent("Sin mesa");
+    expect(linea("prev")).toHaveTextContent("Prevista: Comedor 9");
+    expect(linea("sanchez")).toHaveTextContent("Fijada · Comedor 7");
+    expect(within(linea("sanchez")).getByLabelText("Mesa fijada")).toBeInTheDocument();
+    expect(linea("grupo")).toHaveTextContent("Son 6 · mesa de 4");
+    expect(linea("lopez")).toHaveTextContent("Tarde");
+    const contenido = screen.getByTestId("hoja-mesa-contenido");
+    expect(contenido).toHaveClass("overflow-y-auto");
+    expect(contenido.querySelectorAll(".overflow-y-auto")).toHaveLength(0);
+    for (const b of contenido.querySelectorAll("li[data-reserva-id] button")) expect(b).toHaveClass("min-h-16");
+  });
+
+  it("la fijada en otra mesa pide confirmación y, al aceptar, se sienta aquí y se quita la fijación", async () => {
+    montar();
+    fireEvent.click(within(document.querySelector('li[data-reserva-id="sanchez"]') as HTMLElement).getByRole("button"));
+    expect(screen.getByRole("alert")).toHaveTextContent("Tiene fijada la mesa 7 del Comedor. ¿Sentarla aquí y quitar la fijación?");
+    expect(h.llamadas).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar igualmente" }));
+    await waitFor(() => expect(h.llamadas).toContain("fijar:sanchez:false"));
+    expect(h.llamadas).toContain("asignar:sanchez:[t1]");
+  });
+});
