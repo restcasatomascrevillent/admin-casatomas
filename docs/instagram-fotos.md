@@ -135,6 +135,38 @@ Montserrat). Post (que también es cada imagen del carrusel) y story.
   guarda 2 JPEG de muestra; las del 08/11/2026 están en
   `instagram-studio/propuesta/evaluacion/capturas-marco/`).
 
+## Plantillas v2 por papel (08/11/2026)
+
+El dueño pidió plantillas «que no parezcan de IA». Fuente: su sistema de marca
+(`instagram-studio/propuesta/marca-base`: `templates/redes-posts.html`, `templates/video-9x16.html`
+y los reels con `reel-kit.jsx`). Un juego por marca, cada plantilla con un **papel** (`papel` en
+`Plantilla`) y en post y story:
+
+| Papel | Casa Tomás | Touza | Qué lleva |
+|---|---|---|---|
+| portada | `ct-portada`, `ct-portada-marco` | `tz-portada`, `tz-portada-marco` | titular de la idea, frase, marca; botón solo en un post suelto |
+| plato (interior) | `ct-plato`, `ct-plato-marco` | `tz-plato`, `tz-plato-marco` | foto limpia y el nombre pequeño (rótulo de los reels); sin logo ni botón |
+| cierre | `ct-cierre`, `ct-cierre-marco`, `ct-cierre-marca` (sin foto) | `tz-cierre`, `tz-cierre-marco`, `tz-cierre-marca` (sin foto) | logo / TOUZA, lema, botón e información |
+| tipográfica | `ct-frase` | `tz-frase` (y `tz-tipografica`, la de la lista) | una frase o un anuncio, sin foto |
+
+- `*-marco` = foto entera sin ampliar (fotos de la carta, 1200×900): foto arriba (a la izquierda en
+  la portada, saliendo por la derecha en el plato) y texto debajo, alineado a la izquierda.
+- Sin velo en toda la foto: degradado solo donde va el texto. Sin rombos ni filetes.
+  `ct-portada` es el post del plato del dueño; `ct-cierre-marca`, su post del lema (centrado, tal
+  cual); `tz-cierre`, su post de Touza (foto al 80 %, como su 75 %).
+- **Clásicas** (`clasica: true`): `ct-foto-titular`, `ct-marco`, `ct-tipografica`,
+  `tz-foto-titular`, `tz-marco`. Se siguen abriendo, validando y publicando (piezas guardadas), pero
+  no salen en los selectores (`plantillasVisibles`, que añade la actual si es clásica con
+  «(clásica)») ni las eligen la IA ni las campañas.
+- Ayudas en `src/lib/instagram/plantillas/index.ts`: `plantillasVisibles`, `plantillaPara(marca,
+  formato, papel, encaje)`, `varianteConEncaje` y `plantillaEnmarcada` (por defecto, la de portada).
+  Copia del servidor: `supabase/functions/instagram-ia/plantillas.ts` (con `papel` y `clasica`;
+  `plantillas.test.ts` la compara).
+- Pruebas: `src/lib/instagram/__tests__/editorial.render.test.ts` (Chromium: cada plantilla v2 en
+  post y story con textos normales y al límite, más largos → error con el campo; carruseles por
+  papel). Con `INSTAGRAM_CAPTURAS_V2=<carpeta>` guarda los JPEG y `hoja-de-contacto.jpg`; las del
+  08/11/2026 están en `instagram-studio/propuesta/evaluacion/plantillas-v2/`.
+
 ## Vinos de la carta
 
 Desde el 05/11/2026 la biblioteca enseña también los **vinos de la carta** con foto (tabla `"Vinos"`, bucket público `vinos`), con el filtro **Vinos** y la etiqueta «Vino». Funciona igual que los platos:
