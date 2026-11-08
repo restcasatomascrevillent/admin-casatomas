@@ -50,6 +50,13 @@ export const LIMITES: Record<string, number> = {
   compras_producto: 10,
   /** Productos de variacion_precios (la RPC marca su truncado). */
   variacion_precios: 10,
+  /** Filas por vista de margenes_carta (peor primero). */
+  margenes_carta: 12,
+  /** Sin vista van las tres listas: menos filas de cada una para que quepan. */
+  margenes_carta_todas: 5,
+  /** Avisos por tipo de alertas_precio: pocos si van todos los tipos, mas si se pide uno. */
+  alertas_precio: 4,
+  alertas_precio_tipo: 12,
 };
 
 /** Fecha de hoy en Europe/Madrid. El modelo la necesita para resolver "este mes". */
@@ -111,6 +118,7 @@ REGLAS
 16. Nunca preguntes «¿quieres que consulte…?»: llama a las herramientas que falten y da la cifra.
 17. Seguimiento («hazme la comparativa», «y en cerveza?»): mismo tema, unidad y periodo que el turno anterior.
 18. «Ultimo mes» = mes natural anterior: di el periodo («octubre de 2026») y si esta incompleto.
+19. Si un resultado trae "como_leer", siguelo.
 Formato: español, 1.234,56 €, fechas 15/01/2026. Viñetas o tabla, sin saludos ni relleno. Maximo 6 lineas salvo listados.`;
 }
 
@@ -264,6 +272,23 @@ export const TOOLS = [
     "Busqueda semantica de documentos por tema ('facturas de pescado'); con proveedor, numero o " +
     "fechas: filtrar_documentos.",
     { consulta: { type: "string" }, tipo: TIPO_NULL }),
+  fn("margenes_carta",
+    "Margen de lo vendido: al peso (€/kg carta vs compra), vinos (botella) y platos (escandallo). 'que deja menos margen'.",
+    {
+      texto: { type: ["string", "null"], description: "null = los peores" },
+      vista: { type: ["string", "null"], enum: ["peso", "vinos", "platos", null] },
+      solo_problemas: { type: ["boolean", "null"] },
+    }),
+  fn("alertas_precio",
+    "Avisos de Analisis: sube (por €/mes), baja, mejor (mas barato en otro proveedor), proveedor, pactado, " +
+    "familia (gasto sobre su media), otros. 'que tengo que mirar', 'donde ahorro'.",
+    {
+      tipo: { type: ["string", "null"], enum: ["sube", "baja", "mejor", "proveedor", "pactado", "familia", "otros", null] },
+      producto: { type: ["string", "null"] },
+      local: { type: ["string", "null"], enum: ["casa_tomas", "touza", null] },
+      desde: FECHA_HIST,
+      hasta: FECHA_HIST,
+    }),
   fn("consulta_flexible",
     "Medias (ticket medio), cruces por varias agrupaciones y lo que no cubran las demas. " +
     "fuente documentos (total/subtotal/iva con IVA) o lineas (cantidad/precio_unitario/total_linea SIN IVA; " +
@@ -775,6 +800,48 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
           p_sentido: texto(args.sentido),
         },
         limite: null,
+      };
+    }
+
+    case "margenes_carta": {
+      const vista = texto(args.vista);
+      if (vista && !["peso", "vinos", "platos"].includes(vista)) {
+        throw new Error('El parametro "vista" debe ser peso, vinos, platos o null.');
+      }
+      return {
+        tipo: "rpc",
+        rpc: "margenes_carta_agente",
+        params: {
+          p_texto: texto(args.texto),
+          p_vista: vista,
+          p_solo_problemas: booleano(args.solo_problemas) ?? false,
+          p_limite: vista ? LIMITES.margenes_carta : LIMITES.margenes_carta_todas,
+        },
+        limite: null,
+        maxChars: 9_000,
+      };
+    }
+
+    case "alertas_precio": {
+      const { desde, hasta } = rangoOpcional(args);
+      const tipo = texto(args.tipo);
+      if (tipo && !["sube", "baja", "mejor", "proveedor", "pactado", "familia", "otros"].includes(tipo)) {
+        throw new Error('El parametro "tipo" debe ser sube, baja, mejor, proveedor, pactado, familia, otros o null.');
+      }
+      const local = texto(args.local);
+      return {
+        tipo: "rpc",
+        rpc: "alertas_precio_agente",
+        params: {
+          p_desde: desde,
+          p_hasta: hasta,
+          p_local: local === "casa_tomas" || local === "touza" ? local : null,
+          p_tipo: tipo,
+          p_producto: texto(args.producto),
+          p_limite: tipo ? LIMITES.alertas_precio_tipo : LIMITES.alertas_precio,
+        },
+        limite: null,
+        maxChars: 9_000,
       };
     }
 

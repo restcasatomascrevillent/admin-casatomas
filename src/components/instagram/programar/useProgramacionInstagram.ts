@@ -64,11 +64,18 @@ export function mensajeError(e: unknown): string {
   return "No se pudo completar la acción";
 }
 
-export function useCalendarioInstagram(desde: Date, hasta: Date, opciones: { activo?: boolean } = {}) {
-  return useQuery({
+/**
+ * Consulta del calendario (clave, función y tiempos), compartida por el hook y
+ * por el prefetch del Estudio (components/instagram/estudio/consultas.ts).
+ * staleTime de 1 min (igual que el sondeo) y caché de 30 min: volver a una
+ * pestaña que ya lo cargó pinta al momento y refresca por detrás.
+ */
+export function opcionesCalendarioInstagram(desde: Date, hasta: Date) {
+  return {
     queryKey: [...CLAVE_PROGRAMACION, "calendario", desde.toISOString(), hasta.toISOString()],
-    enabled: opciones.activo ?? true,
     refetchInterval: 60_000,
+    staleTime: 60_000,
+    gcTime: 30 * 60_000,
     queryFn: async (): Promise<{ programaciones: ProgramacionInstagram[]; publicadas: PiezaResumen[]; borradores: BorradorResumen[] }> => {
       const [prog, pub, bor] = await Promise.all([
         sb
@@ -106,7 +113,11 @@ export function useCalendarioInstagram(desde: Date, hasta: Date, opciones: { act
         borradores: bor.error ? [] : ((bor.data ?? []) as unknown as BorradorResumen[]),
       };
     },
-  });
+  };
+}
+
+export function useCalendarioInstagram(desde: Date, hasta: Date, opciones: { activo?: boolean } = {}) {
+  return useQuery({ ...opcionesCalendarioInstagram(desde, hasta), enabled: opciones.activo ?? true });
 }
 
 /** Programación vigente (pendiente, publicándose o con error) de una pieza; null si no hay. */

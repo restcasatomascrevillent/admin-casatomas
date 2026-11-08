@@ -3,8 +3,8 @@
 // revisar», «Regalado por proveedor» y «Evolución de un producto». Leen las RPC de siempre: el tablero
 // (meses), `explorar_compras` (rankings) y `documentos_de_cifra`
 // (albaranes). Solo piden datos si están en el tablero (si no, no se montan).
-import { useId, useMemo, useState } from "react";
-import { BarChart3, FileText, LineChart, Search, ShoppingCart } from "lucide-react";
+import { useContext, useId, useMemo, useState } from "react";
+import { FileText, Search, ShoppingCart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatImporte, plural } from "@/components/facturas/shared/formatters";
@@ -13,7 +13,7 @@ import { useBuscarProductosComprados } from "@/hooks/useTableroCompras";
 import { enlaceProveedorCompras, fechaCorta, nombreCorto, resumenGastoMes, textoPct, type MesGasto } from "@/lib/facturas/tableroCompras";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
 import { etiquetaMes } from "@/lib/facturas/agrupacionDocumentos";
-import { FILTROS_VACIOS, parametrosExplorar, rangoDeClave, resumenExploracion, type Agrupar, type ConfigExplorador, type LocalRpc, type Medida } from "@/lib/facturas/explorador";
+import { FILTROS_VACIOS, parametrosExplorar, rangoDeClave, resumenExploracion, type Agrupar, type LocalRpc, type Medida } from "@/lib/facturas/explorador";
 import { enlaceDocumentoCompras, peticionSimple, type PeticionDocumentos } from "@/lib/facturas/documentosCifra";
 import type { Tamano } from "@/lib/facturas/widgetsTablero";
 import {
@@ -29,6 +29,7 @@ import {
   FOCO,
   SinDatos,
   Tarjeta,
+  TarjetaLlena,
   type AccionMenu,
 } from "./piezas";
 import { GraficaExplorador } from "./GraficaExplorador";
@@ -45,7 +46,6 @@ interface Comunes {
   onAmpliar?: () => void;
   onDocumentos: (p: PeticionDocumentos) => void;
   onIrA: (enlace: string) => void;
-  onExplorar: (c: Partial<ConfigExplorador>) => void;
   /** Cargando otro periodo: las filas no se pueden tocar. */
   pendiente?: boolean;
 }
@@ -83,6 +83,8 @@ export function GastoPorMesModulo({
   onIrA?: (enlace: string) => void;
 }) {
   const con = meses.filter((m) => m.documentos > 0 || m.total !== 0);
+  // En una vista de Análisis la gráfica llena su caja (piezas › TarjetaLlena).
+  const llena = useContext(TarjetaLlena);
   const porMes = useMemo(() => alertasPorClave(alertasDelPeriodo(alertas, periodo, local), "mes"), [alertas, periodo, local]);
   const hayMarcas = con.some((m) => porMes.has(m.mes));
   const max = Math.max(1, ...con.map((m) => Math.max(0, m.casa_tomas) + Math.max(0, m.touza)));
@@ -110,7 +112,7 @@ export function GastoPorMesModulo({
               </span>
             </p>
           )}
-          <ol className={cn("flex items-stretch gap-1 @[28rem]:gap-1.5", tamano === "s" ? "h-36" : "h-44")} aria-label="Gasto de cada mes">
+          <ol className={cn("flex items-stretch gap-1 @[28rem]:gap-1.5", llena ? "min-h-36 flex-1" : tamano === "s" ? "h-36" : "h-44")} aria-label="Gasto de cada mes">
             {con.map((m) => {
               const ct = Math.max(0, m.casa_tomas);
               const tz = conTouza ? Math.max(0, m.touza) : 0;
@@ -231,7 +233,7 @@ function RankingExplorar({
 }
 
 export function ProductosMasComprados(p: Comunes) {
-  const { periodo, local, onDocumentos, onExplorar } = p;
+  const { periodo, local, onDocumentos } = p;
   return (
     <RankingExplorar
       {...p}
@@ -248,18 +250,13 @@ export function ProductosMasComprados(p: Comunes) {
           onClick: () =>
             onDocumentos(peticionSimple({ titulo: x.etiqueta, desde: periodo.desde, hasta: periodo.hasta, medida: "base", agrupar: "producto", clave: x.clave, local, cifra: x.valor, detalle: "Base sin IVA de sus líneas" })),
         },
-        {
-          etiqueta: "Ver su precio en el explorador",
-          icono: <LineChart className={ICONO} aria-hidden />,
-          onClick: () => onExplorar({ medida: "precio", agrupar: "mes", desglose: "proveedor", grafica: "auto", filtros: { ...FILTROS_VACIOS, productos: [x.clave] } }),
-        },
       ]}
     />
   );
 }
 
 export function RegaladoPorProveedor(p: Comunes) {
-  const { periodo, local, onDocumentos, onIrA, onExplorar } = p;
+  const { periodo, local, onDocumentos, onIrA } = p;
   return (
     <RankingExplorar
       {...p}
@@ -282,11 +279,6 @@ export function RegaladoPorProveedor(p: Comunes) {
                   ),
               },
               { etiqueta: "Abrir en Compras", icono: <ShoppingCart className={ICONO} aria-hidden />, onClick: () => onIrA(enlaceProveedorCompras(x.id as number)) },
-              {
-                etiqueta: "Ver por mes en el explorador",
-                icono: <BarChart3 className={ICONO} aria-hidden />,
-                onClick: () => onExplorar({ medida: "regalado", agrupar: "mes", desglose: null, filtros: { ...FILTROS_VACIOS, proveedores: [{ id: x.id as number, nombre: nombreCorto(x.etiqueta) }] } }),
-              },
             ]
       }
     />

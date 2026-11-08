@@ -84,8 +84,9 @@ const DOCS = [
   documento(1, "factura", "F-100", "PESCADOS MARTA, S.L.", "2026-09-01", {
     productos_factura: [linea(101, "MERLUZA PINCHO 3KG", 10, "Merluza de pincho")],
   }),
+  // Sin verificar: un documento verificado ya no enseña avisos en la lista (08/11/2026).
   documento(2, "factura", "F-101", "BODEGA CAMPOLUZ, S.L.", "2026-09-05", {
-    verificada: true,
+    verificada: false,
     local: "touza",
     alertas_validacion: [{ codigo: "iva_incoherente", severidad: "alta", mensaje: "El IVA no cuadra" }],
     productos_factura: [linea(102, "Vino tinto crianza", 12, "Vino tinto crianza")],
@@ -290,7 +291,7 @@ describe("Compras · chips por modo", () => {
     expect(within(listaDocs()).getByText("F-101")).toBeInTheDocument();
 
     fireEvent.click(within(barra).getByRole("button", { name: /^Sin revisar/ }));
-    expect(within(listaDocs()).queryByText("F-101")).not.toBeInTheDocument();
+    expect(within(listaDocs()).queryByText("A-2")).not.toBeInTheDocument();
     expect(within(listaDocs()).getByText("F-100")).toBeInTheDocument();
 
     fireEvent.click(within(barra).getByRole("button", { name: /^Facturas/ }));
@@ -516,7 +517,8 @@ describe("Compras · filas a todo el ancho", () => {
     const fila = (num: string) => within(listaDocs()).getByText(num).closest("button") as HTMLElement;
     expect(fila("F-101")).toHaveTextContent("1 aviso");
     expect(fila("F-101")).toHaveTextContent("Touza");
-    expect(fila("F-101")).not.toHaveTextContent("Sin revisar");
+    expect(fila("F-101")).toHaveTextContent("Sin revisar");
+    expect(fila("A-2")).not.toHaveTextContent("Sin revisar");
     expect(fila("A-1")).toHaveTextContent("Albarán");
     expect(fila("A-1")).toHaveTextContent("Sin revisar");
     expect(fila("A-1")).toHaveTextContent("Sin factura");

@@ -40,10 +40,9 @@ describe("Requiere atención", () => {
       ...[2, 3, 4, 5, 6].map((i) => alerta(i)),
     ]);
     const onIrA = vi.fn();
-    const onExplorar = vi.fn();
     const abrir = vi.fn();
     window.addEventListener(EVENTO_ABRIR_AVISOS, abrir);
-    render(<RequiereAtencion alertas={alertas} onIrA={onIrA} onExplorar={onExplorar} />);
+    render(<RequiereAtencion alertas={alertas} onIrA={onIrA} />);
     const tarjeta = screen.getByTestId("tarjeta-requiere-atencion");
     expect(within(tarjeta).getAllByRole("listitem")).toHaveLength(5);
     expect(within(tarjeta).getByText("Importante")).toBeTruthy();
@@ -53,17 +52,18 @@ describe("Requiere atención", () => {
     expect((abrir.mock.calls[0][0] as CustomEvent).detail).toEqual({ seccion: "facturas" });
     window.removeEventListener(EVENTO_ABRIR_AVISOS, abrir);
 
-    // La subida: su precio en el explorador o su documento.
+    // La subida: su documento (ya no hay «precio en el explorador»).
     fireEvent.click(within(tarjeta).getByRole("button", { name: /Importante: Sube Merluza/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Ver su precio en el explorador" }));
-    expect(onExplorar).toHaveBeenCalledWith(expect.objectContaining({ medida: "precio", agrupar: "mes", filtros: expect.objectContaining({ productos: ["MERLUZA"], unidad: "kg" }) }));
+    expect(screen.queryByRole("button", { name: /explorador/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Abrir el documento" }));
+    expect(onIrA).toHaveBeenCalledWith("?tab=compras&modo=documentos&doc=1");
     fireEvent.click(within(tarjeta).getByRole("button", { name: /Alerta 2/ }));
     fireEvent.click(screen.getByRole("button", { name: "Abrir el documento" }));
     expect(onIrA).toHaveBeenCalledWith("?tab=compras&modo=documentos&doc=2");
   });
 
   it("sin alertas no ocupa sitio", () => {
-    const { container } = render(<RequiereAtencion alertas={[]} onIrA={vi.fn()} onExplorar={vi.fn()} />);
+    const { container } = render(<RequiereAtencion alertas={[]} onIrA={vi.fn()} />);
     expect(container.textContent).toBe("");
   });
 });

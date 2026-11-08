@@ -3,7 +3,7 @@
 //     recalculan con el periodo y el local del tablero;
 //   · de la IA: una copia de la serie de precio que dio el copiloto.
 import { useMemo } from "react";
-import { BarChart3, PinOff } from "lucide-react";
+import { PinOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GraficoSeriePrecio } from "@/components/facturas/GraficoSeriePrecio";
 import { useExplorarCompras } from "@/hooks/useExplorarCompras";
@@ -13,7 +13,6 @@ import {
   graficaEfectiva,
   parametrosExplorar,
   resumenExploracion,
-  type ConfigExplorador,
   type ExploracionFijada,
   type LocalRpc,
 } from "@/lib/facturas/explorador";
@@ -30,13 +29,11 @@ function TarjetaFijada({
   periodo,
   local,
   onQuitar,
-  onAbrir,
 }: {
   fijada: ExploracionFijada;
   periodo: { desde: string | null; hasta: string | null };
   local: LocalRpc;
   onQuitar: () => void;
-  onAbrir: (c: ConfigExplorador) => void;
 }) {
   const params = useMemo(() => parametrosExplorar(fijada.config, periodo, local), [fijada.config, periodo, local]);
   const q = useExplorarCompras(params, { retraso: 0 });
@@ -45,13 +42,10 @@ function TarjetaFijada({
   return (
     <Tarjeta
       titulo={fijada.titulo}
-      subtitulo={ex && !ex.sinDatos ? `Total ${formatoValor(ex.total.valor, ex.parametros.medida, ex.parametros.unidad)}` : "Del explorador"}
+      subtitulo={ex && !ex.sinDatos ? `Total ${formatoValor(ex.total.valor, ex.parametros.medida, ex.parametros.unidad)}` : "Gráfica fijada"}
       resumen={ex ? resumenExploracion(ex) : undefined}
       accion={
         <span className="flex shrink-0">
-          <button type="button" className={BOTON} onClick={() => onAbrir(fijada.config)} aria-label={`Abrir en el explorador: ${fijada.titulo}`}>
-            <BarChart3 className="h-3.5 w-3.5" aria-hidden /> Abrir
-          </button>
           <button type="button" className={BOTON} onClick={onQuitar} aria-label={`Quitar del tablero: ${fijada.titulo}`}>
             <PinOff className="h-3.5 w-3.5" aria-hidden /> Quitar
           </button>
@@ -80,7 +74,6 @@ export function FijadasDelTablero({
   local,
   explorador,
   onQuitarExplorador,
-  onAbrir,
   ia,
   onQuitarIa,
 }: {
@@ -88,14 +81,13 @@ export function FijadasDelTablero({
   local: LocalRpc;
   explorador: ExploracionFijada[];
   onQuitarExplorador: (id: string) => void;
-  onAbrir: (c: ConfigExplorador) => void;
   ia: GraficaFijada[];
   onQuitarIa: (id: string) => void;
 }) {
   return (
     <div className="grid gap-3 @[40rem]/tablero:grid-cols-2" role="group" aria-label="Gráficas fijadas">
       {explorador.map((f) => (
-        <TarjetaFijada key={f.id} fijada={f} periodo={periodo} local={local} onQuitar={() => onQuitarExplorador(f.id)} onAbrir={onAbrir} />
+        <TarjetaFijada key={f.id} fijada={f} periodo={periodo} local={local} onQuitar={() => onQuitarExplorador(f.id)} />
       ))}
       {ia.map((g) => (
         <Tarjeta

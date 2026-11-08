@@ -14,6 +14,8 @@ set client_encoding = 'UTF8';
 --      30 € con botella de 15 € → 2× → multiplicador_bajo; plato sin
 --      escandallo → sin_mapear con su motivo; < 1 s.
 --   T4 sin permiso: margenes_carta y margenes_guardar_escandallo dan 42501.
+--   T6 «Por peso» (20261115410000): €/kg de carta con y sin IVA, compra €/kg,
+--      multiplicador, última compra; los platos por «Unidad» no salen.
 --   T5 edición (si el usuario puede editar Facturas): guardar el escandallo lo
 --      deja en 'manual' y quita el motivo; revisado; vino sin mapear.
 begin;
@@ -168,6 +170,26 @@ begin
     select x into v from jsonb_array_elements(j->'vinos') x where x->>'id' = 'prueba-margenes-vino';
     if (v->>'coste')::numeric <> 15 or (v->>'multiplicador')::numeric <> 2 or not (v->'banderas' ? 'multiplicador_bajo') then
       raise exception 'FALLO T3: vino coste % multiplicador % banderas %', v->>'coste', v->>'multiplicador', v->'banderas';
+    end if;
+
+    -- T6 «Por peso» (20261115410000): 22 €/100 g = 220 €/kg en carta, 200 sin IVA;
+    -- compra 140 €/kg → ×1,43 < ×2 (por defecto) → multiplicador_bajo; 70 % de coste;
+    -- última compra la factura de junio (no el albarán facturado ni Touza).
+    if (j->'config'->>'multiplicador_min_peso') is null then
+      raise exception 'FALLO T6: config sin multiplicador_min_peso';
+    end if;
+    select x into p from jsonb_array_elements(j->'peso') x where x->>'id' = 'prueba-margenes-percebe';
+    if p is null then raise exception 'FALLO T6: el plato de 100 g no sale en peso'; end if;
+    if (p->>'venta_kg_iva')::numeric <> 220 or (p->>'venta_kg')::numeric <> 200 or (p->>'compra_kg')::numeric <> 140
+       or (p->>'multiplicador')::numeric <> 1.43 or (p->>'pct')::numeric <> 70 then
+      raise exception 'FALLO T6: peso %', p;
+    end if;
+    if p->>'ultimo_proveedor' <> 'PRUEBA MARGENES SL' or p->>'ultima_fecha' <> '2031-06-10'
+       or ((j->'config'->>'multiplicador_min_peso')::numeric = 2 and not (p->'banderas' ? 'multiplicador_bajo')) then
+      raise exception 'FALLO T6: última compra % % banderas %', p->>'ultimo_proveedor', p->>'ultima_fecha', p->'banderas';
+    end if;
+    if exists (select 1 from jsonb_array_elements(j->'peso') x where x->>'id' = 'prueba-margenes-vacio') then
+      raise exception 'FALLO T6: un plato por «Unidad» sale en peso';
     end if;
 
     -- Las compras que forman el coste: sin el albarán facturado ni Touza.

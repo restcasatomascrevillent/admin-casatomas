@@ -222,20 +222,11 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       lado: "bottom",
     },
     {
-      elemento: "facturas-analisis-explorador",
-      pestana: F_IA,
-      titulo: "Explorar: tu gráfica a medida",
-      texto:
-        "Cambia la gráfica al momento sin preguntar a la IA: qué medir (gasto, base, abonos, precio…), por qué agruparlo (día, mes, proveedor, familia…), por qué colorearlo y qué filtrar. Toca una barra para ver solo ese tramo o sus documentos. «Fijar en el tablero» la guarda.",
-      opcional: true,
-      lado: "top",
-    },
-    {
       elemento: "facturas-analisis-tablero",
       pestana: F_IA,
       titulo: "Las gráficas",
       texto:
-        "Toca un proveedor, un producto que sube, una familia o un gasto fijo: verás sus documentos, podrás abrirlo en «Compras» o llevarlo al explorador. En «Gasto por familia» te avisa de las líneas sin clasificar.",
+        "Toca un proveedor, un producto que sube, una familia o un gasto fijo: verás sus documentos y podrás abrirlo en «Compras». En «Gasto por familia» te avisa de las líneas sin clasificar.",
       opcional: true,
       lado: "top",
     },

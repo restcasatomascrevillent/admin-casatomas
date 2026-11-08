@@ -19,14 +19,31 @@ export function useRolesEncargos(): Roles & { cargando: boolean } {
   return { restaurante: r.canAccess, agencia: a.canAccess, cargando: r.loading || a.loading };
 }
 
+/**
+ * Consulta de la lista (clave, función y tiempos), compartida con el prefetch
+ * del Estudio. staleTime igual al sondeo (1 min) y caché de 30 min: volver al
+ * Estudio o al tablero pinta al momento.
+ */
+export const opcionesEncargos = () => ({
+  queryKey: CLAVE_ENCARGOS,
+  queryFn: listarEncargos,
+  refetchInterval: 60_000,
+  staleTime: 60_000,
+  gcTime: 30 * 60_000,
+});
+
+/**
+ * ¿Se piden ya los encargos? Sí mientras los permisos aún cargan (la RLS ya
+ * filtra: sin permiso, la lista llega vacía), para no esperar a los roles
+ * antes de lanzar la consulta (antes iba en cascada). Solo se para si ya se
+ * sabe que no ve ningún lado.
+ */
+export function encargosActivos(roles: Roles & { cargando: boolean }): boolean {
+  return roles.cargando || roles.restaurante || roles.agencia;
+}
+
 export function useEncargos(activo = true) {
-  return useQuery({
-    queryKey: CLAVE_ENCARGOS,
-    queryFn: listarEncargos,
-    enabled: activo,
-    refetchInterval: 60_000,
-    staleTime: 15_000,
-  });
+  return useQuery({ ...opcionesEncargos(), enabled: activo });
 }
 
 export function useDetalleEncargo(id: string | null) {
@@ -45,7 +62,7 @@ export function useAjustesEncargos() {
 /** Número de la pestaña «Encargos»: lo que espera a quien mira. */
 export function usePendientesEncargos(): number {
   const roles = useRolesEncargos();
-  const { data } = useEncargos(!roles.cargando && (roles.restaurante || roles.agencia));
+  const { data } = useEncargos(encargosActivos(roles));
   const { restaurante, agencia } = roles;
   return useMemo(() => pendientes(data ?? [], { restaurante, agencia }), [data, restaurante, agencia]);
 }

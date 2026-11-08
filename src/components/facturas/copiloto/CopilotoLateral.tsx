@@ -46,7 +46,6 @@ interface Props {
   fijadas: ReadonlySet<string>;
   onFijar: (g: GraficaIa) => void;
   onQuitarFijada: (id: string) => void;
-  onExplorar?: (g: GraficaIa) => void;
   /** URL del chat a pantalla completa (con la conversación abierta). */
   enlacePantallaCompleta?: string;
   /** Clic normal en «Pantalla completa»: cambia de vista en esta pestaña. */

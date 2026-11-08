@@ -134,6 +134,10 @@ const Facturas = () => {
   // página ocupa justo lo visible y cada pestaña reparte ese alto por dentro.
   // Sin medida (jsdom, primer pintado) cae al `calc(100dvh-6rem)` de siempre.
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  // Barra única de Análisis (07/11/2026): periodo, local, «Personalizar» y la IA van en
+  // ESTA fila, junto a las pestañas; ChatFacturas los pinta aquí con un portal.
+  const [ranuraAnalisis, setRanuraAnalisis] = useState<HTMLDivElement | null>(null);
+  const barraUnica = activeTab === "chat" && !pantallaIa;
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_FACTURAS);
 
   // Contadores para los badges de las pestañas
@@ -193,6 +197,10 @@ const Facturas = () => {
             // En el móvil, solo iconos: a 390 px el gasto de IA tapaba «Cargar» (QA 05/11/2026).
             soloIconosEnMovil
             className={pantallaIa ? "hidden" : undefined}
+            // En Análisis la barra de filtros va en esta fila; por debajo de lg (tablet vertical, móvil), en la de abajo.
+            accionesAnchas={barraUnica}
+            iconosSoloMuyAncho={barraUnica}
+            accionesDebajoEnMovil={barraUnica ? "lg" : undefined}
             pestanas={[
               { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, tour: "facturas-pestana-ia" },
               { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
@@ -200,12 +208,18 @@ const Facturas = () => {
             ].filter((p) => visibles.includes(p.valor as PestanaFacturas))}
             acciones={
               <>
-                {/* El gasto del chatbot es de la IA: solo con «Editar». Sin él, un hueco empuja lo demás a la derecha. */}
-                {permisos.editar ? <GastoIaPestana className="ml-auto" /> : <span className="ml-auto" aria-hidden="true" />}
+                {barraUnica && <div ref={setRanuraAnalisis} className="flex min-w-0 flex-1" data-testid="ranura-analisis" />}
+                {/* El gasto del chatbot es de la IA: solo con «Editar». Sin él, un hueco empuja lo demás a la derecha.
+                    En Análisis, con la barra única, solo en pantallas muy anchas (no cabe en 1280). */}
+                {permisos.editar ? (
+                  <GastoIaPestana className={barraUnica ? "hidden 2xl:flex" : "ml-auto"} />
+                ) : (
+                  !barraUnica && <span className="ml-auto" aria-hidden="true" />
+                )}
                 {soloLectura && <EtiquetaSoloLectura />}
                 {/* Avisos de facturas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral).
                     Son de lo comprado (precios, documentos): solo para quien consulta Facturas. */}
-                {permisos.consultar && <BotonAvisosSeccion seccion="facturas" />}
+                {permisos.consultar && <BotonAvisosSeccion seccion="facturas" compacto={barraUnica} />}
                 <BotonAyuda seccion="facturas" />
               </>
             }
@@ -239,6 +253,7 @@ const Facturas = () => {
                       pantallaCompleta={pantallaIa}
                       conIa={permisos.editar}
                       puedeEditar={permisos.editar}
+                      ranuraBarra={ranuraAnalisis}
                     />
                   )}
                 </div>

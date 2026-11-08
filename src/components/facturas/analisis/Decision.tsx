@@ -6,11 +6,11 @@
 //   · PreciosLoMasComprado  ¿Cómo van los precios de lo que más compro? («precios_top»)
 //   · DondeAhorrar          ¿Dónde puedo ahorrar?      («ahorro»)
 // Las alertas van DENTRO de las tarjetas (no en una lista suelta). Desde
-// cualquier fila se abre la factura de origen (VisorDocumento) o se lleva al
-// explorador. «Visto», «Es normal» y el precio pactado piden «Editar».
+// cualquier fila se abre la factura de origen (VisorDocumento).
+// «Visto», «Es normal» y el precio pactado piden «Editar».
 // Textos cortos propios: nada de recortar el mensaje largo con «…».
 import { useId, useState, type ReactNode } from "react";
-import { Check, FileText, Handshake, LineChart, Sparkles, X } from "lucide-react";
+import { Check, FileText, Handshake, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatEntero, plural } from "@/components/facturas/shared/formatters";
 import {
@@ -27,9 +27,9 @@ import {
 } from "@/lib/facturas/decision";
 import { resumenCortoAlerta, tituloCortoAlerta } from "@/lib/facturas/alertas";
 import type { DocumentoCifra } from "@/lib/facturas/documentosCifra";
-import { FILTROS_VACIOS, type ConfigExplorador } from "@/lib/facturas/explorador";
 import type { Tamano } from "@/lib/facturas/widgetsTablero";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
+import { nombreMes as nombreMesLargo } from "@/lib/facturas/vistasAnalisis";
 import { useAccionDecision } from "@/hooks/useDecisionFacturas";
 import { usePuedeEditarFacturas } from "./edicionFacturas";
 import { VisorDocumento } from "./VisorDocumento";
@@ -54,7 +54,7 @@ export function Chip({ tono, children, title }: { tono: keyof typeof TONO_CHIP; 
   );
 }
 
-const BOTON =
+export const BOTON =
   "inline-flex min-h-9 items-center gap-1 rounded-md border border-border/70 bg-background px-2.5 text-xs font-medium text-foreground hover:border-primary/50 hover:text-primary disabled:opacity-50 pointer-coarse:min-h-11";
 
 interface Comunes {
@@ -67,7 +67,7 @@ interface Comunes {
 const nombreMes = (mes: string) => mesCorto(mes, false);
 
 /** El visor de un documento (o dos, para comparar) dentro de una tarjeta. */
-function useVisor(onIrA?: (enlace: string) => void) {
+export function useVisor(onIrA?: (enlace: string) => void) {
   const [docs, setDocs] = useState<DocumentoCifra[]>([]);
   const [indice, setIndice] = useState<number | null>(null);
   const abrir = (d: (DocumentoCifra | null)[]) => {
@@ -88,13 +88,6 @@ function useVisor(onIrA?: (enlace: string) => void) {
   );
   return { abrir, visor };
 }
-
-const explorarPrecio = (producto: string, unidad: string | null, proveedor?: { id: number; nombre: string } | null): Partial<ConfigExplorador> => ({
-  medida: "precio",
-  agrupar: "mes",
-  desglose: "proveedor",
-  filtros: { ...FILTROS_VACIOS, productos: [producto], unidad: unidad ? unidad.toLowerCase() : null, ...(proveedor ? { proveedores: [proveedor] } : {}) },
-});
 
 // ─── 1. ¿En qué se va el dinero? ────────────────────────────────────────────
 
@@ -120,13 +113,19 @@ export function FamiliasFrenteMedia({
   const ref = textoMesesReferencia(decision.referencia.meses);
   const pct = decision.umbrales.familiaPct;
   const fuera = fams.filter((f) => f.aviso);
+  // Con «Año» o «Todo» no suele haber meses completos ANTES del periodo (20261115300000):
+  // entonces se compara su último mes completo con la media de los anteriores del periodo.
+  const comparado = decision.periodo.comparado;
+  const ultimoMes = comparado?.modo === "ultimo_mes" ? nombreMesLargo(comparado.desde) : null;
   return (
     <Tarjeta
       titulo="¿En qué se va el dinero?"
       subtitulo={
-        ref
-          ? `Base sin IVA por familia. La barra es el periodo; la raya, la media de ${ref}. Aviso si se sale más de un ${pct} %.`
-          : "Base sin IVA por familia (aún no hay meses completos anteriores para comparar)."
+        ref && ultimoMes
+          ? `Base sin IVA. Barra: ${ultimoMes}, el último mes completo (no hay meses anteriores al periodo); raya: media de ${ref}. Aviso si se sale más de un ${pct} %.`
+          : ref
+            ? `Base sin IVA por familia. La barra es el periodo; la raya, la media de ${ref}. Aviso si se sale más de un ${pct} %.`
+            : "Base sin IVA por familia (aún no hay meses completos para comparar)."
       }
       resumen={
         fams.length
@@ -148,7 +147,7 @@ export function FamiliasFrenteMedia({
           )}
         </div>
       )}
-      {decision.periodo.enCurso && (
+      {decision.periodo.enCurso && !ultimoMes && (
         <p className="mb-1.5 text-xs text-muted-foreground">Periodo en curso: la media se cuenta hasta hoy.</p>
       )}
       {fams.length === 0 ? (
@@ -194,7 +193,7 @@ export function FamiliasFrenteMedia({
           </ul>
           <BotonVerMas total={fams.length} visibles={limite} abierto={todas} onCambio={setTodas} controla={idLista} femenino />
           <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-hidden>
-            <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-3.5 rounded-sm bg-primary/80" />Periodo</span>
+            <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-3.5 rounded-sm bg-primary/80" />{ultimoMes ? ultimoMes.charAt(0).toUpperCase() + ultimoMes.slice(1) : "Periodo"}</span>
             {ref && <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-0.5 bg-foreground/60" />Media {ref}</span>}
           </p>
         </>
@@ -209,14 +208,12 @@ function FilaCambio({
   c,
   pestana,
   onVerDocs,
-  onExplorar,
   puedeEditar,
   pendiente,
 }: {
   c: CambioPrecio;
   pestana: PestanaCambios | "aviso";
   onVerDocs: (docs: (DocumentoCifra | null)[]) => void;
-  onExplorar: (cfg: Partial<ConfigExplorador>) => void;
   puedeEditar: boolean;
   pendiente?: boolean;
 }) {
@@ -259,15 +256,6 @@ function FilaCambio({
               </button>
             )
           )}
-          {d.producto && a.tipo !== "facturas_precio_proveedor" && (
-            <button
-              type="button"
-              className={cn(BOTON, FOCO)}
-              onClick={() => onExplorar(explorarPrecio(d.producto as string, a.tipo === "facturas_precio_mejor" ? null : d.unidad))}
-            >
-              <LineChart className="h-3.5 w-3.5" aria-hidden /> Ver en la gráfica
-            </button>
-          )}
           {puedeEditar && (
             <>
               <button type="button" className={cn(BOTON, FOCO)} disabled={ocupado} onClick={() => accion.mutate({ tipo: "visto", id: a.id })}>
@@ -295,9 +283,8 @@ export function CambiosDePrecio({
   tamano = "m",
   onAmpliar,
   pendiente,
-  onExplorar,
   onIrA,
-}: Comunes & { onExplorar: (c: Partial<ConfigExplorador>) => void; onIrA?: (enlace: string) => void }) {
+}: Comunes & { onIrA?: (enlace: string) => void }) {
   const puedeEditar = usePuedeEditarFacturas();
   const [pestana, setPestana] = useState<PestanaCambios>("sube");
   const [todas, setTodas] = useState(false);
@@ -360,7 +347,7 @@ export function CambiosDePrecio({
       {avisos.length > 0 && (
         <ul aria-label="Avisos de precio" className="mb-1 rounded-lg bg-amber-500/10 px-2.5" data-testid="avisos-precio">
           {avisos.map((x) => (
-            <FilaCambio key={x.alerta.id} c={x} pestana="aviso" onVerDocs={abrir} onExplorar={onExplorar} puedeEditar={puedeEditar} pendiente={pendiente} />
+            <FilaCambio key={x.alerta.id} c={x} pestana="aviso" onVerDocs={abrir} puedeEditar={puedeEditar} pendiente={pendiente} />
           ))}
         </ul>
       )}
@@ -372,7 +359,7 @@ export function CambiosDePrecio({
         <>
           <ul id={idLista} aria-label="Cambios de precio">
             {visibles.map((x) => (
-              <FilaCambio key={x.alerta.id} c={x} pestana={pestana} onVerDocs={abrir} onExplorar={onExplorar} puedeEditar={puedeEditar} pendiente={pendiente} />
+              <FilaCambio key={x.alerta.id} c={x} pestana={pestana} onVerDocs={abrir} puedeEditar={puedeEditar} pendiente={pendiente} />
             ))}
           </ul>
           <BotonVerMas total={lista.length} visibles={limite} abierto={todas} onCambio={setTodas} controla={idLista} />
@@ -438,10 +425,8 @@ export function PreciosLoMasComprado({
   decision,
   onAmpliar,
   pendiente,
-  onExplorar,
   onVerDocumentos,
 }: Comunes & {
-  onExplorar: (c: Partial<ConfigExplorador>) => void;
   /** Las facturas de ese producto (DocumentosDeCifra). */
   onVerDocumentos: (p: ProductoTop) => void;
 }) {
@@ -453,11 +438,6 @@ export function PreciosLoMasComprado({
   const acciones = (p: ProductoTop): AccionMenu[] => {
     if (pendiente) return [];
     const l: AccionMenu[] = [
-      {
-        etiqueta: "Ver su precio en el explorador",
-        icono: <LineChart className={ICONO} aria-hidden />,
-        onClick: () => onExplorar(explorarPrecio(p.linea ?? p.producto, p.unidad)),
-      },
       { etiqueta: "Ver sus facturas", icono: <FileText className={ICONO} aria-hidden />, onClick: () => onVerDocumentos(p) },
     ];
     const ultimo = geometriaMini(p.meses, []).ultimoPrecio;

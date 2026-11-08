@@ -17,6 +17,7 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { VersionPanel } from "@/components/panel/VersionPanel";
 import { cn } from "@/lib/utils";
+import { precargarSeccion } from "@/lib/precargaSecciones";
 import {
   Sidebar,
   SidebarContent,
@@ -242,6 +243,10 @@ export function AppSidebar() {
                     <NavLink
                       to={item.url}
                       aria-label={item.title}
+                      // Al acercar el ratón o el dedo, empieza a bajar el fichero de la sección (07/11/2026).
+                      onMouseEnter={() => precargarSeccion(item.url)}
+                      onTouchStart={() => precargarSeccion(item.url)}
+                      onFocus={() => precargarSeccion(item.url)}
                       className="flex items-center gap-3 rounded-lg hover:bg-sidebar-accent"
                     >
                       <item.icon

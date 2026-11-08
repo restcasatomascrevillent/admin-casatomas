@@ -7,8 +7,7 @@
 //    · pequeño = 1 columna, mediano = 2, grande = 3 (o todo el ancho si no
 //      caben) de una rejilla tipo «bento» que empaqueta los pequeños juntos
 //      (`grid-auto-flow: dense`);
-//    · «Explorar» es un módulo fijo (no se quita: la IA y las filas llevan a
-//      él) que se puede mover; parte la rejilla en «antes» y «después».
+//    · La vista «Explorar» se quitó (08/11/2026): un «explorar» guardado se descarta.
 //
 //  Se guarda por usuario en `dashboard_config` (nombre_vista
 //  «facturas_analisis»: tabla y RLS ya existentes, sin migración) y, como
@@ -34,7 +33,6 @@ export type IdCifra =
   | "familias_fuera";
 
 export type IdModulo =
-  | "explorar"
   | "proveedores"
   | "subidas"
   | "familias"
@@ -63,7 +61,7 @@ export interface InfoModulo {
   tamano: Tamano;
   /** No se puede quitar (sí mover). */
   fijo?: boolean;
-  /** Solo admite este tamaño (Explorar ocupa siempre todo el ancho). */
+  /** Solo admite este tamaño (sin uso por ahora). */
   soloTamano?: Tamano;
 }
 
@@ -84,7 +82,6 @@ export const CIFRAS: InfoCifra[] = [
 ];
 
 export const MODULOS: InfoModulo[] = [
-  { id: "explorar", titulo: "Explorar", descripcion: "La gráfica a medida (medida, eje, color y filtros)", tamano: "l", fijo: true, soloTamano: "l" },
   { id: "proveedores", titulo: "Proveedores con más gasto", descripcion: "Ranking con IVA y su % del total", tamano: "s" },
   { id: "subidas", titulo: "¿Qué me están subiendo?", descripcion: "Cambios de precio por € al mes: suben, más barato en otro, bajan", tamano: "m" },
   { id: "familias", titulo: "¿En qué se va el dinero?", descripcion: "Gasto por familia frente a su media, con avisos", tamano: "m" },
@@ -120,7 +117,7 @@ export interface ModuloActivo {
 export interface ConfigTablero {
   /** Cifras de arriba, en orden (las que no están, no se ven). */
   cifras: IdCifra[];
-  /** Módulos en orden, con su tamaño. Siempre lleva «explorar». */
+  /** Módulos en orden, con su tamaño. */
   modulos: ModuloActivo[];
   /**
    * Versión del tablero guardado. Sin ella (o < VERSION_TABLERO) es de antes de las
@@ -129,13 +126,13 @@ export interface ConfigTablero {
   v?: number;
 }
 
-/** 2 = gráficas de decisión (15/11/2026). */
-export const VERSION_TABLERO = 2;
+/** 2 = gráficas de decisión (15/11/2026); 3 = Análisis en una pantalla, con «Gasto por mes» en «Qué decidir hoy» (07/11/2026). */
+export const VERSION_TABLERO = 3;
 
 /**
  * El tablero de gestión (15/11/2026, maqueta del dueño): arriba el gasto y las
  * tres cifras de decisión; luego las cuatro preguntas (subidas, ahorro, familias
- * y precios de lo más comprado) con los proveedores; Explorar; y el resto.
+ * y precios de lo más comprado) con los proveedores; y el resto.
  */
 export const CONFIG_TABLERO_POR_DEFECTO: ConfigTablero = {
   cifras: ["gasto", "precios_suben", "ahorro_posible", "familias_fuera", "por_revisar"],
@@ -145,10 +142,10 @@ export const CONFIG_TABLERO_POR_DEFECTO: ConfigTablero = {
     { id: "familias", tamano: "m" },
     { id: "proveedores", tamano: "s" },
     { id: "precios_top", tamano: "l" },
-    { id: "explorar", tamano: "l" },
     { id: "fijos", tamano: "s" },
     { id: "abonos", tamano: "s" },
     { id: "locales", tamano: "s" },
+    { id: "gasto_mes", tamano: "m" },
   ],
   v: VERSION_TABLERO,
 };
@@ -161,6 +158,11 @@ export const CONFIG_TABLERO_POR_DEFECTO: ConfigTablero = {
  */
 export function actualizarVersion(c: ConfigTablero): ConfigTablero {
   if ((c.v ?? 1) >= VERSION_TABLERO) return c;
+  if ((c.v ?? 1) >= 2) {
+    // 3 (07/11/2026): «Gasto por mes» va al lado de «Qué decidir hoy»; se añade una vez.
+    const modulos = c.modulos.some((m) => m.id === "gasto_mes") ? c.modulos : [...c.modulos, { id: "gasto_mes" as IdModulo, tamano: "m" as Tamano }];
+    return { ...c, modulos, v: VERSION_TABLERO };
+  }
   const cifras = [...c.cifras];
   const pos = Math.max(0, cifras.indexOf("gasto") + 1);
   const nuevas = (["precios_suben", "ahorro_posible", "familias_fuera"] as IdCifra[]).filter((x) => !cifras.includes(x));
@@ -169,11 +171,12 @@ export function actualizarVersion(c: ConfigTablero): ConfigTablero {
   const meter = (id: IdModulo, tras: IdModulo, tamano: Tamano) => {
     if (modulos.some((m) => m.id === id)) return;
     const i = modulos.findIndex((m) => m.id === tras);
-    const j = i >= 0 ? i + 1 : Math.max(0, modulos.findIndex((m) => m.id === "explorar"));
+    const j = i >= 0 ? i + 1 : modulos.length;
     modulos.splice(j, 0, { id, tamano });
   };
   meter("ahorro", "subidas", "s");
   meter("precios_top", "familias", "l");
+  meter("gasto_mes", "locales", "m");
   return { cifras, modulos, v: VERSION_TABLERO };
 }
 
@@ -185,7 +188,7 @@ const esCifra = (v: unknown): v is IdCifra => CIFRAS.some((c) => c.id === v);
 const esModulo = (v: unknown): v is IdModulo => MODULOS.some((m) => m.id === v);
 const esTamano = (v: unknown): v is Tamano => v === "s" || v === "m" || v === "l";
 
-/** El tamaño que vale para ese módulo (Explorar, siempre grande). */
+/** El tamaño que vale para ese módulo. */
 export function tamanoValido(id: IdModulo, t: unknown): Tamano {
   const info = infoModulo(id);
   if (info.soloTamano) return info.soloTamano;
@@ -194,7 +197,7 @@ export function tamanoValido(id: IdModulo, t: unknown): Tamano {
 
 /**
  * Lee una configuración guardada sin fiarse: fuera lo desconocido y lo
- * repetido; «explorar» siempre (si falta, al principio). Sin nada válido, la
+ * repetido (el antiguo «explorar» ya no existe y se descarta). Sin nada válido, la
  * de por defecto.
  */
 export function normalizarConfigTablero(entrada: unknown): ConfigTablero {
@@ -211,7 +214,6 @@ export function normalizarConfigTablero(entrada: unknown): ConfigTablero {
     const producto = id === "precio_producto" && typeof o.producto === "string" && o.producto.trim() ? o.producto.trim().slice(0, 160) : null;
     modulos.push({ id, tamano: tamanoValido(id, o.tamano), ...(producto ? { producto } : {}) });
   }
-  if (!modulos.some((m) => m.id === "explorar")) modulos.unshift({ id: "explorar", tamano: "l" });
   const v = typeof o.v === "number" ? o.v : undefined;
   return actualizarVersion({ cifras: cifras.slice(0, MAX_CIFRAS), modulos, v });
 }
@@ -265,12 +267,6 @@ export function elegirProducto(c: ConfigTablero, producto: string | null): Confi
 
 export function cambiarTamano(c: ConfigTablero, id: IdModulo, tamano: Tamano): ConfigTablero {
   return { ...c, modulos: c.modulos.map((m) => (m.id === id ? { ...m, tamano: tamanoValido(id, tamano) } : m)) };
-}
-
-/** Los módulos antes y después de «Explorar» (cada tramo es su propia rejilla). */
-export function tramosModulos(c: ConfigTablero): { antes: ModuloActivo[]; despues: ModuloActivo[] } {
-  const i = c.modulos.findIndex((m) => m.id === "explorar");
-  return { antes: c.modulos.slice(0, Math.max(0, i)), despues: c.modulos.slice(i + 1) };
 }
 
 // ─── Rejilla «bento» ────────────────────────────────────────────────────────

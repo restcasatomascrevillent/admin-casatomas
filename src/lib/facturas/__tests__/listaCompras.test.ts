@@ -50,6 +50,12 @@ describe("avisos, filtros y proveedores con cabeceras", () => {
     expect(avisosCabecera(cabeceras[1])).toEqual([]);
   });
 
+  it("un documento verificado no tiene avisos pendientes en la lista (08/11/2026)", () => {
+    const conAvisos = { ...cabeceras[0], precio_atipico: true };
+    expect(avisosCabecera({ ...conAvisos, verificada: false }).length).toBeGreaterThan(0);
+    expect(avisosCabecera({ ...conAvisos, verificada: true })).toEqual([]);
+  });
+
   it("el resolver da el proveedor unificado por el id del documento; lo demás, con el de base", () => {
     const resolver = crearResolverDeLista(cabeceras, (t) => ({ clave: `texto:${t}`, nombre: t }));
     expect(resolver("PESCADOS MARTA, S.L.")).toEqual({ clave: "#3", nombre: "Pescados Marta S.L." });
