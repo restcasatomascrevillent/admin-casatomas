@@ -40,6 +40,7 @@
     "test:vinos-copeo-encuesta:db": "node scripts/test-vinos-copeo-encuesta.mjs",
     "test:vinos-parker:db": "node scripts/test-vinos-parker.mjs",
     "test:instagram:db": "node scripts/test-instagram.mjs",
+    "test:carta-originales:db": "node scripts/test-carta-originales.mjs",
     "test:instagram-programar:db": "node scripts/test-instagram-programar.mjs",
     "test:instagram-metricas:db": "node scripts/test-instagram-metricas.mjs",
     "test:instagram-servidor:db": "node scripts/test-instagram-servidor.mjs",

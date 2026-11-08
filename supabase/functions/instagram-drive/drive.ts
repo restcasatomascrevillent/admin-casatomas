@@ -42,6 +42,20 @@
  *     Igual que «carta», pero con la foto de un vino de la carta (tabla
  *     "Vinos", bucket público «vinos» de ESTE Supabase).
  *
+ *     En «carta» y «vino», si la ficha tiene ORIGINAL en Drive
+ *     (carta_fotos_originales) y Drive está configurado, se copia ESE (JPEG a
+ *     tamaño completo) en vez de la versión web: { …, original: true }. Si el
+ *     original falla, la versión web, con `original: false` y un `aviso`.
+ *
+ *   POST ?accion=subir_original  (multipart/form-data: tabla "Platos"|"Vinos", id, archivo)
+ *     200 { ok, tabla, id, driveId, marca, nombre, ancho, alto, reemplazado }.
+ *     Permiso: «Editar» en la carta (gestor_carta), NO el de Marketing. Solo
+ *     JPEG (el panel lo convierte: orientación EXIF aplicada, lado mayor
+ *     ≤ 4000, ≤ 8 MB). Se sube a marketing/carta/<marca>/<nombre>-<id>.jpg
+ *     (marca: restaurante → casa-tomas; si no, touza) y el id de Drive se
+ *     guarda en carta_fotos_originales. Si la ficha ya tenía original en esa
+ *     carpeta, se REEMPLAZA su contenido (mismo id de Drive).
+ *
  *   Seguridad: solo se leen ficheros que estén DENTRO de la carpeta de la
  *   marca (por `parents`), aunque el token pueda ver más (facturas, etc.).
  *
@@ -52,6 +66,7 @@ import { ErrorDrive, esIdDrive, medidasJpeg, type FicheroDrive } from "../_share
 import {
   ARREGLO_DRIVE_FILE,
   AVISO_DRIVE_FILE,
+  carpetaCarta,
   carpetaFotos,
   clasificarAlcance,
   esMarcaDrive,
@@ -79,6 +94,16 @@ import {
   type FilaFotoDrive,
   type Sesion,
 } from "../_shared/instagram/supabase.ts";
+import {
+  guardarOriginal,
+  LADO_MAXIMO_ORIGINAL,
+  leerOriginal,
+  marcaDeFicha,
+  MAX_BYTES_ORIGINAL,
+  MIGRACION_ORIGINALES,
+  SECCION_CARTA,
+  SIN_PERMISO_CARTA,
+} from "./originales.ts";
 
 const ETIQUETA = "instagram-drive";
 
@@ -169,6 +194,10 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
   if (request.method === "OPTIONS") return opciones();
   if (request.method !== "GET" && request.method !== "POST") return json(405, { ok: false, error: "Método no permitido" });
   const env = deps.env ?? entornoDeno();
+  const url = new URL(request.url);
+  // El original de la carta lo sube quien edita la carta (gestor_carta),
+  // tenga o no Marketing: se autoriza aparte.
+  if (request.method === "POST" && url.searchParams.get("accion") === "subir_original") return await subirOriginal(request, env, deps);
   // Ver fotos (listar, miniatura) basta con «Ver»; copiarlas al cubo
   // (preparar) o subirlas a Drive exige «Editar» (20261111000000).
   const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch, permiso: "leer" });
@@ -177,7 +206,6 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
     return jsonAuth(auth.estado, auth.motivo);
   }
   const s = auth.sesion;
-  const url = new URL(request.url);
   const tipoContenido = (request.headers.get("content-type") ?? "").toLowerCase();
 
   let accion = url.searchParams.get("accion");
@@ -197,9 +225,10 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
   // La foto de la carta (platos o vinos) no pasa por Google Drive: funciona aunque falten sus secretos.
   if (request.method === "POST" && accion === "preparar" && (cuerpo.origen === "carta" || cuerpo.origen === "vino")) {
     try {
+      const depsCarta = { ...deps, env };
       return cuerpo.origen === "vino"
-        ? await prepararCarta(s, cuerpo.marca, cuerpo.vinoId, deps, CARTA_VINOS)
-        : await prepararCarta(s, cuerpo.marca, cuerpo.platoId, deps);
+        ? await prepararCarta(s, cuerpo.marca, cuerpo.vinoId, depsCarta, CARTA_VINOS)
+        : await prepararCarta(s, cuerpo.marca, cuerpo.platoId, depsCarta);
     } catch (e) {
       if (e instanceof ErrorSupabase) {
         registro("error", ETIQUETA, "Supabase (carta)", e);
@@ -219,7 +248,7 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
     if (request.method === "POST" && accion === "listar") return await listar(s, c, cuerpo.marca);
     if (request.method === "POST" && accion === "preparar") return await preparar(s, c, cuerpo.marca, cuerpo.id, deps);
     if (request.method === "POST" && accion === "subir") return await subir(s, c, request, deps);
-    return json(400, { ok: false, error: "Acción no válida (listar, subir, miniatura o preparar)" });
+    return json(400, { ok: false, error: "Acción no válida (listar, subir, miniatura, preparar o subir_original)" });
   } catch (e) {
     if (e instanceof ErrorDrive) {
       registro("warn", ETIQUETA, "Drive", { accion, motivo: e.motivo, estado: e.estado, mensaje: e.message });
@@ -378,6 +407,10 @@ async function prepararCarta(s: Sesion, marca: unknown, id: unknown, deps: Depen
   const ruta = rutaBucketDeUrl(plato.imagen_url, s.sb.url, o.bucket);
   if (!ruta) return json(400, { ok: false, error: `La foto de ese ${o.nombre} no está en el bucket «${o.bucket}» de este Supabase` });
 
+  // Si la ficha tiene original en Drive, se copia ESE (tamaño completo) y no la versión web.
+  const conOriginal = await prepararOriginal(s, o, id, deps);
+  if (conOriginal.respuesta) return conOriginal.respuesta;
+
   // Se reconstruye la URL (nunca la de la fila) y no se siguen redirecciones.
   const origenUrl = `${s.sb.url}/storage/v1/object/public/${o.bucket}/${ruta.split("/").map(encodeURIComponent).join("/")}`;
   const d = await s.fetch(origenUrl, { redirect: "error", signal: AbortSignal.timeout(20_000) });
@@ -392,7 +425,133 @@ async function prepararCarta(s: Sesion, marca: unknown, id: unknown, deps: Depen
   await subirObjeto(s, destino, bytes, tipo);
   const m = medidasImagen(bytes, tipo);
   await limpiarTmp(s, deps.ahora ?? Date.now, destino);
-  return json(200, { ok: true, ruta: destino, url: urlPublica(s.sb, destino), ancho: m?.ancho ?? null, alto: m?.alto ?? null });
+  return json(200, {
+    ok: true,
+    ruta: destino,
+    url: urlPublica(s.sb, destino),
+    ancho: m?.ancho ?? null,
+    alto: m?.alto ?? null,
+    original: false,
+    ...(conOriginal.aviso ? { aviso: conOriginal.aviso } : {}),
+  });
+}
+
+/**
+ * Copia a tmp/ el ORIGINAL de Drive de una ficha de la carta, si lo tiene.
+ * `respuesta`: el 200 listo. Sin original (o sin Drive configurado): nada,
+ * y se usa la versión web. Si el original falla: `aviso` y versión web.
+ */
+async function prepararOriginal(s: Sesion, o: OrigenCarta, id: string, deps: DependenciasDrive): Promise<{ respuesta?: Response; aviso?: string }> {
+  const env = deps.env ?? entornoDeno();
+  const cfg = leerConfigDrive(env, { fetch: deps.fetch, ahora: deps.ahora });
+  if ("faltan" in cfg) return {};
+  const aviso = "No se ha podido usar el original de Drive: se usa la foto de la web.";
+  try {
+    const { fila } = await leerOriginal(s, o.tabla, id);
+    if (!fila) return {};
+    const c = cfg.config;
+    const carpeta = await carpetaCarta(c, fila.marca);
+    const f = await c.cliente.metadatos(fila.drive_id, "id,mimeType,size,parents,trashed,imageMediaMetadata(width,height,rotation)");
+    if (!f || f.trashed || !estaEn(f, carpeta) || f.mimeType !== "image/jpeg" || Number(f.size ?? "0") > MAX_BYTES_FOTO) {
+      registro("warn", ETIQUETA, "original no válido", { tabla: o.tabla, id, driveId: fila.drive_id });
+      return { aviso };
+    }
+    const { bytes } = await c.cliente.descargar(f.id);
+    const m = medidasJpeg(bytes);
+    if (!m || bytes.byteLength > MAX_BYTES_FOTO) return { aviso };
+    const destino = `tmp/${(deps.nuevoId ?? (() => crypto.randomUUID()))()}.jpg`;
+    await subirObjeto(s, destino, bytes, "image/jpeg");
+    await limpiarTmp(s, deps.ahora ?? Date.now, destino);
+    return { respuesta: json(200, { ok: true, ruta: destino, url: urlPublica(s.sb, destino), ancho: m.ancho, alto: m.alto, original: true }) };
+  } catch (e) {
+    registro("warn", ETIQUETA, "original de Drive", { tabla: o.tabla, id, error: sanear((e as Error)?.message ?? e) });
+    return { aviso };
+  }
+}
+
+/** Sube el original de la foto de un plato o vino a Drive (ver la cabecera). */
+async function subirOriginal(request: Request, env: Record<string, string | undefined>, deps: DependenciasDrive): Promise<Response> {
+  const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch, permiso: "editar", seccion: SECCION_CARTA });
+  if ("motivo" in auth) {
+    if (auth.estado >= 500) registro("error", ETIQUETA, "autorización (original)", { motivo: auth.motivo });
+    return jsonAuth(auth.estado, auth.estado === 403 ? SIN_PERMISO_CARTA : auth.motivo);
+  }
+  const s = auth.sesion;
+  const largo = Number(request.headers.get("content-length") ?? "0");
+  if (largo > MAX_BYTES_ORIGINAL + 64 * 1024) return json(413, { ok: false, error: "El original pesa más de 8 MB" });
+  const cfg = leerConfigDrive(env, { fetch: deps.fetch, ahora: deps.ahora });
+  if ("faltan" in cfg) return sinConfig(cfg.faltan, cfg.problema, env);
+  const c = cfg.config;
+
+  let datos: FormData;
+  try {
+    datos = await request.formData();
+  } catch {
+    return json(400, { ok: false, error: "Se esperaba un formulario multipart con el original" });
+  }
+  const tabla = datos.get("tabla");
+  const id = datos.get("id");
+  const archivo = datos.get("archivo");
+  if (tabla !== "Platos" && tabla !== "Vinos") return json(400, { ok: false, error: "«tabla» tiene que ser Platos o Vinos" });
+  if (typeof id !== "string" || !RE_ID_PLATO.test(id)) return json(400, { ok: false, error: "Falta un «id» válido" });
+  if (!archivo || typeof archivo === "string") return json(400, { ok: false, error: "Falta el original («archivo»)" });
+  if (archivo.size > MAX_BYTES_ORIGINAL) return json(413, { ok: false, error: "El original pesa más de 8 MB" });
+  const bytes = new Uint8Array(await archivo.arrayBuffer());
+  const medidas = medidasJpeg(bytes);
+  if (!medidas) return json(415, { ok: false, error: "El original tiene que ser un JPEG (el panel lo convierte antes de subirlo)" });
+  if (medidas.ancho > LADO_MAXIMO_ORIGINAL || medidas.alto > LADO_MAXIMO_ORIGINAL) {
+    return json(422, { ok: false, error: `El original mide ${medidas.ancho}×${medidas.alto}; el lado mayor no puede pasar de ${LADO_MAXIMO_ORIGINAL} px` });
+  }
+  const o = tabla === "Vinos" ? CARTA_VINOS : CARTA_PLATOS;
+
+  try {
+    // La ficha, con el JWT del usuario (decide la RLS): nombre y marca.
+    const r = await s.fetch(`${s.sb.url}/rest/v1/${o.tabla}?id=eq.${encodeURIComponent(id)}&select=id,nombre,restaurante,touza`, {
+      headers: { apikey: s.sb.clave, Authorization: `Bearer ${s.token}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) throw new ErrorSupabase(`No se pudo leer el ${o.nombre} (${r.status})`, r.status);
+    const fichas = (await r.json().catch(() => [])) as Array<{ id: string; nombre: string | null; restaurante: boolean | null; touza: boolean | null }>;
+    const ficha = Array.isArray(fichas) ? fichas[0] : undefined;
+    if (!ficha) return json(404, { ok: false, error: `Ese ${o.nombre} no existe (o no tienes permiso para verlo)` });
+
+    const previo = await leerOriginal(s, o.tabla, id);
+    if (previo.sinTabla) {
+      return json(503, { ok: false, error: `Falta aplicar la migración ${MIGRACION_ORIGINALES}`, comoArreglarlo: "Aplica la migración en Supabase (ver docs/instagram-fotos.md)." });
+    }
+    const marca = marcaDeFicha(ficha);
+    const carpeta = await carpetaCarta(c, marca);
+    const nombre = `${nombreSeguro((ficha.nombre ?? "").trim() || o.nombre)}-${id}.jpg`;
+    const descripcion = `Original de la foto del ${o.nombre} «${(ficha.nombre ?? "").trim() || id}» (carta)`;
+
+    let subido: FicheroDrive | null = null;
+    if (previo.fila?.drive_id) {
+      const f = await c.cliente.metadatos(previo.fila.drive_id, "id,parents,trashed");
+      if (f && !f.trashed && estaEn(f, carpeta)) subido = await c.cliente.reemplazar(f.id, nombre, "image/jpeg", bytes, descripcion);
+    }
+    const reemplazado = !!subido;
+    if (!subido) subido = await c.cliente.subir(carpeta, nombre, "image/jpeg", bytes, descripcion);
+
+    try {
+      await guardarOriginal(s, o.tabla, id, { drive_id: subido.id, marca, nombre, ancho: medidas.ancho, alto: medidas.alto, bytes: bytes.byteLength });
+    } catch (e) {
+      registro("warn", ETIQUETA, "original en Drive sin fila", { tabla: o.tabla, id, driveId: subido.id, error: (e as Error).message });
+      return json(500, { ok: false, error: `El original está en Drive, pero no se pudo anotar en la ficha: ${sanear((e as Error).message)}`, driveId: subido.id });
+    }
+    registro("info", ETIQUETA, "original subido", { tabla: o.tabla, id, marca, driveId: subido.id, reemplazado, usuario: s.usuario });
+    return json(200, { ok: true, tabla: o.tabla, id, driveId: subido.id, marca, nombre, ancho: medidas.ancho, alto: medidas.alto, reemplazado });
+  } catch (e) {
+    if (e instanceof ErrorDrive) {
+      registro("warn", ETIQUETA, "Drive (original)", { motivo: e.motivo, estado: e.estado, mensaje: e.message });
+      return await errorDrive(e, c);
+    }
+    if (e instanceof ErrorSupabase) {
+      registro("error", ETIQUETA, "Supabase (original)", e);
+      return json(e.estado === 401 || e.estado === 403 ? 403 : 500, { ok: false, error: e.message });
+    }
+    registro("error", ETIQUETA, "fallo (original)", e);
+    return json(500, { ok: false, error: "No se pudo guardar el original en Drive", detalle: sanear((e as Error)?.message ?? e) });
+  }
 }
 
 /** Borra las copias tmp/ de más de 24 h. Oportunista: nunca falla la petición. */

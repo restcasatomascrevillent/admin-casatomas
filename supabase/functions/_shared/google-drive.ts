@@ -279,6 +279,27 @@ export class ClienteDrive {
     );
   }
 
+  /**
+   * Cambia el contenido (y el nombre) de un fichero que ya existe, sin
+   * moverlo de carpeta: se conserva su id (originales de la carta).
+   */
+  async reemplazar(id: string, nombre: string, tipo: string, bytes: Uint8Array, descripcion?: string): Promise<FicheroDrive> {
+    if (!esIdDrive(id)) throw new ErrorDrive("Id de fichero no válido", "respuesta");
+    const frontera = `frontera-${crypto.randomUUID()}`;
+    const meta = JSON.stringify({ name: nombre, ...(descripcion ? { description: descripcion } : {}) });
+    const cod = new TextEncoder();
+    const cabeza = cod.encode(`--${frontera}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${frontera}\r\nContent-Type: ${tipo}\r\n\r\n`);
+    const cola = cod.encode(`\r\n--${frontera}--`);
+    const cuerpo = new Uint8Array(cabeza.length + bytes.length + cola.length);
+    cuerpo.set(cabeza, 0);
+    cuerpo.set(bytes, cabeza.length);
+    cuerpo.set(cola, cabeza.length + bytes.length);
+    return await this.json<FicheroDrive>(
+      `${URL_SUBIDA}/files/${id}?uploadType=multipart&supportsAllDrives=true&fields=${encodeURIComponent("id,name,mimeType,size,parents,createdTime")}`,
+      { method: "PATCH", headers: { "Content-Type": `multipart/related; boundary=${frontera}` }, body: cuerpo, signal: AbortSignal.timeout(60_000) },
+    );
+  }
+
   /** Contenido de un fichero. */
   async descargar(id: string): Promise<{ bytes: Uint8Array; tipo: string }> {
     if (!esIdDrive(id)) throw new ErrorDrive("Id de fichero no válido", "respuesta");

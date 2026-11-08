@@ -270,6 +270,7 @@ describe("instagram-drive · preparar una foto de la carta (origen «carta»)", 
       url: `${SB}/storage/v1/object/public/instagram/tmp/${UUID}.webp`,
       ancho: 1080,
       alto: 1440,
+      original: false,
     });
     const lectura = llamadas.find((l) => l.url.startsWith(`${SB}/rest/v1/Platos?`))!;
     expect(lectura.url).toContain(`id=eq.${PLATO}`);
@@ -351,7 +352,7 @@ describe("instagram-drive · preparar la foto de un vino de la carta (origen «v
     const { f, llamadas } = conVinos(filaVino());
     const r = await manejarDrive(pedirVino(), { env: ENV_SB, fetch: f, ...deps });
     expect(r.status).toBe(200);
-    expect(await r.json()).toEqual({ ok: true, ruta: `tmp/${UUID}.webp`, url: `${SB}/storage/v1/object/public/instagram/tmp/${UUID}.webp`, ancho: 1080, alto: 1440 });
+    expect(await r.json()).toEqual({ ok: true, ruta: `tmp/${UUID}.webp`, url: `${SB}/storage/v1/object/public/instagram/tmp/${UUID}.webp`, ancho: 1080, alto: 1440, original: false });
     const lectura = llamadas.find((l) => l.url.startsWith(`${SB}/rest/v1/Vinos?`))!;
     expect(lectura.url).toContain(`id=eq.${VINO}`);
     expect(lectura.cabeceras.authorization).toBe(`Bearer ${JWT}`);
