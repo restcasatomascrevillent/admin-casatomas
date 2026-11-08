@@ -520,7 +520,7 @@ export function CrearMovil({
   const fotosSubidasParaPrevia = useMemo(() => fotosParaMontar(fotos), [fotos]);
   const info = PASOS[paso];
   const nombreMarca = MARCAS.find((m) => m.id === marca)?.nombre ?? marca;
-  const resumenProgramada = `${nombreDia(fechaProgramada || hoy, hoy)} a las ${hora}`;
+  const resumenProgramada = /^\d{2}:\d{2}$/.test(hora) ? `${nombreDia(fechaProgramada || hoy, hoy)} a las ${hora}` : "elige la hora";
 
   // ── Pintar ──────────────────────────────────────────────────────────────
   // Cabecera compacta: una sola línea «Paso 2/3 · Montar con IA» con la barra de progreso (05/11/2026).
@@ -959,6 +959,8 @@ export function CrearMovil({
                     step={300}
                     value={hora}
                     onChange={(e) => {
+                      // Algunos móviles mandan «» mientras se edita el reloj: no se pierde la hora.
+                      if (!/^\d{2}:\d{2}$/.test(e.target.value)) return;
                       setHoraTocada(true);
                       setHora(e.target.value);
                     }}
