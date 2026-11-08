@@ -80,6 +80,8 @@ const plantilla: Plantilla = {
     pie: 70,
   },
   tiposFoto: ["barra", "coctel", "bebida", "interior"],
+  // A sangre: la foto tiene que cubrir el lienzo (si no, «Foto enmarcada»).
+  encaje: "sangre",
   html,
 };
 

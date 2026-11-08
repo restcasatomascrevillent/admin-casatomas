@@ -771,6 +771,66 @@ export type Database = {
         }
         Relationships: []
       }
+      carta_fotos_originales: {
+        Row: {
+          alto: number
+          ancho: number
+          bytes: number
+          created_at: string
+          drive_id: string
+          id: string
+          marca: string
+          nombre: string
+          plato_id: string | null
+          subido_por: string | null
+          updated_at: string
+          vino_id: string | null
+        }
+        Insert: {
+          alto: number
+          ancho: number
+          bytes: number
+          created_at?: string
+          drive_id: string
+          id?: string
+          marca: string
+          nombre: string
+          plato_id?: string | null
+          subido_por?: string | null
+          updated_at?: string
+          vino_id?: string | null
+        }
+        Update: {
+          alto?: number
+          ancho?: number
+          bytes?: number
+          created_at?: string
+          drive_id?: string
+          id?: string
+          marca?: string
+          nombre?: string
+          plato_id?: string | null
+          subido_por?: string | null
+          updated_at?: string
+          vino_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carta_fotos_originales_plato_id_fkey"
+            columns: ["plato_id"]
+            isOneToOne: true
+            referencedRelation: "Platos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carta_fotos_originales_vino_id_fkey"
+            columns: ["vino_id"]
+            isOneToOne: true
+            referencedRelation: "Vinos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorias_producto: {
         Row: {
           activa: boolean
@@ -1183,6 +1243,7 @@ export type Database = {
           asignacion_aviso_activo: boolean
           asignacion_espacios_excluidos: string[]
           asignacion_mesas_excluidas: string[]
+          asignacion_mesas_al_final: string[]
           asignacion_ventana_horas: number
           auto_confirmar: boolean
           created_at: string
@@ -1204,6 +1265,7 @@ export type Database = {
           asignacion_aviso_activo?: boolean
           asignacion_espacios_excluidos?: string[]
           asignacion_mesas_excluidas?: string[]
+          asignacion_mesas_al_final?: string[]
           asignacion_ventana_horas?: number
           auto_confirmar?: boolean
           created_at?: string
@@ -1225,6 +1287,7 @@ export type Database = {
           asignacion_aviso_activo?: boolean
           asignacion_espacios_excluidos?: string[]
           asignacion_mesas_excluidas?: string[]
+          asignacion_mesas_al_final?: string[]
           asignacion_ventana_horas?: number
           auto_confirmar?: boolean
           created_at?: string

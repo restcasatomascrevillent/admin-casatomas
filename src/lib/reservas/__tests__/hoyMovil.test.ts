@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  candidatasParaMesa,
+  textoMesaFijada,
   listaHoyEscritorio,
   tieneAlergia,
   agruparHoyMovil,
@@ -209,5 +211,36 @@ describe("listaHoyEscritorio", () => {
     expect(tieneAlergia("Alérgico al marisco")).toBe(true);
     expect(tieneAlergia("celíaca")).toBe(true);
     expect(tieneAlergia("trona para el niño")).toBe(false);
+  });
+});
+
+describe("candidatasParaMesa (hoja de mesa del móvil, 08/11/2026)", () => {
+  const r = (id: string, hora: string, pax: number, extra: Record<string, unknown> = {}) => ({
+    id, nombre: id, hora, numero_comensales: pax, estado: "confirmada", espacio_id: "s", ...extra,
+  });
+  const mesas: Record<string, Array<{ id: string; nombre: string; sala?: string }>> = {
+    aqui: [{ id: "m11", nombre: "11", sala: "Terraza" }],
+    otra: [{ id: "m7", nombre: "7", sala: "Comedor" }],
+    fija: [{ id: "m7", nombre: "7", sala: "Comedor" }, { id: "m8", nombre: "8", sala: "Comedor" }],
+  };
+  const turnoDe = (h: string) => (h < "17:00" ? "comida" : "cena") as "comida" | "cena";
+  const c = candidatasParaMesa(
+    [r("b", "14:30", 2), r("a", "14:15", 4), r("tarde", "13:50", 2), r("aqui", "15:00", 2), r("otra", "14:00", 2), r("grande", "14:10", 6), r("fija", "13:00", 2, { mesa_fijada: true }), r("cena", "21:00", 2), r("llego", "14:00", 2, { estado: "completada" })],
+    { mesaId: "m11", plazas: 4, turno: "comida", turnoDe, minutoAhora: 14 * 60 + 5, mesasDe: (id) => mesas[id] ?? [] },
+  );
+  it("separa y ordena: encajan (retrasadas arriba, luego por hora), otras por hora y fijadas en otra al final", () => {
+    expect(c.encajan.map((x) => x.reserva.id)).toEqual(["tarde", "a", "b", "aqui"]);
+    expect(c.otras.map((x) => x.reserva.id)).toEqual(["otra", "grande"]);
+    expect(c.fijadasOtra.map((x) => x.reserva.id)).toEqual(["fija"]);
+  });
+  it("la línea de situación", () => {
+    const t = (id: string) => [...c.encajan, ...c.otras, ...c.fijadasOtra].find((x) => x.reserva.id === id)!.textoSituacion;
+    expect(t("b")).toBe("Sin mesa");
+    expect(t("aqui")).toBe("Prevista aquí");
+    expect(t("otra")).toBe("Prevista: Comedor 7");
+    expect(t("fija")).toBe("Fijada · Comedor 7+8");
+    expect(c.otras.find((x) => x.reserva.id === "grande")!.noCaben).toBe(true);
+    expect(textoMesaFijada(mesas.otra)).toBe("la mesa 7 del Comedor");
+    expect(textoMesaFijada(mesas.fija)).toBe("las mesas 7+8 del Comedor");
   });
 });

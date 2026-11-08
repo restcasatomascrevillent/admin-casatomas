@@ -101,6 +101,8 @@ export interface OpcionesSupabase {
   fetch?: typeof fetch;
   /** «editar» (por defecto): can_edit_section. «leer»: can_read_section. */
   permiso?: PermisoMarketing;
+  /** Sección de permisos (por defecto «marketing»; «gestor_carta» para los originales de la carta). */
+  seccion?: string;
 }
 
 export type PermisoMarketing = "editar" | "leer";
@@ -134,7 +136,7 @@ export async function autorizarMarketing(cabecera: string | null | undefined, op
     if (!usuario?.id) return { ok: false, estado: 401, motivo: "Sesión no válida" };
 
     const permiso = opts.permiso ?? "editar";
-    const puede = await consultarPermiso({ sb, token, fetch: f }, permiso, senal);
+    const puede = await consultarPermiso({ sb, token, fetch: f }, permiso, senal, opts.seccion);
     if (puede === 401) return { ok: false, estado: 401, motivo: "Sesión no válida o caducada" };
     if (typeof puede === "number") return { ok: false, estado: 500, motivo: `La comprobación de permisos respondió ${puede}` };
     if (!puede) return { ok: false, estado: 403, motivo: permiso === "leer" ? "Sin permiso de Marketing" : SIN_PERMISO_EDITAR };
@@ -149,11 +151,12 @@ async function consultarPermiso(
   s: Pick<Sesion, "sb" | "token" | "fetch">,
   permiso: PermisoMarketing,
   senal: AbortSignal = AbortSignal.timeout(MS_TIEMPO),
+  seccion: string = SECCION_MARKETING,
 ): Promise<boolean | number> {
   const r = await s.fetch(`${s.sb.url}/rest/v1/rpc/${rpcDePermiso(permiso)}`, {
     method: "POST",
     headers: cabeceras(s, { "Content-Type": "application/json" }),
-    body: JSON.stringify({ _section: SECCION_MARKETING }),
+    body: JSON.stringify({ _section: seccion }),
     signal: senal,
   });
   if (!r.ok) return r.status;
