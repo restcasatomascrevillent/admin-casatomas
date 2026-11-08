@@ -168,7 +168,7 @@ const pieza = (n: number, porQue: string) => ({
   fecha: `2026-11-${String(10 + n * 7).padStart(2, "0")}`,
   hora: "13:00",
   formato: "post",
-  plantilla: "ct-foto-titular",
+  plantilla: "ct-portada",
   plato_id: "pulpo",
   foto_sugerida: "carta:pulpo",
   antetitulo: "",
@@ -222,7 +222,7 @@ describe("«Qué funciona» en instagram-ia", () => {
       openai: [
         respuestaOpenAI({
           ideas: [
-            { fecha: "2026-11-10", titulo: "Martes", idea: "Los martes dan un 9 % de interacción. Pulpo.", motivo: "metricas", formato: "post", plantilla: "ct-foto-titular", plato_id: "pulpo", gancho: "Martes de pulpo." },
+            { fecha: "2026-11-10", titulo: "Martes", idea: "Los martes dan un 9 % de interacción. Pulpo.", motivo: "metricas", formato: "post", plantilla: "ct-portada", plato_id: "pulpo", gancho: "Martes de pulpo." },
           ],
         }),
       ],
@@ -265,7 +265,7 @@ describe("«Qué funciona» en instagram-ia", () => {
 
     const ideas = falso({
       qf: [404, { code: "PGRST202" }],
-      openai: [respuestaOpenAI({ ideas: [{ fecha: "2026-11-10", titulo: "Martes", idea: "Pulpo.", motivo: "plato", formato: "post", plantilla: "ct-foto-titular", plato_id: "pulpo", gancho: "Martes de pulpo." }] })],
+      openai: [respuestaOpenAI({ ideas: [{ fecha: "2026-11-10", titulo: "Martes", idea: "Pulpo.", motivo: "plato", formato: "post", plantilla: "ct-portada", plato_id: "pulpo", gancho: "Martes de pulpo." }] })],
     });
     const r2 = await manejarIA(peticion({ accion: "ideas_semana", marca: "casa-tomas", semana: "2026-11-10" }), deps(ideas.f));
     expect(r2.status).toBe(200);

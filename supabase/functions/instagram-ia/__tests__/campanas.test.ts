@@ -117,7 +117,7 @@ const pieza = (n: number, extra: Record<string, unknown> = {}) => ({
   fecha: `2026-11-${String(9 + n * 3).padStart(2, "0")}`,
   hora: "13:00",
   formato: "post",
-  plantilla: "ct-foto-titular",
+  plantilla: "ct-portada",
   plato_id: "pulpo",
   foto_sugerida: DRIVE,
   antetitulo: "Esta semana",
@@ -191,7 +191,7 @@ describe("instagram-ia: proponer_campana", () => {
               pieza(3, { titular: "Croquetas de la casa", plato_id: "croquetas", foto_sugerida: "", caption: "Gancho 3. Croquetas de jamón para compartir. Te esperamos." }),
               pieza(0),
               pieza(1, { foto_sugerida: "drive:OtraFotoQueNoExiste", formato: "story" }),
-              pieza(2, { plantilla: "ct-tipografica", foto_sugerida: "", plato_id: "", titular: "Noches de otoño", caption: "Gancho 2. El otoño se vive en la mesa. Te esperamos." }),
+              pieza(2, { plantilla: "ct-frase", foto_sugerida: "", plato_id: "", titular: "Noches de otoño", caption: "Gancho 2. El otoño se vive en la mesa. Te esperamos." }),
             ],
             { titulo: "Otoño en casa 🍂" },
           ),
@@ -209,7 +209,7 @@ describe("instagram-ia: proponer_campana", () => {
     expect(p0).toMatchObject({ platoId: "pulpo", plato: { id: "pulpo", nombre: "Pulpo a la gallega" }, foto: DRIVE, faltaFoto: false });
     expect(p1).toMatchObject({ foto: null, faltaFoto: true, formato: "story" });
     expect(p1.avisos.join(" ")).toMatch(/falta foto/);
-    expect(p2).toMatchObject({ plantilla: "ct-tipografica", foto: null, faltaFoto: false, platoId: null });
+    expect(p2).toMatchObject({ plantilla: "ct-frase", foto: null, faltaFoto: false, platoId: null });
     expect(p3).toMatchObject({ platoId: "croquetas", faltaFoto: true });
     expect(j.campana.fases[1].hasta).toBe("2026-11-29"); // recortada al final de la campaña
 
@@ -272,7 +272,7 @@ describe("instagram-ia: proponer_campana", () => {
     const RAZON_TZ = "Los jueves son la noche más floja de la semana.";
     const tz = (n: number, extra: Record<string, unknown> = {}) =>
       pieza(n, {
-        plantilla: "tz-foto-titular",
+        plantilla: "tz-portada",
         plato_id: "vermu",
         foto_sugerida: "",
         titular: `La barra de TOUZA ${n}`,
@@ -343,7 +343,7 @@ describe("instagram-ia: ideas_semana", () => {
       idea: "San Martín: el pulpo a la gallega como plato de la semana.",
       motivo: "fecha_senalada",
       formato: "post",
-      plantilla: "ct-foto-titular",
+      plantilla: "ct-portada",
       plato_id: "pulpo",
       gancho: "A cada casa le llega su San Martín.",
       ...extra,

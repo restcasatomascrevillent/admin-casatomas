@@ -15,7 +15,7 @@
 import { z } from "zod/v4";
 import { FORMATOS, MARCAS, type FormatoId } from "./tokens.js";
 import { AMPLIACION_MAXIMA, FOTOS, LADO_MINIMO_MARCO, escalaParaCubrir, valeParaMarco, type Foto } from "./fotos.js";
-import { PLANTILLAS, obtenerPlantilla } from "./plantillas/index.js";
+import { PLANTILLAS, obtenerPlantilla, plantillaEnmarcada, varianteConEncaje } from "./plantillas/index.js";
 import { encajeDe, type CampoPieza, type DatosPieza, type ElementoLista, type Plantilla } from "./tipos.js";
 
 export const MAX_PALABRAS_TITULAR = 6;
@@ -217,7 +217,11 @@ export function problemasDePieza(d: EntradaPieza, plantilla: Plantilla | undefin
         const escala = escalaParaCubrir(foto.ancho, foto.alto, f.ancho, f.alto);
         if (escala > AMPLIACION_MAXIMA) {
           // Si la marca tiene plantilla enmarcada para ese formato y la foto le vale, se dice.
-          const marco = PLANTILLAS.find((x) => x.marca === d.marca && encajeDe(x) === "marco" && x.formatos.includes(d.formato as FormatoId));
+          // La enmarcada del mismo papel (las clásicas, la clásica: ct-foto-titular → ct-marco).
+          const marco =
+            plantilla && plantilla.marca === d.marca
+              ? varianteConEncaje(plantilla, "marco", d.formato as FormatoId)
+              : plantillaEnmarcada(d.marca, d.formato as FormatoId);
           const consejo = marco && valeParaMarco(foto) ? `. Usa la plantilla «${marco.nombre}» («${marco.id}»): la enseña entera, sin ampliarla` : "";
           p.push(
             `La foto «${foto.id}» (${foto.ancho}×${foto.alto}) tendría que ampliarse un ${Math.round((escala - 1) * 100)} % para cubrir un ${d.formato} de ${f.ancho}×${f.alto} (máximo ${Math.round((AMPLIACION_MAXIMA - 1) * 100)} %)${consejo}`,
@@ -279,7 +283,8 @@ export function validarPieza(json: unknown, opciones: OpcionesValidacion = {}): 
   }
   const d = r.data;
   const plantilla = buscar(d.plantilla);
-  const disponibles = plantilla || opciones.buscarPlantilla ? [] : PLANTILLAS.map((x) => x.id);
+  // Se sugieren las que salen en los selectores (las clásicas se aceptan, pero no se proponen).
+  const disponibles = plantilla || opciones.buscarPlantilla ? [] : PLANTILLAS.filter((x) => !x.clasica).map((x) => x.id);
   const problemas = problemasDePieza(d, plantilla, opciones.fotos ?? FOTOS, disponibles);
   if (problemas.length) return { ok: false, problemas };
   return { ok: true, datos: aDatos(d) };

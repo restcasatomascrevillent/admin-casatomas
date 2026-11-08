@@ -43,8 +43,8 @@ describe("esAptaPara según el encaje de la plantilla", () => {
     expect(encajeDe(obtenerPlantilla("tz-foto-titular"))).toBe("sangre");
     expect(encajeDe(obtenerPlantilla("tz-marco"))).toBe("marco");
     expect(encajeDe(undefined)).toBe("sangre");
-    expect(plantillaEnmarcada("casa-tomas", "story")?.id).toBe("ct-marco");
-    expect(plantillaEnmarcada("touza", "post")?.id).toBe("tz-marco");
+    expect(plantillaEnmarcada("casa-tomas", "story")?.id).toBe("ct-portada-marco");
+    expect(plantillaEnmarcada("touza", "post")?.id).toBe("tz-portada-marco");
   });
 
   it("una foto de la carta (1200×900) no vale a sangre y sí enmarcada, en post y en story", () => {

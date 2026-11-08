@@ -17,9 +17,52 @@ import type { PlantillaCampana } from "../_shared/instagram/validar-campana.ts";
  */
 export interface PlantillaIA extends PlantillaCampana {
   campanas: boolean;
+  /**
+   * Clásica (las de antes del 08/11/2026): se sigue aceptando si llega (las
+   * piezas guardadas), pero montar_pieza y las campañas no la eligen.
+   */
+  clasica?: boolean;
 }
 
+/** Papel de una plantilla v2 (src/lib/instagram/tipos.ts → PapelPlantilla). */
+export type PapelIA = "portada" | "plato" | "cierre" | "tipografica";
+
 export const PLANTILLAS_IA: readonly PlantillaIA[] = [
+  {
+    id: "ct-cierre",
+    marca: "casa-tomas",
+    campos: ["titular", "cita", "cta", "pie"],
+    limites: { titular: 40, cita: 90, cta: 26, pie: 48 },
+    titularOpcional: true,
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "sangre",
+    papel: "cierre",
+    campanas: true,
+  },
+  {
+    id: "ct-cierre-marca",
+    marca: "casa-tomas",
+    campos: ["titular", "cita", "cta", "pie"],
+    limites: { titular: 40, cita: 70, cta: 26, pie: 30 },
+    titularOpcional: true,
+    formatos: ["post", "story"],
+    conFoto: false,
+    papel: "cierre",
+    campanas: true,
+  },
+  {
+    id: "ct-cierre-marco",
+    marca: "casa-tomas",
+    campos: ["titular", "cita", "cta", "pie"],
+    limites: { titular: 40, cita: 80, cta: 26, pie: 48 },
+    titularOpcional: true,
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "cierre",
+    campanas: true,
+  },
   {
     id: "ct-foto-titular",
     marca: "casa-tomas",
@@ -28,6 +71,18 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     formatos: ["post", "story"],
     conFoto: true,
     encaje: "sangre",
+    clasica: true,
+    campanas: false,
+  },
+  {
+    id: "ct-frase",
+    marca: "casa-tomas",
+    campos: ["antetitulo", "titular", "cita", "pie"],
+    limites: { antetitulo: 40, titular: 60, cita: 90, pie: 48 },
+    titularOpcional: true,
+    formatos: ["post", "story"],
+    conFoto: false,
+    papel: "tipografica",
     campanas: true,
   },
   {
@@ -38,6 +93,51 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     formatos: ["post", "story"],
     conFoto: true,
     encaje: "marco",
+    clasica: true,
+    campanas: false,
+  },
+  {
+    id: "ct-plato",
+    marca: "casa-tomas",
+    campos: ["antetitulo", "titular", "cita"],
+    limites: { antetitulo: 30, titular: 34, cita: 60 },
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "sangre",
+    papel: "plato",
+    campanas: true,
+  },
+  {
+    id: "ct-plato-marco",
+    marca: "casa-tomas",
+    campos: ["antetitulo", "titular", "cita"],
+    limites: { antetitulo: 34, titular: 38, cita: 70 },
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "plato",
+    campanas: true,
+  },
+  {
+    id: "ct-portada",
+    marca: "casa-tomas",
+    campos: ["antetitulo", "titular", "cita", "cta", "pie"],
+    limites: { antetitulo: 24, titular: 44, cita: 80, cta: 24, pie: 34 },
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "sangre",
+    papel: "portada",
+    campanas: true,
+  },
+  {
+    id: "ct-portada-marco",
+    marca: "casa-tomas",
+    campos: ["antetitulo", "titular", "cita", "cta", "pie"],
+    limites: { antetitulo: 34, titular: 38, cita: 70, cta: 24, pie: 34 },
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "portada",
     campanas: true,
   },
   {
@@ -48,6 +148,42 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     titularOpcional: true,
     formatos: ["post"],
     conFoto: false,
+    clasica: true,
+    campanas: false,
+  },
+  {
+    id: "tz-cierre",
+    marca: "touza",
+    campos: ["antetitulo", "titular", "cita", "cta", "pie"],
+    limites: { antetitulo: 30, titular: 36, cita: 90, cta: 22, pie: 34 },
+    titularOpcional: true,
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "sangre",
+    papel: "cierre",
+    campanas: true,
+  },
+  {
+    id: "tz-cierre-marca",
+    marca: "touza",
+    campos: ["antetitulo", "titular", "cita", "cta", "pie"],
+    limites: { antetitulo: 28, titular: 36, cita: 80, cta: 22, pie: 40 },
+    titularOpcional: true,
+    formatos: ["post", "story"],
+    conFoto: false,
+    papel: "cierre",
+    campanas: true,
+  },
+  {
+    id: "tz-cierre-marco",
+    marca: "touza",
+    campos: ["titular", "cita", "cta", "pie"],
+    limites: { titular: 36, cita: 70, cta: 22, pie: 40 },
+    titularOpcional: true,
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "cierre",
     campanas: true,
   },
   {
@@ -58,6 +194,18 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     formatos: ["post", "story"],
     conFoto: true,
     encaje: "sangre",
+    clasica: true,
+    campanas: false,
+  },
+  {
+    id: "tz-frase",
+    marca: "touza",
+    campos: ["antetitulo", "titular", "cita", "pie"],
+    limites: { antetitulo: 36, titular: 40, cita: 90, pie: 30 },
+    titularOpcional: true,
+    formatos: ["post", "story"],
+    conFoto: false,
+    papel: "tipografica",
     campanas: true,
   },
   {
@@ -68,6 +216,51 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     formatos: ["post", "story"],
     conFoto: true,
     encaje: "marco",
+    clasica: true,
+    campanas: false,
+  },
+  {
+    id: "tz-plato",
+    marca: "touza",
+    campos: ["antetitulo", "titular", "cita"],
+    limites: { antetitulo: 30, titular: 32, cita: 64 },
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "sangre",
+    papel: "plato",
+    campanas: true,
+  },
+  {
+    id: "tz-plato-marco",
+    marca: "touza",
+    campos: ["antetitulo", "titular", "cita"],
+    limites: { antetitulo: 30, titular: 36, cita: 70 },
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "plato",
+    campanas: true,
+  },
+  {
+    id: "tz-portada",
+    marca: "touza",
+    campos: ["antetitulo", "titular", "cita", "cta", "pie"],
+    limites: { antetitulo: 30, titular: 36, cita: 80, cta: 22, pie: 30 },
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "sangre",
+    papel: "portada",
+    campanas: true,
+  },
+  {
+    id: "tz-portada-marco",
+    marca: "touza",
+    campos: ["antetitulo", "titular", "cita", "cta", "pie"],
+    limites: { antetitulo: 30, titular: 36, cita: 70, cta: 22, pie: 30 },
+    formatos: ["post", "story"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "portada",
     campanas: true,
   },
   {
@@ -77,6 +270,7 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     limites: { antetitulo: 28, titular: 40, pie: 40 },
     formatos: ["post"],
     conFoto: false,
+    papel: "tipografica",
     campanas: false,
   },
 ];
@@ -86,11 +280,24 @@ export function plantillaIA(id: unknown): PlantillaIA | null {
 }
 
 /**
- * Plantilla enmarcada («Foto enmarcada») de la marca para ese formato, o null.
- * Es la que vale para una foto que no cubre el lienzo (las de la carta).
+ * Plantilla v2 (no clásica) con foto de la marca, el papel, el formato y el
+ * encaje pedidos, o null (src/lib/instagram → plantillaPara).
  */
-export function plantillaMarco(marca: string, formato: "post" | "story"): PlantillaIA | null {
-  return PLANTILLAS_IA.find((p) => p.marca === marca && p.conFoto && p.encaje === "marco" && p.formatos.includes(formato)) ?? null;
+export function plantillaPara(marca: string, formato: "post" | "story", papel: PapelIA, encaje: "sangre" | "marco"): PlantillaIA | null {
+  return (
+    PLANTILLAS_IA.find(
+      (p) => p.marca === marca && !p.clasica && p.conFoto && p.papel === papel && (p.encaje ?? "sangre") === encaje && p.formatos.includes(formato),
+    ) ?? null
+  );
+}
+
+/**
+ * Plantilla enmarcada («Foto enmarcada») de la marca para ese formato, o null.
+ * Es la que vale para una foto que no cubre el lienzo (las de la carta). Por
+ * defecto la de portada.
+ */
+export function plantillaMarco(marca: string, formato: "post" | "story", papel: PapelIA = "portada"): PlantillaIA | null {
+  return plantillaPara(marca, formato, papel, "marco");
 }
 
 /** Plantillas de una marca que sirven para una campaña. */

@@ -85,6 +85,20 @@ export interface ContextoPlantilla {
  */
 export type EncajeFoto = "sangre" | "marco";
 
+/**
+ * Papel de una plantilla en una publicación (plantillas v2, 08/11/2026). Un
+ * carrusel se monta como los reels del sistema de marca: intro, planos con
+ * rótulo y cierre.
+ * - "portada": la primera imagen (o la única de un post o una story), con el
+ *   titular de la idea y la marca.
+ * - "plato": imagen interior del carrusel, limpia: la foto y el nombre del
+ *   plato pequeño. Sin logo ni botón.
+ * - "cierre": la última imagen: logo, lema y botón.
+ * - "tipografica": sin foto, una frase o un anuncio.
+ */
+export type PapelPlantilla = "portada" | "plato" | "cierre" | "tipografica";
+export const PAPELES: readonly PapelPlantilla[] = ["portada", "plato", "cierre", "tipografica"];
+
 export interface Plantilla {
   /** p. ej. "ct-foto-titular" */
   id: string;
@@ -107,6 +121,14 @@ export interface Plantilla {
   tiposFoto?: readonly string[];
   /** Cómo pone la foto (ver EncajeFoto). Por defecto "sangre". Solo plantillas con foto. */
   encaje?: EncajeFoto;
+  /** Papel en la publicación (ver PapelPlantilla). Las clásicas no tienen. */
+  papel?: PapelPlantilla;
+  /**
+   * Plantilla clásica (las de antes del 08/11/2026): se sigue pudiendo abrir,
+   * validar y publicar (las piezas guardadas no se rompen), pero no sale en los
+   * selectores ni la elige la IA.
+   */
+  clasica?: boolean;
   html(datos: DatosPieza, ctx: ContextoPlantilla): string;
 }
 

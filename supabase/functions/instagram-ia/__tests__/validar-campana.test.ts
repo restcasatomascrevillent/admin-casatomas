@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { esFecha, lunesDe, revisarCampana, revisarIdea, revisarPiezaCampana, type ContextoCampana } from "../../_shared/instagram/validar-campana.ts";
-import { plantillasCampana } from "../plantillas.ts";
+import { PLANTILLAS_IA, plantillasCampana } from "../plantillas.ts";
 
 const CTX: ContextoCampana = {
   marca: "casa-tomas",
@@ -28,7 +28,7 @@ const pieza = (extra: Record<string, unknown> = {}) => ({
   fecha: "2026-11-10",
   hora: "13:00",
   formato: "post",
-  plantilla: "ct-foto-titular",
+  plantilla: "ct-portada",
   plato_id: "pulpo",
   foto_sugerida: "carta:pulpo",
   antetitulo: "",
@@ -59,24 +59,26 @@ describe("validar-campana", () => {
     expect(sinFoto.ok).toBe(true);
   });
 
-  it("foto de la carta con plantilla a sangre → se corrige a la enmarcada (ct-marco) y se avisa; la de Drive no", () => {
+  it("foto de la carta con plantilla a sangre → se corrige a la enmarcada del mismo papel (ct-portada-marco) y se avisa; la de Drive no", () => {
     const r = revisarPiezaCampana(pieza(), CTX);
-    expect(r.valor.plantilla).toBe("ct-marco");
-    expect(r.correcciones.join(" ")).toMatch(/foto de la carta no cubre la plantilla «ct-foto-titular».*«ct-marco» \(Foto enmarcada\)/);
+    expect(r.valor.plantilla).toBe("ct-portada-marco");
+    expect(r.correcciones.join(" ")).toMatch(/foto de la carta no cubre la plantilla «ct-portada».*«ct-portada-marco» \(Foto enmarcada\)/);
     const story = revisarPiezaCampana(pieza({ formato: "story" }), CTX);
-    expect(story.valor.plantilla).toBe("ct-marco");
+    expect(story.valor.plantilla).toBe("ct-portada-marco");
     const drive = revisarPiezaCampana(pieza({ foto_sugerida: "drive:FotoDelPulpo0001" }), CTX);
-    expect(drive.valor.plantilla).toBe("ct-foto-titular");
-    const yaMarco = revisarPiezaCampana(pieza({ plantilla: "ct-marco" }), CTX);
-    expect(yaMarco.valor.plantilla).toBe("ct-marco");
+    expect(drive.valor.plantilla).toBe("ct-portada");
+    const yaMarco = revisarPiezaCampana(pieza({ plantilla: "ct-portada-marco" }), CTX);
+    expect(yaMarco.valor.plantilla).toBe("ct-portada-marco");
     expect(yaMarco.correcciones.join(" ")).not.toMatch(/no cubre/);
   });
 
   it("descarta plato inexistente, fecha fuera, plantilla de otra marca y formato que la plantilla no admite", () => {
     expect(revisarPiezaCampana(pieza({ plato_id: "langosta" }), CTX).errores.join(" ")).toMatch(/no está en la carta activa/);
     expect(revisarPiezaCampana(pieza({ fecha: "2026-11-30" }), CTX).errores.join(" ")).toMatch(/fuera de la campaña/);
-    expect(revisarPiezaCampana(pieza({ plantilla: "tz-foto-titular" }), CTX).errores.join(" ")).toMatch(/no es de la marca/);
-    expect(revisarPiezaCampana(pieza({ plantilla: "ct-tipografica", formato: "story" }), CTX).errores.join(" ")).toMatch(/no admite el formato story/);
+    expect(revisarPiezaCampana(pieza({ plantilla: "tz-portada" }), CTX).errores.join(" ")).toMatch(/no es de la marca/);
+    // ct-tipografica (clásica, solo post) ya no se ofrece a las campañas; con ella en la lista, el formato manda.
+    const conClasicas = { ...CTX, plantillas: PLANTILLAS_IA.filter((p) => p.marca === "casa-tomas") };
+    expect(revisarPiezaCampana(pieza({ plantilla: "ct-tipografica", formato: "story" }), conClasicas).errores.join(" ")).toMatch(/no admite el formato story/);
     expect(revisarPiezaCampana(pieza({ titular: "Un titular de muchas más de seis palabras" }), CTX).ok).toBe(false);
   });
 
@@ -91,7 +93,7 @@ describe("validar-campana", () => {
 
   it("TOUZA: «reservar» en cualquier texto tumba la campaña", () => {
     const ctx = { ...CTX, marca: "touza" as const, plantillas: plantillasCampana("touza"), carta: [{ id: "vermu", nombre: "Vermú de la casa" }] };
-    const p = pieza({ plantilla: "tz-foto-titular", plato_id: "vermu", foto_sugerida: "", titular: "La barra", gancho: "Esta noche.", caption: "Esta noche. Vermú de la casa en la barra.", hashtags: ["#TOUZA"], por_que: "Jueves.", alt_text: "Copa." });
+    const p = pieza({ plantilla: "tz-portada", plato_id: "vermu", foto_sugerida: "", titular: "La barra", gancho: "Esta noche.", caption: "Esta noche. Vermú de la casa en la barra.", hashtags: ["#TOUZA"], por_que: "Jueves.", alt_text: "Copa." });
     const r = revisarCampana({ titulo: "Jueves", mensaje: "Reserva tu sitio", fases: [], piezas: [p, p] }, ctx);
     expect(r.ok).toBe(false);
     expect(r.descartadas[0]).toMatchObject({ donde: "Campaña" });
@@ -120,7 +122,7 @@ describe("validar-campana", () => {
 
   it("ideas: dentro de la semana y con plato de la carta", () => {
     const ctx = { ...CTX, desde: "2026-11-09", hasta: "2026-11-15" };
-    const idea = { fecha: "2026-11-11", titulo: "San Martín", idea: "Pulpo a la gallega para el día.", motivo: "fecha_senalada", formato: "post", plantilla: "ct-foto-titular", plato_id: "pulpo", gancho: "" };
+    const idea = { fecha: "2026-11-11", titulo: "San Martín", idea: "Pulpo a la gallega para el día.", motivo: "fecha_senalada", formato: "post", plantilla: "ct-portada", plato_id: "pulpo", gancho: "" };
     expect(revisarIdea(idea, ctx).ok).toBe(true);
     expect(revisarIdea({ ...idea, fecha: "2026-11-20" }, ctx).ok).toBe(false);
     expect(revisarIdea({ ...idea, plato_id: "langosta" }, ctx).ok).toBe(false);

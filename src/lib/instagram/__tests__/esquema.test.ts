@@ -104,8 +104,9 @@ describe("validarPieza", () => {
 
   it("rechaza una plantilla que no existe (registro real) y dice cuáles hay", () => {
     expect(problemas({ ...base, plantilla: "no-existe" }, {}).join("\n")).toMatch(
-      /La plantilla «no-existe» no existe\. Disponibles: ct-foto-titular, ct-marco, ct-tipografica, tz-foto-titular, tz-marco, tz-tipografica/,
+      /La plantilla «no-existe» no existe\. Disponibles: ct-cierre, ct-cierre-marca, ct-cierre-marco, ct-frase, ct-plato, .*tz-tipografica$/,
     );
+    expect(problemas({ ...base, plantilla: "no-existe" }, {}).join("\n")).not.toMatch(/ct-foto-titular/);
   });
 
   it("lista TODOS los problemas a la vez", () => {

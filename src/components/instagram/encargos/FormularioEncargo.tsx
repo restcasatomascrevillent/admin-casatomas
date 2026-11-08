@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { baseFotosPublica, plantillasDe, type MarcaId } from "@/lib/instagram";
+import { baseFotosPublica, plantillasVisibles, type MarcaId } from "@/lib/instagram";
 import type { BaseReel } from "@/lib/instagram/reels";
 import { SelectorFoto } from "@/components/marketing/instagram/SelectorFoto";
 import { useFotosInstagram } from "@/components/marketing/instagram/useFotosInstagram";
@@ -94,7 +94,8 @@ export function FormularioEncargo({ abierto, onAbierto, inicial, ajustes, onHech
 
   const cambiar = (c: Partial<DatosFormulario>) => setD((x) => ({ ...x, ...c }));
   const { fotos: catalogo } = useFotosInstagram(d.marca);
-  const plantillas = useMemo(() => plantillasDe(d.marca, d.formato === "story" ? "story" : "post"), [d.marca, d.formato]);
+  // Sin las clásicas (salvo la que ya lleve el encargo), por papel: la portada primero.
+  const plantillas = useMemo(() => plantillasVisibles(d.marca, d.formato === "story" ? "story" : "post", d.plantilla), [d.marca, d.formato, d.plantilla]);
   const bases = useMemo(() => basesDeMarca(d.marca), [d.marca]);
   const entregaPrevista = sumarDiasLaborables(hoy, ajustes.plazo_dias_laborables);
 
