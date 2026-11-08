@@ -115,6 +115,38 @@ Desde el 05/11/2026 la biblioteca enseña también los **vinos de la carta** con
 
 Código: `idFotoVino`, `vinoIdDeFoto`, `fotoDesdeVino`, `fotosDesdeVinos` en `src/lib/instagram/fotos.ts`; `useVinosConFoto` en `useFotosInstagram.ts`; `prepararFotoVino` y `prepararFotoOrigen` en `api.ts`; `prepararCarta` con `CARTA_VINOS` en `instagram-drive/drive.ts`. Sin migraciones.
 
+## Originales de la carta en Drive
+
+Desde el 08/11/2026 (petición del dueño). La carta guarda la foto **para la web** (1200×900 webp con el fondo de carta en platos, 900×1200 en vinos), que no sirve a sangre en Instagram. Ahora, cada vez que alguien sube o cambia la foto de un **plato** o un **vino** en Gestión web › Carta (alta, edición y «foto rápida»), además de la versión web se guarda el **ORIGINAL** en Google Drive:
+
+```
+marketing/                         ← GOOGLE_DRIVE_MARKETING_FOLDER_ID
+└── carta/
+    ├── casa-tomas/<nombre-del-plato>-<id>.jpg
+    └── touza/<nombre-del-plato>-<id>.jpg
+```
+
+- **Qué se guarda**: el fichero que eligió el usuario, ANTES del recorte y de la compresión (`fotoCarta.original`), convertido en el navegador a JPEG calidad 0,92 con la orientación EXIF aplicada, fondo blanco si tenía transparencia, lado mayor ≤ 4000 px (nunca amplía) y ≤ 8 MB (baja la calidad y, si hace falta, el lado a 3000). HEIC solo si el navegador lo abre (la carta, de momento, no admite HEIC). Código: `src/components/carta/originalCarta.ts`, enganchado en `trasGuardarFotoCarta` (`recorte/avisoGuardadoSinFondo.ts`), que llaman todos los formularios después de guardar la ficha.
+- **No bloquea**: va en segundo plano después de guardar. Si Drive falla (o falta la migración, o los secretos), la foto de la web ya está guardada y sale el aviso «El original no se ha podido guardar en Drive» con el motivo.
+- **Servidor**: `instagram-drive?accion=subir_original` (multipart: `tabla` Platos|Vinos, `id`, `archivo`). Permiso: **«Editar» en la carta** (`can_edit_section('gestor_carta')`), no el de Marketing. Solo JPEG (lee las medidas del propio fichero), lado ≤ 4000, ≤ 8 MB. Marca: `restaurante` → casa-tomas; si no, `touza` → touza. Si la ficha ya tenía original en esa carpeta, **reemplaza su contenido** (mismo id de Drive); si no, crea el fichero. Guarda el id en `carta_fotos_originales` con el JWT del usuario.
+- **Instagram lo usa**: en la biblioteca, las fotos de la carta con original salen con las **medidas del original** (y su aptitud post/story) y una marca discreta **«Original»**; las demás, **«Solo web»** (`src/lib/instagram/originalesCarta.ts`, `useOriginalesCarta`, `EtiquetaOriginal.tsx`). Al **preparar** (origen carta o vino), si hay original y Drive está configurado, la función copia ESE a `tmp/` (comprobando que está dentro de `marketing/carta/<marca>`, es JPEG y ≤ 8 MB) y responde `original: true`; si falla, usa la versión web con `original: false` y un `aviso`. El render y la IA reciben las medidas del fichero preparado.
+- **Fotos que ya existían**: no tienen original. `scripts/instagram/importar-originales.mjs` los sube desde una carpeta local según un CSV `id_plato,fichero[,tabla]` (con la misma Edge Function y la sesión de alguien con «Editar» en la carta), y con `--sugerir` propone los emparejamientos por nombre de fichero y de plato (revísalos a mano: p. ej. `arroz.jpg` sale como «Arroz con leche»). `--simular` convierte sin subir. Sugerencias de las fotos de `instagram-studio/propuesta/marca-base/assets/local` contra la demo: `scripts/instagram/originales-sugerencias-demo.csv`.
+
+**Límite conocido**: si la foto de la web cambia por otro camino (recorte en un ordenador potente, restaurar una foto anterior, scripts), el original de Drive no se toca y puede quedar desfasado hasta la próxima subida desde el formulario.
+
+### Base de datos
+
+Migración `supabase/migrations/20261117100000_carta_fotos_originales.sql` (rollback en `supabase/rollbacks/`, que deja los ficheros en Drive). **Tabla aparte** `carta_fotos_originales` y no columnas en `"Platos"`/`"Vinos"`: esas tablas las lee `anon` desde las webs (se publicarían los ids de Drive), tienen triggers al editar (updated_at, publicación de vinos, auditoría) que se dispararían sin que nadie cambie la ficha, y así los permisos son propios. Una fila por plato **o** por vino (CHECK, UNIQUE, ON DELETE CASCADE): `drive_id`, `marca`, `nombre`, `ancho`, `alto`, `bytes`, `subido_por` (lo pone la BD). RLS: escribe `gestor_carta` («Editar»); leen `gestor_carta` y `marketing` («Ver»); `anon`, nada. Prueba: `npm run test:carta-originales:db` (PGlite, en el CI).
+
+Aplicar en la demo y desplegar (desde `wt/instagram-panel`, enlazado a la demo):
+
+```
+npx supabase db query --linked -f supabase/migrations/20261117100000_carta_fotos_originales.sql
+npx supabase functions deploy instagram-drive --project-ref sfonaclosuafvlhutkon
+```
+
+Tiene que terminar en «carta_fotos_originales: aplicada». Producción solo después de aceptar el PR y con el «sí» del dueño.
+
 ## Preparación en el navegador (Subir foto)
 
 - Acepta JPEG, PNG y WebP; HEIC/HEIF solo si el navegador sabe abrirlo (Safari sí; Chrome y

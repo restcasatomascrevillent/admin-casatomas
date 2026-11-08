@@ -21,6 +21,12 @@
  * marca (tabla "Vinos", bucket «vinos») salen con id «vino:<id del vino>» y
  * tipo «bebida»; sus medidas se apuntan con la clave «vino:<id>» y se preparan
  * con origen «vino».
+ *
+ * Originales (desde el 08/11/2026): si el plato o el vino tiene ORIGINAL en
+ * Drive (carta_fotos_originales), la foto sale con las medidas del original
+ * y `original: true` («Original»); si no, `original: false` («Solo web»). Al
+ * prepararla, la función copia el original; las medidas que valen son las
+ * del fichero preparado.
  */
 import { useMemo } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
@@ -37,6 +43,7 @@ import {
   type Foto,
   type MarcaId,
 } from "@/lib/instagram";
+import { aplicarOriginales, indexarOriginales, type FilaOriginalCarta } from "@/lib/instagram/originalesCarta";
 import { listarFotosDrive, prepararFotoOrigen, type FotoPreparada } from "./api";
 
 /** Prefijo de las claves de React Query de la biblioteca de Drive. */
@@ -102,6 +109,29 @@ export function useVinosConFoto(marca: MarcaId) {
   });
 }
 
+export const CLAVE_ORIGINALES_CARTA = ["instagram_carta_originales"] as const;
+
+/**
+ * Originales en Drive de platos y vinos (carta_fotos_originales, como el
+ * usuario: decide la RLS). Sin la migración o sin permiso, ninguno (todas
+ * salen «Solo web»): nunca rompe la biblioteca.
+ */
+export function useOriginalesCarta() {
+  return useQuery({
+    queryKey: CLAVE_ORIGINALES_CARTA,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("carta_fotos_originales").select("plato_id,vino_id,ancho,alto").limit(2000);
+      if (error) {
+        console.warn("[instagram] originales de la carta no disponibles", error.message);
+        return indexarOriginales([]);
+      }
+      return indexarOriginales((data ?? []) as FilaOriginalCarta[]);
+    },
+    staleTime: 5 * 60_000,
+    retry: 0,
+  });
+}
+
 function useMedidasCarta(): MedidasCarta {
   const qc = useQueryClient();
   const { data } = useQuery({
@@ -144,8 +174,9 @@ export function useFotosInstagram(marca: MarcaId, formato?: FormatoId) {
   const platos = usePlatosConFoto(marca);
   const medidas = useMedidasCarta();
   const vinos = useVinosConFoto(marca);
-  const carta = useMemo(() => fotosDesdePlatos(platos.data ?? [], marca, medidas), [platos.data, marca, medidas]);
-  const deVinos = useMemo(() => fotosDesdeVinos(vinos.data ?? [], marca, medidas), [vinos.data, marca, medidas]);
+  const originales = useOriginalesCarta();
+  const carta = useMemo(() => aplicarOriginales(fotosDesdePlatos(platos.data ?? [], marca, medidas), originales.data), [platos.data, marca, medidas, originales.data]);
+  const deVinos = useMemo(() => aplicarOriginales(fotosDesdeVinos(vinos.data ?? [], marca, medidas), originales.data), [vinos.data, marca, medidas, originales.data]);
   const catalogo = useMemo(() => [...(consulta.data?.fotos ?? []), ...carta, ...deVinos], [consulta.data, carta, deVinos]);
   const fotos = useMemo(() => fotosDe(marca, formato, catalogo), [marca, formato, catalogo]);
   return {
@@ -189,8 +220,9 @@ export function useFotoPreparada(marca: MarcaId, idFoto: string, catalogo: reado
   });
   const lista = useMemo<FotoLista | null>(() => {
     if (!idPreparable || !base || !consulta.data?.ruta) return null;
-    const ancho = base.ancho || consulta.data.ancho || 0;
-    const alto = base.alto || consulta.data.alto || 0;
+    // Valen las medidas del fichero PREPARADO (el original de Drive si lo hay; no las de la miniatura web).
+    const ancho = consulta.data.ancho || base.ancho || 0;
+    const alto = consulta.data.alto || base.alto || 0;
     const foto: Foto = { ...base, ruta: consulta.data.ruta, ancho, alto };
     return { foto, ruta: consulta.data.ruta, preparada: { id: base.id, url: consulta.data.url, ancho, alto, tipo: base.tipo, marca: base.marca } };
   }, [idPreparable, base, consulta.data]);
