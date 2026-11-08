@@ -56,6 +56,25 @@
  *     guarda en carta_fotos_originales. Si la ficha ya tenía original en esa
  *     carpeta, se REEMPLAZA su contenido (mismo id de Drive).
  *
+ *   POST ?accion=descargar_original  (JSON: { tabla: "Platos"|"Vinos", id, tipo?: "foto"|"video", comprobar?: true })
+ *     Desde el 08/11/2026 los ORIGINALES de la carta viven SOLO en Drive (en
+ *     Supabase solo queda la versión web, el «sticker»). Devuelve los bytes del
+ *     original (image/jpeg o video/*) para «Cambiar fondo», el recorte, el
+ *     cambio de fondo del vídeo, etc. Con `comprobar: true`, solo JSON
+ *     { ok, tipo, driveId, nombre, mimeType, bytes, ancho?, alto? } (sin
+ *     descargar). 404 { sinOriginal: true } si la ficha no tiene original: el
+ *     panel usa entonces la versión web como respaldo y lo avisa. Permiso:
+ *     «Editar» en la carta (gestor_carta). Foto: la de carta_fotos_originales,
+ *     comprobando que está en marketing/carta/<marca>. Vídeo (solo Platos):
+ *     marketing/carta/<marca>/videos/<id>.<ext>.
+ *
+ *   POST ?accion=subir_original_video  (multipart/form-data: tabla "Platos", id, archivo)
+ *     200 { ok, tabla, id, driveId, marca, nombre, bytes, reemplazado }. El
+ *     vídeo ORIGINAL (bruto) del plato, ≤ 50 MB, mp4/mov/m4v/webm/3gp/mkv
+ *     (se mira la cabecera del fichero), a marketing/carta/<marca>/videos/<id>.<ext>
+ *     con subida reanudable. Uno por plato: si ya había, se REEMPLAZA (mismo
+ *     id de Drive). Permiso: «Editar» en la carta. Sin filas en la BD.
+ *
  *   Seguridad: solo se leen ficheros que estén DENTRO de la carpeta de la
  *   marca (por `parents`), aunque el token pueda ver más (facturas, etc.).
  *
@@ -68,6 +87,7 @@ import {
   AVISO_DRIVE_FILE,
   carpetaCarta,
   carpetaFotos,
+  carpetaVideosCarta,
   clasificarAlcance,
   esMarcaDrive,
   estaEn,
@@ -197,7 +217,15 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
   const url = new URL(request.url);
   // El original de la carta lo sube quien edita la carta (gestor_carta),
   // tenga o no Marketing: se autoriza aparte.
-  if (request.method === "POST" && url.searchParams.get("accion") === "subir_original") return await subirOriginal(request, env, deps);
+  const accionUrl = url.searchParams.get("accion");
+  if (request.method === "POST" && accionUrl === "subir_original") return await subirOriginal(request, env, deps);
+  if (request.method === "POST" && accionUrl === "subir_original_video") return await subirOriginalVideo(request, env, deps);
+  if (request.method === "POST" && accionUrl === "descargar_original") return await descargarOriginal(request, env, deps);
+  // `{ accion: "descargar_original" }` en el cuerpo JSON (sin ?accion=): se mira una copia.
+  if (request.method === "POST" && !accionUrl && !(request.headers.get("content-type") ?? "").toLowerCase().startsWith("multipart/form-data")) {
+    const copia = await leerJson(request.clone(), 16 * 1024);
+    if (copia.ok && (copia.valor as { accion?: unknown } | null)?.accion === "descargar_original") return await descargarOriginal(request, env, deps);
+  }
   // Ver fotos (listar, miniatura) basta con «Ver»; copiarlas al cubo
   // (preparar) o subirlas a Drive exige «Editar» (20261111000000).
   const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch, permiso: "leer" });
@@ -248,7 +276,7 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
     if (request.method === "POST" && accion === "listar") return await listar(s, c, cuerpo.marca);
     if (request.method === "POST" && accion === "preparar") return await preparar(s, c, cuerpo.marca, cuerpo.id, deps);
     if (request.method === "POST" && accion === "subir") return await subir(s, c, request, deps);
-    return json(400, { ok: false, error: "Acción no válida (listar, subir, miniatura, preparar o subir_original)" });
+    return json(400, { ok: false, error: "Acción no válida (listar, subir, miniatura, preparar, subir_original, subir_original_video o descargar_original)" });
   } catch (e) {
     if (e instanceof ErrorDrive) {
       registro("warn", ETIQUETA, "Drive", { accion, motivo: e.motivo, estado: e.estado, mensaje: e.message });
@@ -551,6 +579,226 @@ async function subirOriginal(request: Request, env: Record<string, string | unde
     }
     registro("error", ETIQUETA, "fallo (original)", e);
     return json(500, { ok: false, error: "No se pudo guardar el original en Drive", detalle: sanear((e as Error)?.message ?? e) });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Originales de la carta SOLO en Drive (08/11/2026): descargar y vídeos.
+// ---------------------------------------------------------------------------
+
+/** Vídeo original de un plato: el mismo tope que el bruto del flujo «dispositivo potente». */
+export const MAX_BYTES_VIDEO_ORIGINAL = 50 * 1024 * 1024;
+/** Extensiones de vídeo admitidas → tipo MIME (las de tipoMimeBruto del panel). */
+export const TIPOS_VIDEO: Record<string, string> = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+  "3gp": "video/3gpp",
+  mkv: "video/x-matroska",
+};
+const SIN_ORIGINAL = "Esta ficha no tiene original en Google Drive";
+
+/** Extensión del vídeo por nombre o tipo; null si no es de los admitidos. */
+export function extensionVideo(nombre: string, tipo: string): string | null {
+  const ext = /\.([a-z0-9]+)$/i.exec(nombre)?.[1]?.toLowerCase();
+  if (ext && TIPOS_VIDEO[ext]) return ext;
+  const t = tipo.toLowerCase().split(";")[0].trim();
+  if (t === "video/quicktime") return "mov";
+  if (t === "video/webm") return "webm";
+  if (t === "video/3gpp") return "3gp";
+  if (t === "video/x-matroska") return "mkv";
+  if (t === "video/mp4") return "mp4";
+  return null;
+}
+
+/** ¿La cabecera es de un vídeo? (ISO BMFF «ftyp» —mp4/mov/m4v/3gp— o EBML —webm/mkv—). */
+export function pareceVideo(cabecera: Uint8Array): boolean {
+  if (cabecera.length >= 8 && String.fromCharCode(...cabecera.subarray(4, 8)) === "ftyp") return true;
+  return cabecera.length >= 4 && cabecera[0] === 0x1a && cabecera[1] === 0x45 && cabecera[2] === 0xdf && cabecera[3] === 0xa3;
+}
+
+/** Nombre del vídeo original de un plato en Drive (uno por plato). */
+export const nombreVideoOriginal = (id: string, ext: string) => `${id}.${ext}`;
+/** El id ya está validado con RE_ID_PLATO (solo letras, números, «_» y «-»). */
+const esVideoDePlato = (f: FicheroDrive, id: string) => !f.trashed && f.name.toLowerCase().startsWith(`${id.toLowerCase()}.`) && /^\.[a-z0-9]{2,4}$/i.test(f.name.slice(id.length));
+
+async function autorizarCarta(request: Request, env: Record<string, string | undefined>, deps: DependenciasDrive): Promise<{ s: Sesion } | { respuesta: Response }> {
+  const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch, permiso: "editar", seccion: SECCION_CARTA });
+  if ("motivo" in auth) {
+    if (auth.estado >= 500) registro("error", ETIQUETA, "autorización (carta)", { motivo: auth.motivo });
+    return { respuesta: jsonAuth(auth.estado, auth.estado === 403 ? SIN_PERMISO_CARTA : auth.motivo) };
+  }
+  return { s: auth.sesion };
+}
+
+interface FichaCarta {
+  id: string;
+  nombre: string | null;
+  restaurante: boolean | null;
+  touza: boolean | null;
+}
+
+/** Ficha de "Platos"/"Vinos" con el JWT del usuario (decide la RLS). */
+async function leerFicha(s: Sesion, o: OrigenCarta, id: string): Promise<FichaCarta | null> {
+  const r = await s.fetch(`${s.sb.url}/rest/v1/${o.tabla}?id=eq.${encodeURIComponent(id)}&select=id,nombre,restaurante,touza`, {
+    headers: { apikey: s.sb.clave, Authorization: `Bearer ${s.token}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!r.ok) throw new ErrorSupabase(`No se pudo leer el ${o.nombre} (${r.status})`, r.status);
+  const filas = (await r.json().catch(() => [])) as FichaCarta[];
+  return Array.isArray(filas) && filas[0] ? filas[0] : null;
+}
+
+/** Vídeo original de un plato en marketing/carta/<marca>/videos (primero en la marca de la ficha). */
+async function buscarVideoOriginal(c: ConfigDriveInstagram, id: string, marcas: MarcaDrive[]): Promise<{ f: FicheroDrive; marca: MarcaDrive; carpeta: string } | null> {
+  for (const marca of marcas) {
+    const carpeta = await carpetaVideosCarta(c, marca);
+    const f = (await c.cliente.buscarEnCarpeta(carpeta, `${id}.`)).find((x) => esVideoDePlato(x, id) && estaEn(x, carpeta));
+    if (f) return { f, marca, carpeta };
+  }
+  return null;
+}
+
+function binario(bytes: Uint8Array, tipo: string): Response {
+  return new Response(bytes as Uint8Array<ArrayBuffer>, {
+    status: 200,
+    headers: { ...CORS, "Content-Type": tipo, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" },
+  });
+}
+
+async function errorCarta(e: unknown, c: ConfigDriveInstagram, que: string): Promise<Response> {
+  if (e instanceof ErrorDrive) {
+    registro("warn", ETIQUETA, `Drive (${que})`, { motivo: e.motivo, estado: e.estado, mensaje: e.message });
+    return await errorDrive(e, c);
+  }
+  if (e instanceof ErrorSupabase) {
+    registro("error", ETIQUETA, `Supabase (${que})`, e);
+    return json(e.estado === 401 || e.estado === 403 ? 403 : 500, { ok: false, error: e.message });
+  }
+  registro("error", ETIQUETA, `fallo (${que})`, e);
+  return json(500, { ok: false, error: `No se pudo completar la operación con Drive (${que})`, detalle: sanear((e as Error)?.message ?? e) });
+}
+
+/** Devuelve (o comprueba) el ORIGINAL de Drive de un plato o vino (ver la cabecera). */
+async function descargarOriginal(request: Request, env: Record<string, string | undefined>, deps: DependenciasDrive): Promise<Response> {
+  const a = await autorizarCarta(request, env, deps);
+  if ("respuesta" in a) return a.respuesta;
+  const s = a.s;
+  const leido = await leerJson(request, 16 * 1024);
+  if ("error" in leido) return json(leido.estado, { ok: false, error: leido.error });
+  const cuerpo = (leido.valor && typeof leido.valor === "object" ? leido.valor : {}) as Record<string, unknown>;
+  const { tabla, id } = cuerpo;
+  const tipo = cuerpo.tipo ?? "foto";
+  const comprobar = cuerpo.comprobar === true;
+  if (tabla !== "Platos" && tabla !== "Vinos") return json(400, { ok: false, error: "«tabla» tiene que ser Platos o Vinos" });
+  if (typeof id !== "string" || !RE_ID_PLATO.test(id)) return json(400, { ok: false, error: "Falta un «id» válido" });
+  if (tipo !== "foto" && tipo !== "video") return json(400, { ok: false, error: "«tipo» tiene que ser foto o video" });
+  if (tipo === "video" && tabla !== "Platos") return json(400, { ok: false, error: "Solo los platos tienen vídeo" });
+  const cfg = leerConfigDrive(env, { fetch: deps.fetch, ahora: deps.ahora });
+  if ("faltan" in cfg) return sinConfig(cfg.faltan, cfg.problema, env);
+  const c = cfg.config;
+  const o = tabla === "Vinos" ? CARTA_VINOS : CARTA_PLATOS;
+
+  try {
+    if (tipo === "video") {
+      const ficha = await leerFicha(s, o, id);
+      if (!ficha) return json(404, { ok: false, error: `Ese ${o.nombre} no existe (o no tienes permiso para verlo)` });
+      const propia = marcaDeFicha(ficha);
+      const hallado = await buscarVideoOriginal(c, id, [propia, propia === "touza" ? "casa-tomas" : "touza"]);
+      if (!hallado) return json(404, { ok: false, sinOriginal: true, error: SIN_ORIGINAL });
+      const { f, marca } = hallado;
+      const ext = extensionVideo(f.name, f.mimeType);
+      const mime = ext ? TIPOS_VIDEO[ext] : null;
+      if (!mime) return json(422, { ok: false, error: "El original de Drive no es un vídeo admitido" });
+      if (Number(f.size ?? "0") > MAX_BYTES_VIDEO_ORIGINAL) return json(422, { ok: false, error: "El vídeo original pesa más de 50 MB" });
+      if (comprobar) return json(200, { ok: true, tipo: "video", tabla, id, driveId: f.id, nombre: f.name, mimeType: mime, bytes: Number(f.size ?? "0"), marca });
+      const { bytes } = await c.cliente.descargar(f.id);
+      if (bytes.byteLength > MAX_BYTES_VIDEO_ORIGINAL) return json(422, { ok: false, error: "El vídeo original pesa más de 50 MB" });
+      registro("info", ETIQUETA, "original descargado", { tabla, id, tipo, usuario: s.usuario });
+      return binario(bytes, mime);
+    }
+
+    const { fila, sinTabla } = await leerOriginal(s, o.tabla, id);
+    if (sinTabla) {
+      return json(503, { ok: false, error: `Falta aplicar la migración ${MIGRACION_ORIGINALES}`, comoArreglarlo: "Aplica la migración en Supabase (ver docs/instagram-fotos.md)." });
+    }
+    if (!fila) return json(404, { ok: false, sinOriginal: true, error: SIN_ORIGINAL });
+    const carpeta = await carpetaCarta(c, fila.marca);
+    const f = await c.cliente.metadatos(fila.drive_id, "id,name,mimeType,size,parents,trashed,imageMediaMetadata(width,height,rotation)");
+    if (!f || f.trashed || !estaEn(f, carpeta)) {
+      registro("warn", ETIQUETA, "original anotado fuera de su carpeta", { tabla, id, driveId: fila.drive_id });
+      return json(404, { ok: false, sinOriginal: true, error: "El original anotado ya no está en la carpeta de la carta de Drive" });
+    }
+    if (f.mimeType !== "image/jpeg" || Number(f.size ?? "0") > MAX_BYTES_ORIGINAL) return json(422, { ok: false, error: "El original de Drive no es un JPEG de hasta 8 MB" });
+    const m = medidasDrive(f);
+    if (comprobar) {
+      return json(200, {
+        ok: true,
+        tipo: "foto",
+        tabla,
+        id,
+        driveId: f.id,
+        nombre: f.name,
+        mimeType: f.mimeType,
+        bytes: Number(f.size ?? "0"),
+        ancho: m?.ancho ?? fila.ancho,
+        alto: m?.alto ?? fila.alto,
+        marca: fila.marca,
+      });
+    }
+    const { bytes } = await c.cliente.descargar(f.id);
+    if (bytes.byteLength > MAX_BYTES_ORIGINAL || !medidasJpeg(bytes)) return json(422, { ok: false, error: "El original de Drive no es un JPEG de hasta 8 MB" });
+    registro("info", ETIQUETA, "original descargado", { tabla, id, tipo, usuario: s.usuario });
+    return binario(bytes, "image/jpeg");
+  } catch (e) {
+    return await errorCarta(e, c, "descargar original");
+  }
+}
+
+/** Sube (o reemplaza) el vídeo ORIGINAL de un plato a Drive (ver la cabecera). */
+async function subirOriginalVideo(request: Request, env: Record<string, string | undefined>, deps: DependenciasDrive): Promise<Response> {
+  const a = await autorizarCarta(request, env, deps);
+  if ("respuesta" in a) return a.respuesta;
+  const s = a.s;
+  const largo = Number(request.headers.get("content-length") ?? "0");
+  if (largo > MAX_BYTES_VIDEO_ORIGINAL + 64 * 1024) return json(413, { ok: false, error: "El vídeo original pesa más de 50 MB" });
+  const cfg = leerConfigDrive(env, { fetch: deps.fetch, ahora: deps.ahora });
+  if ("faltan" in cfg) return sinConfig(cfg.faltan, cfg.problema, env);
+  const c = cfg.config;
+
+  let datos: FormData;
+  try {
+    datos = await request.formData();
+  } catch {
+    return json(400, { ok: false, error: "Se esperaba un formulario multipart con el vídeo" });
+  }
+  const tabla = datos.get("tabla") ?? "Platos";
+  const id = datos.get("id");
+  const archivo = datos.get("archivo");
+  if (tabla !== "Platos") return json(400, { ok: false, error: "Solo los platos tienen vídeo («tabla» = Platos)" });
+  if (typeof id !== "string" || !RE_ID_PLATO.test(id)) return json(400, { ok: false, error: "Falta un «id» válido" });
+  if (!archivo || typeof archivo === "string") return json(400, { ok: false, error: "Falta el vídeo («archivo»)" });
+  if (archivo.size > MAX_BYTES_VIDEO_ORIGINAL) return json(413, { ok: false, error: "El vídeo original pesa más de 50 MB" });
+  if (archivo.size === 0) return json(400, { ok: false, error: "El vídeo está vacío" });
+  const ext = extensionVideo(archivo.name ?? "", archivo.type ?? "");
+  if (!ext || !pareceVideo(new Uint8Array(await archivo.slice(0, 16).arrayBuffer()))) {
+    return json(415, { ok: false, error: "El original tiene que ser un vídeo mp4, mov, m4v, webm, 3gp o mkv" });
+  }
+
+  try {
+    const ficha = await leerFicha(s, CARTA_PLATOS, id);
+    if (!ficha) return json(404, { ok: false, error: "Ese plato no existe (o no tienes permiso para verlo)" });
+    const marca = marcaDeFicha(ficha);
+    const carpeta = await carpetaVideosCarta(c, marca);
+    const nombre = nombreVideoOriginal(id, ext);
+    const descripcion = `Vídeo original del plato «${(ficha.nombre ?? "").trim() || id}» (carta)`;
+    const previo = (await c.cliente.buscarEnCarpeta(carpeta, `${id}.`)).find((x) => esVideoDePlato(x, id) && estaEn(x, carpeta));
+    const subido = await c.cliente.subirReanudable({ ...(previo ? { reemplazarId: previo.id } : { carpeta }), nombre, tipo: TIPOS_VIDEO[ext], datos: archivo, descripcion });
+    registro("info", ETIQUETA, "vídeo original subido", { id, marca, driveId: subido.id, reemplazado: !!previo, usuario: s.usuario });
+    return json(200, { ok: true, tabla: "Platos", id, driveId: subido.id, marca, nombre, bytes: archivo.size, reemplazado: !!previo });
+  } catch (e) {
+    return await errorCarta(e, c, "vídeo original");
   }
 }
 

@@ -95,6 +95,11 @@ export function carpetaCarta(c: ConfigDriveInstagram, marca: MarcaDrive): Promis
   return carpeta(c, ["carta", marca]);
 }
 
+/** marketing/carta/<marca>/videos: vídeos ORIGINALES (en bruto) de los platos (la crea si falta). */
+export function carpetaVideosCarta(c: ConfigDriveInstagram, marca: MarcaDrive): Promise<string> {
+  return carpeta(c, ["carta", marca, "videos"]);
+}
+
 /** «AAAA-MM» de una fecha (UTC). */
 export function mesDe(fecha: Date): string {
   return fecha.toISOString().slice(0, 7);
