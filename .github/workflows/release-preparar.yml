@@ -1,0 +1,105 @@
+# Release · preparar (docs/PROCESO-DE-CAMBIOS.md).
+#
+# A mano: Actions → «Release · preparar» → Run workflow. Escribe qué PR o commits de staging
+# quieres publicar y para qué. Crea release/X.Y.Z desde main con SOLO eso (más la versión y el
+# CHANGELOG) y abre el PR a main con el informe. Si la selección necesita otros cambios, choca con
+# main o ya estaba publicada, se para y lo explica en el resumen de la ejecución: no añade nada solo.
+#
+# Es lo mismo que `node scripts/release.mjs preparar …` en local; este workflow solo lo ejecuta
+# en GitHub. Nunca fusiona nada ni despliega: producción cambia cuando el dueño acepta el PR.
+name: Release · preparar
+
+on:
+  workflow_dispatch:
+    inputs:
+      seleccion:
+        description: "PR y commits de staging, separados por espacios (p. ej.: #12 #15 a1b2c3d)"
+        required: true
+        type: string
+      objetivo:
+        description: "Qué se publica y para qué (una frase)"
+        required: true
+        type: string
+      tipo:
+        description: "Tipo de versión (auto: minor si hay funciones nuevas, patch si no)"
+        required: true
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+      version:
+        description: "Versión exacta X.Y.Z (opcional; manda sobre «tipo»)"
+        required: false
+        type: string
+      no_depende:
+        description: "SHAs que la selección NO necesita aunque el script lo crea (opcional; queda anotado)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: release-preparar
+  cancel-in-progress: false
+
+jobs:
+  preparar:
+    name: Preparar release/X.Y.Z
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Aplicar la selección sobre main
+        id: prep
+        env:
+          SELECCION: ${{ inputs.seleccion }}
+          OBJETIVO: ${{ inputs.objetivo }}
+          TIPO: ${{ inputs.tipo }}
+          VERSION: ${{ inputs.version }}
+          NO_DEPENDE: ${{ inputs.no_depende }}
+          RELEASE_GIT_NAME: github-actions[bot]
+          RELEASE_GIT_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        shell: bash
+        run: |
+          git config user.name "$RELEASE_GIT_NAME"
+          git config user.email "$RELEASE_GIT_EMAIL"
+          read -ra ITEMS <<< "$SELECCION"
+          ARGS=(preparar "${ITEMS[@]}" --base origin/main --desde origin/staging --objetivo "$OBJETIVO" --tipo "$TIPO")
+          [ -n "$VERSION" ] && ARGS+=(--version "$VERSION")
+          [ -n "$NO_DEPENDE" ] && ARGS+=(--no-depende "$NO_DEPENDE")
+          set +e
+          node scripts/release.mjs "${ARGS[@]}" > preparacion.txt 2>&1
+          ESTADO=$?
+          set -e
+          cat preparacion.txt
+          { echo "## Preparar release"; echo; echo '```'; cat preparacion.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$ESTADO" != "0" ]; then
+            echo "::error::Release bloqueada: mira el resumen de la ejecución (dependencias, conflictos o selección)."
+            exit 1
+          fi
+
+      - name: Subir la rama y abrir el PR a main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RAMA: ${{ steps.prep.outputs.rama }}
+          VERSION: ${{ steps.prep.outputs.version }}
+          REPO: ${{ github.event.repository.name }}
+        shell: bash
+        run: |
+          git push origin "refs/heads/$RAMA"
+          node scripts/release.mjs informe --base origin/main --head "$RAMA" --rama "$RAMA" --salida cuerpo.md
+          gh pr create --base main --head "$RAMA" --title "Release v$VERSION · $REPO" --body-file cuerpo.md
+          # Los PR que abre Actions con su token no lanzan otros workflows: se lanzan aquí.
+          gh workflow run ci.yml --ref "$RAMA"
+          gh workflow run release-candidata.yml --ref "$RAMA"
+          echo "PR abierto: release v$VERSION ($RAMA). CI y «Release · candidata» lanzados." >> "$GITHUB_STEP_SUMMARY"

@@ -14,6 +14,9 @@ on:
   pull_request:
   push:
     branches: [staging, main]
+  # Lo lanza «Release · preparar» sobre la rama release/X.Y.Z: los PR que abre Actions con su
+  # token no disparan otros workflows (docs/PROCESO-DE-CAMBIOS.md).
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -163,16 +166,25 @@ jobs:
             echo "::warning::Bajaste a $n errores de ESLint: baja TOPE_ESLINT a $n en .github/workflows/ci.yml."
           fi
 
-  control-promocion:
-    name: Validar promoción a producción
+  control-release:
+    name: Validar release a producción
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    timeout-minutes: 5
+    # Producción solo acepta PR desde release/X.Y.Z (scripts/release.mjs comprobar): nada de
+    # staging entero, versión y CHANGELOG coherentes y basada en el último main.
+    if: >-
+      (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+      (github.event_name == 'workflow_dispatch' && startsWith(github.ref_name, 'release/'))
     steps:
-      - name: Solo staging puede promocionarse a main
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Rama, versión, CHANGELOG y base de la release
         env:
-          SOURCE_BRANCH: ${{ github.head_ref }}
-        run: |
-          if [ "$SOURCE_BRANCH" != "staging" ]; then
-            echo "::error::Producción solo admite PR desde staging (rama recibida: $SOURCE_BRANCH)"
-            exit 1
-          fi
+          RAMA: ${{ github.head_ref || github.ref_name }}
+        run: node scripts/release.mjs comprobar --base origin/main --head HEAD --rama "$RAMA"
