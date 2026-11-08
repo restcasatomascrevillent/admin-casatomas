@@ -148,7 +148,7 @@ Código: `idFotoVino`, `vinoIdDeFoto`, `fotoDesdeVino`, `fotosDesdeVinos` en `sr
 
 ## Originales de la carta en Drive
 
-Desde el 08/11/2026 (petición del dueño). La carta guarda la foto **para la web** (1200×900 webp con el fondo de carta en platos, 900×1200 en vinos), que no sirve a sangre en Instagram. Ahora, cada vez que alguien sube o cambia la foto de un **plato** o un **vino** en Gestión web › Carta (alta, edición y «foto rápida»), además de la versión web se guarda el **ORIGINAL** en Google Drive:
+Desde el 08/11/2026 (petición del dueño). Y desde ese mismo día **el original vive SOLO en Drive**: en Supabase queda solo la versión web (ver «En Supabase solo el sticker», más abajo). La carta guarda la foto **para la web** (1200×900 webp con el fondo de carta en platos, 900×1200 en vinos), que no sirve a sangre en Instagram. Ahora, cada vez que alguien sube o cambia la foto de un **plato** o un **vino** en Gestión web › Carta (alta, edición y «foto rápida»), además de la versión web se guarda el **ORIGINAL** en Google Drive:
 
 ```
 marketing/                         ← GOOGLE_DRIVE_MARKETING_FOLDER_ID
@@ -163,7 +163,34 @@ marketing/                         ← GOOGLE_DRIVE_MARKETING_FOLDER_ID
 - **Instagram lo usa**: en la biblioteca, las fotos de la carta con original salen con las **medidas del original** (y su aptitud post/story) y una marca discreta **«Original»**; las demás, **«Solo web»** (`src/lib/instagram/originalesCarta.ts`, `useOriginalesCarta`, `EtiquetaOriginal.tsx`). Al **preparar** (origen carta o vino), si hay original y Drive está configurado, la función copia ESE a `tmp/` (comprobando que está dentro de `marketing/carta/<marca>`, es JPEG y ≤ 8 MB) y responde `original: true`; si falla, usa la versión web con `original: false` y un `aviso`. El render y la IA reciben las medidas del fichero preparado.
 - **Fotos que ya existían**: no tienen original. `scripts/instagram/importar-originales.mjs` los sube desde una carpeta local según un CSV `id_plato,fichero[,tabla]` (con la misma Edge Function y la sesión de alguien con «Editar» en la carta), y con `--sugerir` propone los emparejamientos por nombre de fichero y de plato (revísalos a mano: p. ej. `arroz.jpg` sale como «Arroz con leche»). `--simular` convierte sin subir. Sugerencias de las fotos de `instagram-studio/propuesta/marca-base/assets/local` contra la demo: `scripts/instagram/originales-sugerencias-demo.csv`.
 
-**Límite conocido**: si la foto de la web cambia por otro camino (recorte en un ordenador potente, restaurar una foto anterior, scripts), el original de Drive no se toca y puede quedar desfasado hasta la próxima subida desde el formulario.
+**Límite conocido**: si la foto de la web cambia por otro camino (restaurar una foto anterior, scripts), el original de Drive no se toca y puede quedar desfasado hasta la próxima subida desde el formulario. (El recorte en un ordenador potente sí lo sube: ver abajo.)
+
+### En Supabase solo el sticker (08/11/2026)
+
+Decisión del dueño: «En Supabase no quiero guardar más que el sticker, para no pasarme de memoria». Medido en la demo: los originales de platos eran 103 ficheros y 58 MB frente a 8 MB de stickers.
+
+| | Supabase (bucket público) | Google Drive (`marketing/carta/<marca>/`) |
+|---|---|---|
+| Foto de plato / vino con fondo de carta | **solo** el sticker `<id>-carta-<ext>.webp` (`platos`, `vinos`) | el original `<nombre>-<id>.jpg` (`carta_fotos_originales`) |
+| Foto guardada con «Usar foto original» (o recorte fallido) | `<id>.<ext>`: es la foto de la web | también el original |
+| Vídeo del plato | el vídeo de la web `<id>-video.<mp4\|webm>` | el bruto `videos/<id>.<ext>` (uno por plato) |
+| Bebidas y cócteles | siguen con `<id>.<ext>` + sticker (aún no tienen original en Drive) | — |
+
+- **Subir** (`subirFotoCarta.ts`, `BUCKETS_SOLO_STICKER`): en platos y vinos con fondo de carta ya NO se sube `<id>.<ext>` al bucket; el original va solo a Drive con `subir_original` (`trasGuardarFotoCarta`). Si Drive falla, la foto de la web se guarda igual y sale «El original no se ha podido guardar en Drive».
+- **Leer el original** (`src/components/carta/originalDrive.ts` → `instagram-drive?accion=descargar_original` `{ tabla, id, tipo?: "foto"|"video", comprobar?: true }`): devuelve los bytes al panel (nada se copia a Supabase). Permiso: **«Editar» en la carta** (`gestor_carta`); 404 `{ sinOriginal: true }` si no hay. Solo sirve ficheros de `marketing/carta/<marca>` (o `…/videos`). Orden en el panel: Drive → original antiguo del bucket (`<id>.<ext>`, hasta que se mueva) → la foto de la web (el sticker), **avisando** «No hay original guardado: se usa la foto de la web». Lo usan:
+  - **«Cambiar fondo» / «Quitar fondo»** (`BotonCambiarFondo`, recibe `tabla` e `id`). Un original que viene de Drive queda marcado (`esOriginalDeDrive`) y al guardar **no se vuelve a subir** (no se recomprime); si pesa más de 5 MB se reduce para la carta, pero el de Drive no cambia.
+  - **«Volver a la foto original»** (vinos): carga el original de Drive con «Usar foto original» elegido; si aún es uno antiguo del bucket, la ficha vuelve a apuntar a él como antes.
+  - **Leer la etiqueta con IA** (vinos): usa la foto nueva o la de la web.
+  - **Recorte en un ordenador potente** (`recortarFotoGuardada`, trabajos del móvil): la ficha tenía `<id>.<ext>` como foto de la web; tras ponerle el sticker, ese fichero se sube a Drive y **solo si queda allí** se borra del bucket.
+  - **Vídeos** (`subirVideoPlato.ts`): `guardarOriginalVideo` → `subir_original_video` (subida reanudable de Drive, ≤ 50 MB, mp4/mov/m4v/webm/3gp/mkv mirando la cabecera); `buscarOriginalVideo` → `comprobar`; `descargarOriginalVideo` → `descargar_original` con `tipo: "video"`; el flujo potente sube el bruto a Drive y borra `pendientes/` siempre (si Drive falla, avisa). «Mandar a un dispositivo potente» baja el original de Drive y sube una copia temporal a `pendientes/`.
+  - **Instagram** (`preparar` con origen carta o vino) ya leía el original de Drive y copia una temporal a `tmp/` del bucket «instagram».
+- **Migrar lo que ya hay**: `scripts/carta/mover-originales-a-drive.mjs` (ver su cabecera). Por defecto **simula** (lista y suma MB, sin tocar nada); solo con `--aplicar` sube a Drive con la Edge Function (`subir_original` / `subir_original_video`, misma conversión que el panel), lo anota en `carta_fotos_originales`, comprueba en Drive tamaño y medidas (`descargar_original` con `comprobar`) y **solo entonces** borra del bucket lo que ninguna ficha usa como foto de la web. Nunca toca stickers, fotos de la web, vídeos de la web, `pendientes/` ni los «huérfanos» sin ficha (los lista). Se autentica **sin service_role**, con la sesión de una cuenta con «Editar» en la carta (`PANEL_JWT` o `PANEL_EMAIL` + `PANEL_PASSWORD`). Para simular sin sesión: `--sql` imprime una consulta de solo lectura y `--inventario <json>` lee su salida de `npx supabase db query --linked -o json`. `--limite N` para ir por tandas.
+  - Simulación en la DEMO (08/11/2026): **232 ficheros, 72,41 MB** de 198 fichas (platos: 103 fotos, 58,19 MB, y 1 vídeo, 0,90 MB; vinos: 128 fotos, 13,32 MB). 43 platos tienen 2 originales (p. ej. `.JPG` y `.webp`): se sube el de más píxeles y se borran los dos. 9 ficheros de vinos son de dos fichas (Magnum): se borran cuando las dos están en Drive. 4 platos sin foto en la web tienen original en el bucket (4,81 MB): también se mueven.
+- **Despliegue**: hay que volver a desplegar `instagram-drive` (acciones nuevas `descargar_original` y `subir_original_video`) y el panel. Sin migraciones. Orden: desplegar la función → el panel → `--simular` → `--aplicar` (primero en la demo).
+
+**Instagram en Supabase** (revisado el 08/11/2026 en la demo): el bucket «instagram» solo tiene temporales: `tmp/` (copias de fotos, se borran a las 24 h al preparar otra y cada noche con el cron `instagram-limpieza-bucket`) y `piezas/` de piezas aún sin publicar (3 en la demo, de 4 días; el cron las borra a los 7 días sin publicar, o al publicar tras guardarlas en Drive). Lo único permanente que puede dejar Instagram son las **pistas de audio** de los reels (`instagram-video/audio/<uuid>.<ext>`, que sube «Vídeo para reel»): la limpieza nocturna no toca `audio/` a propósito (`limpieza.ts`); en la demo no hay ninguna. También quedan (si existieran) las fotos subidas al bucket antes de Drive (`fotos/<marca>/subidas/`, `instagram_fotos.ruta`): en la demo, ninguna.
+
+**Límites**: el original de Drive no se borra al quitar la foto o el vídeo de una ficha (el panel no borra nada de Drive). El vídeo original pasa por la Edge Function (hasta 50 MB por petición): **sin verificar** contra Google desde aquí con un vídeo real de ese tamaño.
 
 ### Base de datos
 
