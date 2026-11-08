@@ -104,6 +104,13 @@ describe("selección y orden de los platos", () => {
     expect(nombres(contenido)).toEqual(["Flan"]);
   });
 
+  it("quita los platos elegidos a mano y no deja la categoría vacía", () => {
+    const contenido = contenidoPlatos(filas, { carta: "restaurante", idioma: "es", excluidos: new Set(["c2", "p1"]) });
+    expect(nombres(contenido)).toEqual(["Novedad", "Entrecot", "Sin orden", "Categoría nueva"]);
+    // POSTRES se queda sin platos: no hay sección (ni página).
+    expect(contenido.secciones.map((s) => s.clave)).toEqual(["NOVEDADES DEL DÍA", "CARNES", "BOCADILLOS"]);
+  });
+
   it("precio con unidad solo si no es «Unidad» ni «Ración»", () => {
     const contenido = contenidoPlatos(
       [
@@ -207,10 +214,15 @@ describe("vinos", () => {
   it("agrupa por tipo (orden de la web) y denominación, con la D.O. del vino como cabecera", () => {
     const contenido = contenidoVinos(filas, { carta: "restaurante", idioma: "es" });
     expect(contenido.secciones.map((s) => s.titulo)).toEqual(["Tintos", "Blancos", "Champagnes y espumosos"]);
-    expect(contenido.secciones.every((s) => s.paginaNueva)).toBe(true);
     expect(contenido.secciones[0].grupos[0].titulo).toBe("D.O. Ribera del Duero");
     expect(contenido.secciones[0].grupos[0].elementos.map((e) => e.nombre)).toEqual(["Pago de Carraovejas", "Pesquera"]);
     expect(contenido.secciones[0].grupos[0].elementos[0].copa).toBe(`Copa 6,00${NBSP}€`);
+  });
+
+  it("quita los vinos elegidos a mano y no deja denominaciones ni tipos vacíos", () => {
+    const contenido = contenidoVinos(filas, { carta: "restaurante", idioma: "es", excluidos: ["t2", "c1"] });
+    expect(contenido.secciones.map((s) => s.titulo)).toEqual(["Tintos", "Blancos"]);
+    expect(contenido.secciones[0].grupos[0].elementos.map((e) => e.nombre)).toEqual(["Pago de Carraovejas"]);
   });
 
   it("zona: región y, fuera de España, el país (traducido si hay columna)", () => {
