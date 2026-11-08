@@ -75,6 +75,16 @@ export interface ContextoPlantilla {
   urlLogo(pieza: string, color: string): string;
 }
 
+/**
+ * Cómo pone la plantilla la foto (08/11/2026, para usar las fotos de la carta):
+ * - "sangre": la foto CUBRE el lienzo (object-fit: cover). Solo vale una foto
+ *   que lo cubra ampliando como mucho un 5 % (AMPLIACION_MAXIMA).
+ * - "marco": la foto va ENTERA, sin recortar ni ampliar, dentro de un marco
+ *   sobre el fondo de la marca. Vale cualquier foto con el lado largo de
+ *   LADO_MINIMO_MARCO px o más (las de la carta, 1200×900 apaisadas, sí).
+ */
+export type EncajeFoto = "sangre" | "marco";
+
 export interface Plantilla {
   /** p. ej. "ct-foto-titular" */
   id: string;
@@ -95,6 +105,8 @@ export interface Plantilla {
   limites?: Partial<Record<CampoPieza, number>>;
   /** Tipos de foto admitidos (FOTOS → tipo), si usa foto. */
   tiposFoto?: readonly string[];
+  /** Cómo pone la foto (ver EncajeFoto). Por defecto "sangre". Solo plantillas con foto. */
+  encaje?: EncajeFoto;
   html(datos: DatosPieza, ctx: ContextoPlantilla): string;
 }
 
@@ -106,6 +118,12 @@ export function esc(texto: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/** Encaje de la foto de una plantilla (por defecto "sangre"). Acepta también el valor suelto. */
+export function encajeDe(plantilla?: Pick<Plantilla, "encaje"> | EncajeFoto | null): EncajeFoto {
+  const e = typeof plantilla === "string" ? plantilla : plantilla?.encaje;
+  return e === "marco" ? "marco" : "sangre";
 }
 
 /** true si la plantilla deja el titular opcional cuando hay cita. */

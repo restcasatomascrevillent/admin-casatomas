@@ -104,6 +104,37 @@ Código: `fotosDesdePlatos`, `fotoDesdePlato`, `idFotoCarta`, `platoIdDeFoto`, `
 y el recorrido de `EditorInstagram.test.tsx`. Sin migraciones. Hay que volver a desplegar
 `instagram-drive` (Supabase) y el panel con `/api/instagram-render` (Vercel).
 
+## Foto enmarcada: plantillas para las fotos de la carta (08/11/2026)
+
+Las fotos de la carta (tabla «Platos», bucket `platos`) miden **1200×900**, apaisadas y comprimidas
+para la web. Las plantillas a sangre (`ct-foto-titular`, `tz-foto-titular`) tendrían que ampliarlas
+más del 50 % y se verían borrosas. Para ellas (y para cualquier foto apaisada o pequeña) están las
+plantillas **«Foto enmarcada»**: `ct-marco` (Casa Tomás: papel, paspartú blanco y filete oro,
+Libre Baskerville) y `tz-marco` (Touza: negro, filete oro al 40 %, wordmark TOUZA, Cormorant y
+Montserrat). Post (que también es cada imagen del carrusel) y story.
+
+- **La foto va entera**: sin recortar ni ampliar (`max-width`/`max-height` al 100 % de su hueco: una
+  de 1200 px se reduce a unos 880 px de ancho; una pequeña se queda en su tamaño). En story, la
+  foto cae en el tercio central y los textos van arriba (antetítulo y titular) y abajo (nombre del
+  plato o cita, botón y pie), dentro de la zona segura del sistema de marca (220 / 320 / 64).
+- **Campos**: antetítulo, titular (6 palabras), `cita` (nombre del plato o una frase corta), CTA y
+  pie. Límites en `src/lib/instagram/plantillas/ct-marco|tz-marco/index.ts`, calibrados renderizando.
+- **Aptitud según la plantilla** (`encaje` en `Plantilla`: `"sangre"` por defecto o `"marco"`):
+  `esAptaPara(foto, formato, plantilla)` y `validarPieza` exigen a sangre cubrir ampliando ≤ 5 % y,
+  enmarcada, solo **lado largo ≥ 800 px** (`LADO_MINIMO_MARCO`). `motivoNoApta` (SelectorFoto)
+  hace lo mismo: con la enmarcada las fotos de la carta dejan de salir en gris; con una a sangre
+  explican «Usa la plantilla Foto enmarcada». En «Crear» (BibliotecaFotos) la plantilla la elige
+  después la IA, así que una foto vale si vale enmarcada.
+- **IA**: si una foto no cubre, `montar_pieza` elige la enmarcada y, si el modelo devuelve una a
+  sangre, el servidor la corrige y avisa; en campañas, una foto `carta:` con plantilla a sangre se
+  corrige igual (ver [instagram-ia.md](instagram-ia.md)).
+- Pruebas: `src/components/marketing/instagram/__tests__/aptitudMarco.test.ts` (aptitud),
+  `src/lib/instagram/__tests__/marco.render.test.ts` (Chromium: foto entera y sin ampliar, tercio
+  central, zona segura, textos largos) y `api/_lib/__tests__/instagram-marco.test.ts`
+  (`/api/instagram-render`, pieza y carrusel con Chromium; con `INSTAGRAM_CAPTURAS_MARCO=<carpeta>`
+  guarda 2 JPEG de muestra; las del 08/11/2026 están en
+  `instagram-studio/propuesta/evaluacion/capturas-marco/`).
+
 ## Vinos de la carta
 
 Desde el 05/11/2026 la biblioteca enseña también los **vinos de la carta** con foto (tabla `"Vinos"`, bucket público `vinos`), con el filtro **Vinos** y la etiqueta «Vino». Funciona igual que los platos:

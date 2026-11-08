@@ -44,15 +44,15 @@ function datosDe(id: string): DatosPieza {
 }
 
 describe("registro estático de plantillas", () => {
-  it("tiene las 4 plantillas del prototipo y todas cumplen el contrato", () => {
-    expect(PLANTILLAS.map((p) => p.id)).toEqual(["ct-foto-titular", "ct-tipografica", "tz-foto-titular", "tz-tipografica"]);
+  it("tiene las 4 plantillas del prototipo y las 2 enmarcadas, y todas cumplen el contrato", () => {
+    expect(PLANTILLAS.map((p) => p.id)).toEqual(["ct-foto-titular", "ct-marco", "ct-tipografica", "tz-foto-titular", "tz-marco", "tz-tipografica"]);
     for (const p of PLANTILLAS) expect(problemasDePlantilla(p), p.id).toEqual([]);
   });
   it("obtenerPlantilla y plantillasDe", () => {
     expect(obtenerPlantilla("ct-tipografica")?.titularOpcional).toBe(true);
     expect(obtenerPlantilla("no-existe")).toBeUndefined();
-    expect(plantillasDe("touza").map((p) => p.id)).toEqual(["tz-foto-titular", "tz-tipografica"]);
-    expect(plantillasDe("casa-tomas", "story").map((p) => p.id)).toEqual(["ct-foto-titular"]);
+    expect(plantillasDe("touza").map((p) => p.id)).toEqual(["tz-foto-titular", "tz-marco", "tz-tipografica"]);
+    expect(plantillasDe("casa-tomas", "story").map((p) => p.id)).toEqual(["ct-foto-titular", "ct-marco"]);
   });
   it("ct-tipografica admite cita (≤ 70 caracteres) y deja el titular opcional", () => {
     const p = obtenerPlantilla("ct-tipografica")!;
@@ -155,7 +155,7 @@ describe("construirDocumento", () => {
     expect(() => construirDocumento({ ...d, formato: "story" }, BASES)).toThrow(/no tiene formato story/);
   });
   it("todos los ejemplos validan y construyen", () => {
-    expect(EJEMPLOS).toHaveLength(12);
+    expect(EJEMPLOS).toHaveLength(16);
     for (const e of EJEMPLOS) {
       const r = validarPieza(e.json);
       expect(r.ok ? [] : r.problemas, e.id).toEqual([]);
