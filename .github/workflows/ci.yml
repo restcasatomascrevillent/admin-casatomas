@@ -106,6 +106,8 @@ jobs:
         run: npm run test:instagram-seguridad:db
       - name: Carruseles de Instagram, diapositivas, programar con el texto y limpieza de todas las imágenes (PGlite)
         run: npm run test:instagram-carrusel:db
+      - name: RRSS, editor IA, generación única por trabajo, topes diarios, cubo privado y rollback (PGlite)
+        run: npm run test:rrss:db
       - name: «Editar» para escribir en la carta y en el newsletter; con solo «Ver», consulta (PGlite)
         run: npm run test:permisos-carta-newsletter:db
       - name: Mesa fijada de una reserva, migración y rollback (PGlite)
