@@ -77,11 +77,10 @@ export interface GrupoCarta {
   elementos: ElementoCarta[];
 }
 
+/** Una sección de la carta impresa: una categoría de platos o un tipo de vino. Ocupa su propia cara. */
 export interface SeccionCarta {
   clave: string;
   titulo: string;
-  /** Empieza en página nueva (cada tipo de vino). */
-  paginaNueva: boolean;
   grupos: GrupoCarta[];
 }
 
@@ -257,14 +256,24 @@ export interface OpcionesContenido {
   idioma: IdiomaCarta;
   /** Categorías incluidas (claves exactas de la BD). Sin indicar: todas. */
   categorias?: ReadonlySet<string> | readonly string[];
+  /** Platos o vinos (id) que se quitan de la carta impresa a mano, para que su sección quepa en una cara. */
+  excluidos?: ReadonlySet<string> | readonly string[];
 }
 
-const incluida = (categorias: OpcionesContenido["categorias"], clave: string) =>
-  !categorias || (Array.isArray(categorias) ? categorias.includes(clave) : (categorias as ReadonlySet<string>).has(clave));
+const contiene = (lista: ReadonlySet<string> | readonly string[], clave: string) =>
+  Array.isArray(lista) ? lista.includes(clave) : (lista as ReadonlySet<string>).has(clave);
+
+const incluida = (categorias: OpcionesContenido["categorias"], clave: string) => !categorias || contiene(categorias, clave);
+
+const sinExcluidos = <T extends { id: string }>(filas: readonly T[], excluidos: OpcionesContenido["excluidos"]): T[] =>
+  excluidos ? filas.filter((fila) => !contiene(excluidos, fila.id)) : [...filas];
 
 export function contenidoPlatos(filas: readonly FilaPlato[], opciones: OpcionesContenido): ContenidoCarta {
   const { carta, idioma } = opciones;
-  const grupos = platosPorCategoria(filas, carta).filter(([clave]) => incluida(opciones.categorias, clave));
+  const grupos = platosPorCategoria(filas, carta)
+    .filter(([clave]) => incluida(opciones.categorias, clave))
+    .map(([clave, platos]): [string, FilaPlato[]] => [clave, sinExcluidos(platos, opciones.excluidos)])
+    .filter(([, platos]) => platos.length > 0);
   const clavesPorPlato = new Map(grupos.flatMap(([, platos]) => platos.map((p) => [p.id, clavesAlergenosFila(p)] as const)));
   const leyenda = numeracionAlergenos(
     [...clavesPorPlato.values()].flat(),
@@ -274,7 +283,6 @@ export function contenidoPlatos(filas: readonly FilaPlato[], opciones: OpcionesC
   const secciones: SeccionCarta[] = grupos.map(([clave, platos]) => ({
     clave,
     titulo: tituloCategoriaPlatos(clave, platos, idioma),
-    paginaNueva: false,
     grupos: [
       {
         titulo: null,
@@ -418,7 +426,13 @@ export function zonaVino(vino: FilaVino, idioma: IdiomaCarta): string | null {
 export function contenidoVinos(filas: readonly FilaVino[], opciones: OpcionesContenido): ContenidoCarta {
   const { carta, idioma } = opciones;
   const tipos = vinosAgrupados(filas, carta)
-    .map((t) => ({ ...t, denominaciones: t.denominaciones.filter(([clave]) => incluida(opciones.categorias, clave)) }))
+    .map((t) => ({
+      ...t,
+      denominaciones: t.denominaciones
+        .filter(([clave]) => incluida(opciones.categorias, clave))
+        .map(([clave, lista]): [string, FilaVino[]] => [clave, sinExcluidos(lista, opciones.excluidos)])
+        .filter(([, lista]) => lista.length > 0),
+    }))
     .filter((t) => t.denominaciones.length > 0);
   const vinos = tipos.flatMap((t) => t.denominaciones.flatMap(([, v]) => v));
   const clavesPorVino = new Map(vinos.map((v) => [v.id, clavesAlergenosFila(v)] as const));
@@ -430,7 +444,6 @@ export function contenidoVinos(filas: readonly FilaVino[], opciones: OpcionesCon
   const secciones: SeccionCarta[] = tipos.map(({ tipo, denominaciones }) => ({
     clave: tipo,
     titulo: TEXTOS[idioma].tiposVino[tipo],
-    paginaNueva: true,
     grupos: denominaciones.map(([clave, lista]) => ({
       titulo: tituloDenominacion(clave, lista, idioma),
       elementos: lista.map((vino) => ({
@@ -472,6 +485,12 @@ const CONJUNCION: Record<IdiomaCarta, string> = { es: "y", en: "and", fr: "et" }
 function listaEnFrase(partes: string[], idioma: IdiomaCarta): string {
   if (partes.length <= 1) return partes.join("");
   return `${partes.slice(0, -1).join(", ")} ${CONJUNCION[idioma]} ${partes[partes.length - 1]}`;
+}
+
+/** Nombre de una sección en castellano, como en la lista del diálogo («Carnes», «Tintos»), para los avisos del panel. */
+export function nombreSeccion(tipo: TipoCartaImpresa, clave: string): string {
+  if (tipo === "vinos") return TEXTOS.es.tiposVino[clave as TipoVino] ?? clave;
+  return etiquetaCategoria(clave);
 }
 
 /** ¿Hay algo publicado en esa carta? (para ofrecer o no la opción Touza). */

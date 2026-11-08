@@ -10,6 +10,9 @@
  * Con «sangrado de imprenta» la hoja crece 10 mm por lado: 3 mm de sangrado
  * (BleedBox) y marcas de corte fuera de él; el formato final (TrimBox) sigue
  * siendo el A5 o el A4 elegido.
+ *
+ * No genera una carta con una sección que no cabe en su cara (página marcada
+ * `desborda` por la maquetación): antes hay que reorganizarla.
  */
 import type { Font } from "@pdf-lib/fontkit";
 import type { PDFFont, PDFName, PDFOperator, PDFPage } from "pdf-lib";
@@ -90,7 +93,16 @@ export function trozosConInterletraje(texto: string, fuente: Font): (string | nu
   return partes.filter((parte) => parte !== "");
 }
 
+export class SeccionNoCabeError extends Error {
+  constructor(readonly paginas: number[]) {
+    super(`No cabe en su cara: página ${paginas.join(", ")}. Reorganiza la sección antes de generar el PDF.`);
+    this.name = "SeccionNoCabeError";
+  }
+}
+
 export async function crearPdfCarta(paginas: PaginaCarta[], recursos: RecursosPdf, opciones: OpcionesPdf): Promise<Uint8Array> {
+  const desbordadas = paginas.filter((pagina) => pagina.desborda).map((pagina) => pagina.numero);
+  if (desbordadas.length) throw new SeccionNoCabeError(desbordadas);
   const pdfLib = await import("pdf-lib");
   const {
     PDFDocument,
