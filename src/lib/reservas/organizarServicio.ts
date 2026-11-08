@@ -148,6 +148,11 @@ export interface EntradaOrg {
   minutoAhora?: number | null;
   /** Mesas que Configuración no ofrece al asignar. */
   excluidas?: ReadonlySet<string>;
+  /**
+   * Mesas que se usan solo como último recurso (para dejar paso; 08/11/2026). Cuestan `COSTES.alFinal` cada
+   * una, salvo para la reserva que ya está en ella (asignada a mano o fijada: se respeta).
+   */
+  alFinal?: ReadonlySet<string>;
   /** Sugerencia para un grupo grande (Reservado / mesa larga en el Salón). */
   sugerirGrupo?: (r: ReservaOrg) => string | null;
 }
@@ -165,6 +170,8 @@ export const COSTES = {
   cambiarMesa: 5,
   cambiarSala: 8,
   sinSitio: 100,
+  /** Por mesa «al final» (para dejar paso): solo antes que quedarse sin sitio. */
+  alFinal: 60,
   /** Por debajo de esta mejora no se propone mover nada (antes del servicio / empezado). */
   umbral: 4,
   umbralEmpezado: 20,
@@ -270,8 +277,12 @@ function mejorColocacion(
     const salaActual = ctx.mesaPorId.get(r.mesaIds[0])?.salaId ?? r.espacioId;
     return (salaActual === salaId ? COSTES.cambiarMesa : COSTES.cambiarSala) * factor;
   };
+  const alFinal = ctx.entrada.alFinal;
+  const costeAlFinal = (mesaIds: string[]) =>
+    alFinal ? mesaIds.filter((id) => alFinal.has(id) && !r.mesaIds.includes(id)).length * COSTES.alFinal : 0;
   let mejor: Colocacion | null = null;
-  const considerar = (c: Colocacion) => {
+  const considerar = (c0: Colocacion) => {
+    const c = { ...c0, coste: c0.coste + costeAlFinal(c0.mesaIds) };
     if (!mejor || c.coste < mejor.coste - 1e-9) mejor = c;
   };
 
@@ -431,7 +442,8 @@ function hacerPlan(ctx: Contexto, fijas: ReservaOrg[], aColocar: ReservaOrg[], e
       r.mesaIds.length === 0 || mismoConjunto(r.mesaIds, [mesaId])
         ? 0
         : (ctx.mesaPorId.get(r.mesaIds[0])?.salaId === salaId ? COSTES.cambiarMesa : COSTES.cambiarSala) * factor;
-    return (plazas - r.comensales) * COSTES.sillaVacia + mover;
+    const alFinal = ctx.entrada.alFinal?.has(mesaId) && !r.mesaIds.includes(mesaId) ? COSTES.alFinal : 0;
+    return (plazas - r.comensales) * COSTES.sillaVacia + mover + alFinal;
   };
   for (let vuelta = 0; vuelta < 3; vuelta++) {
     let mejoro = false;

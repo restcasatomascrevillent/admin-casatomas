@@ -15,7 +15,11 @@ export const CAMPOS_ASIGNACION = [
   "asignacion_aviso_activo",
   "asignacion_espacios_excluidos",
   "asignacion_mesas_excluidas",
+  "asignacion_mesas_al_final",
 ] as const;
+
+/** Llega con 20261108120000_mesas_usar_al_final.sql: si aún no existe, se guarda el resto sin ella. */
+export const CAMPOS_AL_FINAL = ["asignacion_mesas_al_final"] as const;
 
 const CAMPOS_OPCIONALES = [...CAMPOS_MODO_SERVICIO, ...CAMPOS_ASIGNACION] as const;
 
@@ -55,6 +59,8 @@ export interface ConfiguracionReservas {
   asignacion_espacios_excluidos?: string[] | null;
   /** Mesas que NO se ofrecen al asignar (vacío = todas). */
   asignacion_mesas_excluidas?: string[] | null;
+  /** Mesas que los repartos automáticos usan solo como último recurso (para dejar paso). */
+  asignacion_mesas_al_final?: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -76,6 +82,7 @@ const DEFAULTS: Omit<ConfiguracionReservas, "id" | "created_at" | "updated_at"> 
   asignacion_aviso_activo: true,
   asignacion_espacios_excluidos: [],
   asignacion_mesas_excluidas: [],
+  asignacion_mesas_al_final: [],
 };
 
 export function useConfiguracionReservas() {
@@ -130,7 +137,7 @@ export function useActualizarConfiguracionReservas() {
       // guardaron mirando si la fila devuelta trae la columna.
       // Primero se quitan SOLO las de asignación (la migración más nueva): si
       // las de modo servicio ya existen, sus cambios no se pierden en silencio.
-      for (const grupo of [CAMPOS_ASIGNACION, CAMPOS_OPCIONALES] as const) {
+      for (const grupo of [CAMPOS_AL_FINAL, CAMPOS_ASIGNACION, CAMPOS_OPCIONALES] as const) {
         if (!error || !esErrorEsquemaPendiente(error)) break;
         if (!grupo.some((campo) => campo in updates)) continue;
         const resto = { ...updates };

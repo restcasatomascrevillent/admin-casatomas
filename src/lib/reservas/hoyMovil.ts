@@ -138,6 +138,8 @@ export function mesasQueCaben(
   comensales: number,
   salaReserva: string | null,
   libre: (mesaId: string) => boolean,
+  /** Mesas que se usan solo como último recurso (para dejar paso): detrás de las demás de su sala. */
+  alFinal?: ReadonlySet<string>,
 ): MesaOpcion[] {
   const numero = (n: string) => {
     const v = parseInt(n, 10);
@@ -149,6 +151,7 @@ export function mesasQueCaben(
       (a, b) =>
         Number(b.espacioId === salaReserva) - Number(a.espacioId === salaReserva) ||
         a.salaNombre.localeCompare(b.salaNombre, "es") ||
+        Number(!!alFinal?.has(a.id)) - Number(!!alFinal?.has(b.id)) ||
         a.plazas - b.plazas ||
         numero(a.nombre) - numero(b.nombre) ||
         a.nombre.localeCompare(b.nombre, "es"),
