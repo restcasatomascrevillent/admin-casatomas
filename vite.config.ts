@@ -9,7 +9,7 @@ import { FICHEROS_FFMPEG, RUTA_FFMPEG, VERSION_FFMPEG_CORE } from "./src/compone
 // para que cada despliegue tire la caché anterior. En Vercel es el commit.
 const BUILD_ID = (process.env.VERCEL_GIT_COMMIT_SHA ?? Date.now().toString(36)).slice(0, 12);
 
-// Versión M.N que se ve en el pie del menú (docs/PROCESO-DE-CAMBIOS.md).
+// Versión X.Y.Z que se ve arriba del menú (docs/PROCESO-DE-CAMBIOS.md).
 const VERSION_APP = calcularVersion();
 
 // Publica dist/version.json con el id del build: el panel lo consulta (sin

@@ -1,15 +1,16 @@
-// Versión automática «M.N» (ver docs/PROCESO-DE-CAMBIOS.md):
-//   M = "mayor" de versionado.json (0 hasta la primera salida a producción).
-//   N = commits desde el último que cambió versionado.json, SIN contar merges:
-//       cada commit suma 1, y aceptar el PR staging → main (un merge) no suma,
-//       así producción queda con la misma versión que tenía la demo.
+// Versión de la app (docs/PROCESO-DE-CAMBIOS.md).
 //
-// Uso:  node scripts/version.mjs            → JSON con versión, commit, rama y entorno
-//       node scripts/version.mjs --ref origin/main --solo-version   → "0.12"
+//   - La versión publicada vive en versionado.json ("version": "1.2.3"). Solo la cambia
+//     scripts/release.mjs al preparar una release; al aceptarla se crea la etiqueta v1.2.3.
+//     La versión identifica una PUBLICACIÓN: no sube con cada commit.
+//   - main (producción) y release/X.Y.Z (candidata) muestran esa versión tal cual.
+//   - El resto (staging = demo, ramas de trabajo) muestra "X.Y.Z+<commit>": lo publicado más
+//     cambios todavía sin publicar (el panel enseña «v1.2.3» y lo detalla al pasar el ratón).
 //
-// Necesita el historial de git. Si el clon es superficial (Vercel, CI) intenta
-// completarlo; si no puede, la versión sale como "M.?" y avisa, en vez de
-// inventar un número.
+// Uso:  node scripts/version.mjs                                   → JSON con versión, commit, rama y entorno
+//       node scripts/version.mjs --ref origin/main --solo-version  → "1.2.3"
+//
+// No necesita el historial de git: lee versionado.json y el commit (en Vercel, de sus variables).
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -17,6 +18,7 @@ import path from "node:path";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FICHERO = "versionado.json";
+const RE_SEMVER = /^\d+\.\d+\.\d+$/;
 
 function git(args, cwd) {
   return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
@@ -32,41 +34,36 @@ export function detectarEntorno(env = process.env, rama = env.VERCEL_GIT_COMMIT_
   return rama === "staging" ? "demo" : "preview";
 }
 
+/** main y release/X.Y.Z llevan la versión exacta: son producción o la candidata a serlo. */
+export function esRamaDePublicacion(rama) {
+  return rama === "main" || /^release\/\d+\.\d+\.\d+$/.test(rama ?? "");
+}
+
 /**
- * @param {{ ref?: string, cwd?: string, env?: NodeJS.ProcessEnv, completarHistorial?: boolean }} opciones
+ * @param {{ ref?: string, cwd?: string, env?: NodeJS.ProcessEnv }} opciones
+ * @returns {{ version: string, publicada: string | null, desarrollo: boolean, commit: string | null, rama: string | null, entorno: "produccion" | "demo" | "preview" | "local", aviso: string | null }}
  */
-export function calcularVersion({ ref = "HEAD", cwd = RAIZ, env = process.env, completarHistorial = true } = {}) {
-  let aviso = null;
-  const textoConfig = intentar(() => (ref === "HEAD" ? readFileSync(path.join(cwd, FICHERO), "utf8") : git(["show", `${ref}:${FICHERO}`], cwd)));
-  const mayor = textoConfig === null ? null : Number(JSON.parse(textoConfig).mayor);
-  if (mayor === null || !Number.isInteger(mayor) || mayor < 0) {
-    return { version: "sin versionar", mayor: null, numero: null, commit: null, rama: null, entorno: detectarEntorno(env), aviso: `falta ${FICHERO}` };
-  }
+export function calcularVersion({ ref = "HEAD", cwd = RAIZ, env = process.env } = {}) {
+  const commitLargo = (ref === "HEAD" && env.VERCEL_GIT_COMMIT_SHA) || intentar(() => git(["rev-parse", ref], cwd));
+  const commit = commitLargo ? commitLargo.slice(0, 7) : null;
+  const ramaGit = intentar(() => git(["rev-parse", "--abbrev-ref", ref], cwd));
+  const rama = (ref === "HEAD" && env.VERCEL_GIT_COMMIT_REF) || (ramaGit && ramaGit !== "HEAD" ? ramaGit.replace(/^origin\//, "") : null);
+  const entorno = detectarEntorno(env, rama ?? undefined);
 
-  const superficial = () => intentar(() => git(["rev-parse", "--is-shallow-repository"], cwd));
-  if (superficial() === "true" && completarHistorial) intentar(() => git(["fetch", "--unshallow", "--quiet"], cwd));
-  let numero = null;
-  const estado = superficial();
-  if (estado === "false") {
-    const base = intentar(() => git(["log", "-1", "--format=%H", ref, "--", FICHERO], cwd));
-    const cuenta = base ? intentar(() => git(["rev-list", "--count", "--no-merges", `${base}..${ref}`], cwd)) : null;
-    numero = cuenta === null ? null : Number(cuenta);
-    if (!base) aviso = `${FICHERO} todavía no está en ningún commit`;
-  } else {
-    // Contar en un clon incompleto daría un número falso: mejor "M.?" y el motivo.
-    aviso = estado === "true" ? "historial de git incompleto" : "sin historial de git";
+  const texto = intentar(() => (ref === "HEAD" ? readFileSync(path.join(cwd, FICHERO), "utf8") : git(["show", `${ref}:${FICHERO}`], cwd)));
+  const publicada = intentar(() => JSON.parse(texto).version);
+  if (!RE_SEMVER.test(publicada ?? "")) {
+    return { version: "sin versionar", publicada: null, desarrollo: true, commit, rama, entorno, aviso: `falta "version": "X.Y.Z" en ${FICHERO}` };
   }
-
-  const commit = (ref === "HEAD" && env.VERCEL_GIT_COMMIT_SHA) || intentar(() => git(["rev-parse", ref], cwd));
-  const rama = (ref === "HEAD" && env.VERCEL_GIT_COMMIT_REF) || intentar(() => git(["rev-parse", "--abbrev-ref", ref], cwd));
+  const desarrollo = !(entorno === "produccion" || esRamaDePublicacion(rama));
   return {
-    version: `${mayor}.${numero ?? "?"}`,
-    mayor,
-    numero,
-    commit: commit ? commit.slice(0, 7) : null,
+    version: desarrollo ? `${publicada}+${commit ?? "dev"}` : publicada,
+    publicada,
+    desarrollo,
+    commit,
     rama,
-    entorno: detectarEntorno(env, rama ?? undefined),
-    aviso,
+    entorno,
+    aviso: null,
   };
 }
 
