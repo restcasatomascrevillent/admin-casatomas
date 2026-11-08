@@ -7,13 +7,15 @@
  * exigen que todas las de PLANTILLAS lo cumplan.
  */
 import { FORMATOS, MARCAS, type FormatoId, type MarcaId } from "../tokens.js";
-import { CAMPOS_PIEZA, type CampoPieza, type Plantilla } from "../tipos.js";
+import { CAMPOS_PIEZA, encajeDe, type CampoPieza, type Plantilla } from "../tipos.js";
 import ctFotoTitular from "./ct-foto-titular/index.js";
+import ctMarco from "./ct-marco/index.js";
 import ctTipografica from "./ct-tipografica/index.js";
 import tzFotoTitular from "./tz-foto-titular/index.js";
+import tzMarco from "./tz-marco/index.js";
 import tzTipografica from "./tz-tipografica/index.js";
 
-const TODAS: readonly Plantilla[] = [ctFotoTitular, ctTipografica, tzFotoTitular, tzTipografica];
+const TODAS: readonly Plantilla[] = [ctFotoTitular, ctMarco, ctTipografica, tzFotoTitular, tzMarco, tzTipografica];
 
 /** Todas las plantillas, ordenadas por id. */
 export const PLANTILLAS: readonly Plantilla[] = [...TODAS].sort((a, b) => a.id.localeCompare(b.id));
@@ -28,6 +30,15 @@ export function obtenerPlantilla(id: string): Plantilla | undefined {
 /** Plantillas de una marca (y, si se pide, que tengan ese formato), ordenadas por id. */
 export function plantillasDe(marca: MarcaId, formato?: FormatoId): Plantilla[] {
   return PLANTILLAS.filter((p) => p.marca === marca && (!formato || p.formatos.includes(formato)));
+}
+
+/**
+ * Plantilla enmarcada («Foto enmarcada», encaje «marco») de la marca para ese
+ * formato, o undefined. Es la que vale para las fotos que no cubren el lienzo
+ * (las de la carta, 1200×900 apaisadas).
+ */
+export function plantillaEnmarcada(marca: MarcaId, formato: FormatoId): Plantilla | undefined {
+  return plantillasDe(marca, formato).find((p) => p.admitidos.includes("foto") && encajeDe(p) === "marco");
 }
 
 /** Comprueba que un objeto cumple el contrato Plantilla. Devuelve la lista de problemas ([] = bien). */
@@ -78,6 +89,10 @@ export function problemasDePlantilla(p: unknown): string[] {
   }
   if (o.tiposFoto !== undefined && (!Array.isArray(o.tiposFoto) || o.tiposFoto.some((t) => typeof t !== "string"))) {
     errores.push("«tiposFoto» debe ser una lista de textos");
+  }
+  if (o.encaje !== undefined && o.encaje !== "sangre" && o.encaje !== "marco") errores.push("«encaje» debe ser «sangre» o «marco»");
+  if (o.encaje !== undefined && Array.isArray(o.admitidos) && !(o.admitidos as string[]).includes("foto")) {
+    errores.push("«encaje» solo tiene sentido en una plantilla con foto");
   }
   if (typeof o.html !== "function") errores.push("«html» debe ser una función (datos, ctx) => string");
   return errores;

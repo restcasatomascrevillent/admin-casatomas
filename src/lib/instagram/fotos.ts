@@ -18,6 +18,7 @@
  * Las funciones que reciben `fotos` aceptan cualquier catálogo (combinarCatalogo).
  */
 import { FORMATOS, MARCAS, type FormatoId, type MarcaId } from "./tokens.js";
+import { encajeDe, type EncajeFoto, type Plantilla } from "./tipos.js";
 
 export const TIPOS_FOTO = ["plato", "sala", "bebida", "ambiente", "barra", "coctel", "interior"] as const;
 export type TipoFoto = (typeof TIPOS_FOTO)[number];
@@ -83,13 +84,36 @@ export function escalaParaCubrir(ancho: number, alto: number, lienzoAncho: numbe
 }
 
 /**
- * ¿Se puede usar la foto en ese formato? Es la MISMA regla que aplica
- * validarPieza (cubrir el lienzo ampliando como mucho un 5 %), para que lo que
- * ofrece el selector de la UI nunca lo rechace luego la validación.
+ * Lado largo mínimo de una foto para la plantilla enmarcada (encaje «marco»):
+ * la foto va entera y sin ampliar dentro de unos 900 px de ancho, así que con
+ * 800 px se ve nítida (las de la carta miden 1200×900).
  */
-export function esAptaPara(foto: Pick<Foto, "ancho" | "alto">, formato: FormatoId): boolean {
+export const LADO_MINIMO_MARCO = 800;
+
+/** ¿La foto CUBRE el formato ampliando como mucho un 5 %? (regla de las plantillas a sangre). */
+export function cubreFormato(foto: Pick<Foto, "ancho" | "alto">, formato: FormatoId): boolean {
   const f = FORMATOS[formato];
   return escalaParaCubrir(foto.ancho, foto.alto, f.ancho, f.alto) <= AMPLIACION_MAXIMA;
+}
+
+/** ¿Vale la foto para una plantilla enmarcada? (lado largo ≥ LADO_MINIMO_MARCO; no hace falta que cubra). */
+export function valeParaMarco(foto: Pick<Foto, "ancho" | "alto">): boolean {
+  return Math.max(foto.ancho, foto.alto) >= LADO_MINIMO_MARCO;
+}
+
+/**
+ * ¿Se puede usar la foto en ese formato con esa plantilla? Es la MISMA regla
+ * que aplica validarPieza, para que lo que ofrece el selector de la UI nunca
+ * lo rechace luego la validación:
+ * - plantilla a sangre (o sin plantilla): cubrir el lienzo ampliando ≤ 5 %;
+ * - plantilla enmarcada (encaje «marco»): lado largo ≥ 800 px.
+ */
+export function esAptaPara(
+  foto: Pick<Foto, "ancho" | "alto">,
+  formato: FormatoId,
+  plantilla?: Pick<Plantilla, "encaje"> | EncajeFoto | null,
+): boolean {
+  return encajeDe(plantilla) === "marco" ? valeParaMarco(foto) : cubreFormato(foto, formato);
 }
 
 /** Foto por id (en el catálogo dado; por defecto, el estático), o undefined. */
