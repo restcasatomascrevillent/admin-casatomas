@@ -10,7 +10,7 @@
  * montajes por sesión (MAX_MONTAJES_SESION).
  */
 import { ErrorIA, llamar, type OpcionesLlamada, type TonoIA } from "@/components/instagram/ia/api";
-import { obtenerPlantilla, plantillasDe, type MarcaId } from "@/lib/instagram";
+import { obtenerPlantilla, plantillaPara, type MarcaId } from "@/lib/instagram";
 import {
   MAX_FOTOS_CARRUSEL,
   type DiapositivaMontada,
@@ -138,10 +138,9 @@ const CAPTIONS: Record<TonoIA, string[]> = {
   retranca: ["Esto no se pesca en el súper. Avisados quedáis.", "Llegó, lo vimos y no pudimos callarlo. Mientras dure, que dura poco."],
 };
 
-/** Plantilla con foto de la marca (la primera que tenga «foto» entre sus campos). */
+/** Plantilla con foto de la marca: la portada a sangre (plantillas v2). */
 function plantillaConFoto(marca: MarcaId): string {
-  const conFoto = plantillasDe(marca).find((p) => p.admitidos.includes("foto"));
-  return conFoto?.id ?? (marca === "touza" ? "tz-foto-titular" : "ct-foto-titular");
+  return plantillaPara(marca, "post", "portada", "sangre")?.id ?? (marca === "touza" ? "tz-portada" : "ct-portada");
 }
 
 /**

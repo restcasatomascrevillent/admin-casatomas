@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   CAMPOS_PIEZA,
   MARCAS_IDS,
-  plantillasDe,
+  plantillasVisibles,
   type CampoPieza,
   type FormatoId,
   type MarcaId,
@@ -61,7 +61,7 @@ export function FormularioPieza({
   const obligatorio = (c: CampoPieza) =>
     c === "titular" ? !plantilla?.titularOpcional : (plantilla?.obligatorios ?? []).includes(c);
   const limite = (c: CampoPieza) => plantilla?.limites?.[c];
-  const plantillas = plantillasDe(borrador.marca);
+  const plantillas = plantillasVisibles(borrador.marca, undefined, borrador.plantilla);
   const maxFilas = limite("lista") ?? 8;
 
   const campoTexto = (campo: CampoTexto) => {

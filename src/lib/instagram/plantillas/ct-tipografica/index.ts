@@ -39,6 +39,8 @@ const plantilla: Plantilla = {
     cita: 70,
     pie: 48,
   },
+  // Clásica (08/11/2026): la sustituye «ct-frase».
+  clasica: true,
 
   html(datos, ctx) {
     const pie = datos.pie ?? PIE_POR_DEFECTO;

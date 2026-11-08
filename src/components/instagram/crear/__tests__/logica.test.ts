@@ -66,8 +66,8 @@ describe("estado de Crear", () => {
       avisos: [],
     });
     expect(r.fotos).toEqual([B, A, C]);
-    // Plantilla de Touza en Casa Tomás → la de por defecto.
-    expect(ajusteDe(r, B)).toEqual({ plantilla: "ct-foto-titular", datos: { titular: "Portada" }, altText: "Una mesa" });
+    // Plantilla de Touza en Casa Tomás → la de por defecto (la portada a sangre).
+    expect(ajusteDe(r, B)).toEqual({ plantilla: "ct-portada", datos: { titular: "Portada" }, altText: "Una mesa" });
     expect(ajusteDe(r, A).datos).toEqual({ antetitulo: "Hoy", titular: "Segunda" });
     expect(r.hashtags).toEqual(["#Marisco", "#Crevillent"]);
     expect(r.avisos.join(" ")).toMatch(/no ha usado una foto/);
@@ -150,7 +150,8 @@ describe("Montar con IA (cliente)", () => {
     const r = await m({ marca: "touza", fotos: [{ id: A, url: "a" }, { id: B, url: "b" }] });
     expect(m.peticiones).toHaveLength(1);
     expect(r.formato).toBe("carrusel");
-    expect(r.diapositivas.every((d) => d.plantilla === "tz-foto-titular")).toBe(true);
+    // Como el servidor: portada y cierre.
+    expect(r.diapositivas.map((d) => d.plantilla)).toEqual(["tz-portada", "tz-cierre"]);
     expect(r.horaSugerida).toBeNull();
   });
 });

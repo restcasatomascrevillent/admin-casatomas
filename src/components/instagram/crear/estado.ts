@@ -8,7 +8,7 @@
  * tiene su «ajuste» en `ajustes` (por id): si se reordena o se quita una foto,
  * su ajuste la acompaña y no hay que reconciliar listas.
  */
-import { obtenerPlantilla, plantillasDe, type FormatoId, type MarcaId, type Plantilla } from "@/lib/instagram";
+import { obtenerPlantilla, plantillaPara, plantillasVisibles, type FormatoId, type MarcaId, type Plantilla } from "@/lib/instagram";
 import { MAX_FOTOS_CARRUSEL, type FormatoMontado, type RespuestaMontar } from "@/lib/instagram/montar";
 import { borradorDesdeDatos, borradorVacio, piezaDesdeBorrador } from "@/components/marketing/instagram/pieza";
 import type { TonoIA } from "@/components/instagram/ia/api";
@@ -83,9 +83,13 @@ export const NOMBRE_FORMATO_MONTADO: Record<FormatoMontado, string> = {
   story: "Story",
 };
 
-/** Plantillas de la marca que llevan foto y valen para ese formato. */
-export function plantillasConFoto(marca: MarcaId, formato: FormatoId): Plantilla[] {
-  return plantillasDe(marca, formato).filter((p) => p.admitidos.includes("foto"));
+/**
+ * Plantillas de la marca que llevan foto y valen para ese formato, por papel
+ * (portada, plato, cierre). Sin las clásicas, salvo `actual` si la pieza ya la
+ * lleva (una pieza guardada con una clásica se sigue viendo en el selector).
+ */
+export function plantillasConFoto(marca: MarcaId, formato: FormatoId, actual?: string): Plantilla[] {
+  return plantillasVisibles(marca, formato, actual).filter((p) => p.admitidos.includes("foto"));
 }
 
 /** La plantilla vale para esa marca y formato y lleva foto. */
@@ -94,8 +98,10 @@ export function plantillaValida(id: string, marca: MarcaId, formato: FormatoId):
   return !!p && p.marca === marca && p.formatos.includes(formato) && p.admitidos.includes("foto");
 }
 
+/** Ajuste por defecto: la portada a sangre de la marca. */
 export function ajusteBase(marca: MarcaId, formato: FormatoId): AjusteImagen {
-  return { plantilla: plantillasConFoto(marca, formato)[0]?.id ?? "", datos: {}, altText: "" };
+  const portada = plantillaPara(marca, formato, "portada", "sangre") ?? plantillasConFoto(marca, formato)[0];
+  return { plantilla: portada?.id ?? "", datos: {}, altText: "" };
 }
 
 /** Ajuste de una foto, o el de por defecto si aún no tiene (o si su plantilla ya no vale). */

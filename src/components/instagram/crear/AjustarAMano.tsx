@@ -46,7 +46,7 @@ export function AjustarAMano({ estado, abierto, onAbierto, actual, onActual, onM
   const ajuste = foto ? ajusteDe(estado, foto) : null;
   const plantilla = ajuste ? obtenerPlantilla(ajuste.plantilla) : undefined;
   const campos = CAMPOS_ROTULO.filter((c) => plantilla?.admitidos.includes(c));
-  const opcionesPlantilla = plantillasConFoto(estado.marca, formatoPieza);
+  const opcionesPlantilla = plantillasConFoto(estado.marca, formatoPieza, ajuste?.plantilla);
 
   return (
     <Collapsible open={abierto} onOpenChange={onAbierto} className="rounded-md border">
@@ -120,7 +120,7 @@ export function AjustarAMano({ estado, abierto, onAbierto, actual, onActual, onM
                 <SelectContent>
                   {opcionesPlantilla.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
-                      {p.nombre}
+                      {p.clasica ? `${p.nombre} (clásica)` : p.nombre}
                     </SelectItem>
                   ))}
                 </SelectContent>

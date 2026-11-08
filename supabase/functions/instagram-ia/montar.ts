@@ -28,6 +28,13 @@
  *   por no cubrir) va en la plantilla enmarcada («ct-marco»/«tz-marco»). Se
  *   le dice a la IA (DATOS.fotos[].cubre) y, si aun así devuelve una a
  *   sangre, se corrige a la enmarcada y se avisa.
+ * - Papeles (plantillas v2, 08/11/2026): como los reels del sistema de marca,
+ *   intro → planos con rótulo → cierre. En un carrusel la PRIMERA imagen lleva
+ *   la plantilla «portada», las del medio «plato» y la ÚLTIMA «cierre»; un post
+ *   o una story, «portada». El servidor la elige por la posición y el encaje
+ *   (plantillaPara) aunque la IA diga otra; el botón solo va en la última
+ *   imagen del carrusel (en las demás se quita y se avisa) y un cierre sin
+ *   texto lleva el lema de la marca. Las plantillas clásicas no se eligen.
  * - Validadores: los de sugerir_texto para el texto (precios, alérgenos,
  *   platos, datos personales, TOUZA sin reservas…), los de sugerir_rotulos para
  *   los rótulos de cada imagen con los límites de SU plantilla, plantillas que
@@ -78,7 +85,7 @@ import {
   type Mensaje,
   type ParteMensaje,
 } from "./ia.ts";
-import { PLANTILLAS_IA, plantillaIA, type PlantillaIA } from "./plantillas.ts";
+import { PLANTILLAS_IA, plantillaIA, plantillaPara, type PapelIA, type PlantillaIA } from "./plantillas.ts";
 import { DESCRIPCION_TONO, NOMBRE_MARCA, REGLAS_COMUNES, REGLAS_ESTILO, REGLAS_MARCA, REGLAS_REDACCION, TONOS, type Tono } from "./prompts.ts";
 import { rutaBucketDeUrl, rutaTmpDeUrl, urlPublica, vinoParaModelo, type FilaVino } from "./vision.ts";
 
@@ -175,10 +182,26 @@ export function formatoFinal(pedido: FormatoMontado | "auto", nFotos: number): F
 /** Formato de cada imagen: el carrusel es una serie de «post» (4:5). */
 const formatoImagen = (f: FormatoMontado): "post" | "story" => (f === "story" ? "story" : "post");
 
-/** Plantillas de la marca con foto que admiten el formato de imagen. */
+/** Plantillas v2 (no clásicas) de la marca con foto y papel que admiten el formato de imagen. */
 export function plantillasMontar(marca: MarcaIA, formato: FormatoMontado): PlantillaIA[] {
-  return PLANTILLAS_IA.filter((p) => p.marca === marca && p.conFoto && p.formatos.includes(formatoImagen(formato)));
+  return PLANTILLAS_IA.filter(
+    (p) => p.marca === marca && !p.clasica && p.conFoto && !!p.papel && p.papel !== "tipografica" && p.formatos.includes(formatoImagen(formato)),
+  );
 }
+
+/** Papel de la imagen i (desde 0) de n: en un carrusel, portada → platos → cierre; si no, portada. */
+export function papelDe(i: number, n: number, formato: FormatoMontado): PapelIA {
+  if (formato !== "carrusel" || i === 0) return "portada";
+  return i === n - 1 ? "cierre" : "plato";
+}
+
+/** Lema o frase de marca para un cierre que llega sin texto (brand-voice.html del sistema de marca). */
+export const LEMA_CIERRE: Record<MarcaIA, string> = {
+  "casa-tomas": "Nunca é longo o camiño que conduce á casa dun amigo.",
+  touza: "Touza no es solo un bar; es una declaración de intenciones.",
+};
+
+const NOMBRE_PAPEL: Record<PapelIA, string> = { portada: "portada", plato: "imagen del medio", cierre: "cierre", tipografica: "tipográfica" };
 
 // ── Prompt y esquema ────────────────────────────────────────────────────────
 
@@ -212,17 +235,27 @@ export const ESQUEMA_MONTAR = {
 } as const;
 
 export function promptSistemaMontar(marca: MarcaIA, formato: FormatoMontado, plantillas: PlantillaIA[], nFotos: number): string {
-  const lista = plantillas
+  const ORDEN: PapelIA[] = ["portada", "plato", "cierre", "tipografica"];
+  const lista = [...plantillas]
+    .sort((x, y) => ORDEN.indexOf(x.papel ?? "portada") - ORDEN.indexOf(y.papel ?? "portada"))
     .map(
       (p) =>
-        `- «${p.id}»${p.encaje === "marco" ? " (Foto enmarcada: la foto entera, sin ampliar)" : " (foto a sangre: la amplía hasta cubrir)"}: ${p.campos.map((c) => `${c} (máx. ${p.limites[c] ?? 60}${c === "titular" ? ", 6 palabras" : ""})`).join(", ")}`,
+        `- «${p.id}» (${NOMBRE_PAPEL[p.papel ?? "portada"]}, ${p.encaje === "marco" ? "Foto enmarcada: la foto entera, sin ampliar" : "foto a sangre: la amplía hasta cubrir"}): ${p.campos.map((c) => `${c} (máx. ${p.limites[c] ?? 60}${c === "titular" ? ", 6 palabras" : ""})`).join(", ")}`,
     )
     .join("\n");
-  const marco = plantillas.find((p) => p.encaje === "marco");
-  const cuantas =
-    formato === "carrusel"
-      ? `un CARRUSEL con las ${nFotos} fotos (cada foto una vez, ninguna fuera), ordenadas para contar algo: la PRIMERA es la portada, la que más engancha.`
-      : `un ${formato === "story" ? "STORY" : "POST"} de UNA imagen: elige la mejor foto de las ${nFotos}.`;
+  const marco = plantillas.find((p) => p.encaje === "marco" && p.papel === "portada") ?? plantillas.find((p) => p.encaje === "marco");
+  const carrusel = formato === "carrusel";
+  const cuantas = carrusel
+    ? `un CARRUSEL con las ${nFotos} fotos (cada foto una vez, ninguna fuera), ordenadas para contar algo: la PRIMERA es la portada, la que más engancha, y la ÚLTIMA cierra.`
+    : `un ${formato === "story" ? "STORY" : "POST"} de UNA imagen: elige la mejor foto de las ${nFotos}.`;
+  const papeles = carrusel
+    ? [
+        "Cada imagen tiene un papel, como en los reels de la marca (intro, planos con rótulo y cierre), y la plantilla va según el papel:",
+        "  - Imagen 1, PORTADA (plantilla de portada): el titular cuenta la idea de toda la serie (no el nombre de un plato); «antetitulo» solo si aporta (p. ej. «Nuevo», «Esta semana»); «cita», una frase corta o \"\". Sin «cta».",
+        "  - Imágenes del medio, PLATO (plantilla de imagen del medio): limpias. «titular» = el nombre del plato o del cóctel, tal cual y corto; «antetitulo» (la categoría) y «cita» (un detalle) solo si aportan. Nada de botón.",
+        `  - Última imagen, CIERRE (plantilla de cierre): «cita» = ${marca === "touza" ? `una frase corta de la marca (p. ej. «${LEMA_CIERRE.touza}»)` : `el lema en gallego, tal cual: «${LEMA_CIERRE["casa-tomas"]}»`}; «cta», UNA de DATOS.guia.ctas${marca === "touza" ? " (nunca «Reservar»: Touza no admite reservas)" : ""}; «titular» "" salvo que haga falta.`,
+      ]
+    : ["La imagen es la PORTADA (plantilla de portada): titular con la idea; «antetitulo», «cita» y «cta» solo si aportan."];
   return [
     `Eres quien monta las publicaciones de Instagram de ${NOMBRE_MARCA[marca]} (Crevillent, Alicante). Sigue la guía de la marca (DATOS.guia).`,
     "Llegan unas fotos numeradas (Foto 1, Foto 2…). MÍRALAS: la publicación va de lo que se ve en ellas.",
@@ -231,12 +264,13 @@ export function promptSistemaMontar(marca: MarcaIA, formato: FormatoMontado, pla
     "- «resumen»: UNA frase con lo que has entendido de las fotos (p. ej. «6 fotos de marisco fresco: centolla, nécoras y percebes»).",
     "- «diapositivas»: en el orden de publicación. Cada una con «foto» (el número de la foto), «plantilla» (SOLO una de esta lista), sus rótulos y «alt_text».",
     lista,
+    ...papeles,
     ...(marco
       ? [
-          `  Si una foto tiene «cubre»: false en DATOS.fotos (las de la carta, 1200×900, o cualquiera apaisada o pequeña), usa SOLO «${marco.id}»: una plantilla a sangre la ampliaría y se vería borrosa. En «${marco.id}», «cita» es el nombre del plato (tal cual en DATOS.carta) o una frase corta; si no lo sabes, "".`,
+          `  Si una foto tiene «cubre»: false en DATOS.fotos (las de la carta, 1200×900, o cualquiera apaisada o pequeña), usa SOLO plantillas «Foto enmarcada» (como «${marco.id}»): una a sangre la ampliaría y se vería borrosa. Si no sabes el nombre del plato, "".`,
         ]
       : []),
-    "  Rótulos en tipo frase, concretos y sobre lo que se ve en ESA foto; el titular es obligatorio (6 palabras como mucho). La «cta» solo de DATOS.guia.ctas, o \"\". Los campos que la plantilla no usa van vacíos (\"\").",
+    "  Rótulos en tipo frase, concretos, CORTOS y sobre lo que se ve en ESA foto: menos es más, nada de relleno. La «cta» solo de DATOS.guia.ctas, o \"\". Los campos que la plantilla no usa van vacíos (\"\").",
     "  «alt_text»: UNA frase literal de esa foto (qué hay, sobre qué, el fondo), sin adjetivos de venta.",
     "- «gancho» y «caption» (SIN hashtags, empieza por el gancho, de 150 a 350 caracteres; en un carrusel puede llegar a 500 si hace falta contar la serie).",
     "- «hashtags»: de 3 a 5, concretos y locales. Nada de genéricos (#foodie, #instafood, #restaurante).",
@@ -283,10 +317,11 @@ export function revisarMontaje(
   const correcciones: string[] = [];
   const errores: string[] = [];
   const validas = plantillasMontar(ctx.marca, formato);
-  const sangre = validas.find((p) => p.encaje !== "marco");
-  const marco = validas.find((p) => p.encaje === "marco");
-  const diapositivas: DiapositivaMontada[] = [];
+  const fImg = formatoImagen(formato);
   const usadas = new Set<string>();
+
+  // 1.ª pasada: las imágenes que valen (foto recibida y sin repetir), en el orden de la IA.
+  const elegidas: Array<{ n: number; foto: FotoMontar; d: Record<string, unknown> }> = [];
   for (const d of Array.isArray(bruto.diapositivas) ? (bruto.diapositivas as Array<Record<string, unknown>>) : []) {
     const n = Number(d?.foto);
     const foto = Number.isInteger(n) && n >= 1 && n <= fotos.length ? fotos[n - 1] : null;
@@ -298,47 +333,59 @@ export function revisarMontaje(
       correcciones.push(`La foto ${n} salía dos veces: se deja una.`);
       continue;
     }
-    // Una foto que no cubre el lienzo (las de la carta) solo vale enmarcada.
-    const cubre = fotoCubre(foto, formatoImagen(formato));
-    const porDefecto = (cubre ? sangre : marco) ?? validas[0];
-    let plantilla = plantillaIA(d.plantilla);
-    if (!plantilla || !validas.includes(plantilla)) {
-      if (!porDefecto) {
-        errores.push(`No hay plantilla con foto de ${ctx.marca} para ${formato}.`);
-        continue;
-      }
-      correcciones.push(`La plantilla «${textoDe(d.plantilla, 60)}» no vale para ${formato === "carrusel" ? "un carrusel" : `un ${formato}`} de esta marca: se usa «${porDefecto.id}».`);
-      plantilla = porDefecto;
-    } else if (!cubre && plantilla.encaje !== "marco" && marco) {
+    usadas.add(foto.id);
+    elegidas.push({ n, foto, d: d && typeof d === "object" ? { ...d } : {} });
+  }
+  if (formato !== "carrusel" && elegidas.length > 1) {
+    correcciones.push(`Un ${formato} lleva una sola imagen: se queda la primera.`);
+    for (const e of elegidas.slice(1)) usadas.delete(e.foto.id);
+    elegidas.length = 1;
+  }
+
+  // 2.ª pasada: plantilla según el papel (la posición) y el encaje (si la foto cubre).
+  const diapositivas: DiapositivaMontada[] = [];
+  elegidas.forEach(({ n, foto, d }, i) => {
+    const papel = papelDe(i, elegidas.length, formato);
+    const cubre = fotoCubre(foto, fImg);
+    const encaje = cubre ? "sangre" : "marco";
+    const pedida = plantillaIA(d.plantilla);
+    const plantilla = plantillaPara(ctx.marca, fImg, papel, encaje) ?? validas.find((p) => (p.encaje ?? "sangre") === encaje) ?? validas[0];
+    if (!plantilla) {
+      errores.push(`No hay plantilla con foto de ${ctx.marca} para ${formato}.`);
+      return;
+    }
+    if (!cubre && pedida && pedida.conFoto && (pedida.encaje ?? "sangre") !== "marco") {
       const medidas = foto.ancho && foto.alto ? ` (${foto.ancho}×${foto.alto})` : foto.id.startsWith("carta:") ? " (foto de la carta)" : "";
       correcciones.push(
-        `Foto ${n}${medidas}: no cubre ${formato === "story" ? "una story" : "un post"} y con «${plantilla.id}» se vería ampliada y borrosa: se usa «${marco.id}» (Foto enmarcada).`,
+        `Foto ${n}${medidas}: no cubre ${formato === "story" ? "una story" : "un post"} y con «${pedida.id}» se vería ampliada y borrosa: se usa «${plantilla.id}» (Foto enmarcada).`,
       );
-      plantilla = marco;
+    } else if (!pedida || pedida.marca !== ctx.marca || !pedida.conFoto || !pedida.formatos.includes(fImg)) {
+      correcciones.push(`La plantilla «${textoDe(d.plantilla, 60)}» no vale para ${formato === "carrusel" ? "un carrusel" : `un ${formato}`} de esta marca: se usa «${plantilla.id}».`);
     }
+    // El botón, solo en la última imagen del carrusel.
+    const cta = textoDe(d.cta, 200).trim();
+    if (cta && formato === "carrusel" && i < elegidas.length - 1) {
+      correcciones.push(`Imagen ${i + 1}: se quita el botón «${cta}»: en un carrusel va solo en la última.`);
+      d.cta = "";
+    }
+    // Un cierre sin texto lleva el lema de la marca.
+    if (papel === "cierre" && !textoDe(d.cita).trim() && !textoDe(d.titular).trim() && plantilla.campos.includes("cita")) d.cita = LEMA_CIERRE[ctx.marca];
     const r = revisarRotulos(d, plantilla, ctx);
     if (!r.ok) {
       errores.push(...r.errores.map((x) => `Foto ${n}: ${x}`));
-      continue;
+      return;
     }
     correcciones.push(...r.correcciones.map((x) => `Foto ${n}: ${x}`));
     const alt = quitarEmoji(textoDe(d.alt_text, MAX_ALT_TEXT)).replace(/\s+/g, " ").trim();
     errores.push(...erroresDatosPersonales(alt, ctx.cuentasPropias).map((x) => `Foto ${n} (texto alternativo): ${x}`));
-    usadas.add(foto.id);
     diapositivas.push({ foto: foto.id, plantilla: plantilla.id, datos: r.valor as Rotulos, altText: alt });
-  }
+  });
 
   if (formato === "carrusel") {
     if (diapositivas.length < 2) errores.push("Un carrusel necesita al menos 2 imágenes válidas.");
     const fuera = fotos.filter((f) => !usadas.has(f.id)).map((f) => fotos.indexOf(f) + 1);
     if (fuera.length) correcciones.push(`Han quedado fuera del carrusel las fotos ${fuera.join(", ")}.`);
-  } else {
-    if (!diapositivas.length) errores.push("Falta la imagen de la publicación.");
-    if (diapositivas.length > 1) {
-      correcciones.push(`Un ${formato} lleva una sola imagen: se queda la primera.`);
-      diapositivas.length = 1;
-    }
-  }
+  } else if (!diapositivas.length) errores.push("Falta la imagen de la publicación.");
 
   // El texto, con los mismos validadores que sugerir_texto.
   const texto = revisarVarianteTexto(

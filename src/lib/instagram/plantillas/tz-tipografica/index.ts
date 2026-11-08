@@ -79,6 +79,8 @@ const plantilla: Plantilla = {
     lista: MAX_FILAS,
     pie: 40,
   },
+  // No es clásica: es la única con lista (horarios, cartas cortas, precios).
+  papel: "tipografica",
   html,
 };
 

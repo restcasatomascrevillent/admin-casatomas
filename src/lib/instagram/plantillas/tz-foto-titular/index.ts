@@ -82,6 +82,8 @@ const plantilla: Plantilla = {
   tiposFoto: ["barra", "coctel", "bebida", "interior"],
   // A sangre: la foto tiene que cubrir el lienzo (si no, «Foto enmarcada»).
   encaje: "sangre",
+  // Clásica (08/11/2026): sigue abriendo las piezas guardadas, pero ya no sale en los selectores.
+  clasica: true,
   html,
 };
 
