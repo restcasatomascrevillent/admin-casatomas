@@ -1,56 +1,25 @@
 // Alertas de Facturas en Análisis (20261107300000_facturas_alertas):
 //   · «Requiere atención»: arriba del tablero, las 5 más importantes; cada una
-//     abre un menú (ver su precio en el explorador, abrir el documento, el
+//     abre un menú (abrir el documento, el
 //     proveedor…). «Ver todas» abre los avisos de Facturas (la campana).
 //   · MarcaAlerta / MarcasDeGrafica: el aviso dibujado en la propia gráfica.
 //     Es un botón (44 px al tocar) que abre su texto: sin «pasar el ratón».
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, BarChart3, ExternalLink, FileText, LineChart, ShoppingCart } from "lucide-react";
+import { AlertTriangle, ExternalLink, FileText, ShoppingCart } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { plural } from "@/components/facturas/shared/formatters";
 import { TIPO_ICON, abrirAvisosSeccion } from "@/lib/avisos";
 import { detalleCortoAlerta, resumenCortoAlerta, tituloCortoAlerta, type AlertaFacturas } from "@/lib/facturas/alertas";
-import { FILTROS_VACIOS, type ConfigExplorador } from "@/lib/facturas/explorador";
 import { FilaConMenu, FOCO, Tarjeta, type AccionMenu } from "./piezas";
 
 const ICONO = "h-4 w-4 text-muted-foreground";
 export const MAX_REQUIERE_ATENCION = 5;
 
 /** Qué se puede hacer con una alerta desde Análisis. */
-function accionesAlerta(
-  a: AlertaFacturas,
-  onIrA: (enlace: string) => void,
-  onExplorar: (c: Partial<ConfigExplorador>) => void,
-): AccionMenu[] {
+function accionesAlerta(a: AlertaFacturas, onIrA: (enlace: string) => void): AccionMenu[] {
   const d = a.datos;
   const acciones: AccionMenu[] = [];
-  if (a.tipo === "facturas_precio_sube" && d.producto) {
-    acciones.push({
-      etiqueta: "Ver su precio en el explorador",
-      icono: <LineChart className={ICONO} aria-hidden />,
-      onClick: () =>
-        onExplorar({
-          medida: "precio",
-          agrupar: "mes",
-          desglose: "proveedor",
-          filtros: { ...FILTROS_VACIOS, productos: [d.producto as string], unidad: d.unidad ? d.unidad.toLowerCase() : null },
-        }),
-    });
-  }
-  if (a.tipo === "facturas_familia_gasto" && d.familiaId !== null) {
-    acciones.push({
-      etiqueta: "Ver la familia por mes",
-      icono: <BarChart3 className={ICONO} aria-hidden />,
-      onClick: () =>
-        onExplorar({
-          medida: "base",
-          agrupar: "mes",
-          desglose: null,
-          filtros: { ...FILTROS_VACIOS, familias: [{ id: d.familiaId as number, nombre: d.familia ?? "Familia" }] },
-        }),
-    });
-  }
   if (d.enlace) {
     const esDoc = d.enlace.includes("doc=");
     acciones.push({
@@ -77,12 +46,10 @@ function IconoAlerta({ a, className }: { a: AlertaFacturas; className?: string }
 export function RequiereAtencion({
   alertas,
   onIrA,
-  onExplorar,
   pendiente,
 }: {
   alertas: AlertaFacturas[];
   onIrA: (enlace: string) => void;
-  onExplorar: (c: Partial<ConfigExplorador>) => void;
   pendiente?: boolean;
 }) {
   if (alertas.length === 0) return null;
@@ -110,7 +77,7 @@ export function RequiereAtencion({
           <li key={a.id}>
             <FilaConMenu
               nombre={`${a.prioridad === "alta" ? "Importante: " : ""}${a.titulo}. ${a.mensaje} Opciones`}
-              acciones={pendiente ? [] : accionesAlerta(a, onIrA, onExplorar)}
+              acciones={pendiente ? [] : accionesAlerta(a, onIrA)}
               cabecera={{ titulo: tituloCortoAlerta(a), detalle: detalleCortoAlerta(a) }}
               title={a.mensaje}
               className={cn(

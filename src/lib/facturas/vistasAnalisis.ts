@@ -13,7 +13,7 @@
 import type { CambioPrecio, DecisionFacturas, FamiliaDecision } from "./decision";
 import type { IdModulo } from "./widgetsTablero";
 
-export type IdVista = "decidir" | "precios" | "ahorro" | "gasto" | "proveedores" | "explorar" | "revisar";
+export type IdVista = "decidir" | "precios" | "ahorro" | "gasto" | "proveedores" | "revisar";
 
 export const VISTAS: { id: IdVista; etiqueta: string }[] = [
   { id: "decidir", etiqueta: "Qué decidir hoy" },
@@ -21,7 +21,6 @@ export const VISTAS: { id: IdVista; etiqueta: string }[] = [
   { id: "ahorro", etiqueta: "Ahorro" },
   { id: "gasto", etiqueta: "Gasto" },
   { id: "proveedores", etiqueta: "Proveedores" },
-  { id: "explorar", etiqueta: "Explorar" },
   { id: "revisar", etiqueta: "Por revisar" },
 ];
 
@@ -58,7 +57,7 @@ export function guardarVista(v: IdVista): void {
 /**
  * Dónde vive cada módulo del configurador («Personalizar»). Los que no están
  * aquí son el contenido fijo de su vista (subidas → Precios, ahorro → Ahorro,
- * familias → Gasto, explorar → Explorar).
+ * familias → Gasto).
  */
 export const VISTA_DE_MODULO: Partial<Record<IdModulo, IdVista>> = {
   gasto_mes: "decidir",
@@ -69,7 +68,7 @@ export const VISTA_DE_MODULO: Partial<Record<IdModulo, IdVista>> = {
   proveedores: "proveedores",
   locales: "proveedores",
   regalado: "proveedores",
-  precio_producto: "explorar",
+  precio_producto: "gasto",
   por_revisar: "revisar",
 };
 

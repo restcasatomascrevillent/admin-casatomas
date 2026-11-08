@@ -19,17 +19,20 @@ import { RESPUESTA } from "./decisionRespuesta";
 const dec = () => normalizarDecision(RESPUESTA);
 
 describe("vistas", () => {
-  it("siete vistas, «Qué decidir hoy» por defecto; la de la URL manda sobre la recordada", () => {
-    expect(VISTAS.map((v) => v.etiqueta)).toEqual(["Qué decidir hoy", "Precios", "Ahorro", "Gasto", "Proveedores", "Explorar", "Por revisar"]);
+  it("seis vistas, «Qué decidir hoy» por defecto; la de la URL manda sobre la recordada", () => {
+    expect(VISTAS.map((v) => v.etiqueta)).toEqual(["Qué decidir hoy", "Precios", "Ahorro", "Gasto", "Proveedores", "Por revisar"]);
     expect(vistaInicial(new URLSearchParams(), null)).toBe("decidir");
     expect(vistaInicial(new URLSearchParams(), "gasto")).toBe("gasto");
     expect(vistaInicial(new URLSearchParams("vista=precios"), "gasto")).toBe("precios");
     // Lo que no es una vista, no vale.
     expect(vistaInicial(new URLSearchParams("vista=bento"), "nada")).toBe("decidir");
+    // «Explorar» ya no existe: cae en la vista por defecto.
+    expect(vistaInicial(new URLSearchParams("vista=explorar"), null)).toBe("decidir");
+    expect(vistaInicial(new URLSearchParams(), "explorar")).toBe("decidir");
   });
 
   it("todo módulo del configurador tiene sitio: en su vista o como contenido fijo de una", () => {
-    const fijos = new Set(["explorar", "subidas", "ahorro", "familias"]);
+    const fijos = new Set(["subidas", "ahorro", "familias"]);
     for (const m of MODULOS) expect(fijos.has(m.id) || !!VISTA_DE_MODULO[m.id]).toBe(true);
     expect(VISTA_DE_MODULO.gasto_mes).toBe("decidir");
     expect(VISTA_DE_MODULO.locales).toBe("proveedores");

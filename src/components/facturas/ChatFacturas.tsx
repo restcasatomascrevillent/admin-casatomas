@@ -56,19 +56,15 @@ import {
   textoRango,
   type SeleccionPeriodo,
 } from "@/lib/facturas/periodoAnalisis";
-import { ajustarConfig, CONFIG_POR_DEFECTO, FILTROS_VACIOS, type ConfigExplorador } from "@/lib/facturas/explorador";
 import type { PeticionDocumentos } from "@/lib/facturas/documentosCifra";
-import type { GraficaIa } from "@/lib/facturas/graficasCopiloto";
 import { EstadoVacio } from "@/components/facturas/compras/estilo";
 import { TableroCompras } from "./analisis/TableroCompras";
-import { Explorador } from "./analisis/Explorador";
 import { SelectorPeriodo } from "./analisis/SelectorPeriodo";
 import { DocumentosDeCifra } from "./analisis/DocumentosDeCifra";
 import { ErrorTablero, EsqueletoTablero, Segmentado } from "./analisis/piezas";
 import { CopilotoLateral } from "./copiloto/CopilotoLateral";
 import { ChatPantallaCompleta } from "./copiloto/ChatPantallaCompleta";
 import { enlacePantallaCompleta, destinoVolver, type EstadoPantallaCompleta } from "@/lib/facturas/copilotoCompleto";
-import { esMovil } from "./analisis/desplazar";
 import { guardarVista, leerVistaGuardada, PARAM_VISTA, vistaInicial, type IdVista } from "@/lib/facturas/vistasAnalisis";
 import { EdicionFacturasContext } from "./analisis/edicionFacturas";
 
@@ -97,18 +93,6 @@ interface ChatFacturasProps {
 const NOMBRE_PERIODO: Record<PeriodoAnalisis, string> = { mes: "este mes", trimestre: "este trimestre", anio: "este año", todo: "el histórico" };
 
 /** Para «Volver …» tras «Ver solo este tramo»: «al año 2026», «a este mes», «a 1 mar – 15 abr 2026». */
-function textoVolver(sel: SeleccionPeriodo, hoy: Date): string {
-  if (sel.tipo === "personalizado") return `a ${textoRango(sel.desde, sel.hasta)}`;
-  if (sel.tipo === "anio") return `al año ${hoy.getFullYear()}`;
-  return sel.tipo === "todo" ? "a todo el histórico" : `a ${NOMBRE_PERIODO[sel.tipo]}`;
-}
-
-/** «Ver solo este tramo» se puede deshacer: el periodo y el eje de antes. */
-interface TramoAnterior {
-  seleccion: SeleccionPeriodo;
-  agrupar: ConfigExplorador["agrupar"];
-}
-
 /** «Hoy», que cambia si la tablet se queda encendida pasada la medianoche (cada minuto y al volver a la pestaña). */
 function useHoy(): Date {
   const [hoy, setHoy] = useState(() => new Date());
@@ -152,13 +136,11 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
   const deUrl = useMemo(() => leerAnalisisDeUrl(params, hoyRef.current), [params]);
   const [seleccion, setSeleccion] = useState<SeleccionPeriodo>(() => deUrl.periodo ?? SELECCION_POR_DEFECTO);
   const [local, setLocal] = useState<FiltroLocal>(() => deUrl.local ?? "todos");
-  const [config, setConfig] = useState<ConfigExplorador>(CONFIG_POR_DEFECTO);
   const [peticionDocs, setPeticionDocs] = useState<PeticionDocumentos | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [verHistorial, setVerHistorial] = useState(false);
   // «Personalizar» el tablero (el diálogo lo monta TableroCompras).
   const [personalizando, setPersonalizando] = useState(false);
-  const [tramos, setTramos] = useState<TramoAnterior[]>([]);
   // La vista del tablero (una a la vez): la de la URL; si no, la última de este navegador.
   const [vista, setVista] = useState<IdVista>(() => vistaInicial(params, leerVistaGuardada()));
   const vistaUrl = params.get(PARAM_VISTA);
@@ -189,7 +171,6 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     const l = deUrl.local;
     if (p) {
       setSeleccion((s) => (mismaSeleccion(s, p) ? s : p));
-      if (!mismaSeleccion(escrito.current.seleccion, p)) setTramos([]);
     }
     if (l) setLocal(l);
     escrito.current = { ...escrito.current, ...(p ? { seleccion: p } : {}), ...(l ? { local: l } : {}) };
@@ -209,9 +190,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     if (sig.toString() !== prev.toString()) setParams(sig, { replace: true });
   }, [seleccion, local, hoy, setParams]);
 
-  /** El periodo que elige el dueño (barra, «Ver todo el histórico»): olvida los tramos. */
+  /** El periodo que elige el dueño (barra, «Ver todo el histórico»). */
   const elegirPeriodo = useCallback((s: SeleccionPeriodo) => {
-    setTramos([]);
     setSeleccion(s);
   }, []);
 
@@ -234,7 +214,6 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
   const { fijadas, fijar, quitar } = useGraficasFijadas();
   const idsFijadas = useMemo(() => new Set(fijadas.map((g) => g.id)), [fijadas]);
   const exploraciones = useExploracionesFijadas();
-  const idsExploraciones = useMemo(() => new Set(exploraciones.fijadas.map((g) => g.id)), [exploraciones.fijadas]);
 
   const {
     conversaciones,
@@ -264,25 +243,6 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     },
   }));
 
-  // Llevar algo al explorador abre la vista «Explorar» (ya no hay que desplazar el tablero).
-  const explorar = useCallback(
-    (parcial: Partial<ConfigExplorador>) => {
-      setConfig((c) => ajustarConfig({ ...c, ...parcial }).config);
-      elegirVista("explorar");
-    },
-    [elegirVista],
-  );
-  const explorarGraficaIa = (g: GraficaIa) => {
-    // En el móvil el copiloto ocupa toda la pantalla: se cierra para ver el explorador.
-    if (esMovil()) setAbierto(false);
-    explorar({
-      medida: "precio",
-      agrupar: "mes",
-      desglose: "proveedor",
-      grafica: "auto",
-      filtros: { ...FILTROS_VACIOS, productos: [g.serie.producto], unidad: g.serie.unidad ? g.serie.unidad.toLowerCase() : null },
-    });
-  };
   // ─── Pantalla completa (`/facturas/ia`) ───
   const navegar = useNavigate();
   const ubicacion = useLocation();
@@ -291,10 +251,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     const estado: EstadoPantallaCompleta = { volverA: `${ubicacion.pathname}${ubicacion.search}` };
     navegar(enlaceCompleta, { state: estado });
   };
-  /** Al salir de pantalla completa: al panel lateral (por defecto) o al explorador con una gráfica de la IA. */
-  const alSalir = useRef<GraficaIa | null>(null);
-  const salirDePantallaCompleta = (explorarGrafica?: GraficaIa) => {
-    alSalir.current = explorarGrafica ?? null;
+  /** Al salir de pantalla completa: de vuelta al panel de Análisis. */
+  const salirDePantallaCompleta = () => {
     const estado = ubicacion.state as Partial<EstadoPantallaCompleta> | null;
     // Vino de Análisis en esta pestaña: «Atrás», a la misma URL (periodo y local) y sin apilar historial.
     if (estado?.volverA) navegar(-1);
@@ -303,14 +261,9 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
   const estabaCompleta = useRef(pantallaCompleta);
   useEffect(() => {
     if (estabaCompleta.current && !pantallaCompleta) {
-      const g = alSalir.current;
-      alSalir.current = null;
-      if (g) explorarGraficaIa(g);
-      // De vuelta, el panel lateral abierto con la misma conversación (en el móvil, para ver la gráfica, no).
-      if (!g || !esMovil()) {
-        setVerHistorial(false);
-        setAbierto(true);
-      }
+      // De vuelta, el panel lateral abierto con la misma conversación.
+      setVerHistorial(false);
+      setAbierto(true);
     }
     estabaCompleta.current = pantallaCompleta;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al entrar o salir de pantalla completa
@@ -326,23 +279,6 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
   };
   const irA = (enlace: string) => onIrA?.(enlace);
   const textoPeriodo = textoSeleccion(seleccion, hoy);
-  // «Ver solo este tramo»: se apunta el periodo y el eje de antes para poder volver.
-  const verTramo = (desde: string, hasta: string) => {
-    setTramos((t) => [...t, { seleccion, agrupar: config.agrupar }]);
-    setSeleccion({ tipo: "personalizado", desde, hasta });
-  };
-  const ultimoTramo = tramos[tramos.length - 1];
-  const volverTramo = ultimoTramo
-    ? {
-        texto: textoVolver(ultimoTramo.seleccion, hoy),
-        volver: () => {
-          setTramos((t) => t.slice(0, -1));
-          setSeleccion(ultimoTramo.seleccion);
-          setConfig((c) => ajustarConfig({ ...c, agrupar: ultimoTramo.agrupar }).config);
-        },
-      }
-    : null;
-
   const datos = tablero.data;
   let cuerpo;
   if (tablero.isLoading) cuerpo = <EsqueletoTablero />;
@@ -372,29 +308,10 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         onVista={elegirVista}
         onDocumentos={setPeticionDocs}
         onIrA={irA}
-        onExplorar={explorar}
         fijadasIa={fijadas}
         onQuitarFijadaIa={quitar}
         fijadasExplorador={exploraciones.fijadas}
         onQuitarFijadaExplorador={exploraciones.quitar}
-        explorador={
-          <Explorador
-            config={config}
-            onConfig={setConfig}
-            periodo={fechas}
-            textoPeriodo={textoPeriodo}
-            local={lrpc}
-            onLocal={setLocal}
-            onTramo={verTramo}
-            volverTramo={volverTramo}
-            hoy={hoy}
-            onDocumentos={setPeticionDocs}
-            onIrA={irA}
-            fijadas={idsExploraciones}
-            onFijar={exploraciones.fijar}
-            onQuitarFijada={exploraciones.quitar}
-          />
-        }
       />
     );
 
@@ -485,7 +402,6 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
           fijadas={idsFijadas}
           onFijar={fijar}
           onQuitarFijada={quitar}
-          onExplorar={(g) => salirDePantallaCompleta(g)}
           borrador={borrador}
           onBorrador={setBorrador}
         />
@@ -513,7 +429,6 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         fijadas={idsFijadas}
         onFijar={fijar}
         onQuitarFijada={quitar}
-        onExplorar={explorarGraficaIa}
         enlacePantallaCompleta={enlaceCompleta}
         onPantallaCompleta={irAPantallaCompleta}
         borrador={borrador}

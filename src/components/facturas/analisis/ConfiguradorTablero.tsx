@@ -2,7 +2,7 @@
 //
 //   · TU TABLERO: las cifras y los módulos, en orden. Se reordenan arrastrando
 //     desde el asa (ratón, dedo o teclado: Espacio y flechas) o con
-//     «Subir»/«Bajar» y se quitan con «×». «Explorar» se mueve pero no se quita.
+//     «Subir»/«Bajar» y se quitan con «×». Los módulos fijos se mueven pero no se quitan.
 //     Desde el 07/11/2026 (Análisis en una pantalla) cada módulo vive en su
 //     vista (lo dice su descripción) y ya no hay tamaños ni vista previa; las
 //     cifras que no son de las cuatro de arriba salen en la vista «Gasto».
@@ -47,7 +47,7 @@ interface Props {
 
 /** La vista donde sale un módulo («Gasto», «Proveedores»…). */
 const nombreVista = (id: IdModulo): string => {
-  const v = VISTA_DE_MODULO[id] ?? (id === "subidas" ? "precios" : id === "ahorro" ? "ahorro" : id === "familias" ? "gasto" : "explorar");
+  const v = VISTA_DE_MODULO[id] ?? (id === "subidas" ? "precios" : id === "ahorro" ? "ahorro" : id === "familias" ? "gasto" : "gasto");
   return VISTAS.find((x) => x.id === v)?.etiqueta ?? v;
 };
 
@@ -174,7 +174,7 @@ function Contenido({ config, onCerrar, onGuardar }: Omit<Props, "abierto">) {
                 const m = borrador.modulos[i];
                 const info = infoModulo(id as IdModulo);
                 return (
-                  <Fila asa={asa} titulo={info.titulo} descripcion={info.fijo ? "La vista «Explorar»: se puede mover, no quitar" : `${info.descripcion} · en «${nombreVista(info.id)}»`}>
+                  <Fila asa={asa} titulo={info.titulo} descripcion={info.fijo ? "Fijo: se puede mover, no quitar" : `${info.descripcion} · en «${nombreVista(info.id)}»`}>
                     <SubirBajar
                       nombre={info.titulo}
                       primero={i === 0}
@@ -248,7 +248,7 @@ function Contenido({ config, onCerrar, onGuardar }: Omit<Props, "abierto">) {
           onClick={() => setBorrador(CONFIG_TABLERO_POR_DEFECTO)}
           disabled={esPorDefecto}
           aria-label="Restablecer el tablero de siempre"
-          title="Vuelve al tablero por defecto: las cifras de decisión, las cuatro preguntas y Explorar"
+          title="Vuelve al tablero por defecto: las cifras de decisión, las cuatro preguntas y el resto de módulos"
         >
           <RotateCcw className="h-4 w-4" aria-hidden />
           <span className="hidden sm:inline">Restablecer</span>

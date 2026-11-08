@@ -13,7 +13,7 @@ import { formatCurrency, formatEntero, plural } from "@/components/facturas/shar
 import { resumenCortoAlerta, tituloCortoAlerta } from "@/lib/facturas/alertas";
 import { textoPctCorto, type CambioPrecio, type DecisionFacturas, type FamiliaDecision, type ProductoTop } from "@/lib/facturas/decision";
 import { decisionesDeHoy, explicarAhorro, geometriaPrecio, nombreMes, partesFraseAhorro, mesesHasta, type PuntoPrecio } from "@/lib/facturas/vistasAnalisis";
-import { FILTROS_VACIOS, parametrosExplorar, type ConfigExplorador, type LocalRpc } from "@/lib/facturas/explorador";
+import { FILTROS_VACIOS, parametrosExplorar, type LocalRpc } from "@/lib/facturas/explorador";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
 import { useExplorarCompras } from "@/hooks/useExplorarCompras";
 import { useAccionDecision } from "@/hooks/useDecisionFacturas";
@@ -227,7 +227,6 @@ export function PreciosMaestroDetalle({
   conTop = true,
   elegida,
   onElegida,
-  onExplorar,
   onVerDocumentosTop,
   onIrA,
 }: {
@@ -240,7 +239,6 @@ export function PreciosMaestroDetalle({
   /** Elemento elegido (`a:<id alerta>` o `t:<clave>`), lo lleva la vista para «Ver precio». */
   elegida: string | null;
   onElegida: (clave: string | null) => void;
-  onExplorar: (c: Partial<ConfigExplorador>) => void;
   onVerDocumentosTop: (p: ProductoTop) => void;
   onIrA?: (enlace: string) => void;
 }) {
@@ -320,7 +318,7 @@ export function PreciosMaestroDetalle({
           )}
         </div>
       </Caja>
-      <DetallePrecio key={sel?.clave ?? "nada"} e={sel} decision={decision} periodo={periodo} local={local} pendiente={pendiente} onExplorar={onExplorar} onVerDocumentosTop={onVerDocumentosTop} onIrA={onIrA} />
+      <DetallePrecio key={sel?.clave ?? "nada"} e={sel} decision={decision} periodo={periodo} local={local} pendiente={pendiente} onVerDocumentosTop={onVerDocumentosTop} onIrA={onIrA} />
     </>
   );
 }
@@ -375,7 +373,6 @@ function DetallePrecio({
   periodo,
   local,
   pendiente,
-  onExplorar,
   onVerDocumentosTop,
   onIrA,
 }: {
@@ -384,7 +381,6 @@ function DetallePrecio({
   periodo: { desde: string | null; hasta: string | null };
   local: LocalRpc;
   pendiente?: boolean;
-  onExplorar: (c: Partial<ConfigExplorador>) => void;
   onVerDocumentosTop: (p: ProductoTop) => void;
   onIrA?: (enlace: string) => void;
 }) {
@@ -507,22 +503,6 @@ function DetallePrecio({
           {e.top && (
             <button type="button" className={cn(BOTON, FOCO)} onClick={() => onVerDocumentosTop(e.top!)}>
               <FileText className="h-3.5 w-3.5" aria-hidden /> Ver sus facturas
-            </button>
-          )}
-          {(producto || e.top) && (
-            <button
-              type="button"
-              className={cn(BOTON, FOCO)}
-              onClick={() =>
-                onExplorar({
-                  medida: "precio",
-                  agrupar: "mes",
-                  desglose: "proveedor",
-                  filtros: { ...FILTROS_VACIOS, productos: [e.top ? (e.top.linea ?? e.top.producto) : (producto as string)], unidad: unidad ? unidad.toLowerCase() : null },
-                })
-              }
-            >
-              <LineChart className="h-3.5 w-3.5" aria-hidden /> En el explorador
             </button>
           )}
           {puedeEditar && pacto && (pacto.pactado ? (

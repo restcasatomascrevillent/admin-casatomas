@@ -131,7 +131,7 @@ function verVista(nombre: string) {
 /** Los módulos de cada vista. */
 function modulosPorVista() {
   const salida: Record<string, (string | undefined)[]> = {};
-  for (const v of ["Qué decidir hoy", "Precios", "Gasto", "Proveedores", "Explorar", "Por revisar"]) {
+  for (const v of ["Qué decidir hoy", "Precios", "Gasto", "Proveedores", "Por revisar"]) {
     verVista(v);
     salida[v] = ordenModulos();
   }
@@ -185,13 +185,12 @@ describe("cada módulo en su vista (Análisis en una pantalla)", () => {
       Precios: ["subidas"],
       Gasto: ["familias", "fijos", "abonos"],
       Proveedores: ["proveedores", "locales"],
-      Explorar: [],
       "Por revisar": ["por_revisar"],
     });
     // Container queries: la vista mira el ancho del tablero (que se estrecha con la IA), no el de la pantalla.
     expect(screen.getByTestId("vista-analisis").closest(".\\@container\\/tablero")).not.toBeNull();
-    verVista("Explorar");
-    expect(screen.getByRole("region", { name: "Explorar" })).toBeInTheDocument();
+    // La vista «Explorar» ya no existe.
+    expect(within(screen.getByRole("group", { name: "Vista del análisis" })).queryByRole("button", { name: "Explorar" })).not.toBeInTheDocument();
   });
 
   it("lo que se quita en «Personalizar» no sale en su vista; una vista sin módulos lo dice", async () => {
@@ -245,7 +244,7 @@ describe("Personalizar el tablero", () => {
     // Sin sesión se guarda en este navegador (y se dice).
     expect(toastMock.info).toHaveBeenCalledWith("Tablero guardado en este navegador", expect.anything());
     const guardada = JSON.parse(window.localStorage.getItem("facturas-analisis-tablero") ?? "null");
-    expect(guardada.modulos.map((m: { id: string }) => m.id)).toEqual(["subidas", "ahorro", "proveedores", "familias", "precios_top", "explorar", "fijos", "locales", "gasto_mes", "productos"]);
+    expect(guardada.modulos.map((m: { id: string }) => m.id)).toEqual(["subidas", "ahorro", "proveedores", "familias", "precios_top", "fijos", "locales", "gasto_mes", "productos"]);
   });
 
   it("se recuerda al volver; «Restablecer» deja el de siempre y «Cancelar» no cambia nada", async () => {
@@ -274,20 +273,14 @@ describe("Personalizar el tablero", () => {
     expect(JSON.parse(window.localStorage.getItem("facturas-analisis-tablero") ?? "null")).toEqual(CONFIG_TABLERO_POR_DEFECTO);
   });
 
-  it("«Explorar» se puede mover pero no quitar", async () => {
+  it("«Explorar» ya no es un módulo del tablero", async () => {
     montar();
     await screen.findByText("1.362.491,57 €");
     const d = await abrirPersonalizar();
     const modulos = within(d).getByRole("list", { name: "Módulos, en orden" });
-    expect(within(modulos).queryByRole("button", { name: "Quitar «Explorar»" })).not.toBeInTheDocument();
-    expect(within(modulos).queryByRole("group", { name: "Tamaño de «Explorar»" })).not.toBeInTheDocument();
+    expect(within(modulos).queryByRole("button", { name: /Explorar/ })).not.toBeInTheDocument();
     expect(within(d).queryByRole("switch", { name: "Mostrar «Explorar»" })).not.toBeInTheDocument();
-    expect(within(modulos).getByRole("button", { name: "Arrastrar «Explorar»" })).toBeInTheDocument();
-    fireEvent.click(within(modulos).getByRole("button", { name: "Bajar «Explorar»" }));
-    fireEvent.click(within(d).getByRole("button", { name: "Guardar" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Personalizar el tablero" })).not.toBeInTheDocument());
-    verVista("Explorar");
-    expect(screen.getByRole("region", { name: "Explorar" })).toBeInTheDocument();
+    expect(d).not.toHaveTextContent(/Explorar/);
   });
 
   it("con sesión: lee y guarda la configuración del usuario en dashboard_config", async () => {
@@ -312,7 +305,7 @@ describe("Personalizar el tablero", () => {
     expect(opciones).toEqual({ onConflict: "user_id,nombre_vista" });
     expect(fila).toMatchObject({ user_id: "u-1", nombre_vista: "facturas_analisis" });
     // La versión 2 guardada se pone al día (3: «Gasto por mes» en «Qué decidir hoy»).
-    expect(fila.orden_widgets).toEqual(["cifra:documentos", "modulo:explorar", "modulo:fijos", "modulo:gasto_mes", "modulo:abonos", "version:3"]);
+    expect(fila.orden_widgets).toEqual(["cifra:documentos", "modulo:fijos", "modulo:gasto_mes", "modulo:abonos", "version:3"]);
     await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Tablero guardado en tu cuenta"));
     expect(JSON.parse(window.localStorage.getItem("facturas-analisis-tablero:u-1") ?? "null").modulos.at(-1)).toEqual({ id: "abonos", tamano: "s" });
   });
@@ -324,8 +317,8 @@ describe("«Evolución de un producto»", () => {
     window.localStorage.setItem("facturas-analisis-tablero", JSON.stringify({ v: 3, cifras: ["gasto"], modulos: [{ id: "explorar" }, { id: "precio_producto", tamano: "m" }] }));
     montar();
     await screen.findByText("1.362.491,57 €");
-    // Vive en la vista «Explorar», debajo del explorador.
-    verVista("Explorar");
+    // Vive en la vista «Gasto».
+    verVista("Gasto");
     const tarjeta = await screen.findByRole("region", { name: "Evolución de un producto" });
     // Sin producto no hay nada que ampliar.
     expect(within(tarjeta).queryByRole("button", { name: /^Ampliar/ })).not.toBeInTheDocument();
@@ -335,7 +328,7 @@ describe("«Evolución de un producto»", () => {
     await waitFor(() =>
       expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_medida: "precio", p_agrupar: "mes", p_desglose: "proveedor", p_filtros: { productos: ["MERLUZA DE PINCHO"] } })),
     );
-    expect(JSON.parse(window.localStorage.getItem("facturas-analisis-tablero") ?? "null").modulos[1]).toEqual({ id: "precio_producto", tamano: "m", producto: "MERLUZA DE PINCHO" });
+    expect(JSON.parse(window.localStorage.getItem("facturas-analisis-tablero") ?? "null").modulos[0]).toEqual({ id: "precio_producto", tamano: "m", producto: "MERLUZA DE PINCHO" });
     fireEvent.click(within(conProducto).getByRole("button", { name: "Ampliar: Precio de Merluza de pincho" }));
     expect(await screen.findByRole("dialog", { name: "Precio de Merluza de pincho" })).toBeInTheDocument();
     await waitFor(() => expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_medida: "precio", p_top: 8, p_filtros: { productos: ["MERLUZA DE PINCHO"] } })));

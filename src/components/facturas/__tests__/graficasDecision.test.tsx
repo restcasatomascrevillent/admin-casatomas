@@ -35,7 +35,7 @@ beforeEach(() => rpc.mockClear());
 
 describe("¿Qué me están subiendo?", () => {
   it("ordena por € al mes, dice cuáles no avisan y cambia de pestaña", () => {
-    montar(<CambiosDePrecio decision={dec()} onExplorar={vi.fn()} />);
+    montar(<CambiosDePrecio decision={dec()} />);
     const t = screen.getByTestId("tarjeta-subidas");
     const filas = within(t).getAllByRole("listitem");
     expect(filas[0].textContent).toContain("Sube Percebe");
@@ -52,12 +52,10 @@ describe("¿Qué me están subiendo?", () => {
     expect(within(t).getByText(/Ninguna bajada/)).toBeTruthy();
   });
 
-  it("«Ver factura» abre el original y «Ver en la gráfica» lleva al explorador", () => {
-    const onExplorar = vi.fn();
-    montar(<CambiosDePrecio decision={dec()} onExplorar={onExplorar} />);
+  it("«Ver factura» abre el original (ya no hay botón al explorador)", () => {
+    montar(<CambiosDePrecio decision={dec()} />);
     const t = screen.getByTestId("tarjeta-subidas");
-    fireEvent.click(within(t).getAllByRole("button", { name: /Ver en la gráfica/ })[0]);
-    expect(onExplorar).toHaveBeenCalledWith(expect.objectContaining({ medida: "precio", filtros: expect.objectContaining({ productos: ["PERCEBE GALLEGO G"], unidad: null }) }));
+    expect(within(t).queryByRole("button", { name: /Ver en la gráfica/ })).toBeNull();
     fireEvent.click(within(t).getByRole("button", { name: /Ver factura/ }));
     const visor = screen.getByRole("dialog");
     expect(visor.textContent).toContain("260489");
@@ -65,14 +63,14 @@ describe("¿Qué me están subiendo?", () => {
   });
 
   it("«Visto» y «Es normal» llaman a su RPC; sin «Editar» no salen", async () => {
-    const { unmount } = montar(<CambiosDePrecio decision={dec()} onExplorar={vi.fn()} />);
+    const { unmount } = montar(<CambiosDePrecio decision={dec()} />);
     const t = screen.getByTestId("tarjeta-subidas");
     fireEvent.click(within(t).getAllByRole("button", { name: /Visto/ })[0]);
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("facturas_alerta_visto", { p_id: "s1" }));
     fireEvent.click(within(t).getAllByRole("button", { name: /Es normal/ })[1]);
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("facturas_alerta_es_normal", { p_id: "s2", p_dias: null }));
     unmount();
-    montar(<CambiosDePrecio decision={dec()} onExplorar={vi.fn()} />, false);
+    montar(<CambiosDePrecio decision={dec()} />, false);
     expect(screen.queryByRole("button", { name: /Visto/ })).toBeNull();
     expect(screen.getAllByRole("button", { name: /Ver factura/ })).toHaveLength(1);
   });
@@ -95,7 +93,7 @@ describe("¿En qué se va el dinero?", () => {
 describe("¿Cómo van los precios de lo que más compro?", () => {
   it("minigráfica con su precio y pactado; «Revisar unidades»; quitar el pacto", async () => {
     const onVer = vi.fn();
-    montar(<PreciosLoMasComprado decision={dec()} onExplorar={vi.fn()} onVerDocumentos={onVer} />);
+    montar(<PreciosLoMasComprado decision={dec()} onVerDocumentos={onVer} />);
     const t = screen.getByTestId("tarjeta-precios-top");
     expect(within(t).getByText(/Pactado 203,98/)).toBeTruthy();
     expect(within(t).getByTestId("revisar-unidades").textContent).toMatch(/Jamón 5J mezcla compras por pieza \(519,17\s€\) y por kg \(45,00\s€\)/);

@@ -6,11 +6,11 @@
 //   · PreciosLoMasComprado  ¿Cómo van los precios de lo que más compro? («precios_top»)
 //   · DondeAhorrar          ¿Dónde puedo ahorrar?      («ahorro»)
 // Las alertas van DENTRO de las tarjetas (no en una lista suelta). Desde
-// cualquier fila se abre la factura de origen (VisorDocumento) o se lleva al
-// explorador. «Visto», «Es normal» y el precio pactado piden «Editar».
+// cualquier fila se abre la factura de origen (VisorDocumento).
+// «Visto», «Es normal» y el precio pactado piden «Editar».
 // Textos cortos propios: nada de recortar el mensaje largo con «…».
 import { useId, useState, type ReactNode } from "react";
-import { Check, FileText, Handshake, LineChart, Sparkles, X } from "lucide-react";
+import { Check, FileText, Handshake, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatEntero, plural } from "@/components/facturas/shared/formatters";
 import {
@@ -27,7 +27,6 @@ import {
 } from "@/lib/facturas/decision";
 import { resumenCortoAlerta, tituloCortoAlerta } from "@/lib/facturas/alertas";
 import type { DocumentoCifra } from "@/lib/facturas/documentosCifra";
-import { FILTROS_VACIOS, type ConfigExplorador } from "@/lib/facturas/explorador";
 import type { Tamano } from "@/lib/facturas/widgetsTablero";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
 import { nombreMes as nombreMesLargo } from "@/lib/facturas/vistasAnalisis";
@@ -89,13 +88,6 @@ export function useVisor(onIrA?: (enlace: string) => void) {
   );
   return { abrir, visor };
 }
-
-const explorarPrecio = (producto: string, unidad: string | null, proveedor?: { id: number; nombre: string } | null): Partial<ConfigExplorador> => ({
-  medida: "precio",
-  agrupar: "mes",
-  desglose: "proveedor",
-  filtros: { ...FILTROS_VACIOS, productos: [producto], unidad: unidad ? unidad.toLowerCase() : null, ...(proveedor ? { proveedores: [proveedor] } : {}) },
-});
 
 // ─── 1. ¿En qué se va el dinero? ────────────────────────────────────────────
 
@@ -216,14 +208,12 @@ function FilaCambio({
   c,
   pestana,
   onVerDocs,
-  onExplorar,
   puedeEditar,
   pendiente,
 }: {
   c: CambioPrecio;
   pestana: PestanaCambios | "aviso";
   onVerDocs: (docs: (DocumentoCifra | null)[]) => void;
-  onExplorar: (cfg: Partial<ConfigExplorador>) => void;
   puedeEditar: boolean;
   pendiente?: boolean;
 }) {
@@ -266,15 +256,6 @@ function FilaCambio({
               </button>
             )
           )}
-          {d.producto && a.tipo !== "facturas_precio_proveedor" && (
-            <button
-              type="button"
-              className={cn(BOTON, FOCO)}
-              onClick={() => onExplorar(explorarPrecio(d.producto as string, a.tipo === "facturas_precio_mejor" ? null : d.unidad))}
-            >
-              <LineChart className="h-3.5 w-3.5" aria-hidden /> Ver en la gráfica
-            </button>
-          )}
           {puedeEditar && (
             <>
               <button type="button" className={cn(BOTON, FOCO)} disabled={ocupado} onClick={() => accion.mutate({ tipo: "visto", id: a.id })}>
@@ -302,9 +283,8 @@ export function CambiosDePrecio({
   tamano = "m",
   onAmpliar,
   pendiente,
-  onExplorar,
   onIrA,
-}: Comunes & { onExplorar: (c: Partial<ConfigExplorador>) => void; onIrA?: (enlace: string) => void }) {
+}: Comunes & { onIrA?: (enlace: string) => void }) {
   const puedeEditar = usePuedeEditarFacturas();
   const [pestana, setPestana] = useState<PestanaCambios>("sube");
   const [todas, setTodas] = useState(false);
@@ -367,7 +347,7 @@ export function CambiosDePrecio({
       {avisos.length > 0 && (
         <ul aria-label="Avisos de precio" className="mb-1 rounded-lg bg-amber-500/10 px-2.5" data-testid="avisos-precio">
           {avisos.map((x) => (
-            <FilaCambio key={x.alerta.id} c={x} pestana="aviso" onVerDocs={abrir} onExplorar={onExplorar} puedeEditar={puedeEditar} pendiente={pendiente} />
+            <FilaCambio key={x.alerta.id} c={x} pestana="aviso" onVerDocs={abrir} puedeEditar={puedeEditar} pendiente={pendiente} />
           ))}
         </ul>
       )}
@@ -379,7 +359,7 @@ export function CambiosDePrecio({
         <>
           <ul id={idLista} aria-label="Cambios de precio">
             {visibles.map((x) => (
-              <FilaCambio key={x.alerta.id} c={x} pestana={pestana} onVerDocs={abrir} onExplorar={onExplorar} puedeEditar={puedeEditar} pendiente={pendiente} />
+              <FilaCambio key={x.alerta.id} c={x} pestana={pestana} onVerDocs={abrir} puedeEditar={puedeEditar} pendiente={pendiente} />
             ))}
           </ul>
           <BotonVerMas total={lista.length} visibles={limite} abierto={todas} onCambio={setTodas} controla={idLista} />
@@ -445,10 +425,8 @@ export function PreciosLoMasComprado({
   decision,
   onAmpliar,
   pendiente,
-  onExplorar,
   onVerDocumentos,
 }: Comunes & {
-  onExplorar: (c: Partial<ConfigExplorador>) => void;
   /** Las facturas de ese producto (DocumentosDeCifra). */
   onVerDocumentos: (p: ProductoTop) => void;
 }) {
@@ -460,11 +438,6 @@ export function PreciosLoMasComprado({
   const acciones = (p: ProductoTop): AccionMenu[] => {
     if (pendiente) return [];
     const l: AccionMenu[] = [
-      {
-        etiqueta: "Ver su precio en el explorador",
-        icono: <LineChart className={ICONO} aria-hidden />,
-        onClick: () => onExplorar(explorarPrecio(p.linea ?? p.producto, p.unidad)),
-      },
       { etiqueta: "Ver sus facturas", icono: <FileText className={ICONO} aria-hidden />, onClick: () => onVerDocumentos(p) },
     ];
     const ultimo = geometriaMini(p.meses, []).ultimoPrecio;

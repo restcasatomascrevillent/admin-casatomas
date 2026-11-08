@@ -10,8 +10,8 @@
 //        · Ahorro           mismo producto más barato en otro proveedor, explicado;
 //        · Gasto            familias frente a su media, gastos fijos, abonos…;
 //        · Proveedores      los que más gasto + Casa Tomás y Touza;
-//        · Explorar         el explorador a toda la vista y las gráficas fijadas;
 //        · Por revisar      albaranes sin factura y los demás avisos.
+// (La vista «Explorar» se quitó el 08/11/2026; las gráficas fijadas salen en «Qué decidir hoy».)
 // La vista elegida se recuerda (?vista= y localStorage; la lleva ChatFacturas).
 // «Personalizar» (ConfiguradorTablero) sigue eligiendo qué módulos se ven: cada
 // uno vive en su vista (lib/facturas/vistasAnalisis › VISTA_DE_MODULO), y las
@@ -22,7 +22,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { BarChart3, FileText, LineChart, Pin, ShoppingCart } from "lucide-react";
+import { FileText, Pin, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatEntero, plural } from "@/components/facturas/shared/formatters";
 import type { GraficaFijada } from "@/lib/facturas/graficasCopiloto";
@@ -43,7 +43,7 @@ import { notaRetencionGasto } from "@/lib/facturas/retencion";
 import { formasEntero, formasImporte } from "@/lib/facturas/cifras";
 import { elegirProducto, type IdCifra, type IdModulo, type ModuloActivo } from "@/lib/facturas/widgetsTablero";
 import type { IdDetalle } from "@/lib/facturas/detalleModulo";
-import { FILTROS_VACIOS, type ConfigExplorador, type ExploracionFijada, type LocalRpc, type Medida } from "@/lib/facturas/explorador";
+import { type ExploracionFijada, type LocalRpc, type Medida } from "@/lib/facturas/explorador";
 import { peticionSimple, type PeticionDocumentos } from "@/lib/facturas/documentosCifra";
 import { consultaTablero } from "@/hooks/useTableroCompras";
 import { useConfigTablero } from "@/hooks/useConfigTablero";
@@ -68,12 +68,8 @@ interface Props {
   datos: Datos;
   periodo: { desde: string | null; hasta: string | null };
   local: LocalRpc;
-  /** La tarjeta «Explorar» (la monta quien tiene su estado). */
-  explorador: ReactNode;
   onDocumentos: (p: PeticionDocumentos) => void;
   onIrA: (enlace: string) => void;
-  /** Lleva una configuración al explorador (y abre la vista «Explorar»). */
-  onExplorar: (c: Partial<ConfigExplorador>) => void;
   fijadasIa: GraficaFijada[];
   onQuitarFijadaIa: (id: string) => void;
   fijadasExplorador: ExploracionFijada[];
@@ -99,10 +95,8 @@ export function TableroCompras({
   datos,
   periodo,
   local,
-  explorador,
   onDocumentos,
   onIrA,
-  onExplorar,
   fijadasIa,
   onQuitarFijadaIa,
   fijadasExplorador,
@@ -178,12 +172,6 @@ export function TableroCompras({
   const verDocs = (onClick: () => void): AccionMenu => ({ etiqueta: "Ver documentos", icono: <FileText className={ICONO} aria-hidden />, onClick });
   const enCompras = (id: number | null): AccionMenu[] =>
     id === null ? [] : [{ etiqueta: "Abrir en Compras", icono: <ShoppingCart className={ICONO} aria-hidden />, onClick: () => onIrA(enlaceProveedorCompras(id)) }];
-  const explorar = (etiqueta: string, c: Partial<ConfigExplorador>): AccionMenu => ({
-    etiqueta,
-    icono: <BarChart3 className={ICONO} aria-hidden />,
-    onClick: () => onExplorar(c),
-  });
-  /** Al llevar algo al explorador desde el detalle, el detalle ya se ha cerrado. */
   const ampliar = (id: IdDetalle) => () => setDetalle(id);
   // Familias: el tramo que comparan (el periodo o, con «Año»/«Todo», su último mes completo).
   const tramoFamilias = dec?.periodo.comparado ?? null;
@@ -381,7 +369,7 @@ export function TableroCompras({
 
   // ─── Módulos ──────────────────────────────────────────────────────────────
 
-  const comunesExtra = { periodo, local, onDocumentos, onIrA, onExplorar, pendiente };
+  const comunesExtra = { periodo, local, onDocumentos, onIrA, pendiente };
   const modulo = (m: ModuloActivo): ReactNode => {
     const t = m.tamano;
     switch (m.id) {
@@ -397,12 +385,6 @@ export function TableroCompras({
                 : [
                     verDocs(() => docs(nombreCorto(p.nombre), "gasto", { agrupar: "proveedor", clave: String(p.id), cifra: p.gasto })),
                     ...enCompras(p.id),
-                    explorar("Ver su gasto por mes", {
-                      medida: "gasto",
-                      agrupar: "mes",
-                      desglose: null,
-                      filtros: { ...FILTROS_VACIOS, proveedores: [{ id: p.id, nombre: nombreCorto(p.nombre) }] },
-                    }),
                   ],
             )}
           />
@@ -416,17 +398,6 @@ export function TableroCompras({
             umbralPct={umbral}
             alertas={alertasPeriodo}
             acciones={siListo((s: Datos["subidas"]["productos"][number]) => [
-              {
-                etiqueta: "Ver su precio en el explorador",
-                icono: <LineChart className={ICONO} aria-hidden />,
-                onClick: () =>
-                  onExplorar({
-                    medida: "precio",
-                    agrupar: "mes",
-                    desglose: "proveedor",
-                    filtros: { ...FILTROS_VACIOS, productos: [s.producto], unidad: s.unidad ? s.unidad.toLowerCase() : null },
-                  }),
-              },
               ...(s.proveedor_id !== null
                 ? [
                     verDocs(() =>
@@ -456,12 +427,6 @@ export function TableroCompras({
                   ? []
                   : [
                       verDocs(() => docsFamilia(f)),
-                      explorar("Ver por mes en el explorador", {
-                        medida: "base",
-                        agrupar: "mes",
-                        desglose: null,
-                        filtros: { ...FILTROS_VACIOS, familias: [{ id: f.id as number, nombre: f.familia }] },
-                      }),
                     ],
               )}
             />
@@ -477,13 +442,7 @@ export function TableroCompras({
                 ? []
                 : [
                     verDocs(() => docs(f.familia, "base", { agrupar: "familia", clave: String(f.id), cifra: f.importe, detalle: "Base sin IVA de sus líneas" })),
-                    explorar("Ver por mes en el explorador", {
-                      medida: "base",
-                      agrupar: "mes",
-                      desglose: null,
-                      filtros: { ...FILTROS_VACIOS, familias: [{ id: f.id as number, nombre: f.familia }] },
-                    }),
-                  ],
+                ],
             )}
           />
         );
@@ -647,8 +606,8 @@ export function TableroCompras({
   const extras = config.cifras.filter((c) => !CIFRAS_NAVEGACION.has(c));
   let contenido: ReactNode;
   switch (vista) {
-    case "decidir":
-      contenido = (
+    case "decidir": {
+      const decidir = (
         <div className={cn(DOS, activo("gasto_mes") && "@[48rem]/tablero:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]")}>
           {dec ? (
             <QueDecidirHoy
@@ -669,7 +628,29 @@ export function TableroCompras({
           {m("gasto_mes")}
         </div>
       );
+      const hayFijadas = fijadasExplorador.length > 0 || fijadasIa.length > 0;
+      contenido = hayFijadas ? (
+        <div className="h-full min-h-0 space-y-4 overflow-y-auto overscroll-contain pr-1" data-testid="vista-decidir-scroll">
+          <div className="h-full min-h-[22rem]">{decidir}</div>
+          <section aria-labelledby="titulo-fijadas" className="space-y-2">
+            <h3 id="titulo-fijadas" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+              <Pin className="h-3.5 w-3.5" aria-hidden /> Tus gráficas fijadas
+            </h3>
+            <FijadasDelTablero
+              periodo={periodo}
+              local={local}
+              explorador={fijadasExplorador}
+              onQuitarExplorador={onQuitarFijadaExplorador}
+              ia={fijadasIa}
+              onQuitarIa={onQuitarFijadaIa}
+            />
+          </section>
+        </div>
+      ) : (
+        decidir
+      );
       break;
+    }
     case "precios":
       contenido = dec ? (
         <div className={cn(DOS, "@[48rem]/tablero:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]")}>
@@ -681,7 +662,6 @@ export function TableroCompras({
             conTop={!!activo("precios_top")}
             elegida={precioElegido}
             onElegida={setPrecioElegido}
-            onExplorar={onExplorar}
             onIrA={onIrA}
             onVerDocumentosTop={(p) =>
               docs(p.producto, "base", {
@@ -709,7 +689,7 @@ export function TableroCompras({
       );
       break;
     case "gasto": {
-      const derecha = (["fijos", "abonos", "productos"] as IdModulo[]).filter((id) => activo(id));
+      const derecha = (["fijos", "abonos", "productos", "precio_producto"] as IdModulo[]).filter((id) => activo(id));
       contenido = (
         <div className="flex flex-col gap-3 @[48rem]/tablero:h-full">
           <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground" data-testid="franja-gasto">
@@ -754,30 +734,6 @@ export function TableroCompras({
       );
       break;
     }
-    case "explorar":
-      contenido = (
-        <div className="relative h-full min-h-0 space-y-4 overflow-y-auto overscroll-contain pr-1" data-testid="vista-explorar-scroll">
-          {explorador}
-          {activo("precio_producto") && <TarjetaLlena.Provider value={false}>{m("precio_producto")}</TarjetaLlena.Provider>}
-          {(fijadasExplorador.length > 0 || fijadasIa.length > 0) && (
-            <section aria-labelledby="titulo-fijadas" className="space-y-2">
-              <h3 id="titulo-fijadas" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                <Pin className="h-3.5 w-3.5" aria-hidden /> Tus gráficas fijadas
-              </h3>
-              <FijadasDelTablero
-                periodo={periodo}
-                local={local}
-                explorador={fijadasExplorador}
-                onQuitarExplorador={onQuitarFijadaExplorador}
-                onAbrir={(c) => onExplorar(c)}
-                ia={fijadasIa}
-                onQuitarIa={onQuitarFijadaIa}
-              />
-            </section>
-          )}
-        </div>
-      );
-      break;
     case "revisar":
       contenido = (
         <div className={cn(DOS, dec && "@[48rem]/tablero:grid-cols-2")}>
@@ -856,7 +812,6 @@ export function TableroCompras({
         local={local}
         onDocumentos={onDocumentos}
         onIrA={onIrA}
-        onExplorar={onExplorar}
       />
       <ConfiguradorTablero
         abierto={personalizando}

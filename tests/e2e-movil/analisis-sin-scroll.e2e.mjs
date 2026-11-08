@@ -86,7 +86,7 @@ const TAMANOS = [
   { nombre: "tablet vertical", width: 820, height: 1180, unaLinea: false },
   { nombre: "móvil", width: 390, height: 844, unaLinea: false },
 ];
-const VISTAS = ["Qué decidir hoy", "Precios", "Ahorro", "Gasto", "Proveedores", "Explorar", "Por revisar"];
+const VISTAS = ["Qué decidir hoy", "Precios", "Ahorro", "Gasto", "Proveedores", "Por revisar"];
 
 /** Lo que sobra de la PÁGINA (0 = sin scroll vertical). */
 const sobraPagina = (page) => page.evaluate(() => {

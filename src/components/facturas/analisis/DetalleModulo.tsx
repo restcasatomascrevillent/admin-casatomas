@@ -7,16 +7,14 @@
 //     con el periodo y el local del tablero; cambiarlos aquí NO cambia el
 //     tablero.
 //   · Gráfica (ranking de barras o por meses) y TABLA ORDENABLE (cabeceras
-//     con `aria-sort`); cada fila abre su menú (ver documentos, Compras,
-//     explorador).
-//   · Pie: cuántas filas y cuánto suman, «Exportar CSV», «Ver documentos» y
-//     «Abrir en el explorador».
+//     con `aria-sort`); cada fila abre su menú (ver documentos, Compras).
+//   · Pie: cuántas filas y cuánto suman, «Exportar CSV», «Ver documentos».
 //
 // Sin IA: lee las RPC de siempre (explorar_compras hasta 50 filas,
 // tablero_compras, documentos_de_cifra). Ver lib/facturas/detalleModulo.ts.
 import { useMemo, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpDown, BarChart3, Check, ChevronDown, FileText, LineChart, Loader2, Search, ShoppingCart, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpDown, BarChart3, Check, ChevronDown, FileText, Loader2, Search, ShoppingCart, SlidersHorizontal, X } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -33,7 +31,6 @@ import {
   rangoDeClave,
   resumenExploracion,
   type Agrupar,
-  type ConfigExplorador,
   type EntidadFiltro,
   type LocalRpc,
 } from "@/lib/facturas/explorador";
@@ -73,7 +70,6 @@ interface Props {
   local: LocalRpc;
   onDocumentos: (p: PeticionDocumentos) => void;
   onIrA: (enlace: string) => void;
-  onExplorar: (c: Partial<ConfigExplorador>) => void;
 }
 
 export function DetalleModulo({ modulo, onCerrar, ...resto }: Props) {
@@ -106,7 +102,7 @@ const OPCIONES_IVA: { valor: Iva; etiqueta: string }[] = [
 const ETIQUETA_LOCAL: Record<FiltroLocal, string> = { todos: "los dos locales", casa_tomas: "Casa Tomás", touza: "Touza" };
 const ICONO = "h-4 w-4 text-muted-foreground";
 
-function Contenido({ modulo, producto, onCerrar, periodo, local, onDocumentos, onIrA, onExplorar }: Props & { modulo: IdDetalle }) {
+function Contenido({ modulo, producto, onCerrar, periodo, local, onDocumentos, onIrA }: Props & { modulo: IdDetalle }) {
   const base0 = SPECS[modulo];
   const productos = modulo === "precio_producto" && producto ? [producto] : [];
   const spec = productos.length ? { ...base0, titulo: `Precio de ${producto!.charAt(0).toUpperCase()}${producto!.slice(1).toLowerCase()}` } : base0;
@@ -237,11 +233,6 @@ function Contenido({ modulo, producto, onCerrar, periodo, local, onDocumentos, o
           : [
               verDocs({ ...comun, titulo: modulo === "abonos" ? `Abonos de ${f.nombre}` : f.nombre, medida, agrupar: "proveedor", clave: String(f.id), cifra: f.valor === null ? null : Math.abs(f.valor) * (modulo === "abonos" ? -1 : 1), filtros: filtrosComunes() }),
               ...enCompras(f.id),
-              {
-                etiqueta: "Ver su gasto por mes",
-                icono: <BarChart3 className={ICONO} aria-hidden />,
-                onClick: () => salir(() => onExplorar({ medida: modulo === "proveedores" ? medida : modulo, agrupar: "mes", desglose: null, filtros: { ...FILTROS_VACIOS, proveedores: [{ id: f.id as number, nombre: f.nombre }] } })),
-              },
             ];
       case "familias": {
         const id = f.id ?? (f.clave === "0" ? 0 : null);
@@ -249,21 +240,11 @@ function Contenido({ modulo, producto, onCerrar, periodo, local, onDocumentos, o
           ? []
           : [
               verDocs({ ...comun, titulo: f.nombre, medida: "base", agrupar: "familia", clave: String(id), cifra: f.valor, detalle: "Base sin IVA de sus líneas", filtros: filtrosComunes() }),
-              {
-                etiqueta: "Ver por mes en el explorador",
-                icono: <BarChart3 className={ICONO} aria-hidden />,
-                onClick: () => salir(() => onExplorar({ medida: "base", agrupar: "mes", desglose: null, filtros: { ...FILTROS_VACIOS, familias: [{ id, nombre: f.nombre }] } })),
-              },
             ];
       }
       case "productos":
         return [
           verDocs({ ...comun, titulo: f.nombre, medida: "base", agrupar: "producto", clave: f.clave, cifra: f.valor, detalle: "Base sin IVA de sus líneas", filtros: filtrosComunes() }),
-          {
-            etiqueta: "Ver su precio en el explorador",
-            icono: <LineChart className={ICONO} aria-hidden />,
-            onClick: () => salir(() => onExplorar({ medida: "precio", agrupar: "mes", desglose: "proveedor", grafica: "auto", filtros: { ...FILTROS_VACIOS, productos: [f.clave] } })),
-          },
         ];
       case "locales":
       case "gasto_mes":
@@ -279,11 +260,6 @@ function Contenido({ modulo, producto, onCerrar, periodo, local, onDocumentos, o
       case "subidas": {
         const s = f.dato as Subida;
         return [
-          {
-            etiqueta: "Ver su precio en el explorador",
-            icono: <LineChart className={ICONO} aria-hidden />,
-            onClick: () => salir(() => onExplorar({ medida: "precio", agrupar: "mes", desglose: "proveedor", filtros: { ...FILTROS_VACIOS, productos: [s.producto], unidad: s.unidad ? s.unidad.toLowerCase() : null } })),
-          },
           ...(s.proveedor_id !== null
             ? [
                 verDocs({ ...comun, titulo: `${s.producto} · ${nombreCorto(s.proveedor)}`, medida: "base", filtros: { proveedores: [s.proveedor_id], productos: [s.producto] }, detalle: "Base sin IVA de sus líneas" }),
@@ -343,21 +319,6 @@ function Contenido({ modulo, producto, onCerrar, periodo, local, onDocumentos, o
     }
     return null;
   })();
-
-  const abrirExplorador: (() => void) | null =
-    spec.fuente === "explorar" && consulta
-      ? () =>
-          salir(() =>
-            onExplorar({
-              medida: consulta.medida,
-              agrupar: consulta.agrupar,
-              desglose: consulta.desglose,
-              grafica: "auto",
-              top: Math.min(consulta.top, 25),
-              filtros: { ...FILTROS_VACIOS, proveedores, familias: spec.familia ? familias : [], productos },
-            }),
-          )
-      : null;
 
   const exportar = () => {
     if (!base) return;
@@ -560,11 +521,6 @@ function Contenido({ modulo, producto, onCerrar, periodo, local, onDocumentos, o
         {docsDeTodo && (
           <BotonPie onClick={docsDeTodo} disabled={!base || actualizando} icono={<FileText className="h-4 w-4" aria-hidden />} corto="Documentos">
             Ver documentos
-          </BotonPie>
-        )}
-        {abrirExplorador && (
-          <BotonPie onClick={abrirExplorador} icono={<BarChart3 className="h-4 w-4" aria-hidden />} corto="Explorador">
-            Abrir en el explorador
           </BotonPie>
         )}
       </div>

@@ -41,7 +41,7 @@ import {
  * El prompt va en cache (≈5.600 de 8.200 tokens de entrada, 0,10 $/M en
  * gpt-4.1-mini): ~+90 tokens ≈ +0,00001 $ por ronda.
  */
-const LIMITE_PROMPT = 6_400;
+const LIMITE_PROMPT = 6_450; // + regla 19 «como_leer» (margenes_carta y alertas_precio, 16/11/2026)
 
 // deno-lint-ignore no-explicit-any
 type Esquema = any;
@@ -77,6 +77,8 @@ describe("TOOLS", () => {
       "volumen_comprado",
       "buscar_productos",
       "buscar_facturas",
+      "margenes_carta",
+      "alertas_precio",
       "consulta_flexible",
     ]);
     // buscar_documentos sale: la sustituye filtrar_documentos (con sumas de todo lo filtrado).
@@ -135,7 +137,9 @@ describe("TOOLS", () => {
     // ~190 tokens por ronda; el prompt no crece: la pista va en la descripcion).
     // 10.550 con bebidas (13/11/2026: formatos, botellas y orden envases en volumen_comprado;
     // +174, ~45 tokens por ronda).
-    expect(tamano).toBeLessThan(10_630); // + IRPF (07/11/2026)
+    // 11.9xx con margenes_carta y alertas_precio (16/11/2026: margenes de la carta y avisos de
+    // Analisis; +1.310, ~330 tokens por ronda; las pautas de lectura van en "como_leer" del resultado).
+    expect(tamano).toBeLessThan(11_950); // + IRPF (07/11/2026)
     for (const t of TOOLS) expect(t.function.description.length, t.function.name).toBeLessThan(330);
   });
 });
@@ -725,7 +729,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
     expect(p).toMatch(/Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg»/);
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_630); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(11_950); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
 });
 
@@ -759,7 +763,7 @@ describe("ronda 9 (10/10/2026, migracion 20261010170000)", () => {
 
   it("tamaños: el prompt y TOOLS no crecen respecto a la ronda 8 (5.728 y 9.620 caracteres)", () => {
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_630); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(11_950); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
 });
 
@@ -899,5 +903,40 @@ describe("IRPF (07/11/2026, migracion 20261107610000)", () => {
     expect(METRICAS_FLEX).toContain("sum_retencion_irpf");
     expect(METRICAS_FLEX).toContain("count_con_retencion");
     expect(systemPrompt("2026-11-07")).toMatch(/IRPF\/retencion: su retencion_irpf/);
+  });
+});
+
+describe("margenes_carta y alertas_precio (16/11/2026, migracion 20261116100000)", () => {
+  it("margenes_carta va a margenes_carta_agente con sus parametros", () => {
+    const ll = prepararLlamada("margenes_carta", { texto: " carabinero ", vista: "peso", solo_problemas: null });
+    expect(ll).toMatchObject({
+      tipo: "rpc",
+      rpc: "margenes_carta_agente",
+      params: { p_texto: "carabinero", p_vista: "peso", p_solo_problemas: false, p_limite: 12 },
+    });
+    const todas = prepararLlamada("margenes_carta", { texto: null, vista: null, solo_problemas: true });
+    expect(todas).toMatchObject({ params: { p_vista: null, p_solo_problemas: true, p_limite: 5 }, maxChars: 9000 });
+  });
+
+  it("margenes_carta rechaza una vista desconocida", () => {
+    expect(() => prepararLlamada("margenes_carta", { texto: null, vista: "postres", solo_problemas: true })).toThrow(/vista/);
+  });
+
+  it("alertas_precio: todos los tipos con pocas filas; un tipo con mas", () => {
+    const todos = prepararLlamada("alertas_precio", { tipo: null, producto: null, local: null, desde: null, hasta: null });
+    expect(todos).toMatchObject({ rpc: "alertas_precio_agente", params: { p_tipo: null, p_local: null, p_limite: 4 } });
+    const sube = prepararLlamada("alertas_precio", { tipo: "sube", producto: "percebe", local: "touza", desde: "2026-10-01", hasta: "2026-10-31" });
+    expect(sube).toMatchObject({
+      params: { p_tipo: "sube", p_producto: "percebe", p_local: "touza", p_desde: "2026-10-01", p_hasta: "2026-10-31", p_limite: 12 },
+    });
+  });
+
+  it("alertas_precio valida tipo y fechas", () => {
+    expect(() => prepararLlamada("alertas_precio", { tipo: "raro", producto: null, local: null, desde: null, hasta: null })).toThrow(/tipo/);
+    expect(() => prepararLlamada("alertas_precio", { tipo: null, producto: null, local: null, desde: "2026-13-01", hasta: null })).toThrow(/fecha/);
+  });
+
+  it("el prompt manda seguir como_leer", () => {
+    expect(systemPrompt("2026-11-16")).toMatch(/como_leer/);
   });
 });

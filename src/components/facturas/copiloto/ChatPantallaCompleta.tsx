@@ -48,7 +48,6 @@ interface Props {
   fijadas: ReadonlySet<string>;
   onFijar: (g: GraficaIa) => void;
   onQuitarFijada: (id: string) => void;
-  onExplorar?: (g: GraficaIa) => void;
   borrador?: string;
   onBorrador?: (texto: string) => void;
 }

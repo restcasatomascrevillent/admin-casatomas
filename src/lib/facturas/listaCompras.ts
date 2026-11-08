@@ -177,8 +177,15 @@ export function listaDesdeCompletos(facturas: Factura[], albaranes: Factura[]): 
   return { cabeceras, completos };
 }
 
-/** Avisos de una fila de la lista: los guardados más el de precio atípico (para contarlos y filtrar). */
-export function avisosCabecera(d: Pick<CabeceraDocumento, "alertas" | "precio_atipico">): Pick<AlertaValidacion, "codigo" | "severidad">[] {
+/**
+ * Avisos de una fila de la lista: los guardados más el de precio atípico (para contarlos y filtrar).
+ * Un documento VERIFICADO no tiene avisos pendientes (08/11/2026): quien lo verifica ya los ha
+ * visto; la ficha los sigue enseñando por si hay que volver a ellos.
+ */
+export function avisosCabecera(
+  d: Pick<CabeceraDocumento, "alertas" | "precio_atipico"> & { verificada?: boolean },
+): Pick<AlertaValidacion, "codigo" | "severidad">[] {
+  if (d.verificada) return [];
   return d.precio_atipico ? [...d.alertas, AVISO_PRECIO_ATIPICO] : d.alertas;
 }
 
