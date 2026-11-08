@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Originales de las fotos de la carta que YA existían (antes del 08/11/2026
  * solo se guardaba la versión web): sube a Google Drive, como ORIGINALES de
