@@ -55,6 +55,11 @@ export interface PlantillaCampana extends PlantillaRotulos {
   formatos: readonly ("post" | "story")[];
   /** La plantilla lleva foto (si no hay, la pieza sale con «falta foto»). */
   conFoto: boolean;
+  /**
+   * Cómo pone la foto: «sangre» (la amplía hasta cubrir el lienzo) o «marco»
+   * (entera, sin ampliar). Las fotos de la carta (1200×900) solo valen enmarcadas.
+   */
+  encaje?: "sangre" | "marco";
 }
 
 export type FormatoCampana = "post" | "story";
@@ -232,8 +237,8 @@ export function revisarPiezaCampana(bruta: unknown, ctx: ContextoCampana): { ok:
   // Formato y plantilla.
   const formato = texto(o.formato, 20) as FormatoCampana;
   if (!FORMATOS_CAMPANA.includes(formato)) errores.push(`Formato no válido («${formato.slice(0, 20)}»): solo post o story.`);
-  const idPlantilla = texto(o.plantilla, 80);
-  const plantilla = ctx.plantillas.find((p) => p.id === idPlantilla) ?? null;
+  let idPlantilla = texto(o.plantilla, 80);
+  let plantilla = ctx.plantillas.find((p) => p.id === idPlantilla) ?? null;
   if (!plantilla) errores.push(`La plantilla «${idPlantilla}» no es de la marca.`);
   else if (FORMATOS_CAMPANA.includes(formato) && !plantilla.formatos.includes(formato)) {
     errores.push(`La plantilla «${plantilla.id}» no admite el formato ${formato}.`);
@@ -254,6 +259,15 @@ export function revisarPiezaCampana(bruta: unknown, ctx: ContextoCampana): { ok:
     else {
       if (pedida) correcciones.push("La foto sugerida no está en la biblioteca ni en la carta: queda como «falta foto».");
       faltaFoto = true;
+    }
+    // Las fotos de la carta (1200×900, apaisadas) no cubren un post ni una story: solo enmarcadas.
+    if (foto && deCarta && plantilla.encaje !== "marco") {
+      const marco = ctx.plantillas.find((p) => p.conFoto && p.encaje === "marco" && (!FORMATOS_CAMPANA.includes(formato) || p.formatos.includes(formato)));
+      if (marco) {
+        correcciones.push(`La foto de la carta no cubre la plantilla «${plantilla.id}» (se vería ampliada y borrosa): se usa «${marco.id}» (Foto enmarcada).`);
+        plantilla = marco;
+        idPlantilla = marco.id;
+      }
     }
   }
 
