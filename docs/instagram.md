@@ -1,5 +1,9 @@
 # Instagram en el panel: generar y publicar piezas
 
+> **Desde el 08/11/2026** Instagram es la primera pestaña de la sección **RRSS**
+> (`/rrss?red=instagram`; `/instagram?…` redirige ahí con los mismos parámetros).
+> Todo lo de abajo sigue igual. Facebook y el editor IA: [rrss.md](rrss.md).
+
 Sección **Instagram** del menú lateral (ruta `/instagram`, justo debajo de
 Newsletter; desde el 05/11/2026 ya no es una pestaña de Newsletter). Mismo
 permiso que Newsletter: la sección `marketing` (y el mismo interruptor del

@@ -23,7 +23,7 @@
  * supabase/functions/_shared/rrss/plan.ts (la Edge Function no puede importar
  * de src/); src/lib/rrss/__tests__/copias.test.ts comprueba que son iguales.
  */
-import { esEstilo, limitarTratamiento, TRANSICIONES, type EstiloId, type Transicion, type Tratamiento } from "./estilos";
+import { esEstilo, limitarTratamiento, TRANSICIONES, type EstiloId, type Transicion, type Tratamiento } from "./estilos.js";
 import type { FormatoSalida, Medio } from "./formatos";
 
 export const VERSION_PLAN = 1;

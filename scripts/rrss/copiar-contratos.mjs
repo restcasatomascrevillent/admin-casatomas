@@ -17,7 +17,7 @@ export function copiaDe(texto) {
     CABECERA +
     texto
       .replace('import type { MarcaId } from "../instagram/tokens";', 'type MarcaId = "casa-tomas" | "touza";')
-      .replace(/from "\.\/(\w+)";/g, 'from "./$1.ts";')
+      .replace(/from "\.\/(\w+)(?:\.js)?";/g, 'from "./$1.ts";')
   );
 }
 
