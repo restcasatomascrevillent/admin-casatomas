@@ -28,6 +28,8 @@ import { TarjetaCartaLateral } from "./TarjetaCartaLateral";
 import { cartasVino, EXPLICACION_CARTAS_VINO, textoPublicacionVino, vinoPublicado } from "./publicacionVino";
 import { avisoTarjetaSinOrigen, mensajeFaltaOrigen, origenVinoClaro } from "@/lib/origen-vino";
 import { ETIQUETA_ORIGEN_POR_CONFIRMAR } from "@/lib/tipos-vino";
+import { usePuntuacionesParker } from "./parker/usePuntuacionesParker";
+import { resumenParker } from "./parker/parker";
 
 // Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
 const CARTA_CARD_ASPECT_RATIO = 300 / 160;
@@ -66,6 +68,7 @@ export function ListaVinos({ vinos, soloLectura = false }: ListaVinosProps) {
     toggleTouza,
     actualizarVino,
   } = useVinos();
+  const parker = usePuntuacionesParker();
   const [vinoAEditar, setVinoAEditar] = useState<Vino | null>(null);
   const [vinoAEliminar, setVinoAEliminar] = useState<Vino | null>(null);
   const fotoRapida = useRef<FotoRapidaHandle>(null);
@@ -155,6 +158,7 @@ export function ListaVinos({ vinos, soloLectura = false }: ListaVinosProps) {
           const fotoOculta = fotosOcultas.has(vino.id);
           const nombre = vino.nombre || "Vino";
           const alergenos = parseAlergenos(vino.alergenos_oficiales);
+          const parkerVino = resumenParker(vino, parker.porVino(vino.id));
           const cartas = cartasVino(vino);
           const publicado = vinoPublicado(cartas);
           const origenClaro = origenVinoClaro(vino);
@@ -280,7 +284,9 @@ export function ListaVinos({ vinos, soloLectura = false }: ListaVinosProps) {
                     </p>
                   )}
 
-                  {/* Precio, y la copa y la puntuación Parker si las tiene (04/11/2026) */}
+                  {/* Precio, la copa y la puntuación Parker (04/11/2026). Desde el 08/11/2026 el
+                      icono «RP» es la puntuación que enseña la web (verificada y de la añada que se
+                      sirve); si falta algo (añada, revisión…) sale un aviso en ámbar o gris. */}
                   <div className="flex flex-wrap items-end justify-between gap-2 pt-2 border-t">
                     <div className="flex items-baseline gap-1">
                       <span className="text-2xl font-bold text-primary">
@@ -288,7 +294,7 @@ export function ListaVinos({ vinos, soloLectura = false }: ListaVinosProps) {
                       </span>
                       <span className="text-lg font-medium text-primary">€</span>
                     </div>
-                    {(vino.copeo || vino.puntuacion_parker) && (
+                    {(vino.copeo || parkerVino.tipo !== "sin_datos") && (
                       <div className="flex flex-wrap items-center gap-1">
                         {vino.copeo && (
                           <Badge variant="secondary" className="gap-1 px-1.5 py-0 text-xs" title="Se sirve por copas">
@@ -296,14 +302,25 @@ export function ListaVinos({ vinos, soloLectura = false }: ListaVinosProps) {
                             {vino.precio_copa_eur ? `Copa ${vino.precio_copa_eur.toFixed(2)} €` : "Copa"}
                           </Badge>
                         )}
-                        {vino.puntuacion_parker ? (
+                        {parkerVino.tipo === "publicada" ? (
+                          <Badge variant="outline" className="gap-1 px-1.5 py-0 text-xs" title={parkerVino.detalle}>
+                            <Award className="h-3 w-3" aria-hidden="true" />
+                            {parkerVino.texto}
+                          </Badge>
+                        ) : parkerVino.tipo !== "sin_datos" ? (
                           <Badge
                             variant="outline"
-                            className="gap-1 px-1.5 py-0 text-xs"
-                            title={`Puntuación Parker${vino.puntuacion_parker_anada ? ` (añada ${vino.puntuacion_parker_anada})` : ""}`}
+                            className={cn(
+                              "gap-1 px-1.5 py-0 text-xs font-normal",
+                              parkerVino.tipo === "revision" || parkerVino.tipo === "falta_anada"
+                                ? "border-amber-500/60 text-amber-800 dark:text-amber-300"
+                                : "text-muted-foreground",
+                            )}
+                            title={parkerVino.detalle}
+                            data-testid="parker-aviso"
                           >
                             <Award className="h-3 w-3" aria-hidden="true" />
-                            {vino.puntuacion_parker} RP
+                            {parkerVino.texto}
                           </Badge>
                         ) : null}
                       </div>

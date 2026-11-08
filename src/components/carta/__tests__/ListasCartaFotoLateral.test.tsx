@@ -8,6 +8,15 @@ import type { Bebida } from "@/hooks/useBebidas";
 import type { Coctel } from "@/hooks/useCocteles";
 
 const mutacion = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+// Puntuaciones Parker con fuente (08/11/2026): la lista las lee con react-query; aquí, ninguna.
+vi.mock("@/components/carta/parker/usePuntuacionesParker", () => ({
+  usePuntuacionesParker: () => ({
+    filas: [], isLoading: false, porVino: () => [],
+    guardar: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
+    confirmar: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
+    borrar: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
+  }),
+}));
 vi.mock("@/hooks/useVinos", () => ({
   useVinos: () => ({
     eliminarVino: mutacion(), toggleExpanded: mutacion(),
