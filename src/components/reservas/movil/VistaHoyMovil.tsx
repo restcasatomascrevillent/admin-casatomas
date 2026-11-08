@@ -39,6 +39,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Armchair,
   Clock,
   DoorOpen,
@@ -87,8 +88,13 @@ import type { FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
 import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 import {
   estadoMesasHoy,
+  candidatasParaMesa,
   estaTerminada,
   listaHoyEscritorio,
+  textoMesaFijada,
+  tieneAlergia,
+  type CandidataMesa,
+  type MesaDeReserva,
   listaHoyMovil,
   textoMesaConfirmada,
   textoMesas,
@@ -477,7 +483,7 @@ export function VistaHoyMovil({
       </Sheet>
 
       <Sheet open={!!mesaLibre} onOpenChange={(o) => !o && setMesaLibre(null)}>
-        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl">
+        <SheetContent side="bottom" className="flex h-[92dvh] max-h-[92dvh] flex-col gap-0 rounded-t-2xl p-0">
           {mesaLibre && (
             <PanelMesaLibre
               key={mesaLibre.mesa.id}
@@ -1105,19 +1111,32 @@ export function PanelMesaLibre({
         })
       : [...desplazadas];
 
-  // Las que aún no han llegado en este turno y caben: la que tiene esta mesa prevista primero y luego la más cercana a ahora.
-  const candidatas = useMemo(() => {
-    const m = (h: string) => parseInt(h.slice(0, 2), 10) * 60 + parseInt(h.slice(3, 5), 10);
-    return reservas
-      .filter(
-        (r) => ESTADOS_POR_LLEGAR.has(r.estado) && turnoDeHora(r.hora) === turno && r.numero_comensales <= mesa.plazas,
-      )
-      .sort(
-        (a, b) =>
-          Number(b.id === prevista?.reservaId) - Number(a.id === prevista?.reservaId) ||
-          Math.abs(m(a.hora) - minutoAhora) - Math.abs(m(b.hora) - minutoAhora),
-      );
-  }, [reservas, turno, mesa.plazas, minutoAhora, prevista?.reservaId]);
+  // A quién sentar aquí (08/11/2026, «grande y claro»): «Encajan aquí» (caben y sin mesa o con esta prevista;
+  // retrasadas arriba), «Otras» por hora y, al final y atenuadas, las que tienen FIJADA otra mesa.
+  const mesasDeReserva = useMemo(() => {
+    const salaDe = new Map((salas ?? []).map((s) => [s.id, s.nombre]));
+    const mapa = new Map<string, MesaDeReserva[]>();
+    for (const a of asignaciones) {
+      const m = mesas.find((x) => x.id === a.mesa_id);
+      const espacio = m?.espacio_id ?? a.mesas?.espacio_id;
+      const fila = { id: a.mesa_id, nombre: m?.nombre ?? a.mesas?.nombre ?? "?", sala: espacio ? salaDe.get(espacio) : undefined };
+      mapa.set(a.reserva_id, [...(mapa.get(a.reserva_id) ?? []), fila]);
+    }
+    return mapa;
+  }, [asignaciones, mesas, salas]);
+  const candidatas = useMemo(
+    () =>
+      candidatasParaMesa(reservas, {
+        mesaId: mesa.id,
+        plazas: mesa.plazas,
+        turno,
+        turnoDe: turnoDeHora,
+        minutoAhora,
+        mesasDe: (id) => mesasDeReserva.get(id) ?? [],
+      }),
+    [reservas, mesa.id, mesa.plazas, turno, minutoAhora, mesasDeReserva],
+  );
+  const hayCandidatas = candidatas.encajan.length + candidatas.otras.length + candidatas.fijadasOtra.length > 0;
 
   // Para quien entra sin reserva: ¿pisa la franja de ahora a alguien?
   const [horaAhora] = useState(() => horaActual());
@@ -1177,7 +1196,17 @@ export function PanelMesaLibre({
     const propias = asignaciones.filter((a) => a.reserva_id === r.id).map((a) => a.mesa_id);
     const quitarFijacion = !!r.mesa_fijada && propias.length > 0 && !propias.includes(mesa.id);
     const hacer = () => ejecutar(() => sentarReserva(r, mesa, { desplazadas, quitarFijacion }));
-    const textos = [quitarFijacion ? AVISO_FIJADA : "", desplazadas.length > 0 ? textoDesplazamiento(mesa.nombre, desplazadas, nombreMesa) : ""].filter(Boolean);
+    const suyas = mesasDeReserva.get(r.id) ?? [];
+    const pax = r.numero_comensales || 0;
+    const textos = [
+      quitarFijacion
+        ? suyas.length > 0
+          ? `Tiene fijada ${textoMesaFijada(suyas)}. ¿Sentarla aquí y quitar la fijación?`
+          : AVISO_FIJADA
+        : "",
+      pax > mesa.plazas ? `Son ${pax} y la mesa ${mesa.nombre} es de ${mesa.plazas}.` : "",
+      desplazadas.length > 0 ? textoDesplazamiento(mesa.nombre, desplazadas, nombreMesa) : "",
+    ].filter(Boolean);
     if (textos.length > 0) setPendiente({ texto: textos.join(" "), ejecutar: hacer, boton: quitarFijacion ? "Cambiar igualmente" : undefined });
     else void hacer();
   };
@@ -1185,9 +1214,11 @@ export function PanelMesaLibre({
   const ocupadaAhora = estadoSinReserva.tipo === "ocupada" || estadoSinReserva.tipo === "fijada";
 
   return (
-    <div className="space-y-4 pb-2">
-      <SheetHeader className="text-left">
-        <SheetTitle>
+    // Hoja casi a pantalla completa (08/11/2026): cabecera fija arriba, UN solo scroll en el contenido y «Cerrar»
+    // abajo. Fuera de una hoja de altura fija (tests) se ve igual, sin scroll.
+    <div className="flex h-full min-h-0 flex-col" data-testid="hoja-mesa-libre">
+      <SheetHeader className="shrink-0 border-b px-4 pb-3 pt-4 text-left">
+        <SheetTitle className="text-2xl font-bold">
           Mesa {mesa.nombre} · {mesa.salaNombre}
         </SheetTitle>
         <SheetDescription>
@@ -1197,6 +1228,7 @@ export function PanelMesaLibre({
         </SheetDescription>
       </SheetHeader>
 
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-3" data-testid="hoja-mesa-contenido">
       {estadoSinReserva.tipo === "fijada" && (
         <p className="flex items-center gap-2 rounded-md bg-muted p-2 text-sm">
           <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -1219,36 +1251,42 @@ export function PanelMesaLibre({
         />
       ) : (
         <>
-          {puedeEditar && candidatas.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Sentar una reserva</p>
-              <ul className="max-h-60 space-y-2 overflow-y-auto">
-                {candidatas.map((r) => (
-                  <li key={r.id}>
-                    <Button
-                      variant={r.id === prevista?.reservaId ? "default" : "outline"}
-                      className="h-12 w-full justify-between"
-                      disabled={ocupado}
-                      onClick={() => sentarUna(r)}
-                    >
-                      <span className="truncate">
-                        <span className="font-semibold tabular-nums">{horaCorta(r.hora)}</span> {r.nombre || "Sin nombre"}
-                        {r.id === prevista?.reservaId && " · prevista aquí"}
-                      </span>
-                      <span className="flex items-center gap-1 tabular-nums">
-                        <Users className="h-4 w-4" aria-hidden />
-                        {r.numero_comensales}
-                      </span>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {puedeEditar && hayCandidatas && (
+            <section aria-label="Sentar una reserva" className="space-y-3">
+              <p className="text-base font-semibold">Sentar una reserva</p>
+              {(
+                [
+                  ["Encajan aquí", candidatas.encajan, false],
+                  ["Otras", candidatas.otras, false],
+                  ["Con otra mesa fijada", candidatas.fijadasOtra, true],
+                ] as const
+              ).map(
+                ([titulo, filas, atenuadas]) =>
+                  filas.length > 0 && (
+                    <div key={titulo} className="space-y-1.5" data-grupo={titulo}>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</p>
+                      <ul className="space-y-2">
+                        {filas.map((c) => (
+                          <FilaCandidataMesa
+                            key={c.reserva.id}
+                            candidata={c}
+                            plazasMesa={mesa.plazas}
+                            atenuada={atenuadas}
+                            destacada={c.reserva.id === prevista?.reservaId}
+                            disabled={ocupado}
+                            onSentar={() => sentarUna(c.reserva)}
+                          />
+                        ))}
+                      </ul>
+                    </div>
+                  ),
+              )}
+            </section>
           )}
 
           {puedeEditar && !ocupadaAhora && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Sentar sin reserva aquí: ¿cuántos son?</p>
+            <section aria-label="Sentar sin reserva" className="space-y-2 border-t pt-4">
+              <p className="text-base font-semibold">Sin reserva: ¿cuántos son?</p>
               <div className="grid grid-cols-4 gap-2">
                 {PERSONAS.map((n) => (
                   <Button
@@ -1256,21 +1294,87 @@ export function PanelMesaLibre({
                     variant="outline"
                     className="h-14 text-lg font-semibold"
                     disabled={ocupado || n > mesa.plazas}
+                    title={n > mesa.plazas ? `Más de ${mesa.plazas}: hay que juntar mesas` : undefined}
                     onClick={() => sinReserva(n)}
                   >
                     {n}
                   </Button>
                 ))}
               </div>
-            </div>
+              {mesa.plazas < PERSONAS.length && (
+                <p className="text-xs text-muted-foreground">Más de {mesa.plazas}: junta mesas antes de sentarlos.</p>
+              )}
+            </section>
           )}
         </>
       )}
+      </div>
 
-      <Button variant="ghost" className="h-12 w-full" onClick={onCerrar}>
-        Cerrar
-      </Button>
+      <div className="shrink-0 border-t px-4 py-2">
+        <Button variant="ghost" className="h-12 w-full" onClick={onCerrar}>
+          Cerrar
+        </Button>
+      </div>
     </div>
+  );
+}
+
+/**
+ * Una reserva en la hoja de una mesa libre (08/11/2026): fila grande (≥ 64 px) con hora, nombre y personas y,
+ * debajo, su situación («Sin mesa», «Prevista: Comedor 7», «Fijada · Comedor 7» con candado), nota, alergia y,
+ * si no caben, «Son 6 · mesa de 4» en ámbar.
+ */
+function FilaCandidataMesa({
+  candidata,
+  plazasMesa,
+  atenuada,
+  destacada,
+  disabled,
+  onSentar,
+}: {
+  candidata: CandidataMesa<ReservaMovil>;
+  plazasMesa: number;
+  atenuada: boolean;
+  destacada: boolean;
+  disabled: boolean;
+  onSentar: () => void;
+}) {
+  const { reserva: r, situacion, textoSituacion, noCaben, retrasada } = candidata;
+  const notas = (r.notas_cliente ?? "").trim();
+  const alergia = tieneAlergia(notas);
+  return (
+    <li data-reserva-id={r.id} data-situacion={situacion} data-atenuada={atenuada ? "true" : undefined}>
+      <Button
+        variant={destacada ? "default" : "outline"}
+        className={cn("h-auto min-h-16 w-full flex-col items-stretch gap-1 px-3 py-2 text-left", atenuada && "opacity-60")}
+        disabled={disabled}
+        onClick={onSentar}
+        aria-label={`${horaCorta(r.hora)} ${r.nombre || "Sin nombre"}, ${r.numero_comensales} personas, ${textoSituacion}${noCaben ? `, son ${r.numero_comensales} y la mesa es de ${plazasMesa}` : ""}`}
+      >
+        <span className="flex w-full items-center gap-2">
+          <span className="text-lg font-bold tabular-nums">{horaCorta(r.hora)}</span>
+          <span className="min-w-0 flex-1 truncate text-base font-semibold">{r.nombre || "Sin nombre"}</span>
+          <span className="flex shrink-0 items-center gap-1 text-lg font-bold tabular-nums">
+            <Users className="h-5 w-5" aria-hidden />
+            {r.numero_comensales}
+          </span>
+        </span>
+        <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-medium" data-testid="situacion-reserva">
+          <span className={cn("inline-flex items-center gap-1", !destacada && "text-muted-foreground")}>
+            {(situacion === "fijada" || textoSituacion.startsWith("Fijada")) && <Lock className="h-3.5 w-3.5" aria-label="Mesa fijada" />}
+            {textoSituacion}
+          </span>
+          {retrasada && <span className="rounded-full bg-red-600 px-1.5 text-white">Tarde</span>}
+          {noCaben && (
+            <span className="rounded-full bg-amber-100 px-1.5 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200" data-testid="aviso-no-caben">
+              Son {r.numero_comensales} · mesa de {plazasMesa}
+            </span>
+          )}
+          {alergia && <AlertTriangle className="h-3.5 w-3.5 text-red-600" aria-label="Alergia" />}
+          {notas && !alergia && <StickyNote className="h-3.5 w-3.5" aria-label="Notas del cliente" />}
+        </span>
+      </Button>
+    </li>
   );
 }
 

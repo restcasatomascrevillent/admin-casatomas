@@ -343,3 +343,96 @@ export function listaHoyEscritorio<R extends ReservaHoyMovil & { salida_at?: str
 const RE_ALERGIA = /alerg|intoleran|cel[ií]ac|gluten|lactosa|frutos secos|marisco/i;
 
 export const tieneAlergia = (notas: string | null | undefined) => RE_ALERGIA.test(notas ?? "");
+
+// ─── Hoja de una mesa libre (móvil): a quién sentar aquí (08/11/2026) ────────
+
+/** Una mesa de una reserva, con su sala, para decir dónde está («Comedor 7»). */
+export interface MesaDeReserva {
+  id: string;
+  nombre: string;
+  sala?: string;
+}
+
+export type SituacionReserva = "sin_mesa" | "aqui" | "prevista" | "fijada";
+
+export interface CandidataMesa<R extends ReservaHoyMovil = ReservaHoyMovil> {
+  reserva: R;
+  situacion: SituacionReserva;
+  /** «Sin mesa», «Prevista aquí», «Prevista: Comedor 7», «Fijada · Comedor 7». */
+  textoSituacion: string;
+  /** Sus mesas (las previstas o fijadas), si tiene. */
+  mesas: MesaDeReserva[];
+  /** Son más personas que plazas tiene esta mesa. */
+  noCaben: boolean;
+  /** Ya pasó su hora y no ha llegado. */
+  retrasada: boolean;
+}
+
+/** «Comedor 7» o «Comedor 7+8». */
+function textoMesasConSala(mesas: readonly MesaDeReserva[]): string {
+  const sala = mesas[0]?.sala;
+  return `${sala ? `${sala} ` : ""}${mesas.map((m) => m.nombre).join("+")}`;
+}
+
+/** «la mesa 7 del Comedor» / «las mesas 7+8 del Comedor», para la confirmación de quitar la fijación. */
+export function textoMesaFijada(mesas: readonly MesaDeReserva[]): string {
+  const nombres = mesas.map((m) => m.nombre).join("+");
+  const sala = mesas[0]?.sala;
+  return `${mesas.length > 1 ? "las mesas" : "la mesa"} ${nombres}${sala ? ` del ${sala}` : ""}`;
+}
+
+/**
+ * A quién sentar en una mesa libre (hoja de mesa del móvil, petición del dueño 08/11/2026: «grande y claro»).
+ * Las que aún no han llegado en el turno, en tres grupos:
+ *   · `encajan`: caben y no tienen mesa (o la tienen prevista aquí): las retrasadas arriba y luego por hora;
+ *   · `otras`: no caben, o tienen prevista otra mesa: por hora;
+ *   · `fijadasOtra`: tienen FIJADA otra mesa: al final (la vista las atenúa y pide confirmación).
+ */
+export function candidatasParaMesa<R extends ReservaHoyMovil & { mesa_fijada?: boolean | null }>(
+  reservas: readonly R[],
+  opciones: {
+    mesaId: string;
+    plazas: number;
+    turno: "comida" | "cena";
+    turnoDe: (hora: string) => "comida" | "cena";
+    minutoAhora: number;
+    mesasDe: (reservaId: string) => MesaDeReserva[];
+  },
+): { encajan: CandidataMesa<R>[]; otras: CandidataMesa<R>[]; fijadasOtra: CandidataMesa<R>[] } {
+  const encajan: CandidataMesa<R>[] = [];
+  const otras: CandidataMesa<R>[] = [];
+  const fijadasOtra: CandidataMesa<R>[] = [];
+  for (const r of reservas) {
+    if (!ESTADOS_POR_LLEGAR.has(r.estado) || opciones.turnoDe(r.hora) !== opciones.turno) continue;
+    const mesas = opciones.mesasDe(r.id);
+    const aqui = mesas.some((m) => m.id === opciones.mesaId);
+    const fijada = !!r.mesa_fijada && mesas.length > 0;
+    const situacion: SituacionReserva = mesas.length === 0 ? "sin_mesa" : aqui ? "aqui" : fijada ? "fijada" : "prevista";
+    const textoSituacion =
+      situacion === "sin_mesa"
+        ? "Sin mesa"
+        : situacion === "aqui"
+          ? fijada ? "Fijada aquí" : "Prevista aquí"
+          : situacion === "fijada"
+            ? `Fijada · ${textoMesasConSala(mesas)}`
+            : `Prevista: ${textoMesasConSala(mesas)}`;
+    const m = minutos(r.hora);
+    const fila: CandidataMesa<R> = {
+      reserva: r,
+      situacion,
+      textoSituacion,
+      mesas,
+      noCaben: (r.numero_comensales || 0) > opciones.plazas,
+      retrasada: m != null && m < opciones.minutoAhora,
+    };
+    if (situacion === "fijada") fijadasOtra.push(fila);
+    else if (!fila.noCaben && (situacion === "sin_mesa" || situacion === "aqui")) encajan.push(fila);
+    else otras.push(fila);
+  }
+  const porHora = (a: CandidataMesa<R>, b: CandidataMesa<R>) =>
+    a.reserva.hora.localeCompare(b.reserva.hora) || (a.reserva.nombre ?? "").localeCompare(b.reserva.nombre ?? "", "es");
+  encajan.sort((a, b) => Number(b.retrasada) - Number(a.retrasada) || porHora(a, b));
+  otras.sort(porHora);
+  fijadasOtra.sort(porHora);
+  return { encajan, otras, fijadasOtra };
+}
