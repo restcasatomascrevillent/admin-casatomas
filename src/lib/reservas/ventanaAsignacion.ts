@@ -44,6 +44,8 @@ export interface ConfigAsignacion {
   espaciosExcluidos: string[];
   /** Mesas NO usables al asignar. Vacío = todas las activas. */
   mesasExcluidas: string[];
+  /** Mesas que los repartos automáticos usan solo como último recurso (para dejar paso). */
+  mesasAlFinal: string[];
 }
 
 export interface ColumnasConfigAsignacion {
@@ -51,6 +53,7 @@ export interface ColumnasConfigAsignacion {
   asignacion_aviso_activo?: boolean | null;
   asignacion_espacios_excluidos?: string[] | null;
   asignacion_mesas_excluidas?: string[] | null;
+  asignacion_mesas_al_final?: string[] | null;
 }
 
 /**
@@ -67,6 +70,7 @@ export function configAsignacionDesde(config: ColumnasConfigAsignacion | null | 
       ? [...config.asignacion_espacios_excluidos]
       : [],
     mesasExcluidas: Array.isArray(config?.asignacion_mesas_excluidas) ? [...config.asignacion_mesas_excluidas] : [],
+    mesasAlFinal: Array.isArray(config?.asignacion_mesas_al_final) ? [...config.asignacion_mesas_al_final] : [],
   };
 }
 
@@ -119,6 +123,7 @@ export function crearEsquemaConfigAsignacion(mesas: readonly MesaDeSala[]) {
       asignacion_aviso_activo: z.boolean(),
       asignacion_espacios_excluidos: z.array(z.string()),
       asignacion_mesas_excluidas: z.array(z.string()),
+      asignacion_mesas_al_final: z.array(z.string()),
     })
     .superRefine((valores, ctx) => {
       const sueltas = mesasIncoherentes(

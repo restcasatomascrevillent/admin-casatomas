@@ -61,7 +61,6 @@ import { reservasConMesaEnSala, yaAtendida } from "@/lib/reservas/hoyMovil";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -138,9 +137,6 @@ import {
   ALTURA_MINIMA_PLANO_HOY,
   ALTURA_MINIMA_PLANO_HOY_MOVIL,
   coincideFiltroHoy,
-  guardarModoMesasHoy,
-  leerModoMesasHoy,
-  type ModoMesasHoy,
   turnoDelPlano,
   type FiltroTurnoHoy,
 } from "@/lib/reservas/vistaHoy";
@@ -676,12 +672,6 @@ export function VistaPlanoHoy({
 
   const volverABase = useVolverAPlanoBase(sala?.id ?? "", hoy, turno);
   const [confirmarBase, setConfirmarBase] = useState(false);
-  // «Plano | Ordenadas» (escritorio, 07/11/2026): se recuerda en este navegador; por defecto «Plano».
-  const [modoMesas, setModoMesas] = useState<ModoMesasHoy>(leerModoMesasHoy);
-  const cambiarModoMesas = (m: ModoMesasHoy) => {
-    setModoMesas(m);
-    guardarModoMesasHoy(m);
-  };
   // Deslizar el dedo (o arrastrar) a izquierda o derecha sobre las mesas cambia de sala: 50 px como poco y
   // más de lado que de arriba abajo. Un toque quieto en una mesa sigue siendo un toque; tras deslizar, el
   // clic que llegue después se ignora.
@@ -1267,25 +1257,8 @@ export function VistaPlanoHoy({
             </TabsList>
             )}
             {/* «Reparto de mesas» ya no se ofrece desde Hoy (10/10/2026): lo esencial está aquí. */}
-            {fijo && sala && (
-              <ToggleGroup
-                type="single"
-                value={modoMesas}
-                onValueChange={(v) => (v === "plano" || v === "ordenadas") && cambiarModoMesas(v)}
-                variant="outline"
-                className="ml-auto shrink-0"
-                aria-label="Cómo ver las mesas"
-              >
-                <ToggleGroupItem value="plano" className="h-11 min-w-11 px-3 text-sm">
-                  Plano
-                </ToggleGroupItem>
-                <ToggleGroupItem value="ordenadas" className="h-11 min-w-11 px-3 text-sm">
-                  Ordenadas
-                </ToggleGroupItem>
-              </ToggleGroup>
-            )}
             {!proponiendo && sala && (
-              <div className={cn("flex shrink-0 items-center gap-2", !fijo && "ml-auto")}>
+              <div className="ml-auto flex shrink-0 items-center gap-2">
                 {/* Cerrar la terraza y volver al plano base escriben: solo con «Editar» (06/11/2026). Con
                     solo «Ver», si la terraza está cerrada se dice, sin interruptor. */}
                 {esTerraza && puedeEditar && (
@@ -1379,7 +1352,6 @@ export function VistaPlanoHoy({
                     coincidentes={coincidentesMapa}
                     onTocarMesa={tocarMesa}
                     uniones={unionesMapa}
-                    modo={modoMesas}
                   />
                 ) : (
                   <MapaSalaServicio

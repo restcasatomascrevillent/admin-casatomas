@@ -22,6 +22,12 @@
  *   ellas) y «Qué funciona» si existe.
  * - Formato: «auto» → 1 foto post, 2-10 carrusel; uno fijo manda. En el
  *   carrusel cada imagen es un «post» (4:5).
+ * - Encaje (08/11/2026): una foto que NO cubre el lienzo ampliando ≤ 5 %
+ *   (las de la carta, 1200×900; o cualquiera apaisada o pequeña, por las
+ *   medidas que manda el panel; sin medidas, las de «carta:»/«vino:» se dan
+ *   por no cubrir) va en la plantilla enmarcada («ct-marco»/«tz-marco»). Se
+ *   le dice a la IA (DATOS.fotos[].cubre) y, si aun así devuelve una a
+ *   sangre, se corrige a la enmarcada y se avisa.
  * - Validadores: los de sugerir_texto para el texto (precios, alérgenos,
  *   platos, datos personales, TOUZA sin reservas…), los de sugerir_rotulos para
  *   los rótulos de cada imagen con los límites de SU plantilla, plantillas que
@@ -82,11 +88,33 @@ const MAX_HASHTAGS = 5;
 const DIAS_FECHAS = 21;
 const RE_ID_FOTO = /^(drive|carta|vino|subida):[A-Za-z0-9_-]{1,200}$/;
 const FORMATOS: readonly (FormatoMontado | "auto")[] = ["auto", "post", "carrusel", "story"];
+/** Medidas de los formatos y ampliación máxima a sangre (src/lib/instagram: tokens.ts y fotos.ts). */
+const LIENZO = { post: { ancho: 1080, alto: 1350 }, story: { ancho: 1080, alto: 1920 } } as const;
+const AMPLIACION_MAXIMA = 1.05;
 
 export interface FotoMontar {
   id: string;
   /** URL reconstruida desde la ruta (nunca la que llega). */
   url: string;
+  /** Medidas que manda el panel (enteros positivos) o null si no llegan. */
+  ancho?: number | null;
+  alto?: number | null;
+}
+
+const medida = (v: unknown): number | null => (Number.isInteger(v) && (v as number) > 0 && (v as number) <= 20000 ? (v as number) : null);
+
+/**
+ * ¿La foto cubre el lienzo a sangre (ampliando ≤ 5 %)? Con medidas, la regla
+ * de esAptaPara; sin ellas, las de la carta y los vinos (1200×900 apaisadas,
+ * comprimidas para la web) no, y las de Drive o subidas sí.
+ */
+export function fotoCubre(foto: Pick<FotoMontar, "id" | "ancho" | "alto">, formato: "post" | "story"): boolean {
+  const { ancho, alto } = foto;
+  if (ancho && alto) {
+    const l = LIENZO[formato];
+    return Math.max(l.ancho / ancho, l.alto / alto) <= AMPLIACION_MAXIMA;
+  }
+  return !/^(carta|vino):/.test(foto.id);
 }
 
 export interface EntradaMontar {
@@ -129,7 +157,7 @@ export function validarEntradaMontar(valor: unknown, supabaseUrl: string): Resul
     if (fotos.some((x) => x.id === f.id)) return { ok: false, error: `La foto «${f.id}» está repetida` };
     const url = urlFotoSegura(f.url, supabaseUrl);
     if (!url) return { ok: false, tipo: "foto_no_valida", error: `La foto «${f.id}» no es una copia de nuestro bucket (tmp/ de «instagram», «platos» o «vinos»)` };
-    fotos.push({ id: f.id, url });
+    fotos.push({ id: f.id, url, ancho: medida(f.ancho), alto: medida(f.alto) });
   }
   if (formato === "carrusel" && fotos.length < 2) return { ok: false, error: "Un carrusel necesita al menos 2 fotos" };
   return {
@@ -185,8 +213,12 @@ export const ESQUEMA_MONTAR = {
 
 export function promptSistemaMontar(marca: MarcaIA, formato: FormatoMontado, plantillas: PlantillaIA[], nFotos: number): string {
   const lista = plantillas
-    .map((p) => `- «${p.id}»: ${p.campos.map((c) => `${c} (máx. ${p.limites[c] ?? 60}${c === "titular" ? ", 6 palabras" : ""})`).join(", ")}`)
+    .map(
+      (p) =>
+        `- «${p.id}»${p.encaje === "marco" ? " (Foto enmarcada: la foto entera, sin ampliar)" : " (foto a sangre: la amplía hasta cubrir)"}: ${p.campos.map((c) => `${c} (máx. ${p.limites[c] ?? 60}${c === "titular" ? ", 6 palabras" : ""})`).join(", ")}`,
+    )
     .join("\n");
+  const marco = plantillas.find((p) => p.encaje === "marco");
   const cuantas =
     formato === "carrusel"
       ? `un CARRUSEL con las ${nFotos} fotos (cada foto una vez, ninguna fuera), ordenadas para contar algo: la PRIMERA es la portada, la que más engancha.`
@@ -199,6 +231,11 @@ export function promptSistemaMontar(marca: MarcaIA, formato: FormatoMontado, pla
     "- «resumen»: UNA frase con lo que has entendido de las fotos (p. ej. «6 fotos de marisco fresco: centolla, nécoras y percebes»).",
     "- «diapositivas»: en el orden de publicación. Cada una con «foto» (el número de la foto), «plantilla» (SOLO una de esta lista), sus rótulos y «alt_text».",
     lista,
+    ...(marco
+      ? [
+          `  Si una foto tiene «cubre»: false en DATOS.fotos (las de la carta, 1200×900, o cualquiera apaisada o pequeña), usa SOLO «${marco.id}»: una plantilla a sangre la ampliaría y se vería borrosa. En «${marco.id}», «cita» es el nombre del plato (tal cual en DATOS.carta) o una frase corta; si no lo sabes, "".`,
+        ]
+      : []),
     "  Rótulos en tipo frase, concretos y sobre lo que se ve en ESA foto; el titular es obligatorio (6 palabras como mucho). La «cta» solo de DATOS.guia.ctas, o \"\". Los campos que la plantilla no usa van vacíos (\"\").",
     "  «alt_text»: UNA frase literal de esa foto (qué hay, sobre qué, el fondo), sin adjetivos de venta.",
     "- «gancho» y «caption» (SIN hashtags, empieza por el gancho, de 150 a 350 caracteres; en un carrusel puede llegar a 500 si hace falta contar la serie).",
@@ -246,7 +283,8 @@ export function revisarMontaje(
   const correcciones: string[] = [];
   const errores: string[] = [];
   const validas = plantillasMontar(ctx.marca, formato);
-  const porDefecto = validas[0];
+  const sangre = validas.find((p) => p.encaje !== "marco");
+  const marco = validas.find((p) => p.encaje === "marco");
   const diapositivas: DiapositivaMontada[] = [];
   const usadas = new Set<string>();
   for (const d of Array.isArray(bruto.diapositivas) ? (bruto.diapositivas as Array<Record<string, unknown>>) : []) {
@@ -260,6 +298,9 @@ export function revisarMontaje(
       correcciones.push(`La foto ${n} salía dos veces: se deja una.`);
       continue;
     }
+    // Una foto que no cubre el lienzo (las de la carta) solo vale enmarcada.
+    const cubre = fotoCubre(foto, formatoImagen(formato));
+    const porDefecto = (cubre ? sangre : marco) ?? validas[0];
     let plantilla = plantillaIA(d.plantilla);
     if (!plantilla || !validas.includes(plantilla)) {
       if (!porDefecto) {
@@ -268,6 +309,12 @@ export function revisarMontaje(
       }
       correcciones.push(`La plantilla «${textoDe(d.plantilla, 60)}» no vale para ${formato === "carrusel" ? "un carrusel" : `un ${formato}`} de esta marca: se usa «${porDefecto.id}».`);
       plantilla = porDefecto;
+    } else if (!cubre && plantilla.encaje !== "marco" && marco) {
+      const medidas = foto.ancho && foto.alto ? ` (${foto.ancho}×${foto.alto})` : foto.id.startsWith("carta:") ? " (foto de la carta)" : "";
+      correcciones.push(
+        `Foto ${n}${medidas}: no cubre ${formato === "story" ? "una story" : "un post"} y con «${plantilla.id}» se vería ampliada y borrosa: se usa «${marco.id}» (Foto enmarcada).`,
+      );
+      plantilla = marco;
     }
     const r = revisarRotulos(d, plantilla, ctx);
     if (!r.ok) {
@@ -405,7 +452,12 @@ export async function manejarMontar(valor: unknown, m: ContextoMontar): Promise<
     marca: e.marca,
     hoy: hoyMadrid(ahora),
     formato,
-    fotos: e.fotos.map((x, i) => ({ numero: i + 1, origen: x.id.split(":")[0] })),
+    fotos: e.fotos.map((x, i) => ({
+      numero: i + 1,
+      origen: x.id.split(":")[0],
+      ...(x.ancho && x.alto ? { medidas: `${x.ancho}×${x.alto}` } : {}),
+      cubre: fotoCubre(x, formatoImagen(formato)),
+    })),
     tono: DESCRIPCION_TONO[e.tono],
     indicacion: e.indicacion,
     guia: { version: guia.version, texto: guia.guia, hashtags_base: guia.hashtags_base, ctas: guia.ctas },

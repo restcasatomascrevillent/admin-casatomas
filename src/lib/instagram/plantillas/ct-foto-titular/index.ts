@@ -47,6 +47,8 @@ const plantilla: Plantilla = {
     pie: 48,
   },
   tiposFoto: ["plato", "sala", "ambiente", "bebida", "interior", "barra"],
+  // A sangre: la foto tiene que cubrir el lienzo (si no, «Foto enmarcada»).
+  encaje: "sangre",
 
   html(datos, ctx) {
     const story = datos.formato === "story";

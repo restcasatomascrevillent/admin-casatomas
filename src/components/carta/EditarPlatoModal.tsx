@@ -682,6 +682,8 @@ export function EditarPlatoModal({
                       </Button>
                       <BotonCambiarFondo
                         recorte={fotoCarta}
+                        tabla="Platos"
+                        id={plato?.id}
                         url={removeImage ? null : plato?.imagen_url}
                         onIniciado={() => {
                           setRemoveImage(false);

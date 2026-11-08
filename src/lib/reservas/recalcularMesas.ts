@@ -18,6 +18,9 @@
 //     franja (misma cuenta que el trigger, `estadoParaConfirmar`), sin nadie
 //     sentado ahora mismo en este turno y no excluida del reparto. Entre las
 //     válidas, la más justa (menos sillas vacías) y luego por número.
+//   · Las mesas «al final» (Configuración, `asignacion_mesas_al_final`: las
+//     10, 11 y 12 del Comedor, para dejar paso; 08/11/2026) solo se eligen
+//     si no queda ninguna otra válida.
 //   · Si no hay ninguna, se dice: «se queda sin mesa: no hay ninguna libre».
 // ============================================================================
 
@@ -70,6 +73,8 @@ export function elegirMesaReemplazo(p: {
   /** Mesas que no se pueden usar (la que se acaba de elegir, las ya repartidas…). */
   evitar?: ReadonlySet<string>;
   excluidas?: ReadonlySet<string>;
+  /** Mesas que se usan solo como último recurso (para dejar paso). */
+  alFinal?: ReadonlySet<string>;
   config?: ConfigOcupacionMesa;
 }): MesaOpcion | null {
   const { reserva } = p;
@@ -83,8 +88,10 @@ export function elegirMesaReemplazo(p: {
       !ocupadas.has(m.id) &&
       estadoParaConfirmar(p.asignaciones, m.id, { id: reserva.id, hora: reserva.hora }, p.config).tipo === "libre",
   );
+  const alFinal = (m: MesaOpcion) => Number(!!p.alFinal?.has(m.id));
   validas.sort(
     (a, b) =>
+      alFinal(a) - alFinal(b) ||
       a.plazas - b.plazas || numeroMesa(a.nombre) - numeroMesa(b.nombre) || a.nombre.localeCompare(b.nombre, "es"),
   );
   return validas[0] ?? null;
@@ -115,6 +122,7 @@ export function recolocarDesplazadas(p: {
   /** Las mesas que se acaban de elegir para la reserva (o el cliente sin reserva) que se sienta. */
   mesasElegidas: readonly string[];
   excluidas?: ReadonlySet<string>;
+  alFinal?: ReadonlySet<string>;
   config?: ConfigOcupacionMesa;
 }): Desplazamiento[] {
   const salaDe = new Map(p.opciones.map((m) => [m.id, m.espacioId]));
@@ -133,6 +141,7 @@ export function recolocarDesplazadas(p: {
       reserva: { id: d.reservaId, hora: d.hora, comensales, salaId },
       evitar,
       excluidas: p.excluidas,
+      alFinal: p.alFinal,
       config: p.config,
     });
     if (!mesa) return { ...d, mesaIdsQuedan: [], recolocadaEn: null };
@@ -182,6 +191,7 @@ export function proponerRecalculo(p: {
   asignaciones: readonly AsignacionConfirmar[];
   turno: "comida" | "cena";
   excluidas?: ReadonlySet<string>;
+  alFinal?: ReadonlySet<string>;
   config?: ConfigOcupacionMesa;
 }): PropuestaRecalculo {
   const nombreDe = new Map(p.opciones.map((m) => [m.id, m.nombre]));
@@ -221,6 +231,7 @@ export function proponerRecalculo(p: {
       asignaciones: sinEsta,
       reserva: { id, hora, comensales: r?.numero_comensales ?? 1, salaId },
       excluidas: p.excluidas,
+      alFinal: p.alFinal,
       config: p.config,
     });
     const nombre = r?.nombre?.trim() || "Sin nombre";

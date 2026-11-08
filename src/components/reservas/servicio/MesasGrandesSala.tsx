@@ -5,13 +5,10 @@
 // el móvil, en ordenador se ve mal». En vez del plano realista (`MapaSalaServicio`,
 // que sigue para el resto de vistas), un plano tipo programa de gestión de
 // restaurante: sin paredes, sin decoración y sin cuadrícula; cada mesa es una
-// TARJETA grande que ocupa el sitio de la sala, colocada más o menos donde está
-// (filas y columnas derivadas de sus posiciones: `rejillaMesasGrandes`).
-//
-// DOS MODOS (07/11/2026, «respétame un poco más el mapa… y si no, ordenadas»):
-// «Plano» (cada mesa en su sitio real, a escala: `planoFiel`) y «Ordenadas»
-// (rejilla por número: `rejillaOrdenadas`). Táctil: objetivos de 44 px como poco
-// (si en «Plano» no llegan, esa sala va «Ordenadas»), sin zoom ni scroll al tocar.
+// TARJETA grande, ORDENADAS por número (el 10 después del 9: `rejillaOrdenadas`).
+// El modo «Plano» (cada mesa en su sitio real) se quitó el 08/11/2026: «elimina el
+// plano; solo se queda la vista Ordenadas». Táctil: objetivos de 44 px como poco,
+// sin zoom ni scroll al tocar.
 //
 // SIN SCROLL (07/11/2026, el dueño en el Salón de la demo, v0.391): todas las
 // mesas caben SIEMPRE en el hueco. El tamaño de cada tarjeta sale del ancho y el
@@ -33,12 +30,10 @@ import { Link2, Lock, MessageSquareText, Move, Star, Users } from "lucide-react"
 import { cn } from "@/lib/utils";
 import type { Mesa } from "@/hooks/useMesas";
 import type { ResultadoEstadoMesa } from "@/lib/reservas/servicioSala";
-import { nombreCartelMesa, tiempoCortoMesa, type ModoMesasHoy } from "@/lib/reservas/vistaHoy";
+import { nombreCartelMesa, tiempoCortoMesa } from "@/lib/reservas/vistaHoy";
 import type { UnionDibujo } from "@/lib/reservas/dibujoMesas";
 import {
   compararNombreMesa,
-  MINIMO_TACTIL,
-  planoFiel,
   rejillaOrdenadas,
   RELLENO_MESAS_GRANDES,
   unidadesMesas,
@@ -59,11 +54,6 @@ export interface MesasGrandesSalaProps {
   onTocarMesa: (mesa: Mesa) => void;
   /** Mesas juntas en este servicio (`dibujarUniones`): una tarjeta por unión. */
   uniones?: readonly UnionDibujo[];
-  /**
-   * «Plano» (cada mesa en su sitio, a escala) u «Ordenadas» (rejilla por número). Si en «Plano» alguna tarjeta
-   * quedaría por debajo de 44 px (objetivo táctil), la sala se pinta «Ordenadas».
-   */
-  modo?: ModoMesasHoy;
 }
 
 export function MesasGrandesSala({
@@ -74,7 +64,6 @@ export function MesasGrandesSala({
   coincidentes,
   onTocarMesa,
   uniones = [],
-  modo = "plano",
 }: MesasGrandesSalaProps) {
   const [caja, setCaja] = useState<HTMLDivElement | null>(null);
   const tamano = useTamanoElemento(caja) ?? HUECO_POR_DEFECTO;
@@ -82,18 +71,12 @@ export function MesasGrandesSala({
   const porId = useMemo(() => new Map(mesas.map((m) => [m.id, m])), [mesas]);
   const unionDe = useMemo(() => new Map(uniones.map((u) => [u.ids[0], u])), [uniones]);
   const unidades = useMemo(() => unidadesMesas(mesas, uniones), [mesas, uniones]);
-  const plano = useMemo(
-    () => (modo === "plano" ? planoFiel(unidades, ancho, alto) : null),
-    [modo, unidades, ancho, alto],
-  );
-  const enPlano = !!plano && plano.cajas.length > 0 && plano.minimo >= MINIMO_TACTIL;
-  // «Ordenadas»: por número de la mesa principal (el 10 después del 9).
+  // Por número de la mesa principal (el 10 después del 9).
   const ordenadas = useMemo(() => {
-    if (enPlano) return null;
     const nombre = (ids: string[]) => porId.get(ids[0])?.nombre ?? "";
     const lista = [...unidades].sort((a, b) => compararNombreMesa(nombre(a.ids), nombre(b.ids)));
     return { lista, rejilla: rejillaOrdenadas(lista.length, ancho, alto) };
-  }, [enPlano, unidades, porId, ancho, alto]);
+  }, [unidades, porId, ancho, alto]);
 
   if (unidades.length === 0) {
     return (
@@ -139,15 +122,8 @@ export function MesasGrandesSala({
       ref={setCaja}
       className="relative h-full w-full touch-none select-none overflow-hidden"
       data-testid="mesas-grandes"
-      data-modo={enPlano ? "plano" : "ordenadas"}
-      data-modo-pedido={modo}
     >
-      {enPlano && plano ? (
-        plano.cajas.map((c) =>
-          tarjeta(c.ids, { position: "absolute", left: c.left, top: c.top, width: c.width, height: c.height }, c.width, c.height),
-        )
-      ) : ordenadas ? (
-        <div className="flex h-full w-full items-center justify-center" style={{ padding: RELLENO_MESAS_GRANDES }}>
+      <div className="flex h-full w-full items-center justify-center" style={{ padding: RELLENO_MESAS_GRANDES }}>
           <div
             className="grid"
             data-filas={ordenadas.rejilla.filas}
@@ -160,8 +136,7 @@ export function MesasGrandesSala({
           >
             {ordenadas.lista.map((u) => tarjeta(u.ids, {}, ordenadas.rejilla.tarjetaAncho, ordenadas.rejilla.tarjetaAlto))}
           </div>
-        </div>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -186,7 +161,7 @@ function TarjetaMesa({
   /** Una mesa, o las de una unión (la principal primero). */
   mesas: Mesa[];
   plazas: number;
-  /** Posición (en «Plano», absoluta) y tamaño. */
+  /** Estilo extra de la tarjeta (posición en la rejilla). */
   estilo: CSSProperties;
   /** Medidas en px, para escalar letras y quitar lo que no cabe. */
   ancho: number;

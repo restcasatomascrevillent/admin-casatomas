@@ -7,7 +7,7 @@
  * La IA solo propone: nada de aquí publica ni programa.
  */
 import { ErrorIA, llamar, type OpcionesLlamada } from "@/components/instagram/ia/api";
-import { obtenerPlantilla, plantillasDe } from "@/lib/instagram";
+import { cubreFormato, obtenerPlantilla, plantillaEnmarcada, plantillasDe } from "@/lib/instagram";
 import {
   MAX_FOTOS_CARRUSEL,
   type DiapositivaMontada,
@@ -116,17 +116,24 @@ export function crearMontadorSimulado(o: OpcionesMontadorSimulado = {}): Montado
     if (o.fallo) throw new ErrorIA(o.fallo, "servidor");
     const fotos = o.invertirOrden ? [...p.fotos].reverse() : p.fotos;
     const formato: FormatoMontado = fotos.length > 1 ? "carrusel" : p.formato === "story" ? "story" : "post";
-    const plantilla = plantillasDe(p.marca, formato === "story" ? "story" : "post").find((x) => x.admitidos.includes("foto"));
+    const formatoImg = formato === "story" ? "story" : "post";
+    const plantilla = plantillasDe(p.marca, formatoImg).find((x) => x.admitidos.includes("foto"));
+    // Como el servidor: una foto que no cubre el lienzo (las de la carta, 1200×900) va enmarcada.
+    const enmarcada = plantillaEnmarcada(p.marca, formatoImg);
     const titulares = ["Recién llegado", "Del mar a la mesa", "Para compartir", "Hecho al momento", "Te esperamos"];
-    const diapositivas: DiapositivaMontada[] = fotos.map((f, i) => ({
-      foto: f.id,
-      plantilla: plantilla?.id ?? "",
-      datos: {
-        titular: titulares[i % titulares.length],
-        ...(i === 0 && obtenerPlantilla(plantilla?.id ?? "")?.admitidos.includes("antetitulo") ? { antetitulo: "Esta semana" } : {}),
-      },
-      altText: `Foto ${i + 1} de ${fotos.length} de la publicación.`,
-    }));
+    const diapositivas: DiapositivaMontada[] = fotos.map((f, i) => {
+      const noCubre = !!f.ancho && !!f.alto && !cubreFormato({ ancho: f.ancho, alto: f.alto }, formatoImg);
+      const id = (noCubre && enmarcada ? enmarcada : plantilla)?.id ?? "";
+      return {
+        foto: f.id,
+        plantilla: id,
+        datos: {
+          titular: titulares[i % titulares.length],
+          ...(i === 0 && obtenerPlantilla(id)?.admitidos.includes("antetitulo") ? { antetitulo: "Esta semana" } : {}),
+        },
+        altText: `Foto ${i + 1} de ${fotos.length} de la publicación.`,
+      };
+    });
     const tema = p.indicacion?.trim() ? `«${p.indicacion.trim()}»` : "lo que se ve en las fotos";
     return {
       ok: true as const,

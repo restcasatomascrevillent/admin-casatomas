@@ -2,16 +2,40 @@
  * «Cambiar el fondo del vídeo» (lógica PURA, sin Supabase ni React).
  *
  * El fondo va pintado dentro de los fotogramas del vídeo generado, así que
- * para cambiarlo hay que volver a procesar el vídeo ORIGINAL. Por eso se
- * conserva el original en el bucket `platos`, en una ruta estable por plato
- * (`videos-originales/<platoId>.<ext>`, se sustituye cada vez), y el fondo
- * con el que se hizo el vídeo se apunta en su `video_url` (`&fondo=<tema>`),
- * sin columnas nuevas.
+ * para cambiarlo hay que volver a procesar el vídeo ORIGINAL. Desde el
+ * 08/11/2026 (en Supabase solo la versión web) el original vive en Google
+ * Drive, uno por plato: marketing/carta/<marca>/videos/<platoId>.<ext>
+ * (instagram-drive · subir_original_video / descargar_original). En el panel
+ * se identifica con `drive:<platoId>.<ext>`. Los antiguos del bucket `platos`
+ * (`videos-originales/<platoId>.<ext>`) se siguen leyendo mientras
+ * scripts/carta/mover-originales-a-drive.mjs no los mueva. El fondo con el
+ * que se hizo el vídeo se apunta en su `video_url` (`&fondo=<tema>`), sin
+ * columnas nuevas.
  */
 import { TEMAS, type NombreTema } from "../composicionCarta";
 import { extensionBruto } from "../potente/colaPendientes";
 
+/** Carpeta ANTIGUA de los originales en el bucket `platos` (solo lectura y limpieza). */
 export const CARPETA_ORIGINALES = "videos-originales";
+export const PREFIJO_ORIGINAL_DRIVE = "drive:";
+
+/** `drive:<platoId>.<ext>`: el original del plato está en Google Drive. */
+export function rutaOriginalDrive(platoId: string, ext: ExtensionOriginal): string {
+  return `${PREFIJO_ORIGINAL_DRIVE}${platoId}.${ext}`;
+}
+
+export function esOriginalDrive(ruta: string | null | undefined): ruta is string {
+  return typeof ruta === "string" && ruta.startsWith(PREFIJO_ORIGINAL_DRIVE);
+}
+
+/** platoId de `drive:<platoId>.<ext>` (null si no lo es). */
+export function platoDeOriginalDrive(ruta: string): string | null {
+  if (!esOriginalDrive(ruta)) return null;
+  const resto = ruta.slice(PREFIJO_ORIGINAL_DRIVE.length);
+  const punto = resto.lastIndexOf(".");
+  const id = punto > 0 ? resto.slice(0, punto) : resto;
+  return /^[A-Za-z0-9_-]{1,100}$/.test(id) ? id : null;
+}
 
 export const MENSAJE_SIN_ORIGINAL =
   "Este vídeo se hizo antes de guardar el original: elige el vídeo otra vez para cambiarle el fondo.";
@@ -39,7 +63,7 @@ export function extensionDeRuta(ruta: string): ExtensionOriginal {
 
 /** File para la cola a partir del original descargado (el nombre lleva la extensión, que usa la conversión). */
 export function archivoDesdeOriginal(blob: Blob, ruta: string): File {
-  const nombre = ruta.split("/").pop() || "original.mp4";
+  const nombre = ruta.replace(PREFIJO_ORIGINAL_DRIVE, "").split("/").pop() || "original.mp4";
   return new File([blob], nombre, { type: blob.type || "video/mp4" });
 }
 

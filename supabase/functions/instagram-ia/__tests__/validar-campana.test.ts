@@ -59,6 +59,19 @@ describe("validar-campana", () => {
     expect(sinFoto.ok).toBe(true);
   });
 
+  it("foto de la carta con plantilla a sangre → se corrige a la enmarcada (ct-marco) y se avisa; la de Drive no", () => {
+    const r = revisarPiezaCampana(pieza(), CTX);
+    expect(r.valor.plantilla).toBe("ct-marco");
+    expect(r.correcciones.join(" ")).toMatch(/foto de la carta no cubre la plantilla «ct-foto-titular».*«ct-marco» \(Foto enmarcada\)/);
+    const story = revisarPiezaCampana(pieza({ formato: "story" }), CTX);
+    expect(story.valor.plantilla).toBe("ct-marco");
+    const drive = revisarPiezaCampana(pieza({ foto_sugerida: "drive:FotoDelPulpo0001" }), CTX);
+    expect(drive.valor.plantilla).toBe("ct-foto-titular");
+    const yaMarco = revisarPiezaCampana(pieza({ plantilla: "ct-marco" }), CTX);
+    expect(yaMarco.valor.plantilla).toBe("ct-marco");
+    expect(yaMarco.correcciones.join(" ")).not.toMatch(/no cubre/);
+  });
+
   it("descarta plato inexistente, fecha fuera, plantilla de otra marca y formato que la plantilla no admite", () => {
     expect(revisarPiezaCampana(pieza({ plato_id: "langosta" }), CTX).errores.join(" ")).toMatch(/no está en la carta activa/);
     expect(revisarPiezaCampana(pieza({ fecha: "2026-11-30" }), CTX).errores.join(" ")).toMatch(/fuera de la campaña/);

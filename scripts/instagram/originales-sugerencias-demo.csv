@@ -1,0 +1,13 @@
+id_plato,fichero,tabla,nombre_plato,puntuacion,foto_en_la_web,alternativas
+a98d37d3-44e2-4064-8cc7-32aaa2e8a51f,alcachofas.jpg,Platos,Revuelto de alcachofas crujientes con queso parmesano,0.88,sí,"Alcachofa a la parrilla con oreja, guanciale y queso Idiazábal [d69eaeb6-0e18-42be-a91c-76060a820d7b] 0.88"
+a93f4553-eddf-4832-820e-49d9b0e21493,arroz.jpg,Platos,Arroz con leche,0.93,sí,Arroz meloso de rape [e4ffd7d0-6234-45f2-b319-d88bf8a867fb] 0.90 | Arroz meloso de langosta [7b153dce-517e-4f31-821b-9e7d4e575549] 0.90 | Arroz meloso de bogavante [158ccf9e-58e1-4879-befd-9341b7ed77c4] 0.90
+10673b54-c56a-48fa-868d-fa328fdf00ed,bogavante.jpg,Platos,Bogavante de la ría,0.93,no,Arroz meloso de bogavante [158ccf9e-58e1-4879-befd-9341b7ed77c4] 0.90
+,carne-guiso.jpg,Platos,(sin plato parecido: rellena id_plato o borra la fila),,,
+d100ee2d-d277-4edb-b1cb-06b67fa339bd,cecina.jpg,Platos,Cecina de wagyu,0.93,sí,
+111e2e2d-5357-47c2-baf2-3e7a72ea4579,chuleton.jpg,Platos,Chuletón ternera,0.93,sí,Chuletón de buey minhota [07503983-ccfa-4aa4-9dbc-3671929186e8] 0.90 | Chuletón vaca madurada 60 días [19a05c55-ad76-4ae7-a6f9-a4e5c71e7fc0] 0.89 | Tataki de chuletón con berenjena asada a la brasa [a4a35062-8c27-4ef5-9044-73bd76e0130f] 0.88
+97fa2f61-25b9-4ce6-b0ca-0aac33ed8ded,gambas.jpg,Platos,Gamba roja,0.93,sí,Gamba blanca [8f18b98f-0865-404a-a390-9e219a067d50] 0.93 | Croqueta de gamba roja al ajillo [67ab87c4-6a82-4e7b-9fe8-500ad4536d68] 0.89
+a586c8a4-3ee8-4295-96e0-b80ea9b50e43,ostras.jpg,Platos,Ostras,1.00,sí,Ostras gallegas [a759896c-b7d3-4f33-93a2-fe5c625dfcb9] 0.93 | Ostra con caviar oscietra [e7b520a8-ea2d-42bc-85fb-cc54c1307e3e] 0.90
+,postre-nudo.jpg,Platos,(sin plato parecido: rellena id_plato o borra la fila),,,
+5b8ae58c-2b26-4108-8c52-01b6e24dfd81,salazones.jpg,Platos,E. Salazones,1.00,sí,Bonito en salazón [3000489b-9a7c-4ca6-a22a-8616935bf93b] 0.93
+,steak-tartar.jpg,Platos,(sin plato parecido: rellena id_plato o borra la fila),,,
+01cb6bf9-14f8-4d81-aa3d-1213634790ea,tartar-atun.jpg,Platos,Tartar de atún rojo,0.95,sí,
