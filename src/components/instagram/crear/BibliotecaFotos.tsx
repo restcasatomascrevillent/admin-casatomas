@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, ImagePlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { urlRecurso, type Foto, type FormatoId, type MarcaId } from "@/lib/instagram";
+import { plantillaEnmarcada, urlRecurso, type Foto, type FormatoId, type MarcaId } from "@/lib/instagram";
 import { MAX_FOTOS_CARRUSEL } from "@/lib/instagram/montar";
 import { MiniaturaCarta, MiniaturaDrive, motivoNoApta } from "@/components/marketing/instagram/SelectorFoto";
 import { EtiquetaOriginal } from "@/components/marketing/instagram/EtiquetaOriginal";
@@ -116,7 +116,9 @@ export function BibliotecaFotos({ marca, formato, elegidas, onAlternar, onSubida
         data-testid="biblioteca-fotos"
       >
         {fotos.map((foto) => {
-          const motivo = motivoNoApta(foto, formato);
+          // La plantilla la elige después la IA (o «Ajustar a mano»): una foto vale si vale
+          // para ALGUNA plantilla, y la más permisiva es la enmarcada (las de la carta, 1200×900).
+          const motivo = motivoNoApta(foto, formato, plantillaEnmarcada(marca, formato) ?? undefined);
           const orden = elegidas.indexOf(foto.id);
           const elegida = orden >= 0;
           const nombre = nombreFoto(foto);

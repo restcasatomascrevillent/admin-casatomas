@@ -11,4 +11,4 @@ export * from "./esquema.js";
 export * from "./documento.js";
 export * from "./maquetacion.js";
 export * from "./ejemplos.js";
-export { PLANTILLAS, obtenerPlantilla, plantillasDe, problemasDePlantilla } from "./plantillas/index.js";
+export { PLANTILLAS, obtenerPlantilla, plantillaEnmarcada, plantillasDe, problemasDePlantilla } from "./plantillas/index.js";
