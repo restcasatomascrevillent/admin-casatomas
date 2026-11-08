@@ -75,7 +75,7 @@ vi.mock("@/components/reservas/ElegirMesaDialog", () => ({
 }));
 
 import { VistaPlanoHoy, type ReservaPlanoHoy } from "@/components/reservas/servicio/VistaPlanoHoy";
-import { CLAVE_MODO_MESAS_HOY, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
+import type { FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
 
 beforeAll(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -210,7 +210,6 @@ function anchoVentana(px: number) {
 }
 
 beforeEach(() => {
-  window.localStorage.removeItem(CLAVE_MODO_MESAS_HOY);
   anchoVentana(1440);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(a(14, 30));
@@ -748,13 +747,11 @@ describe("Plano de Hoy · fijo (escritorio): una sala a la vez con flechas", () 
     expect(screen.queryByRole("button", { name: "Alejar el plano" })).toBeNull();
   });
 
-  for (const modo of ["plano", "ordenadas"] as const) {
-    it(`«${modo}»: el plano de mesas NO tiene scroll y el número de mesa sale entero, sin recortar`, async () => {
-      window.localStorage.setItem(CLAVE_MODO_MESAS_HOY, modo);
+  {
+    it("las mesas NO tienen scroll y el número de mesa sale entero, sin recortar", async () => {
       h.mesas = [...h.mesas, mesa("m13", "13", "comedor", 4, 7, 4)];
       montar({ fijo: true });
       const contenedor = await screen.findByTestId("mesas-grandes");
-      expect(contenedor).toHaveAttribute("data-modo", modo);
       for (const nodo of [contenedor, ...Array.from(contenedor.querySelectorAll("*"))] as HTMLElement[]) {
         expect(nodo.getAttribute("class") ?? "").not.toMatch(/overflow-(auto|scroll|y-auto|x-auto|y-scroll|x-scroll)/);
       }
@@ -768,41 +765,16 @@ describe("Plano de Hoy · fijo (escritorio): una sala a la vez con flechas", () 
     });
   }
 
-  it("«Plano»: cada mesa en su sitio (lo de la izquierda a la izquierda, lo de arriba arriba)", async () => {
-    montar({ fijo: true });
-    expect(await screen.findByTestId("mesas-grandes")).toHaveAttribute("data-modo", "plano");
-    const izq = (n: string) => parseFloat(mesaBoton(n).style.left);
-    const arriba = (n: string) => parseFloat(mesaBoton(n).style.top);
-    // Comedor: 1, 2 y 3 en y = 1 m (x 1, 3, 5); 4 y 5 en y = 4 m (x 1, 3).
-    expect(izq("1")).toBeLessThan(izq("2"));
-    expect(izq("2")).toBeLessThan(izq("3"));
-    expect(izq("4")).toBeLessThan(izq("5"));
-    expect(arriba("1")).toBeLessThan(arriba("4"));
-    expect(arriba("1")).toBe(arriba("3"));
-    // Objetivo táctil: ninguna tarjeta por debajo de 44 px.
-    for (const n of ["1", "2", "3", "4", "5"]) {
-      expect(parseFloat(mesaBoton(n).style.width)).toBeGreaterThanOrEqual(44);
-      expect(parseFloat(mesaBoton(n).style.height)).toBeGreaterThanOrEqual(44);
-    }
-  });
-
-  it("«Ordenadas»: por número (el 10 después del 9), y la elección se recuerda", async () => {
+  it("solo «Ordenadas» (08/11/2026): por número (el 10 después del 9), sin selector «Plano | Ordenadas»", async () => {
     h.mesas = [mesa("a", "10", "comedor", 4, 0, 0), mesa("b", "9", "comedor", 4, 5, 5), mesa("c", "2", "comedor", 4, 3, 1), mesa("d", "1", "comedor", 4, 9, 9)];
-    const { unmount } = montar({ fijo: true });
-    await screen.findByTestId("mesas-grandes");
-    const selector = screen.getByRole("group", { name: "Cómo ver las mesas" });
-    expect(within(selector).getByRole("radio", { name: "Plano" })).toHaveAttribute("aria-checked", "true");
-    fireEvent.click(within(selector).getByRole("radio", { name: "Ordenadas" }));
-    const contenedor = screen.getByTestId("mesas-grandes");
-    expect(contenedor).toHaveAttribute("data-modo", "ordenadas");
+    montar({ fijo: true });
+    const contenedor = await screen.findByTestId("mesas-grandes");
     const orden = Array.from(contenedor.querySelectorAll("[data-mesa-id]")).map((b) => b.getAttribute("aria-label")!.split(",")[0]);
     expect(orden).toEqual(["Mesa 1", "Mesa 2", "Mesa 9", "Mesa 10"]);
-    expect(window.localStorage.getItem(CLAVE_MODO_MESAS_HOY)).toBe("ordenadas");
-    unmount();
-    montar({ fijo: true });
-    expect(await screen.findByTestId("mesas-grandes")).toHaveAttribute("data-modo", "ordenadas");
-    // El selector, con objetivos de 44 px.
-    for (const r of within(screen.getByRole("group", { name: "Cómo ver las mesas" })).getAllByRole("radio")) expect(r).toHaveClass("h-11");
+    expect(screen.queryByRole("group", { name: "Cómo ver las mesas" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Plano" })).toBeNull();
+    // Objetivo táctil: tarjetas de 44 px como poco.
+    for (const b of Array.from(contenedor.querySelectorAll("[data-mesa-id]"))) expect(b).toHaveClass("min-h-11", "min-w-11");
   });
 
   it("deslizar el dedo a izquierda o derecha sobre las mesas cambia de sala; un toque no", async () => {
