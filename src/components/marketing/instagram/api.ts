@@ -506,6 +506,87 @@ export async function subirOriginalCarta(
   };
 }
 
+export type TablaOriginalCarta = "Platos" | "Vinos";
+export type TipoOriginalCarta = "foto" | "video";
+
+/** Lo que dice instagram-drive · descargar_original con `comprobar: true`. */
+export interface InfoOriginalCarta {
+  tipo: TipoOriginalCarta;
+  driveId: string;
+  nombre: string;
+  mimeType: string;
+  bytes: number;
+  ancho: number | null;
+  alto: number | null;
+}
+
+async function pedirOriginal(n: { tabla: TablaOriginalCarta; id: string; tipo?: TipoOriginalCarta; comprobar?: boolean }, opts: OpcionesLlamada = {}): Promise<Response | null> {
+  const token = opts.token === undefined ? await tokenSesion() : opts.token;
+  if (!token) throw new ErrorInstagram("No hay sesión: vuelve a entrar en el panel.", "sesion", 401);
+  let r: Response;
+  try {
+    r = await (opts.fetch ?? fetch)(`${URL_DRIVE}?accion=descargar_original`, {
+      method: "POST",
+      headers: { ...cabecerasEdge(), "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ tabla: n.tabla, id: n.id, tipo: n.tipo ?? "foto", ...(n.comprobar ? { comprobar: true } : {}) }),
+    });
+  } catch (e) {
+    throw new ErrorInstagram((e as Error)?.message || "Sin conexión", "red");
+  }
+  if (r.ok) return r;
+  const c = (esJson(r) ? await r.json().catch(() => ({})) : {}) as { error?: string; message?: string; sinOriginal?: boolean; comoArreglarlo?: string | string[] };
+  if (r.status === 404 && c.sinOriginal) return null;
+  if (r.status === 404 && !c.error) {
+    throw new ErrorInstagram("La función instagram-drive no está desplegada (o es anterior a descargar_original).", "servidor", 404, "Despliégala: npx supabase functions deploy instagram-drive --project-ref <ref del proyecto>.");
+  }
+  const tipo: TipoErrorInstagram = r.status === 401 || r.status === 403 ? "sesion" : "servidor";
+  throw new ErrorInstagram(c.error ?? c.message ?? `El servidor respondió ${r.status}`, tipo, r.status, c.comoArreglarlo);
+}
+
+/**
+ * ORIGINAL de Drive de un plato o un vino (foto JPEG o, en platos, el vídeo
+ * en bruto). Desde el 08/11/2026 los originales viven SOLO en Drive: en
+ * Supabase solo queda la versión web. null si la ficha no tiene original.
+ * Permiso: «Editar» en la carta.
+ */
+export async function descargarOriginalCarta(n: { tabla: TablaOriginalCarta; id: string; tipo?: TipoOriginalCarta }, opts?: OpcionesLlamada): Promise<Blob | null> {
+  const r = await pedirOriginal(n, opts);
+  if (!r) return null;
+  const tipo = (r.headers.get("content-type") ?? "").split(";")[0].trim();
+  if (!(tipo.startsWith("image/") || tipo.startsWith("video/"))) throw new ErrorInstagram(`El original llegó como ${tipo || "tipo desconocido"}`, "servidor", r.status);
+  const blob = await r.blob();
+  return blob.type ? blob : new Blob([blob], { type: tipo });
+}
+
+/** ¿Tiene original en Drive? (sin descargarlo). null si no. */
+export async function comprobarOriginalCarta(n: { tabla: TablaOriginalCarta; id: string; tipo?: TipoOriginalCarta }, opts?: OpcionesLlamada): Promise<InfoOriginalCarta | null> {
+  const r = await pedirOriginal({ ...n, comprobar: true }, opts);
+  if (!r) return null;
+  const j = (await r.json().catch(() => ({}))) as Crudo;
+  return {
+    tipo: j.tipo === "video" ? "video" : "foto",
+    driveId: String(j.driveId ?? ""),
+    nombre: String(j.nombre ?? ""),
+    mimeType: String(j.mimeType ?? ""),
+    bytes: Number(j.bytes) || 0,
+    ancho: typeof j.ancho === "number" ? j.ancho : null,
+    alto: typeof j.alto === "number" ? j.alto : null,
+  };
+}
+
+/** Sube (o reemplaza) el vídeo ORIGINAL en bruto de un plato a Drive (≤ 50 MB). */
+export async function subirOriginalVideoCarta(
+  n: { id: string; archivo: Blob; nombre: string },
+  opts?: OpcionesLlamada,
+): Promise<{ driveId: string; nombre: string; bytes: number; reemplazado: boolean }> {
+  const form = new FormData();
+  form.set("tabla", "Platos");
+  form.set("id", n.id);
+  form.set("archivo", n.archivo, n.nombre);
+  const r = await llamar<Crudo>(`${URL_DRIVE}?accion=subir_original_video`, { method: "POST", body: form }, opts, cabecerasEdge());
+  return { driveId: String(r.driveId ?? ""), nombre: String(r.nombre ?? ""), bytes: Number(r.bytes) || 0, reemplazado: r.reemplazado === true };
+}
+
 /** Prepara una foto de Drive, de la carta o de un vino según su origen. */
 export function prepararFotoOrigen(marca: MarcaId, origen: FotoPreparable, opts?: OpcionesLlamada) {
   if (origen.origen === "carta") return prepararFotoCarta(marca, origen.id, opts);
