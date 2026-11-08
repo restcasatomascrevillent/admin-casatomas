@@ -84,6 +84,8 @@ jobs:
         run: npm run test:vinos-copeo-encuesta:db
       - name: Instagram, bucket y piezas por la sección marketing (PGlite)
         run: npm run test:instagram:db
+      - name: Originales de las fotos de la carta en Drive (PGlite)
+        run: npm run test:carta-originales:db
       - name: Instagram, publicaciones programadas, RPC y cron del programador (PGlite)
         run: npm run test:instagram-programar:db
       - name: Métricas de Instagram, tablas, RLS y cron (PGlite)
