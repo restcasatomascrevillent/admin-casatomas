@@ -115,6 +115,8 @@ export function opcionesParaSentar(params: {
   ajustesDia: readonly AjusteDia[];
   asignaciones: readonly AsignacionDia[];
   excluidas: ReadonlySet<string>;
+  /** Mesas que se usan solo como último recurso (para dejar paso): al final de la lista y nunca de propuesta. */
+  alFinal?: ReadonlySet<string>;
   configOcupacion?: ConfigOcupacionMesa;
   /** `id` vacío para quien aún no tiene reserva (walk-in). */
   reserva: { id: string; hora: string; comensales: number; espacioId: string | null };
@@ -127,9 +129,12 @@ export function opcionesParaSentar(params: {
   const libre = (mesaId: string) =>
     !excluidas.has(mesaId) &&
     !conflictoDeMesa(asignaciones, mesaId, { id: reserva.id || "__nueva__", hora: reserva.hora }, configOcupacion);
-  const caben = mesasQueCaben(opciones, reserva.comensales, reserva.espacioId, libre);
+  const alFinal = params.alFinal ?? new Set<string>();
+  const caben = mesasQueCaben(opciones, reserva.comensales, reserva.espacioId, libre, alFinal);
 
-  const cabeDondeToca = reserva.espacioId ? caben.some((m) => m.espacioId === reserva.espacioId) : caben.length > 0;
+  // Si donde toca solo caben mesas «al final», antes se prueba juntar/separar piezas en una normal.
+  const normales = caben.filter((m) => !alFinal.has(m.id));
+  const cabeDondeToca = reserva.espacioId ? normales.some((m) => m.espacioId === reserva.espacioId) : normales.length > 0;
   if (cabeDondeToca) return { caben, propuesta: null };
 
   // Propuesta de piezas: en su sala, o en cualquiera si no tiene.
@@ -149,7 +154,7 @@ export function opcionesParaSentar(params: {
       porReserva.set(a.reserva_id, r);
     }
     for (const m of piezas) {
-      if (!libre(m.id)) continue;
+      if (!libre(m.id) || alFinal.has(m.id)) continue;
       const r = proponerParaSentar({
         mesas: piezas,
         estado,
@@ -165,8 +170,11 @@ export function opcionesParaSentar(params: {
 }
 
 /** Para quien entra sin reserva: la mesa más justa de cualquier sala, y luego por sala. */
-export function ordenarParaSinReserva(caben: readonly MesaOpcion[]): MesaOpcion[] {
-  return [...caben].sort((a, b) => a.plazas - b.plazas || a.salaNombre.localeCompare(b.salaNombre, "es"));
+export function ordenarParaSinReserva(caben: readonly MesaOpcion[], alFinal?: ReadonlySet<string>): MesaOpcion[] {
+  const ultima = (m: MesaOpcion) => Number(!!alFinal?.has(m.id));
+  return [...caben].sort(
+    (a, b) => ultima(a) - ultima(b) || a.plazas - b.plazas || a.salaNombre.localeCompare(b.salaNombre, "es"),
+  );
 }
 
 // ─── «Sin reserva» (walk-in) ─────────────────────────────────────────────────
