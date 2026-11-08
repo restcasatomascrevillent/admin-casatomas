@@ -215,7 +215,10 @@ import {
   CircleDashed,
   Armchair,
   SquarePen,
+  Lock,
+  LockOpen,
 } from "lucide-react";
+import { useFijarMesa } from "@/hooks/useMesaFijada";
 import { toast } from "sonner";
 import { posicionInicialMesaNueva } from "./posicionMesaNueva";
 import { cn } from "@/lib/utils";
@@ -445,6 +448,7 @@ function TarjetaReserva({
           {tieneMesa ? (
             <span className="flex min-w-0 items-center gap-1" title={nombreMesasJuntas(mesasAsignadas)}>
               {mesasAsignadas.length > 1 && <Link2 className="h-3 w-3 shrink-0 text-emerald-600" />}
+              {reserva.mesa_fijada && <Lock className="h-3 w-3 shrink-0" aria-label="Mesa fijada" />}
               <span className="truncate font-medium text-foreground">{nombreMesasJuntas(mesasAsignadas)}</span>
             </span>
           ) : (
@@ -879,6 +883,7 @@ export function PlanoEspacio2D({
   // Editar una reserva desde su fila del panel (2026-09-30).
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
+  const fijarMesa = useFijarMesa();
 
   // ── Día y turno ───────────────────────────────────────────────────────────
   // Prioridad: prop `fecha` > `?fecha=` de la URL > hoy. El parámetro se llama
@@ -2670,6 +2675,24 @@ export function PlanoEspacio2D({
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
+                {/* «Fijar mesa» (07/11/2026): Organizar y Recalcular no la mueven ni se le quita al sentar a otro. */}
+                {(mesaIdsActivos.length > 0 || reservaActiva.mesa_fijada) && (
+                  <Button
+                    variant={reservaActiva.mesa_fijada ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-11 touch-manipulation"
+                    aria-pressed={!!reservaActiva.mesa_fijada}
+                    onClick={() => void fijarMesa(reservaActiva, !reservaActiva.mesa_fijada)}
+                    title="Con la mesa fijada, no se mueve al organizar ni se le quita al sentar a otro"
+                  >
+                    {reservaActiva.mesa_fijada ? (
+                      <LockOpen className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <Lock className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    {reservaActiva.mesa_fijada ? "Quitar fijación" : "Fijar mesa"}
+                  </Button>
+                )}
                 {mesaIdsActivos.length > 0 && (
                   <Button
                     variant="outline"

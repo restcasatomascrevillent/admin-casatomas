@@ -4,6 +4,7 @@ import { createClient as createClientBase } from "https://esm.sh/@supabase/supab
 import { autenticar, corsHeaders, jsonResponse, verificarSecreto } from "../procesar-factura/auth.ts";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { clasificarPendientes, FUNCION, MODELO_POR_DEFECTO } from "./clasificacion.ts";
+import { modeloDeFuncion } from "../_shared/modelo-funcion.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 const createClient = clienteConAuditoria(createClientBase, "clasificar-productos");
 
@@ -32,6 +33,8 @@ const URL_SB = Deno.env.get("SUPABASE_URL")!;
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const pedido = (Deno.env.get("CLASIFICAR_PRODUCTOS_MODELO") ?? "").trim();
 const MODELO = /^[a-z0-9][a-z0-9.\-]{2,60}$/i.test(pedido) ? pedido : MODELO_POR_DEFECTO;
+// Desde el 07/11/2026 manda ia_modelo_funcion (Super Admin › Servicios ›
+// Modelos); sin modelo en la tabla, este de arriba (como antes).
 
 const cfgAuth = {
   supabaseUrl: URL_SB,
@@ -56,7 +59,8 @@ serve(conAuditoriaDePeticion("clasificar-productos", createClientBase, async (re
   }
 
   const supabase = createClient(URL_SB, SERVICE, { auth: { autoRefreshToken: false, persistSession: false } });
-  const uso = new AcumuladorUso(FUNCION, MODELO, "chat");
+  const modelo = await modeloDeFuncion(FUNCION, MODELO, { cliente: supabase });
+  const uso = new AcumuladorUso(FUNCION, modelo, "chat");
   const t0 = Date.now();
   try {
     const r = await clasificarPendientes({
@@ -66,7 +70,7 @@ serve(conAuditoriaDePeticion("clasificar-productos", createClientBase, async (re
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${claveOpenAI("ocr")}` },
           body: JSON.stringify({
-            model: MODELO,
+            model: modelo,
             max_completion_tokens: 16000,
             response_format: { type: "json_schema", json_schema: esquema },
             messages: mensajes,

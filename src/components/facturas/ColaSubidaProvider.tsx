@@ -4,10 +4,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { leerTrabajosOcrEnCurso } from "@/hooks/useTrabajoOcr";
 import { ColaSubidaContext, type ContextoColaSubida, RUTA_CARGAR } from "@/hooks/useColaSubida";
 import { invalidarTrasDocumento, type AlertaValidacion } from "@/hooks/useFacturas";
 import {
+  alertasRelevantes,
   clasificarResultado,
   crearColaSubida,
   cuentaActivos,
@@ -16,6 +18,7 @@ import {
   depsSupabase,
   type ElementoCola,
   hayEnNavegador,
+  idToastTanda,
   POSICION_AVISOS,
   type ResumenTanda,
   textoResumenTanda,
@@ -60,7 +63,11 @@ interface Props {
  * pestaña o de sección no cancela nada. La pestaña «Cargar» y el indicador
  * del menú solo leen de aquí.
  *
- *  · Al terminar cada documento: toast con el resultado y botón «Ver».
+ *  · Un documento suelto: toast con el resultado y botón «Ver».
+ *  · Una tanda de VARIOS (07/11/2026, «se llena de avisos al subir los
+ *    albaranes»): UN solo toast que se va actualizando («Leyendo 4 de 12») y
+ *    al final resume la tanda; sin un aviso ni un pop-up por documento. Los
+ *    duplicados quedan en «Cargar» para decidir, como el resto de detalles.
  *  · Al terminar la tanda: una entrada en la campana (si el usuario no estaba
  *    mirando «Cargar») — una por tanda, no una por documento, para no llenarla.
  *  · Al cargar la página: adopta los documentos largos del usuario que siguen
@@ -74,7 +81,12 @@ export function ColaSubidaProvider({ children, deps }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const usuarioId = user?.id ?? null;
+  // Solo quien puede entrar en Facturas (o en su Subida) lee ocr_trabajos al entrar (07/11/2026):
+  // antes se pedía dos veces nada más abrir el panel, aunque no tuviera permiso.
+  const accesoFacturas = useCanAccessSection("facturas");
+  const accesoSubida = useCanAccessSection("facturas_subida");
+  const puedeFacturas = accesoFacturas.canAccess || accesoSubida.canAccess;
+  const usuarioId = user?.id && puedeFacturas ? user.id : null;
 
   // Los callbacks de la cola se crean una vez: leen lo último por referencia.
   const navegarRef = useRef(navigate);
@@ -85,6 +97,9 @@ export function ColaSubidaProvider({ children, deps }: Props) {
   // Avisos de «ya estaba subido»: uno detrás de otro, el primero es el que se ve.
   const [avisos, setAvisos] = useState<AvisoDuplicado[]>([]);
   const encolarAviso = (a: AvisoDuplicado) => setAvisos((prev) => [...prev, a]);
+
+  // La cola se crea dentro de su propio inicializador: los callbacks la leen por referencia.
+  const colaRef = useRef<ReturnType<typeof crearColaSubida> | null>(null);
 
   const [cola] = useState(() => {
     const irACargar = { label: "Ver", onClick: () => navegarRef.current(RUTA_CARGAR) };
@@ -103,12 +118,27 @@ export function ColaSubidaProvider({ children, deps }: Props) {
         invalidarTrasDocumento(queryClient);
       }
       const temporal = r?.archivoEstado === "temporal" ? " · original pendiente de subir a Drive (se subirá solo)" : "";
+      if (clase === "pendiente") queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
+      // Tanda de varios documentos: un solo toast con el avance (el resumen, en alAcabarTanda).
+      const deLaTanda = e.tanda > 0 ? (colaRef.current?.getEstado().elementos ?? []).filter((x) => x.tanda === e.tanda) : [];
+      if (deLaTanda.length > 1) {
+        const hechos = deLaTanda.filter((x) => x.fase === "terminado").length;
+        if (hechos < deLaTanda.length) {
+          toast.loading(`Leyendo documentos: ${hechos} de ${deLaTanda.length}`, {
+            id: idToastTanda(e.tanda),
+            description: "Al terminar verás un resumen. El detalle de cada uno está en «Cargar».",
+            action: irACargar,
+            ...pos,
+          });
+        }
+        return;
+      }
       switch (clase) {
         case "guardada":
           toast.success(`${doc} ${guardado}`, { description: `${e.nombre}${temporal}`, action: ver, ...pos });
           break;
         case "avisos": {
-          const n = r?.alertas?.length ?? 0;
+          const n = alertasRelevantes(r).length;
           toast.warning(`${doc} ${guardado} con ${n} aviso${n === 1 ? "" : "s"}`, {
             description: `${e.nombre}: conviene revisar los importes.${temporal}`,
             action: ver,
@@ -131,7 +161,6 @@ export function ColaSubidaProvider({ children, deps }: Props) {
           });
           break;
         case "pendiente":
-          queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
           if (r?.anadible) {
             // Otra página de una factura que ya existe: no es un duplicado, basta el toast.
             toast(`${e.nombre}: es otra página de ${r.anadible.existente.numero_documento}`, {
@@ -160,6 +189,21 @@ export function ColaSubidaProvider({ children, deps }: Props) {
     };
     const alAcabarTanda = (r: ResumenTanda) => {
       queryClient.invalidateQueries({ queryKey: ["ocr_trabajos_en_curso"] });
+      if (r.total > 1) {
+        // El toast de la tanda pasa a resumen: verde si todo bien, ámbar si hay algo que mirar.
+        const c = r.porClase;
+        const algoQueMirar = c.avisos + c.sin_original + c.pendiente + c.duplicada + c.en_servidor + c.fallida > 0;
+        const opciones = {
+          id: idToastTanda(r.tanda),
+          description: textoResumenTanda(r),
+          action: irACargar,
+          duration: algoQueMirar ? 12000 : 6000,
+          position: POSICION_AVISOS,
+        };
+        const titulo = `Subida terminada: ${r.total} documentos`;
+        if (algoQueMirar) toast.warning(titulo, opciones);
+        else toast.success(titulo, opciones);
+      }
       const u = ubicacionRef.current;
       const oculta = typeof document !== "undefined" && document.visibilityState === "hidden";
       if (!debeAvisarEnCampana(u.pathname, u.search, oculta)) return;
@@ -177,7 +221,9 @@ export function ColaSubidaProvider({ children, deps }: Props) {
           if (error) console.info("[cola-subida] sin aviso en la campana:", error.message);
         });
     };
-    return crearColaSubida({ ...depsSupabase(), ...deps, alTerminar, alAcabarTanda });
+    const nueva = crearColaSubida({ ...depsSupabase(), ...deps, alTerminar, alAcabarTanda });
+    colaRef.current = nueva;
+    return nueva;
   });
 
   const estado = useSyncExternalStore(cola.suscribir, cola.getEstado, cola.getEstado);

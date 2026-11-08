@@ -7,10 +7,12 @@
  *   Servicios   una tarjeta por servicio en uso con su consumo
  *   Costes      coste del mes por proveedor y la IA por proceso (antes «Costes»)
  *   Configurar  añadir, quitar, borrar y editar servicios; tipo de cambio
+ *   Modelos     qué modelo de OpenAI usa cada función, probarlo, modelos nuevos
+ *               y retirados de la cuenta e historial (07/11/2026)
  */
 export const RUTA_SERVICIOS = "/super-admin/servicios";
 
-export const PESTANAS_SERVICIOS = ["estado", "servicios", "costes", "configurar"] as const;
+export const PESTANAS_SERVICIOS = ["estado", "servicios", "costes", "modelos", "configurar"] as const;
 export type PestanaServicios = (typeof PESTANAS_SERVICIOS)[number];
 
 export const PESTANA_POR_DEFECTO: PestanaServicios = "estado";

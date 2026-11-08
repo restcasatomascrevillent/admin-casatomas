@@ -16,6 +16,7 @@ import { z } from "zod";
 import type { QueryClient } from "@tanstack/react-query";
 import { emitirRevalidacionSesion } from "@/lib/revalidacion-sesion";
 import { borrarCopiasLista } from "@/lib/facturas/copiaListaCompras";
+import { activarCopiaHoy, borrarCopiaHoy } from "@/lib/cacheOffline";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
 import {
   limpiarAvisoSesionCaducada,
@@ -106,6 +107,33 @@ async function registrarAccesoAuditoria(accion: "acceso" | "logout") {
 }
 
 /**
+ * getUser() compartido (07/11/2026, login más rápido): al entrar se pedía 2-3
+ * veces seguidas (INITIAL_SESSION + getSession, SIGNED_IN y la comprobación
+ * inicial de bloqueo). Quien llega mientras hay una en vuelo espera a la misma;
+ * no se guarda el resultado más allá de eso, salvo `ultimaValidacion`, que solo
+ * usa la PRIMERA comprobación tras abrir la sesión (ver `comprobar`).
+ */
+type RespuestaGetUser = Awaited<ReturnType<typeof supabase.auth.getUser>>;
+let getUserEnVuelo: Promise<RespuestaGetUser> | null = null;
+let ultimaValidacion: { userId: string; t: number } | null = null;
+/** Margen en el que la comprobación inicial reutiliza la validación recién hecha. */
+const MARGEN_VALIDACION_MS = 2000;
+
+function getUserCompartido(): Promise<RespuestaGetUser> {
+  if (getUserEnVuelo) return getUserEnVuelo;
+  const promesa = supabase.auth.getUser().then((r) => {
+    if (r && !r.error && r.data?.user) ultimaValidacion = { userId: r.data.user.id, t: Date.now() };
+    return r;
+  });
+  getUserEnVuelo = promesa;
+  const soltar = () => {
+    if (getUserEnVuelo === promesa) getUserEnVuelo = null;
+  };
+  promesa.then(soltar, soltar);
+  return promesa;
+}
+
+/**
  * Conserva la REFERENCIA del usuario previo si es la misma persona (mismo id).
  *
  * supabase-js emite SIGNED_IN / TOKEN_REFRESHED cada vez que la pestaña o la
@@ -159,8 +187,9 @@ export function AuthProvider({
   const idPintado = useRef<string | null>(null);
   /** Cancela y VACÍA la caché: invalidar no basta, serviría datos viejos en el primer render. */
   const vaciarCache = useCallback(() => {
-    // También la copia de la lista de Compras guardada en el dispositivo.
+    // También la copia de la lista de Compras guardada en el dispositivo, y la de «Hoy» (cacheOffline.ts).
     borrarCopiasLista();
+    borrarCopiaHoy();
     const qc = clienteConsultas.current;
     if (!qc) return;
     void qc.cancelQueries();
@@ -189,6 +218,16 @@ export function AuthProvider({
   // Mientras se averigua si una sesión muerta es caducidad o bloqueo, el
   // SIGNED_OUT que emite Auth al fallar la renovación no decide el aviso.
   const decidiendoCierre = useRef(false);
+
+  // «Hoy» sin cobertura (07/11/2026): con la sesión ya CONFIRMADA (no antes, para que otra cuenta no
+  // vea la copia de la anterior) se carga la copia del día de este usuario y se mantiene al día. Al
+  // salir o cambiar de usuario, `vaciarCache` la borra y esto deja de escribirla.
+  const idUsuario = user?.id ?? null;
+  useEffect(() => {
+    const qc = clienteConsultas.current;
+    if (!qc || !idUsuario) return;
+    return activarCopiaHoy(qc, idUsuario);
+  }, [idUsuario]);
 
   useEffect(() => {
     let isMounted = true;
@@ -232,8 +271,7 @@ export function AuthProvider({
         return;
       }
 
-      const { data: userData, error: userError } =
-        await supabase.auth.getUser();
+      const { data: userData, error: userError } = await getUserCompartido();
       if (!esVigente()) return;
       const status =
         typeof userError === "object" &&
@@ -391,7 +429,18 @@ export function AuthProvider({
         return;
       comprobando = true;
       try {
-        const { error, data } = await supabase.auth.getUser();
+        // La primera comprobación llega justo después de que syncValidatedSession validara a este
+        // mismo usuario: si fue hace menos de 2 s, no se repite la petición (el canal de bloqueos ya
+        // está suscrito y el sondeo de 15 s sigue igual).
+        if (
+          inicial &&
+          ultimaValidacion?.userId === userId &&
+          Date.now() - ultimaValidacion.t < MARGEN_VALIDACION_MS
+        ) {
+          inicial = false;
+          return;
+        }
+        const { error, data } = await getUserCompartido();
         if (esBloqueoExplicito(error as ErrorAuth)) {
           await cerrarPorBloqueo();
         } else if (

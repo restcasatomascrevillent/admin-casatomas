@@ -10,12 +10,14 @@ import {
   Settings,
   HelpCircle,
   Instagram,
+  ChartNoAxesCombined,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { VersionPanel } from "@/components/panel/VersionPanel";
 import { cn } from "@/lib/utils";
+import { precargarSeccion } from "@/lib/precargaSecciones";
 import {
   Sidebar,
   SidebarContent,
@@ -37,6 +39,7 @@ import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
 import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
 import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
+import { InstalarApp, useModoInstalacion } from "@/components/panel/InstalarApp";
 import { ShoppingBag } from "lucide-react";
 
 // `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
@@ -118,6 +121,15 @@ const menuItems: {
     sectionKey: ["facturas", "facturas_subida"],
     toggleKey: "facturas",
   },
+  // «Análisis general» (07/11/2026, petición del dueño): sección propia, fuera de Facturas. Primera
+  // pantalla, Márgenes de carta. Usa el permiso y el interruptor de Facturas (no hay sección «analisis»).
+  {
+    title: "Análisis general",
+    url: "/analisis",
+    icon: ChartNoAxesCombined,
+    sectionKey: "facturas",
+    toggleKey: "facturas",
+  },
   {
     title: "Usuarios",
     url: "/usuarios",
@@ -139,6 +151,7 @@ export function AppSidebar() {
   const { isAdmin, role, permissions, loading } = useUserRole();
   const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
   const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
+  const modoInstalacion = useModoInstalacion();
 
   // También en sus subrutas: /facturas/ia (la IA a pantalla completa) sigue marcando «Facturas».
   const isActive = (path: string) => currentPath === path || (path !== "/" && currentPath.startsWith(`${path}/`));
@@ -230,6 +243,10 @@ export function AppSidebar() {
                     <NavLink
                       to={item.url}
                       aria-label={item.title}
+                      // Al acercar el ratón o el dedo, empieza a bajar el fichero de la sección (07/11/2026).
+                      onMouseEnter={() => precargarSeccion(item.url)}
+                      onTouchStart={() => precargarSeccion(item.url)}
+                      onFocus={() => precargarSeccion(item.url)}
                       className="flex items-center gap-3 rounded-lg hover:bg-sidebar-accent"
                     >
                       <item.icon
@@ -262,6 +279,12 @@ export function AppSidebar() {
             rol={role ?? null}
             permisos={permissions ?? []}
           />
+          {/* «Instalar app» (07/11/2026): solo si el navegador lo permite y aún no está instalada. */}
+          {(modoInstalacion === "android" || modoInstalacion === "ios") && (
+            <SidebarMenuItem>
+              <InstalarApp colapsado={isCollapsed} />
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Cerrar sesión"

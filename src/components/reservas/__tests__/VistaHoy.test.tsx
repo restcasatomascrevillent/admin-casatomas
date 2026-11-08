@@ -55,8 +55,11 @@ vi.mock("@/integrations/supabase/client", () => {
 });
 
 vi.mock("@/components/reservas/GestorReservasKanban", () => ({
-  GestorReservasKanban: () => null,
+  GestorReservasKanban: () => <div data-testid="vista-kanban" />,
 }));
+// 07/11/2026: en escritorio, la lista del móvil y el plano fijo (cada uno con sus tests): aquí, dobles.
+vi.mock("@/components/reservas/movil/VistaHoyMovil", () => ({ VistaHoyMovil: () => <div data-testid="vista-lista" /> }));
+vi.mock("@/components/reservas/servicio/VistaPlanoHoy", () => ({ VistaPlanoHoy: () => <div data-testid="vista-plano" /> }));
 vi.mock("@/hooks/useOcupacionHoy", () => ({ useResumenOcupacionHoy: vi.fn() }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: vi.fn() }));
 // Las tarjetas del desplegable del Reservado (mismas del kanban): sin asignaciones, con permiso de edición,
@@ -199,7 +202,7 @@ describe("VistaHoy — lo que ya NO hay (retirado el 04/10/2026 a petición del 
   });
 });
 
-describe("VistaHoy — disponibilidad por cuartos de hora (reservas-sin-salas)", () => {
+describe("VistaHoy — sin kanban ni cuartos de hora en escritorio (07/11/2026)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.store.reservas = [];
@@ -216,24 +219,14 @@ describe("VistaHoy — disponibilidad por cuartos de hora (reservas-sin-salas)",
     >);
   });
 
-  it("va plegada: no monta ninguna rejilla hasta que se despliega", () => {
+  // 07/11/2026: los cuartos de hora plegados iban con el kanban; en Hoy de escritorio ya no hay ninguno de los dos.
+  it("en escritorio ya no salen ni el kanban ni los cuartos de hora", () => {
     montar();
-    expect(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /disponibilidad por cuartos de hora/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId("rejilla-cuartos")).not.toBeInTheDocument();
-  });
-
-  // Touza no admite reservas (decisión del dueño 2026-10-01): antes salía una rejilla por negocio (Casa Tomás y Touza).
-  it("al desplegarla enseña UNA rejilla de hoy, la de Casa Tomás", () => {
-    montar();
-    fireEvent.click(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i }));
-    const rejillas = screen.getAllByTestId("rejilla-cuartos").map((r) => r.textContent);
-    expect(rejillas).toEqual([HOY]);
-  });
-
-  it("el título no sale dos veces seguidas: el botón del plegable ya lo dice y la rejilla lo oculta", () => {
-    montar();
-    fireEvent.click(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i }));
-    expect(screen.getByTestId("rejilla-cuartos")).toHaveAttribute("data-ocultar-titulo", "true");
+    expect(screen.queryByTestId("vista-kanban")).not.toBeInTheDocument();
+    expect(screen.getByTestId("vista-lista")).toBeInTheDocument();
+    expect(screen.getByTestId("vista-plano")).toBeInTheDocument();
   });
 });
 
@@ -271,10 +264,54 @@ describe("VistaHoy — lo que cambia en OTRO dispositivo (realtime y su respaldo
       refetchIntervalInBackground: false,
     });
   });
+});
 
-  it("la rejilla por cuartos queda dentro de `ReservasEnVivoContexto`: no abre un segundo canal a `reservas`", () => {
+// 07/11/2026, «Hoy» con poca cobertura: la pestaña ya no espera al resumen de ocupación (bloqueaba todo
+// con un esqueleto) y avisa con una banda fina cuando la lectura falla por red.
+describe("VistaHoy — con poca cobertura", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.store.reservas = [];
+    h.store.error = null;
+    vi.mocked(useEspaciosReserva).mockReturnValue({ data: SALAS } as unknown as ReturnType<
+      typeof useEspaciosReserva
+    >);
+  });
+
+  it("no monta el resumen de ocupación (ni espera por él)", () => {
     montar();
-    fireEvent.click(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i }));
-    expect(screen.getByTestId("rejilla-cuartos")).toHaveAttribute("data-en-vivo", "true");
+    expect(vi.mocked(useResumenOcupacionHoy)).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Buscar reservas")).toBeInTheDocument();
+  });
+
+  it("con red no hay banda de «Sin conexión»", async () => {
+    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" })];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+    expect(screen.queryByTestId("aviso-sin-conexion")).not.toBeInTheDocument();
+  });
+
+  it("si la lectura falla por red sale «Sin conexión»", async () => {
+    h.store.error = { message: "TypeError: Failed to fetch" };
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+    expect(await screen.findByTestId("aviso-sin-conexion")).toHaveTextContent("Sin conexión");
+  });
+
+  it("un error que no es de red no se disfraza de «Sin conexión»", async () => {
+    h.store.error = { message: "permission denied for table reservas" };
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+    expect(screen.queryByTestId("aviso-sin-conexion")).not.toBeInTheDocument();
+  });
+
+  it("pide columnas por nombre (`COLUMNAS_RESERVAS_HOY`), no `*`", async () => {
+    h.store.reservas = [reserva({ id: "r1", nombre: "Ana", marca: "casa_tomas", notas_cliente: "trona", sobra: "x" })];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+    const filas = queryClient.getQueryData<Record<string, unknown>[]>(["reservas-hoy", "pendientes-mesa", HOY])!;
+    // El doble devuelve solo lo pedido: lo que no está en la lista no llega.
+    expect(filas[0]).toMatchObject({ id: "r1", nombre: "Ana", notas_cliente: "trona", llegada_at: null, salida_at: null });
+    expect(filas[0]).not.toHaveProperty("sobra");
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, ExternalLink, ImageOff, Loader2, MoveRight, Pencil, Plus, XCircle } from "lucide-react";
+import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, ExternalLink, Loader2, MoveRight, Pencil, Plus, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { baseFotosPublica, obtenerPlantilla, urlRecurso, type MarcaId } from "@/lib/instagram";
+import type { MarcaId } from "@/lib/instagram";
 import { cn } from "@/lib/utils";
 import { ESTADOS_CALENDARIO, ESTILO_TONO, LEYENDA_CALENDARIO } from "@/components/instagram/estados";
 import { InsigniaEstado, MarcaMini, PuntoTono } from "@/components/instagram/InsigniaEstado";
@@ -45,9 +45,11 @@ import {
 import { ProgramarPiezaDialog } from "./ProgramarPiezaDialog";
 import { useAccionesProgramacion, useCalendarioInstagram } from "./useProgramacionInstagram";
 import { useHuecosEncargo } from "@/components/instagram/encargos/useEncargos";
+import { Miniatura, tituloEvento } from "./Miniatura";
+// Antes vivían aquí: se reexportan para no romper a quien los importa de este fichero.
+export { Miniatura, tituloEvento, urlMiniatura } from "./Miniatura";
 import { HuecoCalendario } from "@/components/instagram/encargos/HuecoCalendario";
 
-const BASE_FOTOS = baseFotosPublica(String(import.meta.env.VITE_SUPABASE_URL ?? ""));
 const NOMBRE_MARCA: Record<string, string> = { "casa-tomas": "Casa Tomás", touza: "Touza" };
 const DIAS_LARGOS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
 const MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -58,36 +60,6 @@ export function filtroDeEvento(e: Pick<EventoCalendario, "tipo" | "estado">): Fi
   if (e.tipo === "publicada") return "publicada";
   if (e.tipo === "borrador") return "borrador";
   return e.estado === "error" ? "error" : "programada";
-}
-
-/** Título corto de la pieza: titular o cita, o el nombre de la plantilla. */
-export function tituloEvento(e: EventoCalendario): string {
-  const datos = e.pieza?.datos ?? null;
-  const texto = [datos?.titular, datos?.cita].find((t): t is string => typeof t === "string" && !!t.trim());
-  if (texto) return texto;
-  const plantilla = e.pieza?.plantilla ? obtenerPlantilla(e.pieza.plantilla)?.nombre ?? e.pieza.plantilla : "Pieza";
-  return plantilla.replace(/^Touza · /, "");
-}
-
-export function urlMiniatura(e: EventoCalendario): string | null {
-  const ruta = e.pieza?.imagen_ruta;
-  if (!ruta || e.tipo === "publicada") return null; // publicada: el JPEG ya no está en el bucket
-  const url = /^https?:\/\//.test(ruta) ? ruta : urlRecurso(BASE_FOTOS, ruta);
-  return `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(e.pieza?.updated_at ?? "")}`;
-}
-
-export function Miniatura({ evento, className }: { evento: EventoCalendario; className?: string }) {
-  const [fallo, setFallo] = useState(false);
-  const url = urlMiniatura(evento);
-  const proporcion = evento.pieza?.formato === "story" ? "aspect-[9/16]" : "aspect-[4/5]";
-  if (!url || fallo) {
-    return (
-      <span className={cn("flex shrink-0 items-center justify-center rounded bg-muted text-muted-foreground", proporcion, className)}>
-        <ImageOff className="h-3.5 w-3.5" aria-hidden="true" />
-      </span>
-    );
-  }
-  return <img src={url} alt="" loading="lazy" onError={() => setFallo(true)} className={cn("shrink-0 rounded object-cover", proporcion, className)} />;
 }
 
 interface TarjetaProps {

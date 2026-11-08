@@ -398,7 +398,6 @@ describe("useCambiarSalaReserva · caché", () => {
       "reservas_hoy_todas",
       "ocupacion_hoy",
       "today-reservations",
-      "today-confirmed-reservations",
       "dashboard-stats",
       "reservas_mes",
       "reservas-servicio-dia",

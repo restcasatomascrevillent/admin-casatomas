@@ -440,6 +440,16 @@ describe("unir fotos como UN documento (páginas)", () => {
   });
 });
 
+describe("avisos normales en un albarán (07/11/2026)", () => {
+  it("sin total o sin subtotal no es «con avisos» en un albarán, pero sí en una factura", () => {
+    const alertas = [{ codigo: "total_ausente", severidad: "alta", mensaje: "Sin total" }, { codigo: "subtotal_ausente", severidad: "media", mensaje: "Sin base" }];
+    expect(clasificarResultado(ok("a", { tipo: "albaran", alertas }))).toBe("guardada");
+    expect(clasificarResultado(ok("f", { tipo: "factura", alertas }))).toBe("avisos");
+    // Un precio raro en un albarán sí se avisa.
+    expect(clasificarResultado(ok("a", { tipo: "albaran", alertas: [{ codigo: "precio_atipico_historico", severidad: "alta", mensaje: "Precio raro" }] }))).toBe("avisos");
+  });
+});
+
 describe("otra página de una factura existente", () => {
   it("cuenta como «por decidir» y, al añadirla, como guardada", () => {
     const anadible = {

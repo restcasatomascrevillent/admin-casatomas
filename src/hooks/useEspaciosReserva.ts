@@ -26,19 +26,22 @@ export interface EspacioReserva {
  * nombre (hay dos «Terraza»). Los filtros que cada pantalla aplica además se
  * quedan como segunda red.
  */
-export const useEspaciosReserva = () => {
-  return useQuery({
-    queryKey: ["espacios_reserva"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("espacios_reserva" as any)
-        .select("*")
-        .order("nombre");
+/** Consulta compartida de las salas (también la usa «Reservas de hoy» del Dashboard, con `select`). */
+export const consultaEspaciosReserva = {
+  queryKey: ["espacios_reserva"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("espacios_reserva" as any)
+      .select("*")
+      .order("nombre");
 
-      if (error) throw error;
-      return ((data ?? []) as any[]).filter((e) => salaAdmiteReservas(e)) as any;
-    },
-  });
+    if (error) throw error;
+    return ((data ?? []) as any[]).filter((e) => salaAdmiteReservas(e)) as any;
+  },
+};
+
+export const useEspaciosReserva = () => {
+  return useQuery(consultaEspaciosReserva);
 };
 
 export const useCrearEspacio = () => {

@@ -66,6 +66,7 @@ vi.mock("sonner", () => ({ toast: toastMock }));
 
 import { ChatFacturas, type ChatFacturasRef } from "../ChatFacturas";
 import { useChatFacturas } from "@/hooks/useChatFacturas";
+import { RESPUESTA } from "@/lib/facturas/__tests__/decisionRespuesta";
 
 const SERIE = {
   producto: "Merluza",
@@ -172,9 +173,17 @@ async function preguntar(texto: string) {
   fireEvent.click(within(panel()).getByRole("button", { name: /enviar pregunta/i }));
 }
 
+// El tablero de antes (06/11/2026), ya en la versión actual: lo que prueban estas pruebas.
+const TABLERO_DE_ANTES = {
+  v: 2,
+  cifras: ["gasto", "abonos", "regalado", "por_revisar"],
+  modulos: ["proveedores", "subidas", "familias", "fijos", "abonos", "locales"].map((id) => ({ id, tamano: "s" })),
+};
+
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   window.localStorage.clear();
+  window.localStorage.setItem("facturas-analisis-tablero", JSON.stringify(TABLERO_DE_ANTES));
   for (const k of Object.keys(doble.rpcs)) delete doble.rpcs[k];
   doble.rpc.mockClear();
   doble.invoke.mockReset();
@@ -190,9 +199,14 @@ beforeEach(() => {
 });
 
 
-/** Toca una cifra de arriba y devuelve su ventanita de información (06/11/2026: la tarjeta solo enseña la cifra). */
+/** Abre una vista del tablero (Análisis en una pantalla, 07/11/2026: una vista a la vez). */
+function verVista(nombre: string) {
+  fireEvent.click(within(screen.getByRole("group", { name: "Vista del análisis" })).getByRole("button", { name: nombre }));
+}
+/** Toca una de las cifras de la vista «Gasto» (las que elige «Personalizar») y devuelve su ventanita de información. */
 async function infoDe(nombre: RegExp) {
-  fireEvent.click(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: nombre }));
+  if (!screen.queryByLabelText("Más cifras del periodo")) verVista("Gasto");
+  fireEvent.click(within(screen.getByLabelText("Más cifras del periodo")).getByRole("button", { name: nombre }));
   return screen.findByTestId("info-indicador");
 }
 /** Cierra la ventanita abierta. */
@@ -209,45 +223,57 @@ describe("tablero: sale hecho al abrir la pestaña", () => {
     expect(within(screen.getByRole("group", { name: "Periodo" })).getByRole("button", { name: "Año 2026" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("4 indicadores: en la tarjeta solo la etiqueta y la cifra; al tocarla, la información", async () => {
+  it("4 cifras que también son navegación: pulsar una abre su vista y queda marcada; las demás cifras, en «Gasto»", async () => {
     montar();
     const ind = await screen.findByLabelText("Indicadores del periodo");
-    expect(ind).toHaveTextContent(/Gasto con IVA1\.362\.491,57\s€/);
-    expect(ind).toHaveTextContent(/Abonos−14\.376,94\s€/);
-    expect(ind).toHaveTextContent(/Regalado y descuentos28\.204,41\s€/);
-    expect(ind).toHaveTextContent(/Por revisar40/);
-    // Sin texto en la tarjeta (06/11/2026).
-    expect(ind).not.toHaveTextContent(/jun – jul 2026|43 documentos|lo que valía|albaranes sin factura/);
-    // «Por revisar» con 40 albaranes: aviso en la tarjeta.
-    const porRevisar = within(ind).getByRole("button", { name: /^Por revisar/ });
-    expect(within(porRevisar).getByTestId("aviso-indicador")).toHaveTextContent("1");
-    expect(porRevisar).toHaveAccessibleName(/1 aviso por revisar/);
-
-    let info = await infoDe(/^Gasto con IVA/);
-    expect(info).toHaveTextContent(/jun – jul 2026\s?· \+13,5 % frente a 1 ene 2025 – 5 nov 2025/);
-    await cerrarInfo();
-    info = await infoDe(/^Abonos/);
+    expect(ind).toHaveTextContent(/Gasto del periodo1\.362\.491,57\s€con IVA · \+13,5 % que el anterior/);
+    expect(ind).toHaveTextContent(/Precios que han subido/);
+    expect(ind).toHaveTextContent(/Puedes ahorrar/);
+    expect(ind).toHaveTextContent(/Por revisar40albaranes sin factura/);
+    const vistas = screen.getByRole("group", { name: "Vista del análisis" });
+    // Por defecto, «Qué decidir hoy».
+    expect(within(vistas).getByRole("button", { name: "Qué decidir hoy" })).toHaveAttribute("aria-pressed", "true");
+    const gasto = within(ind).getByRole("button", { name: /^Gasto del periodo/ });
+    expect(gasto).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(gasto);
+    expect(gasto).toHaveAttribute("aria-pressed", "true");
+    expect(within(vistas).getByRole("button", { name: "Gasto" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(ubicacion.actual).toContain("vista=gasto"));
+    expect(screen.getByTestId("franja-gasto")).toHaveTextContent(/jun – jul 2026\+13,5 % frente a 1 ene 2025 – 5 nov 2025/);
+    // Las cifras que no son de navegación (las elige «Personalizar»), en «Gasto», sin repetir el gasto ni «Por revisar».
+    const mas = screen.getByLabelText("Más cifras del periodo");
+    expect(mas).toHaveTextContent(/Abonos−14\.376,94\s€/);
+    expect(mas).toHaveTextContent(/Regalado y descuentos28\.204,41\s€/);
+    expect(mas).not.toHaveTextContent(/Por revisar|Gasto con IVA/);
+    let info = await infoDe(/^Abonos/);
     expect(info).toHaveTextContent("43 documentos");
     await cerrarInfo();
     info = await infoDe(/^Regalado y descuentos/);
     expect(info).toHaveTextContent(/lo que valía 107\.581,24\s€ · 69 estimados/);
     await cerrarInfo();
-    info = await infoDe(/^Por revisar/);
-    expect(within(info).getByRole("list", { name: "Por revisar" })).toHaveTextContent(/40 albaranes aún no están en una factura/);
+    fireEvent.click(within(ind).getByRole("button", { name: /^Por revisar/ }));
+    expect(within(ind).getByRole("button", { name: /^Por revisar/ })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("region", { name: "Albaranes por revisar" })).toBeInTheDocument();
   });
 
   it("todas las tarjetas, con título y resumen para lectores de pantalla", async () => {
     montar();
     await screen.findByText("1.362.491,57 €");
-    for (const titulo of [
-      "Explorar", "Proveedores con más gasto", "Lo que más ha subido",
-      "Gasto por familia", "Gastos fijos al mes", "Abonos por proveedor", "Casa Tomás y Touza",
-    ]) {
-      expect(within(tablero()).getByRole("region", { name: titulo })).toBeInTheDocument();
+    // Una vista a la vez: cada módulo vive en la suya.
+    const porVista: Record<string, string[]> = {
+      Precios: ["Lo que más ha subido"],
+      Gasto: ["Gasto por familia", "Gastos fijos al mes", "Abonos por proveedor"],
+      Proveedores: ["Proveedores con más gasto", "Casa Tomás y Touza"],
+    };
+    for (const [vista, titulos] of Object.entries(porVista)) {
+      verVista(vista);
+      for (const titulo of titulos) expect(within(tablero()).getByRole("region", { name: titulo })).toBeInTheDocument();
+      if (vista !== "Gasto") expect(within(tablero()).queryByRole("region", { name: "Gastos fijos al mes" })).not.toBeInTheDocument();
     }
+    verVista("Proveedores");
     expect(within(tablero()).getByRole("region", { name: "Proveedores con más gasto" })).toHaveAccessibleDescription(/Los que más: Proveedor 1 9\.000 €/);
     // Nada del copiloto de antes en la pantalla principal.
-    // (El desplegable «Al instante» del chat; sus chips vuelven el 06/11/2026 bajo «Explorar», como «Al instante: …».)
+    // (El desplegable «Al instante» del chat; la vista «Explorar» se quitó el 08/11/2026.)
     expect(screen.queryByRole("button", { name: /^al instante$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^nuevo$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /limpiar/i })).not.toBeInTheDocument();
@@ -267,6 +293,8 @@ describe("tablero: sale hecho al abrir la pestaña", () => {
 
   it("proveedores: 5 a la vista y «Ver los 7»", async () => {
     montar();
+    await screen.findByText("1.362.491,57 €");
+    verVista("Proveedores");
     const tarjeta = await screen.findByRole("region", { name: "Proveedores con más gasto" });
     const lista = within(tarjeta).getByRole("list", { name: "Proveedores por gasto" });
     expect(within(lista).getAllByRole("button")).toHaveLength(5);
@@ -277,6 +305,8 @@ describe("tablero: sale hecho al abrir la pestaña", () => {
   it("familias: avisa de las líneas sin clasificar y «Clasificar con IA» lleva a Productos", async () => {
     const onIrA = vi.fn();
     montar({ onIrA });
+    await screen.findByText("1.362.491,57 €");
+    verVista("Gasto");
     const tarjeta = await screen.findByRole("region", { name: "Gasto por familia" });
     expect(tarjeta).toHaveTextContent(/10\.396 líneas sin clasificar/);
     fireEvent.click(within(tarjeta).getByRole("button", { name: /clasificar con ia/i }));
@@ -308,6 +338,8 @@ describe("con solo «Ver» en Facturas (06/11/2026): se consulta, sin IA y sin l
 
   it("«Clasificar con IA» no sale (avisa igual de las líneas sin clasificar)", async () => {
     montar({ conIa: false, puedeEditar: false });
+    await screen.findByText("1.362.491,57 €");
+    verVista("Gasto");
     const tarjeta = await screen.findByRole("region", { name: "Gasto por familia" });
     expect(tarjeta).toHaveTextContent(/10\.396 líneas sin clasificar/);
     expect(within(tarjeta).queryByRole("button", { name: /clasificar con ia/i })).not.toBeInTheDocument();
@@ -322,92 +354,34 @@ describe("con solo «Ver» en Facturas (06/11/2026): se consulta, sin IA y sin l
 });
 
 describe("tablero: menús de las filas", () => {
-  it("un proveedor ofrece ver sus documentos, abrirlo en Compras o llevarlo al explorador", async () => {
+  it("un proveedor ofrece ver sus documentos, abrirlo en Compras", async () => {
     const onIrA = vi.fn();
     montar({ onIrA });
     await screen.findByText("1.362.491,57 €");
+    verVista("Proveedores");
     fireEvent.click(screen.getByRole("button", { name: /^PROVEEDOR 1, S\.L\.: 9\.000,00\s€/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Abrir en Compras" }));
     expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=proveedores&prov=300");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    verVista("Gasto");
     fireEvent.click(within(screen.getByRole("region", { name: "Abonos por proveedor" })).getByRole("button", { name: /CATRAL/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Abrir en Compras" }));
     expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=proveedores&prov=377");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    verVista("Proveedores");
     fireEvent.click(screen.getByRole("button", { name: /^PROVEEDOR 2, S\.L\./ }));
-    fireEvent.click(await screen.findByRole("button", { name: "Ver su gasto por mes" }));
-    await waitFor(() =>
-      expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_medida: "gasto", p_agrupar: "mes", p_filtros: { proveedores: [301] } })),
-    );
+    expect(await screen.findByRole("button", { name: "Ver documentos" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Ver su gasto por mes/ })).not.toBeInTheDocument();
   });
 
-  it("un producto que sube se abre en el explorador con su precio por proveedor", async () => {
+  it("un producto que sube ya no ofrece llevarlo al explorador (quitado el 08/11/2026)", async () => {
     montar();
+    await screen.findByText("1.362.491,57 €");
+    verVista("Precios");
     const subidas = await screen.findByRole("region", { name: "Lo que más ha subido" });
     expect(subidas).toHaveTextContent(/mismo proveedor, 12 ene – 11 abr vs 9 jul – 6 oct/);
     fireEvent.click(within(subidas).getByRole("button", { name: /^PAN DE CRISTAL/ }));
-    fireEvent.click(await screen.findByRole("button", { name: "Ver su precio en el explorador" }));
-    await waitFor(() =>
-      expect(llamadas("explorar_compras")).toContainEqual(
-        expect.objectContaining({ p_medida: "precio", p_agrupar: "mes", p_desglose: "proveedor", p_filtros: { productos: ["PAN DE CRISTAL"], unidad: "ud" } }),
-      ),
-    );
-  });
-});
-
-describe("explorador", () => {
-  it("sale con el gasto por mes y local y cambia al instante al tocar la estantería", async () => {
-    montar();
-    const ex = await screen.findByRole("region", { name: "Explorar" });
-    await waitFor(() =>
-      expect(llamadas("explorar_compras")).toContainEqual({
-        p_desde: "2026-01-01", p_hasta: "2026-12-31", p_medida: "gasto", p_agrupar: "mes", p_desglose: "local", p_filtros: {}, p_top: 10,
-      }),
-    );
-    expect(await within(ex).findByText("308.808,70 €")).toBeInTheDocument();
-    // Tabla accesible: una fila por mes y una columna por local.
-    fireEvent.click(within(ex).getByRole("button", { name: /ver como tabla/i }));
-    const tabla = within(ex).getByRole("table");
-    expect(within(tabla).getByRole("columnheader", { name: /Touza/ })).toBeInTheDocument();
-    expect(within(tabla).getByRole("button", { name: "Julio 2026" })).toBeInTheDocument();
-    // Preset «Top proveedores».
-    fireEvent.click(within(ex).getByRole("button", { name: "Top proveedores" }));
-    await waitFor(() => expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_agrupar: "proveedor", p_desglose: null })));
-    expect(await within(ex).findByText(/Y 4 más fuera de la gráfica/)).toBeInTheDocument();
-  });
-
-  it("tocar un mes: ver solo ese tramo (cambia el periodo de todo el tablero y la URL) o ver sus documentos", async () => {
-    const onIrA = vi.fn();
-    montar({ onIrA });
-    const ex = await screen.findByRole("region", { name: "Explorar" });
-    fireEvent.click(await within(ex).findByRole("button", { name: /ver como tabla/i }));
-    fireEvent.click(await within(ex).findByRole("button", { name: "Julio 2026" }));
-    const punto = within(ex).getByRole("region", { name: "Punto elegido" });
-    fireEvent.click(within(punto).getByRole("button", { name: "Abrir en Compras" }));
-    expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=documentos&mes=2026-07");
-    fireEvent.click(within(punto).getByRole("button", { name: "Ver documentos" }));
-    await waitFor(() =>
-      expect(llamadas("documentos_de_cifra")).toContainEqual(expect.objectContaining({ p_medida: "gasto", p_agrupar: "mes", p_clave: "2026-07", p_desglose: "local" })),
-    );
-    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByTestId("documentos-de-cifra")).not.toBeInTheDocument());
-    // Sigue elegido tras cerrar los documentos.
-    fireEvent.click(within(within(ex).getByRole("region", { name: "Punto elegido" })).getByRole("button", { name: "Ver solo este tramo" }));
-    await waitFor(() => expect(llamadasTablero()).toContainEqual({ p_desde: "2026-07-01", p_hasta: "2026-07-31", p_local: null }));
-    await waitFor(() => expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_agrupar: "dia", p_desde: "2026-07-01" })));
-    await waitFor(() => expect(ubicacion.actual).toBe("?tab=chat&desde=2026-07-01&hasta=2026-07-31"));
-  });
-
-  it("«Fijar en el tablero» guarda la configuración y se recuerda", async () => {
-    const { unmount } = montar();
-    const ex = await screen.findByRole("region", { name: "Explorar" });
-    fireEvent.click(within(ex).getByRole("button", { name: "Fijar en el tablero" }));
-    expect(within(ex).getByRole("button", { name: "Fijada" })).toHaveAttribute("aria-pressed", "true");
-    expect(JSON.parse(window.localStorage.getItem("facturas-analisis-explorador-fijadas") ?? "[]")[0].config).toMatchObject({ medida: "gasto", agrupar: "mes", desglose: "local" });
-    unmount();
-    montar();
-    const fijadas = await screen.findByRole("group", { name: "Gráficas fijadas" });
-    expect(within(fijadas).getByRole("region", { name: "Gasto con IVA por mes, por local" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /explorador/ })).not.toBeInTheDocument();
   });
 });
 
@@ -435,8 +409,8 @@ describe("ver documentos de una cifra", () => {
     const onIrA = vi.fn();
     montar({ onIrA });
     await screen.findByText("1.362.491,57 €");
-    const info = await infoDe(/^Gasto con IVA/);
-    fireEvent.click(within(info).getByRole("button", { name: "Ver documentos" }));
+    verVista("Gasto");
+    fireEvent.click(screen.getByRole("button", { name: "Ver los documentos del gasto" }));
     const hoja = await screen.findByTestId("documentos-de-cifra");
     await waitFor(() =>
       expect(llamadas("documentos_de_cifra")).toContainEqual(
@@ -460,11 +434,10 @@ describe("ver documentos de una cifra", () => {
     expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=documentos&doc=12");
   });
 
-  it("«Por revisar» pide solo los albaranes sin factura", async () => {
+  it("«Por revisar» abre su vista con solo los albaranes sin factura", async () => {
     montar();
     await screen.findByText("1.362.491,57 €");
-    const info = await infoDe(/^Por revisar/);
-    fireEvent.click(within(info).getByRole("button", { name: "Ver los albaranes sin factura" }));
+    fireEvent.click(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Por revisar/ }));
     await waitFor(() =>
       expect(llamadas("documentos_de_cifra")).toContainEqual(expect.objectContaining({ p_medida: "gasto", p_filtros: { tipos: ["albaran"] } })),
     );
@@ -553,6 +526,8 @@ describe("copiloto plegado", () => {
     expect(await within(panel()).findByRole("figure", { name: "Evolución del precio de Merluza" })).toBeInTheDocument();
     fireEvent.click(within(panel()).getByRole("button", { name: "Fijar en el tablero" }));
     expect(within(panel()).getByRole("button", { name: /fijada en el tablero/i })).toHaveAttribute("aria-pressed", "true");
+    // Las gráficas fijadas salen bajo «Qué decidir hoy».
+    verVista("Qué decidir hoy");
     const fijadas = within(tablero()).getByRole("group", { name: "Gráficas fijadas" });
     expect(within(fijadas).getByRole("region", { name: "Evolución del precio · Merluza" })).toBeInTheDocument();
     unmount();
@@ -631,11 +606,11 @@ describe("QA 05/11/2026: página, URL y pestañas", () => {
   it("el tablero es `relative`: los resúmenes `sr-only` (absolute) no alargan la página", async () => {
     montar();
     await screen.findByText("1.362.491,57 €");
-    await within(tablero()).findByText("308.808,70 €");
+    verVista("Gasto");
     const t = tablero();
     expect(t).toHaveClass("relative", "overflow-y-auto");
     const ocultos = [...t.querySelectorAll<HTMLElement>(".sr-only")];
-    expect(ocultos.length).toBeGreaterThan(5);
+    expect(ocultos.length).toBeGreaterThan(2);
     // Cada uno tiene un antepasado posicionado DENTRO del tablero (el propio tablero cuenta).
     for (const el of ocultos) {
       const posicionado = el.parentElement?.closest(".relative");
@@ -671,13 +646,16 @@ describe("QA 05/11/2026: página, URL y pestañas", () => {
     expect(await screen.findByRole("dialog", { name: "Pregúntale a la IA" })).toBeInTheDocument();
   });
 
-  it("con el copiloto abierto el contenido le deja sitio a la derecha (≥ lg) y el botón IA va junto al local", async () => {
+  it("con el copiloto abierto el contenido le deja sitio a la derecha (≥ lg) y el botón IA va en la barra, con el local", async () => {
     const { container } = montar();
     await screen.findByText("1.362.491,57 €");
     const raiz = container.firstElementChild as HTMLElement;
     expect(raiz.className).not.toContain("lg:pr-[360px]");
     const boton = screen.getByRole("button", { name: /pregúntale a la ia/i });
-    expect(boton.parentElement).toBe(screen.getByRole("group", { name: "Local" }).parentElement);
+    const barra = screen.getByTestId("barra-analisis");
+    expect(barra).toContainElement(boton);
+    expect(barra).toContainElement(screen.getByRole("group", { name: "Local" }));
+    expect(barra).toContainElement(screen.getByRole("button", { name: "Personalizar el tablero" }));
     fireEvent.click(boton);
     expect(raiz.className).toContain("lg:pr-[360px]");
   });
@@ -692,44 +670,20 @@ describe("QA 05/11/2026: cifras de otro periodo, tramos y documentos", () => {
     try {
       montar();
       await screen.findByText("1.362.491,57 €");
+      verVista("Proveedores");
       fireEvent.click(screen.getByTestId("periodo-personalizado"));
       fireEvent.click(await screen.findByRole("button", { name: "Año pasado" }));
       const ind = screen.getByLabelText("Indicadores del periodo");
       await waitFor(() => expect(ind).toHaveAttribute("aria-busy", "true"));
       expect(ind).toHaveClass("opacity-60");
-      expect(within(ind).queryAllByRole("button")).toHaveLength(0);
+      for (const b of within(ind).getAllByRole("button")) expect(b).toBeDisabled();
       // Las filas de las tarjetas, desactivadas.
       expect(screen.getByRole("button", { name: /^PROVEEDOR 1, S\.L\.: 9\.000,00\s€/ })).toBeDisabled();
       await act(async () => soltar({ data: TABLERO, error: null }));
-      await waitFor(() => expect(within(screen.getByLabelText("Indicadores del periodo")).getAllByRole("button")).toHaveLength(4));
+      await waitFor(() => expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Gasto del periodo/ })).toBeEnabled());
     } finally {
       doble.rpc.mockImplementation(original);
     }
-  });
-
-  it("«Ver solo este tramo» se puede deshacer con «Volver al año 2026» (periodo y eje de antes)", async () => {
-    montar();
-    const ex = await screen.findByRole("region", { name: "Explorar" });
-    fireEvent.click(await within(ex).findByRole("button", { name: /ver como tabla/i }));
-    fireEvent.click(await within(ex).findByRole("button", { name: "Julio 2026" }));
-    fireEvent.click(within(within(ex).getByRole("region", { name: "Punto elegido" })).getByRole("button", { name: "Ver solo este tramo" }));
-    await waitFor(() => expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_agrupar: "dia", p_desde: "2026-07-01" })));
-    fireEvent.click(await within(ex).findByRole("button", { name: "Volver al año 2026" }));
-    await waitFor(() => expect(ubicacion.actual).toBe("?tab=chat&desde=2026-01-01&hasta=2026-12-31"));
-    expect(within(screen.getByRole("group", { name: "Periodo" })).getByRole("button", { name: "Año 2026" })).toHaveAttribute("aria-pressed", "true");
-    // El eje vuelve a «Mes» (la gráfica del año ya estaba en caché: no hace falta pedirla otra vez).
-    await waitFor(() => expect(within(ex).getByRole("combobox", { name: "Agrupar por" })).toHaveTextContent("Mes"));
-    expect(within(ex).queryByRole("button", { name: /^Volver/ })).not.toBeInTheDocument();
-  });
-
-  it("«Abrir en Compras» de un mes conserva el local elegido", async () => {
-    const onIrA = vi.fn();
-    montar({ onIrA }, "/facturas?tab=chat&local=touza");
-    const ex = await screen.findByRole("region", { name: "Explorar" });
-    fireEvent.click(await within(ex).findByRole("button", { name: /ver como tabla/i }));
-    fireEvent.click(await within(ex).findByRole("button", { name: "Julio 2026" }));
-    fireEvent.click(within(within(ex).getByRole("region", { name: "Punto elegido" })).getByRole("button", { name: "Abrir en Compras" }));
-    expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=documentos&mes=2026-07&local=touza");
   });
 
   it("gastos fijos: «Ver documentos» pide solo los meses de su media (desde_media/hasta_media)", async () => {
@@ -738,6 +692,8 @@ describe("QA 05/11/2026: cifras de otro periodo, tramos y documentos", () => {
       fijos: { ...TABLERO.fijos, proveedores: [{ ...TABLERO.fijos.proveedores[0], desde_media: "2026-02-01", hasta_media: "2026-10-31" }] },
     });
     montar();
+    await screen.findByText("1.362.491,57 €");
+    verVista("Gasto");
     const fijos = await screen.findByRole("region", { name: "Gastos fijos al mes" });
     fireEvent.click(within(fijos).getByRole("button", { name: /^ACCIONA GREEN/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Ver documentos" }));
@@ -752,7 +708,8 @@ describe("QA 05/11/2026: cifras de otro periodo, tramos y documentos", () => {
   it("al cerrar «Ver documentos», el foco vuelve a la cifra que se tocó", async () => {
     montar();
     await screen.findByText("1.362.491,57 €");
-    const cifra = within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Gasto con IVA/ });
+    verVista("Gasto");
+    const cifra = within(screen.getByLabelText("Más cifras del periodo")).getByRole("button", { name: /^Abonos/ });
     cifra.focus();
     fireEvent.click(cifra);
     fireEvent.click(within(await screen.findByTestId("info-indicador")).getByRole("button", { name: "Ver documentos" }));
@@ -762,20 +719,6 @@ describe("QA 05/11/2026: cifras de otro periodo, tramos y documentos", () => {
     expect(document.activeElement).toBe(cifra);
   });
 
-  it("la 9.ª gráfica fijada avisa de que se quita la más antigua", async () => {
-    const ocho = Array.from({ length: 8 }, (_, i) => ({
-      id: `f${i}`,
-      titulo: `Fijada ${i}`,
-      config: { medida: "gasto", agrupar: "proveedor", desglose: null, grafica: "auto", top: i + 1, filtros: {} },
-      fijadaEn: "",
-    }));
-    window.localStorage.setItem("facturas-analisis-explorador-fijadas", JSON.stringify(ocho));
-    montar();
-    const ex = await screen.findByRole("region", { name: "Explorar" });
-    fireEvent.click(within(ex).getByRole("button", { name: "Fijar en el tablero" }));
-    expect(within(ex).getByRole("status")).toHaveTextContent(/Caben 8 gráficas fijadas/);
-    expect(JSON.parse(window.localStorage.getItem("facturas-analisis-explorador-fijadas") ?? "[]")).toHaveLength(8);
-  });
 });
 
 describe("QA 05/11/2026: copiloto", () => {
@@ -835,24 +778,18 @@ describe("tablero: retención de IRPF y meses incompletos (06/11/2026)", () => {
     };
   });
 
-  it("«Gasto con IVA» no cambia y dice lo retenido, el coste real, el mes incompleto y que la variación no es fiable", async () => {
+  it("el gasto no cambia; «Gasto» dice lo retenido, el coste real, el mes incompleto y que la variación no es fiable", async () => {
     montar();
     const ind = await screen.findByLabelText("Indicadores del periodo");
-    expect(ind).toHaveTextContent(/Gasto con IVA1\.362\.491,57\s€/);
-    // Aviso en la tarjeta: mes incompleto y variación no fiable.
-    const gasto = within(ind).getByRole("button", { name: /^Gasto con IVA/ });
-    expect(within(gasto).getByTestId("aviso-indicador")).toHaveTextContent("2");
-    const info = await infoDe(/^Gasto con IVA/);
-    expect(within(info).getByTestId("nota-retencion-irpf")).toHaveTextContent(/^incluye −5\.920,09\s€ de IRPF retenido; coste real 1\.368\.411,66\s€$/);
-    expect(within(info).getByTestId("nota-meses-incompletos")).toHaveTextContent("Julio 2026 está incompleto: faltan facturas por subir");
-    expect(info).toHaveTextContent(/\+13,5 % frente a 1 ene 2025 – 5 nov 2025 \(no fiable\)/);
-  });
-
-  it("la gráfica del explorador explica la trama del mes incompleto y la variación avisa", async () => {
-    montar();
-    const ex = await screen.findByRole("region", { name: "Explorar" });
-    expect(await within(ex).findByTestId("leyenda-mes-incompleto")).toHaveTextContent("Mes incompleto: faltan facturas por subir");
-    expect(within(ex).getByTestId("variacion-no-fiable")).toHaveAttribute("title", AVISO);
+    expect(ind).toHaveTextContent(/Gasto del periodo1\.362\.491,57\s€/);
+    // Marca de aviso en la cifra (mes incompleto y variación no fiable).
+    const gasto = within(ind).getByRole("button", { name: /^Gasto del periodo/ });
+    expect(gasto).toHaveAccessibleName(/con avisos/);
+    fireEvent.click(gasto);
+    const franja = screen.getByTestId("franja-gasto");
+    expect(within(franja).getByTestId("nota-retencion-irpf")).toHaveTextContent(/^incluye −5\.920,09\s€ de IRPF retenido; coste real 1\.368\.411,66\s€$/);
+    expect(within(franja).getByTestId("nota-meses-incompletos")).toHaveTextContent("Julio 2026 está incompleto: faltan facturas por subir");
+    expect(franja).toHaveTextContent(/\+13,5 % frente a 1 ene 2025 – 5 nov 2025 \(no fiable\)/);
   });
 
   it("sin retención ni meses incompletos no sale ninguna nota", async () => {
@@ -860,11 +797,123 @@ describe("tablero: retención de IRPF y meses incompletos (06/11/2026)", () => {
     doble.rpcs.explorar_compras = explorar;
     montar();
     const ind = await screen.findByLabelText("Indicadores del periodo");
-    expect(within(ind).queryByTestId("nota-retencion-irpf")).toBeNull();
-    expect(within(ind).queryByTestId("nota-meses-incompletos")).toBeNull();
-    expect(ind).not.toHaveTextContent(/no fiable/);
-    const ex = await screen.findByRole("region", { name: "Explorar" });
-    await within(ex).findByText("308.808,70 €");
-    expect(within(ex).queryByTestId("leyenda-mes-incompleto")).toBeNull();
+    expect(within(ind).getByRole("button", { name: /^Gasto del periodo/ })).not.toHaveAccessibleName(/con avisos/);
+    verVista("Gasto");
+    const franja = screen.getByTestId("franja-gasto");
+    expect(within(franja).queryByTestId("nota-retencion-irpf")).toBeNull();
+    expect(within(franja).queryByTestId("nota-meses-incompletos")).toBeNull();
+    expect(franja).not.toHaveTextContent(/no fiable/);
+  });
+});
+
+// ─── Análisis en UNA pantalla (07/11/2026): barra única, cifras-navegación y vistas ──
+
+describe("Análisis en una pantalla: vistas con las gráficas de decisión", () => {
+  beforeEach(() => {
+    doble.rpcs.facturas_decision = () => RESPUESTA;
+    // El tablero por defecto (con «Lo más comprado» y «Gasto por mes»).
+    window.localStorage.removeItem("facturas-analisis-tablero");
+  });
+
+  it("barra única: periodo (con «Elegir fechas» como icono), local, «Personalizar» como icono y la IA, juntos", async () => {
+    montar();
+    await screen.findByText("1.362.491,57 €");
+    const barra = screen.getByTestId("barra-analisis");
+    expect(within(barra).getByRole("group", { name: "Periodo" })).toBeInTheDocument();
+    const fechas = within(barra).getByRole("button", { name: "Elegir fechas" });
+    expect(fechas).toHaveAttribute("title", "Elegir fechas");
+    expect(fechas).not.toHaveTextContent(/Personalizado/);
+    expect(within(barra).getByRole("group", { name: "Local" })).toBeInTheDocument();
+    expect(within(barra).getByRole("button", { name: "Personalizar el tablero" })).not.toHaveTextContent(/Personalizar/);
+    expect(within(barra).getByRole("button", { name: /pregúntale a la ia/i })).toBeInTheDocument();
+    // Ya no hay «Añadir o quitar módulos» al final del tablero (el icono de la barra sale también en el móvil).
+    expect(screen.queryByRole("button", { name: /añadir o quitar módulos/i })).not.toBeInTheDocument();
+  });
+
+  it("«Qué decidir hoy» (por defecto): las 5 que más dinero mueven, con sus botones; «Ver precio» abre «Precios» con esa subida", async () => {
+    montar();
+    const lista5 = await screen.findByRole("list", { name: "Decisiones, de más a menos dinero" });
+    expect(screen.getByTestId("caja-decidir")).toContainElement(lista5);
+    const filas = within(lista5).getAllByRole("listitem");
+    expect(filas.map((f) => f.dataset.decision)).toEqual(["familia", "sube", "mejor", "mejor", "sube"]);
+    expect(filas[0]).toHaveTextContent(/Congelados gasta un 30 % más de lo normal/);
+    expect(filas[0]).toHaveTextContent("+428 €");
+    expect(filas[1]).toHaveTextContent(/PERCEBE GALLEGO G ha subido un 29 %.*\+62 €\/mes/);
+    expect(filas[2]).toHaveTextContent(/Berberecho: Casimiro Pérez te lo deja 6,50 €\/kg más barato.*−117 € \/ 90 días/);
+    expect(within(filas[0]).getByRole("button", { name: "Ver qué se compró" })).toBeInTheDocument();
+    expect(within(filas[2]).getByRole("button", { name: "Comparar facturas" })).toBeInTheDocument();
+    expect(within(filas[2]).getByRole("button", { name: "No es lo mismo" })).toBeInTheDocument();
+    fireEvent.click(within(filas[1]).getByRole("button", { name: "Ver precio" }));
+    const vistas = screen.getByRole("group", { name: "Vista del análisis" });
+    expect(within(vistas).getByRole("button", { name: "Precios" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Precios que han subido/ })).toHaveAttribute("aria-pressed", "true");
+    const lista = screen.getByRole("listbox", { name: /^Precios: Suben/ });
+    expect(within(lista).getByRole("option", { selected: true })).toHaveTextContent(/PERCEBE GALLEGO G/);
+    const detalle = screen.getByTestId("caja-precio-detalle");
+    expect(within(detalle).getByRole("heading", { name: "PERCEBE GALLEGO G" })).toBeInTheDocument();
+    expect(within(detalle).getByRole("button", { name: "Ver factura" })).toBeInTheDocument();
+    expect(within(detalle).getByRole("button", { name: "Visto" })).toBeInTheDocument();
+    expect(within(detalle).getByRole("button", { name: "Es normal" })).toBeInTheDocument();
+    // La gráfica del elegido pide su precio por mes, de ESE producto.
+    await waitFor(() => expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_medida: "precio", p_agrupar: "mes", p_filtros: { productos: ["PERCEBE GALLEGO G"] } })));
+    // Otro de la lista cambia el detalle.
+    fireEvent.click(within(lista).getByRole("option", { name: /MELON PIEL SAPO/ }));
+    expect(within(screen.getByTestId("caja-precio-detalle")).getByRole("heading", { name: "MELON PIEL SAPO" })).toBeInTheDocument();
+    // «Lo más comprado»: la gráfica sale de los datos de la RPC, con la raya del precio pactado y la acción de quitarlo.
+    fireEvent.click(screen.getByRole("button", { name: "Lo más comprado" }));
+    const det = screen.getByTestId("caja-precio-detalle");
+    expect(within(det).getByRole("heading", { name: "Cruzcampo barril 50 l" })).toBeInTheDocument();
+    expect(within(det).getByTestId("raya-referencia")).toBeInTheDocument();
+    expect(within(det).getByRole("button", { name: "Quitar precio pactado" })).toBeInTheDocument();
+  });
+
+  it("«Puedes ahorrar» abre «Ahorro»: dos barras (ahora / más barato), el −18 % y la frase con lo que compraste", async () => {
+    montar();
+    await screen.findByText("1.362.491,57 €");
+    const cifra = within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Puedes ahorrar/ });
+    await waitFor(() => expect(cifra).toBeEnabled());
+    expect(cifra).toHaveTextContent(/219,00\s€cada 90 días · 2 productos/);
+    fireEvent.click(cifra);
+    expect(cifra).toHaveAttribute("aria-pressed", "true");
+    const [berberecho] = screen.getAllByTestId("fila-ahorro");
+    expect(berberecho).toHaveTextContent(/Ahora: Cetárea Angelmar.*35,50 €\/kg/);
+    expect(berberecho).toHaveTextContent(/Más barato: Casimiro Pérez.*29,00 €\/kg/);
+    expect(berberecho).toHaveTextContent("−18 %");
+    expect(within(berberecho).getByTestId("frase-ahorro")).toHaveTextContent("Compraste 18 kg en 90 días. A 29,00 € en lugar de 35,50 € habrías pagado 117 € menos.");
+    for (const b of ["Comparar las dos facturas", "No es el mismo producto", "Visto"]) expect(within(berberecho).getByRole("button", { name: b })).toBeInTheDocument();
+    await waitFor(() => expect(ubicacion.actual).toContain("vista=ahorro"));
+    expect(window.localStorage.getItem("facturas-analisis-vista")).toBe("ahorro");
+  });
+
+  it("con solo «Ver»: se ve todo, sin los botones que cambian datos", async () => {
+    montar({ conIa: false, puedeEditar: false }, "/facturas?tab=chat&vista=ahorro");
+    const [fila] = await screen.findAllByTestId("fila-ahorro");
+    expect(within(fila).getByRole("button", { name: "Comparar las dos facturas" })).toBeInTheDocument();
+    expect(within(fila).queryByRole("button", { name: "Visto" })).not.toBeInTheDocument();
+    expect(within(fila).queryByRole("button", { name: "No es el mismo producto" })).not.toBeInTheDocument();
+  });
+
+  it("un enlace con ?vista= abre esa vista; «Por revisar» enseña los albaranes y los demás avisos", async () => {
+    montar({}, "/facturas?tab=chat&vista=revisar");
+    expect(await screen.findByRole("region", { name: "Albaranes por revisar" })).toBeInTheDocument();
+    const avisos = await screen.findByTestId("caja-avisos");
+    expect(within(avisos).getByTestId("aviso-por-revisar")).toHaveTextContent(/Proveedor nuevo/);
+    expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Por revisar/ })).toHaveAccessibleName(/1 con aviso/);
+  });
+
+  it("bug del dueño: con «Año» sin meses anteriores, «¿En qué se va el dinero?» compara el último mes completo y lo explica", async () => {
+    doble.rpcs.facturas_decision = () => ({
+      ...RESPUESTA,
+      periodo: { ...RESPUESTA.periodo, desde: "2026-01-01", hasta: "2026-12-31", meses_equivalentes: 10, comparado: { modo: "ultimo_mes", desde: "2026-09-01", hasta: "2026-09-30" } },
+      referencia: { meses: ["2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08"], desde: "2026-03-01", hasta: "2026-08-31" },
+    });
+    montar({}, "/facturas?tab=chat&vista=gasto");
+    const tarjeta = await screen.findByRole("region", { name: "¿En qué se va el dinero?" });
+    expect(tarjeta).toHaveTextContent(/Barra: septiembre, el último mes completo \(no hay meses anteriores al periodo\); raya: media de marzo–agosto/);
+    expect(tarjeta).not.toHaveTextContent(/aún no hay meses completos/);
+    // «Ver documentos» de una familia pide los de ese mes, no los del año.
+    fireEvent.click(within(tarjeta).getByRole("button", { name: /^Congelados/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ver documentos" }));
+    await waitFor(() => expect(llamadas("documentos_de_cifra")).toContainEqual(expect.objectContaining({ p_desde: "2026-09-01", p_hasta: "2026-09-30", p_agrupar: "familia", p_clave: "8" })));
   });
 });

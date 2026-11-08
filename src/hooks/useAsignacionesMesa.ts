@@ -58,6 +58,8 @@ export interface AsignacionConDetalles extends AsignacionMesa {
     fecha?: string;
     /** «Liberar mesa»: la reserva ya se fue (la mesa queda libre desde esa hora). */
     salida_at?: string | null;
+    /** «Fijar mesa» (20261107120000_reservas_mesa_fijada.sql). */
+    mesa_fijada?: boolean | null;
   };
   mesas: {
     id: string;
@@ -100,10 +102,11 @@ export function useAsignacionesMesa(
       ? [CLAVE_ASIGNACIONES_MESA, fecha, espacioId, turno]
       : [CLAVE_ASIGNACIONES_MESA, fecha, espacioId],
     queryFn: async () => {
+      // Columnas por nombre (07/11/2026; antes `*`): son todas las de la tabla, sin sorpresas si crece.
       let query = supabase
         .from("asignaciones_mesa")
         .select(`
-          *,
+          id, reserva_id, mesa_id, created_at, fecha, turno, espacio_id, asignada_por,
           reservas!inner (
             id,
             nombre,
@@ -111,7 +114,8 @@ export function useAsignacionesMesa(
             numero_comensales,
             estado,
             fecha,
-            salida_at
+            salida_at,
+            mesa_fijada
           ),
           mesas!inner (
             id,

@@ -3,8 +3,8 @@
 // revisar», «Regalado por proveedor» y «Evolución de un producto». Leen las RPC de siempre: el tablero
 // (meses), `explorar_compras` (rankings) y `documentos_de_cifra`
 // (albaranes). Solo piden datos si están en el tablero (si no, no se montan).
-import { useId, useMemo, useState } from "react";
-import { BarChart3, FileText, LineChart, Search, ShoppingCart } from "lucide-react";
+import { useContext, useId, useMemo, useState } from "react";
+import { FileText, Search, ShoppingCart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatImporte, plural } from "@/components/facturas/shared/formatters";
@@ -13,7 +13,7 @@ import { useBuscarProductosComprados } from "@/hooks/useTableroCompras";
 import { enlaceProveedorCompras, fechaCorta, nombreCorto, resumenGastoMes, textoPct, type MesGasto } from "@/lib/facturas/tableroCompras";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
 import { etiquetaMes } from "@/lib/facturas/agrupacionDocumentos";
-import { FILTROS_VACIOS, parametrosExplorar, rangoDeClave, resumenExploracion, type Agrupar, type ConfigExplorador, type LocalRpc, type Medida } from "@/lib/facturas/explorador";
+import { FILTROS_VACIOS, parametrosExplorar, rangoDeClave, resumenExploracion, type Agrupar, type LocalRpc, type Medida } from "@/lib/facturas/explorador";
 import { enlaceDocumentoCompras, peticionSimple, type PeticionDocumentos } from "@/lib/facturas/documentosCifra";
 import type { Tamano } from "@/lib/facturas/widgetsTablero";
 import {
@@ -29,9 +29,13 @@ import {
   FOCO,
   SinDatos,
   Tarjeta,
+  TarjetaLlena,
   type AccionMenu,
 } from "./piezas";
 import { GraficaExplorador } from "./GraficaExplorador";
+import { MarcaAlerta } from "./Alertas";
+import { useAlertasFacturas } from "@/hooks/useAlertasFacturas";
+import { alertasDelPeriodo, alertasPorClave, marcasDeExploracion, type AlertaFacturas } from "@/lib/facturas/alertas";
 
 const ICONO = "h-4 w-4 text-muted-foreground";
 
@@ -42,7 +46,6 @@ interface Comunes {
   onAmpliar?: () => void;
   onDocumentos: (p: PeticionDocumentos) => void;
   onIrA: (enlace: string) => void;
-  onExplorar: (c: Partial<ConfigExplorador>) => void;
   /** Cargando otro periodo: las filas no se pueden tocar. */
   pendiente?: boolean;
 }
@@ -70,9 +73,20 @@ export function GastoPorMesModulo({
   tamano = "m",
   onAmpliar,
   onDocumentos,
+  onIrA,
   pendiente,
-}: Pick<Comunes, "periodo" | "local" | "tamano" | "onAmpliar" | "onDocumentos" | "pendiente"> & { meses: MesGasto[] }) {
+  alertas = [],
+}: Pick<Comunes, "periodo" | "local" | "tamano" | "onAmpliar" | "onDocumentos" | "pendiente"> & {
+  meses: MesGasto[];
+  /** Alertas de Facturas (20261107300000): los meses con alguna llevan su marca encima. */
+  alertas?: AlertaFacturas[];
+  onIrA?: (enlace: string) => void;
+}) {
   const con = meses.filter((m) => m.documentos > 0 || m.total !== 0);
+  // En una vista de Análisis la gráfica llena su caja (piezas › TarjetaLlena).
+  const llena = useContext(TarjetaLlena);
+  const porMes = useMemo(() => alertasPorClave(alertasDelPeriodo(alertas, periodo, local), "mes"), [alertas, periodo, local]);
+  const hayMarcas = con.some((m) => porMes.has(m.mes));
   const max = Math.max(1, ...con.map((m) => Math.max(0, m.casa_tomas) + Math.max(0, m.touza)));
   const variosAnios = new Set(con.map((m) => m.mes.slice(0, 4))).size > 1;
   const conTouza = !local && con.some((m) => m.touza > 0);
@@ -98,13 +112,19 @@ export function GastoPorMesModulo({
               </span>
             </p>
           )}
-          <ol className={cn("flex items-stretch gap-1 @[28rem]:gap-1.5", tamano === "s" ? "h-36" : "h-44")} aria-label="Gasto de cada mes">
+          <ol className={cn("flex items-stretch gap-1 @[28rem]:gap-1.5", llena ? "min-h-36 flex-1" : tamano === "s" ? "h-36" : "h-44")} aria-label="Gasto de cada mes">
             {con.map((m) => {
               const ct = Math.max(0, m.casa_tomas);
               const tz = conTouza ? Math.max(0, m.touza) : 0;
               const nombre = etiquetaMes(m.mes);
+              const delMes = porMes.get(m.mes) ?? [];
               return (
                 <li key={m.mes} className="flex min-w-0 flex-1 flex-col">
+                  {hayMarcas && (
+                    <span className="flex h-7 shrink-0 items-end justify-center">
+                      <MarcaAlerta alertas={delMes} etiqueta={nombre} onIrA={onIrA} className="h-5 min-w-5 px-0.5" />
+                    </span>
+                  )}
                   <button
                     type="button"
                     disabled={pendiente}
@@ -129,6 +149,7 @@ export function GastoPorMesModulo({
             })}
           </ol>
           {con.some((m) => m.incompleto) && <p className="mt-2 text-xs text-amber-800 dark:text-amber-400">Las barras claras son meses incompletos: faltan facturas por subir.</p>}
+          {hayMarcas && <p className="mt-1 text-xs text-muted-foreground">Toca el aviso de un mes para ver sus alertas.</p>}
         </>
       )}
     </Tarjeta>
@@ -212,7 +233,7 @@ function RankingExplorar({
 }
 
 export function ProductosMasComprados(p: Comunes) {
-  const { periodo, local, onDocumentos, onExplorar } = p;
+  const { periodo, local, onDocumentos } = p;
   return (
     <RankingExplorar
       {...p}
@@ -229,18 +250,13 @@ export function ProductosMasComprados(p: Comunes) {
           onClick: () =>
             onDocumentos(peticionSimple({ titulo: x.etiqueta, desde: periodo.desde, hasta: periodo.hasta, medida: "base", agrupar: "producto", clave: x.clave, local, cifra: x.valor, detalle: "Base sin IVA de sus líneas" })),
         },
-        {
-          etiqueta: "Ver su precio en el explorador",
-          icono: <LineChart className={ICONO} aria-hidden />,
-          onClick: () => onExplorar({ medida: "precio", agrupar: "mes", desglose: "proveedor", grafica: "auto", filtros: { ...FILTROS_VACIOS, productos: [x.clave] } }),
-        },
       ]}
     />
   );
 }
 
 export function RegaladoPorProveedor(p: Comunes) {
-  const { periodo, local, onDocumentos, onIrA, onExplorar } = p;
+  const { periodo, local, onDocumentos, onIrA } = p;
   return (
     <RankingExplorar
       {...p}
@@ -263,11 +279,6 @@ export function RegaladoPorProveedor(p: Comunes) {
                   ),
               },
               { etiqueta: "Abrir en Compras", icono: <ShoppingCart className={ICONO} aria-hidden />, onClick: () => onIrA(enlaceProveedorCompras(x.id as number)) },
-              {
-                etiqueta: "Ver por mes en el explorador",
-                icono: <BarChart3 className={ICONO} aria-hidden />,
-                onClick: () => onExplorar({ medida: "regalado", agrupar: "mes", desglose: null, filtros: { ...FILTROS_VACIOS, proveedores: [{ id: x.id as number, nombre: nombreCorto(x.etiqueta) }] } }),
-              },
             ]
       }
     />
@@ -373,6 +384,20 @@ export function EvolucionProducto({
   );
   const q = useExplorarCompras(params, { retraso: 0, activo: !!producto });
   const ex = q.data;
+  const alertasQ = useAlertasFacturas(local);
+  const marcas = useMemo(
+    () =>
+      ex && producto
+        ? marcasDeExploracion(alertasQ.data ?? [], {
+            medida: "precio",
+            agrupar: "mes",
+            filtros: { ...FILTROS_VACIOS, productos: [producto], unidad: ex.parametros.unidad },
+            periodo,
+            local,
+          })
+        : null,
+    [alertasQ.data, ex, producto, periodo, local],
+  );
   const bonito = producto ? producto.charAt(0).toUpperCase() + producto.slice(1).toLowerCase() : "";
   const idBusca = useId();
   return (
@@ -425,7 +450,15 @@ export function EvolucionProducto({
       ) : !ex || ex.sinDatos ? (
         <SinDatos>No se ha comprado {bonito.toLowerCase()} en este periodo.</SinDatos>
       ) : (
-        <GraficaExplorador exploracion={ex} tipo="lineas" alto={tamano === "s" ? 170 : 210} compacta descripcion={`Precio de ${bonito}. ${resumenExploracion(ex)}`} />
+        <GraficaExplorador
+          exploracion={ex}
+          tipo="lineas"
+          alto={tamano === "s" ? 170 : 210}
+          compacta
+          descripcion={`Precio de ${bonito}. ${resumenExploracion(ex)}${marcas?.referencia ? ` ${marcas.referencia.etiqueta}: ${formatImporte(marcas.referencia.valor)}.` : ""}`}
+          alertas={marcas?.porClave}
+          referencia={marcas?.referencia}
+        />
       )}
     </Tarjeta>
   );

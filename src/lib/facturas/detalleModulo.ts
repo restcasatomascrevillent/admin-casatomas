@@ -18,7 +18,8 @@ import type { DocumentoCifra } from "./documentosCifra";
 import { ETIQUETA_LOCAL, ETIQUETA_TIPO } from "./documentosCifra";
 import type { IdModulo } from "./widgetsTablero";
 
-export type IdDetalle = Exclude<IdModulo, "explorar">;
+// «precios_top» y «ahorro» (gráficas de decisión) no tienen detalle en grande: sus filas abren el explorador o la factura.
+export type IdDetalle = Exclude<IdModulo, "explorar" | "precios_top" | "ahorro">;
 export type Iva = "con" | "sin";
 
 /** Qué filtros tienen sentido en cada módulo. */

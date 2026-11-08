@@ -7,8 +7,7 @@
 //    · pequeño = 1 columna, mediano = 2, grande = 3 (o todo el ancho si no
 //      caben) de una rejilla tipo «bento» que empaqueta los pequeños juntos
 //      (`grid-auto-flow: dense`);
-//    · «Explorar» es un módulo fijo (no se quita: la IA y las filas llevan a
-//      él) que se puede mover; parte la rejilla en «antes» y «después».
+//    · La vista «Explorar» se quitó (08/11/2026): un «explorar» guardado se descarta.
 //
 //  Se guarda por usuario en `dashboard_config` (nombre_vista
 //  «facturas_analisis»: tabla y RLS ya existentes, sin migración) y, como
@@ -27,10 +26,13 @@ export type IdCifra =
   | "documentos"
   | "proveedores"
   | "fijos_mes"
-  | "retencion";
+  | "retencion"
+  // Gráficas de decisión (20261115100000_facturas_decision)
+  | "precios_suben"
+  | "ahorro_posible"
+  | "familias_fuera";
 
 export type IdModulo =
-  | "explorar"
   | "proveedores"
   | "subidas"
   | "familias"
@@ -41,7 +43,10 @@ export type IdModulo =
   | "productos"
   | "por_revisar"
   | "regalado"
-  | "precio_producto";
+  | "precio_producto"
+  // Gráficas de decisión (20261115100000_facturas_decision)
+  | "precios_top"
+  | "ahorro";
 
 export interface InfoCifra {
   id: IdCifra;
@@ -56,7 +61,7 @@ export interface InfoModulo {
   tamano: Tamano;
   /** No se puede quitar (sí mover). */
   fijo?: boolean;
-  /** Solo admite este tamaño (Explorar ocupa siempre todo el ancho). */
+  /** Solo admite este tamaño (sin uso por ahora). */
   soloTamano?: Tamano;
 }
 
@@ -71,13 +76,15 @@ export const CIFRAS: InfoCifra[] = [
   { id: "proveedores", titulo: "Proveedores", descripcion: "A cuántos proveedores se ha comprado" },
   { id: "fijos_mes", titulo: "Gastos fijos al mes", descripcion: "Lo que se paga casi todos los meses" },
   { id: "retencion", titulo: "Retención IRPF", descripcion: "IRPF retenido (alquileres, gestoría…)" },
+  { id: "precios_suben", titulo: "Precios que han subido", descripcion: "Cuántos y cuánto te cuestan de más al mes" },
+  { id: "ahorro_posible", titulo: "Más barato en otro proveedor", descripcion: "Cuántos y el ahorro posible en 90 días" },
+  { id: "familias_fuera", titulo: "Familias fuera de lo normal", descripcion: "Familias que se salen de su media" },
 ];
 
 export const MODULOS: InfoModulo[] = [
-  { id: "explorar", titulo: "Explorar", descripcion: "La gráfica a medida (medida, eje, color y filtros)", tamano: "l", fijo: true, soloTamano: "l" },
   { id: "proveedores", titulo: "Proveedores con más gasto", descripcion: "Ranking con IVA y su % del total", tamano: "s" },
-  { id: "subidas", titulo: "Lo que más ha subido", descripcion: "Productos que han subido de precio, mismo proveedor", tamano: "s" },
-  { id: "familias", titulo: "Gasto por familia", descripcion: "Base sin IVA de las líneas por familia", tamano: "s" },
+  { id: "subidas", titulo: "¿Qué me están subiendo?", descripcion: "Cambios de precio por € al mes: suben, más barato en otro, bajan", tamano: "m" },
+  { id: "familias", titulo: "¿En qué se va el dinero?", descripcion: "Gasto por familia frente a su media, con avisos", tamano: "m" },
   { id: "fijos", titulo: "Gastos fijos al mes", descripcion: "Proveedores que facturan casi todos los meses", tamano: "s" },
   { id: "abonos", titulo: "Abonos por proveedor", descripcion: "Devoluciones y rectificativas", tamano: "s" },
   { id: "locales", titulo: "Casa Tomás y Touza", descripcion: "El gasto de los dos locales, frente a frente", tamano: "s" },
@@ -86,6 +93,8 @@ export const MODULOS: InfoModulo[] = [
   { id: "por_revisar", titulo: "Albaranes por revisar", descripcion: "Los últimos albaranes que aún no tienen factura", tamano: "s" },
   { id: "regalado", titulo: "Regalado por proveedor", descripcion: "Quién regala o descuenta más", tamano: "s" },
   { id: "precio_producto", titulo: "Evolución de un producto", descripcion: "El precio medio de un producto mes a mes, por proveedor", tamano: "m" },
+  { id: "precios_top", titulo: "¿Cómo van los precios de lo que más compro?", descripcion: "Minigráficas del precio de los 6 productos con más gasto", tamano: "l" },
+  { id: "ahorro", titulo: "¿Dónde puedo ahorrar?", descripcion: "Mismo producto más barato en otro proveedor", tamano: "s" },
 ];
 
 export const TAMANOS: { valor: Tamano; etiqueta: string; corta: string; columnas: number }[] = [
@@ -108,23 +117,68 @@ export interface ModuloActivo {
 export interface ConfigTablero {
   /** Cifras de arriba, en orden (las que no están, no se ven). */
   cifras: IdCifra[];
-  /** Módulos en orden, con su tamaño. Siempre lleva «explorar». */
+  /** Módulos en orden, con su tamaño. */
   modulos: ModuloActivo[];
+  /**
+   * Versión del tablero guardado. Sin ella (o < VERSION_TABLERO) es de antes de las
+   * gráficas de decisión: se le añaden una vez (ver `actualizarVersion`).
+   */
+  v?: number;
 }
 
-/** El tablero de siempre: las 4 cifras, Explorar y las 6 tarjetas pequeñas. */
+/** 2 = gráficas de decisión (15/11/2026); 3 = Análisis en una pantalla, con «Gasto por mes» en «Qué decidir hoy» (07/11/2026). */
+export const VERSION_TABLERO = 3;
+
+/**
+ * El tablero de gestión (15/11/2026, maqueta del dueño): arriba el gasto y las
+ * tres cifras de decisión; luego las cuatro preguntas (subidas, ahorro, familias
+ * y precios de lo más comprado) con los proveedores; y el resto.
+ */
 export const CONFIG_TABLERO_POR_DEFECTO: ConfigTablero = {
-  cifras: ["gasto", "abonos", "regalado", "por_revisar"],
+  cifras: ["gasto", "precios_suben", "ahorro_posible", "familias_fuera", "por_revisar"],
   modulos: [
-    { id: "explorar", tamano: "l" },
+    { id: "subidas", tamano: "m" },
+    { id: "ahorro", tamano: "s" },
+    { id: "familias", tamano: "m" },
     { id: "proveedores", tamano: "s" },
-    { id: "subidas", tamano: "s" },
-    { id: "familias", tamano: "s" },
+    { id: "precios_top", tamano: "l" },
     { id: "fijos", tamano: "s" },
     { id: "abonos", tamano: "s" },
     { id: "locales", tamano: "s" },
+    { id: "gasto_mes", tamano: "m" },
   ],
+  v: VERSION_TABLERO,
 };
+
+/**
+ * Un tablero guardado antes de las gráficas de decisión: se le añaden UNA vez
+ * (luego cada uno quita lo que no quiera) las tres cifras nuevas tras «Gasto»
+ * (si caben), «¿Dónde puedo ahorrar?» tras las subidas y «¿Cómo van los
+ * precios…?» tras las familias; subidas y familias pasan a medianas.
+ */
+export function actualizarVersion(c: ConfigTablero): ConfigTablero {
+  if ((c.v ?? 1) >= VERSION_TABLERO) return c;
+  if ((c.v ?? 1) >= 2) {
+    // 3 (07/11/2026): «Gasto por mes» va al lado de «Qué decidir hoy»; se añade una vez.
+    const modulos = c.modulos.some((m) => m.id === "gasto_mes") ? c.modulos : [...c.modulos, { id: "gasto_mes" as IdModulo, tamano: "m" as Tamano }];
+    return { ...c, modulos, v: VERSION_TABLERO };
+  }
+  const cifras = [...c.cifras];
+  const pos = Math.max(0, cifras.indexOf("gasto") + 1);
+  const nuevas = (["precios_suben", "ahorro_posible", "familias_fuera"] as IdCifra[]).filter((x) => !cifras.includes(x));
+  cifras.splice(pos, 0, ...nuevas.slice(0, Math.max(0, MAX_CIFRAS - cifras.length)));
+  const modulos = c.modulos.map((m) => (m.id === "subidas" || m.id === "familias") && m.tamano === "s" ? { ...m, tamano: "m" as Tamano } : m);
+  const meter = (id: IdModulo, tras: IdModulo, tamano: Tamano) => {
+    if (modulos.some((m) => m.id === id)) return;
+    const i = modulos.findIndex((m) => m.id === tras);
+    const j = i >= 0 ? i + 1 : modulos.length;
+    modulos.splice(j, 0, { id, tamano });
+  };
+  meter("ahorro", "subidas", "s");
+  meter("precios_top", "familias", "l");
+  meter("gasto_mes", "locales", "m");
+  return { cifras, modulos, v: VERSION_TABLERO };
+}
 
 export const NOMBRE_VISTA_TABLERO = "facturas_analisis";
 export const CLAVE_CONFIG_TABLERO = "facturas-analisis-tablero";
@@ -134,7 +188,7 @@ const esCifra = (v: unknown): v is IdCifra => CIFRAS.some((c) => c.id === v);
 const esModulo = (v: unknown): v is IdModulo => MODULOS.some((m) => m.id === v);
 const esTamano = (v: unknown): v is Tamano => v === "s" || v === "m" || v === "l";
 
-/** El tamaño que vale para ese módulo (Explorar, siempre grande). */
+/** El tamaño que vale para ese módulo. */
 export function tamanoValido(id: IdModulo, t: unknown): Tamano {
   const info = infoModulo(id);
   if (info.soloTamano) return info.soloTamano;
@@ -143,7 +197,7 @@ export function tamanoValido(id: IdModulo, t: unknown): Tamano {
 
 /**
  * Lee una configuración guardada sin fiarse: fuera lo desconocido y lo
- * repetido; «explorar» siempre (si falta, al principio). Sin nada válido, la
+ * repetido (el antiguo «explorar» ya no existe y se descarta). Sin nada válido, la
  * de por defecto.
  */
 export function normalizarConfigTablero(entrada: unknown): ConfigTablero {
@@ -160,8 +214,8 @@ export function normalizarConfigTablero(entrada: unknown): ConfigTablero {
     const producto = id === "precio_producto" && typeof o.producto === "string" && o.producto.trim() ? o.producto.trim().slice(0, 160) : null;
     modulos.push({ id, tamano: tamanoValido(id, o.tamano), ...(producto ? { producto } : {}) });
   }
-  if (!modulos.some((m) => m.id === "explorar")) modulos.unshift({ id: "explorar", tamano: "l" });
-  return { cifras: cifras.slice(0, MAX_CIFRAS), modulos };
+  const v = typeof o.v === "number" ? o.v : undefined;
+  return actualizarVersion({ cifras: cifras.slice(0, MAX_CIFRAS), modulos, v });
 }
 
 export const mismaConfig = (a: ConfigTablero, b: ConfigTablero): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -215,12 +269,6 @@ export function cambiarTamano(c: ConfigTablero, id: IdModulo, tamano: Tamano): C
   return { ...c, modulos: c.modulos.map((m) => (m.id === id ? { ...m, tamano: tamanoValido(id, tamano) } : m)) };
 }
 
-/** Los módulos antes y después de «Explorar» (cada tramo es su propia rejilla). */
-export function tramosModulos(c: ConfigTablero): { antes: ModuloActivo[]; despues: ModuloActivo[] } {
-  const i = c.modulos.findIndex((m) => m.id === "explorar");
-  return { antes: c.modulos.slice(0, Math.max(0, i)), despues: c.modulos.slice(i + 1) };
-}
-
 // ─── Rejilla «bento» ────────────────────────────────────────────────────────
 
 /**
@@ -265,6 +313,8 @@ export function aFilaBd(c: ConfigTablero): { widgets_activos: unknown[]; orden_w
   const activos = [
     ...c.cifras.map((id) => ({ tipo: "cifra", id })),
     ...c.modulos.map((m) => ({ tipo: "modulo", id: m.id, tamano: m.tamano, ...(m.producto ? { producto: m.producto } : {}) })),
+    // Al final: la versión del tablero (los de antes no la llevan y se actualizan una vez).
+    { tipo: "version", id: String(c.v ?? VERSION_TABLERO) },
   ];
   return { widgets_activos: activos, orden_widgets: activos.map((a) => `${a.tipo}:${a.id}`) };
 }
@@ -274,11 +324,13 @@ export function deFilaBd(fila: { widgets_activos?: unknown } | null | undefined)
   if (!Array.isArray(w) || w.length === 0) return null;
   const cifras: unknown[] = [];
   const modulos: unknown[] = [];
+  let v: number | undefined;
   for (const x of w) {
     if (!x || typeof x !== "object") continue;
     const o = x as Record<string, unknown>;
-    if (o.tipo === "cifra") cifras.push(o.id);
+    if (o.tipo === "version") v = Number(o.id) || undefined;
+    else if (o.tipo === "cifra") cifras.push(o.id);
     else if (o.tipo === "modulo") modulos.push({ id: o.id, tamano: o.tamano, producto: o.producto });
   }
-  return normalizarConfigTablero({ cifras, modulos });
+  return normalizarConfigTablero({ cifras, modulos, v });
 }

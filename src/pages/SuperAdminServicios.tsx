@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Activity, AlertTriangle, Loader2, RefreshCw, Server, Settings2, Wallet } from "lucide-react";
+import { Activity, AlertTriangle, Bot, Loader2, RefreshCw, Server, Settings2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { DialogoEditarServicio } from "@/components/servicios/DialogoEditarServi
 import { PestanaConfigurar } from "@/components/servicios/PestanaConfigurar";
 import { PestanaCostes } from "@/components/servicios/PestanaCostes";
 import { PestanaEstado } from "@/components/servicios/PestanaEstado";
+import { PestanaModelos } from "@/components/servicios/PestanaModelos";
 import { PestanaServicios } from "@/components/servicios/PestanaServicios";
 import { PESTANA_POR_DEFECTO, type PestanaServicios as Pestana, pestanaDeUrl } from "@/components/servicios/pestanas";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
@@ -51,6 +52,8 @@ const CONTENIDO_PESTANA = "mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contai
  *   · Servicios: una tarjeta por servicio en uso con su consumo.
  *   · Costes: coste del mes por proveedor y la IA por proceso (tope, mes
  *     anterior, sincronizar con OpenAI).
+ *   · Modelos (07/11/2026): qué modelo de OpenAI usa cada función, cambiarlo
+ *     y probarlo; modelos de la cuenta (nuevos marcados) e historial.
  *   · Configurar: añadir, quitar, borrar y editar servicios; tipo de cambio.
  * Las lecturas las hace la Edge Function `servicios-uso` (caché de 15 min);
  * «Actualizar» (arriba) la fuerza para todos.
@@ -197,13 +200,14 @@ export default function SuperAdminServicios() {
         )}
 
         <Tabs value={pestana} onValueChange={(v) => cambiarPestana(v as Pestana)} className="flex min-h-0 flex-1 flex-col">
-          {/* Sin iconos en el móvil: así caben las cuatro a 320 px sin hacer scroll. */}
+          {/* Sin iconos en el móvil: así caben a 320 px sin hacer scroll. */}
           <PestanasPagina
             iconosSoloEscritorio
             pestanas={[
               { valor: "estado", etiqueta: "Estado", icono: <Activity />, contador: urgentes, tonoContador: "dorado", etiquetaContador: `${urgentes} ${urgentes === 1 ? "urgente" : "urgentes"}` },
               { valor: "servicios", etiqueta: "Servicios", icono: <Server />, contador: disponible ? enUso.length : undefined },
               { valor: "costes", etiqueta: "Costes", icono: <Wallet /> },
+              { valor: "modelos", etiqueta: "Modelos", icono: <Bot /> },
               { valor: "configurar", etiqueta: "Configurar", icono: <Settings2 /> },
             ]}
           />
@@ -240,6 +244,9 @@ export default function SuperAdminServicios() {
           </TabsContent>
           <TabsContent value="costes" className={CONTENIDO_PESTANA}>
             <PestanaCostes resumen={estado ? null : resumen} estadoServicios={estado} eurPorUsd={eurPorUsd} costesDisponibles={costes} />
+          </TabsContent>
+          <TabsContent value="modelos" className={CONTENIDO_PESTANA}>
+            {pestana === "modelos" && <PestanaModelos />}
           </TabsContent>
           <TabsContent value="configurar" className={CONTENIDO_PESTANA}>
             {estado ?? (

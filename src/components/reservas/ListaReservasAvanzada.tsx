@@ -21,7 +21,10 @@ import {
   Pencil,
   Inbox,
   CalendarPlus,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -374,6 +377,21 @@ const OPCIONES_FILTRO_CANAL: { value: string; label: string; corta?: string }[] 
  * elegido, «Nombre: valor» («Estado: Pendiente», «Canal: Web»). Un valor que no está entre las opciones (una
  * URL antigua, p. ej.) se enseña tal cual.
  */
+/** Un filtro puesto, en el móvil: chip pequeño que se quita con un toque (área táctil de 44 px). */
+function ChipFiltro({ children, onQuitar }: { children: ReactNode; onQuitar: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onQuitar}
+      className="touch-hit inline-flex h-8 max-w-full items-center gap-1 rounded-full border bg-muted px-2.5 text-xs font-medium"
+    >
+      <span className="truncate">{children}</span>
+      <X className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span className="sr-only">(quitar)</span>
+    </button>
+  );
+}
+
 function textoFiltroCerrado(
   nombre: string,
   valor: string,
@@ -457,6 +475,8 @@ export function ListaReservasAvanzada({
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter || "all");
   const [canalFilter, setCanalFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(initialDateFilter);
+  // Móvil (< 768 px, 07/11/2026): los filtros (fecha, estado, canal, «Por atender») viven en una hoja inferior.
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
   // Sin filtro «Negocio»: solo Casa Tomás admite reservas (decisión del dueño, 2026-10-01). Lo que quede de
   // Touza en la base de datos no llega a ser fila (`unificarReservasYSolicitudes`, regla `admiteReservas`).
   const { data: espaciosData } = useEspaciosReserva();
@@ -784,6 +804,139 @@ export function ListaReservasAvanzada({
     window.scrollTo({ top: 0 });
   };
 
+  // Cuántos filtros hay puestos (el buscador aparte): la cifra del botón «Filtros» del móvil.
+  const filtrosActivos = Number(!!dateFilter) + Number(statusFilter !== "all") + Number(canalFilter !== "all");
+
+  // Los controles de filtro: en la fila de la tarjeta desde `md` y en la hoja «Filtros» en el móvil.
+  const controlesFiltro = (
+    <>
+      {/* Botón Hoy */}
+      <Button
+        variant={dateFilter && dateFilter.toDateString() === new Date().toDateString() ? "default" : "outline"}
+        size="default"
+        onClick={() => setDateFilter(new Date())}
+      >
+        Hoy
+      </Button>
+
+      {/* Filtro de fecha */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className="min-w-[120px] sm:min-w-[150px]">
+            <Calendar className="mr-2 h-4 w-4" />
+            {dateFilter
+              ? (dateFilter.toDateString() === new Date().toDateString()
+                ? "Hoy"
+                : format(dateFilter, "d MMM yyyy", { locale: es }))
+              : "Fecha"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <CalendarUI
+            mode="single"
+            selected={dateFilter}
+            onSelect={setDateFilter}
+            initialFocus
+          />
+          {dateFilter && (
+            <div className="p-2 border-t">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={() => setDateFilter(undefined)}
+              >
+                Limpiar
+              </Button>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
+
+      {/* «Por atender» (2026-10-05, petición del dueño: «pon aquí un filtro de solo pendientes»; el nombre lo
+          decidió él: «Por atender», no «Pendientes»): botón de alternancia con el estilo de «Hoy» para ver
+          solo lo que espera a que el personal haga algo —las reservas pendientes y las solicitudes sin
+          resolver—. No es un filtro aparte: pone y quita la opción «Por atender» del desplegable «Estado»
+          (`FILTRO_POR_ATENDER`), así que los dos van siempre a la par, y volver a pulsarlo deja «Todos los
+          estados». La cifra es lo que enseñaría al pulsarlo con los demás filtros puestos. Un poco más
+          ceñido que «Hoy» (`px-3 gap-1.5`): con él, la barra sigue cabiendo en una línea a 1440 px. */}
+      <Button
+        variant={soloPorAtender ? "default" : "outline"}
+        className="gap-1.5 px-3"
+        aria-pressed={soloPorAtender}
+        title={
+          soloPorAtender
+            ? "Quitar el filtro «Por atender»"
+            : "Ver solo lo que está por atender: reservas pendientes y solicitudes sin resolver"
+        }
+        onClick={() => setStatusFilter((actual) => (actual === FILTRO_POR_ATENDER ? "all" : FILTRO_POR_ATENDER))}
+      >
+        Por atender{" "}
+        <span
+          data-cifra-por-atender={cuantasPorAtender}
+          className={cn(
+            "rounded-full px-1.5 text-[11px] pointer-coarse:text-xs font-semibold leading-5 tabular-nums",
+            // Pulsado, en negativo sobre el botón oscuro (también con un 0), como la cifra del timeline.
+            soloPorAtender
+              ? "bg-primary-foreground text-primary"
+              : cuantasPorAtender > 0
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground",
+          )}
+        >
+          {cuantasPorAtender}
+          {/* El espacio, fuera del `sr-only` (dentro, el nombre accesible lo recorta). Se lee «Por atender
+              4 reservas y solicitudes». */}
+          {" "}
+          <span className="sr-only">{cuantasPorAtender === 1 ? "reserva o solicitud" : "reservas y solicitudes"}</span>
+        </span>
+      </Button>
+
+      {/* Filtro de estado. Cerrado dice QUÉ filtra (2026-10-05, petición del dueño): «Estado» sin filtro y
+          «Estado: Pendiente» con uno (`textoFiltroCerrado`). Lo que no cabe se recorta con «…» letra a
+          letra (`truncate`: el `line-clamp-1` del primitivo corta por palabras y dejaba «Canal:…» sin el
+          valor), a la izquierda (un `<button>` centra), sin encoger la flecha (`[&>svg]:shrink-0`) y con
+          el texto entero en el `title`. Ancho: 170 px (antes 200 desde `sm`): caben enteros los seis
+          estados y «Por atender» y, con el botón nuevo, la barra sigue en una línea a 1440 px; solo las
+          dos opciones de solicitudes se recortan, y desde `2xl` (1536 px), donde sobra sitio, caben. */}
+      <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SelectTrigger
+          className="w-[170px] gap-1 text-left 2xl:w-[236px] [&>svg]:shrink-0"
+          aria-label="Filtrar por estado"
+          title={statusFilter === "all" ? undefined : textoEstado}
+        >
+          <SelectValue>
+            <span className="block truncate">{textoEstado}</span>
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {OPCIONES_FILTRO_ESTADO.map((o) => (
+            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Filtro de canal: igual que el de estado («Canal» / «Canal: Web»). 144 px en todas las anchuras
+          (antes 120 en el móvil y 140 desde `sm`): cabe «Canal: Teléfono», y a 375 px va en su línea. */}
+      <Select value={canalFilter} onValueChange={setCanalFilter}>
+        <SelectTrigger
+          className="w-[144px] gap-1 text-left [&>svg]:shrink-0"
+          aria-label="Filtrar por canal"
+          title={canalFilter === "all" ? undefined : textoCanal}
+        >
+          <SelectValue>
+            <span className="block truncate">{textoCanal}</span>
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {OPCIONES_FILTRO_CANAL.map((o) => (
+            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </>
+  );
+
   if (loading) {
     return (
       <Card>
@@ -818,15 +971,15 @@ export function ListaReservasAvanzada({
           preferencia se recuerda en el navegador). Cada estado es un botón que activa/desactiva el filtro
           «Estado»: volver a pulsar el que está puesto lo quita («Todos»). */}
       <TimelineEstadosReserva
-        className="shrink-0"
+        className="shrink-0 max-md:hidden"
         estadoActivo={statusFilter}
         onElegirEstado={(estado) => setStatusFilter((actual) => (actual === estado ? "all" : estado))}
       />
 
       {/* Filtros */}
-      <Card className="shrink-0">
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-center">
+      <Card className="shrink-0 max-md:border-0 max-md:bg-transparent max-md:shadow-none">
+        <CardContent className="p-0 md:p-4">
+          <div className="flex flex-row flex-wrap items-center gap-2 md:gap-4">
             {/* Búsqueda */}
             <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -839,135 +992,65 @@ export function ListaReservasAvanzada({
               />
             </div>
 
-            <div className="flex gap-2 flex-wrap">
-              {/* Botón Hoy */}
-              <Button
-                variant={dateFilter && dateFilter.toDateString() === new Date().toDateString() ? "default" : "outline"}
-                size="default"
-                onClick={() => setDateFilter(new Date())}
-              >
-                Hoy
-              </Button>
+            {/* Móvil (< 768 px, 07/11/2026): solo el buscador y «Filtros (N)», que abre una hoja inferior con
+                fecha, «Por atender», estado y canal. Desde `md`, todo en la fila de siempre. */}
+            <Button
+              type="button"
+              variant={filtrosActivos > 0 ? "default" : "outline"}
+              className="h-11 shrink-0 gap-1.5 px-3 md:hidden"
+              onClick={() => setFiltrosAbiertos(true)}
+              aria-label={filtrosActivos > 0 ? `Filtros (${filtrosActivos} activos)` : "Filtros"}
+            >
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+              Filtros{filtrosActivos > 0 && ` (${filtrosActivos})`}
+            </Button>
 
-              {/* Filtro de fecha */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="min-w-[120px] sm:min-w-[150px]">
-                    <Calendar className="mr-2 h-4 w-4" />
-                    {dateFilter
-                      ? (dateFilter.toDateString() === new Date().toDateString()
-                        ? "Hoy"
-                        : format(dateFilter, "d MMM yyyy", { locale: es }))
-                      : "Fecha"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarUI
-                    mode="single"
-                    selected={dateFilter}
-                    onSelect={setDateFilter}
-                    initialFocus
-                  />
-                  {dateFilter && (
-                    <div className="p-2 border-t">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => setDateFilter(undefined)}
-                      >
-                        Limpiar
-                      </Button>
-                    </div>
-                  )}
-                </PopoverContent>
-              </Popover>
-
-              {/* «Por atender» (2026-10-05, petición del dueño: «pon aquí un filtro de solo pendientes»; el nombre lo
-                  decidió él: «Por atender», no «Pendientes»): botón de alternancia con el estilo de «Hoy» para ver
-                  solo lo que espera a que el personal haga algo —las reservas pendientes y las solicitudes sin
-                  resolver—. No es un filtro aparte: pone y quita la opción «Por atender» del desplegable «Estado»
-                  (`FILTRO_POR_ATENDER`), así que los dos van siempre a la par, y volver a pulsarlo deja «Todos los
-                  estados». La cifra es lo que enseñaría al pulsarlo con los demás filtros puestos. Un poco más
-                  ceñido que «Hoy» (`px-3 gap-1.5`): con él, la barra sigue cabiendo en una línea a 1440 px. */}
-              <Button
-                variant={soloPorAtender ? "default" : "outline"}
-                className="gap-1.5 px-3"
-                aria-pressed={soloPorAtender}
-                title={
-                  soloPorAtender
-                    ? "Quitar el filtro «Por atender»"
-                    : "Ver solo lo que está por atender: reservas pendientes y solicitudes sin resolver"
-                }
-                onClick={() => setStatusFilter((actual) => (actual === FILTRO_POR_ATENDER ? "all" : FILTRO_POR_ATENDER))}
-              >
-                Por atender{" "}
-                <span
-                  data-cifra-por-atender={cuantasPorAtender}
-                  className={cn(
-                    "rounded-full px-1.5 text-[11px] pointer-coarse:text-xs font-semibold leading-5 tabular-nums",
-                    // Pulsado, en negativo sobre el botón oscuro (también con un 0), como la cifra del timeline.
-                    soloPorAtender
-                      ? "bg-primary-foreground text-primary"
-                      : cuantasPorAtender > 0
-                        ? "bg-muted text-foreground"
-                        : "text-muted-foreground",
-                  )}
-                >
-                  {cuantasPorAtender}
-                  {/* El espacio, fuera del `sr-only` (dentro, el nombre accesible lo recorta). Se lee «Por atender
-                      4 reservas y solicitudes». */}
-                  {" "}
-                  <span className="sr-only">{cuantasPorAtender === 1 ? "reserva o solicitud" : "reservas y solicitudes"}</span>
-                </span>
-              </Button>
-
-              {/* Filtro de estado. Cerrado dice QUÉ filtra (2026-10-05, petición del dueño): «Estado» sin filtro y
-                  «Estado: Pendiente» con uno (`textoFiltroCerrado`). Lo que no cabe se recorta con «…» letra a
-                  letra (`truncate`: el `line-clamp-1` del primitivo corta por palabras y dejaba «Canal:…» sin el
-                  valor), a la izquierda (un `<button>` centra), sin encoger la flecha (`[&>svg]:shrink-0`) y con
-                  el texto entero en el `title`. Ancho: 170 px (antes 200 desde `sm`): caben enteros los seis
-                  estados y «Por atender» y, con el botón nuevo, la barra sigue en una línea a 1440 px; solo las
-                  dos opciones de solicitudes se recortan, y desde `2xl` (1536 px), donde sobra sitio, caben. */}
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger
-                  className="w-[170px] gap-1 text-left 2xl:w-[236px] [&>svg]:shrink-0"
-                  aria-label="Filtrar por estado"
-                  title={statusFilter === "all" ? undefined : textoEstado}
-                >
-                  <SelectValue>
-                    <span className="block truncate">{textoEstado}</span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {OPCIONES_FILTRO_ESTADO.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Filtro de canal: igual que el de estado («Canal» / «Canal: Web»). 144 px en todas las anchuras
-                  (antes 120 en el móvil y 140 desde `sm`): cabe «Canal: Teléfono», y a 375 px va en su línea. */}
-              <Select value={canalFilter} onValueChange={setCanalFilter}>
-                <SelectTrigger
-                  className="w-[144px] gap-1 text-left [&>svg]:shrink-0"
-                  aria-label="Filtrar por canal"
-                  title={canalFilter === "all" ? undefined : textoCanal}
-                >
-                  <SelectValue>
-                    <span className="block truncate">{textoCanal}</span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {OPCIONES_FILTRO_CANAL.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="hidden gap-2 flex-wrap md:flex">
+              {controlesFiltro}
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Móvil: los filtros puestos, como chips pequeños que se quitan con un toque. */}
+      {filtrosActivos > 0 && (
+        <div className="flex shrink-0 flex-wrap gap-1.5 md:hidden" aria-label="Filtros activos">
+          {dateFilter && (
+            <ChipFiltro onQuitar={() => setDateFilter(undefined)}>
+              {dateFilter.toDateString() === new Date().toDateString() ? "Hoy" : format(dateFilter, "d MMM yyyy", { locale: es })}
+            </ChipFiltro>
+          )}
+          {statusFilter !== "all" && <ChipFiltro onQuitar={() => setStatusFilter("all")}>{textoEstado}</ChipFiltro>}
+          {canalFilter !== "all" && <ChipFiltro onQuitar={() => setCanalFilter("all")}>{textoCanal}</ChipFiltro>}
+        </div>
+      )}
+
+      <Sheet open={filtrosAbiertos} onOpenChange={setFiltrosAbiertos}>
+        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader className="text-left">
+            <SheetTitle>Filtros</SheetTitle>
+            <SheetDescription>Fecha, estado y canal de las reservas y solicitudes.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 flex flex-wrap gap-2 [&_button]:min-h-11">{controlesFiltro}</div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              className="h-12"
+              disabled={filtrosActivos === 0}
+              onClick={() => {
+                setDateFilter(undefined);
+                setStatusFilter("all");
+                setCanalFilter("all");
+              }}
+            >
+              Quitar filtros
+            </Button>
+            <Button className="h-12" onClick={() => setFiltrosAbiertos(false)}>
+              Ver {filas.length} {filas.length === 1 ? "resultado" : "resultados"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* BLOQUE DE LA LISTA: mide lo que queda de ventana (`altoLista`, ver `ALTURA_MINIMA_LISTA`) y es una
           columna: la barra de «N seleccionadas» y la paginación a su alto, y la tabla (o las tarjetas) con
@@ -1048,19 +1131,19 @@ export function ListaReservasAvanzada({
                         className="shrink-0"
                       />
                       <EstrellaImportante reserva={reservation} canEdit={canEdit} variante="tarjeta" onClick={al.importante} />
-                      <span className="font-medium text-sm">{reservation.nombre || "Sin nombre"}</span>
+                      <span className="text-base font-semibold">{reservation.nombre || "Sin nombre"}</span>
                     </div>
                     <InsigniaEstado estado={reservation.estado} />
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span>{new Date(reservation.fecha).toLocaleDateString("es-ES")}</span>
-                    <span>{reservation.hora}</span>
-                    <span className="flex items-center gap-1"><Users className="h-3 w-3" />{reservation.numero_comensales}</span>
+                    <span className="font-medium text-foreground tabular-nums">{reservation.hora?.slice(0, 5)}</span>
+                    <span className="flex items-center gap-1 tabular-nums"><Users className="h-4 w-4" />{reservation.numero_comensales}</span>
                     {getCanalBadge(reservation.canal, true)}
                   </div>
                   {reservation.telefono && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Phone className="h-3 w-3" />{reservation.telefono}
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Phone className="h-4 w-4" />{reservation.telefono}
                     </p>
                   )}
                   {/* El mismo juego de acciones y en el mismo orden que en la

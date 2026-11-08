@@ -1,8 +1,30 @@
-import { AlertTriangle, Clock, CloudOff, Info, KanbanSquare, LayoutGrid, Receipt, TrendingUp } from "lucide-react";
+import {
+  TrendingDown,
+  Handshake,
+  AlertTriangle,
+  BadgePercent,
+  Bot,
+  Clock,
+  CloudOff,
+  FileQuestion,
+  Info,
+  KanbanSquare,
+  LayoutGrid,
+  PieChart,
+  Receipt,
+  ScanSearch,
+  TrendingUp,
+  UserPlus,
+} from "lucide-react";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
+import { rutaAlerta, TIPOS_ALERTA_FACTURAS } from "@/lib/facturas/alertas";
 
 /** Adónde lleva un aviso (null = no tiene origen al que ir). Lo comparten la campana y la página «Avisos». */
-export function rutaDeAviso(n: Pick<NotificacionDashboard, "tipo" | "referencia_tipo"> & { referencia_id?: string | null }): string | null {
+export function rutaDeAviso(
+  n: Pick<NotificacionDashboard, "tipo" | "referencia_tipo"> & { referencia_id?: string | null; datos?: NotificacionDashboard["datos"] },
+): string | null {
+  // Alertas de Facturas (20261107300000): cada una trae su enlace del panel (documento, proveedor, mes).
+  if (n.referencia_tipo === "facturas_alerta") return rutaAlerta(n.datos) ?? "/facturas?tab=chat";
   // Reserva sin sala o mesa dentro de la ventana: pestaña «Asignación» de /reservas.
   if (n.tipo === "reserva_sin_asignar") return "/reservas?tab=asignacion";
   // Las solicitudes viven en la pestaña unificada «Reservas», filtradas por «Solicitudes sin resolver».
@@ -11,6 +33,8 @@ export function rutaDeAviso(n: Pick<NotificacionDashboard, "tipo" | "referencia_
   if (n.referencia_tipo === "facturas_productos") return "/facturas?tab=productos";
   // Original de una factura que no se ha podido subir a Drive (20261105193000).
   if (n.referencia_tipo === "facturas_original") return "/facturas?tab=compras";
+  // Modelos de OpenAI nuevos, retirados o sin precio (20261107500000): solo super admin.
+  if (n.referencia_tipo === "ia_modelos") return "/super-admin/servicios?tab=modelos";
   // Encargos de Instagram (20261110100000): la ficha del encargo.
   if (n.referencia_tipo === "instagram_encargo") {
     return n.referencia_id ? `/instagram?tab=encargos&encargo=${encodeURIComponent(n.referencia_id)}` : "/instagram?tab=encargos";
@@ -22,7 +46,7 @@ export type FiltroAvisos = "todos" | "sin_leer" | "reservas" | "facturas" | "otr
 
 export const TIPOS_POR_FILTRO: Record<"reservas" | "facturas", string[]> = {
   reservas: ["solicitud_pendiente", "reserva_nueva", "reserva_sin_asignar"],
-  facturas: ["facturas_subida", "subida_precio", "original_sin_drive"],
+  facturas: ["facturas_subida", "subida_precio", "original_sin_drive", ...TIPOS_ALERTA_FACTURAS.map((t) => t.tipo)],
 };
 
 export const FILTROS_AVISOS: { valor: FiltroAvisos; etiqueta: string }[] = [
@@ -77,6 +101,22 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   original_sin_drive: CloudOff,
   // Encargos de Instagram: aceptado, entregado, mensaje de Oficiosos…
   instagram_encargo: KanbanSquare,
+  // Alertas diarias de Facturas (cron facturas-alertas, 20261107300000).
+  facturas_precio_sube: TrendingUp,
+  facturas_precio_mejor: BadgePercent,
+  facturas_familia_gasto: PieChart,
+  facturas_albaran_sin_factura: FileQuestion,
+  facturas_proveedor_nuevo: UserPlus,
+  facturas_importe_inusual: AlertTriangle,
+  facturas_revision: ScanSearch,
+  // 20261115100000_facturas_decision
+  facturas_precio_baja: TrendingDown,
+  facturas_precio_proveedor: TrendingUp,
+  facturas_precio_pactado: Handshake,
+  // Centro de modelos de IA (cron diario ia-modelos-openai, 20261107500000).
+  ia_modelo_nuevo: Bot,
+  ia_modelo_retirado: AlertTriangle,
+  ia_modelo_sin_precio: Bot,
   sistema: Info,
 };
 
@@ -102,8 +142,22 @@ export const SECCIONES_AVISOS: Record<SeccionAvisos, { titulo: string; tipos: { 
       { tipo: "facturas_subida", etiqueta: "Subidas de facturas" },
       { tipo: "subida_precio", etiqueta: "Subidas de precio" },
       { tipo: "original_sin_drive", etiqueta: "Originales sin Drive" },
+      ...TIPOS_ALERTA_FACTURAS,
     ],
   },
 };
 
 export const tiposDeSeccion = (seccion: SeccionAvisos) => SECCIONES_AVISOS[seccion].tipos.map((t) => t.tipo);
+
+/** Avisos con caducidad (alertas de Facturas) ya pasada: no se enseñan. `ahora` inyectable para pruebas. */
+export function avisoCaducado(n: Pick<NotificacionDashboard, "caduca_en">, ahora: number = Date.now()): boolean {
+  if (!n.caduca_en) return false;
+  const t = Date.parse(n.caduca_en);
+  return Number.isFinite(t) && t <= ahora;
+}
+
+/** Evento para abrir el modal «Avisos» de una sección desde otro sitio («Ver todas» de Análisis). */
+export const EVENTO_ABRIR_AVISOS = "abrir-avisos-seccion";
+export function abrirAvisosSeccion(seccion: SeccionAvisos) {
+  window.dispatchEvent(new CustomEvent(EVENTO_ABRIR_AVISOS, { detail: { seccion } }));
+}

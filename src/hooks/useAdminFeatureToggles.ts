@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
+import { leerToggles, tomarAdelantada } from "@/lib/precargaToggles";
 
 export interface AdminFeatureToggle {
   section_key: string;
@@ -17,10 +18,7 @@ export function useAdminFeatureToggles() {
 
   const fetchToggles = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("admin_feature_toggles")
-      .select("section_key, label, enabled, updated_at")
-      .order("label", { ascending: true });
+    const { data, error } = await (tomarAdelantada() ?? leerToggles());
 
     if (!error && data) {
       setToggles(data);

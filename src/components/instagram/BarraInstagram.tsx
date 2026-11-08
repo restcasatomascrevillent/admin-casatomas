@@ -3,13 +3,23 @@
  * `.acciones-barra`): el selector de marca común a todas las pestañas («Las
  * dos / Casa Tomás / Touza», píldora `.segmentado`) y el indicador de la
  * cuenta conectada («● @cuenta»), que abre la conexión.
+ *
+ * El indicador NO llama a instagram-estado al cargar (esa función pregunta a
+ * Meta varias veces, 2-5 s): pinta la última cuenta comprobada (en caché de
+ * TanStack Query o guardada en el navegador, cuentaGuardada.ts). La
+ * comprobación completa solo se hace al abrir el diálogo o con «Comprobar».
+ * Ver docs/instagram-rendimiento.md.
  */
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { MarcaId } from "@/lib/instagram";
-import { ConexionInstagram } from "@/components/marketing/instagram/ConexionInstagram";
 import { useConexionInstagram } from "@/components/marketing/instagram/useConexionInstagram";
+import { leerCuentaGuardada } from "@/components/marketing/instagram/cuentaGuardada";
+
+// El diálogo de conexión solo se descarga al abrirlo.
+const ConexionInstagram = lazy(() => import("@/components/marketing/instagram/ConexionInstagram").then((m) => ({ default: m.ConexionInstagram })));
 
 export type FiltroMarca = MarcaId | "todas";
 
@@ -44,14 +54,20 @@ export function SelectorMarca({ valor, onCambio, className }: { valor: FiltroMar
   );
 }
 
-/** Texto del indicador según el estado de la conexión. */
-export function textoIndicador(c: { estado: { ok: boolean; cuenta: { username: string } | null; cuentasPorMarca: Array<{ marca: string; username: string | null }> } | null; cargando: boolean; error: unknown }, marca: FiltroMarca): { texto: string; tono: "ok" | "aviso" | "mal" | "gris" } {
+/**
+ * Texto del indicador según el estado de la conexión. `caducada`: el estado es
+ * una cuenta guardada hace más de 45 min (se ve el @usuario, con el punto gris).
+ */
+export function textoIndicador(
+  c: { estado: { ok: boolean; cuenta: { username: string } | null; cuentasPorMarca: Array<{ marca: string; username: string | null }> } | null; cargando: boolean; error: unknown; caducada?: boolean },
+  marca: FiltroMarca,
+): { texto: string; tono: "ok" | "aviso" | "mal" | "gris" } {
   if (c.cargando) return { texto: "Comprobando…", tono: "gris" };
   if (c.error || !c.estado) return { texto: "Sin comprobar", tono: c.error ? "mal" : "gris" };
   const deMarca = marca === "todas" ? null : c.estado.cuentasPorMarca.find((x) => x.marca === marca)?.username;
   const usuario = deMarca ?? c.estado.cuenta?.username ?? null;
-  if (!usuario) return { texto: "Sin cuenta", tono: "mal" };
-  return { texto: `@${usuario}`, tono: c.estado.ok ? "ok" : "aviso" };
+  if (!usuario) return { texto: "Sin cuenta", tono: c.caducada ? "gris" : "mal" };
+  return { texto: `@${usuario}`, tono: c.caducada ? "gris" : c.estado.ok ? "ok" : "aviso" };
 }
 
 const COLOR_PUNTO = { ok: "bg-[#117e39]", aviso: "bg-[#e7b008]", mal: "bg-red-600", gris: "bg-muted-foreground/60" } as const;
@@ -61,9 +77,21 @@ const COLOR_PUNTO = { ok: "bg-[#117e39]", aviso: "bg-[#e7b008]", mal: "bg-red-60
  * cabecera del asistente móvil, donde no cabe «@cuenta».
  */
 export function IndicadorCuenta({ marca, className, compacto = false }: { marca: FiltroMarca; className?: string; compacto?: boolean }) {
-  const conexion = useConexionInstagram();
+  // Sin comprobación automática: solo lo que ya esté en la caché de TanStack Query…
+  const conexion = useConexionInstagram(false);
+  // …o, si aún no, la última cuenta guardada en el navegador.
+  const [guardada] = useState(() => leerCuentaGuardada());
   const [abierto, setAbierto] = useState(false);
-  const { texto, tono } = textoIndicador(conexion, marca);
+  const enMemoria = conexion.estado;
+  const { texto, tono } = textoIndicador(
+    {
+      estado: enMemoria ?? guardada?.cuenta ?? null,
+      cargando: !enMemoria && !guardada && conexion.comprobando,
+      error: enMemoria || guardada ? null : conexion.error,
+      caducada: !enMemoria && !!guardada && !guardada.vigente,
+    },
+    marca,
+  );
   return (
     <>
       <button
@@ -89,7 +117,11 @@ export function IndicadorCuenta({ marca, className, compacto = false }: { marca:
             <DialogTitle>Conexión con Instagram</DialogTitle>
             <DialogDescription>En qué cuenta publica cada marca y si todo está listo.</DialogDescription>
           </DialogHeader>
-          <ConexionInstagram sinTitulo className="border-0 p-0" />
+          {abierto && (
+            <Suspense fallback={<Skeleton role="status" className="h-40 w-full" aria-label="Cargando la conexión" />}>
+              <ConexionInstagram sinTitulo className="border-0 p-0" />
+            </Suspense>
+          )}
         </DialogContent>
       </Dialog>
     </>

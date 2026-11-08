@@ -74,6 +74,7 @@ interface FilaReserva {
   espacio_id: string | null;
   marca?: string | null;
   salida_at?: string | null;
+  mesa_fijada?: boolean | null;
 }
 
 /**
@@ -178,6 +179,7 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
         espacioId: r.espacio_id,
         mesaIds: mesasDe.get(r.id) ?? [],
         salidaAt: r.salida_at ?? null,
+        fijada: !!r.mesa_fijada,
       }));
     const ahora = new Date();
     const empezado = fecha === hoyLocal() && turnoDeHora(ahora.toTimeString().slice(0, 8)) === turno;

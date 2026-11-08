@@ -1,0 +1,112 @@
+{
+  "descripcion": "Batería de evaluación de modelos del copiloto de Facturas (docs/facturas/EVAL-MODELOS.md). Respuestas de referencia calculadas con SQL directo en la DEMO (sfonaclosuafvlhutkon) el 07/11/2026 (hoy = 2026-11-07; datos hasta 2026-11-03, octubre incompleto con 49 documentos, histórico útil desde diciembre de 2025). Importes de familia/producto = líneas SIN IVA (regla 1 de docs/facturas/README.md); gasto de documentos = total CON IVA. Sin filtro de local (Casa Tomás + Touza), como el chatbot por defecto. Una cifra es correcta si cae dentro de tolerancia_pct de «valor» o de alguna de «alternativas» (otra lectura razonable de la pregunta).",
+  "fecha_referencia": "2026-11-07",
+  "proyecto": "sfonaclosuafvlhutkon",
+  "preguntas": [
+    {
+      "id": "q01",
+      "mensaje": "cuántos litros de cerveza he comprado este año",
+      "historial": [],
+      "esperado": { "valor": 20520.9, "unidad": "l", "tolerancia_pct": 3, "alternativas": [], "notas": "459 líneas de la familia Cervezas, 0 sin convertir; 94.579,58 € sin IVA; todo de DISTRIBUCIONES DE BEBIDAS CATRAL." },
+      "herramientas_esperadas": ["volumen_comprado"],
+      "sql": "select sum(cantidad_base) from volumen_lineas where categoria='Cervezas' and medida='l' and fecha between '2026-01-01' and '2026-11-07'"
+    },
+    {
+      "id": "q02",
+      "mensaje": "hazme una comparativa de a cuánto estoy comprando el litro de cerveza de todos los proveedores en el último año",
+      "historial": [],
+      "esperado": { "valor": 4.609, "unidad": "€/l sin IVA", "tolerancia_pct": 8, "alternativas": [], "notas": "En el último año solo hay UN proveedor de cerveza en el catálogo: DISTRIBUCIONES DE BEBIDAS CATRAL, 20.520,9 l por 94.579,58 € = 4,61 €/l sin IVA. Buena respuesta: lo dice (no inventa otros proveedores) y da el €/l; mejor si desglosa por formato (barril/botellín)." },
+      "herramientas_esperadas": ["volumen_comprado", "compras_producto", "historial_precios", "ranking"],
+      "sql": "select proveedor_txt, sum(importe)/sum(cantidad_base) from volumen_lineas where categoria='Cervezas' and medida='l' and fecha > '2025-11-07' group by 1"
+    },
+    {
+      "id": "q03",
+      "mensaje": "hazme la comparativa",
+      "historial": [
+        { "rol": "user", "contenido": "cuántos litros de cerveza he comprado este año" },
+        { "rol": "assistant", "contenido": "Este año (1 de enero al 7 de noviembre de 2026) has comprado unos 20.521 litros de cerveza en 459 líneas, por 94.579,58 € sin IVA." }
+      ],
+      "esperado": { "valor": 4.609, "unidad": "€/l sin IVA", "tolerancia_pct": 8, "alternativas": [], "notas": "Seguimiento: debe entender que es la comparativa de precio por litro de cerveza entre proveedores (este año = último año: mismos datos). Un único proveedor, Catral, a 4,61 €/l. Falla si pregunta «¿qué comparativa?» o compara otra cosa sin relación." },
+      "herramientas_esperadas": ["volumen_comprado", "compras_producto", "historial_precios", "ranking"],
+      "sql": "igual que q02 con fecha >= '2026-01-01'"
+    },
+    {
+      "id": "q04",
+      "mensaje": "cuánto me he gastado en vino en el último mes",
+      "historial": [],
+      "esperado": { "valor": 43.92, "unidad": "€ sin IVA", "tolerancia_pct": 5, "alternativas": [19366], "notas": "Últimos 30 días (y octubre) = 43,92 € sin IVA, pero octubre está INCOMPLETO (49 documentos frente a ~160 de un mes normal). Buena respuesta: da la cifra y avisa de que el mes está incompleto; también vale dar septiembre (19.366 € sin IVA, último mes completo) diciendo por qué." },
+      "herramientas_esperadas": ["gasto_por_categoria", "consulta_flexible", "compras_producto", "volumen_comprado"],
+      "sql": "select sum(pf.total) from productos_factura pf join facturas fa on fa.id=pf.factura_id join productos_catalogo pc on pc.id=pf.producto_id join categorias_producto c on c.id=pc.categoria_id where c.nombre='Vinos' and not (fa.tipo='albaran' and fa.facturado_en_id is not null) and fa.fecha > '2026-10-07'"
+    },
+    {
+      "id": "q05",
+      "mensaje": "¿y en cerveza?",
+      "historial": [
+        { "rol": "user", "contenido": "cuánto me he gastado en vino en el último mes" },
+        { "rol": "assistant", "contenido": "En el último mes (8 de octubre a 7 de noviembre de 2026) llevas 43,92 € de vino sin IVA. Ojo: octubre está incompleto en los datos." }
+      ],
+      "esperado": { "valor": 0, "unidad": "€ sin IVA", "tolerancia_pct": 0, "alternativas": [12911], "notas": "Mismo periodo: NO hay ninguna línea de cerveza (0 €), porque octubre está incompleto. Buena respuesta: «no hay compras de cerveza registradas en ese periodo» + aviso de mes incompleto; también vale septiembre (12.911 € sin IVA) explicándolo. Falla si da el gasto de todo el año como si fuera el mes." },
+      "herramientas_esperadas": ["gasto_por_categoria", "consulta_flexible", "compras_producto", "volumen_comprado"],
+      "sql": "igual que q04 con c.nombre='Cervezas'"
+    },
+    {
+      "id": "q06",
+      "mensaje": "qué proveedor de marisco me sale más caro",
+      "historial": [],
+      "esperado": { "valor": null, "unidad": "proveedor", "tolerancia_pct": null, "alternativas": [], "notas": "Pregunta abierta. Por €/kg de la familia Marisco (proveedores con > 200 € de compra): DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO SRL 138,2 €/kg, NUEVO TOMAS Y CARMEN CB 128,1 €/kg, PESQUERO MYT 114,9 €/kg. Por gasto total: HERMANOS NAREJOS 29.918,70 € (40,7 €/kg). Correcta si nombra uno de los tres primeros por €/kg o, si interpreta «caro» como gasto, Hermanos Narejos diciendo el criterio. Mejor si compara el MISMO producto (p. ej. gamba roja)." },
+      "aceptar_proveedores": ["NICOLÁS Y VALERO", "NUEVO TOMAS Y CARMEN", "PESQUERO MYT", "NAREJOS"],
+      "herramientas_esperadas": ["ranking", "consulta_flexible", "gasto_por_categoria", "compras_producto", "volumen_comprado"],
+      "sql": "select proveedor_txt, sum(importe), sum(importe) filter (where medida='kg')/sum(cantidad_base) filter (where medida='kg') from volumen_lineas where categoria='Marisco' group by 1 having sum(importe) > 200 order by 3 desc"
+    },
+    {
+      "id": "q07",
+      "mensaje": "kilos de gamba roja y precio por kilo",
+      "historial": [],
+      "esperado": { "valor": 42.05, "unidad": "kg", "tolerancia_pct": 5, "valor2": 130.56, "unidad2": "€/kg sin IVA", "tolerancia2_pct": 8, "alternativas": [], "notas": "Todo el histórico: 42,05 kg por 5.490 € sin IVA = 130,56 €/kg (19 líneas). Por proveedor: Hermanos Narejos 15,1 kg a 155,6 €/kg; Nicolás y Valero 6,85 kg a 156,6 y 14,1 kg a 121,2 (dos fichas del mismo proveedor); Pescados Moltó 6 kg a 59,7 €/kg. Correcta si da kilos Y €/kg dentro de tolerancia (o el desglose por proveedor coherente)." },
+      "herramientas_esperadas": ["volumen_comprado", "compras_producto", "historial_precios"],
+      "sql": "select sum(cantidad_base), sum(importe)/sum(cantidad_base) from volumen_lineas where nom_n ~ 'gamba' and nom_n ~ 'roja' and medida='kg'"
+    },
+    {
+      "id": "q08",
+      "mensaje": "qué ha subido de precio este año",
+      "historial": [],
+      "esperado": { "valor": 130, "unidad": "productos con subida > 10 %", "tolerancia_pct": 15, "alternativas": [], "notas": "variacion_precios_agente(2026-01-01, 2026-11-07): 130 productos suben más del 10 % (última compra frente a la media de 90 días). Los primeros son datos raros (Pan de cristal 1.600 %, San Pellegrino 698 %, Guacamole 530 %: probables errores de unidad). Correcta si cita productos reales de la herramienta con su % y el criterio; mejor si avisa de que los extremos parecen errores de unidad. Falla si inventa productos o no usa variacion_precios." },
+      "aceptar_productos": ["Pan de cristal", "Pellegrino", "Guacamole", "Almeja", "Hamburguesa", "Mejillón", "Gintleman", "Cucharas"],
+      "herramientas_esperadas": ["variacion_precios"],
+      "sql": "select variacion_precios_agente('2026-01-01','2026-11-07', null, null, null, 8, null)"
+    },
+    {
+      "id": "q09",
+      "mensaje": "cuánto gasté en septiembre y en qué familias",
+      "historial": [],
+      "esperado": { "valor": 134154.74, "unidad": "€ con IVA", "tolerancia_pct": 2, "alternativas": [], "notas": "Septiembre de 2026: 187 documentos, 134.154,74 € con IVA. Familias (líneas sin IVA): Bebidas 42.099 €, Pescado y marisco 31.830 €, Carnes y embutidos 11.942 €, Servicios 8.496 €, Despensa 6.726 €… Correcta si da el total y las 3 primeras familias en orden (puede aclarar que las familias van sin IVA)." },
+      "herramientas_esperadas": ["resumen_periodo", "gasto_por_categoria"],
+      "sql": "select sum(total) from facturas where not (tipo='albaran' and facturado_en_id is not null) and fecha between '2026-09-01' and '2026-09-30'"
+    },
+    {
+      "id": "q10",
+      "mensaje": "qué le compro a Makro",
+      "historial": [],
+      "esperado": { "valor": 35395.43, "unidad": "€ con IVA (todo el histórico)", "tolerancia_pct": 3, "alternativas": [], "notas": "165 documentos, 35.395,43 €. Familias: Despensa 8.022 €, Frutas y verduras 5.764 €, Panadería 4.373 €, Lácteos 4.183 €. Productos: brioche trenzado METRO Chef (1.324 €), queso crema cubo 5 kg (784 €), pimiento rojo en tiras (676 + 548 €), hojas de pan, P.X. Delgado 5 l, patata mini, limas. Correcta si nombra productos o familias reales de Makro (no hace falta el total si describe bien lo que compra)." },
+      "aceptar_productos": ["brioche", "queso crema", "pimiento", "hojas de pan", "P.X.", "patata", "limas", "Despensa", "Frutas"],
+      "herramientas_esperadas": ["ficha_proveedor", "ranking", "compras_producto"],
+      "sql": "select nombre, sum(pf.total) from productos_factura pf join facturas fa on fa.id=pf.factura_id where fa.proveedor ilike '%makro%' and not (fa.tipo='albaran' and fa.facturado_en_id is not null) group by 1 order by 2 desc limit 8"
+    },
+    {
+      "id": "q11",
+      "mensaje": "albaranes sin factura",
+      "historial": [],
+      "esperado": { "valor": 41, "unidad": "albaranes", "tolerancia_pct": 0, "valor2": 17993.28, "unidad2": "€", "tolerancia2_pct": 3, "alternativas": [], "notas": "41 albaranes con facturado_en_id NULL por 17.993,28 € (uno sin total: Joselito). Mayores: Bodega Campoluz 3.010,61 €, Once de Enero 2.986,50 €, Nicolás y Valero (5) 2.290,17 €. Correcta si da el número (o el importe) dentro de tolerancia." },
+      "herramientas_esperadas": ["albaranes_sin_factura"],
+      "sql": "select count(*), sum(total) from facturas where tipo='albaran' and facturado_en_id is null"
+    },
+    {
+      "id": "q12",
+      "mensaje": "cuánto IRPF me han retenido este año",
+      "historial": [],
+      "esperado": { "valor": 5920.09, "unidad": "€", "tolerancia_pct": 2, "alternativas": [], "notas": "42 facturas de 2026 con retención: 5.920,09 € (Salvador Mas 2.090 €, Crevigest 1.714,64 €, Vicente Bailén 1.425 €, Alfonso Bernal 654,65 €…). OJO: ninguna herramienta del chatbot suma retencion_irpf (solo detalle_documento la enseña por documento), así que se espera que los modelos no lo sepan: lo correcto entonces es decir que no puede calcularlo, NUNCA inventar una cifra." },
+      "herramientas_esperadas": ["consulta_flexible", "filtrar_documentos", "detalle_documento"],
+      "sql": "select sum(retencion_irpf), count(*) from facturas where retencion_irpf is not null and fecha >= '2026-01-01'"
+    }
+  ]
+}

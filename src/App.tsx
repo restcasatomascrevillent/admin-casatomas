@@ -15,26 +15,29 @@ import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
 import { ColaVideosProvider } from "@/components/carta/video/ColaVideosProvider";
 import { rutaServicios } from "@/components/servicios/pestanas";
+import { PanelLayout, CargandoContenido } from "@/components/PanelLayout";
+import { CARGADORES_SECCION } from "@/lib/precargaSecciones";
 import Auth from "./pages/Auth";
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Reservas = lazy(() => import("./pages/Reservas"));
+const Dashboard = lazy(CARGADORES_SECCION["/dashboard"]);
+const Reservas = lazy(CARGADORES_SECCION["/reservas"]);
 const Espacios = lazy(() => import("./pages/Espacios"));
 const Ecommerce = lazy(() => import("./pages/Ecommerce"));
 // Gestor Web unifica Carta, Novedades, Menús y Tapas en pestañas (?tab=...).
 // La ruta antigua /gestor-carta redirige aquí; /gestion-bot redirige ahora a
 // /super-admin/bot-web.
-const GestionWeb = lazy(() => import("./pages/GestorWeb"));
+const GestionWeb = lazy(CARGADORES_SECCION["/gestion-web"]);
 const AsistenteTelefonico = lazy(() => import("./pages/AsistenteTelefonico"));
-const Marketing = lazy(() => import("./pages/Marketing"));
-const Instagram = lazy(() => import("./pages/Instagram"));
+const Marketing = lazy(CARGADORES_SECCION["/marketing"]);
+const Instagram = lazy(CARGADORES_SECCION["/instagram"]);
 const InstagramRapido = lazy(() => import("./pages/InstagramRapido"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Cheques = lazy(() => import("./pages/Cheques"));
-const Tienda = lazy(() => import("./pages/Tienda"));
-const Facturas = lazy(() => import("./pages/Facturas"));
-const Usuarios = lazy(() => import("./pages/Usuarios"));
-const Ayuda = lazy(() => import("./pages/Ayuda"));
-const Avisos = lazy(() => import("./pages/Avisos"));
+const Cheques = lazy(CARGADORES_SECCION["/cheques"]);
+const Tienda = lazy(CARGADORES_SECCION["/tienda"]);
+const Facturas = lazy(CARGADORES_SECCION["/facturas"]);
+const AnalisisGeneral = lazy(CARGADORES_SECCION["/analisis"]);
+const Usuarios = lazy(CARGADORES_SECCION["/usuarios"]);
+const Ayuda = lazy(CARGADORES_SECCION["/ayuda"]);
+const Avisos = lazy(CARGADORES_SECCION["/avisos"]);
 const GestorGasto = lazy(() => import("./pages/GestorGasto"));
 const GestionResenas = lazy(() => import("./pages/GestionResenas"));
 const TraficoWeb = lazy(() => import("./pages/TraficoWeb"));
@@ -45,7 +48,26 @@ const SuperAdminBotWeb = lazy(() => import("./pages/SuperAdminBotWeb"));
 const SuperAdminAuditoria = lazy(() => import("./pages/SuperAdminAuditoria"));
 const SuperAdminServicios = lazy(() => import("./pages/SuperAdminServicios"));
 
-const queryClient = new QueryClient();
+/**
+ * Valores por defecto pensados para la red mala del local (07/11/2026, «Hoy» desde el móvil):
+ *   · `staleTime` 30 s: volver a una pantalla (o cambiar Kanban ↔ Plano) no repite lo que se acaba de pedir.
+ *   · `retry` 2 con espera creciente y acotada (1 s, 2 s… máx. 8 s), en vez de 3.
+ *   · `refetchOnWindowFocus`: sí, pero solo lo que ya está viejo (respeta `staleTime`).
+ *   · `networkMode: "offlineFirst"`: sin red se pinta lo que hay en caché (o la copia del día,
+ *     `lib/cacheOffline.ts`) y la petición espera a que vuelva la red en vez de quedarse colgada.
+ * Las pruebas crean su propio `QueryClient`: esto no las afecta.
+ */
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 2,
+      retryDelay: (intento) => Math.min(1_000 * 2 ** intento, 8_000),
+      refetchOnWindowFocus: true,
+      networkMode: "offlineFirst",
+    },
+  },
+});
 
 /**
  * Páginas bajo demanda (01-11-2026): antes App importaba las ~25 páginas y
@@ -80,7 +102,30 @@ function VisualViewportVars() {
  */
 const pagina = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[]) => (
   <RouteErrorBoundary>
+    <ProtectedRoute requiredSection={requiredSection}>
+      {/* Dentro del marco del panel (PanelLayout): el «Cargando» va solo en la zona de contenido. */}
+      <Suspense fallback={<CargandoContenido />}>{contenido}</Suspense>
+    </ProtectedRoute>
+  </RouteErrorBoundary>
+);
+
+/** Página protegida SIN el marco del panel (pantalla completa, p. ej. /instagram/rapido). */
+const paginaSinMarco = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[]) => (
+  <RouteErrorBoundary>
     <ProtectedRoute requiredSection={requiredSection}>{bajoDemanda(contenido)}</ProtectedRoute>
+  </RouteErrorBoundary>
+);
+
+/**
+ * Marco del panel (07/11/2026): menú lateral y cabecera montados UNA vez para todas las secciones; al navegar
+ * solo cambia el contenido. `requiredSection={[]}` = solo sesión (cargando a pantalla completa y, sin usuario,
+ * a /auth); el permiso de cada sección lo sigue comprobando su ruta con `pagina()`.
+ */
+const marcoPanel = (
+  <RouteErrorBoundary>
+    <ProtectedRoute requiredSection={[]}>
+      <PanelLayout />
+    </ProtectedRoute>
   </RouteErrorBoundary>
 );
 
@@ -121,32 +166,39 @@ const App = () => (
               >
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
-                  <Route path="/" element={pagina(<Dashboard />)} />
-                  <Route path="/dashboard" element={pagina(<Dashboard />)} />
-                  <Route path="/reservas" element={pagina(<Reservas />)} />
+                  {/* Secciones con menú: un solo marco (PanelLayout) para todas. */}
+                  <Route element={marcoPanel}>
+                    <Route path="/" element={pagina(<Dashboard />)} />
+                    <Route path="/dashboard" element={pagina(<Dashboard />)} />
+                    <Route path="/reservas" element={pagina(<Reservas />)} />
+                    <Route path="/gestion-web" element={pagina(<GestionWeb />)} />
+                    <Route path="/marketing" element={pagina(<Marketing />)} />
+                    {/* Instagram: sección propia desde el 05/11/2026 (antes, pestaña de Newsletter). Sección de permisos «marketing». */}
+                    <Route path="/instagram" element={pagina(<Instagram />)} />
+                    <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
+                    <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />
+                    <Route path="/facturas" element={pagina(<Facturas />)} />
+                    {/* «Pregúntale a la IA» a pantalla completa (06/11/2026): la MISMA página de Facturas
+                        (mismo árbol, no se desmonta al ir y volver). La IA exige «Editar»: sin él, la
+                        página vuelve a /facturas (con solo «Facturas · Subida», a Cargar). */}
+                    <Route path="/facturas/ia" element={pagina(<Facturas />, ["facturas", "facturas_subida"])} />
+                    {/* «Análisis general» (07/11/2026): sección propia con los permisos de Facturas (solo «Ver», no Subida). */}
+                    <Route path="/analisis" element={pagina(<AnalisisGeneral />, "facturas")} />
+                    <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
+                    {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
+                    {/* Historial de avisos (campana): para todos los roles. */}
+                    <Route path="/avisos" element={pagina(<Avisos />)} />
+                    <Route path="/ayuda" element={pagina(<Ayuda />)} />
+                  </Route>
+                  {/* Redirecciones de rutas antiguas (fuera del marco, como antes). */}
                   {/* Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Se
                       conserva la ruta para que marcadores/enlaces antiguos no den 404. */}
                   <Route path="/trabajadores" element={<Navigate to="/" replace />} />
-                  <Route path="/gestion-web" element={pagina(<GestionWeb />)} />
                   <Route path="/gestor-carta" element={<Navigate to="/gestion-web?tab=carta" replace />} />
                   <Route path="/gestion-bot" element={<Navigate to="/super-admin/bot-web" replace />} />
-                  <Route path="/marketing" element={pagina(<Marketing />)} />
-                  {/* Instagram: sección propia desde el 05/11/2026 (antes, pestaña de Newsletter). Sección de permisos «marketing». */}
-                  <Route path="/instagram" element={pagina(<Instagram />)} />
+                  {/* Sin menú, a pantalla completa (fuera del marco): */}
                   {/* Acceso directo para la pantalla de inicio del móvil: asistente rápido a pantalla completa (docs/instagram-movil.md). */}
-                  <Route path="/instagram/rapido" element={pagina(<InstagramRapido />, "marketing")} />
-                  <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
-                  <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />
-                  <Route path="/facturas" element={pagina(<Facturas />)} />
-                  {/* «Pregúntale a la IA» a pantalla completa (06/11/2026): la MISMA página de Facturas
-                      (mismo árbol, no se desmonta al ir y volver). La IA exige «Editar»: sin él, la
-                      página vuelve a /facturas (con solo «Facturas · Subida», a Cargar). */}
-                  <Route path="/facturas/ia" element={pagina(<Facturas />, ["facturas", "facturas_subida"])} />
-                  <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
-                  {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
-                  {/* Historial de avisos (campana): para todos los roles. */}
-                  <Route path="/avisos" element={pagina(<Avisos />)} />
-                  <Route path="/ayuda" element={pagina(<Ayuda />)} />
+                  <Route path="/instagram/rapido" element={paginaSinMarco(<InstagramRapido />, "marketing")} />
                   <Route path="/super-admin/login" element={bajoDemanda(<SuperAdminLogin />)} />
                   <Route path="/super-admin" element={paginaSuperAdmin(<SuperAdminPanel />)} />
                   <Route path="/super-admin/ecommerce" element={paginaSuperAdmin(<Ecommerce />)} />

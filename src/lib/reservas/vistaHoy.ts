@@ -15,6 +15,17 @@
 
 import { turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
 
+/**
+ * Columnas de `reservas` que pide «Hoy» (kanban, plano y vista de móvil), en vez de `select("*")`
+ * (07/11/2026, «Hoy» ligera con poca cobertura). Son las que leen las tarjetas (`ReservaCard`), el plano
+ * (`VistaPlanoHoy`, `MapaSalaServicio`), el móvil (`VistaHoyMovil`) y las acciones de servicio (parche
+ * optimista de `estado`/`llegada_at`/`salida_at`). El editor de una reserva relee la fila entera por id
+ * (`EditarReservaDialog`), así que aquí no hace falta nada más. `llegada_at` y `salida_at` ya se piden
+ * por nombre en `useReservasServicioDia`: las dos migraciones están en todos los proyectos.
+ */
+export const COLUMNAS_RESERVAS_HOY =
+  "id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, importante, en_blacklist, notas_cliente, marca, llegada_at, salida_at, mesa_fijada";
+
 /** Las dos vistas de «Hoy». Por defecto, el kanban (la de siempre). */
 export type ModoVistaHoy = "kanban" | "plano";
 export const VISTA_HOY_POR_DEFECTO: ModoVistaHoy = "kanban";
@@ -78,6 +89,27 @@ export function guardarSalaPlanoHoy(salaId: string): void {
     window.localStorage.setItem(CLAVE_SALA_PLANO_HOY, salaId);
   } catch {
     // Sin almacenamiento: se vuelve a la primera sala.
+  }
+}
+
+/** Cómo se ven las mesas en «Hoy» de escritorio: en su sitio («plano») o por número («ordenadas»). */
+export type ModoMesasHoy = "plano" | "ordenadas";
+export const CLAVE_MODO_MESAS_HOY = "reservas:hoy:mesas-modo";
+
+/** El modo de mesas elegido en este navegador; por defecto «plano». */
+export function leerModoMesasHoy(): ModoMesasHoy {
+  try {
+    return window.localStorage.getItem(CLAVE_MODO_MESAS_HOY) === "ordenadas" ? "ordenadas" : "plano";
+  } catch {
+    return "plano";
+  }
+}
+
+export function guardarModoMesasHoy(modo: ModoMesasHoy): void {
+  try {
+    window.localStorage.setItem(CLAVE_MODO_MESAS_HOY, modo);
+  } catch {
+    // Sin almacenamiento: la próxima vez, «Plano».
   }
 }
 

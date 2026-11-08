@@ -19,18 +19,56 @@ import {
   moverEnLista,
   moverModulo,
   normalizarConfigTablero,
-  tramosModulos,
+  actualizarVersion,
+  VERSION_TABLERO,
   type ConfigTablero,
 } from "../widgetsTablero";
 
-const D = CONFIG_TABLERO_POR_DEFECTO;
+// Las pruebas de mecánica usan el tablero de antes (06/11/2026), ya en la versión actual.
+const D: ConfigTablero = {
+  cifras: ["gasto", "abonos", "regalado", "por_revisar"],
+  modulos: [
+    { id: "proveedores", tamano: "s" },
+    { id: "subidas", tamano: "s" },
+    { id: "familias", tamano: "s" },
+    { id: "fijos", tamano: "s" },
+    { id: "abonos", tamano: "s" },
+    { id: "locales", tamano: "s" },
+  ],
+  v: VERSION_TABLERO,
+};
 const ids = (c: ConfigTablero) => c.modulos.map((m) => m.id);
 
 describe("catálogo y configuración por defecto", () => {
-  it("por defecto: las 4 cifras de siempre, Explorar y las 6 tarjetas pequeñas", () => {
-    expect(D.cifras).toEqual(["gasto", "abonos", "regalado", "por_revisar"]);
-    expect(ids(D)).toEqual(["explorar", "proveedores", "subidas", "familias", "fijos", "abonos", "locales"]);
-    expect(D.modulos.filter((m) => m.id !== "explorar").every((m) => m.tamano === "s")).toBe(true);
+  it("por defecto (15/11/2026): gasto y las cifras de decisión; las cuatro preguntas, sin «Explorar»", () => {
+    const P = CONFIG_TABLERO_POR_DEFECTO;
+    expect(P.cifras).toEqual(["gasto", "precios_suben", "ahorro_posible", "familias_fuera", "por_revisar"]);
+    expect(P.modulos.map((m) => m.id).slice(0, 5)).toEqual(["subidas", "ahorro", "familias", "proveedores", "precios_top"]);
+    expect(P.modulos.map((m) => m.id)).not.toContain("explorar");
+    expect(P.v).toBe(VERSION_TABLERO);
+  });
+
+  it("un tablero guardado de antes recibe UNA vez las gráficas de decisión", () => {
+    const { v: _v, ...viejo } = D;
+    const c = normalizarConfigTablero(viejo);
+    expect(c.cifras).toEqual(["gasto", "precios_suben", "ahorro_posible", "familias_fuera", "abonos", "regalado", "por_revisar"]);
+    expect(ids(c)).toEqual(["proveedores", "subidas", "ahorro", "familias", "precios_top", "fijos", "abonos", "locales", "gasto_mes"]);
+    expect(c.modulos.find((m) => m.id === "subidas")?.tamano).toBe("m");
+    expect(c.v).toBe(VERSION_TABLERO);
+    // Si luego quita una, no vuelve.
+    const sin = activarModulo(c, "ahorro", false);
+    expect(ids(normalizarConfigTablero(JSON.parse(JSON.stringify(sin))))).not.toContain("ahorro");
+    expect(ids(deFilaBd(aFilaBd(sin)) as ConfigTablero)).not.toContain("ahorro");
+    expect(actualizarVersion(c)).toBe(c);
+  });
+
+  it("un tablero de la versión 2 recibe UNA vez «Gasto por mes» (va junto a «Qué decidir hoy»)", () => {
+    const v2 = { v: 2, cifras: ["gasto"], modulos: [{ id: "explorar", tamano: "l" }, { id: "fijos", tamano: "s" }] };
+    const c = normalizarConfigTablero(v2);
+    expect(ids(c)).toEqual(["fijos", "gasto_mes"]);
+    expect(c.v).toBe(3);
+    const sin = activarModulo(c, "gasto_mes", false);
+    expect(ids(normalizarConfigTablero(JSON.parse(JSON.stringify(sin))))).not.toContain("gasto_mes");
   });
 
   it("el catálogo trae más de lo que sale por defecto (cifras y módulos nuevos)", () => {
@@ -44,38 +82,34 @@ describe("catálogo y configuración por defecto", () => {
 
 describe("normalizarConfigTablero (lo guardado no se fía)", () => {
   it("basura o vacío → la de por defecto", () => {
-    for (const x of [null, undefined, 3, "hola", [], {}, { cifras: "no" }]) expect(normalizarConfigTablero(x)).toEqual(D);
+    for (const x of [null, undefined, 3, "hola", [], {}, { cifras: "no" }]) expect(normalizarConfigTablero(x)).toEqual(CONFIG_TABLERO_POR_DEFECTO);
   });
 
   it("quita lo desconocido y lo repetido; los tamaños raros vuelven al del módulo", () => {
     const c = normalizarConfigTablero({
+      v: 3,
       cifras: ["abonos", "abonos", "inventada", "gasto"],
       modulos: [{ id: "familias", tamano: "xl" }, "proveedores", { id: "familias", tamano: "l" }, { id: "nope" }, { id: "explorar", tamano: "s" }],
     });
     expect(c.cifras).toEqual(["abonos", "gasto"]);
     expect(c.modulos).toEqual([
-      { id: "familias", tamano: "s" },
+      { id: "familias", tamano: "m" },
       { id: "proveedores", tamano: "s" },
-      { id: "explorar", tamano: "l" },
     ]);
   });
 
-  it("Explorar siempre está (si falta, al principio) y siempre es grande", () => {
-    const c = normalizarConfigTablero({ cifras: [], modulos: [{ id: "abonos", tamano: "m" }] });
-    expect(c.modulos).toEqual([
-      { id: "explorar", tamano: "l" },
-      { id: "abonos", tamano: "m" },
-    ]);
-    expect(cambiarTamano(c, "explorar", "s").modulos[0].tamano).toBe("l");
+  it("un «explorar» guardado de antes se descarta y no se vuelve a añadir", () => {
+    const c = normalizarConfigTablero({ v: 3, cifras: [], modulos: [{ id: "explorar", tamano: "l" }, { id: "abonos", tamano: "m" }] });
+    expect(c.modulos).toEqual([{ id: "abonos", tamano: "m" }]);
   });
 
-  it("todo quitado es una configuración válida (solo Explorar)", () => {
-    expect(normalizarConfigTablero({ cifras: [], modulos: [] })).toEqual({ cifras: [], modulos: [{ id: "explorar", tamano: "l" }] });
+  it("todo quitado es una configuración válida (sin módulos)", () => {
+    expect(normalizarConfigTablero({ v: 3, cifras: [], modulos: [] })).toEqual({ cifras: [], modulos: [], v: 3 });
   });
 });
 
 describe("cambios", () => {
-  it("activar y quitar cifras (máximo 8) y módulos (Explorar no se quita)", () => {
+  it("activar y quitar cifras (máximo 8) y módulos", () => {
     let c = activarCifra(D, "media_mes", true);
     expect(c.cifras).toEqual(["gasto", "abonos", "regalado", "por_revisar", "media_mes"]);
     expect(activarCifra(c, "media_mes", true)).toBe(c);
@@ -89,14 +123,13 @@ describe("cambios", () => {
     expect(c.modulos.at(-1)).toEqual({ id: "productos", tamano: "s" });
     expect(activarModulo(D, "gasto_mes", true).modulos.at(-1)).toEqual({ id: "gasto_mes", tamano: "m" });
     expect(ids(activarModulo(c, "proveedores", false))).not.toContain("proveedores");
-    expect(activarModulo(D, "explorar", false)).toBe(D);
   });
 
   it("mover con subir/bajar (sin salirse) y arrastrando", () => {
     expect(moverCifra(D, "abonos", -1).cifras).toEqual(["abonos", "gasto", "regalado", "por_revisar"]);
     expect(moverCifra(D, "gasto", -1).cifras).toEqual(D.cifras);
     expect(moverCifra(D, "por_revisar", 1).cifras).toEqual(D.cifras);
-    expect(ids(moverModulo(D, "explorar", 1)).slice(0, 2)).toEqual(["proveedores", "explorar"]);
+    expect(ids(moverModulo(D, "proveedores", 1)).slice(0, 2)).toEqual(["subidas", "proveedores"]);
     expect(moverEnLista(["a", "b", "c", "d"], 0, 2)).toEqual(["b", "c", "a", "d"]);
     expect(moverEnLista(["a", "b", "c", "d"], 3, 0)).toEqual(["d", "a", "b", "c"]);
     expect(moverEnLista(["a", "b"], 0, 9)).toEqual(["a", "b"]);
@@ -106,14 +139,6 @@ describe("cambios", () => {
     const c = cambiarTamano(D, "familias", "l");
     expect(c.modulos.find((m) => m.id === "familias")?.tamano).toBe("l");
     expect(D.modulos.find((m) => m.id === "familias")?.tamano).toBe("s");
-  });
-
-  it("Explorar parte la rejilla en «antes» y «después»", () => {
-    expect(tramosModulos(D).antes).toEqual([]);
-    expect(tramosModulos(D).despues).toHaveLength(6);
-    const c = moverModulo(moverModulo(D, "explorar", 1), "explorar", 1);
-    expect(tramosModulos(c).antes.map((m) => m.id)).toEqual(["proveedores", "subidas"]);
-    expect(tramosModulos(c).despues.map((m) => m.id)).toEqual(["familias", "fijos", "abonos", "locales"]);
   });
 });
 
@@ -127,7 +152,7 @@ describe("«Evolución de un producto»", () => {
     expect(normalizarConfigTablero(JSON.parse(JSON.stringify(c)))).toEqual(c);
     expect(elegirProducto(c, null).modulos.at(-1)).toEqual({ id: "precio_producto", tamano: "m" });
     // Un producto en otro módulo no se guarda.
-    expect(normalizarConfigTablero({ cifras: [], modulos: [{ id: "abonos", producto: "x" }] }).modulos[1]).toEqual({ id: "abonos", tamano: "s" });
+    expect(normalizarConfigTablero({ v: 2, cifras: [], modulos: [{ id: "abonos", producto: "x" }] }).modulos[0]).toEqual({ id: "abonos", tamano: "s" });
   });
 });
 
@@ -155,7 +180,7 @@ describe("rejilla «bento»", () => {
       { id: "abonos", fila: 0, columna: 2, ancho: 1 },
     ]);
     // Seis pequeños en 3 columnas: dos filas completas; en 2 columnas, tres.
-    const seis = D.modulos.filter((m) => m.id !== "explorar");
+    const seis = D.modulos;
     expect(Math.max(...colocarBento(seis, 3).map((x) => x.fila))).toBe(1);
     expect(Math.max(...colocarBento(seis, 2).map((x) => x.fila))).toBe(2);
   });

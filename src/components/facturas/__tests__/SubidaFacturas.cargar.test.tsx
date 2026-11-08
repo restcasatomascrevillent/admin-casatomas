@@ -8,7 +8,7 @@ vi.mock("@/integrations/supabase/client", async () => {
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }), useUsuarioIdOpcional: () => "u1" }));
 // Con «Editar» en Facturas (todo, como antes del 06/11/2026); los perfiles, en SubidaFacturas.permisos.test.tsx.
 vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
-const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }));
+const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn(), loading: vi.fn() }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
 import { doble } from "./dobleSupabaseFacturas";
@@ -75,10 +75,10 @@ describe("Cargar · diseño plano", () => {
     elegir(["albaran-ok.pdf", "factura-ok.pdf", "duplicado.pdf", "aviso.pdf", "fallido.pdf"]);
     fireEvent.click(screen.getByRole("button", { name: /Enviar 5 documentos/ }));
 
-    // El duplicado abre el pop-up modal (oculta el resto a los lectores): se cierra antes de mirar la lista.
-    fireEvent.click(await screen.findByRole("button", { name: "Cerrar" }));
+    // Tanda de varios: el duplicado NO abre pop-up (07/11/2026, «se llena de avisos»); queda en la lista.
     const seccion = await screen.findByRole("region", { name: "Documentos enviados" });
     await waitFor(() => expect(seccion.querySelectorAll("li[data-nivel='ok']")).toHaveLength(2));
+    expect(screen.queryByRole("dialog")).toBeNull();
     const filas = Array.from(seccion.querySelectorAll("li"));
     expect(filas.map((f) => f.getAttribute("data-nivel"))).toEqual(["fallido", "aviso", "duplicado", "ok", "ok"]);
     expect(within(filas[0]).getByText("fallido.pdf")).toBeTruthy();
@@ -109,8 +109,9 @@ describe("Cargar · diseño plano", () => {
     // Botones ligeros de la tanda.
     expect(screen.getByRole("button", { name: "Reintentar fallidos" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Limpiar terminados" })).toBeTruthy();
-    // El toast también dice «Albarán» (y bien conjugado).
-    expect(toastMock.warning).toHaveBeenCalledWith("Albarán guardado con 1 aviso", expect.anything());
+    // Tanda de 5: un único toast de resumen (no uno por documento), ámbar porque hay algo que mirar.
+    await waitFor(() => expect(toastMock.warning).toHaveBeenCalledWith("Subida terminada: 5 documentos", expect.objectContaining({ id: "subida-tanda-1" })));
+    expect(toastMock.warning).toHaveBeenCalledTimes(1);
     // UI-16: los avisos salen arriba (abajo tapaban la lista y «Limpiar terminados»).
     expect(toastMock.warning).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ position: "top-center" }));
   });

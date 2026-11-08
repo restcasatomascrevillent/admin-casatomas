@@ -41,7 +41,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Clock, Users, Star, GripVertical, Phone, MoveRight, MoreVertical, Loader2, ShieldBan, SquarePen, CircleDashed, MessageSquareText } from "lucide-react";
+import { Clock, Users, Star, GripVertical, Phone, MoveRight, MoreVertical, Loader2, ShieldBan, SquarePen, CircleDashed, MessageSquareText, Lock, LockOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { etiquetaMesasReserva } from "@/components/espacios/nombresMesa";
 import type { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
@@ -80,6 +80,7 @@ export function ReservaCard({
   textoCambiarMesa,
   accionesExtra,
   anchoColumna,
+  onFijarMesa,
 }: {
   reserva: ReservaServicio;
   columnas: Columna[];
@@ -136,6 +137,11 @@ export function ReservaCard({
    * y el menú lateral, así que cada columna decide por su cuenta.
    */
   anchoColumna?: number;
+  /**
+   * «Fijar mesa» / «Quitar fijación» (07/11/2026) en el menú «⋮». Solo con permiso y con mesa:
+   * sin mesa asignada no hay nada que fijar.
+   */
+  onFijarMesa?: (reserva: ReservaServicio, fijar: boolean) => void;
 }) {
   // Qué se puede hacer con esta reserva en Hoy (servicio), según su estado y el permiso.
   const acc = accionesDisponibles(reserva, { vista: "hoy", canEdit: puedeEditar });
@@ -177,7 +183,13 @@ export function ReservaCard({
 
   // Qué lleva el menú «⋮». Sin permiso solo «Llamar» (si hay teléfono); sin nada, no hay menú.
   const conDarMesa = puedeEditar && !!onDarMesa && (!!sinMesa || !!textoCambiarMesa);
-  const extras = puedeEditar ? (accionesExtra ?? []) : [];
+  const conFijar = puedeEditar && !!onFijarMesa && (!!reserva.mesa_fijada || (mesas?.length ?? 0) > 0);
+  const extras = [
+    ...(puedeEditar ? (accionesExtra ?? []) : []),
+    ...(conFijar
+      ? [{ texto: reserva.mesa_fijada ? "Quitar fijación" : "Fijar mesa", onSelect: () => onFijarMesa?.(reserva, !reserva.mesa_fijada), icono: reserva.mesa_fijada ? LockOpen : Lock }]
+      : []),
+  ] as ReadonlyArray<{ texto: string; onSelect: () => void; icono?: typeof Lock }>;
   const conEditar = !!onEditar && acc.editar.visible;
   const hayMenu =
     acc.mover.visible || conDarMesa || extras.length > 0 || !!reserva.telefono || conEditar || acc.listaNegra.visible;
@@ -267,6 +279,7 @@ export function ReservaCard({
             )}
             {extras.map((a) => (
               <DropdownMenuItem key={a.texto} onSelect={a.onSelect}>
+                {a.icono && <a.icono className="h-3.5 w-3.5 mr-2" aria-hidden="true" />}
                 {a.texto}
               </DropdownMenuItem>
             ))}
@@ -368,7 +381,8 @@ export function ReservaCard({
               <span>{typeof reserva.hora === "string" ? reserva.hora.substring(0, 5) : reserva.hora}</span>
               <span>· {reserva.numero_comensales} p.</span>
               <span aria-hidden="true">·</span>
-              <span className={cn(!textoMesas && sinMesa && "text-amber-700 dark:text-amber-400")}>
+              <span className={cn("inline-flex items-center gap-0.5", !textoMesas && sinMesa && "text-amber-700 dark:text-amber-400")}>
+                {textoMesas && reserva.mesa_fijada && <Lock className="h-3 w-3" aria-label="Mesa fijada" />}
                 {textoMesas || (sinMesa ? "Sin mesa" : "—")}
               </span>
               {reserva.telefono && (
@@ -482,8 +496,15 @@ export function ContenidoTarjeta({
           <Badge
             variant="outline"
             className="gap-0.5 text-[11px] pointer-coarse:text-xs px-1.5 py-0 h-5 font-semibold tabular-nums text-foreground border-primary/40 pointer-coarse:h-6 pointer-coarse:text-xs"
-            title={mesas && mesas.length > 1 ? "Mesas asignadas a esta reserva" : "Mesa asignada a esta reserva"}
+            title={
+              reserva.mesa_fijada
+                ? "Mesa fijada: no se mueve al organizar ni se le quita al sentar a otro"
+                : mesas && mesas.length > 1
+                  ? "Mesas asignadas a esta reserva"
+                  : "Mesa asignada a esta reserva"
+            }
           >
+            {reserva.mesa_fijada && <Lock className="h-3 w-3" aria-label="Mesa fijada" />}
             {textoMesas}
           </Badge>
         ) : sinMesa && (

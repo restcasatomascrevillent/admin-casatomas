@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider, useAuth } from "../useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { reiniciarCacheVersionAuditoria } from "@/lib/audit-version";
 import {
   limpiarAvisoSesionCaducada,
   sesionCaducada,
@@ -48,6 +49,8 @@ const user = { id: "user-id", email: "user@test.local" };
 const session = { user, access_token: "token", refresh_token: "refresh" };
 beforeEach(() => {
   vi.clearAllMocks();
+  // La versión «activa» se recuerda (lib/audit-version.ts): cada prueba decide la suya.
+  reiniciarCacheVersionAuditoria();
   state.remote = null;
   limpiarAvisoSesionCaducada();
   vi.mocked(supabase.auth.refreshSession).mockResolvedValue({
@@ -172,7 +175,9 @@ describe("accesos auditados", () => {
     await act(async () => {
       state.callback?.("SIGNED_IN", session);
     });
-    await waitFor(() => expect(supabase.auth.getUser).toHaveBeenCalledTimes(4));
+    // 3 = restaurar + TOKEN_REFRESHED + SIGNED_IN. La comprobación inicial de bloqueo reutiliza la
+    // validación recién hecha del mismo usuario (< 2 s, useAuth `getUserCompartido`); antes eran 4.
+    await waitFor(() => expect(supabase.auth.getUser).toHaveBeenCalledTimes(3));
     expect(
       vi
         .mocked(supabase.rpc)

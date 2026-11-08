@@ -12,10 +12,15 @@
 import { describe, it, expect } from "vitest";
 import {
   AGRUPAR_FLEX,
+  anotarRuta,
   construirConsultaFlexible,
   esErrorCorregible,
+  familiaDeBebida,
   FILTROS_FLEX,
+  LIMITE_VOLUMEN_ENVASES,
   LIMITES,
+  MAX_CHARS_VOLUMEN,
+  NOTA_RESPUESTA_VOLUMEN,
   marcarResultado,
   sinAvisosDeImporte,
   METRICAS_FLEX,
@@ -27,6 +32,16 @@ import {
   tipoDeProducto,
   TOOLS,
 } from "../herramientas.ts";
+
+/**
+ * Tope del prompt de sistema: 6.400 (antes 5.990). Sube ~370 caracteres el
+ * 07/11/2026 (migracion 20261107100000) por las reglas que el dueño pidio tras
+ * fallos reales en la demo: precio del litro en la 15, no preguntar «¿quieres
+ * que consulte…?» (16), seguimiento con el mismo tema (17) y «ultimo mes» (18).
+ * El prompt va en cache (≈5.600 de 8.200 tokens de entrada, 0,10 $/M en
+ * gpt-4.1-mini): ~+90 tokens ≈ +0,00001 $ por ronda.
+ */
+const LIMITE_PROMPT = 6_450; // + regla 19 «como_leer» (margenes_carta y alertas_precio, 16/11/2026)
 
 // deno-lint-ignore no-explicit-any
 type Esquema = any;
@@ -62,6 +77,8 @@ describe("TOOLS", () => {
       "volumen_comprado",
       "buscar_productos",
       "buscar_facturas",
+      "margenes_carta",
+      "alertas_precio",
       "consulta_flexible",
     ]);
     // buscar_documentos sale: la sustituye filtrar_documentos (con sumas de todo lo filtrado).
@@ -102,7 +119,7 @@ describe("TOOLS", () => {
                      "cantidad", "precio_unitario", "total_linea"]) {
       expect(flex.properties.metricas.description).toContain(m);
     }
-    expect(METRICAS_FLEX).toHaveLength(27);
+    expect(METRICAS_FLEX).toHaveLength(29); // + sum_retencion_irpf, count_con_retencion (07/11/2026)
     expect(flex.properties.agrupar.items.enum).toEqual([...AGRUPAR_FLEX]);
     expect(Object.keys(flex.properties.filtros.properties)).toEqual([...FILTROS_FLEX]);
   });
@@ -118,7 +135,11 @@ describe("TOOLS", () => {
     // +998 ~ 250 tokens por ronda).
     // 10.376 con volumen_comprado (06/11/2026: litros/kilos de cerveza, vino, agua…; +756,
     // ~190 tokens por ronda; el prompt no crece: la pista va en la descripcion).
-    expect(tamano).toBeLessThan(10_400);
+    // 10.550 con bebidas (13/11/2026: formatos, botellas y orden envases en volumen_comprado;
+    // +174, ~45 tokens por ronda).
+    // 11.9xx con margenes_carta y alertas_precio (16/11/2026: margenes de la carta y avisos de
+    // Analisis; +1.310, ~330 tokens por ronda; las pautas de lectura van en "como_leer" del resultado).
+    expect(tamano).toBeLessThan(11_950); // + IRPF (07/11/2026)
     for (const t of TOOLS) expect(t.function.description.length, t.function.name).toBeLessThan(330);
   });
 });
@@ -268,7 +289,9 @@ describe("systemPrompt", () => {
     // mas", excluir, ultimo_dato, una_compra y sin_comparar suman 385 (~100 tokens por ronda).
     // 5.348 antes de la ronda 8 (08/10/2026): reparto facturas/albaranes, grafica, ficha,
     // IVA por tipo y unidades distintas suman 384 (~95 tokens por ronda).
-    expect(p.length).toBeLessThan(5_800);
+    // 5.727 antes de bebidas (13/11/2026): la linea de volumen_comprado y la regla 15 suman 256
+    // (~65 tokens por ronda); la guia de redaccion va en el resultado (nota_respuesta).
+    expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT);
   });
 });
 
@@ -632,7 +655,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     expect(tipoDeProducto("factura")).toBe("factura");
     expect(prepararLlamada("gasto_por_categoria", { categoria: "marisco", tipo: "factura" }, "gasto en marisco"))
       .toMatchObject({ params: { p_tipo: null } });
-    expect(prepararLlamada("compras_producto", { producto: "vino", tipo: "factura" }, "cuanto vino compramos"))
+    expect(prepararLlamada("compras_producto", { producto: "jamon", tipo: "factura" }, "cuanto jamon compramos"))
       .toMatchObject({ params: { p_tipo: null } });
     // En documentos el tipo sigue siendo del modelo.
     expect(prepararLlamada("ranking", { criterio: "importe_documento", tipo: "factura" }, "la mas cara"))
@@ -705,8 +728,8 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     const p = systemPrompt("2026-10-08");
     expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
     expect(p).toMatch(/Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg»/);
-    expect(p.length).toBeLessThanOrEqual(5730);
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_400); // 9.620 + volumen_comprado (06/11/2026)
+    expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(11_950); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
 });
 
@@ -739,8 +762,8 @@ describe("ronda 9 (10/10/2026, migracion 20261010170000)", () => {
   });
 
   it("tamaños: el prompt y TOOLS no crecen respecto a la ronda 8 (5.728 y 9.620 caracteres)", () => {
-    expect(p.length).toBeLessThanOrEqual(5730);
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_400); // 9.620 + volumen_comprado (06/11/2026)
+    expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(11_950); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
 });
 
@@ -749,8 +772,13 @@ describe("volumen_comprado (06/11/2026, migracion 20261106400000)", () => {
     expect(prepararLlamada("volumen_comprado", { categoria: "cerveza", producto: null, desde: "2026-01-01", hasta: "2026-12-31", unidad: null })).toEqual({
       tipo: "rpc",
       rpc: "volumen_comprado_agente",
-      params: { p_texto: null, p_categoria: "cerveza", p_desde: "2026-01-01", p_hasta: "2026-12-31", p_medida: null },
+      params: {
+        p_texto: null, p_categoria: "cerveza", p_desde: "2026-01-01", p_hasta: "2026-12-31", p_medida: null,
+        p_limite: null, p_orden: null,
+      },
       limite: null,
+      maxChars: MAX_CHARS_VOLUMEN,
+      notaRespuesta: NOTA_RESPUESTA_VOLUMEN,
     });
     expect(prepararLlamada("volumen_comprado", { categoria: "vino", producto: " tinto ", desde: null, hasta: null, unidad: "l" })).toMatchObject({
       params: { p_texto: "tinto", p_categoria: "vino", p_medida: "l" },
@@ -772,7 +800,143 @@ describe("volumen_comprado (06/11/2026, migracion 20261106400000)", () => {
     expect(t.description).toMatch(/litros de cerveza/);
     expect(t.description).toMatch(/cuantos barriles/);
     expect(t.description).toMatch(/lineas_sin_convertir/);
-    expect(Object.keys((t.parameters as Esquema).properties)).toEqual(["categoria", "producto", "desde", "hasta", "unidad"]);
-    expect(systemPrompt("2026-11-06").length).toBeLessThanOrEqual(5730);
+    expect(Object.keys((t.parameters as Esquema).properties)).toEqual(["categoria", "producto", "desde", "hasta", "unidad", "orden"]);
+    expect(systemPrompt("2026-11-06").length).toBeLessThanOrEqual(LIMITE_PROMPT);
+  });
+});
+
+describe("bebidas por familia (13/11/2026, migracion 20261113100000)", () => {
+  it("reconoce la familia y no un producto concreto", () => {
+    expect(familiaDeBebida("cerveza")).toBe("cerveza");
+    expect(familiaDeBebida("Cervezas")).toBe("cerveza");
+    expect(familiaDeBebida("la bebida cerveza")).toBe("cerveza");
+    expect(familiaDeBebida("cerveza bebida")).toBe("cerveza");
+    expect(familiaDeBebida("los vinos")).toBe("vino");
+    expect(familiaDeBebida("licores")).toBe("licor");
+    expect(familiaDeBebida("refrescos")).toBe("refresco");
+    expect(familiaDeBebida("bebidas")).toBe("bebida");
+    expect(familiaDeBebida("mostaza de cerveza")).toBeNull();
+    expect(familiaDeBebida("vino blanco")).toBeNull();
+    expect(familiaDeBebida("heineken")).toBeNull();
+    expect(familiaDeBebida("agua")).toBeNull();
+    expect(familiaDeBebida("cava")).toBeNull();
+    expect(familiaDeBebida("cerveza y vino")).toBeNull();
+    expect(familiaDeBebida(null)).toBeNull();
+  });
+
+  it("«¿tenemos cerveza?» por buscar_productos va a volumen_comprado por categoria (salia la mostaza de cerveza)", () => {
+    const ll = prepararLlamada("buscar_productos", { consulta: "cerveza" });
+    expect(ll).toMatchObject({
+      tipo: "rpc", rpc: "volumen_comprado_agente",
+      params: { p_categoria: "cerveza", p_texto: null, p_desde: null, p_hasta: null, p_limite: 15 },
+      maxChars: MAX_CHARS_VOLUMEN,
+    });
+    expect(ll.tipo === "rpc" && ll.nota).toMatch(/mostaza de cerveza/);
+    expect(prepararLlamada("buscar_productos", { consulta: "la bebida cerveza" })).toMatchObject({ rpc: "volumen_comprado_agente" });
+    // Un producto concreto sigue por texto.
+    expect(prepararLlamada("buscar_productos", { consulta: "mostaza de cerveza" })).toMatchObject({ tipo: "semantica", rpc: "buscar_productos_agente" });
+  });
+
+  it("compras_producto de una familia va a volumen_comprado con su periodo", () => {
+    expect(prepararLlamada("compras_producto", { producto: "cerveza", desde: "2026-01-01", hasta: "2026-12-31" })).toMatchObject({
+      rpc: "volumen_comprado_agente",
+      params: { p_categoria: "cerveza", p_desde: "2026-01-01", p_hasta: "2026-12-31" },
+    });
+    expect(prepararLlamada("compras_producto", { producto: "heineken" })).toMatchObject({ rpc: "compras_producto_agente" });
+  });
+
+  it("«botellas por vino» por ranking cantidad va a volumen_comprado ordenado por envases (salia «4 botellas y 99 cajas»)", () => {
+    expect(prepararLlamada("ranking", { criterio: "cantidad", categoria: "vino", desde: "2026-01-01", hasta: "2026-12-31", limite: null })).toMatchObject({
+      rpc: "volumen_comprado_agente",
+      params: { p_categoria: "vino", p_orden: "envases", p_limite: LIMITE_VOLUMEN_ENVASES, p_desde: "2026-01-01" },
+    });
+    expect(prepararLlamada("ranking", { criterio: "cantidad", categoria: "vinos", limite: 10 })).toMatchObject({ params: { p_limite: 10 } });
+    // Otros criterios y categorias que no son bebidas, como siempre.
+    expect(prepararLlamada("ranking", { criterio: "importe_linea", categoria: "vino" })).toMatchObject({ rpc: "ranking_agente" });
+    expect(prepararLlamada("ranking", { criterio: "cantidad", categoria: "marisco" })).toMatchObject({ rpc: "ranking_agente" });
+  });
+
+  it("volumen_comprado: orden envases lista 25; «cerveza» como producto es la categoria", () => {
+    expect(prepararLlamada("volumen_comprado", { categoria: "vino", producto: null, orden: "envases" })).toMatchObject({
+      params: { p_orden: "envases", p_limite: LIMITE_VOLUMEN_ENVASES },
+    });
+    expect(prepararLlamada("volumen_comprado", { categoria: null, producto: "la bebida cerveza" })).toMatchObject({
+      params: { p_categoria: "cerveza", p_texto: null },
+    });
+    expect(prepararLlamada("volumen_comprado", { categoria: null, producto: "aceite" })).toMatchObject({
+      params: { p_categoria: null, p_texto: "aceite" },
+    });
+  });
+
+  it("el resultado lleva delante nota_ruta y nota_respuesta (botellas, no cajas sueltas)", () => {
+    const ll = prepararLlamada("buscar_productos", { consulta: "cerveza" });
+    const d = anotarRuta(ll, { total: 20520.88, envases: 22736 });
+    expect(Object.keys(d).slice(0, 2)).toEqual(["nota_ruta", "nota_respuesta"]);
+    expect(d.nota_respuesta).toMatch(/598 botellas \(99 cajas de 6 y 4 sueltas\)/);
+    expect(d.nota_respuesta).toMatch(/nunca «4 botellas y 99 cajas»/);
+    expect(d.nota_respuesta).toMatch(/por_envase\.formato/);
+    // Sin desvio solo la guia; otras herramientas, nada.
+    expect(Object.keys(anotarRuta(prepararLlamada("volumen_comprado", { categoria: "vino" }), { total: 1 }))[0]).toBe("nota_respuesta");
+    expect(anotarRuta(prepararLlamada("estadisticas_globales", {}), { a: 1 })).toEqual({ a: 1 });
+    expect(anotarRuta(ll, [1, 2])).toEqual([1, 2]);
+  });
+
+  it("recortar respeta el tope de volumen_comprado (30 vinos ≈ 9.200 caracteres)", () => {
+    const s = "x".repeat(9_200);
+    expect(recortar(s)).toMatch(/RESULTADO CORTADO a 6000/);
+    expect(recortar(s, MAX_CHARS_VOLUMEN)).toBe(s);
+  });
+
+  it("el prompt manda las bebidas a volumen_comprado y la lista la nombra", () => {
+    const p = systemPrompt("2026-11-13");
+    expect(p).toMatch(/- volumen_comprado: familias \(regla 15\)/);
+    expect(p).toMatch(/15\. Familias \(cerveza, vino, marisco…\), precio del litro\/kilo y comparativas: volumen_comprado con categoria \(botellas: orden envases\)/);
+    expect(p).toMatch(/Nunca buscar_productos ni historial_precios/);
+  });
+});
+
+describe("IRPF (07/11/2026, migracion 20261107610000)", () => {
+  it("las herramientas dicen dónde está la retención", () => {
+    const desc = (n: string) => JSON.stringify(TOOLS.find((t) => t.function.name === n)!.function);
+    expect(desc("resumen_periodo")).toMatch(/IRPF\/retencion: retencion_irpf/);
+    expect(desc("consulta_flexible")).toMatch(/sum_retencion_irpf, count_con_retencion/);
+    expect(METRICAS_FLEX).toContain("sum_retencion_irpf");
+    expect(METRICAS_FLEX).toContain("count_con_retencion");
+    expect(systemPrompt("2026-11-07")).toMatch(/IRPF\/retencion: su retencion_irpf/);
+  });
+});
+
+describe("margenes_carta y alertas_precio (16/11/2026, migracion 20261116100000)", () => {
+  it("margenes_carta va a margenes_carta_agente con sus parametros", () => {
+    const ll = prepararLlamada("margenes_carta", { texto: " carabinero ", vista: "peso", solo_problemas: null });
+    expect(ll).toMatchObject({
+      tipo: "rpc",
+      rpc: "margenes_carta_agente",
+      params: { p_texto: "carabinero", p_vista: "peso", p_solo_problemas: false, p_limite: 12 },
+    });
+    const todas = prepararLlamada("margenes_carta", { texto: null, vista: null, solo_problemas: true });
+    expect(todas).toMatchObject({ params: { p_vista: null, p_solo_problemas: true, p_limite: 5 }, maxChars: 9000 });
+  });
+
+  it("margenes_carta rechaza una vista desconocida", () => {
+    expect(() => prepararLlamada("margenes_carta", { texto: null, vista: "postres", solo_problemas: true })).toThrow(/vista/);
+  });
+
+  it("alertas_precio: todos los tipos con pocas filas; un tipo con mas", () => {
+    const todos = prepararLlamada("alertas_precio", { tipo: null, producto: null, local: null, desde: null, hasta: null });
+    expect(todos).toMatchObject({ rpc: "alertas_precio_agente", params: { p_tipo: null, p_local: null, p_limite: 4 } });
+    const sube = prepararLlamada("alertas_precio", { tipo: "sube", producto: "percebe", local: "touza", desde: "2026-10-01", hasta: "2026-10-31" });
+    expect(sube).toMatchObject({
+      params: { p_tipo: "sube", p_producto: "percebe", p_local: "touza", p_desde: "2026-10-01", p_hasta: "2026-10-31", p_limite: 12 },
+    });
+  });
+
+  it("alertas_precio valida tipo y fechas", () => {
+    expect(() => prepararLlamada("alertas_precio", { tipo: "raro", producto: null, local: null, desde: null, hasta: null })).toThrow(/tipo/);
+    expect(() => prepararLlamada("alertas_precio", { tipo: null, producto: null, local: null, desde: "2026-13-01", hasta: null })).toThrow(/fecha/);
+  });
+
+  it("el prompt manda seguir como_leer", () => {
+    expect(systemPrompt("2026-11-16")).toMatch(/como_leer/);
   });
 });

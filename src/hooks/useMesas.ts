@@ -89,8 +89,15 @@ export interface OpcionesMesas {
 }
 
 /**
- * Mesas de un espacio (o de todos si no se pasa `espacioId`). El `select("*")`
- * trae también `is_merged` y `activa`, que hacen falta para el aforo.
+ * Columnas de `mesas` (las de `Mesa`), en vez de `select("*")` (07/11/2026). Si se añade una columna
+ * que haga falta en pantalla, va aquí y en `Mesa`.
+ */
+export const COLUMNAS_MESAS =
+  "id, espacio_id, nombre, capacidad, forma, ancho, alto, pos_x, pos_y, rotacion, activa, is_merged, original_mesas, etiqueta, created_at, updated_at, piezas, picos_base, picos_max, piezas_max, grupo_piezas, crece_hacia, plazas_min, plazas_max";
+
+/**
+ * Mesas de un espacio (o de todos si no se pasa `espacioId`). Trae también
+ * `is_merged` y `activa`, que hacen falta para el aforo.
  *
  * OJO con sumar `capacidad` para calcular aforo: HAY QUE EXCLUIR LAS FILAS
  * FUSIONADAS (`is_merged = true`). Sumarlas todas cuenta las mismas sillas dos
@@ -125,7 +132,7 @@ export function useMesas(espacioId?: string, opciones?: OpcionesMesas) {
     queryFn: async () => {
       let query = supabase
         .from("mesas")
-        .select("*")
+        .select(COLUMNAS_MESAS)
         .order("nombre");
 
       if (!incluirInactivas) {
@@ -145,7 +152,11 @@ export function useMesas(espacioId?: string, opciones?: OpcionesMesas) {
         original_mesas: mesa.original_mesas as unknown as OriginalMesaData[] | null,
       })) as Mesa[];
     },
-    staleTime: 0, // Siempre considerar datos como stale para refetch
+    // Las mesas cambian poco (07/11/2026, «Hoy» con poca cobertura): antes `staleTime: 0` y cada
+    // montaje (cambiar Kanban ↔ Plano, abrir un diálogo) las volvía a pedir. Lo que se guarda en ESTE
+    // dispositivo invalida `["mesas"]` y se relee al momento. La gestión de mesas de Configuración
+    // (`incluirInactivas`) sigue leyendo siempre de nuevo.
+    staleTime: incluirInactivas ? 0 : 2 * 60_000,
   });
 }
 

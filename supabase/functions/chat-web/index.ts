@@ -12,6 +12,7 @@ import {
 } from "./alergenos.ts";
 import { buscarFilas, coincideCategoria, plegarTexto } from "./busqueda-carta.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import { type ClienteSupabase, esModeloRazonamiento, modeloDeFuncion } from "../_shared/modelo-funcion.ts";
 const createClient = clienteConAuditoria(createClientBase, "chat-web");
 
 // ============================================================================
@@ -156,6 +157,48 @@ const TEMPERATURE = 0.4;
 // caching indica que en GPT-5.6+ se cobra a 1.25x el input normal
 // (https://developers.openai.com/api/docs/guides/prompt-caching).
 const PRECIO_USD_POR_M = { input: 0.2, cached: 0.02, cacheWrite: 0.2 * 1.25, output: 1.2 } as const;
+type PrecioPorM = { input: number; cached: number; cacheWrite: number; output: number };
+
+// Desde el 07/11/2026 el modelo lo puede fijar un super admin en
+// ia_modelo_funcion (Super Admin › Servicios › Modelos). Sin modelo en la
+// tabla se usa MODEL (secreto CHAT_WEB_MODEL o gpt-5.6-luna), igual que antes.
+// Otro modelo cambia parámetros (parametrosChatWeb) y tarifa: la de ia_precios,
+// que es la que alimenta el tope diario (chat_web_cerrar_uso).
+const preciosLeidos = new Map<string, { hasta: number; precio: PrecioPorM }>();
+async function precioDeModelo(supabase: ClienteSupabase, modelo: string): Promise<PrecioPorM> {
+  if (modelo === "gpt-5.6-luna") return PRECIO_USD_POR_M;
+  const c = preciosLeidos.get(modelo);
+  if (c && c.hasta > Date.now()) return c.precio;
+  let precio: PrecioPorM = PRECIO_USD_POR_M;
+  try {
+    const { data } = await supabase.from("ia_precios")
+      .select("usd_por_m_input, usd_por_m_cached, usd_por_m_cache_write, usd_por_m_output").eq("modelo", modelo).maybeSingle();
+    if (data) {
+      const input = Number(data.usd_por_m_input);
+      precio = {
+        input,
+        cached: data.usd_por_m_cached == null ? input : Number(data.usd_por_m_cached),
+        cacheWrite: data.usd_por_m_cache_write == null ? input : Number(data.usd_por_m_cache_write),
+        output: Number(data.usd_por_m_output),
+      };
+    } else {
+      console.warn(`[chat-web] ${modelo} sin tarifa en ia_precios: se estima con la de gpt-5.6-luna`);
+    }
+  } catch (e) {
+    console.error("[chat-web] no se pudo leer ia_precios:", (e as Error)?.message ?? e);
+  }
+  preciosLeidos.set(modelo, { hasta: Date.now() + 60_000, precio });
+  return precio;
+}
+
+/** Parámetros del modelo: los de siempre para la familia 5.5+/6 (admiten reasoning_effort none + temperature). */
+function parametrosChatWeb(modelo: string, maxOutputTokens: number): Record<string, unknown> {
+  if (/^gpt-(5\.[5-9]|6)/i.test(modelo)) {
+    return { reasoning_effort: REASONING_EFFORT, temperature: TEMPERATURE, max_completion_tokens: maxOutputTokens };
+  }
+  if (esModeloRazonamiento(modelo)) return { max_completion_tokens: maxOutputTokens };
+  return { temperature: TEMPERATURE, max_tokens: maxOutputTokens };
+}
 
 interface UsoAcumulado {
   prompt: number;
@@ -165,12 +208,12 @@ interface UsoAcumulado {
   llamadas: number;
 }
 
-function costeUsd(u: UsoAcumulado): number {
+function costeUsd(u: UsoAcumulado, precio: PrecioPorM = PRECIO_USD_POR_M): number {
   const sinCache = Math.max(u.prompt - u.cached - u.cacheWrite, 0);
-  const usd = (sinCache * PRECIO_USD_POR_M.input +
-    u.cached * PRECIO_USD_POR_M.cached +
-    u.cacheWrite * PRECIO_USD_POR_M.cacheWrite +
-    u.completion * PRECIO_USD_POR_M.output) / 1_000_000;
+  const usd = (sinCache * precio.input +
+    u.cached * precio.cached +
+    u.cacheWrite * precio.cacheWrite +
+    u.completion * precio.output) / 1_000_000;
   return Math.round(usd * 1_000_000) / 1_000_000; // numeric(10,6)
 }
 
@@ -1413,6 +1456,7 @@ serve(conAuditoriaDePeticion("chat-web", createClientBase, async (req) => {
     const maxChars = Number(cupo.config?.max_chars) || MAX_CHARS_DEFECTO;
     const maxOutputTokens = Number(cupo.config?.max_output_tokens) || MAX_TOKENS_RESPUESTA_DEFECTO;
     const uso: UsoAcumulado = { prompt: 0, cached: 0, cacheWrite: 0, completion: 0, llamadas: 0 };
+    const modelo = await modeloDeFuncion("chat-web", MODEL, { cliente: supabase });
     let estadoCierre: "ok" | "error" = "error";
 
     // A partir de aquí hay una fila 'reservado' abierta: el `finally` la
@@ -1506,16 +1550,14 @@ serve(conAuditoriaDePeticion("chat-web", createClientBase, async (req) => {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
             body: JSON.stringify({
-              model: MODEL,
+              model: modelo,
               messages,
               tools: TOOLS,
               // En el último paso se prohíben más tools: el modelo TIENE que
               // contestar con lo que ya tiene (antes el loop podía agotarse
               // pidiendo tools y acabar en el mensaje genérico de error).
               tool_choice: ultimoPaso ? "none" : "auto",
-              reasoning_effort: REASONING_EFFORT,
-              temperature: TEMPERATURE,
-              max_completion_tokens: maxOutputTokens,
+              ...parametrosChatWeb(modelo, maxOutputTokens),
               prompt_cache_key: `chat-web-${idiom}`,
             }),
           });
@@ -1585,7 +1627,7 @@ serve(conAuditoriaDePeticion("chat-web", createClientBase, async (req) => {
 
       return responder(cors, true, respuesta, sessionToken);
     } finally {
-      const coste = costeUsd(uso);
+      const coste = costeUsd(uso, await precioDeModelo(supabase, modelo));
       try {
         const { error } = await supabase.rpc("chat_web_cerrar_uso", {
           p_uso_id: usoId,
@@ -1594,7 +1636,7 @@ serve(conAuditoriaDePeticion("chat-web", createClientBase, async (req) => {
           p_cached: uso.cached,
           p_completion: uso.completion,
           p_llamadas: uso.llamadas,
-          p_modelo: MODEL,
+          p_modelo: modelo,
           p_coste: coste,
         });
         if (error) throw new Error(error.message ?? JSON.stringify(error));

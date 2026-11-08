@@ -18,7 +18,7 @@ import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { coincideFiltroHoy, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
+import { COLUMNAS_RESERVAS_HOY, coincideFiltroHoy, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
 import { admiteReservas } from "@/lib/reservas/negocios";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
@@ -46,6 +46,7 @@ import {
   type Columna,
 } from "@/lib/reservas/columnasServicio";
 import { useCanAccessSection } from "@/hooks/useUserRole";
+import { useFijarMesa } from "@/hooks/useMesaFijada";
 import { useIsCoarsePointer } from "@/hooks/use-mobile";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import {
@@ -490,6 +491,8 @@ export function GestorReservasKanban({
   // desactiva; `accionesDisponibles` y `ReservaCard`). Las tarjetas no se arrastran.
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
+  // «Fijar mesa» del menú «⋮» (07/11/2026): Organizar y Recalcular no la mueven.
+  const fijarMesa = useFijarMesa();
   const dedo = useIsCoarsePointer();
   const [activeReserva, setActiveReserva] = useState<ReservaServicio | null>(null);
   // Columnas plegadas a carril, SIEMPRE por decisión del usuario: ya no hay
@@ -543,9 +546,8 @@ export function GestorReservasKanban({
   // 2026-10-01): las de otro negocio que queden en la base de datos se
   // descartan aquí (`admiteReservas`), así que ni se pintan ni se cuentan.
   //
-  // `select("*")`: trae `llegada_at` si la migración 20260923_reservas_llegada
-  // está aplicada, sin romper si no lo está (nombrarla en la lista fallaría),
-  // y `marca`. `as any`: `marca` no está en los tipos generados.
+  // Columnas explícitas (`COLUMNAS_RESERVAS_HOY`, 07/11/2026; antes `select("*")`): las
+  // mismas que pide `VistaHoy`. `as any`: `marca` no está en los tipos generados.
   //
   // La clave empieza por "reservas-kanban": useAccionesServicioReserva hace el
   // update optimista por prefijo. Lo que cambie otro dispositivo llega por
@@ -563,7 +565,7 @@ export function GestorReservasKanban({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservas" as any)
-        .select("*")
+        .select(COLUMNAS_RESERVAS_HOY)
         .eq("fecha", hoy)
         .neq("estado", "cancelada")
         .order("hora", { ascending: true });
@@ -636,6 +638,27 @@ export function GestorReservasKanban({
   });
 
   /**
+   * Las mesas cambian constantemente (07/11/2026, idea del dueño): la asignada es solo la previsión. Al marcar
+   * «Llegó» en una reserva con mesa, el aviso de siempre trae también «Cambiar mesa», que abre el mapa para
+   * confirmar la mesa donde se han sentado de verdad. `darMesa` va por ref: cambia en cada render.
+   */
+  const darMesaRef = useRef(darMesa);
+  darMesaRef.current = darMesa;
+  const accionesTarjeta = useMemo(
+    () => ({
+      ...acciones,
+      marcarLlegada: (reserva: ReservaServicio) =>
+        acciones.marcarLlegada(
+          reserva,
+          puedeEditar && mesasPorReserva.get(reserva.id)?.length
+            ? { accionAviso: { label: "Cambiar mesa", onClick: () => darMesaRef.current(reserva) } }
+            : undefined,
+        ),
+    }),
+    [acciones, mesasPorReserva, puedeEditar],
+  );
+
+  /**
    * Con sala, que ocupe sitio (pendiente/verificada/confirmada/completada) y sin ninguna mesa
    * asignada. Mientras las asignaciones no han llegado NO se marca nada: mejor callar que acusar en falso.
    */
@@ -681,7 +704,8 @@ export function GestorReservasKanban({
     );
   }
 
-  if (isError) {
+  // Sin red pero con las reservas ya cargadas (o guardadas en el dispositivo), se siguen enseñando.
+  if (isError && !reservas) {
     return <EstadoErrorCarga titulo="las reservas de hoy" error={error} onReintentar={() => refetch()} />;
   }
 
@@ -743,16 +767,18 @@ export function GestorReservasKanban({
                         key={reserva.id}
                         reserva={reserva}
                         columnas={columnas}
-                        acciones={acciones}
+                        acciones={accionesTarjeta}
                         onMover={solicitarMovimiento}
                         onToggleImportante={toggleImportante}
                         onBlacklist={setBlacklistReserva}
                         onEditar={(r) => editarReserva(r.id)}
                         onDarMesa={darMesa}
+                        textoCambiarMesa={mesasPorReserva.get(reserva.id)?.length ? "Cambiar mesa" : undefined}
                         sinMesa={estaSinMesa(reserva)}
                         mesas={mesasPorReserva.get(reserva.id)}
                         puedeEditar={puedeEditar}
                         anchoColumna={disposicion.anchoColumna}
+                        onFijarMesa={(r, fijar) => void fijarMesa(r, fijar)}
                       />
                     ))}
                   </KanbanColumn>

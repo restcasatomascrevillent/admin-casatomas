@@ -1,36 +1,28 @@
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
-import { ChevronDown, Clock, Info, MapIcon, Search, SquareKanban, Wand2 } from "lucide-react";
+import { Info, Search, Wand2 } from "lucide-react";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { supabase } from "@/integrations/supabase/client";
-import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { ReservasEnVivoContexto, useReservasEnVivo } from "@/hooks/useReservasEnVivo";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
+import { AvisoSinConexion } from "@/components/panel/AvisoSinConexion";
+import { esErrorDeRed } from "@/hooks/useEnLinea";
 import { useHoyLocal } from "@/hooks/useHoyLocal";
-import { GestorReservasKanban } from "./GestorReservasKanban";
-import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { admiteReservas } from "@/lib/reservas/negocios";
-import {
-  esModoVistaHoy,
-  guardarSalaPlanoHoy,
-  guardarVistaHoy,
-  leerSalaPlanoHoy,
-  leerVistaHoy,
-  type FiltroTurnoHoy,
-  type ModoVistaHoy,
-} from "@/lib/reservas/vistaHoy";
+import { COLUMNAS_RESERVAS_HOY, guardarSalaPlanoHoy, leerSalaPlanoHoy, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
 import { VistaPlanoHoy, type ReservaPlanoHoy } from "./servicio/VistaPlanoHoy";
-import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { VistaHoyMovil } from "./movil/VistaHoyMovil";
 import { BotonSentarSinReserva } from "./SentarSinReserva";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+/** Sin relectura periódica (el móvil ya tiene la suya, `useAlDiaMovil`). */
+const SIN_SONDEO = { refetchInterval: false } as const;
 
 /**
  * Pestaña "Hoy" (rediseñada 2026-09-25, petición del dueño): antes esto era
@@ -73,12 +65,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
  * reserva» (se ocultan, no se desactivan); el kanban, el plano y la vista de móvil tampoco ofrecen
  * nada que escriba. La etiqueta «Solo lectura» la pone la página, junto a las pestañas.
  *
+ * ESCRITORIO SIN KANBAN (07/11/2026, petición del dueño): a la izquierda la lista del móvil (lo que falta por
+ * llegar, con «Sentar · Comedor · Mesa 12», `VistaHoyMovil` en modo `columna`) con su scroll; a la derecha el
+ * plano FIJO, una sala a la vez con flechas (`VistaPlanoHoy` `fijo`). El kanban (`GestorReservasKanban`) sigue
+ * en el código pero ya no se pinta en Hoy; tampoco el selector «Kanban | Plano» ni los cuartos de hora
+ * plegados (iban con el kanban). Lo de arriba sobre el kanban queda como historia.
+ *
  * `onAbrirSala` (sin uso desde el 10/10/2026): abría el reparto de mesas de una sala (`Reservas.tsx`, el
  * mismo salto que el Calendario: `PlanoEspacio2D`, con su conmutador al modo servicio).
  */
 export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } = {}) {
   // Lo que comparten las dos vistas: el buscador y el turno de la fila de filtros, y la vista elegida.
-  const [vista, setVista] = useState<ModoVistaHoy>(leerVistaHoy);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTurno, setFiltroTurno] = useState<FiltroTurnoHoy>("todo");
   const [salaPlano, setSalaPlano] = useState<string | null>(leerSalaPlanoHoy);
@@ -92,7 +89,6 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   const empezarOrganizar = (turno: "comida" | "cena") => {
     setPreguntarTurno(false);
     setFiltroTurno(turno);
-    cambiarVista("plano");
     setOrganizando(turno);
   };
   const pulsarOrganizar = () => (filtroTurno === "todo" ? setPreguntarTurno(true) : empezarOrganizar(filtroTurno));
@@ -100,42 +96,29 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     setFiltroTurno(t);
     if (t !== organizando) setOrganizando(null);
   };
-  const cambiarVista = (nueva: ModoVistaHoy) => {
-    setVista(nueva);
-    guardarVistaHoy(nueva);
-  };
-  const cambiarSala = (salaId: string) => {
+  const cambiarSala = useCallback((salaId: string) => {
     setSalaPlano(salaId);
     guardarSalaPlanoHoy(salaId);
-  };
-  /** Desde el kanban (nombre de una sala): el plano de esa sala. */
-  const verPlanoDeSala = (salaId: string) => {
-    cambiarSala(salaId);
-    cambiarVista("plano");
-  };
+  }, []);
+  const [bloqueEscritorio, setBloqueEscritorio] = useState<HTMLDivElement | null>(null);
+  const altoEscritorio = useAlturaDisponible(bloqueEscritorio, 420);
+  /** Escritorio: la reserva señalada en la lista (ratón, foco o ficha abierta), que el plano resalta. */
+  const [señalada, setSeñalada] = useState<string | null>(null);
 
-  const {
-    isLoading,
-    isError: errorResumen,
-    error: errorResumenDetalle,
-    refetch: refetchResumen,
-  } = useResumenOcupacionHoy();
-
-  // Ojo con el orden: estos hooks van ANTES de los `return` de carga/error de
-  // arriba, o React se queda sin hooks a mitad de render.
+  // 07/11/2026: ya no se espera al «resumen de ocupación» (2 consultas cada minuto que bloqueaban toda la
+  // pestaña con un esqueleto y cuyas cifras no se pintan desde el 17/10). Cada vista enseña lo suyo según llega.
   // Cambios de `reservas` y de mesas hechos en otro dispositivo: UNA suscripción
   // para toda la pestaña (kanban, cifras y la rejilla
   // por cuartos, que no abre la suya: `ReservasEnVivoContexto`).
   useReservasEnVivo();
   // Cambia a medianoche (la tablet se queda toda la noche en «Hoy»).
   const hoy = useHoyLocal();
-  const { data: espacios } = useEspaciosReserva();
   /**
    * Reservas de hoy de Casa Tomás, para el plano del servicio y la vista de hoy en móvil
    * (`marca`, para quedarse con las de Casa Tomás: `admiteReservas`).
    *
-   * `select("*")`, como el kanban: trae `llegada_at`, `importante`, `telefono`… si existen (las tarjetas
-   * del plano los necesitan) sin romper si una migración no está aplicada. NO se reutiliza
+   * Columnas explícitas (`COLUMNAS_RESERVAS_HOY`, 07/11/2026: antes `select("*")`), las mismas que el kanban.
+   * NO se reutiliza
    * `useReservasServicioDia`: ese pide `llegada_at` y `salida_at` por nombre, y su error subiría hasta
    * aquí y tumbaría la pestaña entera. (`"reservas" as any` porque `espacio_id` no está en los tipos generados.)
    *
@@ -147,15 +130,19 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
    */
   const {
     data: reservasHoy,
-    isError: errorReservasHoy,
+    isError: falloReservasHoy,
+    error: errorDetalleReservasHoy,
     refetch: refetchReservasHoy,
+    dataUpdatedAt: reservasHoyActualizadas,
+    fetchStatus: estadoPeticionReservasHoy,
   } = useQuery({
-    ...REFRESCO_PERIODICO,
+    // En el móvil ya las relee `useAlDiaMovil` (cada 30 s): sin el sondeo de cada minuto, para no pedirlas dos veces.
+    ...(esMovil ? SIN_SONDEO : REFRESCO_PERIODICO),
     queryKey: ["reservas-hoy", "pendientes-mesa", hoy],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservas" as any)
-        .select("*")
+        .select(COLUMNAS_RESERVAS_HOY)
         .eq("fecha", hoy)
         .neq("estado", "cancelada")
         .order("hora");
@@ -165,45 +152,48 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     },
   });
 
-  if (isLoading) {
-    return (
-      <div className="space-y-3 sm:space-y-4">
-        <div className="rounded-xl border bg-card/50 p-3 sm:p-4 animate-pulse">
-          <div className="h-10 sm:h-8 bg-muted rounded" />
-        </div>
-        <div className="h-80 bg-muted/40 rounded-xl animate-pulse" />
-      </div>
-    );
-  }
+  /**
+   * Canceladas de hoy, solo para la lista de escritorio (plegadas al final, 07/11/2026). Aparte de la de
+   * arriba para no meterlas en el plano ni en el móvil. Clave con el prefijo "reservas-hoy": se refresca igual.
+   */
+  const { data: canceladasHoy } = useQuery({
+    ...REFRESCO_PERIODICO,
+    enabled: !esMovil,
+    queryKey: ["reservas-hoy", "canceladas", hoy],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `espacio_id` no está en los tipos generados (como la de arriba).
+        .from("reservas" as any)
+        .select(COLUMNAS_RESERVAS_HOY)
+        .eq("fecha", hoy)
+        .eq("estado", "cancelada")
+        .order("hora");
+      if (error) throw error;
+      return ((data ?? []) as unknown as ReservaPlanoHoy[]).filter((r) => admiteReservas(r.marca));
+    },
+  });
 
-  if (errorResumen) {
-    return (
-      <EstadoErrorCarga
-        titulo="el resumen de ocupación de hoy"
-        error={errorResumenDetalle}
-        onReintentar={() => refetchResumen()}
-      />
-    );
-  }
+  // Con datos guardados (caché o copia sin conexión, `cacheOffline.ts`) un fallo de red NO tapa la lista:
+  // se siguen viendo las reservas que había y `AvisoSinConexion` dice de qué hora son.
+  const errorReservasHoy = falloReservasHoy && !reservasHoy;
+  const avisoRed = (
+    <AvisoSinConexion
+      actualizadoEn={reservasHoyActualizadas}
+      falloRed={(falloReservasHoy && esErrorDeRed(errorDetalleReservasHoy)) || estadoPeticionReservasHoy === "paused"}
+    />
+  );
 
   if (esMovil) {
+    // Móvil (07/11/2026): los controles (Reservas|Mesas, turno, buscador y «Sin reserva») van en UNA fila
+    // dentro de `VistaHoyMovil`, que guarda su propio buscador y turno (por defecto el del reloj).
     return (
       <ReservasEnVivoContexto.Provider value={true}>
-        <div className="space-y-2">
-          <BarraFiltrosHoy
-            busqueda={busqueda}
-            onBusqueda={setBusqueda}
-            filtroTurno={filtroTurno}
-            onFiltroTurno={setFiltroTurno}
-            vista={vista}
-            onVista={cambiarVista}
-            soloFiltros
-            accion={<BotonSentarSinReserva className="shrink-0" />}
-          />
+        <div className="flex min-h-0 flex-col gap-1">
+          {avisoRed}
           {errorReservasHoy ? (
             <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />
           ) : (
-            <VistaHoyMovil reservas={reservasHoy} fecha={hoy} busqueda={busqueda} filtroTurno={filtroTurno} />
+            <VistaHoyMovil reservas={reservasHoy} fecha={hoy} />
           )}
         </div>
       </ReservasEnVivoContexto.Provider>
@@ -211,42 +201,54 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   }
 
   return (
-    // `ReservasEnVivoContexto`: lo de dentro (la rejilla por cuartos, el editor
-    // del kanban) ya lo refresca `useReservasEnVivo` y no abre su propio canal a
+    // `ReservasEnVivoContexto`: lo de dentro ya lo refresca `useReservasEnVivo` y no abre su propio canal a
     // `reservas`.
     <ReservasEnVivoContexto.Provider value={true}>
-      <div className="space-y-2">
-        {/* Revisión 17/10/2026: sin cifras de ocupación en la fila de filtros (a petición del
-            dueño). En el kanban sigue «Disponibilidad por cuartos de hora», plegada; el plano
-            empieza justo debajo de la fila de filtros. */}
-        {vista !== "plano" && <CuartosDeHoy fecha={hoy} />}
-
+      {/* Nunca más alto que la pantalla (07/11/2026: en la captura del dueño la página hacía scroll y se cortaban
+          «Nueva Reserva» arriba y la leyenda y la última fila abajo): el bloque mide lo que queda y recorta. */}
+      <div
+        ref={setBloqueEscritorio}
+        className="flex min-h-0 flex-col gap-2 overflow-hidden"
+        style={altoEscritorio ? { height: altoEscritorio } : undefined}
+        data-testid="hoy-escritorio"
+      >
+        {avisoRed}
         <BarraFiltrosHoy
           busqueda={busqueda}
           onBusqueda={setBusqueda}
           filtroTurno={filtroTurno}
           onFiltroTurno={cambiarTurno}
-          vista={vista}
           soloLectura={!puedeEditar}
-          onVista={(v) => {
-            cambiarVista(v);
-            if (v !== "plano") setOrganizando(null);
-          }}
           accion={
             puedeEditar ? (
               <div className="flex shrink-0 gap-2 sm:order-2">
-                <Button className="touch-hit h-9 gap-1.5 px-4 pointer-coarse:h-9" onClick={pulsarOrganizar} disabled={!!organizando}>
+                <Button className="touch-hit h-11 gap-1.5 px-4" onClick={pulsarOrganizar} disabled={!!organizando}>
                   <Wand2 className="h-4 w-4" aria-hidden="true" />
                   Organizar
                 </Button>
-                <BotonSentarSinReserva className="touch-hit h-9 shrink-0 pointer-coarse:h-9" />
+                <BotonSentarSinReserva className="touch-hit h-11 shrink-0" />
               </div>
             ) : undefined
           }
         />
 
-        {vista === "plano" ? (
+        {/* 07/11/2026: a la izquierda la lista completa del turno, por estados, en filas de una línea (con su
+            scroll); a la derecha el plano de mesas grandes, una sala a la vez. Cada columna mide lo que queda de
+            pantalla. Lista de 22 rem (tablet), 26,25 rem (420 px, desde 1280) y 30 rem (480 px, desde 1536). */}
+        <div className="grid min-h-0 grid-cols-[minmax(0,22rem)_minmax(0,1fr)] items-start gap-3 xl:grid-cols-[26.25rem_minmax(0,1fr)] 2xl:grid-cols-[30rem_minmax(0,1fr)]">
+          <section aria-label="Reservas por llegar" className="min-w-0">
+            {errorReservasHoy ? (
+              <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />
+            ) : (
+              <VistaHoyMovil
+                reservas={reservasHoy}
+                fecha={hoy}
+                columna={{ busqueda, filtroTurno, canceladas: canceladasHoy, onSeñalar: setSeñalada }}
+              />
+            )}
+          </section>
           <VistaPlanoHoy
+            fijo
             reservas={reservasHoy}
             busqueda={busqueda}
             filtroTurno={filtroTurno}
@@ -255,10 +257,9 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             organizar={organizando && puedeEditar ? { turno: organizando, onSalir: () => setOrganizando(null) } : null}
             reservasError={errorReservasHoy}
             onReintentarReservas={() => void refetchReservasHoy()}
+            reservaResaltada={señalada}
           />
-        ) : (
-          <GestorReservasKanban busqueda={busqueda} filtroTurno={filtroTurno} onVerPlanoSala={verPlanoDeSala} />
-        )}
+        </div>
       </div>
       <Dialog open={preguntarTurno && puedeEditar} onOpenChange={setPreguntarTurno}>
         <DialogContent className="max-w-sm">
@@ -288,145 +289,68 @@ function turnoSiguiente(): "comida" | "cena" {
   return new Date().getHours() < 16 ? "comida" : "cena";
 }
 
-/** La ayuda (ⓘ) de cada vista de «Hoy». Con solo «Ver» no hay acciones ni arrastre. */
-function ayudaVistaHoy(vista: ModoVistaHoy, soloLectura: boolean): string {
-  if (soloLectura) {
-    return vista === "plano" ? "Toca una mesa para ver su reserva." : "Las reservas de hoy, una columna por sala.";
-  }
-  return vista === "plano"
-    ? "Toca una mesa para ver su reserva y sus acciones."
-    : "Toca una tarjeta para ver sus acciones, o mantenla pulsada y arrástrala a otro espacio.";
+/** La ayuda (ⓘ) de «Hoy». Con solo «Ver» no hay acciones. */
+function ayudaVistaHoy(soloLectura: boolean): string {
+  return soloLectura
+    ? "A la izquierda, las reservas del turno por estado; a la derecha, las mesas de la sala. Pasa el ratón por una reserva para ver su mesa."
+    : "A la izquierda, las reservas del turno por estado («Sentar», «Liberar»; pasa el ratón para ver su mesa). A la derecha, las mesas: tócalas para ver, sentar o fijar. Las flechas (o ← →) cambian de sala.";
 }
 
 /**
- * Opción del selector «Kanban | Plano». Marcada, OSCURA (`bg-primary`), como el resto de conmutadores de
- * vista del panel (Plano | Servicio de una sala): el dorado de `accent` sobre blanco daba 3,5:1.
- */
-const CLASES_OPCION_VISTA =
-  "touch-hit h-9 pointer-coarse:h-9 gap-1.5 whitespace-nowrap data-[state=on]:bg-primary data-[state=on]:text-primary-foreground";
-
-/**
- * La fila de filtros de «Hoy», COMÚN a las dos vistas (antes vivía dentro del kanban, idéntica):
- * buscador, «Todo el día / Comida / Cena», el selector «Kanban | Plano» y la ayuda de cada vista.
- *
- * Sin alto de más: el selector va junto al turno y la ayuda ocupa lo que sobre de la línea (en dos
- * renglones si hace falta, que miden menos que el buscador); solo baja a su propia línea donde ya
- * bajaba antes (tablet). En móvil el selector se queda en iconos (el texto sigue para el lector de
- * pantalla) y comparte fila con el buscador.
+ * La fila de filtros de «Hoy» de escritorio: buscador, «Todo el día / Comida / Cena», las acciones y la ayuda.
+ * Mandan a la vez en la lista de la izquierda y en el plano. (Hasta el 07/11/2026 llevaba el selector
+ * «Kanban | Plano»; el kanban ya no sale en Hoy.)
  */
 function BarraFiltrosHoy({
   busqueda,
   onBusqueda,
   filtroTurno,
   onFiltroTurno,
-  vista,
-  onVista,
-  soloFiltros = false,
   soloLectura = false,
   accion,
 }: {
-  /** Solo «Ver»: la ayuda no habla de acciones ni de arrastrar. */
+  /** Solo «Ver»: la ayuda no habla de acciones. */
   soloLectura?: boolean;
-  /** Botón de acción junto al turno («Sin reserva»). */
+  /** Botones de acción junto al turno («Organizar», «Sin reserva»). */
   accion?: ReactNode;
-  /** Móvil: solo buscador y turno (sin «Kanban | Plano» ni la ayuda). */
-  soloFiltros?: boolean;
   busqueda: string;
   onBusqueda: (texto: string) => void;
   filtroTurno: FiltroTurnoHoy;
   onFiltroTurno: (turno: FiltroTurnoHoy) => void;
-  vista: ModoVistaHoy;
-  onVista: (vista: ModoVistaHoy) => void;
 }) {
   return (
-    // `flex-wrap`: por debajo de ~1100px el texto de ayuda se baja a su propia línea en vez de
-    // estrujar el filtro de turno hasta partir "Todo el día" en dos renglones.
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
-      {/* Móvil: buscador y selector en una fila. Desde `sm`, `contents` los deja sueltos en la fila de
-          siempre y `order` pone el selector detrás del turno. */}
-      <div className="flex min-w-0 items-center gap-2 sm:contents">
-        <div className="relative w-full min-w-0 sm:order-1 sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          <Input
-            placeholder="Buscar por nombre, email o teléfono…"
-            value={busqueda}
-            onChange={(e) => onBusqueda(e.target.value)}
-            className="h-9 pl-9 pointer-coarse:h-10"
-            aria-label="Buscar reservas"
-          />
-        </div>
-        {!soloFiltros && (
-        <ToggleGroup
-          type="single"
-          value={vista}
-          onValueChange={(v) => esModoVistaHoy(v) && onVista(v)}
-          variant="outline"
-          size="sm"
-          className="shrink-0 sm:order-3"
-          aria-label="Vista de Hoy"
-        >
-          <ToggleGroupItem value="kanban" aria-label="Kanban" title="Kanban: una columna por sala" className={CLASES_OPCION_VISTA}>
-            <SquareKanban className="h-4 w-4" aria-hidden="true" />
-            <span className="sr-only sm:not-sr-only">Kanban</span>
-          </ToggleGroupItem>
-          <ToggleGroupItem value="plano" aria-label="Plano" title="Plano: las salas con sus mesas" className={CLASES_OPCION_VISTA}>
-            <MapIcon className="h-4 w-4" aria-hidden="true" />
-            <span className="sr-only sm:not-sr-only">Plano</span>
-          </ToggleGroupItem>
-        </ToggleGroup>
-        )}
+      <div className="relative w-full min-w-0 sm:order-1 sm:w-64">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <Input
+          placeholder="Buscar por nombre, email o teléfono…"
+          value={busqueda}
+          onChange={(e) => onBusqueda(e.target.value)}
+          className="h-11 pl-9"
+          aria-label="Buscar reservas"
+        />
       </div>
       <ToggleGroup
         type="single"
         value={filtroTurno}
         onValueChange={(v) => v && onFiltroTurno(v as FiltroTurnoHoy)}
         variant="outline"
-        size="sm"
         className="shrink-0 sm:order-2"
         aria-label="Filtrar por turno"
       >
-        <ToggleGroupItem value="todo" className="touch-hit whitespace-nowrap pointer-coarse:h-9">Todo el día</ToggleGroupItem>
-        <ToggleGroupItem value="comida" className="touch-hit whitespace-nowrap pointer-coarse:h-9">Comida</ToggleGroupItem>
-        <ToggleGroupItem value="cena" className="touch-hit whitespace-nowrap pointer-coarse:h-9">Cena</ToggleGroupItem>
+        <ToggleGroupItem value="todo" className="touch-hit h-11 whitespace-nowrap">Todo el día</ToggleGroupItem>
+        <ToggleGroupItem value="comida" className="touch-hit h-11 whitespace-nowrap">Comida</ToggleGroupItem>
+        <ToggleGroupItem value="cena" className="touch-hit h-11 whitespace-nowrap">Cena</ToggleGroupItem>
       </ToggleGroup>
       {accion}
-      {!soloFiltros && (
-        // La ayuda, como un ⓘ (10/10/2026): el texto entero en el título y para el lector de pantalla.
-        <span
-          role="note"
-          className="hidden shrink-0 text-muted-foreground sm:order-4 sm:inline-flex"
-          aria-label={ayudaVistaHoy(vista, soloLectura)}
-          title={ayudaVistaHoy(vista, soloLectura)}
-        >
-          <Info className="h-4 w-4" aria-hidden="true" />
-        </span>
-      )}
+      <span
+        role="note"
+        className="hidden shrink-0 text-muted-foreground sm:order-4 sm:inline-flex"
+        aria-label={ayudaVistaHoy(soloLectura)}
+        title={ayudaVistaHoy(soloLectura)}
+      >
+        <Info className="h-4 w-4" aria-hidden="true" />
+      </span>
     </div>
-  );
-}
-
-/**
- * Rejilla interna por cuartos de hora del día (reservas-sin-salas,
- * 2026-09-29), PLEGADA: el kanban sigue siendo el protagonista de Hoy. Una
- * sola rejilla, la de Casa Tomás con su aforo (antes había otra para Touza).
- * Mientras está plegada no se monta nada (Radix desmonta el contenido), así
- * que no cuesta consultas.
- */
-function CuartosDeHoy({ fecha }: { fecha: string }) {
-  return (
-    <Collapsible className="rounded-xl border bg-card/50 px-3 py-2">
-      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 rounded-md py-1 pointer-coarse:min-h-11 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
-          Disponibilidad por cuartos de hora
-        </span>
-        <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-4 pt-2">
-        {/* `ocultarTitulo`: el botón del plegable ya dice «Disponibilidad por cuartos de hora»; repetirlo
-            justo debajo sobraba (antes el segundo llevaba «· Casa Tomás», de cuando había dos negocios). */}
-        <DisponibilidadCuartos fecha={fecha} compacto ocultarTitulo />
-      </CollapsibleContent>
-    </Collapsible>
   );
 }

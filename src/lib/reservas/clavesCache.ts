@@ -40,8 +40,8 @@ const CLAVES_CONTADORES = [
   "reservas_hoy_resumen",
   "reservas_hoy_todas",
   "ocupacion_hoy",
+  // También «confirmadas de hoy» del Dashboard: comparte esta clave (`select`, 07/11/2026).
   "today-reservations",
-  "today-confirmed-reservations",
   "dashboard-stats",
   "reservas_mes",
   // Rejilla «Ocupación de salas» (`useOcupacionSalasDia`).

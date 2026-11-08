@@ -35,6 +35,9 @@ vi.mock("@/hooks/useEdicionReserva", () => ({
 
 import { toast } from "sonner";
 import { ElegirMesaDialog } from "@/components/reservas/ElegirMesaDialog";
+// El diálogo carga el plano bajo demanda (`React.lazy`, 07/11/2026): se carga ya aquí para que la
+// primera apertura no tarde más que lo que esperan los `findBy`.
+import "@/components/reservas/PlanoEspacio2D";
 
 const HOY = "2026-10-01";
 

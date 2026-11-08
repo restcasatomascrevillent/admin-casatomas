@@ -109,6 +109,16 @@ export function textoMesas(mesas: string[]): string {
   return mesas.length === 1 ? `Mesa ${mesas[0]}` : `Mesas ${mesas.join(" + ")}`;
 }
 
+/**
+ * La mesa de una reserva con el lenguaje del servicio (07/11/2026): mientras no ha llegado es solo la
+ * PREVISIÓN («Prevista: Mesa 7»); sentada, la confirmada («En mesa 9»).
+ */
+export function textoMesaConfirmada(mesas: string[], sentada: boolean): string {
+  if (mesas.length === 0) return "Sin mesa";
+  const t = textoMesas(mesas);
+  return sentada ? `En ${t.charAt(0).toLowerCase()}${t.slice(1)}` : `Prevista: ${t}`;
+}
+
 export interface MesaOpcion {
   id: string;
   nombre: string;
@@ -175,6 +185,46 @@ export function lleganAhora<R extends ReservaHoyMovil>(
     .filter(({ m }) => m != null && m >= minutoAhora - 30 && m <= minutoAhora + 15)
     .sort((a, b) => (a.m as number) - (b.m as number) || (a.r.nombre ?? "").localeCompare(b.r.nombre ?? "", "es"))
     .map(({ r, m }) => ({ reserva: r, mesas: mesasDe(r.id), terminada: false, tarde: (m as number) < minutoAhora }));
+}
+
+// ─── Lista del camarero (07/11/2026) ─────────────────────────────────────────
+
+export interface ListaHoyMovil<R extends ReservaHoyMovil = ReservaHoyMovil> {
+  /** «Llegan ahora»: próximos 15 min y hasta 30 min tarde. */
+  llegan: FilaLlegada<R>[];
+  /** El resto de las que aún no han llegado, por hora (las pasadas de hora, marcadas «Tarde»). */
+  porLlegar: FilaLlegada<R>[];
+  /** Ya sentadas («Llegó»), por hora: van abajo y plegadas. */
+  sentadas: FilaHoyMovil<R>[];
+}
+
+/**
+ * La lista de Hoy en móvil, pensada para sentar rápido: primero las que aún no han llegado («Llegan ahora»
+ * arriba y luego el resto por hora), y abajo las ya sentadas. «No vino» y canceladas no salen. Mismos
+ * filtros (turno y buscador) que la barra.
+ */
+export function listaHoyMovil<R extends ReservaHoyMovil>(
+  reservas: readonly R[],
+  mesasDe: (reservaId: string) => string[],
+  minutoAhora: number,
+  filtros: { busqueda: string; filtroTurno: FiltroTurnoHoy },
+): ListaHoyMovil<R> {
+  const llegan = lleganAhora(reservas, mesasDe, minutoAhora, filtros);
+  const enLlegan = new Set(llegan.map((f) => f.reserva.id));
+  const porHora = (a: R, b: R) => a.hora.localeCompare(b.hora) || (a.nombre ?? "").localeCompare(b.nombre ?? "", "es");
+  const vivas = reservas.filter((r) => coincideFiltroHoy(r, filtros));
+  const porLlegar = vivas
+    .filter((r) => ESTADOS_POR_LLEGAR.has(r.estado) && !enLlegan.has(r.id))
+    .sort(porHora)
+    .map((r) => {
+      const m = minutos(r.hora);
+      return { reserva: r, mesas: mesasDe(r.id), terminada: false, tarde: m != null && m < minutoAhora };
+    });
+  const sentadas = vivas
+    .filter((r) => r.estado === ESTADO_LLEGADA)
+    .sort(porHora)
+    .map((r) => ({ reserva: r, mesas: mesasDe(r.id), terminada: true }));
+  return { llegan, porLlegar, sentadas };
 }
 
 // ─── Estado de cada mesa («Mesas») ───────────────────────────────────────────
@@ -246,3 +296,50 @@ export function reservasConMesaEnSala<R extends { id: string; hora: string; esta
     .filter((r) => r.espacio_id === salaId && r.estado !== "cancelada" && tieneMesa(r.id))
     .sort((a, b) => Number(yaAtendida(a)) - Number(yaAtendida(b)) || a.hora.localeCompare(b.hora) || a.id.localeCompare(b.id));
 }
+
+// ─── «Hoy» de escritorio: la lista completa por estados (07/11/2026) ─────────
+
+export interface ListaHoyEscritorio<R extends ReservaHoyMovil = ReservaHoyMovil> {
+  /** Aún no han llegado (pendiente, verificada, confirmada), por hora; las pasadas de hora, «Tarde». */
+  porLlegar: FilaLlegada<R>[];
+  /** «Llegó» y siguen en la mesa (sin `salida_at`), por hora. */
+  sentadas: FilaHoyMovil<R>[];
+  /** Ya se fueron (mesa liberada), «No vino» y canceladas, por hora: al final y plegadas. */
+  terminadas: FilaHoyMovil<R>[];
+}
+
+/**
+ * La lista de «Hoy» de ESCRITORIO (petición del dueño, 07/11/2026: «eso era para el móvil»): TODAS las reservas
+ * del día del turno elegido, agrupadas por estado. Mismos filtros (turno y buscador) que la barra.
+ */
+export function listaHoyEscritorio<R extends ReservaHoyMovil & { salida_at?: string | null }>(
+  reservas: readonly R[],
+  mesasDe: (reservaId: string) => string[],
+  minutoAhora: number,
+  filtros: { busqueda: string; filtroTurno: FiltroTurnoHoy },
+): ListaHoyEscritorio<R> {
+  const porHora = (a: R, b: R) => a.hora.localeCompare(b.hora) || (a.nombre ?? "").localeCompare(b.nombre ?? "", "es");
+  const vistas = reservas.filter((r) => coincideFiltroHoy(r, filtros)).sort(porHora);
+  const porLlegar: FilaLlegada<R>[] = [];
+  const sentadas: FilaHoyMovil<R>[] = [];
+  const terminadas: FilaHoyMovil<R>[] = [];
+  const vistos = new Set<string>();
+  for (const r of vistas) {
+    if (vistos.has(r.id)) continue;
+    vistos.add(r.id);
+    if (ESTADOS_POR_LLEGAR.has(r.estado)) {
+      const m = minutos(r.hora);
+      porLlegar.push({ reserva: r, mesas: mesasDe(r.id), terminada: false, tarde: m != null && m < minutoAhora });
+    } else if (r.estado === ESTADO_LLEGADA && !r.salida_at) {
+      sentadas.push({ reserva: r, mesas: mesasDe(r.id), terminada: false });
+    } else if (r.estado === ESTADO_LLEGADA || r.estado === ESTADO_NO_SHOW || r.estado === "cancelada") {
+      terminadas.push({ reserva: r, mesas: mesasDe(r.id), terminada: true });
+    }
+  }
+  return { porLlegar, sentadas, terminadas };
+}
+
+/** Palabras que en la nota del cliente avisan de una alergia o intolerancia (icono en la lista de escritorio). */
+const RE_ALERGIA = /alerg|intoleran|cel[ií]ac|gluten|lactosa|frutos secos|marisco/i;
+
+export const tieneAlergia = (notas: string | null | undefined) => RE_ALERGIA.test(notas ?? "");

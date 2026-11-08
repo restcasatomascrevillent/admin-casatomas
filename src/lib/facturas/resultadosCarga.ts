@@ -10,6 +10,7 @@
 // ============================================================================
 
 import {
+  alertasRelevantes,
   clasificarResultado,
   type ElementoCola,
   normalizarTipo,
@@ -111,11 +112,12 @@ export function lineaEstado(e: ElementoCola): LineaEstado {
   const partes: string[] = [];
   const guardado = tipoDocumento(r) === "factura" ? "Guardada" : "Guardado";
   if (nivel === "aviso") {
-    const n = r?.alertas?.length ?? 0;
+    const relevantes = alertasRelevantes(r);
+    const n = relevantes.length;
     if (r?.archivoGuardado === false) {
       partes.push(`${guardado} · sin original: el fichero no se ha podido archivar; guarda una copia a mano.`);
     }
-    if (n > 0) partes.push(`${n} aviso${n > 1 ? "s" : ""}: ${r!.alertas!.map((a) => a.mensaje).join(" · ")}`);
+    if (n > 0) partes.push(`${n} aviso${n > 1 ? "s" : ""}: ${relevantes.map((a) => a.mensaje).join(" · ")}`);
   } else {
     partes.push(
       r?.paginaAnadida

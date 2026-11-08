@@ -53,41 +53,35 @@ export function useDashboardStats(startDate: Date, endDate: Date) {
   });
 }
 
+// Hoy (todas menos canceladas). Una sola consulta para los dos hooks de abajo (07/11/2026): antes
+// «confirmadas de hoy» era otra petición a `reservas` con casi las mismas filas; ahora comparten
+// clave y caché y las confirmadas se filtran en el navegador (`select`).
+const consultaReservasHoy = {
+  queryKey: ["today-reservations"],
+  queryFn: async () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+
+    // `as any` + cast final: ver la nota de `useDashboardStats` más arriba.
+    const { data, error } = await supabase
+      .from("reservas" as any)
+      .select("*")
+      .eq("fecha", today)
+      .neq("estado", "cancelada");
+
+    if (error) throw error;
+    return soloQueAdmitenReservas(data);
+  },
+};
+
+const soloConfirmadas = <T extends { estado?: unknown }>(filas: T[]): T[] =>
+  filas.filter((r) => r?.estado === "confirmada");
+
 // Hook para todas las reservas de hoy (para mostrar en widgets informativos)
 export function useTodayReservations() {
-  return useQuery({
-    queryKey: ["today-reservations"],
-    queryFn: async () => {
-      const today = format(new Date(), "yyyy-MM-dd");
-
-      // `as any` + cast final: ver la nota de `useDashboardStats` más arriba.
-      const { data, error } = await supabase
-        .from("reservas" as any)
-        .select("*")
-        .eq("fecha", today)
-        .neq("estado", "cancelada");
-
-      if (error) throw error;
-      return soloQueAdmitenReservas(data);
-    },
-  });
+  return useQuery(consultaReservasHoy);
 }
 
 // Hook para solo reservas confirmadas de hoy (para métricas de ocupación)
 export function useTodayConfirmedReservations() {
-  return useQuery({
-    queryKey: ["today-confirmed-reservations"],
-    queryFn: async () => {
-      const today = format(new Date(), "yyyy-MM-dd");
-
-      const { data, error } = await supabase
-        .from("reservas" as any)
-        .select("*")
-        .eq("fecha", today)
-        .eq("estado", "confirmada");
-
-      if (error) throw error;
-      return soloQueAdmitenReservas(data);
-    },
-  });
+  return useQuery({ ...consultaReservasHoy, select: soloConfirmadas });
 }

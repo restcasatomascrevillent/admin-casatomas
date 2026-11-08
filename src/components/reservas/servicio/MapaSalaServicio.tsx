@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { Maximize2, MessageSquareText, Move, Star, ZoomIn, ZoomOut } from "lucide-react";
+import { Lock, Maximize2, MessageSquareText, Move, Star, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Mesa } from "@/hooks/useMesas";
@@ -75,6 +75,11 @@ export interface MapaSalaServicioProps {
   uniones?: readonly UnionDibujo[];
   /** Piezas y pico de cada mesa por piezas, para pintar las ranuras entre piezas. */
   piezas?: ReadonlyMap<string, PiezasDibujo>;
+  /**
+   * Plano FIJO (07/11/2026, «Hoy» de escritorio): la sala entera escalada al hueco y quieta: sin pellizco,
+   * sin rueda, sin arrastrar el plano y sin los botones de zoom. Tocar una mesa sigue igual.
+   */
+  fijo?: boolean;
 }
 
 export function MapaSalaServicio({
@@ -92,6 +97,7 @@ export function MapaSalaServicio({
   mesaPropuesta = null,
   uniones = [],
   piezas,
+  fijo = false,
 }: MapaSalaServicioProps) {
   const [contenedor, setContenedor] = useState<HTMLDivElement | null>(null);
   const tamano = useTamanoElemento(contenedor);
@@ -113,7 +119,7 @@ export function MapaSalaServicio({
     );
     return escala > 0 ? escala : 1;
   }, [tamano, limites.width, limites.height]);
-  const escala = zoomManual ?? escalaAuto;
+  const escala = (fijo ? null : zoomManual) ?? escalaAuto;
 
 
   // ── Gestos (mismo controlador que el plano de reparto) ─────────────────────
@@ -127,7 +133,7 @@ export function MapaSalaServicio({
   const ratonSobreVacio = useRef(false);
 
   useEffect(() => {
-    if (!contenedor) return;
+    if (!contenedor || fijo) return;
     const vptActual = (): Vpt => {
       const r = contenedor.getBoundingClientRect();
       const z = escalaViva.current;
@@ -178,7 +184,7 @@ export function MapaSalaServicio({
       controlador.current?.destruir();
       controlador.current = null;
     };
-  }, [contenedor]);
+  }, [contenedor, fijo]);
 
   const acercar = () => setZoomManual(Math.min(escala * 1.25, ZOOM_MAX));
   const alejar = () => setZoomManual(Math.max(escala * 0.8, ZOOM_MIN));
@@ -204,7 +210,11 @@ export function MapaSalaServicio({
     <div
       ref={setContenedor}
       data-testid="mapa-sala"
-      className="relative h-full w-full cursor-grab touch-none select-none overflow-hidden active:cursor-grabbing"
+      data-fijo={fijo ? "true" : undefined}
+      className={cn(
+        "relative h-full w-full touch-none select-none overflow-hidden",
+        !fijo && "cursor-grab active:cursor-grabbing",
+      )}
       style={{
         backgroundImage: `
           linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
@@ -281,7 +291,7 @@ export function MapaSalaServicio({
       )}
 
       {/* Zoom: 44 px (además del pellizco y la rueda) y «Ajustar» para volver al encuadre. */}
-      {!sinNada && (
+      {!sinNada && !fijo && (
         <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg border border-border bg-background/90 p-1 shadow-sm backdrop-blur-sm">
           <Button variant="ghost" size="icon" className="h-11 w-11 touch-manipulation" onClick={alejar} aria-label="Alejar el plano">
             <ZoomOut className="h-5 w-5" />
@@ -354,6 +364,7 @@ function MesaServicio({
   const conCartel = !!reserva && cartel && (lado >= UMBRAL_CARTEL_PX || seleccionada || resaltada);
   const detalle = resultado ? textoMinutosMesa(estado, resultado.minutos) : null;
   const importante = !!reserva?.importante;
+  const fijada = !!reserva?.mesa_fijada;
   const nota = (reserva?.notas_cliente ?? "").trim();
   const etiquetaAccesible =
     `Mesa ${mesa.nombre}, ${mesa.capacidad} plazas, ${etiqueta}` +
@@ -362,6 +373,7 @@ function MesaServicio({
       : "") +
     (detalle ? `, ${detalle}` : "") +
     (importante ? ", importante" : "") +
+    (fijada ? ", mesa fijada" : "") +
     (nota ? `, nota del cliente: ${nota}` : "");
   // Se puede SOLTAR una reserva encima (Plano de Hoy, 10/10/2026). Sin `DndContext` alrededor no hace nada.
   const { setNodeRef, isOver } = useDroppable({ id: `mesa-${mesa.id}`, data: { mesaId: mesa.id } });
@@ -419,8 +431,9 @@ function MesaServicio({
         >
           <Icono className="h-3 w-3" />
         </span>
-        {(importante || nota) && (
+        {(importante || nota || fijada) && (
           <span className="absolute -left-1.5 -top-1.5 flex items-center gap-px rounded-full bg-background px-0.5 shadow ring-1 ring-border">
+            {fijada && <Lock data-marca="fijada" className="h-3 w-3 text-foreground" />}
             {importante && <Star data-marca="importante" className="h-3 w-3 fill-amber-400 text-amber-600" />}
             {nota && <MessageSquareText data-marca="nota" className="h-3 w-3 text-foreground" />}
           </span>

@@ -51,8 +51,6 @@ interface Props {
   fijadas: ReadonlySet<string>;
   onFijar: (g: GraficaIa) => void;
   onQuitarFijada: (id: string) => void;
-  /** «Abrir en el explorador»: la misma gráfica, pero en el explorador del tablero. */
-  onExplorar?: (g: GraficaIa) => void;
   /** Panel lateral (estrecho) o pantalla completa. */
   variante?: "lateral" | "completa";
   /** Lo escrito en la caja, guardado fuera (sigue al pasar del panel a pantalla completa). */
@@ -143,7 +141,6 @@ export function PanelCopiloto({
   fijadas,
   onFijar,
   onQuitarFijada,
-  onExplorar,
   variante = "lateral",
   borrador,
   onBorrador,
@@ -246,7 +243,6 @@ export function PanelCopiloto({
                     fijadas={fijadas}
                     onFijar={onFijar}
                     onQuitarFijada={onQuitarFijada}
-                    onExplorar={onExplorar}
                     onRegenerar={i === ultimoAsistente && !isSending ? onRegenerar : undefined}
                   />
                 )}
@@ -334,7 +330,6 @@ function MensajeAsistente({
   onFijar,
   onQuitarFijada,
   onRegenerar,
-  onExplorar,
 }: {
   mensaje: MensajeChat;
   completa?: boolean;
@@ -342,7 +337,6 @@ function MensajeAsistente({
   onFijar: (g: GraficaIa) => void;
   onQuitarFijada: (id: string) => void;
   onRegenerar?: () => void;
-  onExplorar?: (g: GraficaIa) => void;
 }) {
   const documentos = (mensaje.adjuntos ?? []).flatMap((a) => (a.tipo === "documentos" ? a.datos : []));
   const graficas = graficasDeMensaje(mensaje);
@@ -368,11 +362,6 @@ function MensajeAsistente({
                 {fijada ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
                 {fijada ? "Fijada en el tablero · quitar" : "Fijar en el tablero"}
               </button>
-              {onExplorar && (
-                <button type="button" onClick={() => onExplorar(g)} className={BOTON_PIE}>
-                  <LineChart className="h-3.5 w-3.5" aria-hidden /> Abrir en el explorador
-                </button>
-              )}
             </div>
           </div>
         );
