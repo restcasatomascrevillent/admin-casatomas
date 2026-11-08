@@ -96,7 +96,7 @@ describe("procesarTrabajoRemoto", () => {
     descargar: vi.fn(async () => new Blob(["v"], { type: "video/mp4" })),
     terminar: vi.fn(async () => undefined),
     soltar: vi.fn(async () => undefined),
-    conservar: vi.fn(async () => "videos-originales/p1.mp4"),
+    conservar: vi.fn(async () => "drive:p1.mp4"),
     notificar: vi.fn(async () => ({ ok: true })),
     procesarYGuardar: vi.fn(async () => "https://x/p1-video.mp4?t=1"),
   });
@@ -108,7 +108,8 @@ describe("procesarTrabajoRemoto", () => {
     expect(d.reclamar).toHaveBeenCalledWith("t1");
     expect(d.procesarYGuardar).toHaveBeenCalledWith(expect.objectContaining({ platoId: "p1", tema: "cartulina", nombrePlato: "Arroz meloso" }));
     expect(d.terminar).toHaveBeenCalledWith("t1", true);
-    expect(d.conservar).toHaveBeenCalledWith("pendientes/aaaaaaaa.mp4", "p1");
+    // El bruto ya descargado va a Drive (sin volver a bajarlo).
+    expect(d.conservar).toHaveBeenCalledWith("pendientes/aaaaaaaa.mp4", "p1", expect.any(Blob));
     expect(d.notificar).toHaveBeenCalledWith("t1");
   });
 

@@ -9,17 +9,24 @@
  *
  * La ficha solo se toca si SIGUE apuntando a esa foto original: si mientras
  * tanto alguien le puso otra, no se pisa (ErrorFichaCambiada).
+ *
+ * Platos y vinos (08/11/2026, en Supabase solo el sticker): al terminar, la
+ * foto `<id>.<ext>` deja de ser la de la web y queda como original. Se sube
+ * a Google Drive (guardarOriginalCarta) y SOLO si queda allí se borra del
+ * bucket (si otra ficha no la usa). Si Drive falla, se queda en el bucket
+ * (scripts/carta/mover-originales-a-drive.mjs la moverá) y se avisa.
  * Lo usa el ordenador que recorta fotos pendientes (potente/procesarTrabajoRecorte.ts).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { rutaEnBucket } from "@/lib/storage-carta";
+import { borrarFotoSiNoSeUsa, rutaEnBucket } from "@/lib/storage-carta";
 import { solicitarRepublicacion } from "@/lib/rebuild-webs";
 import { componerFotoCarta, type NombreTema } from "../composicionCarta";
 import { extensionFoto } from "../composicionVino";
 import { rutaCartaDesdeOriginal } from "../rutasFotoCarta";
 import { BUCKET_TABLA, TIPO_TABLA, type DatosRecorte } from "./recorteMovil";
 import { reducirFotoRecorte } from "./reducirFotoRecorte";
+import { esTablaOriginal, guardarOriginalCarta } from "../originalCarta";
 import type { ProgresoRecorte } from "./quitarFondoNavegador";
 
 const sb = supabase as unknown as SupabaseClient;
@@ -47,6 +54,9 @@ export interface OpcionesRecorteGuardado {
   /** Lado mayor de la foto que entra al recorte. */
   lado?: number;
   onProgreso?: (p: ProgresoRecorte) => void;
+  /** Solo para pruebas: subir el original a Drive y borrarlo del bucket. */
+  guardarOriginal?: typeof guardarOriginalCarta;
+  borrar?: typeof borrarFotoSiNoSeUsa;
 }
 
 export async function recortarFotoGuardada(d: DatosRecorte, opts: OpcionesRecorteGuardado = {}): Promise<string> {
@@ -58,6 +68,8 @@ export async function recortarFotoGuardada(d: DatosRecorte, opts: OpcionesRecort
     if (error || !data) throw error ?? new Error("No se pudo bajar la foto original");
     original = data;
   }
+  // Platos y vinos: el original se guarda para Drive (después del recorte).
+  const paraDrive = esTablaOriginal(d.tabla) ? original : null;
   const reducida = await reducirFotoRecorte(original, opts.lado ?? LADO_RECORTE_PC);
   original = null;
   const { quitarFondoNavegador } = await import("./quitarFondoNavegador");
@@ -78,5 +90,13 @@ export async function recortarFotoGuardada(d: DatosRecorte, opts: OpcionesRecort
   const { error: eGuardar } = await sb.from(d.tabla).update({ imagen_url: url }).eq("id", d.registroId);
   if (eGuardar) throw eGuardar;
   void solicitarRepublicacion(ORIGEN_PUBLICACION[d.tabla]);
+  if (paraDrive && esTablaOriginal(d.tabla) && d.rutaOriginal !== rutaCarta) {
+    const subir = opts.guardarOriginal ?? guardarOriginalCarta;
+    const borrar = opts.borrar ?? borrarFotoSiNoSeUsa;
+    // Nunca lanza: la foto de la web ya está guardada.
+    if (await subir(d.tabla, d.registroId, paraDrive)) {
+      await borrar({ tabla: d.tabla, bucket, ruta: d.rutaOriginal, excluirId: d.registroId });
+    }
+  }
   return url;
 }
