@@ -57,7 +57,7 @@ Lista lo que hay en staging y no en producción, por PR o commit, con el identif
 
 ### 3. Preparar la release con lo que quieres publicar
 
-**En GitHub (sin instalar nada):** *Actions → Release · preparar → Run workflow*. Escribe la selección (`#12 #15 a1b2c3d`) y el objetivo («Mesas al final en Reservas»). Crea `release/X.Y.Z`, abre el PR a `main` con el informe y lanza las comprobaciones.
+**En GitHub (sin instalar nada):** *Actions → Release · preparar → Run workflow*. Escribe la selección (`#12 #15 a1b2c3d`) y el objetivo («Mesas al final en Reservas»). Crea `release/X.Y.Z`, abre el PR a `main` con el informe y lanza las comprobaciones. GitHub solo deja lanzar a mano los workflows que ya están en `main`: aparece a partir de la v1.0.0, así que esa primera release se prepara en local.
 
 **En local (lo hace Claude):**
 
