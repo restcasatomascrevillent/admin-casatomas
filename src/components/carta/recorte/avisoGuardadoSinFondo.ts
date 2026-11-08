@@ -5,6 +5,7 @@ import type { TablaFoto } from "./recorteMovil";
 // Import ESTÁTICO (03-11-2026): con `import()` un chunk que no carga (p. ej. tras
 // publicar otra versión) dejaba la foto sin fondo y sin ningún aviso.
 import { avisarSinRecorte, noRecortar } from "./recorteEnSegundoPlano";
+import { esTablaOriginal, guardarOriginalCarta } from "../originalCarta";
 
 /** Cuánto se queda en pantalla el aviso (ms): es lo único que le dice al usuario qué hacer luego. */
 export const MS_AVISO_SIN_FONDO = 12_000;
@@ -50,6 +51,9 @@ export interface FichaGuardada {
  */
 export function trasGuardarFotoCarta(foto: Pick<FotoCarta, "estado" | "original" | "tema" | "eleccion">, ficha: FichaGuardada): void {
   const nombre = ficha.nombre?.trim() || null;
+  // Platos y vinos: además de la versión web, el ORIGINAL a Google Drive para
+  // Instagram (originalCarta.ts). En segundo plano; si falla, solo avisa.
+  if (foto.original && esTablaOriginal(ficha.tabla)) void guardarOriginalCarta(ficha.tabla, ficha.id, foto.original);
   try {
     if (foto.estado.fase !== "fallo") return;
     if (!foto.estado.aOrdenador) {

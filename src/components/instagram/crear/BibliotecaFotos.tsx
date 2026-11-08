@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { urlRecurso, type Foto, type FormatoId, type MarcaId } from "@/lib/instagram";
 import { MAX_FOTOS_CARRUSEL } from "@/lib/instagram/montar";
 import { MiniaturaCarta, MiniaturaDrive, motivoNoApta } from "@/components/marketing/instagram/SelectorFoto";
+import { EtiquetaOriginal } from "@/components/marketing/instagram/EtiquetaOriginal";
 import { SubirFotoDialog } from "@/components/marketing/instagram/SubirFotoDialog";
 import { textoError } from "@/components/marketing/instagram/api";
 import { useFotosInstagram } from "@/components/marketing/instagram/useFotosInstagram";
@@ -147,6 +148,7 @@ export function BibliotecaFotos({ marca, formato, elegidas, onAlternar, onSubida
                   Carta
                 </span>
               )}
+              <EtiquetaOriginal foto={foto} />
               {elegida && (
                 <span
                   className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow"

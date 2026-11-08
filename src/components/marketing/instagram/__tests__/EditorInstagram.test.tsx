@@ -293,7 +293,8 @@ describe("EditorInstagram", () => {
     await screen.findByText(/Imagen guardada/);
     const cuerpoRender = JSON.parse(llamadasA(f, "/api/instagram-render")[0][1].body);
     expect(cuerpoRender.pieza.foto).toBe(`carta:${PLATO}`);
-    expect(cuerpoRender.fotoPreparada).toEqual({ id: `carta:${PLATO}`, url: URL_TMP, ancho: 1080, alto: 1350, tipo: "plato", marca: "casa-tomas" });
+    // Al render van las medidas del fichero PREPARADO (el original de Drive si lo hay), no las de la miniatura.
+    expect(cuerpoRender.fotoPreparada).toEqual({ id: `carta:${PLATO}`, url: URL_TMP, ancho: 1050, alto: 1400, tipo: "plato", marca: "casa-tomas" });
   });
 
   it("si cambias el texto tras la prueba, hay que volver a probar", async () => {

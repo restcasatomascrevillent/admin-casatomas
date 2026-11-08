@@ -471,6 +471,41 @@ export async function prepararFotoVino(
   return { ruta: String(r.ruta ?? ""), url: String(r.url ?? ""), ancho: typeof r.ancho === "number" ? r.ancho : null, alto: typeof r.alto === "number" ? r.alto : null };
 }
 
+/** Respuesta de instagram-drive · subir_original. */
+export interface OriginalSubido {
+  driveId: string;
+  marca: MarcaId;
+  nombre: string;
+  ancho: number;
+  alto: number;
+  reemplazado: boolean;
+}
+
+/**
+ * Sube el ORIGINAL (JPEG ya preparado: orientación EXIF aplicada, lado mayor
+ * ≤ 4000, ≤ 8 MB) de la foto de un plato o un vino a Drive
+ * (marketing/carta/<marca>) y lo anota en carta_fotos_originales. Permiso:
+ * «Editar» en la carta. Ver docs/instagram-fotos.md.
+ */
+export async function subirOriginalCarta(
+  n: { tabla: "Platos" | "Vinos"; id: string; blob: Blob },
+  opts?: OpcionesLlamada,
+): Promise<OriginalSubido> {
+  const form = new FormData();
+  form.set("tabla", n.tabla);
+  form.set("id", n.id);
+  form.set("archivo", n.blob, "original.jpg");
+  const r = await llamar<Crudo>(`${URL_DRIVE}?accion=subir_original`, { method: "POST", body: form }, opts, cabecerasEdge());
+  return {
+    driveId: String(r.driveId ?? ""),
+    marca: r.marca === "touza" ? "touza" : "casa-tomas",
+    nombre: String(r.nombre ?? ""),
+    ancho: Number(r.ancho) || 0,
+    alto: Number(r.alto) || 0,
+    reemplazado: r.reemplazado === true,
+  };
+}
+
 /** Prepara una foto de Drive, de la carta o de un vino según su origen. */
 export function prepararFotoOrigen(marca: MarcaId, origen: FotoPreparable, opts?: OpcionesLlamada) {
   if (origen.origen === "carta") return prepararFotoCarta(marca, origen.id, opts);

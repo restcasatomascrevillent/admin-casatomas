@@ -18,6 +18,7 @@ import {
 import { miniaturaDrive, textoError } from "./api";
 import { SubirFotoDialog } from "./SubirFotoDialog";
 import { anotarMedidasCarta, useFotosInstagram } from "./useFotosInstagram";
+import { EtiquetaOriginal } from "./EtiquetaOriginal";
 
 const NOMBRE_FORMATO: Record<FormatoId, string> = { post: "un post", story: "una story" };
 
@@ -229,6 +230,7 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
                     {foto.vinoId ? "Vino" : "Carta"}
                   </span>
                 )}
+                <EtiquetaOriginal foto={foto} />
                 {!foto.tipo && (
                   <span className="absolute bottom-1 left-1 rounded bg-background/90 px-1 text-[10px] font-medium leading-4 text-foreground" aria-hidden="true">
                     Sin clasificar
