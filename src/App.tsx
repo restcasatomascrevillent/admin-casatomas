@@ -47,6 +47,7 @@ const SuperAdminUsuarios = lazy(() => import("./pages/SuperAdminUsuarios"));
 const SuperAdminBotWeb = lazy(() => import("./pages/SuperAdminBotWeb"));
 const SuperAdminAuditoria = lazy(() => import("./pages/SuperAdminAuditoria"));
 const SuperAdminServicios = lazy(() => import("./pages/SuperAdminServicios"));
+const SuperAdminLogs = lazy(() => import("./pages/SuperAdminLogs"));
 
 /**
  * Valores por defecto pensados para la red mala del local (07/11/2026, «Hoy» desde el móvil):
@@ -211,6 +212,7 @@ const App = () => (
                       La ruta vieja se conserva para que marcadores y enlaces antiguos lleven allí. */}
                   <Route path="/super-admin/plantillas-email" element={<Navigate to="/reservas?tab=configuracion&sub=plantillas" replace />} />
                   <Route path="/super-admin/trafico-web" element={paginaSuperAdmin(<TraficoWeb />)} />
+                  <Route path="/super-admin/logs" element={paginaSuperAdmin(<SuperAdminLogs />)} />
                   <Route path="/super-admin/espacios" element={paginaSuperAdmin(<Espacios />)} />
                   <Route path="/super-admin/bot-web" element={paginaSuperAdmin(<SuperAdminBotWeb />)} />
                   <Route path="/super-admin/usuarios" element={paginaSuperAdmin(<SuperAdminUsuarios />)} />

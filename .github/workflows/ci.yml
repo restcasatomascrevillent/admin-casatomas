@@ -78,6 +78,8 @@ jobs:
         run: npm run test:reservas-configuracion:db
       - name: Solo «Ver» canjea cheques; migración y rollback (PGlite)
         run: npm run test:permisos-solo-ver:db
+      - name: Logs web, incidencias y estadísticas de comportamiento (PGlite)
+        run: npm run test:logs-web:db
       - name: Facturas, «Ver» solo consulta y permiso «Facturas · Subida» (PGlite)
         run: npm run test:permisos-facturas-subida:db
       - name: Vino por copas, Parker, votación del vino favorito, horario de menú y tapas y platos vegetarianos (PGlite)
