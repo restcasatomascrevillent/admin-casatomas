@@ -5,8 +5,8 @@ import type { AlertaValidacion, Factura, ProductoFactura } from "@/hooks/useFact
 import { usePuedeCorregirDocumento } from "@/hooks/usePermisosFacturas";
 import { formatDate, formatDateTime, formatImporte, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
 import { etiquetaRetencion } from "@/lib/facturas/retencion";
-import { BotonOriginal } from "@/components/facturas/shared/BotonOriginal";
 import { OriginalIncrustado } from "@/components/facturas/shared/OriginalIncrustado";
+import { vistaPreviaDrive } from "@/lib/facturas/documentosCifra";
 import { EstadoDocumento } from "@/components/facturas/shared/EstadoDocumento";
 import { FilaProducto } from "@/components/facturas/shared/FilaProducto";
 import { esAlbaranSinFactura } from "@/lib/facturas/compras";
@@ -95,12 +95,13 @@ const Punto = () => (
 /**
  * Compras › Documentos › ficha (acabado del 05/11/2026): un visor de documento.
  *   · Cabecera a todo el ancho: tipo y número, estado, y debajo proveedor (enlace),
- *     fecha, CIF y local; a la derecha las acciones agrupadas (Original · Editar ·
- *     Preguntar a la IA).
+ *     fecha, CIF y local; a la derecha las acciones agrupadas (Editar · Preguntar a la IA).
  *   · Importes en una franja (Base · IVA · Total · Regalado) y las líneas en una
  *     tabla limpia (columnas cuando cabe; nombre e importe con el detalle debajo si no).
- *   · El ORIGINAL grande: a la derecha, a todo el alto, si la ficha mide 880 px o
- *     más (tablet en horizontal); si no, debajo de los importes.
+ *   · El ORIGINAL (vista previa de Drive o copia de Storage) grande: a la derecha,
+ *     a todo el alto y con su propio scroll, si la ficha mide 880 px o más (tablet
+ *     en horizontal); si no, debajo de los importes. Es el ÚNICO sitio del original
+ *     (dueño, 09/11/2026): ya no hay botón «Original» en la cabecera.
  * Cada línea con producto asignado enlaza con la ficha de ese producto.
  */
 export function FichaDocumento({
@@ -147,8 +148,9 @@ export function FichaDocumento({
   const regalado = regaladoDocumento(doc);
   const hayImportes = doc.subtotal != null || doc.iva != null || doc.total != null;
   const touza = localDe(doc) === "touza";
-  // El visor lateral solo tiene sentido con un archivo que se pueda incrustar (Drive no se incrusta).
-  const visorLateral = ancha && Boolean(doc.archivo_path);
+  // El visor lateral solo tiene sentido con algo que incrustar: vista previa de Drive o copia en Storage.
+  const hayVisor = Boolean(vistaPreviaDrive(doc.drive_url) || doc.archivo_path);
+  const visorLateral = ancha && hayVisor;
 
   const original = <OriginalIncrustado driveUrl={doc.drive_url} archivoPath={doc.archivo_path} titulo={titulo} relleno={visorLateral} />;
 
@@ -205,36 +207,34 @@ export function FichaDocumento({
         </p>
       </div>
 
-      {/* Acciones agrupadas: icono + palabra, también en tablet. */}
-      <div role="group" aria-label="Acciones del documento" className="flex shrink-0 items-center gap-0.5 rounded-lg border border-border/70 bg-background p-0.5" data-tour="facturas-ficha-acciones">
-        <BotonOriginal driveUrl={doc.drive_url} archivoPath={doc.archivo_path} variant="ficha" label="Ver original" />
-        {/* «Editar» solo con permiso de edición (QA C-09: se ofrecía a quien solo puede ver). */}
-        {puedeEditar && (
-          <>
-            <span className="h-6 w-px bg-border/70" aria-hidden="true" />
+      {/* Acciones agrupadas: icono + palabra, también en tablet. Sin ninguna (solo «Ver», sin IA), no sale la caja vacía. */}
+      {(puedeEditar || onPreguntarIA) && (
+        <div role="group" aria-label="Acciones del documento" className="flex shrink-0 items-center gap-0.5 rounded-lg border border-border/70 bg-background p-0.5" data-tour="facturas-ficha-acciones">
+          {/* «Editar» solo con permiso de edición (QA C-09: se ofrecía a quien solo puede ver). */}
+          {puedeEditar && (
             <Button variant="ghost" className="h-11 min-w-11 shrink-0 gap-1.5 px-3 text-sm font-medium hover:bg-muted active:bg-muted/80" onClick={() => onEditar(doc)}>
               <Pencil className="h-4 w-4" aria-hidden="true" />
               <span>Editar</span>
             </Button>
-          </>
-        )}
-        {onPreguntarIA && (
-          <>
-            <span className="h-6 w-px bg-border/70" aria-hidden="true" />
-            <Button
-              variant="ghost"
-              className="h-11 min-w-11 shrink-0 gap-1.5 px-3 text-sm font-medium text-[hsl(38,59%,33%)] hover:bg-[hsl(38,59%,45%)/0.1] hover:text-[hsl(38,59%,28%)] dark:text-[hsl(38,59%,62%)]"
-              onClick={() => onPreguntarIA(doc)}
-              aria-label="Preguntar a la IA"
-            >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              <span aria-hidden="true">
-                <span className="hidden sm:inline">Preguntar a la </span>IA
-              </span>
-            </Button>
-          </>
-        )}
-      </div>
+          )}
+          {onPreguntarIA && (
+            <>
+              {puedeEditar && <span className="h-6 w-px bg-border/70" aria-hidden="true" />}
+              <Button
+                variant="ghost"
+                className="h-11 min-w-11 shrink-0 gap-1.5 px-3 text-sm font-medium text-[hsl(38,59%,33%)] hover:bg-[hsl(38,59%,45%)/0.1] hover:text-[hsl(38,59%,28%)] dark:text-[hsl(38,59%,62%)]"
+                onClick={() => onPreguntarIA(doc)}
+                aria-label="Preguntar a la IA"
+              >
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                <span aria-hidden="true">
+                  <span className="hidden sm:inline">Preguntar a la </span>IA
+                </span>
+              </Button>
+            </>
+          )}
+        </div>
+      )}
     </header>
   );
 
