@@ -104,7 +104,7 @@ async function sel<T>(s: Sesion, tabla: string, consulta: string): Promise<T[]> 
   const r = await s.fetch(`${s.sb.url}/rest/v1/${tabla}?${consulta}`, { headers: cab(s, { Accept: "application/json" }), signal: AbortSignal.timeout(MS) });
   if (!r.ok) {
     const t = await textoError(r);
-    if (faltaTabla(r.status, t)) throw new ErrorRrss("Falta aplicar la migración 20261118100000_rrss en este Supabase.", 503);
+    if (faltaTabla(r.status, t)) throw new ErrorRrss("Falta aplicar la migración 20261118120000_rrss en este Supabase.", 503);
     throw new ErrorRrss(`No se pudo leer ${tabla} (${r.status})`, 502);
   }
   return (await r.json()) as T[];
@@ -188,7 +188,7 @@ async function reservar(s: Sesion, accion: Accion, proyecto: string | null, mode
   }
   const t = await textoError(r);
   if (/rrss_cupo_ia/.test(t)) throw new ErrorRrss("Has llegado al tope de 80 peticiones a la IA por hoy. Mañana se renueva.", 429, { tipo: "cupo" });
-  if (faltaTabla(r.status, t)) throw new ErrorRrss("Falta aplicar la migración 20261118100000_rrss en este Supabase.", 503);
+  if (faltaTabla(r.status, t)) throw new ErrorRrss("Falta aplicar la migración 20261118120000_rrss en este Supabase.", 503);
   if (r.status === 403 || r.status === 401) throw new ErrorRrss("Hace falta «Editar» en Marketing para usar la IA", 403);
   throw new ErrorRrss(`No se pudo reservar el cupo de la IA (${r.status})`, 502);
 }
