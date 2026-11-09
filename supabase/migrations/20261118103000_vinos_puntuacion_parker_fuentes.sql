@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- 20261118105000_vinos_puntuacion_parker_fuentes — Puntuaciones Parker con
+-- 20261118103000_vinos_puntuacion_parker_fuentes — Puntuaciones Parker con
 -- fuente, por añada, y solo las verificadas en la web (08/11/2026)
 -- ===========================================================================
 -- Petición del dueño (08/11/2026): revisar las puntuaciones Parker de la carta,
@@ -55,7 +55,7 @@ set client_encoding = 'UTF8';
 -- producción (haqmmdfdzzatdnrrcgez) solo tras aceptar el PR y con el «sí» del
 -- dueño. Idempotente. Tiene que terminar en «vinos_puntuacion_parker_fuentes:
 -- aplicada».
--- Deshacer: supabase/rollbacks/20261118105000_vinos_puntuacion_parker_fuentes_ROLLBACK.sql
+-- Deshacer: supabase/rollbacks/20261118103000_vinos_puntuacion_parker_fuentes_ROLLBACK.sql
 -- Pruebas: npm run test:vinos-parker:db (PGlite).
 -- ===========================================================================
 

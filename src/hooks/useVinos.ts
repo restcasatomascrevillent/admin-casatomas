@@ -52,7 +52,7 @@ export interface Vino {
   puntuacion_parker?: number | null;
   puntuacion_parker_anada?: number | null;
   puntuacion_parker_texto?: string | null;
-  /** Añada que se sirve y «sin añada» (NV) (20261118105000). */
+  /** Añada que se sirve y «sin añada» (NV) (20261118103000). */
   anada?: number | null;
   sin_anada?: boolean | null;
 }
@@ -228,7 +228,7 @@ export function useVinos() {
             alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
             alergenos_notas: nuevoVino.alergenos_notas || null,
             orden,
-            // Copa y añada solo si vienen (20261104140000, 20261118105000): sin
+            // Copa y añada solo si vienen (20261104140000, 20261118103000): sin
             // ellos el alta sigue funcionando aunque las columnas aún no existan.
             // La puntuación Parker no se escribe aquí: la calcula la BD.
             ...(nuevoVino.copeo !== undefined ? { copeo: nuevoVino.copeo } : {}),

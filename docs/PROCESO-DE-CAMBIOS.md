@@ -116,7 +116,7 @@ Rama `fix/<tema>` desde **`main`**, PR a `staging` para verlo en la demo, y rele
 
 ### Volver atrás
 
-1. Inmediato: Vercel → proyecto → **Deployments** → el despliegue de producción anterior → **⋯ → Instant Rollback**. El informe de cada release dice cuál es (versión y commit).
+1. Inmediato: Vercel → proyecto → **Deployments** → el despliegue de producción anterior → **⋯ → Instant Rollback**. El informe de cada release dice cuál es (versión y commit). Después de un Instant Rollback, Vercel deja de asignar solos los dominios de producción a los despliegues nuevos: la siguiente release no se publicaría hasta pulsar **Undo Rollback** (o **⋯ → Promote** sobre ella). Para volver a un despliegue de producción anterior sin ese efecto, usa **⋯ → Promote** sobre él: no reconstruye nada.
 2. Límites: no deshace migraciones ni funciones de Supabase (las migraciones traen su `*_ROLLBACK.sql`), ni datos guardados ni variables. `main` sigue con la versión retirada hasta que una release nueva lo revierta (`git revert -m 1 <merge>` en un `fix/`, y release patch).
 
 ## Versiones
@@ -140,6 +140,7 @@ Dónde se ve:
 - El check **Validar release a producción** falla en cualquier PR a `main` que no sea una release correcta.
 - **Claude** no empuja a `main` ni fusiona PR hacia `main` (`CLAUDE.md`).
 - **Límite conocido:** en repos privados del plan gratuito GitHub no permite reglas de protección; alguien con permiso de escritura podría escribir en `main`, pero no se publicaría. Con GitHub Team se cierra del todo (ver abajo).
+- **Límite conocido:** el control de Vercel solo actúa sobre lo que llega desde git. Un despliegue a mano con la CLI o la API de Vercel (`vercel --prod`, `vercel deploy --prod`, `vercel promote`, o sus equivalentes desde una integración) con una cuenta del equipo publica lo que haya en ese ordenador sin pasar por nada. Pasó el 09/11/2026: las dos producciones se desplegaron así (con el mismo código, pero sin versión ni commit en `/version.json` y, en el panel, sin identificador para el service worker) y se volvieron a poner los despliegues de git con **Promote**. Por eso está prohibido (ver *Reglas*). Señal de alarma: `/version.json` de producción sin `commit` o con una versión que no es la de `main`.
 
 ## Configuración necesaria (la hace el dueño, una vez, en los dos repos)
 
@@ -154,6 +155,7 @@ Dónde se ve:
 ## Reglas para quien desarrolla
 
 - Un cambio por rama `feature/*` o `fix/*`, PR a `staging`. Nunca empujar a `main`, nunca *force push*, nunca fusionar hacia `main`.
+- **Nunca desplegar ni promocionar en Vercel a mano** (CLI, API o integraciones): producción solo se publica desde git, al aceptar el PR de una release. La única excepción es volver atrás cuando el dueño lo pida expresamente.
 - Commits a nombre de alguien del equipo de Vercel o de `Claude <noreply@anthropic.com>` (el plan Hobby **bloquea** los de autores con cuenta de Vercel que no son del equipo).
 - Las releases llevan solo lo que pide el dueño. Si `preparar` se bloquea, se le explica qué falta; no se añaden cambios por cuenta propia.
 - `versionado.json` y `CHANGELOG.md` solo los escribe `scripts/release.mjs`.

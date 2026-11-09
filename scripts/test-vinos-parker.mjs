@@ -3,7 +3,7 @@
 //
 //   npm run test:vinos-parker:db
 //
-// Aplica las migraciones REALES 20261104140000 (columnas Parker), 20261118105000
+// Aplica las migraciones REALES 20261104140000 (columnas Parker), 20261118103000
 // (tabla con fuentes + trigger de publicación) y 20261118110000 (datos de la
 // revisión) dos veces, y cubre: que la web solo ve la puntuación VERIFICADA,
 // DEFINITIVA y de la AÑADA QUE SE SIRVE (o la NV si el vino es sin añada); que
@@ -18,8 +18,8 @@ import assert from "node:assert/strict";
 
 const leer = (ruta) => readFile(ruta, "utf8");
 const COPEO = await leer("supabase/migrations/20261104140000_vinos_copeo_y_parker.sql");
-const FUENTES = await leer("supabase/migrations/20261118105000_vinos_puntuacion_parker_fuentes.sql");
-const FUENTES_ROLLBACK = await leer("supabase/rollbacks/20261118105000_vinos_puntuacion_parker_fuentes_ROLLBACK.sql");
+const FUENTES = await leer("supabase/migrations/20261118103000_vinos_puntuacion_parker_fuentes.sql");
+const FUENTES_ROLLBACK = await leer("supabase/rollbacks/20261118103000_vinos_puntuacion_parker_fuentes_ROLLBACK.sql");
 const DATOS = await leer("supabase/migrations/20261118110000_vinos_puntuacion_parker_revision_datos.sql");
 const DATOS_ROLLBACK = await leer("supabase/rollbacks/20261118110000_vinos_puntuacion_parker_revision_datos_ROLLBACK.sql");
 
@@ -106,7 +106,7 @@ const publicado = async (id) =>
 await db.exec(COPEO);
 await q(`update public."Vinos" set puntuacion_parker = 94, puntuacion_parker_anada = 2021 where id = 'aalto'`);
 for (let i = 0; i < 2; i++) await db.exec(FUENTES);
-ok(true, "20261118105000 es idempotente");
+ok(true, "20261118103000 es idempotente");
 igual(await publicado("aalto"), { p: null, a: null, t: null }, "una puntuación sin fila verificada deja de publicarse");
 
 // ─── 1. Publicación: solo verificada, definitiva y de la añada que se sirve ─
