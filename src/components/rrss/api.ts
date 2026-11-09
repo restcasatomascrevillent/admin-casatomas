@@ -175,7 +175,7 @@ export function mensajeError(e: unknown): string {
   if (/rrss_cupo_ia|rrss_cupo/.test(m)) return m.replace(/^.*?rrss_cupo(_ia)?:\s*/, "").replace(/^\w/, (c) => c.toUpperCase());
   if (/rrss_generaciones_una_activa|duplicate key/.test(m)) return "Ya hay una generación en marcha para este trabajo: espera a que termine o cancélala.";
   if (/row-level security|permission denied|42501/i.test(m)) return "Hace falta «Editar» en Marketing para hacer esto.";
-  if (/relation .*rrss_.* does not exist|Could not find the table/i.test(m)) return "Falta aplicar la migración de RRSS (20261118100000_rrss) en este Supabase.";
+  if (/relation .*rrss_.* does not exist|Could not find the table/i.test(m)) return "Falta aplicar la migración de RRSS (20261118120000_rrss) en este Supabase.";
   if (/Payload too large|exceeded the maximum allowed size|413/i.test(m)) return "El archivo pasa de 50 MB, el máximo admitido.";
   return m || "Ha fallado algo inesperado";
 }

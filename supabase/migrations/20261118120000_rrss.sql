@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- 20261118100000_rrss — RRSS: editor IA de fotos y vídeos, borradores de
+-- 20261118120000_rrss — RRSS: editor IA de fotos y vídeos, borradores de
 -- Facebook e ideas para grabar (08/11/2026)
 -- ===========================================================================
 -- La sección «Instagram» del panel pasa a llamarse «RRSS» con tres pestañas:
@@ -35,7 +35,7 @@ set client_encoding = 'UTF8';
 --
 -- Necesita: can_read_section / can_edit_section (20261111000000) y
 -- update_updated_at_column. Idempotente.
--- Rollback: supabase/rollbacks/20261118100000_rrss_ROLLBACK.sql
+-- Rollback: supabase/rollbacks/20261118120000_rrss_ROLLBACK.sql
 -- ===========================================================================
 
 begin;
