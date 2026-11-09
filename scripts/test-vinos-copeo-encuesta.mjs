@@ -345,9 +345,14 @@ await db.exec(`insert into public."Vinos" (id, nombre, categoria, precio_eur, ac
   on conflict do nothing`);
 await votar("anon", "tinto", "Sin plazo", "sinplazo@example.com");
 ok(true, "tras su rollback se vota sin mirar premio ni fecha (función anterior)");
-await q(`update public.configuracion_web set encuesta_vinos_activa = false`);
-await rechaza(db.exec(PREMIO_FECHA).then(() => q(`update public.configuracion_web set encuesta_vinos_activa = true`)), /configuracion_web_encuesta_vinos_completa/,
-  "al volver a aplicarla, la votación no se abre sin premio");
+// Como en la demo el 09/11/2026: la votación está abierta, sin premio ni fecha, al aplicar la migración.
+igual((await q(`select encuesta_vinos_activa from public.configuracion_web`)).rows, [{ encuesta_vinos_activa: true }],
+  "antes de volver a aplicarla, la votación está abierta y sin premio");
+await db.exec(PREMIO_FECHA);
+igual((await q(`select encuesta_vinos_activa from public.configuracion_web`)).rows, [{ encuesta_vinos_activa: false }],
+  "al aplicarla con la votación abierta sin premio ni fecha, la cierra en vez de fallar");
+await rechaza(q(`update public.configuracion_web set encuesta_vinos_activa = true`), /configuracion_web_encuesta_vinos_completa/,
+  "y no se vuelve a abrir sin premio");
 await db.exec(`delete from public.votos_vino_favorito where nombre = 'Sin plazo'`);
 await q(`update public.configuracion_web set encuesta_vinos_premio = '${PREMIO}', encuesta_vinos_fin = '${MANANA}', encuesta_vinos_activa = true`);
 

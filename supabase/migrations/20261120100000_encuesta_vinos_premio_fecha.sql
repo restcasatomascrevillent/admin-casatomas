@@ -13,8 +13,12 @@ set client_encoding = 'UTF8';
 --   2. encuesta_vinos_fin date null: último día para votar, INCLUIDO, en hora
 --      de España (Europe/Madrid).
 --   3. CHECK configuracion_web_encuesta_vinos_completa: no se puede tener
---      encuesta_vinos_activa = true sin premio y sin fecha de cierre. La fila
---      actual tiene la votación cerrada, así que se cumple.
+--      encuesta_vinos_activa = true sin premio y sin fecha de cierre. Si al
+--      aplicarla la votación está abierta sin premio ni fecha (la demo lo estaba
+--      el 09/11/2026; producción, cerrada), se CIERRA antes de añadir la regla:
+--      un sorteo sin bases completas no debe seguir abierto. Se vuelve a abrir
+--      desde el panel tras poner el premio y el último día. El rollback no la
+--      reabre.
 --   4. public.votar_vino_favorito (misma firma, SECURITY DEFINER, search_path
 --      vacío, mismos códigos de error): además rechaza con 'encuesta_cerrada'
 --      (P0001) si no hay premio o si hoy (Europe/Madrid) es posterior a
@@ -59,6 +63,12 @@ comment on column public.configuracion_web.encuesta_vinos_fin is
   'Último día para votar, incluido, en hora de España (Europe/Madrid). Pasado ese día la votación se rechaza aunque siga abierta. Obligatorio para abrir la votación.';
 
 -- 2. Reglas ---------------------------------------------------------------------
+-- Votación abierta sin premio o sin fecha: se cierra (ver cabecera, punto 3).
+update public.configuracion_web
+   set encuesta_vinos_activa = false
+ where encuesta_vinos_activa is true
+   and (btrim(coalesce(encuesta_vinos_premio, '')) = '' or encuesta_vinos_fin is null);
+
 do $$
 begin
   if not exists (select 1 from pg_constraint where conrelid = 'public.configuracion_web'::regclass and conname = 'configuracion_web_encuesta_vinos_premio_valido') then
