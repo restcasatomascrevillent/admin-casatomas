@@ -66,6 +66,11 @@ export interface CasillaOcupacionProps {
   fuenteComensales?: number;
   /** Servicios sin reservas web/teléfono ese día (cierre semanal o manual). */
   cierres?: readonly ServicioCerrado[];
+  /**
+   * «Evento: sala entera» (20261119100000): un texto por evento del día, p. ej.
+   * «Evento: Boda García (Salón, comida)». La casilla enseña el primero.
+   */
+  eventos?: readonly string[];
 }
 
 /** «jueves, 15 de octubre» → «Jueves, 15 de octubre» (solo la primera letra: `capitalize` pondría «De»). */
@@ -94,6 +99,7 @@ export function CasillaOcupacion({
   densidad,
   fuenteComensales,
   cierres,
+  eventos,
 }: CasillaOcupacionProps) {
   const cierraComida = !!cierres?.some((c) => c.turno === "comida");
   const cierraCena = !!cierres?.some((c) => c.turno === "cena");
@@ -109,7 +115,7 @@ export function CasillaOcupacion({
   const descripcion = describirDia(resumen, ventanaHoras);
   const etiqueta = `${format(dia, "d 'de' MMMM", { locale: es })}: ${descripcion.aria}${
     textoCierre ? `. ${textoCierre} para reservas` : ""
-  }`;
+  }${eventos && eventos.length > 0 ? `. ${eventos.join(". ")}` : ""}`;
 
   const conReservas = !!resumen && resumen.reservas > 0;
   const hayBarras =
@@ -211,6 +217,18 @@ export function CasillaOcupacion({
           )}
         >
           {textoCierre}
+        </span>
+      )}
+      {eventos && eventos.length > 0 && (
+        <span
+          data-testid="evento-casilla"
+          aria-hidden="true"
+          className={cn(
+            "truncate rounded bg-violet-100 px-1 text-[10px] pointer-coarse:text-xs font-semibold leading-tight text-violet-900 dark:bg-violet-900/40 dark:text-violet-100",
+            compacta && "hidden",
+          )}
+        >
+          {eventos.length > 1 ? `${eventos.length} eventos` : "Evento"}
         </span>
       )}
       {conReservas && (

@@ -83,6 +83,7 @@ import {
   type TurnoServicio,
 } from "@/hooks/useAjustesMesaServicio";
 import { useSalaCerradaServicio } from "@/hooks/useSalaCerradaServicio";
+import { eventosDelTurno, textoEvento, useSalasEvento } from "@/hooks/useSalaEvento";
 import {
   estadoServicio,
   geometriaServicio,
@@ -708,6 +709,10 @@ export function VistaPlanoHoy({
   const numAjustes = (ajustesQuery.data ?? []).length;
   const esTerraza = !!sala && /terraza/i.test(sala.title);
   const cierreSala = useSalaCerradaServicio(esTerraza ? (sala?.id ?? null) : null, hoy, turno);
+  // «Evento: sala entera» (20261119100000): la sala es de un evento en este turno.
+  const { data: eventosHoy } = useSalasEvento(hoy);
+  const eventosTurno = useMemo(() => eventosDelTurno(eventosHoy, hoy, turno), [eventosHoy, hoy, turno]);
+  const eventoSala = sala ? eventosTurno.get(sala.id) ?? null : null;
 
   /**
    * «Sentar aquí»: la persona está en la sala, así que se le da la mesa Y se marca «Ha llegado» (la misma
@@ -1239,11 +1244,17 @@ export function VistaPlanoHoy({
                     aria-label={
                       `${s.title}: ${cuenta.total} ${cuenta.total === 1 ? "reserva" : "reservas"}` +
                       (cuenta.sinMesa ? `, ${cuenta.sinMesa} sin mesa` : "") +
-                      (s.privada ? ", sala privada fuera de aforo" : "")
+                      (s.privada ? ", sala privada fuera de aforo" : "") +
+                      (eventosTurno.has(s.id) ? `, ${textoEvento(eventosTurno.get(s.id))}` : "")
                     }
                   >
                     {s.privada && <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
                     <span>{s.title}</span>
+                    {eventosTurno.has(s.id) && (
+                      <span className="rounded bg-violet-100 px-1 text-[11px] font-semibold text-violet-900 dark:bg-violet-900/40 dark:text-violet-100">
+                        Evento
+                      </span>
+                    )}
                     <Badge variant="secondary" className="h-5 px-1.5 text-xs tabular-nums">
                       {cuenta.total}
                     </Badge>
@@ -1259,6 +1270,18 @@ export function VistaPlanoHoy({
             {/* «Reparto de mesas» ya no se ofrece desde Hoy (10/10/2026): lo esencial está aquí. */}
             {!proponiendo && sala && (
               <div className="ml-auto flex shrink-0 items-center gap-2">
+                {eventoSala && (
+                  <Badge
+                    className={cn(
+                      "max-w-[16rem] truncate border-violet-300 bg-violet-100 px-2 text-[13px] text-violet-900 hover:bg-violet-100 dark:bg-violet-900/40 dark:text-violet-100",
+                      fijo ? "h-11" : "h-10",
+                    )}
+                    data-testid="hoy-evento-sala"
+                    title="La sala entera es de este evento: nadie más reserva aquí y Organizar no la toca."
+                  >
+                    {textoEvento(eventoSala)}
+                  </Badge>
+                )}
                 {/* Cerrar la terraza y volver al plano base escriben: solo con «Editar» (06/11/2026). Con
                     solo «Ver», si la terraza está cerrada se dice, sin interruptor. */}
                 {esTerraza && puedeEditar && (
@@ -1393,6 +1416,14 @@ export function VistaPlanoHoy({
                 {!fijo && (
                   <p className="pointer-events-none absolute left-2 top-2 rounded-md border bg-background/90 px-2 py-1 text-[13px] font-medium shadow-sm backdrop-blur-sm">
                     {etiquetaTurno}
+                  </p>
+                )}
+                {eventoSala && (
+                  <p
+                    className="pointer-events-none absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-md border border-violet-300 bg-violet-50/95 px-2 py-1 text-sm font-semibold text-violet-900 shadow-sm dark:bg-violet-950/90 dark:text-violet-100"
+                    data-testid="plano-evento-sala"
+                  >
+                    {textoEvento(eventoSala)} · sala entera
                   </p>
                 )}
               </section>
