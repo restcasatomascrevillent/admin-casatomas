@@ -180,6 +180,9 @@ describe("normalizarLote", () => {
     expect(r.eventos[0].propiedades.endpoint).toBe("reservas-web/crear");
     expect(Date.parse(r.eventos[0].ocurrido_en)).toBeLessThanOrEqual(ctx.ahora.getTime() + 300_000);
     expect(normalizarEndpoint("cheques-regalo-web/crear")).toBe("cheques-regalo-web/crear");
+    expect(normalizarEndpoint("https://x.supabase.co/rest/v1/configuracion_tienda?select=*")).toBe("rest:configuracion_tienda");
+    expect(normalizarEndpoint("rest:configuracion_tienda")).toBe("rest:configuracion_tienda");
+    expect(normalizarEndpoint("https://evil/../x y")).toBeNull();
   });
   it("como mucho 50 por lote", async () => {
     const r = await normalizarLote({ contexto: { consentimiento: true }, eventos: Array.from({ length: 60 }, () => ({ id: id(), tipo: "clic", objetivo: "x" })) }, ctx);

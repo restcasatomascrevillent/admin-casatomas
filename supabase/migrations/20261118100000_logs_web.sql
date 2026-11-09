@@ -207,7 +207,7 @@ insert into public.web_eventos_catalogo (tipo, categoria, fuente, operacion, eta
   ('reserva_solicitada',     'operacion', 'navegador', 'reserva',  4,    true,  'El servidor aceptó la solicitud de reserva (HTTP 201). Queda PENDIENTE de confirmar por el restaurante.', 61),
   ('reserva_rechazada',      'operacion', 'navegador', 'reserva',  null, true,  'El servidor rechazó la solicitud (motivo codificado, sin datos del cliente).', 62),
   ('cheque_checkout',        'actividad', 'navegador', 'cheque',   3,    true,  'Redirección al pago de Stripe de un cheque regalo (todavía no pagado).', 70),
-  ('cheque_pagado',          'operacion', 'navegador', 'cheque',   4,    true,  'Vuelta de Stripe con el pago confirmado por el servidor.', 71),
+  ('cheque_pagado',          'operacion', 'navegador', 'cheque',   4,    true,  'Vuelta de Stripe tras completar el pago (Stripe solo redirige así si el pago se completó). La confirmación en la BD es cheque_pagado_bd.', 71),
   ('carga_pagina',           'tecnico',   'navegador', null,       null, true,  'Tiempos de carga de la página (TTFB, DOM listo, carga, LCP).', 80),
   ('peticion',               'tecnico',   'navegador', null,       null, true,  'Petición del navegador a una función del servidor: endpoint, código HTTP y duración (sin cuerpo).', 81),
   ('error_js',               'error',     'navegador', null,       null, false, 'Excepción de JavaScript no capturada (mensaje y pila saneados).', 90),
@@ -737,6 +737,9 @@ as $$
     from public.web_eventos e
    where e.sesion_id = any (p_sesiones)
    group by e.sesion_id
+  -- Solo sesiones con consentimiento: sin él, el navegador manda un id efímero
+  -- (de la pestaña) para relacionar sus errores, y eso no es una sesión.
+  having bool_or(e.consentimiento)
   on conflict (sesion_id) do update set
     visitante_id = excluded.visitante_id, entorno = excluded.entorno, proyecto = excluded.proyecto, inicio = excluded.inicio,
     ultima_actividad = excluded.ultima_actividad, pagina_entrada = excluded.pagina_entrada, ultima_pagina = excluded.ultima_pagina,

@@ -36,9 +36,9 @@ export const CATALOGO_NAVEGADOR: Record<string, DefinicionTipo> = {
   clic: { categoria: "actividad", consentimiento: true, props: ["destino", "elemento", "zona"] },
   contacto: { categoria: "actividad", consentimiento: true, props: ["destino", "zona"], acciones: ["telefono", "whatsapp", "email", "mapa", "red_social"] },
   carta_categoria: { categoria: "actividad", consentimiento: true, props: ["carta"] },
-  plato_abierto: { categoria: "actividad", consentimiento: true, props: ["id", "carta", "categoria"] },
+  plato_abierto: { categoria: "actividad", consentimiento: true, props: ["id", "carta", "categoria", "modo"] },
   vino_abierto: { categoria: "actividad", consentimiento: true, props: ["id", "carta", "categoria", "modo"] },
-  bebida_abierta: { categoria: "actividad", consentimiento: true, props: ["id", "carta", "categoria"] },
+  bebida_abierta: { categoria: "actividad", consentimiento: true, props: ["id", "carta", "categoria", "modo"] },
   busqueda: { categoria: "actividad", consentimiento: true, props: ["longitud", "carta"] },
   filtro: { categoria: "actividad", consentimiento: true, props: ["carta"], acciones: ["activar", "desactivar", "cambiar", "limpiar"] },
   mapa_vinos: { categoria: "actividad", consentimiento: true, props: ["carta"] },
@@ -46,11 +46,11 @@ export const CATALOGO_NAVEGADOR: Record<string, DefinicionTipo> = {
   media: { categoria: "actividad", consentimiento: true, props: ["medio", "posicion", "zona"], acciones: ["abrir", "reproducir", "pausa", "fin", "cerrar", "siguiente", "anterior"] },
   formulario: { categoria: "actividad", consentimiento: true, props: ["campos", "total", "campo", "paso"], acciones: ["inicio", "avance", "envio", "error_validacion", "abandono"] },
   chat: { categoria: "actividad", consentimiento: true, props: ["codigo"], acciones: ["abrir", "mensaje", "respuesta", "error", "cerrar"] },
-  reserva_disponibilidad: { categoria: "actividad", consentimiento: true, props: ["comensales", "dias_antelacion"], acciones: ["con_huecos", "completo", "cerrado", "error"] },
+  reserva_disponibilidad: { categoria: "actividad", consentimiento: true, props: ["comensales", "dias_antelacion", "fallo"], acciones: ["con_huecos", "completo", "cerrado", "error"] },
   reserva_solicitada: { categoria: "operacion", consentimiento: true, props: ["comensales", "dias_antelacion"], acciones: ["ok"] },
   reserva_rechazada: { categoria: "operacion", consentimiento: true, props: ["status"] },
   cheque_checkout: { categoria: "actividad", consentimiento: true, props: ["importe", "plantilla"] },
-  cheque_pagado: { categoria: "operacion", consentimiento: true, props: ["importe"] },
+  cheque_pagado: { categoria: "operacion", consentimiento: true, props: ["importe"], acciones: ["ok"] },
   carga_pagina: { categoria: "tecnico", consentimiento: true, props: ["ttfb", "dom", "carga", "lcp", "cls", "navegacion"] },
   peticion: { categoria: "tecnico", consentimiento: true, props: ["endpoint", "metodo", "status"] },
   error_js: { categoria: "error", consentimiento: false, props: ["componente"] },
@@ -147,7 +147,9 @@ function gravedadDe(tipo: string, props: Record<string, ValorPropiedad>): Graved
 export function normalizarEndpoint(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const sinConsulta = v.split(/[?#]/)[0];
-  const m = /\/functions\/v1\/([a-z0-9-]+(?:\/[a-z0-9-]+)?)/i.exec(sinConsulta) ?? /^([a-z0-9-]+(?:\/[a-z0-9-]+)?)$/i.exec(sinConsulta);
+  const m = /\/functions\/v1\/([a-z0-9-]+(?:\/[a-z0-9-]+)?)/i.exec(sinConsulta)
+    ?? /\/rest\/v1\/(?:rpc\/)?([a-z0-9_]+)/i.exec(sinConsulta)?.map((x, i) => (i === 1 ? `rest:${x}` : x))
+    ?? /^((?:rest:)?[a-z0-9_-]+(?:\/[a-z0-9-]+)?)$/i.exec(sinConsulta);
   return m ? m[1].toLowerCase().slice(0, 80) : null;
 }
 
