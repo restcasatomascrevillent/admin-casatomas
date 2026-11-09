@@ -55,9 +55,19 @@ if (!chromiumInstalado) console.warn("[instagram marco.render.test] SE SALTA: no
 
 /** Foto «de la carta»: 1200×900 JPEG calidad 75 (como el bucket «platos»). */
 async function fotoCarta(origen: string | null, color: string): Promise<Buffer> {
-  const base = origen && fs.existsSync(origen) ? sharp(origen) : sharp({ create: { width: 1600, height: 1200, channels: 3, background: color } }).composite([
-    { input: Buffer.from(`<svg width="1600" height="1200"><circle cx="800" cy="600" r="420" fill="#f4efe6"/><circle cx="760" cy="560" r="260" fill="#7a2e1f"/></svg>`) },
-  ]);
+  // La sintética se compone y se guarda ANTES de redimensionar: en una misma cadena sharp aplica el `composite`
+  // después del `resize`, y la capa de 1600×1200 no cabría en la foto de 1200×900.
+  const base =
+    origen && fs.existsSync(origen)
+      ? sharp(origen)
+      : sharp(
+          await sharp({ create: { width: 1600, height: 1200, channels: 3, background: color } })
+            .composite([
+              { input: Buffer.from(`<svg width="1600" height="1200"><circle cx="800" cy="600" r="420" fill="#f4efe6"/><circle cx="760" cy="560" r="260" fill="#7a2e1f"/></svg>`) },
+            ])
+            .png()
+            .toBuffer(),
+        );
   return base.resize(1200, 900, { fit: "cover" }).jpeg({ quality: 75 }).toBuffer();
 }
 
