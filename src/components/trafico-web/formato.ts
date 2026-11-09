@@ -24,6 +24,9 @@ export const fmtPct = (v: number | null | undefined, conSigno = false): string =
   return `${signo}${fmtDecimal.format(v)} %`;
 };
 
+/** Cambia el guion de un número negativo («-0,11») por el signo menos tipográfico («−0,11»), que se lee mejor. */
+export const menosTipografico = (texto: string): string => texto.replace(/^-/, "−");
+
 /** Bytes en unidades DECIMALES (1 GB = 1e9 B), igual que factura Vercel. */
 export const fmtBytes = (v: number | null | undefined): string => {
   if (esNulo(v)) return SIN_DATOS;

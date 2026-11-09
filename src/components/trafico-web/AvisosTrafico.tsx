@@ -16,12 +16,44 @@ interface AvisosTraficoProps {
   diasConDato: number;
   /** `now` inyectable para tests. */
   ahora?: Date;
+  /** La hora del último sync va aquí salvo cuando ya la enseña la línea de las cifras (KpisTrafico). */
+  mostrarUltimoSync?: boolean;
 }
 
-export function AvisosTrafico({ proyecto, estados, diasConDato, ahora = new Date() }: AvisosTraficoProps) {
+/**
+ * Hora del último sync correcto, en una línea discreta: una sola hora si las webs coinciden (lo normal, el sync es
+ * el mismo para las dos) y «Casa Tomás … · Touza …» si no.
+ */
+export function UltimoSync({ proyecto, estados }: { proyecto: FiltroProyecto; estados: EstadoSync[] | undefined }) {
+  if (!estados || estados.length === 0) return null;
+  const proyectos = proyecto === "ambos" ? PROYECTOS_TRAFICO : [proyecto];
+  const horas = proyectos.map((p) => ({ p, hora: fmtFechaHora(estados.find((x) => x.proyecto === p)?.ultimo_ok_en) }));
+  const iguales = horas.every((h) => h.hora === horas[0].hora);
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1" title="Último sync correcto con Vercel Web Analytics">
+      <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span>
+        Último sync correcto{" "}
+        {iguales
+          ? horas[0].hora
+          : horas.map((h, i) => (
+              <span key={h.p}>
+                {i > 0 && " · "}
+                {NOMBRE_PROYECTO[h.p]} {h.hora}
+              </span>
+            ))}
+      </span>
+    </span>
+  );
+}
+
+export function AvisosTrafico({ proyecto, estados, diasConDato, ahora = new Date(), mostrarUltimoSync = true }: AvisosTraficoProps) {
   const proyectos = proyecto === "ambos" ? PROYECTOS_TRAFICO : [proyecto];
   const problemas = estados ? detectarProblemasSync(proyectos, estados, ahora) : [];
   const pocosDatos = diasConDato > 0 && diasConDato < DIAS_MINIMOS_TENDENCIA;
+  const conSync = mostrarUltimoSync && !!estados && estados.length > 0;
+  // Sin nada que decir no deja un hueco en la región con scroll.
+  if (problemas.length === 0 && !pocosDatos && !conSync) return null;
 
   return (
     <div className="space-y-3">
@@ -53,17 +85,9 @@ export function AvisosTrafico({ proyecto, estados, diasConDato, ahora = new Date
         </Alert>
       )}
 
-      {estados && estados.length > 0 && (
-        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <Clock className="h-3.5 w-3.5" aria-hidden />
-          {proyectos.map((p) => {
-            const e = estados.find((x) => x.proyecto === p);
-            return (
-              <span key={p}>
-                {NOMBRE_PROYECTO[p]}: último sync correcto {fmtFechaHora(e?.ultimo_ok_en)}
-              </span>
-            );
-          })}
+      {conSync && (
+        <p className="text-xs text-muted-foreground">
+          <UltimoSync proyecto={proyecto} estados={estados} />
         </p>
       )}
     </div>
