@@ -29,6 +29,9 @@ export interface EspacioReserva {
 /** Consulta compartida de las salas (también la usa «Reservas de hoy» del Dashboard, con `select`). */
 export const consultaEspaciosReserva = {
   queryKey: ["espacios_reserva"],
+  // Las salas cambian poco (09/11/2026, «Hoy» con mala cobertura): 5 min sin volver a pedirlas. Lo que se
+  // guarda en ESTE dispositivo invalida `["espacios_reserva"]` y se relee al momento.
+  staleTime: 5 * 60_000,
   queryFn: async () => {
     const { data, error } = await supabase
       .from("espacios_reserva" as any)
