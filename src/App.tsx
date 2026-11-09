@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { lazy, Suspense, type ReactNode } from "react";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { SuperAdminRoute } from "./components/SuperAdminRoute";
@@ -28,7 +28,7 @@ const Ecommerce = lazy(() => import("./pages/Ecommerce"));
 const GestionWeb = lazy(CARGADORES_SECCION["/gestion-web"]);
 const AsistenteTelefonico = lazy(() => import("./pages/AsistenteTelefonico"));
 const Marketing = lazy(CARGADORES_SECCION["/marketing"]);
-const Instagram = lazy(CARGADORES_SECCION["/instagram"]);
+const RRSS = lazy(CARGADORES_SECCION["/rrss"]);
 const InstagramRapido = lazy(() => import("./pages/InstagramRapido"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Cheques = lazy(CARGADORES_SECCION["/cheques"]);
@@ -140,6 +140,14 @@ const paginaSuperAdmin = (contenido: ReactNode) => (
   </RouteErrorBoundary>
 );
 
+/** /instagram (sección antigua) → /rrss?red=instagram conservando tab, encargo, pieza… */
+function RedirigirInstagram() {
+  const { search } = useLocation();
+  const p = new URLSearchParams(search);
+  p.set("red", "instagram");
+  return <Navigate to={`/rrss?${p.toString()}`} replace />;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <VisualViewportVars />
@@ -174,8 +182,9 @@ const App = () => (
                     <Route path="/reservas" element={pagina(<Reservas />)} />
                     <Route path="/gestion-web" element={pagina(<GestionWeb />)} />
                     <Route path="/marketing" element={pagina(<Marketing />)} />
-                    {/* Instagram: sección propia desde el 05/11/2026 (antes, pestaña de Newsletter). Sección de permisos «marketing». */}
-                    <Route path="/instagram" element={pagina(<Instagram />)} />
+                    {/* RRSS (08/11/2026): Instagram, Facebook y el editor IA. Antes «Instagram» (sección propia desde el
+                        05/11/2026). Sección de permisos «marketing» (la agencia, solo Instagram › Encargos). */}
+                    <Route path="/rrss" element={pagina(<RRSS />)} />
                     <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
                     <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />
                     <Route path="/facturas" element={pagina(<Facturas />)} />
@@ -196,6 +205,8 @@ const App = () => (
                       conserva la ruta para que marcadores/enlaces antiguos no den 404. */}
                   <Route path="/trabajadores" element={<Navigate to="/" replace />} />
                   <Route path="/gestor-carta" element={<Navigate to="/gestion-web?tab=carta" replace />} />
+                  {/* /instagram?tab=…&encargo=… (marcadores, avisos push, notificar-video) → RRSS › Instagram con los mismos parámetros. */}
+                  <Route path="/instagram" element={<RedirigirInstagram />} />
                   <Route path="/gestion-bot" element={<Navigate to="/super-admin/bot-web" replace />} />
                   {/* Sin menú, a pantalla completa (fuera del marco): */}
                   {/* Acceso directo para la pantalla de inicio del móvil: asistente rápido a pantalla completa (docs/instagram-movil.md). */}

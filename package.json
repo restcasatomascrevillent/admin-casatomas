@@ -49,6 +49,7 @@
     "test:instagram-encargos:db": "node scripts/test-instagram-encargos.mjs",
     "test:instagram-seguridad:db": "node scripts/test-instagram-seguridad.mjs",
     "test:instagram-carrusel:db": "node scripts/test-instagram-carrusel.mjs",
+    "test:rrss:db": "node scripts/test-rrss.mjs",
     "test:permisos-carta-newsletter:db": "node scripts/test-permisos-carta-newsletter.mjs",
     "test:mesa-fijada:db": "node scripts/test-reservas-mesa-fijada.mjs",
     "test:logs-web:db": "node scripts/test-logs-web.mjs",

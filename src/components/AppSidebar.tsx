@@ -9,7 +9,7 @@ import {
   Shield,
   Settings,
   HelpCircle,
-  Instagram,
+  Share2,
   ChartNoAxesCombined,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
@@ -89,12 +89,12 @@ const menuItems: {
     sectionKey: "marketing",
     toggleKey: "marketing",
   },
-  // Instagram (05/11/2026): sección propia, antes era una pestaña de Newsletter.
-  // Mismo permiso y mismo interruptor del Super Admin que Newsletter («marketing»).
+  // RRSS (08/11/2026, antes «Instagram», sección propia desde el 05/11/2026): Instagram, Facebook y el
+  // editor IA de fotos y vídeos. Mismo permiso y mismo interruptor del Super Admin que Newsletter («marketing»).
   {
-    title: "Instagram",
-    url: "/instagram",
-    icon: Instagram,
+    title: "RRSS",
+    url: "/rrss",
+    icon: Share2,
     // La agencia (Oficiosos) también entra, solo a «Encargos» (docs/instagram-encargos.md).
     sectionKey: ["marketing", "instagram_agencia"],
     toggleKey: "marketing",

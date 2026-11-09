@@ -20,8 +20,9 @@ const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   "/reservas": "reservas",
   // "/trabajadores" ya no requiere permiso: la ruta solo redirige a "/".
   "/marketing": "marketing",
-  // Instagram: sección propia del menú, mismo permiso que Newsletter. La
-  // agencia (Oficiosos, «instagram_agencia») entra solo a la pestaña Encargos.
+  // RRSS (antes Instagram): mismo permiso que Newsletter. La agencia
+  // (Oficiosos, «instagram_agencia») entra solo a Instagram › Encargos.
+  "/rrss": ["marketing", "instagram_agencia"],
   "/instagram": ["marketing", "instagram_agencia"],
   "/tienda": "tienda",
   // «Facturas · Subida» (06/11/2026) entra también, solo a la pestaña Cargar.
@@ -47,7 +48,7 @@ const DESTINOS_RECHAZO: { ruta: string; secciones: SectionKey[] }[] = [
   { ruta: "/cheques", secciones: ["cheques"] },
   { ruta: "/tienda", secciones: ["tienda"] },
   { ruta: "/facturas", secciones: ["facturas", "facturas_subida"] },
-  { ruta: "/instagram", secciones: ["instagram_agencia"] },
+  { ruta: "/rrss", secciones: ["instagram_agencia"] },
 ];
 
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {
