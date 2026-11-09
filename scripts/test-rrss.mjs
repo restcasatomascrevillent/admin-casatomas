@@ -1,5 +1,5 @@
 // RRSS: editor IA de fotos y vídeos, borradores de Facebook e ideas para
-// grabar (20261118100000_rrss.sql) contra un Postgres en memoria (PGlite),
+// grabar (20261118120000_rrss.sql) contra un Postgres en memoria (PGlite),
 // con la migración REAL. Nunca toca Supabase.
 //
 //   npm run test:rrss:db
@@ -26,8 +26,8 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 
-const MIGRACION = await readFile("supabase/migrations/20261118100000_rrss.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261118100000_rrss_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261118120000_rrss.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261118120000_rrss_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };

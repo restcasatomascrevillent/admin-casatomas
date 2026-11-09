@@ -140,7 +140,7 @@ en off, material, copy y CTA) y `transcribir` (voz de un clip).
 
 ## Base de datos y permisos
 
-Migración `supabase/migrations/20261118100000_rrss.sql` (rollback en
+Migración `supabase/migrations/20261118120000_rrss.sql` (rollback en
 `supabase/rollbacks/`; pruebas PGlite `npm run test:rrss:db`):
 `rrss_proyectos`, `rrss_archivos`, `rrss_generaciones`, `rrss_resultados`,
 `rrss_ideas`, `rrss_ia_peticiones` y el cubo **privado** `rrss` (50 MB por
@@ -161,7 +161,7 @@ archivo, el máximo del plan; rutas comprobadas por `rrss_ruta_valida`).
 Demo primero (`sfonaclosuafvlhutkon`); producción solo cuando el dueño acepte
 el PR y lo pida.
 
-1. Migración: `npx supabase db query --linked -f supabase/migrations/20261118100000_rrss.sql`
+1. Migración: `npx supabase db query --linked -f supabase/migrations/20261118120000_rrss.sql`
    (termina en «rrss: aplicada»).
 2. Función: `npx supabase functions deploy rrss-ia --project-ref <ref>`
    (`verify_jwt = true` en `supabase/config.toml`). Usa `OPENAI_API_KEY`, que
