@@ -32,6 +32,16 @@ function Cargando() {
 
 const Perezosa = ({ children }: { children: ReactNode }) => <Suspense fallback={<Cargando />}>{children}</Suspense>;
 
+/** Etiqueta larga desde `sm` y corta en el móvil (el nombre accesible es el que se ve). */
+function EtiquetaChip({ larga, corta }: { larga: string; corta: string }) {
+  return (
+    <>
+      <span className="sm:hidden">{corta}</span>
+      <span className="hidden sm:inline">{larga}</span>
+    </>
+  );
+}
+
 /**
  * RRSS (08/11/2026, antes «Instagram»): redes sociales del restaurante en una
  * sola sección, con el mismo permiso que antes (Marketing; la agencia solo ve
@@ -113,8 +123,9 @@ export default function RRSS() {
                   </p>
                   <ChipsSubnivel
                     chips={[
-                      { valor: "editor", etiqueta: "Editar mis archivos", icono: <Wand2 /> },
-                      { valor: "ideas", etiqueta: "Dame ideas para grabar", icono: <Lightbulb /> },
+                      // En el móvil, etiquetas cortas: las largas no caben juntas a 390 px.
+                      { valor: "editor", etiqueta: <EtiquetaChip larga="Editar mis archivos" corta="Editar" />, icono: <Wand2 /> },
+                      { valor: "ideas", etiqueta: <EtiquetaChip larga="Dame ideas para grabar" corta="Ideas para grabar" />, icono: <Lightbulb /> },
                     ]}
                   />
                 </div>

@@ -186,3 +186,10 @@ el PR y lo pida.
   ficheros; los archivados se quedan.
 - Facebook: sin integración de publicación (lo que haría falta está en la
   pestaña, en «Para Oficiosos»).
+
+## Capturas
+
+En `docs/rrss/capturas/` (con datos sintéticos y resultados reales del motor;
+se rehacen con `tests/e2e-movil/rrss.capturas.mjs`, ver su cabecera):
+pestaña Instagram, Facebook, estilos, resultado con comparador, ajustes,
+vídeo, ideas para grabar y el editor en el móvil.
