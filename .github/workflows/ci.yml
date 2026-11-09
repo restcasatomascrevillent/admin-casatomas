@@ -87,6 +87,8 @@ jobs:
         run: npm run test:permisos-facturas-subida:db
       - name: Vino por copas, Parker, votación del vino favorito, horario de menú y tapas y platos vegetarianos (PGlite)
         run: npm run test:vinos-copeo-encuesta:db
+      - name: Puntuaciones Parker con fuente, solo verificadas en la web (PGlite)
+        run: npm run test:vinos-parker:db
       - name: Instagram, bucket y piezas por la sección marketing (PGlite)
         run: npm run test:instagram:db
       - name: Originales de las fotos de la carta en Drive (PGlite)

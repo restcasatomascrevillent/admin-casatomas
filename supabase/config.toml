@@ -259,6 +259,9 @@ verify_jwt = true
 [functions.extraer-vino-foto]
 verify_jwt = true
 
+[functions.buscar-puntuacion-parker]
+verify_jwt = true
+
 # Web Push «Vídeo listo» al móvil que mandó el vídeo a un dispositivo potente.
 # Además del JWT exige gestor_carta y ser quien procesó/creó el trabajo.
 [functions.notificar-video]

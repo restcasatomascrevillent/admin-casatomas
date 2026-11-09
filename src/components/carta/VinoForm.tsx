@@ -34,11 +34,16 @@ import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta } from "./precioCarta";
 import { CamposCopaParker } from "./CamposCopaParker";
 import { camposCopaParker, cambiosCopaParker, COPA_PARKER_VACIO, exigirPrecioCopa } from "./copaParker";
+import { PanelParker } from "./parker/PanelParker";
+import { useBusquedaParker } from "./parker/useBusquedaParker";
+import { usePuntuacionesParker } from "./parker/usePuntuacionesParker";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 // Origen obligatorio (04/11/2026): país, región y categoría con denominación
 // (no «… — ORIGEN PENDIENTE»). Sin él no se guarda, tampoco si lo rellena la IA.
-// Copa y Parker (04/11/2026): ver copaParker.ts.
+// Copa y añada que se sirve: ver copaParker.ts. Parker (08/11/2026): la
+// puntuación se busca tras leer la etiqueta (parker/PanelParker.tsx) y se
+// guarda con su fuente en vinos_puntuacion_parker al guardar la ficha.
 const formSchema = z
   .object({
     nombre: nombreCarta,
@@ -100,6 +105,12 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
   const lectura = useLecturaEtiquetaVino(form, categoriasValidas);
   const { cancelar: cancelarLectura, limpiar: limpiarLectura } = lectura;
 
+  // Puntuación Parker en segundo plano: si falla, la ficha se guarda igual.
+  const busquedaParker = useBusquedaParker();
+  const { limpiar: limpiarParker } = busquedaParker;
+  const { guardar: guardarParker } = usePuntuacionesParker();
+  const [incluirParker, setIncluirParker] = useState(true);
+
   // Precarga desde la foto de la botella (lote «Varias botellas»). Precio vacío
   // a propósito: no se lee de la etiqueta.
   const precargadoRef = useRef(false);
@@ -112,6 +123,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
       anterior?.alCerrar?.();
       // Una lectura que llegue con el formulario cerrado no rellena nada.
       cancelarLectura();
+      limpiarParker();
+      setIncluirParker(true);
       // Si se cierra sin guardar un formulario precargado, no dejar sus datos
       // para el siguiente «Añadir vino».
       if (precargadoRef.current) {
@@ -127,9 +140,18 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     precargaAbiertaRef.current = precarga;
     const v = valoresDesdeDatosVino(precarga.datos);
     limpiarLectura();
-    form.reset({ ...v, categoria: v.categoria || categoriaInicial || "", precio_eur: "", ...COPA_PARKER_VACIO });
+    limpiarParker();
+    // Añada solo si se leyó en la etiqueta (PanelParker busca la puntuación con ella).
+    form.reset({
+      ...v,
+      categoria: v.categoria || categoriaInicial || "",
+      precio_eur: "",
+      ...COPA_PARKER_VACIO,
+      anada: precarga.datos.sin_anada ? "" : typeof precarga.datos.anada === "number" ? String(precarga.datos.anada) : "",
+      sin_anada: precarga.datos.sin_anada === true,
+    });
     iniciarRecorte(precarga.foto, precarga.recorte);
-  }, [open, precarga, form, categoriaInicial, iniciarRecorte, limpiarRecorte, cancelarLectura, limpiarLectura]);
+  }, [open, precarga, form, categoriaInicial, iniciarRecorte, limpiarRecorte, cancelarLectura, limpiarLectura, limpiarParker]);
 
   /** Datos de la etiqueta para el precio sugerido y las tiendas. */
   const datosEtiqueta = precarga?.datos ?? lectura.datos;
@@ -152,6 +174,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     const file = elegida ? await aceptarFotoCarta(elegida, input) : null;
     if (!file) return;
     lectura.cancelar();
+    busquedaParker.limpiar();
     recorte.iniciar(file);
     // Vino nuevo sin nombre: la IA lee la etiqueta a la vez que se recorta.
     // Con precarga (lote) la foto ya se leyó; con nombre escrito, botón manual.
@@ -160,6 +183,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
 
   const clearImage = () => {
     lectura.limpiar();
+    busquedaParker.limpiar();
     recorte.limpiar();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -184,6 +208,17 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
 
     const nuevoVino = await crearVino.mutateAsync(vinoData);
     precarga?.alGuardar?.();
+
+    // Puntuación Parker con su fuente (si hubo búsqueda y no se descartó). Un
+    // fallo aquí no deshace la ficha: se avisa y se puede repetir al editar.
+    const parker = busquedaParker.resultado;
+    if (nuevoVino?.id && parker && incluirParker && busquedaParker.fase === "hecha") {
+      try {
+        await guardarParker.mutateAsync({ vinoId: nuevoVino.id, resultado: parker, origen: "foto" });
+      } catch {
+        // guardarParker ya avisa
+      }
+    }
 
     // Upload image if selected
     if (imageFile && nuevoVino?.id) {
@@ -345,7 +380,20 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
               avisoOrigen={avisoOrigen}
             />
 
-            <CamposCopaParker control={form.control} />
+            <CamposCopaParker
+              control={form.control}
+              parker={
+                <PanelParker
+                  control={form.control}
+                  getValues={form.getValues}
+                  setValue={form.setValue}
+                  busqueda={busquedaParker}
+                  datosEtiqueta={datosEtiqueta}
+                  incluirConFicha={incluirParker}
+                  onIncluirConFicha={setIncluirParker}
+                />
+              }
+            />
 
             {/* Con dedo el pie queda pegado abajo del diálogo (formulario largo o teclado abierto en
                 iOS): «Guardar» siempre a la vista. Con ratón, igual que antes. En el móvil, «Cancelar» y
