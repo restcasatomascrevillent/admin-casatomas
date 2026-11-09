@@ -23,6 +23,7 @@ import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import { CLAVE_AJUSTES_MESA, guardarAjustesServicio, useAjustesMesaDia, type TurnoServicio } from "@/hooks/useAjustesMesaServicio";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useSalaCerradaServicio } from "@/hooks/useSalaCerradaServicio";
+import { eventosDelTurno, useSalasEvento } from "@/hooks/useSalaEvento";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
@@ -112,6 +113,10 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
   );
   const terraza = salas.find((s) => s.terraza) ?? null;
   const cierre = useSalaCerradaServicio(terraza?.id ?? null, fecha, turno);
+  // «Evento: sala entera» (20261119100000): esas salas no entran en Organizar. Ni
+  // se coloca a nadie en ellas ni se toca el evento (sus reservas quedan fuera).
+  const { data: eventosDia } = useSalasEvento(activo ? fecha : null);
+  const salasEvento = useMemo(() => eventosDelTurno(eventosDia, fecha, turno), [eventosDia, fecha, turno]);
 
   // Grupos de 8 o más (no se asignan solos): el Reservado y el Salón para la sugerencia.
   const reservado = useMemo(
@@ -166,7 +171,8 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
 
   const resultado = useMemo(() => {
     if (cargando || !activo) return null;
-    const salaIds = new Set(salas.map((s) => s.id));
+    const salasOrg = salas.filter((s) => !salasEvento.has(s.id));
+    const salaIds = new Set(salasOrg.map((s) => s.id));
     const lista: ReservaOrg[] = (reservas ?? [])
       .filter((r) => turnoDeHora(r.hora) === turno && (!r.espacio_id || salaIds.has(r.espacio_id)))
       .map((r) => ({
@@ -184,7 +190,7 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
     const ahora = new Date();
     const empezado = fecha === hoyLocal() && turnoDeHora(ahora.toTimeString().slice(0, 8)) === turno;
     return organizarServicio({
-      salas,
+      salas: salasOrg,
       mesas: (mesas ?? []).filter((m) => salaIds.has(m.espacio_id)),
       ajustes: (ajustesDia ?? []).filter((a) => a.turno === turno),
       reservas: lista,
@@ -194,7 +200,7 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
       alFinal: new Set(configAsignacionDesde(config).mesasAlFinal),
       sugerirGrupo: (r) => sugerencias.get(r.id)?.texto ?? null,
     });
-  }, [cargando, activo, salas, mesasDe, reservas, mesas, ajustesDia, turno, fecha, cierre.cerrada, config, sugerencias]);
+  }, [cargando, activo, salas, salasEvento, mesasDe, reservas, mesas, ajustesDia, turno, fecha, cierre.cerrada, config, sugerencias]);
 
   const refrescar = () => {
     for (const clave of CLAVES_POR_CAMBIO.ocupacion) void qc.invalidateQueries({ queryKey: [clave] });
@@ -261,7 +267,7 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
     }
   };
 
-  return { resultado, aplicar, aplicando, terraza, cierre, cargando, mesasDe, reservas, ajustesDia, salas, sugerencias };
+  return { resultado, aplicar, aplicando, terraza, cierre, cargando, mesasDe, reservas, ajustesDia, salas, sugerencias, salasEvento };
 }
 
 function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: TurnoServicio; onCerrar: () => void }) {

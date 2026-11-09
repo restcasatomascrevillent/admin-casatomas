@@ -97,6 +97,7 @@ import { LeyendaOcupacion } from "./LeyendaOcupacion";
 import { DialogoCierreDia } from "./DialogoCierreDia";
 import { useCierresReserva } from "@/hooks/useCierresReserva";
 import { cierresPorDia } from "../../../supabase/functions/_shared/cierres";
+import { textoEvento, useSalasEvento } from "@/hooks/useSalaEvento";
 
 
 /** Filas por petición de PostgREST (el tope por defecto de Supabase). */
@@ -282,6 +283,20 @@ export function CalendarioOcupacion() {
   );
   const cierresDia = useMemo(() => cierresPorDia(cierresMes?.cierres ?? []), [cierresMes]);
 
+  // «Evento: sala entera» del mes (20261119100000): «Evento: Boda (Salón, comida)».
+  const { data: eventosMes } = useSalasEvento(
+    format(startOfMonth(currentMonth), "yyyy-MM-dd"),
+    format(endOfMonth(currentMonth), "yyyy-MM-dd"),
+  );
+  const eventosDia = useMemo(() => {
+    const nombres = new Map(((espacios ?? []) as Array<{ id?: string; nombre?: string }>).map((e) => [e.id, e.nombre ?? "Sala"]));
+    const mapa: Record<string, string[]> = {};
+    for (const e of eventosMes ?? []) {
+      (mapa[e.fecha] ??= []).push(`${textoEvento(e)} (${nombres.get(e.espacio_id) ?? "sala"}, ${e.turno})`);
+    }
+    return mapa;
+  }, [eventosMes, espacios]);
+
   // Cifras y nivel de cada día del mes.
   const resumenes = useMemo(
     () => {
@@ -430,6 +445,7 @@ export function CalendarioOcupacion() {
                           fechaISO={dateKey}
                           resumen={resumenes[dateKey]}
                           cierres={cierresDia[dateKey]}
+                          eventos={eventosDia[dateKey]}
                           esPasado={dateKey < hoy}
                           esHoy={dateKey === hoy}
                           seleccionada={isSameDay(day, selectedDate)}

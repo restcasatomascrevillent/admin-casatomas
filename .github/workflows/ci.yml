@@ -119,6 +119,8 @@ jobs:
         run: npm run test:permisos-carta-newsletter:db
       - name: Mesa fijada de una reserva, migración y rollback (PGlite)
         run: npm run test:mesa-fijada:db
+      - name: Evento con la sala entera, aforo y cierre que sigue a la reserva (PGlite)
+        run: npm run test:sala-evento:db
       - name: Versiones de migración sin repetir (salvo las históricas)
         run: npm run test:migraciones
       - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)

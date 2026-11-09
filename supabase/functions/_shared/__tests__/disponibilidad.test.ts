@@ -40,6 +40,7 @@ import {
   esCaracteristicaPrivada,
   idsSalasPrivadas,
   sinReservasEnSalasPrivadas,
+  salasCerradasPorEventoDesdeFilas,
   MARCA_POR_DEFECTO,
   type ConfiguracionTurnoInput,
   type EntradaDisponibilidad,
@@ -1534,5 +1535,67 @@ describe("salas privadas fuera de aforo", () => {
     const con = calcular({ reservas: [...llena, r("14:00", 8, "reservado")], salasPrivadas: ["reservado"] });
     expect(con.aforo.comida).toEqual(sin.aforo.comida);
     expect(con.aforo.comida.completo).toBe(true);
+  });
+});
+
+describe("salas cerradas por un evento (sala entera)", () => {
+  const SALON = { espacio_id: "salon", turno: "comida" as const, capacidad_maxima: 50 };
+
+  it("resta la capacidad de la sala SOLO en su turno", () => {
+    const res = calcular({ salasCerradasPorEvento: [SALON] });
+    expect(res.aforo.comida.capacidad_maxima).toBe(CAPACIDAD - 50);
+    expect(res.aforo.cena.capacidad_maxima).toBe(CAPACIDAD);
+  });
+
+  it("el evento (reservas en la sala cerrada) no consume aforo", () => {
+    const res = calcular({
+      reservas: [r("13:30", 40, "salon"), r("13:30", 10, "comedor"), r("21:00", 6, "salon")],
+      salasCerradasPorEvento: [SALON],
+    });
+    expect(res.aforo.comida.ocupacion).toBe(10);
+    expect(res.aforo.comida.disponible).toBe(CAPACIDAD - 50 - 10);
+    // En la cena el Salón está abierto: esa reserva sí cuenta.
+    expect(res.aforo.cena.ocupacion).toBe(6);
+  });
+
+  it("solo se ofrecen las plazas de las salas que quedan", () => {
+    const res = calcular({
+      comensales: 2,
+      reservas: [r("13:00", CAPACIDAD - 50, "comedor")],
+      salasCerradasPorEvento: [SALON],
+    });
+    expect(res.aforo.comida.completo).toBe(true);
+    expect(res.huecos.filter((h) => h.turno === "comida").every((h) => !h.ofrecido)).toBe(true);
+    expect(res.huecos.filter((h) => h.turno === "cena").some((h) => h.ofrecido)).toBe(true);
+  });
+
+  it("una sala privada cerrada por evento no resta dos veces", () => {
+    const res = calcular({
+      salasPrivadas: ["reservado"],
+      salasCerradasPorEvento: [{ espacio_id: "reservado", turno: "comida", capacidad_maxima: 14 }],
+    });
+    expect(res.aforo.comida.capacidad_maxima).toBe(CAPACIDAD);
+  });
+
+  it("salasCerradasPorEventoDesdeFilas: solo filas de evento, de la marca y no privadas", () => {
+    const espacios = [
+      { id: "salon", capacidad_maxima: 50, caracteristicas: { marca: "casa_tomas" } },
+      { id: "terraza", capacidad_maxima: 50, caracteristicas: {} },
+      { id: "reservado", capacidad_maxima: 14, caracteristicas: { marca: "casa_tomas", privada: true } },
+      { id: "touza", capacidad_maxima: 30, caracteristicas: { marca: "touza" } },
+    ];
+    const filas = [
+      { espacio_id: "salon", turno: "comida", reserva_id: "ev1" },
+      { espacio_id: "salon", turno: "comida", reserva_id: "ev1" }, // duplicada
+      { espacio_id: "terraza", turno: "cena", reserva_id: null }, // cierre de Organizar: no cuenta
+      { espacio_id: "reservado", turno: "cena", reserva_id: "ev2" },
+      { espacio_id: "touza", turno: "cena", reserva_id: "ev3" },
+      { espacio_id: "terraza", turno: "merienda", reserva_id: "ev4" },
+      { espacio_id: "borrada", turno: "cena", reserva_id: "ev5" },
+    ];
+    expect(salasCerradasPorEventoDesdeFilas(filas, espacios, "casa_tomas")).toEqual([
+      { espacio_id: "salon", turno: "comida", capacidad_maxima: 50 },
+    ]);
+    expect(salasCerradasPorEventoDesdeFilas(null, espacios, null)).toEqual([]);
   });
 });

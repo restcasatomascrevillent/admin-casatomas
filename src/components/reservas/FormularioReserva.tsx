@@ -58,6 +58,7 @@ import { esErrorEsquemaPendiente } from "@/lib/reservas/propuestaCliente";
 import { esErrorSalaPrivadaOcupada, mensajeSalaPrivadaOcupada } from "@/lib/reservas/salaPrivada";
 import { esGrupoGrande, esSalaMesaLarga, excedeReservado, sugerenciaGrupoGrande } from "@/lib/reservas/grupoGrande";
 import { notificarCambioReserva } from "@/hooks/useVerificacionReservas";
+import { CLAVE_SALAS_CERRADAS, guardarSalaEvento, useSalaEventoDeReserva } from "@/hooks/useSalaEvento";
 import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 import { notificarAlCliente } from "@/lib/reservas/notificarCliente";
 import {
@@ -72,6 +73,7 @@ import {
   errorNombreEdicion,
   errorTelefonoEdicion,
   ErrorSinFilasEdicion,
+  esMensajeSalaEvento,
   esReservaViva,
   interpretarRespuestaAvisoModificacion,
   invalidaEnlaceConfirmacion,
@@ -317,6 +319,10 @@ export const FormularioReserva = ({
   // Solo al EDITAR: casilla «Avisar al cliente del cambio». Marcada por defecto;
   // solo cuenta cuando se puede avisar (ver `disponibilidadAvisoModificacion`).
   const [avisarCliente, setAvisarCliente] = useState(true);
+  // «Ocupa la sala entera (evento)» (20261119100000). `null` = sin tocar: vale lo
+  // guardado (al editar) o «no» (en el alta).
+  const eventoGuardado = useSalaEventoDeReserva(reservaAEditar?.id);
+  const [ocupaSalaElegido, setOcupaSalaElegido] = useState<boolean | null>(null);
 
   const esquema = useMemo(() => (reservaAEditar ? esquemaEdicion(reservaAEditar) : formSchema), [reservaAEditar]);
   const form = useForm<FormValues>({
@@ -362,6 +368,9 @@ export const FormularioReserva = ({
   const watchedTelefono = form.watch("telefono");
   const watchedEspacio = form.watch("espacio_id") ?? null;
   const fechaStr = watchedFecha ? format(watchedFecha, "yyyy-MM-dd") : null;
+  // Sin sala no hay evento: la casilla se desactiva y no cuenta.
+  const ocupaSalaGuardado = !!eventoGuardado.data;
+  const ocupaSala = !!watchedEspacio && (ocupaSalaElegido ?? ocupaSalaGuardado);
 
   // Reservas + salas del día de Casa Tomás (una sola consulta, compartida con
   // las rejillas por la clave de React Query). La sala es asignación interna.
@@ -702,8 +711,30 @@ export const FormularioReserva = ({
         importante: values.importante,
       };
       let cambios = calcularCambiosEdicion(original, editado);
+      const cambiaEvento = ocupaSala !== ocupaSalaGuardado;
+      const guardarEvento = () =>
+        guardarSalaEvento({
+          reservaId: original.id,
+          ocupa: ocupaSala,
+          espacioId: values.espacio_id ?? null,
+          fecha: format(values.fecha, "yyyy-MM-dd"),
+          hora: values.hora,
+          motivo: values.nombre?.trim() || original.nombre || "",
+        });
 
       if (Object.keys(cambios).length === 0) {
+        if (cambiaEvento) {
+          // Solo se ha marcado o desmarcado «Ocupa la sala entera».
+          const fallo = await guardarEvento();
+          if (fallo) {
+            toast.error(fallo);
+            return;
+          }
+          queryClient.invalidateQueries({ queryKey: [CLAVE_SALAS_CERRADAS] });
+          toast.success(ocupaSala ? "Sala cerrada para el evento" : "La sala ya no está cerrada para el evento");
+          onSuccess?.();
+          return;
+        }
         toast.info("No hay cambios que guardar");
         onSuccess?.();
         return;
@@ -752,11 +783,28 @@ export const FormularioReserva = ({
         cambios = calcularCambiosEdicion(original, editado, { enListaNegra });
       }
 
+      // Quitar el evento ANTES de mover la reserva: si no, el cierre la seguiría
+      // a la sala nueva (y podría chocar con las reservas que haya allí).
+      if (cambiaEvento && !ocupaSala) {
+        const fallo = await guardarEvento();
+        if (fallo) {
+          toast.error(fallo);
+          return;
+        }
+      }
+
       // `.select("id")`: con RLS, una escritura denegada NO da error, devuelve 0
       // filas. Sin comprobarlo se diría «guardado» sin haberlo guardado.
       const { data, error } = await supabase.from("reservas").update(cambios).eq("id", original.id).select("id");
       if (error) throw error;
       if (!data || data.length === 0) throw new ErrorSinFilasEdicion();
+
+      // Poner el evento DESPUÉS, ya con la sala, el día y la hora nuevos.
+      if (cambiaEvento && ocupaSala) {
+        const fallo = await guardarEvento();
+        if (fallo) toast.warning("Reserva guardada, pero la sala no se ha cerrado para el evento", { description: fallo });
+      }
+      if (cambiaEvento) queryClient.invalidateQueries({ queryKey: [CLAVE_SALAS_CERRADAS] });
 
       CLAVES_REFRESCO_EDICION.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
@@ -921,6 +969,19 @@ export const FormularioReserva = ({
       if (error) throw error;
 
       const idCreada = (insertada as { id?: string } | null)?.id ?? null;
+      // «Ocupa la sala entera (evento)»: el cierre se pone con la reserva ya creada.
+      if (idCreada && ocupaSala) {
+        const fallo = await guardarSalaEvento({
+          reservaId: idCreada,
+          ocupa: true,
+          espacioId: values.espacio_id || null,
+          fecha: fechaStr,
+          hora: values.hora,
+          motivo: values.nombre.trim(),
+        });
+        if (fallo) toast.warning("Reserva creada, pero la sala no se ha cerrado para el evento", { description: fallo });
+        queryClient.invalidateQueries({ queryKey: [CLAVE_SALAS_CERRADAS] });
+      }
       // Correo "Confirma tu reserva" (mismo camino que un cambio de estado en
       // la lista). En lista negra no se escribe al cliente: queda pendiente
       // de revisión. Sin email tampoco: emails-reserva no tendría a dónde
@@ -954,6 +1015,7 @@ export const FormularioReserva = ({
         espacio_id: values.espacio_id || null,
       };
       form.reset({ numero_comensales: 2, hora: "", espacio_id: null });
+      setOcupaSalaElegido(null);
       setModoOtraHora(false);
       setLimiteAlcanzado(null);
       setDisponibilidadInfo(null);
@@ -972,6 +1034,9 @@ export const FormularioReserva = ({
       const mensaje = esErrorSalaPrivadaOcupada(error)
         ? // La sala privada (el Reservado) ya tiene una reserva en ese turno: se queda la sala entera.
           mensajeSalaPrivadaOcupada(error)
+        : esMensajeSalaEvento(String(error?.message ?? ""))
+        ? // La sala está cerrada por un evento ese día y turno (20261119100000).
+          String(error.message)
         : error?.code === "23514" && String(error?.message || "").includes("Aforo")
         ? "No hay aforo suficiente en ese turno. Elige otra hora o reduce los comensales."
         : error?.code === "23505" && String(error?.message || "").includes("solicitud")
@@ -1273,7 +1338,10 @@ export const FormularioReserva = ({
                 <span className="flex min-w-0 items-center gap-1.5">
                   <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   <span className="shrink-0">Asignación interna (opcional)</span>
-                  <span className="min-w-0 truncate text-muted-foreground">· {nombreSalaElegida}</span>
+                  <span className="min-w-0 truncate text-muted-foreground">
+                    · {nombreSalaElegida}
+                    {ocupaSala ? " · evento (sala entera)" : ""}
+                  </span>
                 </span>
                 <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
               </Button>
@@ -1316,6 +1384,30 @@ export const FormularioReserva = ({
                   </FormItem>
                 )}
               />
+              {/* «Evento: sala entera» (20261119100000): la reserva se queda la sala ese día y
+                  turno. Resta la sala del aforo, nadie más puede entrar y Organizar no la toca. */}
+              <label
+                className={cn(
+                  "flex min-h-11 items-center gap-3 rounded-md border px-3 py-2 text-sm",
+                  watchedEspacio ? "cursor-pointer" : "cursor-not-allowed opacity-60",
+                )}
+                data-testid="casilla-sala-entera"
+              >
+                <Checkbox
+                  checked={ocupaSala}
+                  disabled={!watchedEspacio}
+                  onCheckedChange={(valor) => setOcupaSalaElegido(valor === true)}
+                  aria-describedby="ayuda-sala-entera"
+                />
+                <span className="min-w-0">
+                  <span className="block font-medium">Ocupa la sala entera (evento)</span>
+                  <span id="ayuda-sala-entera" className="block text-[11px] pointer-coarse:text-xs text-muted-foreground">
+                    {watchedEspacio
+                      ? "Nadie más puede reservar en esta sala en ese turno y su capacidad sale del aforo."
+                      : "Elige antes una sala."}
+                  </span>
+                </span>
+              </label>
               <OcupacionSalas
                 fecha={fechaStr}
                 comensales={Number(watchedComensales) || 0}
