@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TiraCifras } from "@/components/panel/TiraCifras";
 import { LIMITE_FDT_BYTES, NOMBRE_PROYECTO, type FilaFdtMes, type ProyectoTrafico } from "@/hooks/useTraficoWeb";
 import { esNulo, fmtBytes, fmtNumero, fmtPct, URL_USO_VERCEL } from "./formato";
 
@@ -22,7 +23,7 @@ function BarraLimite({ acumulado, proyectado, limite }: { acumulado: number | nu
   return (
     <div className="space-y-1">
       <div
-        className="relative h-3 w-full overflow-hidden rounded-full bg-muted"
+        className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted/70"
         role="img"
         aria-label={`Consumido ${fmtPct(esNulo(acumulado) ? null : (100 * acumulado) / limite)} del límite; proyectado ${fmtPct(
           esNulo(proyectado) ? null : (100 * proyectado) / limite,
@@ -34,7 +35,7 @@ function BarraLimite({ acumulado, proyectado, limite }: { acumulado: number | nu
             style={{
               width: `${pctProy}%`,
               background: alerta ? "var(--viz-critico)" : "var(--viz-1)",
-              opacity: 0.25,
+              opacity: 0.3,
             }}
           />
         )}
@@ -43,7 +44,7 @@ function BarraLimite({ acumulado, proyectado, limite }: { acumulado: number | nu
           style={{ width: `${pctAcum}%`, background: alerta ? "var(--viz-critico)" : "var(--viz-1)" }}
         />
         {/* Marca del 80 % (umbral de alerta R4) */}
-        <div className="absolute inset-y-0 w-px bg-foreground/40" style={{ left: "80%" }} aria-hidden />
+        <div className="absolute inset-y-0 w-0.5 bg-background" style={{ left: "80%" }} aria-hidden />
       </div>
       <div className="relative h-3 text-[10px] pointer-coarse:text-xs text-muted-foreground" aria-hidden>
         <span className="absolute left-0">0</span>
@@ -77,7 +78,7 @@ export function FdtMes({ filas, proyectoSeleccionado }: FdtMesProps) {
             <HardDrive className="h-4 w-4 text-muted-foreground" aria-hidden />
             Fast Data Transfer · {mes}
           </CardTitle>
-          <Badge variant="outline" className="border-amber-500/60 font-semibold tracking-wide text-amber-700 dark:text-amber-400">
+          <Badge variant="outline" className="border-amber-500/50 px-2 py-0 text-[10px] font-semibold tracking-wider text-amber-700 pointer-coarse:text-xs dark:text-amber-400">
             ESTIMACIÓN
           </Badge>
         </div>
@@ -106,18 +107,21 @@ export function FdtMes({ filas, proyectoSeleccionado }: FdtMesProps) {
         )}
 
         <div className="space-y-2">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <p className="text-sm text-muted-foreground">
-              Consumido (estimado):{" "}
-              <span className="text-lg font-semibold tabular-nums text-foreground">{fmtBytes(total?.bytes_acumulados)}</span>{" "}
-              <span className="tabular-nums">({fmtPct(total?.pct_limite)})</span>
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Proyección fin de mes:{" "}
-              <span className="font-semibold tabular-nums text-foreground">{fmtBytes(proyTotal)}</span>{" "}
-              <span className="tabular-nums">({fmtPct(total?.pct_proyectado)})</span>
-            </p>
-          </div>
+          <TiraCifras
+            cifras={[
+              {
+                etiqueta: "Consumido (estimado)",
+                valor: fmtBytes(total?.bytes_acumulados),
+                detalle: `${fmtPct(total?.pct_limite)} del límite`,
+              },
+              {
+                etiqueta: "Proyección fin de mes",
+                valor: fmtBytes(proyTotal),
+                detalle: `${fmtPct(total?.pct_proyectado)} del límite`,
+                tono: total?.alerta_80 ? "rojo" : undefined,
+              },
+            ]}
+          />
           <BarraLimite acumulado={total?.bytes_acumulados ?? null} proyectado={proyTotal} limite={limite} />
           {total && (
             <p className="text-xs text-muted-foreground">
@@ -128,14 +132,14 @@ export function FdtMes({ filas, proyectoSeleccionado }: FdtMesProps) {
         </div>
 
         {porProyecto.length > 0 && (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-x-6 gap-y-3 pb-1 sm:grid-cols-2">
             {porProyecto.map((f) => {
               const destacado = proyectoSeleccionado === f.proyecto;
               const nombre = NOMBRE_PROYECTO[f.proyecto as ProyectoTrafico] ?? f.proyecto;
               return (
                 <div
                   key={f.proyecto}
-                  className={`rounded-md border p-3 text-xs ${destacado ? "border-primary/60 bg-primary/5" : "border-border/60"}`}
+                  className={`border-l-2 pl-3 text-xs ${destacado ? "border-foreground" : "border-border"}`}
                 >
                   <p className="mb-1 text-sm font-medium">{nombre}</p>
                   <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-muted-foreground">

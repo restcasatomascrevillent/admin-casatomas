@@ -79,7 +79,7 @@ function Desglose({ proyecto, dimension, titulo, icono: Icono, desde, hasta }: D
                   </span>
                 </div>
                 {!esNulo(f.pct) && (
-                  <div className="mt-1 h-1.5 w-full rounded-full bg-muted" aria-hidden>
+                  <div className="mt-1 h-1.5 w-full rounded-full bg-muted/70" aria-hidden>
                     <div
                       className="h-1.5 rounded-full"
                       style={{ width: `${Math.min(100, f.pct)}%`, background: "var(--viz-1)" }}
