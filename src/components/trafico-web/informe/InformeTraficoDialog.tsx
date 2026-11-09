@@ -22,6 +22,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { useDatosInformeTrafico, type DatosInformeTrafico } from "@/hooks/useTraficoWeb";
+import { useComportamiento, useConfigLogs } from "@/hooks/useLogsWeb";
+import { construirApartadoComportamiento } from "./comportamiento";
 import { DiapositivasInforme } from "./Diapositivas";
 import {
   construirInformeMensual,
@@ -97,7 +99,13 @@ export default function InformeTraficoDialog({ abierto, onAbiertoChange }: Infor
           : null,
     [principalQ.data, touzaQ.data, rango.diasCerrados, mes, hoy],
   );
-  const informeListo: InformeTrafico | null = informe && informe.vacio === false ? informe : null;
+  // «Qué hacen los visitantes»: mismas cifras que Tráfico web › Comportamiento, del entorno de esta base de datos.
+  const configLogs = useConfigLogs();
+  const comportamientoQ = useComportamiento(rango.diasCerrados > 0 ? rango.desde : null, rango.hasta, configLogs.data?.entorno_bd ?? null);
+  const informeListo: InformeTrafico | null = useMemo(() => {
+    if (!informe || informe.vacio !== false) return null;
+    return { ...informe, comportamiento: construirApartadoComportamiento(comportamientoQ.data, informe.resumen.paginasVistas.valor, informe.mes.nombre) };
+  }, [informe, comportamientoQ.data]);
   const motivoVacio = informe && informe.vacio === true ? informe.motivo : null;
 
   useEffect(() => {

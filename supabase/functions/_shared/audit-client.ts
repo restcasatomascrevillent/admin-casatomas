@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { ipCliente } from "./ip-cliente.ts";
+import { enSegundoPlano, mensajeDeRespuesta, registrarErrorServidor } from "./logs-web/servidor.ts";
 
 type Actor = { id: string; email?: string | null };
 type Contexto = { fuente: string; peticionId: string; actor: Actor | null; userAgent: string; deviceId: string; ip: string; herramientasChat: HerramientaChatAuditada[] };
@@ -80,6 +81,10 @@ export const ADMITE_INTEGRACION: ReadonlySet<string> = new Set([
   "newsletter-sync-resend", "sync-trafico-web", "ocr-trabajo", "clasificar-productos",
   "sincronizar-costes-openai", "instagram-programador", "instagram-metricas",
   "facturas-originales-drive", "ia-modelos-openai",
+  // Super Admin › Logs: la ingesta la llama cualquier visitante de la web (origen
+  // permitido + tope de tamaño + límite por IP con HMAC + cupo diario en la RPC);
+  // el proceso, pg_cron con su secreto o un super admin.
+  "registrar-actividad-web", "procesar-logs-web",
 ]);
 
 /** La autenticación y autorización de negocio siguen en cada handler. */
@@ -135,12 +140,21 @@ export function conAuditoriaDePeticion(
       // Se lee una copia: el handler conserva su cuerpo y su validación.
       const preguntaChat = fuente === "chat-facturas" ? await req.clone().json().catch(() => null) : null;
       let response: Response;
+      let excepcion: string | null = null;
       try { response = await handler(req); }
       catch (error) {
         console.error(`Error ejecutando ${fuente}:`, error);
+        excepcion = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
         response = new Response(JSON.stringify({ success: false, error: "Error interno del servidor" }), {
           status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
+      }
+      // Super Admin › Logs: los 5xx y las excepciones quedan como error_servidor
+      // (sin cuerpo ni datos del usuario). Nunca rompe ni retrasa la respuesta.
+      if (response.status >= 500) {
+        const subruta = new URL(req.url).pathname.split(fuente).slice(1).join(fuente);
+        const mensaje = excepcion ?? await mensajeDeRespuesta(response);
+        await enSegundoPlano(registrarErrorServidor({ fuente, subruta, status: response.status, mensaje, duracionMs: Date.now() - inicio }));
       }
       // Efectos externos (envíos, sincronizaciones, OCR, publicación...) también
       // tienen un evento propio. Las mutaciones SQL se registran atómicamente
