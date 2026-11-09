@@ -1,10 +1,10 @@
-// Reglas de la versión automática (scripts/version.mjs) sobre un repo de git temporal.
+// Reglas de la versión (scripts/version.mjs) sobre un repo de git temporal.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { calcularVersion, detectarEntorno } from "../version.mjs";
+import { calcularVersion, detectarEntorno, esRamaDePublicacion } from "../version.mjs";
 
 const IDENTIDAD = { GIT_AUTHOR_NAME: "Prueba", GIT_AUTHOR_EMAIL: "prueba@example.com", GIT_COMMITTER_NAME: "Prueba", GIT_COMMITTER_EMAIL: "prueba@example.com" };
 const carpetas = [];
@@ -14,65 +14,58 @@ function repo() {
   const cwd = mkdtempSync(path.join(tmpdir(), "version-"));
   carpetas.push(cwd);
   const git = (...args) => execFileSync("git", args, { cwd, env: { ...process.env, ...IDENTIDAD }, encoding: "utf8" }).trim();
-  git("init", "-q", "-b", "staging");
+  git("init", "-q", "-b", "main");
   let n = 0;
   const commit = (fichero = `f${++n}.txt`, contenido = String(n)) => { writeFileSync(path.join(cwd, fichero), contenido); git("add", fichero); git("commit", "-q", "-m", `cambio ${fichero}`); };
-  const mayor = (m) => commit("versionado.json", JSON.stringify({ mayor: m }));
-  const version = (ref = "HEAD") => calcularVersion({ cwd, ref, env: {} }).version;
-  return { cwd, git, commit, mayor, version };
+  const fijar = (version) => commit("versionado.json", JSON.stringify({ version }));
+  const datos = (ref = "HEAD", env = {}) => calcularVersion({ cwd, ref, env });
+  return { cwd, git, commit, fijar, datos };
 }
 
-describe("versión automática M.N", () => {
-  it("el commit que fija el mayor es la .0 y cada commit suma 1", () => {
+describe("versión publicada X.Y.Z", () => {
+  it("main y release/X.Y.Z llevan la versión exacta; no sube con cada commit", () => {
     const r = repo();
-    r.commit(); r.mayor(0);
-    expect(r.version()).toBe("0.0");
+    r.fijar("1.2.0");
     r.commit(); r.commit();
-    expect(r.version()).toBe("0.2");
+    expect(r.datos().version).toBe("1.2.0");
+    r.git("checkout", "-q", "-b", "release/1.3.0");
+    r.fijar("1.3.0");
+    expect(r.datos()).toMatchObject({ version: "1.3.0", publicada: "1.3.0", desarrollo: false, rama: "release/1.3.0" });
   });
 
-  it("aceptar el PR (un merge) no suma: producción queda igual que la demo", () => {
+  it("la demo y las ramas de trabajo muestran lo publicado + el commit", () => {
     const r = repo();
-    r.mayor(0); r.commit();
-    r.git("branch", "main");
-    r.commit(); r.commit();
-    expect([r.version("main"), r.version("staging")]).toEqual(["0.1", "0.3"]); // la demo va por delante
-    r.git("checkout", "-q", "main");
-    r.git("merge", "-q", "--no-ff", "-m", "Merge pull request #1 from org/staging", "staging");
-    expect(r.version("main")).toBe("0.3");
-    expect(r.version("staging")).toBe("0.3");
-  });
-
-  it("cambiar el mayor reinicia la cuenta", () => {
-    const r = repo();
-    r.mayor(0); r.commit(); r.commit();
-    r.mayor(1);
-    expect(r.version()).toBe("1.0");
+    r.fijar("1.2.0");
+    r.git("checkout", "-q", "-b", "staging");
     r.commit();
-    expect(r.version()).toBe("1.1");
+    const sha = r.git("rev-parse", "--short=7", "HEAD");
+    expect(r.datos()).toMatchObject({ version: `1.2.0+${sha}`, publicada: "1.2.0", desarrollo: true, rama: "staging" });
   });
 
-  it("sin versionado.json en la rama, lo dice en vez de inventar", () => {
+  it("en Vercel manda la rama del despliegue y producción siempre es exacta", () => {
     const r = repo();
-    r.commit(); r.git("branch", "main"); r.mayor(0);
-    expect(r.version("main")).toBe("sin versionar");
+    r.fijar("2.0.1");
+    const demo = r.datos("HEAD", { VERCEL: "1", VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "staging", VERCEL_GIT_COMMIT_SHA: "abcdef1234567890" });
+    expect(demo).toMatchObject({ version: "2.0.1+abcdef1", entorno: "demo", commit: "abcdef1" });
+    const candidata = r.datos("HEAD", { VERCEL: "1", VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "release/2.1.0" });
+    expect(candidata).toMatchObject({ version: "2.0.1", entorno: "preview", desarrollo: false });
+    const prod = r.datos("HEAD", { VERCEL: "1", VERCEL_ENV: "production", VERCEL_GIT_COMMIT_REF: "main" });
+    expect(prod).toMatchObject({ version: "2.0.1", entorno: "produccion", desarrollo: false });
   });
 
-  it("en un clon superficial completa el historial, y si no puede da M.? con aviso", () => {
+  it("lee otra referencia sin cambiar de rama", () => {
     const r = repo();
-    r.mayor(0); r.commit(); r.commit(); r.commit();
-    const destino = mkdtempSync(path.join(tmpdir(), "version-clon-"));
-    carpetas.push(destino);
-    execFileSync("git", ["clone", "-q", "--depth", "1", "--branch", "staging", `file://${r.cwd}`, destino]);
-    expect(calcularVersion({ cwd: destino, env: {} }).version).toBe("0.3");
+    r.fijar("1.0.0");
+    r.git("checkout", "-q", "-b", "staging");
+    r.fijar("1.1.0");
+    expect(r.datos("main").version).toBe("1.0.0");
+  });
 
-    const sinRemoto = mkdtempSync(path.join(tmpdir(), "version-clon-"));
-    carpetas.push(sinRemoto);
-    execFileSync("git", ["clone", "-q", "--depth", "1", "--branch", "staging", `file://${r.cwd}`, sinRemoto]);
-    execFileSync("git", ["remote", "remove", "origin"], { cwd: sinRemoto });
-    const datos = calcularVersion({ cwd: sinRemoto, env: {} });
-    expect(datos.version).toBe("0.?");
-    expect(datos.aviso).toBe("historial de git incompleto");
+  it("sin versionado.json válido lo dice en vez de inventar (formato antiguo incluido)", () => {
+    const r = repo();
+    r.commit("versionado.json", JSON.stringify({ mayor: 0 }));
+    expect(r.datos()).toMatchObject({ version: "sin versionar", publicada: null });
+    expect(r.datos().aviso).toMatch(/versionado\.json/);
   });
 });
 
@@ -82,5 +75,12 @@ describe("entorno", () => {
     expect(detectarEntorno({ VERCEL: "1", VERCEL_ENV: "preview" }, "staging")).toBe("demo");
     expect(detectarEntorno({ VERCEL: "1", VERCEL_ENV: "preview" }, "otra")).toBe("preview");
     expect(detectarEntorno({}, "staging")).toBe("local");
+  });
+  it("ramas de publicación", () => {
+    expect(esRamaDePublicacion("main")).toBe(true);
+    expect(esRamaDePublicacion("release/1.4.2")).toBe(true);
+    expect(esRamaDePublicacion("release/1.4")).toBe(false);
+    expect(esRamaDePublicacion("staging")).toBe(false);
+    expect(esRamaDePublicacion(null)).toBe(false);
   });
 });

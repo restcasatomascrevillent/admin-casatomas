@@ -1,58 +1,138 @@
-# Versión de producción (docs/PROCESO-DE-CAMBIOS.md).
+# Release · publicar (docs/PROCESO-DE-CAMBIOS.md).
 #
-# Al aceptar un PR staging → main deja constancia de lo publicado: etiqueta vM.N
-# y GitHub Release con los cambios. No despliega nada (eso lo hace Vercel) y no
-# toca package.json: la versión se calcula del historial (scripts/version.mjs).
-name: Versión de producción
+# Al aceptar un PR release/X.Y.Z → main (Vercel lo publica: scripts/vercel-produccion.mjs):
+#   1. Crea la etiqueta vX.Y.Z en el merge commit y la GitHub Release con su entrada del CHANGELOG.
+#   2. Integra main en staging (versión, CHANGELOG y cualquier retoque hecho en la release). Si
+#      choca, abre un PR main → staging en vez de forzar nada.
+#   3. Espera a que Vercel termine producción y comprueba que sirve vX.Y.Z con ese commit; lo
+#      anota en la GitHub Release. Así quedan unidos versión, commit y despliegue.
+# No despliega nada por su cuenta. Se puede relanzar a mano (Run workflow) si algo falló: es
+# idempotente y trabaja sobre el último commit de main.
+name: Release · publicar
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
+  pull-requests: write
+  deployments: read
 
 concurrency:
-  group: version-produccion
+  group: release-publicar
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Etiqueta y release
+  publicar:
+    name: Etiqueta, GitHub Release y vuelta a staging
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: ¿Es la aceptación de una release?
+        id: release
+        shell: bash
+        run: |
+          MENSAJE=$(git log -1 --format=%B)
+          VERSION=$(MENSAJE="$MENSAJE" node --input-type=module -e "import('./scripts/vercel-produccion.mjs').then((m) => process.stdout.write(m.versionAceptada(process.env.MENSAJE) ?? ''))")
+          FICHERO=$(node -p "require('./versionado.json').version")
+          if [ -z "$VERSION" ] || [ "$VERSION" != "$FICHERO" ]; then
+            echo "::warning::El último commit de main no es la aceptación de una release (release/X.Y.Z con esa versión en versionado.json): Vercel no lo publica y no se crea versión."
+            exit 0
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Etiqueta vX.Y.Z y GitHub Release
+        if: steps.release.outputs.version != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          TAG="v$VERSION"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "La GitHub Release $TAG ya existe." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          PR=$(git log -1 --format=%s | sed -nE 's/^Merge pull request #([0-9]+) .*/\1/p')
+          {
+            node scripts/release.mjs notas "$VERSION"
+            echo
+            echo "---"
+            echo "Publicada al aceptar el PR #$PR · commit \`$GITHUB_SHA\` · producción: https://$REPO.vercel.app"
+          } > notas.md
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file notas.md
+          echo "Creada la versión $TAG." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Integrar main en staging
+        if: steps.release.outputs.version != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch -q origin staging
+          git checkout -q -B staging origin/staging
+          if git merge-base --is-ancestor origin/main staging; then
+            echo "staging ya contiene main." >> "$GITHUB_STEP_SUMMARY"
+          elif git merge --no-ff --no-edit -m "Merge main (v$VERSION) en staging" origin/main; then
+            git push -q origin staging
+            echo "main (v$VERSION) integrado en staging." >> "$GITHUB_STEP_SUMMARY"
+          else
+            git merge --abort
+            gh pr create --base staging --head main --title "Integrar v$VERSION en staging" \
+              --body "main no se ha podido integrar en staging sin conflictos tras publicar v$VERSION. Resuélvelo en este PR (con merge commit) para que la demo tenga la versión y el CHANGELOG nuevos." || true
+            echo "::warning::main no entra limpio en staging: abierto un PR main → staging para resolverlo."
+          fi
+
+  produccion:
+    name: Comprobar producción
+    needs: publicar
+    if: needs.publicar.outputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-          fetch-depth: 0
 
-      - name: Crear la versión si se ha aceptado un PR desde staging
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Esperar a Vercel y comprobar versión y commit en producción
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.publicar.outputs.version }}
+          REPO: ${{ github.event.repository.name }}
         run: |
-          # Misma regla que usa Vercel para publicar (scripts/vercel-produccion.mjs): sale 1 si publica.
-          if VERCEL_ENV=production VERCEL_GIT_COMMIT_MESSAGE="$(git log -1 --format=%B)" node scripts/vercel-produccion.mjs >/dev/null; then
-            echo "::warning::El último commit de main no es un PR aceptado desde staging: Vercel no lo publica y no se crea versión."
-            exit 0
-          fi
-          VERSION=$(node scripts/version.mjs --solo-version)
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::No se pudo calcular la versión: $VERSION"
-            exit 1
-          fi
-          TAG="v$VERSION"
-          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            echo "La versión $TAG ya existe: este PR no traía commits nuevos." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          ANTERIOR=$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD^1 2>/dev/null || true)
-          DESDE=${ANTERIOR:-$(git log -1 --format=%H -- versionado.json)^}
-          {
-            echo "Publicada en producción al aceptar «$(git log -1 --format=%s)»."
-            echo
-            echo "### Cambios"
-            git log --no-merges --format='- %s (`%h`)' "$DESDE..HEAD"
-          } > notas.md
-          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file notas.md
-          echo "Creada la versión $TAG." >> "$GITHUB_STEP_SUMMARY"
+          set +e
+          node scripts/esperar-despliegue.mjs --sha "$GITHUB_SHA" --entorno Production --minutos 20
+          node scripts/comprobar-despliegue.mjs "https://$REPO.vercel.app" --version "$VERSION" --commit "$GITHUB_SHA" --json produccion.json
+          ESTADO=$?
+          set -e
+          DETALLE=$(node -p "require('./produccion.json').detalle")
+          FECHA=$(TZ=Europe/Madrid date '+%d/%m/%Y %H:%M')
+          if [ "$ESTADO" = "0" ]; then LINEA="✅ Producción comprobada el $FECHA: $DETALLE."; else LINEA="❌ Producción NO sirve v$VERSION ($FECHA): $DETALLE."; fi
+          gh release view "v$VERSION" --json body --jq .body > notas.md
+          printf '\n%s\n' "$LINEA" >> notas.md
+          gh release edit "v$VERSION" --notes-file notas.md
+          echo "$LINEA" >> "$GITHUB_STEP_SUMMARY"
+          exit $ESTADO
