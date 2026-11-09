@@ -1363,6 +1363,8 @@ export type Database = {
       configuracion_web: {
         Row: {
           encuesta_vinos_activa: boolean
+          encuesta_vinos_fin: string | null
+          encuesta_vinos_premio: string | null
           horario_menu_dia_casa_tomas: Json | null
           horario_tapas_casa_tomas: Json | null
           id: boolean
@@ -1375,6 +1377,8 @@ export type Database = {
         }
         Insert: {
           encuesta_vinos_activa?: boolean
+          encuesta_vinos_fin?: string | null
+          encuesta_vinos_premio?: string | null
           horario_menu_dia_casa_tomas?: Json | null
           horario_tapas_casa_tomas?: Json | null
           id?: boolean
@@ -1387,6 +1391,8 @@ export type Database = {
         }
         Update: {
           encuesta_vinos_activa?: boolean
+          encuesta_vinos_fin?: string | null
+          encuesta_vinos_premio?: string | null
           horario_menu_dia_casa_tomas?: Json | null
           horario_tapas_casa_tomas?: Json | null
           id?: boolean

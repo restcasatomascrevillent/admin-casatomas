@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from "react";
 import { Download, Gift, Loader2, Trash2, Trophy, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
+  fechaCorta,
+  hoyEnMadrid,
   participantesCsv,
+  PREMIO_MAX,
+  TEXTO_PARA_ABRIR,
+  validarPremioFecha,
   recuentoPorVino,
   sortearGanador,
   useEncuestaVinos,
@@ -39,7 +45,21 @@ export function EncuestaVinoFavorito() {
   const id = useId();
   const [verResultados, setVerResultados] = useState(false);
   const { canAccess: puedeEditar } = useCanAccessSection("gestor_carta", "edit");
-  const { activa, disponible, cargando, error, cambiarActiva, votos, vaciar } = useEncuestaVinos({ cargarVotos: verResultados });
+  const { activa, premio, fin, puedeAbrir, guardarPremioFecha, disponible, cargando, error, cambiarActiva, votos, vaciar } =
+    useEncuestaVinos({ cargarVotos: verResultados });
+  // Borrador de los campos: null = sin tocar (se ve lo guardado).
+  const [borradorPremio, setBorradorPremio] = useState<string | null>(null);
+  const [borradorFin, setBorradorFin] = useState<string | null>(null);
+  const valorPremio = borradorPremio ?? premio;
+  const valorFin = borradorFin ?? fin ?? "";
+  const hayCambios = borradorPremio !== null || borradorFin !== null;
+  const errorForm = hayCambios ? validarPremioFecha(valorPremio, valorFin) : null;
+  const plazoPasado = fin !== null && fin < hoyEnMadrid();
+  const guardar = () =>
+    guardarPremioFecha.mutate(
+      { premio: valorPremio, fin: valorFin },
+      { onSuccess: () => { setBorradorPremio(null); setBorradorFin(null); } },
+    );
 
   const aviso = cargando
     ? "Cargando..."
@@ -85,13 +105,72 @@ export function EncuestaVinoFavorito() {
               <Switch
                 id={id}
                 checked={activa}
-                disabled={!disponible || cambiarActiva.isPending}
+                disabled={!disponible || cambiarActiva.isPending || (!activa && !puedeAbrir)}
+                aria-describedby={!activa && !puedeAbrir ? `${id}-ayuda` : undefined}
                 onCheckedChange={(valor) => cambiarActiva.mutate(valor)}
               />
             </div>
           </div>
         )}
         {aviso && <p className="text-xs text-muted-foreground">{aviso}</p>}
+        {!aviso && !puedeEditar && premio && fin && (
+          <dl className="grid gap-x-4 gap-y-1 pb-1 text-sm sm:grid-cols-[auto_1fr]" data-testid="premio-fecha-lectura">
+            <dt className="text-muted-foreground">Premio</dt>
+            <dd className="break-words">{premio}</dd>
+            <dt className="text-muted-foreground">Último día para votar</dt>
+            <dd>{fechaCorta(fin)}</dd>
+          </dl>
+        )}
+        {!aviso && puedeEditar && (
+          <div className="space-y-2 pb-1 pt-2">
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
+              <div className="space-y-1">
+                <Label htmlFor={`${id}-premio`}>Premio</Label>
+                <Input
+                  id={`${id}-premio`}
+                  className="h-11"
+                  value={valorPremio}
+                  maxLength={PREMIO_MAX}
+                  disabled={activa || guardarPremioFecha.isPending}
+                  onChange={(e) => setBorradorPremio(e.target.value)}
+                  placeholder="Por ejemplo: una cena para dos"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`${id}-fin`}>Último día para votar</Label>
+                <Input
+                  id={`${id}-fin`}
+                  type="date"
+                  className="h-11"
+                  value={valorFin}
+                  disabled={activa || guardarPremioFecha.isPending}
+                  onChange={(e) => setBorradorFin(e.target.value)}
+                />
+              </div>
+            </div>
+            {activa ? (
+              <p className="text-xs text-muted-foreground" data-testid="aviso-cambiar">
+                Para cambiar el premio o el último día, cierra antes la votación.
+                {plazoPasado ? " El último día ya pasó: la web no admite más votos." : ""}
+              </p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" className="h-11" disabled={!hayCambios || guardarPremioFecha.isPending} onClick={guardar}>
+                  {guardarPremioFecha.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                  Guardar
+                </Button>
+                {errorForm && (
+                  <p role="alert" className="text-xs text-destructive">{errorForm}</p>
+                )}
+              </div>
+            )}
+            {!activa && !puedeAbrir && (
+              <p id={`${id}-ayuda`} className="text-xs text-muted-foreground" data-testid="ayuda-abrir">
+                {TEXTO_PARA_ABRIR}
+              </p>
+            )}
+          </div>
+        )}
       </CardContent>
 
       {puedeEditar && (
