@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- Deshace 20261118100000_rrss.sql. BORRA los trabajos, archivos y resultados
+-- Deshace 20261118120000_rrss.sql. BORRA los trabajos, archivos y resultados
 -- de RRSS (no los ficheros del cubo «rrss»: vacíalo antes desde Storage si se
 -- quiere liberar espacio; el cubo se borra solo si está vacío).
 begin;
