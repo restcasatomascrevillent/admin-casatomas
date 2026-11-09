@@ -184,9 +184,13 @@ describe("cada módulo en su vista (Análisis en una pantalla)", () => {
       "Qué decidir hoy": ["gasto_mes"],
       Precios: ["subidas"],
       Gasto: ["familias", "fijos", "abonos"],
-      Proveedores: ["proveedores", "locales"],
+      // Proveedores: lista y ficha fijas; «Casa Tomás y Touza» va en la franja (09/11/2026).
+      Proveedores: [],
       "Por revisar": ["por_revisar"],
     });
+    verVista("Proveedores");
+    expect(within(tablero()).getByRole("region", { name: "Tus proveedores" })).toBeInTheDocument();
+    expect(screen.getByTestId("franja-locales")).toBeInTheDocument();
     // Container queries: la vista mira el ancho del tablero (que se estrecha con la IA), no el de la pantalla.
     expect(screen.getByTestId("vista-analisis").closest(".\\@container\\/tablero")).not.toBeNull();
     // La vista «Explorar» ya no existe.
@@ -204,9 +208,11 @@ describe("cada módulo en su vista (Análisis en una pantalla)", () => {
     expect(ordenModulos()).toEqual(["familias", "abonos"]);
     // Ninguna cifra de más: no hay franja de cifras.
     expect(screen.queryByLabelText("Más cifras del periodo")).not.toBeInTheDocument();
+    // «Proveedores» siempre tiene su lista; sin «Casa Tomás y Touza» no sale el reparto.
     verVista("Proveedores");
     expect(ordenModulos()).toEqual([]);
-    expect(screen.getByText(/Has quitado los módulos de esta vista/)).toBeInTheDocument();
+    expect(within(tablero()).getByRole("region", { name: "Tus proveedores" })).toBeInTheDocument();
+    expect(screen.queryByTestId("franja-locales")).not.toBeInTheDocument();
     // Las cuatro cifras de arriba no se quitan: son la navegación.
     expect(within(screen.getByLabelText("Indicadores del periodo")).getAllByRole("button")).toHaveLength(4);
   });
@@ -254,19 +260,21 @@ describe("Personalizar el tablero", () => {
     verVista("Gasto");
     expect(screen.getByLabelText("Más cifras del periodo")).toHaveTextContent(/14\.376,94/);
     verVista("Proveedores");
-    expect(ordenModulos()).toEqual(["locales"]);
+    expect(screen.getByTestId("franja-locales")).toBeInTheDocument();
 
     let d = await abrirPersonalizar();
     fireEvent.click(within(d).getByRole("button", { name: "Quitar «Casa Tomás y Touza»" }));
     fireEvent.click(within(d).getByRole("button", { name: "Cancelar" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Personalizar el tablero" })).not.toBeInTheDocument());
-    expect(ordenModulos()).toEqual(["locales"]);
+    expect(screen.getByTestId("franja-locales")).toBeInTheDocument();
+    verVista("Gasto");
+    expect(ordenModulos()).toEqual(["familias"]);
 
     d = await abrirPersonalizar();
     fireEvent.click(within(d).getByRole("button", { name: "Restablecer el tablero de siempre" }));
     expect(within(d).getByRole("button", { name: "Restablecer el tablero de siempre" })).toBeDisabled();
     fireEvent.click(within(d).getByRole("button", { name: "Guardar" }));
-    await waitFor(() => expect(ordenModulos()).toEqual(["proveedores", "locales"]));
+    await waitFor(() => expect(ordenModulos()).toEqual(["familias", "fijos", "abonos"]));
     // Las cifras por defecto son las cuatro de arriba (y «familias fuera», en «Qué decidir hoy»): «Gasto» no lleva de más.
     verVista("Gasto");
     expect(screen.queryByLabelText("Más cifras del periodo")).not.toBeInTheDocument();
@@ -340,8 +348,8 @@ describe("detalle en grande de un módulo", () => {
     montar();
     await screen.findByText("1.362.491,57 €");
     verVista("Proveedores");
-    const tarjeta = await screen.findByRole("region", { name: "Proveedores con más gasto" });
-    const ampliar = within(tarjeta).getByRole("button", { name: "Ampliar: Proveedores con más gasto" });
+    const tarjeta = await screen.findByRole("region", { name: "Tus proveedores" });
+    const ampliar = within(tarjeta).getByRole("button", { name: "Ampliar: Tus proveedores" });
     expect(ampliar.tagName).toBe("BUTTON");
     expect(ampliar).toHaveAttribute("aria-haspopup", "dialog");
     pulsar(ampliar, " ");
@@ -356,8 +364,8 @@ describe("detalle en grande de un módulo", () => {
     montar();
     await screen.findByText("1.362.491,57 €");
     verVista("Proveedores");
-    const tarjeta = await screen.findByRole("region", { name: "Proveedores con más gasto" });
-    fireEvent.click(within(tarjeta).getByRole("button", { name: "Ampliar: Proveedores con más gasto" }));
+    const tarjeta = await screen.findByRole("region", { name: "Tus proveedores" });
+    fireEvent.click(within(tarjeta).getByRole("button", { name: "Ampliar: Tus proveedores" }));
     const d = await screen.findByRole("dialog", { name: "Proveedores con más gasto" });
     // Pide los 50 primeros, con IVA, con el periodo y el local del tablero.
     await waitFor(() =>
