@@ -61,7 +61,6 @@ import { reservasConMesaEnSala, yaAtendida } from "@/lib/reservas/hoyMovil";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -84,6 +83,7 @@ import {
   type TurnoServicio,
 } from "@/hooks/useAjustesMesaServicio";
 import { useSalaCerradaServicio } from "@/hooks/useSalaCerradaServicio";
+import { eventosDelTurno, textoEvento, useSalasEvento } from "@/hooks/useSalaEvento";
 import {
   estadoServicio,
   geometriaServicio,
@@ -138,9 +138,6 @@ import {
   ALTURA_MINIMA_PLANO_HOY,
   ALTURA_MINIMA_PLANO_HOY_MOVIL,
   coincideFiltroHoy,
-  guardarModoMesasHoy,
-  leerModoMesasHoy,
-  type ModoMesasHoy,
   turnoDelPlano,
   type FiltroTurnoHoy,
 } from "@/lib/reservas/vistaHoy";
@@ -676,12 +673,6 @@ export function VistaPlanoHoy({
 
   const volverABase = useVolverAPlanoBase(sala?.id ?? "", hoy, turno);
   const [confirmarBase, setConfirmarBase] = useState(false);
-  // «Plano | Ordenadas» (escritorio, 07/11/2026): se recuerda en este navegador; por defecto «Plano».
-  const [modoMesas, setModoMesas] = useState<ModoMesasHoy>(leerModoMesasHoy);
-  const cambiarModoMesas = (m: ModoMesasHoy) => {
-    setModoMesas(m);
-    guardarModoMesasHoy(m);
-  };
   // Deslizar el dedo (o arrastrar) a izquierda o derecha sobre las mesas cambia de sala: 50 px como poco y
   // más de lado que de arriba abajo. Un toque quieto en una mesa sigue siendo un toque; tras deslizar, el
   // clic que llegue después se ignora.
@@ -718,6 +709,10 @@ export function VistaPlanoHoy({
   const numAjustes = (ajustesQuery.data ?? []).length;
   const esTerraza = !!sala && /terraza/i.test(sala.title);
   const cierreSala = useSalaCerradaServicio(esTerraza ? (sala?.id ?? null) : null, hoy, turno);
+  // «Evento: sala entera» (20261119100000): la sala es de un evento en este turno.
+  const { data: eventosHoy } = useSalasEvento(hoy);
+  const eventosTurno = useMemo(() => eventosDelTurno(eventosHoy, hoy, turno), [eventosHoy, hoy, turno]);
+  const eventoSala = sala ? eventosTurno.get(sala.id) ?? null : null;
 
   /**
    * «Sentar aquí»: la persona está en la sala, así que se le da la mesa Y se marca «Ha llegado» (la misma
@@ -1249,11 +1244,17 @@ export function VistaPlanoHoy({
                     aria-label={
                       `${s.title}: ${cuenta.total} ${cuenta.total === 1 ? "reserva" : "reservas"}` +
                       (cuenta.sinMesa ? `, ${cuenta.sinMesa} sin mesa` : "") +
-                      (s.privada ? ", sala privada fuera de aforo" : "")
+                      (s.privada ? ", sala privada fuera de aforo" : "") +
+                      (eventosTurno.has(s.id) ? `, ${textoEvento(eventosTurno.get(s.id))}` : "")
                     }
                   >
                     {s.privada && <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
                     <span>{s.title}</span>
+                    {eventosTurno.has(s.id) && (
+                      <span className="rounded bg-violet-100 px-1 text-[11px] font-semibold text-violet-900 dark:bg-violet-900/40 dark:text-violet-100">
+                        Evento
+                      </span>
+                    )}
                     <Badge variant="secondary" className="h-5 px-1.5 text-xs tabular-nums">
                       {cuenta.total}
                     </Badge>
@@ -1267,25 +1268,20 @@ export function VistaPlanoHoy({
             </TabsList>
             )}
             {/* «Reparto de mesas» ya no se ofrece desde Hoy (10/10/2026): lo esencial está aquí. */}
-            {fijo && sala && (
-              <ToggleGroup
-                type="single"
-                value={modoMesas}
-                onValueChange={(v) => (v === "plano" || v === "ordenadas") && cambiarModoMesas(v)}
-                variant="outline"
-                className="ml-auto shrink-0"
-                aria-label="Cómo ver las mesas"
-              >
-                <ToggleGroupItem value="plano" className="h-11 min-w-11 px-3 text-sm">
-                  Plano
-                </ToggleGroupItem>
-                <ToggleGroupItem value="ordenadas" className="h-11 min-w-11 px-3 text-sm">
-                  Ordenadas
-                </ToggleGroupItem>
-              </ToggleGroup>
-            )}
             {!proponiendo && sala && (
-              <div className={cn("flex shrink-0 items-center gap-2", !fijo && "ml-auto")}>
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                {eventoSala && (
+                  <Badge
+                    className={cn(
+                      "max-w-[16rem] truncate border-violet-300 bg-violet-100 px-2 text-[13px] text-violet-900 hover:bg-violet-100 dark:bg-violet-900/40 dark:text-violet-100",
+                      fijo ? "h-11" : "h-10",
+                    )}
+                    data-testid="hoy-evento-sala"
+                    title="La sala entera es de este evento: nadie más reserva aquí y Organizar no la toca."
+                  >
+                    {textoEvento(eventoSala)}
+                  </Badge>
+                )}
                 {/* Cerrar la terraza y volver al plano base escriben: solo con «Editar» (06/11/2026). Con
                     solo «Ver», si la terraza está cerrada se dice, sin interruptor. */}
                 {esTerraza && puedeEditar && (
@@ -1379,7 +1375,6 @@ export function VistaPlanoHoy({
                     coincidentes={coincidentesMapa}
                     onTocarMesa={tocarMesa}
                     uniones={unionesMapa}
-                    modo={modoMesas}
                   />
                 ) : (
                   <MapaSalaServicio
@@ -1421,6 +1416,14 @@ export function VistaPlanoHoy({
                 {!fijo && (
                   <p className="pointer-events-none absolute left-2 top-2 rounded-md border bg-background/90 px-2 py-1 text-[13px] font-medium shadow-sm backdrop-blur-sm">
                     {etiquetaTurno}
+                  </p>
+                )}
+                {eventoSala && (
+                  <p
+                    className="pointer-events-none absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-md border border-violet-300 bg-violet-50/95 px-2 py-1 text-sm font-semibold text-violet-900 shadow-sm dark:bg-violet-950/90 dark:text-violet-100"
+                    data-testid="plano-evento-sala"
+                  >
+                    {textoEvento(eventoSala)} · sala entera
                   </p>
                 )}
               </section>

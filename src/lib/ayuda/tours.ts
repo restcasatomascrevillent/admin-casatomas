@@ -161,9 +161,9 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     {
       elemento: "facturas-ficha-acciones",
       pestana: F_COMPRAS,
-      titulo: "Ver, corregir o preguntar",
+      titulo: "Corregir o preguntar",
       texto:
-        "«Original» abre la foto o el PDF en otra pestaña. «Editar» corrige la cabecera (proveedor, número, fecha, importes) y tiene el interruptor «Marcar como verificada»; las líneas se corrigen con el lápiz de cada una. «IA» le pregunta al asistente por este documento.",
+        "«Editar» corrige la cabecera (proveedor, número, fecha, importes) y tiene el interruptor «Marcar como verificada»; las líneas se corrigen con el lápiz de cada una. «IA» le pregunta al asistente por este documento.",
       opcional: true,
       lado: "left",
     },
@@ -181,7 +181,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_COMPRAS,
       titulo: "El papel original, con zoom",
       texto:
-        "Al final de la ficha está la foto del documento. Amplía con los botones + y −, con dos dedos o con Ctrl + rueda; arrastra para moverte, doble toque para acercar, gírala si salió torcida o ábrela a pantalla completa. Así comparas lo leído con el papel sin salir de aquí.",
+        "El papel original va al lado de los datos (en pantalla ancha) o justo debajo de los importes, con su propio scroll. Amplía con dos dedos o con Ctrl + rueda (en las fotos también con + y −, doble toque, giro y pantalla completa); «Abrir en Drive» lo abre aparte. Así comparas lo leído con el papel sin salir de aquí.",
       opcional: true,
       lado: "left",
     },

@@ -210,6 +210,56 @@ export function sumarCapacidadPorMarca(
 }
 
 // ------------------------------------------------------------
+// SALAS CERRADAS POR UN EVENTO (20261119100000)
+// ------------------------------------------------------------
+// Una fila de `salas_cerradas_servicio` con `reserva_id` = esa sala está
+// entera para un evento (la reserva `reserva_id`) ese día y turno. Igual que
+// en el trigger `validar_capacidad_reserva`:
+//   - su capacidad sale del aforo de ESE turno (150 - 50 = 100 con el Salón);
+//   - las reservas que están en ella (el propio evento) no consumen aforo.
+// Las filas SIN `reserva_id` (el interruptor «Sala cerrada» de Organizar) no
+// cambian el aforo: aquí no entran.
+
+/** Una sala cerrada por un evento en un turno, con la capacidad que resta. */
+export interface SalaCerradaPorEvento {
+  espacio_id: string;
+  turno: "comida" | "cena";
+  capacidad_maxima: number;
+}
+
+/**
+ * Convierte filas de `salas_cerradas_servicio` (ya filtradas por fecha) en
+ * `SalaCerradaPorEvento`: solo las de un evento (`reserva_id`), de salas
+ * activas de la marca y que no sean privadas (la privada ya está fuera de
+ * aforo; restarla dos veces dejaría el aforo por debajo de lo real).
+ */
+export function salasCerradasPorEventoDesdeFilas(
+  filas: ReadonlyArray<{ espacio_id?: string | null; turno?: string | null; reserva_id?: string | null } | null | undefined> | null | undefined,
+  espacios: ReadonlyArray<{ id?: string | null; capacidad_maxima?: number | null; caracteristicas?: unknown } | null | undefined> | null | undefined,
+  marca: string | null | undefined,
+): SalaCerradaPorEvento[] {
+  const marcaObjetivo = marca || MARCA_POR_DEFECTO;
+  const porId = new Map<string, { capacidad_maxima?: number | null; caracteristicas?: unknown }>();
+  for (const e of espacios ?? []) if (e?.id) porId.set(String(e.id), e);
+  const vistas = new Set<string>();
+  const salida: SalaCerradaPorEvento[] = [];
+  for (const f of filas ?? []) {
+    if (!f?.reserva_id || !f.espacio_id) continue;
+    if (f.turno !== "comida" && f.turno !== "cena") continue;
+    const espacio = porId.get(String(f.espacio_id));
+    if (!espacio || esCaracteristicaPrivada(espacio.caracteristicas)) continue;
+    const marcaEspacio = (espacio.caracteristicas as { marca?: unknown } | null)?.marca;
+    if ((typeof marcaEspacio === "string" && marcaEspacio ? marcaEspacio : MARCA_POR_DEFECTO) !== marcaObjetivo) continue;
+    const clave = `${f.turno}|${f.espacio_id}`;
+    if (vistas.has(clave)) continue;
+    vistas.add(clave);
+    const capacidad = Number(espacio.capacidad_maxima);
+    salida.push({ espacio_id: String(f.espacio_id), turno: f.turno, capacidad_maxima: Number.isFinite(capacidad) ? capacidad : 0 });
+  }
+  return salida;
+}
+
+// ------------------------------------------------------------
 // AVISOS (diagnóstico de configuración incoherente)
 // ------------------------------------------------------------
 export const AVISO_DESAJUSTE_TURNO = "desajuste_corte_turno_16_17";
@@ -315,6 +365,12 @@ export interface EntradaDisponibilidad {
    * 150->170 al dar de alta "El Reservado", ver esa función).
    */
   capacidadTotal: number;
+  /**
+   * Salas cerradas por un EVENTO ese día (ver `salasCerradasPorEventoDesdeFilas`).
+   * En su turno restan su capacidad de `capacidadTotal` y las reservas que
+   * están en ellas no ocupan aforo, igual que el trigger. Sin él, nada cambia.
+   */
+  salasCerradasPorEvento?: ReadonlyArray<SalaCerradaPorEvento>;
   /**
    * Servicios de ESTE día en los que no se cogen reservas (cierre semanal o a
    * mano, ver `_shared/cierres.ts`). Los periodos cuyo inicio cae en un turno
@@ -844,6 +900,23 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
   );
   if (capacidadTotal === 0) avisos.add(AVISO_SIN_CAPACIDAD);
 
+  // Salas cerradas por un evento: restan su capacidad en SU turno.
+  const privadasSet = new Set(entrada.salasPrivadas || []);
+  const cerradaPorEvento = new Set<string>();
+  const restaTurno = { comida: 0, cena: 0 };
+  for (const s of entrada.salasCerradasPorEvento || []) {
+    if (!s?.espacio_id || (s.turno !== "comida" && s.turno !== "cena")) continue;
+    const clave = `${s.turno}|${s.espacio_id}`;
+    if (privadasSet.has(String(s.espacio_id)) || cerradaPorEvento.has(clave)) continue;
+    cerradaPorEvento.add(clave);
+    const c = Number(s.capacidad_maxima);
+    restaTurno[s.turno] += Number.isFinite(c) && c > 0 ? c : 0;
+  }
+  const capacidadTurno = {
+    comida: Math.max(0, capacidadTotal - restaTurno.comida),
+    cena: Math.max(0, capacidadTotal - restaTurno.cena),
+  };
+
   const diaSemana = diaDeLaSemana(fecha);
   const politica = entrada.politica || {};
   const ahora = entrada.ahora || null;
@@ -860,6 +933,8 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
     if (!reserva) continue;
     const minutos = horaAMinutos(reserva.hora);
     if (minutos === null) continue;
+    // El evento que tiene la sala entera no consume aforo (como en el trigger).
+    if (reserva.espacio_id && cerradaPorEvento.has(`${turnoDeHora(minutos)}|${reserva.espacio_id}`)) continue;
     const comensales = Number(reserva.numero_comensales);
     const suma = Number.isFinite(comensales) ? comensales : 0;
     const clave = minutosAHora(minutos);
@@ -871,29 +946,32 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
     else comensalesCena += suma;
   }
 
-  const construirAforo = (ocupacion: number): AforoTurnoCalculado => {
-    const disponible = Math.max(0, capacidadTotal - ocupacion);
+  const construirAforo = (ocupacion: number, capacidad: number): AforoTurnoCalculado => {
+    const disponible = Math.max(0, capacidad - ocupacion);
     return {
-      capacidad_maxima: capacidadTotal,
+      capacidad_maxima: capacidad,
       ocupacion,
       disponible,
-      porcentaje: capacidadTotal > 0 ? Math.round((ocupacion / capacidadTotal) * 100) : 0,
+      porcentaje: capacidad > 0 ? Math.round((ocupacion / capacidad) * 100) : 0,
       completo: disponible < comensalesPedidos,
     };
   };
   const aforo = {
-    comida: construirAforo(comensalesComida),
-    cena: construirAforo(comensalesCena),
+    comida: construirAforo(comensalesComida, capacidadTurno.comida),
+    cena: construirAforo(comensalesCena, capacidadTurno.cena),
   };
 
   const ocupacion: OcupacionHora[] = Array.from(porHora.entries())
-    .map(([hora, v]) => ({
-      hora,
-      turno: turnoDeHora(hora),
-      total_reservas: v.reservas,
-      total_comensales: v.comensales,
-      porcentaje_hora: capacidadTotal > 0 ? Math.round((v.comensales / capacidadTotal) * 100) : 0,
-    }))
+    .map(([hora, v]) => {
+      const capacidad = capacidadTurno[turnoDeHora(hora)];
+      return {
+        hora,
+        turno: turnoDeHora(hora),
+        total_reservas: v.reservas,
+        total_comensales: v.comensales,
+        porcentaje_hora: capacidad > 0 ? Math.round((v.comensales / capacidad) * 100) : 0,
+      };
+    })
     .sort((a, b) => a.hora.localeCompare(b.hora));
 
   const vacio = (
@@ -1007,6 +1085,8 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
       avisos.add(AVISO_DESAJUSTE_TURNO);
     }
 
+    // Aforo del turno del periodo (sin las salas cerradas por un evento).
+    const capacidadPeriodo = capacidadTurno[turnoDeHora(inicio)];
     const { escalera, origen } = resolverEscalera(config, avisos);
     const ocultar = resolverOcultar(config);
 
@@ -1028,7 +1108,7 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
         escalera,
         ocultar_nivel_anterior: ocultar,
         base_umbral: resolverBaseUmbral(config),
-        base_umbral_capacidad: capacidadTotal,
+        base_umbral_capacidad: capacidadPeriodo,
         origen_escalera: origen,
         huecos_ofrecidos: 0,
         huecos_completos: 0,
@@ -1049,8 +1129,8 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
     const baseUmbral = resolverBaseUmbral(config);
     const divisor =
       baseUmbral === "reparto_nivel_base" && huecosNivelBase > 0
-        ? capacidadTotal / huecosNivelBase
-        : capacidadTotal;
+        ? capacidadPeriodo / huecosNivelBase
+        : capacidadPeriodo;
     // Con 150 plazas y una comida de 13:00 a 16:00 (tres horas en punto),
     // `divisor` vale 50: el 70% que abre la media son 35 personas A ESA
     // MISMA HORA, y el 85% que abre el cuarto son 43.
@@ -1171,7 +1251,7 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
         promovido: c.promovido,
         comensales_hora: v.comensales,
         reservas_hora: v.reservas,
-        porcentaje_hora: capacidadTotal > 0 ? Math.round((v.comensales / capacidadTotal) * 100) : 0,
+        porcentaje_hora: aforoTurno.capacidad_maxima > 0 ? Math.round((v.comensales / aforoTurno.capacidad_maxima) * 100) : 0,
         porcentaje_para_umbral: Math.round(porcentajeDe(c.minutoAbs)),
         capacidad_maxima: aforoTurno.capacidad_maxima,
         capacidad_disponible: aforoTurno.disponible,

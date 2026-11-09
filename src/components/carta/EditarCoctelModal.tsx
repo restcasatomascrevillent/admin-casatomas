@@ -403,6 +403,8 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
                   </Button>
                   <BotonCambiarFondo
                     recorte={fotoCarta}
+                    tabla="Cocteles"
+                    id={coctel?.id}
                     url={removeImage ? null : coctel?.imagen_url}
                     onIniciado={() => {
                       setRemoveImage(false);

@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   FORMATOS,
+  LADO_MINIMO_MARCO,
   TIPOS_FOTO,
+  encajeDe,
   escalaParaCubrir,
   esAptaPara,
   urlRecurso,
@@ -18,11 +20,16 @@ import {
 import { miniaturaDrive, textoError } from "./api";
 import { SubirFotoDialog } from "./SubirFotoDialog";
 import { anotarMedidasCarta, useFotosInstagram } from "./useFotosInstagram";
+import { EtiquetaOriginal } from "./EtiquetaOriginal";
 
 const NOMBRE_FORMATO: Record<FormatoId, string> = { post: "un post", story: "una story" };
 
-/** Por qué una foto no se puede usar (o null si se puede). Misma regla que validarPieza. */
-export function motivoNoApta(foto: Foto, formato: FormatoId, plantilla?: Pick<Plantilla, "tiposFoto">): string | null {
+/**
+ * Por qué una foto no se puede usar (o null si se puede). Misma regla que validarPieza:
+ * con una plantilla enmarcada (encaje «marco») basta con que el lado largo mida 800 px o más;
+ * con una a sangre (o sin plantilla) la foto tiene que cubrir el formato.
+ */
+export function motivoNoApta(foto: Foto, formato: FormatoId, plantilla?: Pick<Plantilla, "tiposFoto" | "encaje">): string | null {
   if (foto.problema) return foto.problema;
   // Sin tipo (foto de Drive sin clasificar): vale para cualquier plantilla.
   if (foto.tipo && plantilla?.tiposFoto?.length && !plantilla.tiposFoto.includes(foto.tipo)) {
@@ -32,11 +39,18 @@ export function motivoNoApta(foto: Foto, formato: FormatoId, plantilla?: Pick<Pl
   // al cargar o al prepararla llegan las reales y la validación de la pieza manda.
   if ((!foto.ancho || !foto.alto) && (foto.platoId || foto.vinoId)) return null;
   if (!foto.ancho || !foto.alto) return "Drive todavía no sabe las medidas de esta foto: vuelve a abrir la biblioteca en un rato.";
+  if (encajeDe(plantilla) === "marco") {
+    if (!esAptaPara(foto, formato, "marco")) {
+      return `Es pequeña (${foto.ancho}×${foto.alto}): incluso enmarcada se vería borrosa. Hace falta que su lado largo mida ${LADO_MINIMO_MARCO} px o más.`;
+    }
+    return null;
+  }
   if (!esAptaPara(foto, formato)) {
     const f = FORMATOS[formato];
     const ampliar = Math.round((escalaParaCubrir(foto.ancho, foto.alto, f.ancho, f.alto) - 1) * 100);
     const forma = foto.ancho > foto.alto ? "Es apaisada" : "Es pequeña";
-    return `${forma} (${foto.ancho}×${foto.alto}): para ${NOMBRE_FORMATO[formato]} habría que ampliarla un ${ampliar} % y se vería borrosa.`;
+    const consejo = esAptaPara(foto, formato, "marco") ? " Usa la plantilla Foto enmarcada: la enseña entera, sin ampliarla." : "";
+    return `${forma} (${foto.ancho}×${foto.alto}): para ${NOMBRE_FORMATO[formato]} habría que ampliarla un ${ampliar} % y se vería borrosa.${consejo}`;
   }
   return null;
 }
@@ -229,6 +243,7 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
                     {foto.vinoId ? "Vino" : "Carta"}
                   </span>
                 )}
+                <EtiquetaOriginal foto={foto} />
                 {!foto.tipo && (
                   <span className="absolute bottom-1 left-1 rounded bg-background/90 px-1 text-[10px] font-medium leading-4 text-foreground" aria-hidden="true">
                     Sin clasificar

@@ -603,12 +603,22 @@ export class ErrorSinFilasEdicion extends Error {
 }
 
 /** Mensaje legible para un fallo al guardar (mismo estilo que el alta). */
+/**
+ * ¿Es un rechazo de la BD por el evento con la sala entera (20261119100000)? La
+ * sala está cerrada por un evento, tiene otras reservas o el resto no cabe.
+ */
+export function esMensajeSalaEvento(mensaje: string): boolean {
+  return /cerrada por un evento|si se cierra la sala|más ese turno: muévelas/i.test(mensaje);
+}
+
 export function mensajeErrorEdicion(error: unknown): string {
   if (error instanceof ErrorSinFilasEdicion) return error.message;
   const e = (error ?? {}) as { code?: string; message?: string };
   const mensaje = String(e.message ?? "");
   // Sala privada (el Reservado) ya reservada en ese turno: el mensaje lleva el nombre de la sala.
   if (esErrorSalaPrivadaOcupada(e)) return mensajeSalaPrivadaOcupada(e);
+  // Sala cerrada por un evento (20261119100000): el mensaje de la BD ya dice qué sala y por qué.
+  if (esMensajeSalaEvento(mensaje)) return mensaje;
   // 23514 = check_violation: lo lanza el trigger de aforo, pero también los CHECK de la tabla.
   if (e.code === "23514" && mensaje.includes("Aforo")) {
     return "No hay aforo suficiente en ese turno. Elige otra hora o reduce los comensales.";

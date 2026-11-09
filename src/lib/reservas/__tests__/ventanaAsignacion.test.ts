@@ -152,6 +152,7 @@ describe("configAsignacionDesde", () => {
       avisoActivo: true,
       espaciosExcluidos: [],
       mesasExcluidas: [],
+      mesasAlFinal: [],
     });
     expect(configAsignacionDesde({ asignacion_ventana_horas: null })).toMatchObject({ ventanaHoras: 48 });
   });
@@ -163,8 +164,9 @@ describe("configAsignacionDesde", () => {
         asignacion_aviso_activo: false,
         asignacion_espacios_excluidos: ["s1"],
         asignacion_mesas_excluidas: ["m1"],
+        asignacion_mesas_al_final: ["m2"],
       }),
-    ).toEqual({ ventanaHoras: 24, avisoActivo: false, espaciosExcluidos: ["s1"], mesasExcluidas: ["m1"] });
+    ).toEqual({ ventanaHoras: 24, avisoActivo: false, espaciosExcluidos: ["s1"], mesasExcluidas: ["m1"], mesasAlFinal: ["m2"] });
   });
 });
 
@@ -236,6 +238,7 @@ describe("crearEsquemaConfigAsignacion (zod del formulario)", () => {
     asignacion_aviso_activo: true,
     asignacion_espacios_excluidos: [] as string[],
     asignacion_mesas_excluidas: [] as string[],
+    asignacion_mesas_al_final: [] as string[],
   };
 
   it("acepta una configuración válida", () => {

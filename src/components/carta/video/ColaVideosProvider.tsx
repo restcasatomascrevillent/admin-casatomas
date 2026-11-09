@@ -20,7 +20,7 @@ import {
 import { ColaVideosContext, type ContextoColaVideos } from "./useColaVideos";
 import { mantenerPantallaEncendida, vigilarSegundoPlano } from "./pantallaEncendida";
 import { mostrarNotificacion, pedirPermisoNotificaciones, posterParaNotificacion } from "./notificarVideo";
-import { descargarOriginalVideo, ErrorMigracionVideo, guardarOriginalVideo, guardarVideoPlato } from "./subirVideoPlato";
+import { AVISO_SIN_ORIGINAL_VIDEO, descargarOriginalVideo, ErrorMigracionVideo, guardarOriginalVideo, guardarVideoPlato } from "./subirVideoPlato";
 import { AVISO_PANTALLA_ENCENDIDA } from "./videoPlato";
 
 export const AVISO_VUELTA_SEGUNDO_PLANO =
@@ -125,13 +125,14 @@ export function ColaVideosProvider({ children }: { children: ReactNode }) {
         // La URL actual más fresca (la ficha pudo cambiar mientras tanto) para borrar el fichero viejo.
         const enCache = queryClient.getQueryData<Plato[]>(["platos"])?.find((p) => p.id === t.platoId);
         await guardarVideoPlato(t.platoId, r.blob, enCache ? (enCache.video_url ?? null) : t.urlActual, t.tema);
-        // Conservar el original para poder cambiar el fondo luego (si falla, el vídeo ya está guardado).
+        // Conservar el original (en Google Drive) para poder cambiar el fondo luego (si falla, el vídeo ya está guardado).
         if (t.guardarOriginal) {
           try {
             const rutaOriginal = await guardarOriginalVideo(t.platoId, archivo);
             actualizar(t.id, { rutaOriginal });
           } catch (e) {
             console.warn("[video-plato] no se pudo guardar el original", e);
+            toast.warning(AVISO_SIN_ORIGINAL_VIDEO, { description: `El vídeo de la web sí está guardado. ${(e as Error)?.message ?? ""}`.trim(), duration: 8000 });
           }
         }
         await queryClient.invalidateQueries({ queryKey: ["platos"] });

@@ -18,7 +18,10 @@ export const CAMPOS_EJEMPLO = ["antetitulo", "titular", "cita", "pie"] as const;
 export const ROTULOS_EJEMPLO: Readonly<Record<MarcaIA, readonly string[]>> = {
   "casa-tomas": [
     "Cada jueves por la noche",
+    "Brasa, sal y paciencia",
+    "Chuleta de vaca madurada",
     "Cocina gallega · Marisco · Crevillente",
+    "De nuestra carta",
     "De padres a hijos",
     "Desde 1998",
     "Mucho más que un restaurante",
@@ -34,7 +37,10 @@ export const ROTULOS_EJEMPLO: Readonly<Record<MarcaIA, readonly string[]>> = {
     "De autor",
     "Donde la alquimia de los cócteles se encuentra con la excelencia.",
     "Horario",
+    "Para empezar la noche",
+    "Sofá, mármol y luz baja",
     "Te esperamos en Touza",
+    "Un rincón para quedarse",
     "Un sitio para quedarse",
   ],
 };

@@ -395,7 +395,9 @@ describe("Compras · ficha a pantalla completa", () => {
     const ficha = await screen.findByTestId("ficha-compras");
     expect(within(ficha).getByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
     expect(within(ficha).getByRole("button", { name: "Editar" })).toHaveTextContent("Editar");
-    expect(within(ficha).getByRole("button", { name: /Ver original|original/ })).toBeDisabled(); // sin escaneo guardado
+    // El original solo se ve en el visor de la ficha: sin botón en la cabecera y, sin escaneo guardado, un aviso discreto.
+    expect(within(ficha).queryByRole("button", { name: /original/i })).not.toBeInTheDocument();
+    expect(within(ficha).getByTestId("sin-original")).toHaveTextContent(/No se guardó el original/);
     expect(within(ficha).getByRole("button", { name: /Sin revisar/ })).toBeInTheDocument();
     const ia = within(ficha).getByRole("button", { name: /Preguntar a la IA/ });
     expect(ia).toHaveTextContent("IA");
