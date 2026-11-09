@@ -84,7 +84,8 @@ describe("useBusquedaParker", () => {
   });
 
   it("si falla: «fallida» con el motivo (la ficha se puede guardar igual)", async () => {
-    const { result } = renderHook(() => useBusquedaParker(vi.fn().mockRejectedValue(new Error("Sin saldo en OpenAI"))));
+    const falla = vi.fn().mockRejectedValue(new Error("Sin saldo en OpenAI")) as unknown as Parameters<typeof useBusquedaParker>[0];
+    const { result } = renderHook(() => useBusquedaParker(falla));
     await act(async () => { await result.current.lanzar({ nombre: "Aalto", anada: 2021, sin_anada: false }); });
     expect(result.current).toMatchObject({ fase: "fallida", error: "Sin saldo en OpenAI", resultado: { estado: "fallida", motivo: "busqueda_fallida", anada: 2021 } });
   });
@@ -92,7 +93,8 @@ describe("useBusquedaParker", () => {
 
 function Prueba({ datos, buscar, valores = {} }: { datos: DatosVinoFoto | null; buscar: ReturnType<typeof vi.fn>; valores?: Record<string, unknown> }) {
   const form = useForm({ defaultValues: { nombre: "Cuesta de las Liebres", denominacion_origen: "D.O. Ribera del Duero", anada: "", sin_anada: false, ...valores } });
-  const busqueda = useBusquedaParker(buscar);
+  // vi.fn() no encaja con el tipo de la búsqueda real; aquí solo importa lo que devuelve.
+  const busqueda = useBusquedaParker(buscar as unknown as Parameters<typeof useBusquedaParker>[0]);
   return (
     <Form {...form}>
       <PanelParker control={form.control} getValues={form.getValues} setValue={form.setValue} busqueda={busqueda} datosEtiqueta={datos} incluirConFicha onIncluirConFicha={() => {}} />
