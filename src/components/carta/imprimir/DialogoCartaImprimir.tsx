@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,16 +15,18 @@ import {
   hayPublicados,
   NOMBRE_CARTA,
   nombreFicheroCarta,
+  nombreSeccion,
   tiposVino,
   type CartaImpresa,
   type FilaPlato,
   type FilaVino,
   type TipoCartaImpresa,
 } from "@/lib/carta-pdf/datos";
-import { maquetarCarta, TAMANOS_CARTA, type PaginaCarta, type TamanoCarta } from "@/lib/carta-pdf/maquetacion";
+import { maquetarCarta, seccionesQueNoCaben, TAMANOS_CARTA, type MaquetaCarta, type PaginaCarta, type TamanoCarta } from "@/lib/carta-pdf/maquetacion";
 import { cargarMotorCarta, descargarPdf, type MotorCarta } from "@/lib/carta-pdf/navegador";
 import { crearPdfCarta } from "@/lib/carta-pdf/pdf";
 import { IDIOMAS_CARTA, NOMBRE_IDIOMA, TEXTOS, type IdiomaCarta } from "@/lib/carta-pdf/textos";
+import { RevisionSecciones } from "./RevisionSecciones";
 import { VistaPagina } from "./VistaPagina";
 
 /**
@@ -35,6 +37,11 @@ import { VistaPagina } from "./VistaPagina";
  * Opciones mínimas (tamaño, carta, idioma, categorías y sangrado), vista previa de
  * todas las páginas y «Descargar PDF». La maquetación y el PDF salen de
  * src/lib/carta-pdf; las fuentes y pdf-lib se cargan al abrir el diálogo.
+ *
+ * Una sección por cara (08/11/2026): si alguna no cabe en una cara del tamaño
+ * elegido, se avisa (sección y tamaño) y no se descarga hasta revisarla
+ * (RevisionSecciones): repartirla a propósito, quitar elementos o cambiar de
+ * tamaño.
  */
 
 interface Props {
@@ -84,6 +91,7 @@ function ListaCasillas({
 
 // Por defecto, una lista vacía estable: con `= []` cada render estrenaba lista y se volvía a maquetar todo.
 const SIN_FILAS = [] as const;
+const SIN_PAGINAS: PaginaCarta[] = [];
 
 export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, platos = SIN_FILAS, vinos = SIN_FILAS }: Props) {
   const filas = tipo === "platos" ? platos : vinos;
@@ -98,6 +106,10 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
   const [motor, setMotor] = useState<MotorCarta | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
+  /** Secciones que se ha pedido repartir en varias caras, por tamaño: «A5:tinto». */
+  const [repartidas, setRepartidas] = useState<Set<string>>(() => new Set());
+  /** Platos o vinos (id) quitados a mano de la carta impresa. */
+  const [excluidosElementos, setExcluidosElementos] = useState<Set<string>>(() => new Set());
 
   const cartaActiva: CartaImpresa = carta === "touza" && !hayTouza ? "restaurante" : carta;
 
@@ -122,20 +134,38 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
   );
   const tiposVinoOpciones = useMemo(() => (tipo === "vinos" ? tiposVino(vinos, cartaActiva) : []), [tipo, vinos, cartaActiva]);
 
-  const contenido = useMemo(() => {
+  const { contenido, completo } = useMemo(() => {
     const incluidas = (tipo === "platos"
       ? categoriasPlatosOpciones.map((c) => c.clave)
       : tiposVinoOpciones.flatMap((t) => t.denominaciones.map((d) => d.clave))
     ).filter((clave) => !excluidas.has(clave));
     const opciones = { carta: cartaActiva, idioma, categorias: incluidas };
-    return tipo === "platos" ? contenidoPlatos(platos, opciones) : contenidoVinos(vinos, opciones);
-  }, [tipo, platos, vinos, cartaActiva, idioma, excluidas, categoriasPlatosOpciones, tiposVinoOpciones]);
+    const crear = (excluidos?: ReadonlySet<string>) =>
+      tipo === "platos" ? contenidoPlatos(platos, { ...opciones, excluidos }) : contenidoVinos(vinos, { ...opciones, excluidos });
+    const todo = crear();
+    return { completo: todo, contenido: excluidosElementos.size ? crear(excluidosElementos) : todo };
+  }, [tipo, platos, vinos, cartaActiva, idioma, excluidas, excluidosElementos, categoriasPlatosOpciones, tiposVinoOpciones]);
 
   const totalElementos = contenido.secciones.reduce((t, s) => t + s.grupos.reduce((u, g) => u + g.elementos.length, 0), 0);
 
-  const paginas: PaginaCarta[] = useMemo(
-    () => (motor && totalElementos > 0 ? maquetarCarta(motor.medidor, contenido, tamano) : []),
-    [motor, contenido, totalElementos, tamano],
+  const maqueta: MaquetaCarta | null = useMemo(() => {
+    if (!motor || totalElementos === 0) return null;
+    const prefijo = `${tamano}:`;
+    const repartir = [...repartidas].filter((k) => k.startsWith(prefijo)).map((k) => k.slice(prefijo.length));
+    return maquetarCarta(motor.medidor, contenido, tamano, { repartir });
+  }, [motor, contenido, totalElementos, tamano, repartidas]);
+  const paginas: PaginaCarta[] = maqueta?.paginas ?? SIN_PAGINAS;
+  const problemas = useMemo(() => (maqueta ? seccionesQueNoCaben(maqueta) : []), [maqueta]);
+  const otroTamano: TamanoCarta = tamano === "A5" ? "A4" : "A5";
+  // Solo si algo no cabe: ¿cabría en una cara del otro tamaño?
+  const cabenEnOtro = useMemo(() => {
+    if (!motor || !problemas.length) return new Set<string>();
+    const otra = maquetarCarta(motor.medidor, contenido, otroTamano);
+    return new Set(otra.secciones.filter((s) => s.cabe).map((s) => s.clave));
+  }, [motor, contenido, otroTamano, problemas.length]);
+  const nombrePorSeccion = useMemo(
+    () => new Map((maqueta?.secciones ?? []).map((s) => [s.clave, nombreSeccion(tipo, s.clave)])),
+    [maqueta, tipo],
   );
 
   useEffect(() => {
@@ -158,8 +188,26 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
   const textos = TEXTOS[idioma];
   const tituloCarta = `${NOMBRE_CARTA[cartaActiva]} · ${tipo === "vinos" ? textos.tituloVinos : textos.tituloPlatos}`;
 
+  const repartir = (clave: string, si: boolean) =>
+    setRepartidas((previas) => {
+      const nuevas = new Set(previas);
+      if (si) nuevas.add(`${tamano}:${clave}`);
+      else nuevas.delete(`${tamano}:${clave}`);
+      return nuevas;
+    });
+
+  const cambiarExcluidos = (ids: string[], excluir: boolean) =>
+    setExcluidosElementos((previos) => {
+      const nuevos = new Set(previos);
+      for (const id of ids) {
+        if (excluir) nuevos.add(id);
+        else nuevos.delete(id);
+      }
+      return nuevos;
+    });
+
   const descargar = async () => {
-    if (!motor || !paginas.length) return;
+    if (!motor || !paginas.length || problemas.length) return;
     setDescargando(true);
     try {
       const pdf = await crearPdfCarta(paginas, motor.recursos, { sangrado, titulo: tituloCarta, idioma, tamano });
@@ -181,8 +229,8 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
         <DialogHeader>
           <DialogTitle>Carta para imprimir (PDF)</DialogTitle>
           <DialogDescription>
-            {tipo === "vinos" ? "Carta de vinos" : "Carta de platos"} en A5 o A4 vertical con la letra y los colores de la web.
-            Solo sale lo que está publicado en la carta elegida.
+            {tipo === "vinos" ? "Carta de vinos" : "Carta de platos"} en A5 o A4 vertical con la letra y los colores de la web,
+            con cada sección en su propia cara. Solo sale lo que está publicado en la carta elegida.
           </DialogDescription>
         </DialogHeader>
 
@@ -344,10 +392,37 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
                 <Loader2 className="h-4 w-4 animate-spin" /> Preparando la vista previa…
               </p>
             ) : !paginas.length ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
-                {todasLasClaves.length ? "Elige al menos una categoría." : "No hay nada publicado en esta carta."}
-              </p>
-            ) : ampliada !== null ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                {completo.secciones.length ? (
+                  // Todo lo elegido se ha quitado a mano: que se pueda recuperar.
+                  <>
+                    <p>Has quitado todos los {tipo === "vinos" ? "vinos" : "platos"} de lo elegido.</p>
+                    <Button type="button" variant="link" onClick={() => setExcluidosElementos(new Set())}>
+                      Recuperar los quitados
+                    </Button>
+                  </>
+                ) : (
+                  <p>{todasLasClaves.length ? "Elige al menos una categoría." : "No hay nada publicado en esta carta."}</p>
+                )}
+              </div>
+            ) : (
+              <>
+                {maqueta && (
+                  <RevisionSecciones
+                    tipo={tipo}
+                    tamano={tamano}
+                    secciones={maqueta.secciones}
+                    completo={completo}
+                    excluidos={excluidosElementos}
+                    cabenEnOtro={cabenEnOtro}
+                    otroTamano={otroTamano}
+                    alVerPagina={setAmpliada}
+                    alRepartir={repartir}
+                    alCambiarExcluidos={cambiarExcluidos}
+                    alCambiarTamano={setTamano}
+                  />
+                )}
+                {ampliada !== null ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => setAmpliada(null)}>
@@ -372,12 +447,22 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
                     </Button>
                   </div>
                 </div>
-                <VistaPagina pagina={paginas[ampliada]} etiqueta={etiquetaPagina(ampliada)} className="mx-auto block h-auto w-full max-w-lg shadow-md" />
+                {paginas[ampliada].desborda && (
+                  <p className="flex items-start gap-2 text-sm text-destructive">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    No cabe en una cara {tamano}: lo que se ve es lo que entra con la letra más pequeña que se lee bien.
+                  </p>
+                )}
+                <VistaPagina
+                  pagina={paginas[ampliada]}
+                  etiqueta={etiquetaPagina(ampliada)}
+                  className={cn("mx-auto block h-auto w-full max-w-lg shadow-md", paginas[ampliada].desborda && "ring-2 ring-destructive")}
+                />
               </div>
             ) : (
               <>
                 <p className="mb-3 text-sm text-muted-foreground">
-                  Toca una página para verla en grande.
+                  Una sección por cara. Toca una página para verla en grande.
                 </p>
                 <ol className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                   {paginas.map((pagina, i) => (
@@ -385,27 +470,50 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
                       <button
                         type="button"
                         onClick={() => setAmpliada(i)}
-                        aria-label={`Ver en grande: ${etiquetaPagina(i)}`}
-                        className="block w-full rounded-sm shadow-sm ring-offset-background transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        aria-label={`Ver en grande: ${etiquetaPagina(i)}${pagina.desborda ? " (no cabe)" : ""}`}
+                        className={cn(
+                          "relative block w-full rounded-sm shadow-sm ring-offset-background transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                          pagina.desborda && "ring-2 ring-destructive",
+                        )}
                       >
                         <VistaPagina pagina={pagina} etiqueta={etiquetaPagina(i)} className="block h-auto w-full" />
+                        {pagina.desborda && (
+                          <span className="absolute inset-x-0 bottom-0 bg-destructive px-1 py-0.5 text-center text-[11px] font-medium text-destructive-foreground">
+                            No cabe
+                          </span>
+                        )}
                       </button>
-                      <span className="mt-1 block text-center text-xs tabular-nums text-muted-foreground">{i + 1}</span>
+                      <span className="mt-1 block truncate text-center text-xs tabular-nums text-muted-foreground">
+                        {i + 1}
+                        {pagina.seccion && nombrePorSeccion.has(pagina.seccion) ? ` · ${nombrePorSeccion.get(pagina.seccion)}` : ""}
+                      </span>
                     </li>
                   ))}
                 </ol>
+              </>
+            )}
               </>
             )}
           </section>
         </div>
         {/* Pie fijo abajo: el resumen y «Descargar PDF» siempre a la vista, aunque la lista sea larga. */}
         <div className="sticky -bottom-4 z-10 -mx-4 -mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t bg-background px-4 py-3 sm:-bottom-6 sm:-mx-6 sm:-mb-6 sm:px-6">
-          <p className="text-sm text-muted-foreground" aria-live="polite">
-            {paginas.length
-              ? `${paginas.length} páginas ${tamano} · ${totalElementos} ${tipo === "vinos" ? "vinos" : "platos"}${sangrado ? " · con sangrado" : ""}`
-              : "Sin páginas todavía"}
-          </p>
-          <Button type="button" className="w-full sm:w-auto" onClick={descargar} disabled={!paginas.length || descargando}>
+          <div className="text-sm" aria-live="polite">
+            <p className="text-muted-foreground">
+              {paginas.length
+                ? `${paginas.length} páginas ${tamano} · ${totalElementos} ${tipo === "vinos" ? "vinos" : "platos"}${sangrado ? " · con sangrado" : ""}`
+                : "Sin páginas todavía"}
+            </p>
+            {problemas.length > 0 && (
+              <p className="font-medium text-destructive">
+                {problemas.length === 1
+                  ? `${nombrePorSeccion.get(problemas[0].clave)} no cabe en una cara ${tamano}`
+                  : `${problemas.length} secciones no caben en una cara ${tamano}`}
+                : revísalo antes de descargar.
+              </p>
+            )}
+          </div>
+          <Button type="button" className="w-full sm:w-auto" onClick={descargar} disabled={!paginas.length || problemas.length > 0 || descargando}>
             {descargando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
             Descargar PDF
           </Button>

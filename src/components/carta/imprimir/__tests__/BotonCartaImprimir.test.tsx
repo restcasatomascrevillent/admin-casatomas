@@ -1,7 +1,8 @@
 /**
  * «Carta para imprimir»: el diálogo ofrece tamaño, carta (si hay Touza),
  * idioma, categorías y sangrado; la vista previa cuenta las páginas y
- * «Descargar PDF» genera el fichero con su nombre.
+ * «Descargar PDF» genera el fichero con su nombre. Cada sección va en su cara:
+ * si una no cabe, avisa (sección y tamaño) y no descarga hasta revisarla.
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -98,6 +99,95 @@ describe("BotonCartaImprimir", () => {
     expect(paginas[0].ancho).toBeCloseTo(595.28, 1);
     expect(opciones).toMatchObject({ tamano: "A4", sangrado: true, idioma: "es" });
     expect(m.descargar.mock.calls[0][1]).toMatch(/^Carta-Casa-Tomas-platos-es-A4-\d{4}-\d{2}-\d{2}\.pdf$/);
+  });
+
+  it("una sección por cara: tres categorías, tres páginas entre portada y contraportada", async () => {
+    const dialogo = await abrir({ tipo: "platos", platos: PLATOS });
+    expect(within(dialogo).getByText(/^5 páginas A5/)).toBeInTheDocument();
+    expect(within(dialogo).queryByRole("alert")).toBeNull();
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Descargar PDF" }));
+    await waitFor(() => expect(m.descargar).toHaveBeenCalledTimes(1));
+    const [paginas] = m.crearPdf.mock.calls[0] as unknown as [{ tipo: string; seccion?: string }[]];
+    expect(paginas.filter((p) => p.tipo === "interior").map((p) => p.seccion)).toEqual(["NOVEDADES DEL DÍA", "CARNES", "POSTRES"]);
+  });
+
+  describe("si una sección no cabe en una cara", () => {
+    // 24 mariscos con descripción de dos líneas: en A5 no caben en una cara; en A4, a dos columnas, sí.
+    const MARISCOS = [
+      ...Array.from({ length: 24 }, (_, i) =>
+        plato(String(100 + i), "MARISCOS", {
+          nombre: `Marisco ${i + 1}`,
+          descripcion: "Una descripción que ocupa dos líneas en la carta impresa, como las de verdad.",
+        }),
+      ),
+      plato("1", "CARNES"),
+    ];
+
+    it("avisa con la sección y el tamaño, y no deja descargar", async () => {
+      const dialogo = await abrir({ tipo: "platos", platos: MARISCOS });
+      const aviso = await within(dialogo).findByRole("alert");
+      expect(aviso).toHaveTextContent("Una sección no cabe en una cara A5");
+      expect(aviso).toHaveTextContent(/Mariscos · A5: 24 platos/);
+      expect(within(dialogo).getByText(/Mariscos no cabe en una cara A5: revísalo antes de descargar/)).toBeInTheDocument();
+      expect(within(dialogo).getByRole("button", { name: "Descargar PDF" })).toBeDisabled();
+      expect(within(dialogo).getByRole("button", { name: /Ver en grande: Página 2 de 4 \(no cabe\)/ })).toBeInTheDocument();
+      // «Ver página» abre esa página en grande.
+      fireEvent.click(within(aviso).getByRole("button", { name: /Ver página/ }));
+      expect(await within(dialogo).findByText(/No cabe en una cara A5: lo que se ve es lo que entra/)).toBeInTheDocument();
+    });
+
+    it("se puede repartir a propósito en las caras que necesita, y deshacerlo", async () => {
+      const dialogo = await abrir({ tipo: "platos", platos: MARISCOS });
+      const aviso = await within(dialogo).findByRole("alert");
+      const repartir = within(aviso).getByRole("button", { name: /Repartir en \d+ caras/ });
+      const caras = Number(repartir.textContent!.match(/(\d+) caras/)![1]);
+      expect(caras).toBeGreaterThan(1);
+      fireEvent.click(repartir);
+      await waitFor(() => expect(within(dialogo).queryByRole("alert")).toBeNull());
+      expect(within(dialogo).getByText(new RegExp(`ocupa ${caras} caras A5, repartida a petición tuya`))).toBeInTheDocument();
+      expect(within(dialogo).getByText(new RegExp(`^${caras + 3} páginas A5`))).toBeInTheDocument();
+      fireEvent.click(within(dialogo).getByRole("button", { name: "Descargar PDF" }));
+      await waitFor(() => expect(m.descargar).toHaveBeenCalledTimes(1));
+      fireEvent.click(within(dialogo).getByRole("button", { name: /Volver a una cara/ }));
+      expect(await within(dialogo).findByRole("alert")).toHaveTextContent("Mariscos");
+    });
+
+    it("se pueden quitar platos de esa sección o pasar al tamaño en el que sí cabe", async () => {
+      const dialogo = await abrir({ tipo: "platos", platos: MARISCOS });
+      const aviso = await within(dialogo).findByRole("alert");
+      fireEvent.click(within(aviso).getByRole("button", { name: /Elegir platos/ }));
+      expect(within(aviso).getByText(/Marcados 24 de 24 · en una cara caben unos \d+/)).toBeInTheDocument();
+      fireEvent.click(within(aviso).getByRole("checkbox", { name: /^Marisco 24\s*·/ }));
+      expect(await within(aviso).findByText(/Marcados 23 de 24/)).toBeInTheDocument();
+      expect(within(dialogo).getByText(/· 24 platos/)).toBeInTheDocument();
+
+      fireEvent.click(within(aviso).getByRole("button", { name: "En A4 sí cabe: pasar a A4" }));
+      await waitFor(() => expect(within(dialogo).queryByRole("alert")).toBeNull());
+      expect(within(dialogo).getByText(/páginas A4/)).toBeInTheDocument();
+      // Lo quitado se recuerda y se puede recuperar.
+      expect(within(dialogo).getByText(/1 plato quitado de la carta impresa/)).toBeInTheDocument();
+      fireEvent.click(within(dialogo).getByRole("button", { name: /Recuperarlos/ }));
+      expect(await within(dialogo).findByText(/· 25 platos/)).toBeInTheDocument();
+      expect(within(dialogo).getByRole("button", { name: "Descargar PDF" })).toBeEnabled();
+    });
+
+    it("si se quitan todos, lo dice y deja recuperarlos", async () => {
+      const dialogo = await abrir({ tipo: "platos", platos: MARISCOS });
+      fireEvent.click(within(dialogo).getByRole("checkbox", { name: /^Carnes/ }));
+      const aviso = await within(dialogo).findByRole("alert");
+      fireEvent.click(within(aviso).getByRole("button", { name: /Elegir platos/ }));
+      // Al quitar unos, la sección pasa a caber y la lista sigue abierta en el recuadro de lo decidido.
+      for (let i = 0; i < 24; i++) {
+        const [marcada] = within(dialogo).queryAllByRole("checkbox", { name: /^Marisco \d+/, checked: true });
+        if (!marcada) break;
+        fireEvent.click(marcada);
+      }
+      expect(await within(dialogo).findByText("Has quitado todos los platos de lo elegido.")).toBeInTheDocument();
+      expect(within(dialogo).getByRole("button", { name: "Descargar PDF" })).toBeDisabled();
+      fireEvent.click(within(dialogo).getByRole("button", { name: "Recuperar los quitados" }));
+      expect(await within(dialogo).findByText(/· 24 platos/)).toBeInTheDocument();
+      // Veinticuatro clics, cada uno vuelve a maquetar la carta: con la máquina cargada pasa de 5 s.
+    }, 20_000);
   });
 
   it("en vinos ofrece Casa Tomás o Touza y los tipos de vino", async () => {

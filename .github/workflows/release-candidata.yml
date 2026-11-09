@@ -1,0 +1,151 @@
+# Release · candidata (docs/PROCESO-DE-CAMBIOS.md).
+#
+# En cada PR release/X.Y.Z → main valida la COMBINACIÓN EXACTA que se va a publicar, no staging:
+#   1. Espera a que Vercel despliegue la rama (preview con el Supabase de la demo).
+#   2. Comprueba que esa preview lleva la versión X.Y.Z y el commit de la rama.
+#   3. Si hay cambios visuales, saca capturas antes (main) / después (release) con el Supabase falso
+#      y los datos sintéticos de tests/e2e-movil (sin datos reales) y las sube a la rama
+#      capturas-release para verlas en el PR.
+#   4. Regenera la descripción del PR (scripts/release.mjs informe) con los resultados.
+# Si 2 falla, el check queda en rojo. Nunca fusiona ni despliega producción.
+name: Release · candidata
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  # Lo lanza «Release · preparar» (los PR que abre Actions no disparan este evento).
+  workflow_dispatch:
+
+permissions:
+  contents: write # solo para subir las capturas a la rama capturas-release
+  pull-requests: write
+  deployments: read
+
+concurrency:
+  group: candidata-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  candidata:
+    name: Candidata en preview
+    if: startsWith(github.head_ref || github.ref_name, 'release/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RAMA: ${{ github.head_ref || github.ref_name }}
+      SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Datos de la release
+        id: datos
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./versionado.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          # Deja en las salidas del paso si hay cambios visuales (visual=si|no).
+          node scripts/release.mjs informe --base origin/main --head HEAD --rama "$RAMA" --salida informe-inicial.md
+
+      - name: Esperar la preview de Vercel
+        id: preview
+        continue-on-error: true
+        run: node scripts/esperar-despliegue.mjs --sha "$SHA" --entorno Preview --minutos 20
+
+      - name: Versión y commit de la preview
+        id: comprobar
+        continue-on-error: true
+        env:
+          URL: ${{ steps.preview.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          if [ -z "$URL" ]; then echo '{"ok":false,"detalle":"Vercel no publicó la preview de esta rama"}' > preview.json; exit 1; fi
+          node scripts/comprobar-despliegue.mjs "$URL" --version "$VERSION" --commit "$SHA" --json preview.json
+
+      - run: npm ci
+        if: steps.datos.outputs.visual == 'si'
+      - name: Navegador para Playwright
+        if: steps.datos.outputs.visual == 'si'
+        run: npx playwright install --with-deps chromium
+
+      - name: Capturas antes/después (datos de prueba)
+        id: capturas
+        if: steps.datos.outputs.visual == 'si'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Después: esta release. Antes: main. Los dos contra el Supabase falso (datos sintéticos) y con
+          # la etiqueta de versión que tendrán: candidata (preview) y producción.
+          FALSO=(VITE_SUPABASE_URL=https://e2e-falso.supabase.co VITE_SUPABASE_ANON_KEY=anon-falsa VITE_SUPABASE_PUBLISHABLE_KEY=anon-falsa VERCEL=1)
+          env "${FALSO[@]}" VERCEL_ENV=preview VERCEL_GIT_COMMIT_REF="$RAMA" VERCEL_GIT_COMMIT_SHA="$SHA" npx vite build --outDir dist-despues > /tmp/build-despues.log 2>&1
+          npx vite preview --outDir dist-despues --port 4391 --strictPort --host 127.0.0.1 > /tmp/despues.log 2>&1 &
+          git worktree add -q ../antes origin/main
+          if cmp -s package-lock.json ../antes/package-lock.json; then ln -s "$PWD/node_modules" ../antes/node_modules; else (cd ../antes && npm install --no-audit --no-fund); fi
+          (cd ../antes && env "${FALSO[@]}" VERCEL_ENV=production VERCEL_GIT_COMMIT_REF=main VERCEL_GIT_COMMIT_SHA="$(git rev-parse HEAD)" npx vite build --outDir dist-antes > /tmp/build-antes.log 2>&1)
+          (cd ../antes && npx vite preview --outDir dist-antes --port 4392 --strictPort --host 127.0.0.1 > /tmp/antes.log 2>&1 &)
+          for p in 4391 4392; do for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:$p/" > /dev/null && break; sleep 2; done; done
+          node scripts/capturas-release.mjs --antes http://127.0.0.1:4392 --despues http://127.0.0.1:4391 --salida capturas
+          # Se publican en la rama capturas-release (no se despliega) para verlas dentro del PR.
+          if git ls-remote --exit-code origin capturas-release > /dev/null; then
+            git fetch -q origin capturas-release && git worktree add -q ../cap -B capturas-release origin/capturas-release
+          else
+            git worktree add -q --orphan -b capturas-release ../cap
+          fi
+          mkdir -p "../cap/v$VERSION" && rm -f "../cap/v$VERSION"/*.png && cp capturas/*.png "../cap/v$VERSION/"
+          cd ../cap
+          git config user.name "github-actions[bot]" && git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "v$VERSION" && git commit -q -m "Capturas de la candidata v$VERSION ($SHA)" && git push -q origin capturas-release
+
+      - uses: actions/upload-artifact@v4
+        if: steps.datos.outputs.visual == 'si'
+        with:
+          name: capturas-v${{ env.VERSION }}
+          path: capturas
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Actualizar la descripción del PR con los resultados
+        if: always()
+        shell: bash
+        env:
+          RESULTADO_CAPTURAS: ${{ steps.capturas.outcome }}
+          URL_EJECUCION: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node --input-type=module - <<'JS'
+          import { existsSync, readFileSync, writeFileSync } from "node:fs";
+          const leer = (f) => (existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : null);
+          const { RESULTADO_CAPTURAS: cap, URL_EJECUCION: run, GITHUB_REPOSITORY: repo, VERSION: v } = process.env;
+          const res = { preview: leer("preview.json") ?? { ok: false, detalle: "sin preview" } };
+          const capturas = leer("capturas/capturas.json");
+          if (capturas?.items) {
+            const url = (f) => `https://github.com/${repo}/blob/capturas-release/v${v}/${f}?raw=true`;
+            res.capturas = { ok: true, enlace: `[artefacto capturas-v${v}](${run})`, items: capturas.items.map((i) => ({ nombre: i.nombre, antes: url(i.antes), despues: url(i.despues) })) };
+          } else if (cap && cap !== "skipped") res.capturas = { ok: false, motivo: capturas?.motivo ?? `el paso terminó en «${cap}» ([ejecución](${run}))` };
+          writeFileSync("resultados.json", JSON.stringify(res, null, 2));
+          JS
+          NUM=$(gh pr list --base main --head "$RAMA" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$NUM" ]; then echo "No hay PR abierto de $RAMA a main."; exit 0; fi
+          gh pr view "$NUM" --json body --jq .body > actual.md
+          node scripts/release.mjs informe --base origin/main --head HEAD --rama "$RAMA" --resultados resultados.json --cuerpo-actual actual.md --salida cuerpo.md
+          gh pr edit "$NUM" --body-file cuerpo.md
+          cat cuerpo.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Resultado
+        if: always()
+        shell: bash
+        env:
+          PREVIEW: ${{ steps.comprobar.outcome }}
+        run: |
+          if [ "$PREVIEW" != "success" ]; then echo "::error::La preview de la candidata no es la esperada (versión, commit o no desplegó)."; exit 1; fi
+          echo "Candidata v$VERSION validada en $RAMA."
