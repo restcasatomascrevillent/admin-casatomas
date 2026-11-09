@@ -248,6 +248,11 @@ export interface InformeTrafico {
    * NULL en el informe de una sola web (`construirInforme`).
    */
   touza: ApartadoTouza | null;
+  /**
+   * «Qué hacen los visitantes» (eventos propios con consentimiento, Super Admin › Logs). Lo añade el diálogo
+   * cuando hay sesiones en el mes (`construirApartadoComportamiento`); ausente o NULL = no se pinta.
+   */
+  comportamiento?: import("./comportamiento").ApartadoComportamiento | null;
 }
 
 // ─── Apartado de Touza ───────────────────────────────────────────────────────

@@ -318,3 +318,23 @@ verify_jwt = true
 
 [functions.admin-set-user-access]
 verify_jwt = true
+
+# ----------------------------------------------------------------------------
+# Super Admin › Logs (migración 20261118100000_logs_web.sql, docs/LOGS-WEB.md)
+# ----------------------------------------------------------------------------
+# La llama el navegador de la web con sendBeacon/fetch keepalive y SIN cabeceras
+# (text/plain para no provocar preflight CORS). Protección real en ingesta.ts:
+# origen permitido, tope de 64 KB, límite por IP (HMAC con sal diaria) y cupo
+# diario en la RPC web_logs_ingerir.
+[functions.registrar-actividad-web]
+verify_jwt = false
+
+# pg_cron cada 5 min SIN JWT (x-webhook-secret == LOGS_WEB_CRON_SECRET, en
+# tiempo constante y fallando cerrado) o el botón «Procesar ahora» con JWT de
+# super admin (exigirSuperAdmin).
+[functions.procesar-logs-web]
+verify_jwt = false
+
+# Solo desde el panel, con sesión de super admin (exigirSuperAdmin).
+[functions.resumen-logs-web]
+verify_jwt = true
