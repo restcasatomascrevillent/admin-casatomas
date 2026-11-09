@@ -2,6 +2,35 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.4.0] - 2026-11-09
+
+Objetivo: Reservas (mesas al final, eventos con la sala entera, móvil), Facturas «Proveedores», originales de la carta en Drive e Instagram «Foto enmarcada»
+
+### Añadido
+- Facturas: el original se ve al lado de los datos en la ficha del documento ([98e5553](https://github.com/restcasatomascrevillent/admin-casatomas/commit/98e555340942dbc4c58decda2d9b3f02b414261d))
+- Facturas: vista «Proveedores» para decidir (lista comparada + ficha) ([d419bd1](https://github.com/restcasatomascrevillent/admin-casatomas/commit/d419bd19226d97fcc0fff5dc9a9c526d82e364c2))
+- Reservas: hoja de mesa libre del móvil grande y ordenada ([a13211d](https://github.com/restcasatomascrevillent/admin-casatomas/commit/a13211d6144bb1f0bd7e05b1c87cbdcadf04e7e6))
+- Reservas: mesas que se usan al final (para dejar paso) ([0430083](https://github.com/restcasatomascrevillent/admin-casatomas/commit/0430083dc44e12624d005acf42ec8581bb8e3290))
+- Instagram-drive: originales de las fotos de la carta en Drive ([04e5daa](https://github.com/restcasatomascrevillent/admin-casatomas/commit/04e5daa3776aaac798ae1f8f594b78041ceb3c7c))
+- Carta: guardar el original de la foto en Drive e Instagram lo usa ([617fd4a](https://github.com/restcasatomascrevillent/admin-casatomas/commit/617fd4a7ea75a4934f553989f39bfe4d57f4510e))
+- Instagram: plantillas «Foto enmarcada» para usar las fotos de la carta ([8be60f6](https://github.com/restcasatomascrevillent/admin-casatomas/commit/8be60f6d1799b1c9d9936bb07ad518dfa35f232c))
+- Instagram-ia: elegir «Foto enmarcada» cuando la foto no cubre ([eb69e05](https://github.com/restcasatomascrevillent/admin-casatomas/commit/eb69e0513e77e4ac3fa74834158e43ec8f81742e))
+- Instagram-drive: descargar_original y subir_original_video para originales de la carta solo en Drive ([811b3db](https://github.com/restcasatomascrevillent/admin-casatomas/commit/811b3db510546a03982ee9fac3da4fdeae96664e))
+- Carta: en Supabase solo el sticker; los originales de platos y vinos van solo a Drive ([d67cc4a](https://github.com/restcasatomascrevillent/admin-casatomas/commit/d67cc4a93aa2021941dd9369dc4db6ef60cf2642))
+- Scripts: mover-originales-a-drive (simula por defecto) y docs de «solo el sticker» ([0a13786](https://github.com/restcasatomascrevillent/admin-casatomas/commit/0a13786b81ef379412f43518314a55b32c86a8be))
+- Reservas: leyenda de colores en la vista Mesas del móvil ([4961e55](https://github.com/restcasatomascrevillent/admin-casatomas/commit/4961e550f3a8510f05182943b1670acca8642d11))
+- Reservas: evento con la sala entera ([d5f8950](https://github.com/restcasatomascrevillent/admin-casatomas/commit/d5f895010840fa8b316c841d2dcedb699260fd5d))
+
+### Cambiado
+- Supabase: categoría «Conservas y salazones» que faltaba en producción ([a31fdf8](https://github.com/restcasatomascrevillent/admin-casatomas/commit/a31fdf8d7497394887606bca49f247aba49c311f))
+- Panel: menú lateral sin la barra de scroll blanca con flechas ([940e8b5](https://github.com/restcasatomascrevillent/admin-casatomas/commit/940e8b568ff7c9c63abfaa8021fcc890b50f318a))
+- Reservas: Hoy de escritorio solo con mesas ordenadas, sin «Plano» ([6bab00e](https://github.com/restcasatomascrevillent/admin-casatomas/commit/6bab00ee090ccbeee3ed0e456bef742881a69f2a))
+- Instagram: en el móvil «Programar» ya no se queda sin hora ([07dc455](https://github.com/restcasatomascrevillent/admin-casatomas/commit/07dc4555c6fed1201b2840f09ff76334af471b0b))
+- Scripts: quitar el shebang de importar-originales para que vitest lo cargue ([a8897a4](https://github.com/restcasatomascrevillent/admin-casatomas/commit/a8897a45967cc72d1b862ac52c4764845b336e1d))
+
+### Otros
+- Proceso: nunca desplegar ni promocionar en Vercel a mano ([#29](https://github.com/restcasatomascrevillent/admin-casatomas/pull/29))
+
 ## [1.3.0] - 2026-11-09
 
 Objetivo: RRSS: Instagram, Facebook y editor IA de fotos y vídeos; CI otra vez en marcha
