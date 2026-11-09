@@ -5,7 +5,7 @@ import { mensajeErrorFuncion } from "@/hooks/useEnviarNewsletter";
  * Puntuación Robert Parker / The Wine Advocate en el panel (08/11/2026).
  *
  * Cada vino puede tener una fila por añada en `vinos_puntuacion_parker`
- * (migración 20261118100000) con su estado y su fuente. La web solo enseña la
+ * (migración 20261118103000) con su estado y su fuente. La web solo enseña la
  * VERIFICADA, definitiva, de la añada que se sirve ("Vinos".anada) o la NV si
  * el vino es sin añada: lo calcula la base de datos. Aquí van los tipos, los
  * textos de cada estado y la llamada a la función `buscar-puntuacion-parker`.
