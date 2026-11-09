@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   ScrollText,
   Server,
+  FileSearch,
 } from "lucide-react";
 import { useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -63,6 +64,8 @@ const gruposMenuSuperAdmin: { etiqueta: string; items: ItemMenu[] }[] = [
     etiqueta: "Web y clientes",
     items: [
       { title: "Tráfico web", url: "/super-admin/trafico-web", icon: Activity },
+      // Logs (18/11/2026): actividad de la web, errores e incidencias con Linear, estadísticas de comportamiento.
+      { title: "Logs", url: "/super-admin/logs", icon: FileSearch },
       { title: "Reseñas Google", url: "/super-admin/resenas", icon: Star },
       // «Plantillas Email» se fue a Reservas › Configuración (04/11/2026, petición del dueño).
     ],

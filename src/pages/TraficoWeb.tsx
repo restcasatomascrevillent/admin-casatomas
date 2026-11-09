@@ -24,6 +24,7 @@ import { TopPaginas } from "@/components/trafico-web/TopPaginas";
 import { Desgloses } from "@/components/trafico-web/Desgloses";
 import { EditorPesoPaginas } from "@/components/trafico-web/EditorPesoPaginas";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { SeccionComportamiento } from "@/components/trafico-web/comportamiento/SeccionComportamiento";
 
 // Informe mensual en diapositivas (y su PDF): solo se descarga al abrirlo.
 const InformeTraficoDialog = lazy(() => import("@/components/trafico-web/informe/InformeTraficoDialog"));
@@ -161,6 +162,9 @@ export default function TraficoWeb() {
 
               <TopPaginas proyecto={proyecto} desde={desde} hasta={hasta} />
               <Desgloses proyecto={proyecto} desde={desde} hasta={hasta} />
+              {/* Comportamiento (eventos propios con consentimiento, Super Admin › Logs): mismo periodo y mismas
+                  definiciones que Logs › Estadísticas. Solo la web de Casa Tomás lleva el rastreador. */}
+              {proyecto !== "touza-restaurant-website" && <SeccionComportamiento desde={desde} hasta={hasta} />}
             </>
           )}
         </div>

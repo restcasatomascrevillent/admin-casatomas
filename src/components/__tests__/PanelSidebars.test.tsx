@@ -156,7 +156,7 @@ describe("menú del Super Admin", () => {
       "Control del Panel", "Usuarios", "Auditoría",
       // «Costes» es una pestaña de Servicios desde el 2026-11-04: ya no tiene entrada propia.
       "Gestor Gasto", "Servicios",
-      "Tráfico web", "Reseñas Google",
+      "Tráfico web", "Logs", "Reseñas Google",
     ]);
     // «Plantillas Email» se fue a Reservas › Configuración (04/11/2026).
     expect(screen.queryByRole("link", { name: /Plantillas/i })).not.toBeInTheDocument();
