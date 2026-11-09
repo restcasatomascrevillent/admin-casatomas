@@ -1,3 +1,5 @@
+import { describe, expect, it } from "vitest";
+import type { Factura } from "@/hooks/useFacturas";
 import {
   agruparDocumentos,
   claveEstadoMes,
