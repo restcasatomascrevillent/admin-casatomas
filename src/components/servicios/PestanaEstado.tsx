@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { iconoCategoria } from "./iconosServicio";
 import {
+  type AnilloEstado,
   type DestinoPendiente,
   type EstadoInstalacion,
   type EstadoServicio,
@@ -69,7 +70,7 @@ type Icono = ComponentType<SVGProps<SVGSVGElement>>;
 
 const ICONO_GENERAL: Record<EstadoServicio, Icono> = { rojo: AlertOctagon, ambar: AlertTriangle, verde: CheckCircle2, gris: HelpCircle };
 
-/** Icono del centro del anillo cuando el servicio no tiene ninguna métrica con límite. */
+/** Icono del centro cuando el servicio no tiene ninguna métrica con límite. */
 function iconoSinLimite(f: FichaEstado): Icono {
   if (f.motivo === "Falta la clave" || f.motivo === "Clave rechazada") return KeyRound;
   if (f.estado === "rojo") return AlertOctagon;
@@ -78,39 +79,80 @@ function iconoSinLimite(f: FichaEstado): Icono {
   return f.motivo === "Se mira en su panel" ? ExternalLink : Clock;
 }
 
-/** Anillo de consumo: el arco es el % de la métrica más cerca de su límite (lleno a partir del 100 %). */
-function Anillo({ ficha }: { ficha: FichaEstado }) {
-  const tono = TONO[ficha.estado];
+/** «58%», «<1%», «157%», «>999%». */
+const textoAnillo = (p: number) => (p > 0 && p < 1 ? "<1%" : p >= 1000 ? ">999%" : `${Math.round(p)}%`);
+
+/**
+ * Un anillo de consumo: el arco es el % de la métrica (lleno a partir del 100 %), con el color de
+ * su semáforo. `grande`: el único anillo de la ficha. La cifra encoge con 3 o más dígitos para
+ * no salirse del círculo («157%» se salía, 09/11/2026).
+ */
+function Anillo({ anillo, grande }: { anillo: AnilloEstado; grande: boolean }) {
+  const tono = TONO[anillo.semaforo];
   const r = 26;
   const c = 2 * Math.PI * r;
-  if (!ficha.principal) {
-    const Icono = iconoSinLimite(ficha);
-    return (
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/60 sm:h-16 sm:w-16" aria-hidden="true">
-        <Icono className={cn("h-6 w-6 sm:h-7 sm:w-7", tono.texto)} />
-      </span>
-    );
-  }
-  const p = Math.max(0, ficha.principal.porcentaje);
-  const lleno = Math.min(100, p);
+  const p = Math.max(0, anillo.porcentaje);
+  const texto = textoAnillo(p);
+  const largo = texto.length >= 4;
   return (
-    <span className="relative flex h-14 w-14 items-center justify-center sm:h-16 sm:w-16" aria-hidden="true">
-      <svg viewBox="0 0 64 64" className="absolute inset-0 h-full w-full -rotate-90">
-        <circle cx="32" cy="32" r={r} fill="none" strokeWidth="6" className="stroke-muted" />
+    <span className={cn("relative flex shrink-0 items-center justify-center", grande ? "h-14 w-14 sm:h-16 sm:w-16" : "h-11 w-11 sm:h-12 sm:w-12")}>
+      <svg viewBox="0 0 64 64" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden="true">
+        <circle cx="32" cy="32" r={r} fill="none" strokeWidth={grande ? 6 : 7} className="stroke-muted" />
         <circle
           cx="32"
           cy="32"
           r={r}
           fill="none"
-          strokeWidth="6"
+          strokeWidth={grande ? 6 : 7}
           strokeLinecap="round"
           className={tono.trazo}
-          strokeDasharray={`${(lleno / 100) * c} ${c}`}
+          strokeDasharray={`${(Math.min(100, p) / 100) * c} ${c}`}
         />
       </svg>
-      <span className={cn("text-sm font-bold tabular-nums leading-none", ficha.estado === "verde" ? "text-foreground" : tono.texto)}>
-        {p > 0 && p < 1 ? "<1%" : `${Math.round(p)}%`}
+      <span
+        className={cn(
+          "relative font-bold tabular-nums leading-none tracking-tight",
+          grande ? (largo ? "text-xs sm:text-[13px]" : "text-sm") : largo ? "text-[9px] sm:text-[10px]" : "text-[11px] sm:text-xs",
+          anillo.semaforo === "verde" ? "text-foreground" : tono.texto,
+        )}
+      >
+        {texto}
       </span>
+    </span>
+  );
+}
+
+/** «Visitas: 26 % (257218 de 1.000.000 peticiones)». */
+const detalleAnillo = (a: AnilloEstado) =>
+  `${a.etiqueta}: ${formatearPorcentaje(a.porcentaje)}${a.textoValor && a.textoLimite ? ` (${a.textoValor} de ${a.textoLimite})` : ""}`;
+
+/** Los anillos de la ficha: uno grande si solo hay uno; si no, hasta tres pequeños con su nombre debajo. */
+function Anillos({ ficha }: { ficha: FichaEstado }) {
+  if (ficha.anillos.length === 0) {
+    const IconoCentro = iconoSinLimite(ficha);
+    return (
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/60 sm:h-16 sm:w-16" aria-hidden="true">
+        <IconoCentro className={cn("h-6 w-6 sm:h-7 sm:w-7", TONO[ficha.estado].texto)} />
+      </span>
+    );
+  }
+  const solo = ficha.anillos.length === 1;
+  // Dentro de un botón solo cabe contenido de frase: spans, sin lista. Lo que dicen va en el
+  // nombre accesible del botón.
+  return (
+    <span className={cn("flex w-full min-w-0 justify-center", !solo && "gap-1.5 sm:gap-2")} aria-hidden="true" data-anillos={ficha.anillos.length}>
+      {ficha.anillos.map((a, i) => (
+        // En el móvil (fichas de ~140 px) caben dos con su nombre; el tercero, desde sm.
+        <span
+          key={a.clave}
+          className={cn("min-w-0 flex-1 flex-col items-center gap-1", solo ? "flex" : "max-w-[5rem]", i >= 2 ? "hidden sm:flex" : "flex")}
+          title={detalleAnillo(a)}
+          data-anillo={a.clave}
+        >
+          <Anillo anillo={a} grande={solo} />
+          {!solo && <span className="line-clamp-2 w-full break-words text-center text-[10px] leading-tight text-muted-foreground sm:text-[11px]">{a.corta}</span>}
+        </span>
+      ))}
     </span>
   );
 }
@@ -118,16 +160,16 @@ function Anillo({ ficha }: { ficha: FichaEstado }) {
 function Ficha({ ficha, onAbrir }: { ficha: FichaEstado; onAbrir: (proveedor: string) => void }) {
   const tono = TONO[ficha.estado];
   const IconoCat = iconoCategoria(ficha.categoria);
-  const detalle = ficha.principal
-    ? `${ficha.principal.etiqueta}: ${formatearPorcentaje(ficha.principal.porcentaje)}${ficha.principal.textoValor && ficha.principal.textoLimite ? ` (${ficha.principal.textoValor} de ${ficha.principal.textoLimite})` : ""}`
-    : null;
+  const resumenAnillos = ficha.anillos.map(detalleAnillo).join(". ");
+  const resumenDatos = ficha.datos.map((d) => d.completo).join(". ");
   return (
     <li className="min-w-0" data-ficha={ficha.proveedor} data-estado={ficha.estado}>
+      {/* Un solo control por ficha: el nombre accesible lo dice todo (estado, anillos y datos). */}
       <button
         type="button"
         onClick={() => onAbrir(ficha.proveedor)}
-        title={detalle ?? ficha.nombreCompleto}
-        aria-label={`${ficha.nombreCompleto}: ${TEXTO_ESTADO[ficha.estado]}, ${ficha.motivo}.${detalle ? ` ${detalle}.` : ""} Ver detalle`}
+        title={[resumenAnillos, resumenDatos].filter(Boolean).join("\n") || ficha.nombreCompleto}
+        aria-label={`${ficha.nombreCompleto}: ${TEXTO_ESTADO[ficha.estado]}, ${ficha.motivo}.${resumenAnillos ? ` ${resumenAnillos}.` : ""}${resumenDatos ? ` ${resumenDatos}.` : ""} Ver detalle`}
         className={cn(
           "flex h-full w-full min-w-0 flex-col items-center gap-2 rounded-xl border-2 bg-card p-3 text-center transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)] focus-visible:ring-offset-2",
           tono.borde,
@@ -138,10 +180,20 @@ function Ficha({ ficha, onAbrir }: { ficha: FichaEstado; onAbrir: (proveedor: st
           <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-foreground">{ficha.nombre}</span>
           <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", tono.punto)} aria-hidden="true" />
         </span>
-        <Anillo ficha={ficha} />
+        <Anillos ficha={ficha} />
         <span className={cn("text-sm font-semibold leading-tight", tono.texto)}>{ficha.motivo}</span>
-        {ficha.principal && (
-          <span className="line-clamp-1 w-full text-xs text-muted-foreground">{ficha.principal.etiqueta}</span>
+        {ficha.anillos.length === 1 && (
+          <span className="line-clamp-1 w-full text-xs text-muted-foreground">{ficha.anillos[0].etiqueta}</span>
+        )}
+        {ficha.datos.length > 0 && (
+          <span className="mt-auto flex w-full min-w-0 flex-col gap-1 border-t border-border/60 pt-2 text-[11px] sm:gap-0.5 sm:text-xs" aria-hidden="true" data-datos={ficha.datos.length}>
+            {ficha.datos.map((d) => (
+              <span key={d.clave} className="flex min-w-0 items-baseline justify-between gap-2" data-dato={d.clave} title={d.completo}>
+                <span className="min-w-0 break-words text-left leading-tight text-muted-foreground">{d.corta}</span>
+                <span className="shrink-0 font-medium tabular-nums text-foreground">{d.texto}</span>
+              </span>
+            ))}
+          </span>
         )}
       </button>
     </li>

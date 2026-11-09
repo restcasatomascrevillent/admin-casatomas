@@ -278,6 +278,51 @@ describe("Super Admin › Servicios › Estado", () => {
     expect(screen.queryByRole("list", { name: "Servicios sin datos automáticos" })).toBeNull();
   });
 
+  it("varios anillos por servicio (Vercel: visitas, datos…) y datos sin límite (Stripe); el contador cuenta servicios", async () => {
+    h.servicios = [
+      servicio({ proveedor: "vercel", nombre: "Vercel", categoria: "alojamiento", limites: {
+        peticiones_cdn: { orden: 1, etiqueta: "Visitas a las webs (peticiones al CDN)", limite: 1000000, unidad: "peticiones" },
+        transferencia_rapida: { orden: 2, etiqueta: "Datos servidos a los visitantes", limite: 100, unidad: "GB" },
+        despliegues_24h: { orden: 7, etiqueta: "Publicaciones (despliegues)", limite: 100, unidad: "despliegues" },
+      } }),
+      servicio({ proveedor: "github", nombre: "GitHub", categoria: "codigo", limites: {
+        actions_computo: { orden: 1, etiqueta: "Pruebas automáticas", limite: 12, unidad: "USD" },
+        actions_minutos: { orden: 2, etiqueta: "Minutos de Actions", limite: 2000, unidad: "minutos" },
+      } }),
+      servicio({ proveedor: "stripe", nombre: "Stripe", categoria: "pagos" }),
+    ];
+    h.invoke.mockResolvedValue({ data: { lecturas: [
+      { proveedor: "vercel", tomado_en: AHORA, error: null, detalles: {}, metricas: {
+        peticiones_cdn: { valor: 257218, unidad: "peticiones" }, transferencia_rapida: { valor: 6.07 * 1024 ** 3, unidad: "bytes" }, despliegues_24h: { valor: 58, unidad: "despliegues" },
+      } },
+      { proveedor: "github", tomado_en: AHORA, error: null, detalles: {}, metricas: { actions_computo: { valor: 18, unidad: "USD" }, actions_minutos: { valor: 3148, unidad: "minutos" } } },
+      { proveedor: "stripe", tomado_en: AHORA, error: null, detalles: {}, metricas: {
+        cobros_mes: { orden: 1, etiqueta: "Cobros este mes", valor: 1, unidad: "cobros", periodo: "mes en curso" },
+        importe_cobrado_mes: { orden: 2, etiqueta: "Importe cobrado este mes", valor: 10, unidad: "EUR", periodo: "mes en curso" },
+      } },
+    ], sin_lector: [], generado_en: AHORA }, error: null });
+    pintar();
+    const lista = await screen.findByRole("list", { name: "Estado de cada servicio" });
+    await waitFor(() => expect(within(lista).getAllByRole("listitem").length).toBe(3));
+    const ficha = (p: string) => within(lista).getAllByRole("listitem").find((f) => f.getAttribute("data-ficha") === p)!;
+
+    const vercel = ficha("vercel");
+    expect([...vercel.querySelectorAll("[data-anillo]")].map((a) => [a.getAttribute("data-anillo"), t(a.textContent)])).toEqual([
+      ["despliegues_24h", "58%Despliegues"], ["peticiones_cdn", "26%Visitas"], ["transferencia_rapida", "6%Tráfico"],
+    ]);
+    expect(t(within(vercel).getByRole("button").getAttribute("aria-label"))).toMatch(/Vercel: Bien, Bien\. Publicaciones: 58 % \(58 de 100 despliegues\)\. Visitas a las webs: 26 %/);
+
+    // GitHub: dos métricas al límite, una sola línea en «Qué mirar» y 1 en el contador (como el titular).
+    expect(t(ficha("github").querySelector("[data-anillo='actions_minutos']")?.textContent)).toBe("157%Minutos");
+    const bloque = await screen.findByRole("region", { name: "Qué mirar" });
+    expect(within(bloque).getAllByRole("listitem").map((f) => f.textContent)).toEqual(["Urgente: GitHub · Minutos de Actions y 1 más"]);
+    expect(screen.getByRole("heading", { level: 2, name: "1 servicio necesita atención" })).toBeInTheDocument();
+    expect(pestana("Estado")).toHaveTextContent(/1$/);
+
+    // Stripe, sin límites: sus cifras del mes en la ficha.
+    expect([...ficha("stripe").querySelectorAll("[data-dato]")].map((d) => t(d.textContent))).toEqual(["Cobros1", "Cobrado10,00 €"]);
+  });
+
   it("la ficha lleva a la tarjeta del servicio en la pestaña Servicios y la enfoca", async () => {
     pintar();
     const lista = await screen.findByRole("list", { name: "Estado de cada servicio" });
