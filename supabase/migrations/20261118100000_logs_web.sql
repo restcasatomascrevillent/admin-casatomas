@@ -733,7 +733,9 @@ as $$
          coalesce(sum(case when e.tipo = 'pagina_salida' and e.valor between 0 and 3600000 then e.valor end), 0)::bigint,
          bool_or((e.tipo = 'formulario' and e.accion = 'inicio' and e.objetivo in ('reserva', 'cheque')) or e.tipo = 'cheque_checkout'),
          count(*) filter (where e.categoria = 'operacion' and e.tipo in ('reserva_solicitada', 'cheque_pagado')),
-         bool_or(e.es_bot), bool_or(e.es_interno), bool_or(e.es_prueba), bool_or(e.consentimiento), now()
+         -- Bot solo si TODOS sus eventos lo son: un envío suelto con otro User-Agent (p. ej. el sendBeacon
+         -- de un navegador automático) no tumba una sesión de una persona.
+         bool_and(e.es_bot), bool_or(e.es_interno), bool_or(e.es_prueba), bool_or(e.consentimiento), now()
     from public.web_eventos e
    where e.sesion_id = any (p_sesiones)
    group by e.sesion_id
@@ -841,7 +843,7 @@ begin
       from (select e.incidencia_id, coalesce(e.ruta, '(sin ruta)') as ruta, count(*) as n,
                    row_number() over (partition by e.incidencia_id order by count(*) desc) as rk
               from public.web_eventos e
-             where e.incidencia_id = any (v_afectadas)
+             where e.incidencia_id = any (v_afectadas) and not e.es_bot
              group by e.incidencia_id, coalesce(e.ruta, '(sin ruta)')) r
      where r.rk <= 5
      group by r.incidencia_id

@@ -18,10 +18,12 @@ interface LineaTiempoProps {
   resaltado?: number | null;
   onAbrirIncidencia?: (id: number) => void;
   onAbrirSesion?: (id: string) => void;
+  /** En el recorrido de UNA sesión la marca bot/prueba/interno ya va en la cabecera: no se repite por fila. */
+  sinMarcas?: boolean;
 }
 
 /** Recorrido en orden cronológico con el tiempo desde el primer evento y entre eventos. */
-export function LineaTiempo({ eventos, resaltado, onAbrirIncidencia, onAbrirSesion }: LineaTiempoProps) {
+export function LineaTiempo({ eventos, resaltado, onAbrirIncidencia, onAbrirSesion, sinMarcas = false }: LineaTiempoProps) {
   if (!eventos.length) return <p className="py-4 text-sm italic text-muted-foreground">Sin eventos.</p>;
   const inicio = eventos[0].ocurrido_en;
   return (
@@ -56,7 +58,7 @@ export function LineaTiempo({ eventos, resaltado, onAbrirIncidencia, onAbrirSesi
                   ver sesión
                 </button>
               )}
-              {(e.es_bot || e.es_interno || e.es_prueba) && (
+              {!sinMarcas && (e.es_bot || e.es_interno || e.es_prueba) && (
                 <Badge variant="outline" className="px-1 py-0 text-[10px]">{e.es_bot ? "bot" : e.es_prueba ? "prueba" : "interno"}</Badge>
               )}
             </div>

@@ -184,6 +184,17 @@ describe("normalizarLote", () => {
     expect(normalizarEndpoint("rest:configuracion_tienda")).toBe("rest:configuracion_tienda");
     expect(normalizarEndpoint("https://evil/../x y")).toBeNull();
   });
+  it("los identificadores técnicos (vista_id, id de plato/vino) llegan intactos; un id raro no", async () => {
+    const vista = id();
+    const r = await normalizarLote({ contexto: { consentimiento: true }, eventos: [
+      { id: id(), tipo: "pagina_salida", props: { vista_id: vista, scroll_max: 80 } },
+      { id: id(), tipo: "vino_abierto", objetivo: "Riscal", props: { id: "123", modo: "ficha" } },
+      { id: id(), tipo: "plato_abierto", objetivo: "Lomo", props: { id: "ana@b.es" } },
+    ] }, ctx);
+    expect(r.eventos[0].propiedades).toEqual({ vista_id: vista, scroll_max: 80 });
+    expect(r.eventos[1].propiedades).toEqual({ id: "123", modo: "ficha" });
+    expect(r.eventos[2].propiedades).toEqual({});
+  });
   it("como mucho 50 por lote", async () => {
     const r = await normalizarLote({ contexto: { consentimiento: true }, eventos: Array.from({ length: 60 }, () => ({ id: id(), tipo: "clic", objetivo: "x" })) }, ctx);
     expect([r.eventos.length, r.rechazados]).toEqual([50, 10]);

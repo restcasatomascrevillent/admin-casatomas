@@ -120,7 +120,8 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
   // Por defecto, el contexto de la ocurrencia más reciente con sesión.
   useEffect(() => {
     if (eventoContexto === null && ocurrencias.data?.filas.length) {
-      const conSesion = ocurrencias.data.filas.find((e) => e.sesion_id);
+      // Preferimos una con consentimiento: la de un navegador sin él solo tiene su propio error (id efímero).
+      const conSesion = ocurrencias.data.filas.find((e) => e.sesion_id && e.consentimiento) ?? ocurrencias.data.filas.find((e) => e.sesion_id);
       if (conSesion) setEventoContexto(conSesion.id);
     }
   }, [ocurrencias.data, eventoContexto]);
@@ -156,7 +157,7 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
             <TiraCifras
               cifras={[
                 { etiqueta: "Ocurrencias", valor: i.ocurrencias, detalle: `${i.ocurrencias_24h} en 24 h` },
-                { etiqueta: "Sesiones afectadas", valor: i.sesiones_afectadas, detalle: "con consentimiento" },
+                { etiqueta: "Sesiones afectadas", valor: i.sesiones_afectadas, detalle: "distintas, con o sin consentimiento" },
                 { etiqueta: "Primera vez", valor: fmtFechaHora(i.primera_vez) },
                 { etiqueta: "Última vez", valor: fmtFechaHora(i.ultima_vez) },
                 { etiqueta: "Versión", valor: i.version_ultima ?? "—", detalle: i.version_primera && i.version_primera !== i.version_ultima ? `desde ${i.version_primera}` : undefined },

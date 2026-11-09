@@ -126,7 +126,7 @@ function Horas({ c }: { c: Comportamiento }) {
     <Bloque titulo="Franjas horarias (hora de Madrid)">
       <div className="flex h-24 items-end gap-[2px]" role="img" aria-label="Sesiones por hora del día">
         {c.horas.map((h) => (
-          <div key={h.hora} className="flex flex-1 flex-col items-center justify-end" title={`${h.hora}:00 · ${h.sesiones} sesiones`}>
+          <div key={h.hora} className="flex h-full flex-1 flex-col items-center justify-end" title={`${h.hora}:00 · ${h.sesiones} sesiones`}>
             <div className="w-full rounded-t-sm" style={{ height: `${(100 * h.sesiones) / max}%`, minHeight: h.sesiones ? 2 : 0, background: "var(--viz-1)" }} />
           </div>
         ))}
@@ -174,7 +174,9 @@ export function ComportamientoWeb({ desde, hasta, entorno, incluirInternos = fal
   const c = q.data;
   const r = c.resumen;
   const a = c.anterior;
-  const visitasVercel = vercel.data?.reduce((s, f) => s + (f.visitas ?? 0), 0) ?? null;
+  // Sin días con dato de Vercel (p. ej. «hoy», que Vercel aún no ha cerrado) es «sin datos», no 0.
+  const diasVercel = (vercel.data ?? []).filter((f) => f.visitas !== null && f.visitas !== undefined);
+  const visitasVercel = diasVercel.length ? diasVercel.reduce((s, f) => s + (f.visitas ?? 0), 0) : null;
   const cobertura = tasa(r.paginas_vistas, visitasVercel);
   const pocas = r.sesiones < SESIONES_MINIMAS_FIABLES;
 

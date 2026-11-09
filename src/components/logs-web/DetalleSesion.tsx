@@ -52,7 +52,7 @@ export function DetalleSesion({ sesionId, onCerrar, onAbrirIncidencia }: Detalle
               </>
             )}
             {!s && <p className="text-sm text-muted-foreground">Sin resumen de sesión (eventos de un navegador sin consentimiento: solo errores).</p>}
-            <LineaTiempo eventos={q.data?.eventos ?? []} onAbrirIncidencia={onAbrirIncidencia} />
+            <LineaTiempo eventos={q.data?.eventos ?? []} onAbrirIncidencia={onAbrirIncidencia} sinMarcas={!!s} />
           </div>
         )}
       </SheetContent>

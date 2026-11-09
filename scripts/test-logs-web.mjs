@@ -182,6 +182,11 @@ igual([s1.pagina_entrada, s1.ultima_pagina, s1.paginas_vistas, s1.eventos, s1.or
 igual([Number(s1.tiempo_activo_ms), s1.scroll_max, s1.inicio_operacion, s1.conversiones, s1.visitante_id],
       [35_000, 90, true, 1, V1], "tiempo, scroll, operación y conversión de la sesión");
 
+// Un evento suelto marcado como bot (otro User-Agent en un sendBeacon) no convierte la sesión en bot.
+await ingerir([ev({ tipo: "scroll", sesion_id: S1, visitante_id: V1, secuencia: 10, valor: 50, ruta: "/reservas", es_bot: true })]);
+igual((await q(`select es_bot from public.web_sesiones where sesion_id = $1`, [S1])).rows[0].es_bot, false, "un evento bot suelto no tumba la sesión");
+await q(`delete from public.web_eventos where sesion_id = $1 and secuencia = 10`, [S1]);
+
 // Sin consentimiento: errores sí, pero sin visitante persistente.
 r = await ingerir([ev({ tipo: "error_js", categoria: "error", consentimiento: false, sesion_id: S2, visitante_id: V1, secuencia: 1,
                         ocurrido_en: iso(10_000), ruta: "/carta", huella: "a".repeat(32), mensaje: "TypeError: x is undefined", gravedad: "error" })]);

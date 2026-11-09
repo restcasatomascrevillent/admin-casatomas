@@ -201,6 +201,15 @@ export async function normalizarLote(cuerpo: unknown, ctx: ContextoLote): Promis
 
     const bruta = (e.props && typeof e.props === "object" ? e.props : {}) as Record<string, unknown>;
     let props = sanearPropiedades(bruta, new Set(def.props));
+    // Identificadores técnicos (página vista, plato, vino): se validan aparte. El saneado de textos los
+    // convertiría en «[id]» y se perdería la unión página vista ↔ fin de página.
+    for (const clave of ["vista_id", "id"] as const) {
+      if (!def.props.includes(clave)) continue;
+      const v = bruta[clave];
+      const limpio = typeof v === "number" && Number.isInteger(v) ? String(v) : uuid(v) ?? (typeof v === "string" && /^\d{1,12}$/.test(v) ? v : null);
+      if (limpio) props[clave] = limpio;
+      else delete props[clave];
+    }
     if (typeof bruta.endpoint === "string") {
       const ep = normalizarEndpoint(bruta.endpoint);
       if (ep) props.endpoint = ep;
@@ -225,7 +234,6 @@ export async function normalizarLote(cuerpo: unknown, ctx: ContextoLote): Promis
       }
       if (typeof props.idioma === "string" && !["es", "en", "fr"].includes(props.idioma)) delete props.idioma;
     }
-    if ("vista_id" in props && !uuid(props.vista_id)) delete props.vista_id;
 
     const ruta = sanearRuta(e.ruta);
     const objetivo = sanearTexto(e.objetivo, 120);

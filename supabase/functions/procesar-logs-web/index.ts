@@ -113,7 +113,8 @@ function crearRepo(sb: any): RepoProceso {
         .eq("incidencia_id", id).order("ocurrido_en", { ascending: false }).limit(50), "leer muestras") ?? [];
     },
     async ultimoErrorConSesion(id) {
-      const d = comprobar(await sb.from("web_eventos").select("id").eq("incidencia_id", id).not("sesion_id", "is", null)
+      // Con consentimiento: solo esas tienen recorrido (sin él, el id de sesión es efímero y solo trae el error).
+      const d = comprobar(await sb.from("web_eventos").select("id").eq("incidencia_id", id).eq("consentimiento", true).not("sesion_id", "is", null)
         .order("ocurrido_en", { ascending: false }).limit(1), "leer última ocurrencia");
       return d?.[0]?.id ?? null;
     },

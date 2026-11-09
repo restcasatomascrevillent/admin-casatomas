@@ -195,7 +195,7 @@ export function construirTicket(entrada: EntradaTicket): { titulo: string; descr
   if (i.motivo_ticket) l.push(`- **Por qué se abre:** ${textoIa(i.motivo_ticket, 300)}`);
   if (i.reabierta_veces > 0) l.push(`- **Reaparecida** ${i.reabierta_veces} ${i.reabierta_veces === 1 ? "vez" : "veces"} tras marcarse como resuelta.`);
   if (analisis?.impacto) l.push(`- **Impacto estimado (IA · sin verificar):** ${textoIa(analisis.impacto, 300)}`);
-  l.push("- Las sesiones solo cuentan visitantes que aceptaron «Estadísticas»; los errores se registran de todos, así que el alcance real puede ser mayor.");
+  l.push("- «Sesiones» = navegadores o cargas de página distintas: los errores se registran de todos los visitantes, pero el recorrido solo existe si aceptaron «Estadísticas». Los bots no cuentan.");
   l.push("");
   l.push("## Entorno, versión y despliegue");
   l.push(`- **Entorno:** ${NOMBRE_ENTORNO[i.entorno] ?? i.entorno} · **Proyecto:** ${enLinea(i.proyecto, 60)}`);
