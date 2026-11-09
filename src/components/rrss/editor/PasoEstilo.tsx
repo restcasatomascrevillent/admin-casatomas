@@ -9,7 +9,7 @@ const fuente = (f: FamiliaMotor): CSSProperties => {
 };
 
 /** Rótulo de muestra con la composición del estilo (aproximada): mismo reparto que el motor. */
-function RotuloMuestra({ c }: { c: ComposicionMarca }) {
+function RotuloMuestra({ c, marca }: { c: ComposicionMarca; marca: MarcaId }) {
   const centro = c.alinear === "centro";
   const titular: CSSProperties = {
     ...fuente(c.titular),
@@ -55,8 +55,9 @@ function RotuloMuestra({ c }: { c: ComposicionMarca }) {
       );
     case "minimo":
       return (
-        <div className={cn("absolute inset-x-0 bottom-0 flex flex-col gap-0.5 p-3", alinear)}>
-          <span style={{ ...titular, textShadow: "0 1px 6px rgba(255,255,255,0.45)" }}>Arroz del señorito</span>
+        // Como el motor: arriba por defecto y el color según el fondo (aquí, claro con sombra; el motor mide el fondo).
+        <div className={cn("absolute inset-x-0 top-0 flex flex-col gap-0.5 p-3", alinear)}>
+          <span style={{ ...titular, color: marca === "touza" ? "#f5f3ef" : "#ffffff", textShadow: "0 1px 6px rgba(0,0,0,0.55)" }}>Arroz del señorito</span>
         </div>
       );
     case "marco":
@@ -93,7 +94,7 @@ export function PreviaEstilo({ estilo, marca, src, ancho, alto }: PreviaProps) {
       )}
       {p.vineta > 0 && <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,${(0.8 * p.vineta).toFixed(2)}) 100%)` }} />}
       {p.mate > 0 && <div className="absolute inset-0" style={{ background: `rgba(255,255,255,${(0.12 * p.mate).toFixed(3)})` }} />}
-      <RotuloMuestra c={e.composicion[marca]} />
+      <RotuloMuestra c={e.composicion[marca]} marca={marca} />
     </div>
   );
 }

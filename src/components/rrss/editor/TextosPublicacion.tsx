@@ -74,7 +74,7 @@ export function TextosPublicacion({ proyectoId, canal, textos, onGuardar }: Prop
         Texto de la publicación
       </h3>
       <Campo etiqueta="Texto" htmlFor="tp-caption" ayuda={`${t.caption.length}/${LIMITES_TEXTO.caption} caracteres. Se guarda solo.`}>
-        <Textarea id="tp-caption" rows={6} maxLength={LIMITES_TEXTO.caption} value={t.caption} onChange={(e) => setT((x) => ({ ...x, caption: e.target.value }))} />
+        <Textarea id="tp-caption" rows={Math.min(16, Math.max(6, (t.caption ?? "").split("\n").length + Math.ceil((t.caption ?? "").length / 90) + 1))} maxLength={LIMITES_TEXTO.caption} value={t.caption} onChange={(e) => setT((x) => ({ ...x, caption: e.target.value }))} />
       </Campo>
       <Campo etiqueta="Titular" htmlFor="tp-titular">
         <Input id="tp-titular" maxLength={LIMITES_TEXTO.titular} value={t.titular} onChange={(e) => setT((x) => ({ ...x, titular: e.target.value }))} />

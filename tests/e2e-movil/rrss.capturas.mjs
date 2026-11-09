@@ -114,6 +114,7 @@ async function instalarRrss(contexto, t) {
 // ── Recogida de errores y avisos ────────────────────────────────────────────
 const errores = [];
 const avisos = [];
+const filtrados = new Set();
 let capturaActual = "inicio";
 /** Errores que provoca el propio montaje hermético (fuentes y hosts externos cortados), no la pantalla. */
 const DEL_MONTAJE = /ERR_BLOCKED_BY_CLIENT|blockedbyclient|fonts\.(googleapis|gstatic)\.com/i;
@@ -122,13 +123,13 @@ function vigilar(pagina) {
   pagina.on("console", (m) => {
     if (m.type() !== "error" && m.type() !== "warning") return;
     const texto = m.text();
-    if (DEL_MONTAJE.test(texto) || DEL_MONTAJE.test(m.location()?.url ?? "")) return;
+    if (DEL_MONTAJE.test(texto) || DEL_MONTAJE.test(m.location()?.url ?? "")) return void filtrados.add(texto.slice(0, 160));
     errores.push(`[${capturaActual}] console.${m.type()}: ${texto.slice(0, 400)}`);
   });
   pagina.on("pageerror", (e) => errores.push(`[${capturaActual}] pageerror: ${e.message.slice(0, 400)}`));
   pagina.on("requestfailed", (r) => {
     const f = r.failure()?.errorText ?? "";
-    if (DEL_MONTAJE.test(f) || /ERR_ABORTED/.test(f)) return;
+    if (DEL_MONTAJE.test(f) || /ERR_ABORTED/.test(f)) return void filtrados.add(`${f} ${r.url().slice(0, 120)}`);
     errores.push(`[${capturaActual}] petición fallida: ${r.method()} ${r.url().slice(0, 160)} (${f})`);
   });
   pagina.on("response", (r) => {
@@ -177,32 +178,32 @@ async function altoParaVerTodo(pagina, selector, maximo = 4000) {
 
 /** Avisos de maquetación de la pantalla actual. */
 async function revisarMaquetacion(pagina, nombre) {
-  const r = await pagina.evaluate(() => {
+  const ancho = pagina.viewportSize().width;
+  const r = await pagina.evaluate((ancho) => {
     const out = [];
-    const w = window.innerWidth;
-    if (document.documentElement.scrollWidth > w + 1) out.push(`scroll horizontal de página (${document.documentElement.scrollWidth} > ${w})`);
-    // Contenedores que recortan (overflow hidden/visible) con contenido más alto y sin scroll propio.
+    // En móvil (isMobile) el navegador se aleja para que quepa lo que se sale: innerWidth crece por encima del viewport.
+    const w = Math.max(window.innerWidth, document.documentElement.scrollWidth);
+    if (w > ancho + 1) out.push(`scroll horizontal de página: el contenido mide ${w} px en una pantalla de ${ancho} px`);
+    // El editor más alto que el bloque de alto fijo de la página, sin un contenedor con scroll entre los dos.
     const editor = document.querySelector("[data-testid=editor-ia]");
-    if (editor) {
-      const pagina = document.querySelector("[data-testid=pagina-rrss]");
-      const caja = pagina?.getBoundingClientRect();
+    const bloque = document.querySelector("[data-testid=pagina-rrss]");
+    if (editor && bloque) {
       const main = editor.querySelector(":scope > main");
-      const mr = main?.getBoundingClientRect();
-      const estilo = main ? getComputedStyle(main).overflowY : "";
-      if (caja && mr && mr.bottom > caja.bottom + 1 && estilo !== "auto" && estilo !== "scroll") {
-        const docScroll = document.scrollingElement.scrollHeight > window.innerHeight + 1;
-        out.push(`el editor (${Math.round(mr.height)} px) se sale del bloque de la página (alto fijo ${Math.round(caja.height)} px) y su <main> no tiene scroll propio (overflow-y: ${estilo}); scroll de documento: ${docScroll ? "sí" : "no"}`);
-      }
+      let conScroll = false;
+      for (let a = main; a && a !== bloque; a = a.parentElement) if (/(auto|scroll)/.test(getComputedStyle(a).overflowY)) conScroll = true;
+      const caja = bloque.getBoundingClientRect();
+      const mr = main.getBoundingClientRect();
+      if (!conScroll && mr.bottom > caja.bottom + 1) out.push(`el editor (${Math.round(mr.height)} px) se sale del bloque de alto fijo de la página (${Math.round(caja.height)} px) sin scroll propio: la página entera hace scroll`);
     }
-    // Elementos que se salen por la derecha.
+    // Controles que quedan fuera del ancho de la pantalla (cortados por un contenedor que no hace scroll).
     const fuera = [];
-    for (const el of document.body.querySelectorAll("*")) {
+    for (const el of document.body.querySelectorAll("button, a, [role=tab], input, select, textarea")) {
       const b = el.getBoundingClientRect();
-      if (b.width > 0 && b.right > w + 1 && !el.closest("[role=tablist]") && fuera.length < 4) fuera.push(`${el.tagName.toLowerCase()}.${String(el.className).split(" ").slice(0, 3).join(".")} (${Math.round(b.right)} px)`);
+      if (b.width > 0 && b.height > 0 && (b.right > ancho + 1 || b.left < -1) && fuera.length < 4) fuera.push(`«${(el.textContent || el.getAttribute("aria-label") || el.tagName).trim().slice(0, 40)}» (${Math.round(b.left)}..${Math.round(b.right)} px)`);
     }
-    if (fuera.length) out.push(`se sale por la derecha: ${fuera.join(" · ")}`);
+    if (fuera.length) out.push(`controles fuera del ancho de la pantalla: ${fuera.join(" · ")}`);
     return out;
-  });
+  }, ancho);
   for (const a of r) avisos.push(`[${nombre}] ${a}`);
 }
 
@@ -262,8 +263,9 @@ const navegador = await chromium.launch();
   await pagina.setViewportSize({ width: 1440, height: 900 });
   await pagina.getByTestId("paso:7").click();
   await esperarImagenes(pagina, "[data-testid=comparador] img", 6);
-  // El primero, con el corte un poco a la izquierda para que se vea el «después» con el rótulo.
-  await pagina.getByLabel("Comparar antes y después").first().fill("38");
+  // El primero, con el corte casi a la izquierda para que se vea el «después» con el rótulo; los otros, a la mitad.
+  await pagina.getByLabel("Comparar antes y después").first().fill("12");
+  await pagina.getByLabel("Comparar antes y después").first().blur();
   await altoParaVerTodo(pagina, "[data-testid=editor-ia] > main");
   await capturar(pagina, "04-editor-resultado.png");
 
@@ -278,7 +280,7 @@ const navegador = await chromium.launch();
     main.scrollTop += el.getBoundingClientRect().top - main.getBoundingClientRect().top - 12;
     return { alto: el.getBoundingClientRect().height, top: main.getBoundingClientRect().top };
   });
-  await pagina.setViewportSize({ width: 1440, height: Math.min(2200, Math.round(cajaAjustes.top + cajaAjustes.alto + 90)) });
+  await pagina.setViewportSize({ width: 1440, height: Math.min(2200, Math.round(cajaAjustes.top + cajaAjustes.alto + 40)) });
   await pagina.waitForTimeout(500);
   await pagina.getByTestId("resultado:0").evaluate((el) => {
     const main = el.closest("main");
@@ -296,19 +298,23 @@ const navegador = await chromium.launch();
   await pagina.waitForFunction(() => {
     const v = document.querySelector("[data-testid=resultado-video] video");
     return v && v.poster && v.readyState >= 1;
-  }, null, { timeout: 15_000 }).catch(() => avisos.push("[06-editor-video] el <video> no llegó a leer los metadatos (readyState < 1)"));
+  }, null, { timeout: 15_000 }).catch(() => undefined);
   const sinTomas = await pagina.getByTestId("ajustes-video").evaluate((el) => {
     const main = el.closest("main");
-    const tit = el.querySelector("#av-titulos");
-    return { main: main.getBoundingClientRect().top, fin: tit.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop };
+    const total = el.querySelector("[data-testid=duracion-total]");
+    return { main: main.getBoundingClientRect().top, fin: total.getBoundingClientRect().bottom - main.getBoundingClientRect().top + main.scrollTop };
   });
   // Hasta el final de la lista de tomas («Duración total»), sin el resto de ajustes.
-  await pagina.setViewportSize({ width: 1440, height: Math.min(2400, Math.round(sinTomas.main + sinTomas.fin + 10)) });
+  await pagina.setViewportSize({ width: 1440, height: Math.min(2400, Math.round(sinTomas.main + sinTomas.fin + 44)) });
   await pagina.waitForTimeout(500);
   await pagina.locator("[data-testid=editor-ia] > main").evaluate((m) => (m.scrollTop = 0));
   await capturar(pagina, "06-editor-video.png");
-  const estadoVideo = await pagina.locator("[data-testid=resultado-video] video").evaluate((v) => ({ readyState: v.readyState, error: v.error?.code ?? null, duracion: v.duration }));
-  if (estadoVideo.error) avisos.push(`[06-editor-video] el navegador de las capturas no reproduce el MP4 (MediaError ${estadoVideo.error}); se ve el póster`);
+  const reproductor = pagina.locator("[data-testid=resultado-video] video");
+  if (!(await reproductor.count())) avisos.push("[06-editor-video] no hay reproductor: sin URL del vídeo (¿falta reel.mp4 en RRSS_DATOS?) se queda en «Cargando el vídeo…»");
+  else {
+    const estadoVideo = await reproductor.evaluate((v) => ({ readyState: v.readyState, error: v.error?.code ?? null }));
+    if (estadoVideo.error) avisos.push(`[06-editor-video] el navegador de las capturas no reproduce el MP4 (MediaError ${estadoVideo.error}); se ve el póster`);
+  }
 
   // 7. «Dame ideas para grabar» con una tanda de ideas.
   capturaActual = "07-ideas";
@@ -335,10 +341,17 @@ const navegador = await chromium.launch();
   await pagina.getByTestId("resultado:0").waitFor();
   await esperarImagenes(pagina, "[data-testid=comparador] img", 6);
   await capturar(pagina, "08-editor-movil.png");
+  // Sin captura: «Ajustar» abierto en el móvil, solo para los avisos de maquetación.
+  capturaActual = "08b-movil-ajustar";
+  await pagina.getByTestId("resultado:0").getByRole("button", { name: "Ajustar" }).click();
+  await pagina.getByTestId("ajustes-foto").waitFor();
+  await pagina.waitForTimeout(500);
+  await revisarMaquetacion(pagina, "08b-movil-ajustar (sin captura)");
   await contexto.close();
 }
 
 await navegador.close();
 
+if (filtrados.size) console.log(`\n${filtrados.size} mensaje(s) del propio montaje (hosts externos cortados o peticiones abortadas), no cuentan:\n- ${[...filtrados].join("\n- ")}`);
 console.log(errores.length ? `\n${errores.length} error(es) de consola o de red:\n- ${errores.join("\n- ")}` : "\nSin errores de consola.");
 if (avisos.length) console.log(`\n${avisos.length} aviso(s) de maquetación:\n- ${avisos.join("\n- ")}`);

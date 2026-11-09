@@ -144,7 +144,7 @@ export function AjustesFoto({ pieza, ancho, alto, archivo, urlOriginal, estilo, 
         <Campo etiqueta="Indicación para la IA (opcional)" htmlFor={`${id}-ind`}>
           <Textarea id={`${id}-ind`} rows={2} maxLength={300} value={indicacion} onChange={(e) => setIndicacion(e.target.value)} placeholder="Ej.: más cálida, con el plato más grande" />
         </Campo>
-        <Button type="button" variant="outline" className="gap-2" disabled={ocupado} onClick={() => onOtraPropuesta(indicacion)}>
+        <Button type="button" variant="outline" className="h-auto min-h-10 gap-2 whitespace-normal text-left" disabled={ocupado} onClick={() => onOtraPropuesta(indicacion)}>
           <Sparkles className="h-4 w-4" aria-hidden="true" />
           Pedir otra propuesta a la IA para esta foto
         </Button>

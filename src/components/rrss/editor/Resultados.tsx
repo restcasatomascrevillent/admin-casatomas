@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download, Info, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
@@ -43,7 +43,7 @@ function TarjetaFoto({ r, pieza, proyecto, archivos, urls, gen }: { r: Resultado
   const archivo = pieza ? archivos.find((a) => a.id === pieza.archivo) : undefined;
   const previa = archivo?.analisis?.previa_ruta ? urls[archivo.analisis.previa_ruta] : undefined;
   return (
-    <li data-testid={`resultado:${r.indice}`} className={`space-y-2 rounded-lg border bg-card p-3 ${ajustando ? "sm:col-span-2 xl:col-span-3" : ""}`}>
+    <li data-testid={`resultado:${r.indice}`} className={`min-w-0 space-y-2 rounded-lg border bg-card p-3 ${ajustando ? "sm:col-span-2 xl:col-span-3" : ""}`}>
       <div className={ajustando ? "mx-auto w-full max-w-sm" : ""}>
         <ComparadorFoto ancho={r.ancho} alto={r.alto} urlResultado={urls[r.ruta]} urlOriginal={previa} original={archivo} encuadre={pieza?.encuadre ?? { x: 0.5, y: 0.5, zoom: 1 }} descripcion={pieza?.altText || `Pieza ${r.indice + 1}`} />
       </div>
@@ -82,6 +82,17 @@ function ResultadoVideo({ r, pieza, proyecto, archivos, urls, formato, gen }: { 
   const qc = useQueryClient();
   const [ajustando, setAjustando] = useState(false);
   const [transcribiendo, setTranscribiendo] = useState<Set<string>>(new Set());
+  // Si la URL firmada no llega en 15 s, se dice en vez de quedarse «Cargando» para siempre.
+  const hayUrl = !!urls[r.ruta];
+  const [sinUrl, setSinUrl] = useState(false);
+  useEffect(() => {
+    if (hayUrl) {
+      setSinUrl(false);
+      return;
+    }
+    const t = setTimeout(() => setSinUrl(true), 15_000);
+    return () => clearTimeout(t);
+  }, [hayUrl]);
 
   async function transcribirVoz(id: string) {
     setTranscribiendo((s) => new Set(s).add(id));
@@ -106,7 +117,9 @@ function ResultadoVideo({ r, pieza, proyecto, archivos, urls, formato, gen }: { 
         {urls[r.ruta] ? (
           <video controls playsInline preload="metadata" poster={r.portada_ruta ? urls[r.portada_ruta] : undefined} src={urls[r.ruta]} className="h-full w-full object-contain" />
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-white/70">Cargando el vídeo…</div>
+          <div role={sinUrl ? "alert" : "status"} className="flex h-full items-center justify-center p-3 text-center text-xs text-white/70">
+            {sinUrl ? "No se pudo cargar el vídeo. Vuelve a abrir el trabajo o prueba a descargarlo." : "Cargando el vídeo…"}
+          </div>
         )}
       </div>
       <p className="text-center text-xs text-muted-foreground">

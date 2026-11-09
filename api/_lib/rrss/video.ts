@@ -21,14 +21,14 @@ import type sharpTipo from "sharp";
 import { ESTILOS, factoresFoto, filtrosVideo, sumarTratamientos, type ComposicionMarca, type EstiloId, type Transicion, type Tratamiento } from "../../../src/lib/rrss/estilos.js";
 import type { FormatoSalida, ZonaSegura } from "../../../src/lib/rrss/formatos.js";
 import { rectanguloRecorte } from "../../../src/lib/rrss/geometria.js";
-import { duracionToma, type Movimiento, type PiezaVideo, type Toma, type TituloVideo } from "../../../src/lib/rrss/plan.js";
+import { DURACION_CIERRE, duracionToma, type Movimiento, type PiezaVideo, type Toma, type TituloVideo } from "../../../src/lib/rrss/plan.js";
 import type { MarcaId } from "../../../src/lib/instagram/tokens.js";
 import { dirFuentes, ficheroLogo, FUENTES_MOTOR } from "./recursos.js";
 
 type Sharp = typeof sharpTipo;
 
 export const FPS = 30;
-export const DURACION_CIERRE = 2.6;
+export { DURACION_CIERRE };
 
 export interface InfoMedio {
   duracion: number;

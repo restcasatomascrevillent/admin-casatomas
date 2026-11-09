@@ -129,7 +129,7 @@ export default function RRSS() {
                     ]}
                   />
                 </div>
-                <TabsContent value="editor" className="mt-0 flex-1 min-h-0 data-[state=inactive]:hidden">
+                <TabsContent value="editor" className="mt-0 flex-1 min-h-0 overflow-y-auto overscroll-contain lg:overflow-hidden data-[state=inactive]:hidden">
                   {modoEditor === "editor" && (
                     <Perezosa>
                       <EditorIA className="h-full" origen="editor" trabajoInicial={trabajo} onTrabajo={(id) => cambiar({ trabajo: id })} />

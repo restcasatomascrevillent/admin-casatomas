@@ -154,6 +154,8 @@ export const LIMITES_TEXTO = { antetitulo: 40, titulo: 60, subtitulo: 90, cta: 3
 export const MAX_PALABRAS_TITULO = 7;
 export const MAX_HASHTAGS = { instagram: 5, facebook: 3 } as const;
 export const DURACION_PLANO = { min: 0.8, max: 12 } as const;
+/** Lo que dura el cierre del vídeo (logo y llamada a la acción), el mismo que monta el motor. */
+export const DURACION_CIERRE = 2.6;
 export const MAX_TOMAS = 20;
 export const MAX_TITULOS = 6;
 
@@ -233,10 +235,12 @@ export function normalizarHashtags(v: unknown, max: number): string[] {
 /** Duración de cada toma en el montaje (fin − inicio). */
 export const duracionToma = (t: Pick<Toma, "inicio" | "fin">) => Math.max(0, t.fin - t.inicio);
 
-/** Duración total del vídeo: tomas menos los solapes de las transiciones. */
-export function duracionMontaje(p: Pick<PiezaVideo, "tomas" | "transicion" | "duracionTransicion">): number {
-  const suma = p.tomas.reduce((s, t) => s + duracionToma(t), 0);
-  const solape = p.transicion === "corte" ? 0 : Math.max(0, p.tomas.length - 1) * p.duracionTransicion;
+/** Duración total del vídeo: tomas (y el cierre, si lo lleva) menos los solapes de las transiciones. */
+export function duracionMontaje(p: Pick<PiezaVideo, "tomas" | "transicion" | "duracionTransicion"> & { cierre?: { mostrar: boolean } }): number {
+  const tramos = p.tomas.map(duracionToma);
+  if (p.cierre?.mostrar) tramos.push(DURACION_CIERRE);
+  const suma = tramos.reduce((s, d) => s + d, 0);
+  const solape = p.transicion === "corte" ? 0 : Math.max(0, tramos.length - 1) * p.duracionTransicion;
   return redondear(Math.max(0, suma - solape), 2);
 }
 

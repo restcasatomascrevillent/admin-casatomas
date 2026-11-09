@@ -439,7 +439,7 @@ export function IdeasGrabar({ className }: { className?: string }) {
           {resultado.ideas.length === 0 ? (
             <p className="text-sm text-muted-foreground">Esta tanda no trae propuestas. Prueba a contar un poco más y pide otra vez.</p>
           ) : (
-            <div className="grid gap-4 xl:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
               {resultado.ideas.map((idea, i) => <TarjetaIdea key={i} idea={idea} n={i + 1} />)}
             </div>
           )}
