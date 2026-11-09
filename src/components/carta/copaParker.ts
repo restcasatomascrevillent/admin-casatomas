@@ -4,7 +4,7 @@ import { MENSAJES_PRECIO, normalizarPrecio } from "./precioCarta";
 /**
  * Vino por copas (04/11/2026) y añada que se sirve (08/11/2026). Campos de
  * "Vinos": `copeo` y `precio_copa_eur` (migración 20261104140000) y `anada` y
- * `sin_anada` (20261118100000). Los comparten el alta (VinoForm) y la edición
+ * `sin_anada` (20261118105000). Los comparten el alta (VinoForm) y la edición
  * (EditarVinoModal); los límites son los mismos que los CHECK de la BD.
  *
  * La puntuación Parker YA NO se escribe a mano aquí (08/11/2026): va en
