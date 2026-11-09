@@ -8,7 +8,8 @@ export const CARGADORES_SECCION = {
   "/reservas": () => import("@/pages/Reservas"),
   "/gestion-web": () => import("@/pages/GestorWeb"),
   "/marketing": () => import("@/pages/Marketing"),
-  "/instagram": () => import("@/pages/Instagram"),
+  // RRSS (08/11/2026): antes «/instagram», que ahora redirige aquí.
+  "/rrss": () => import("@/pages/RRSS"),
   "/cheques": () => import("@/pages/Cheques"),
   "/tienda": () => import("@/pages/Tienda"),
   "/facturas": () => import("@/pages/Facturas"),

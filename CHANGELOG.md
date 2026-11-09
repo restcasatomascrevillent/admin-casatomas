@@ -2,6 +2,16 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.3.0] - 2026-11-09
+
+Objetivo: RRSS: Instagram, Facebook y editor IA de fotos y vídeos; CI otra vez en marcha
+
+### Cambiado
+- CI otra vez en marcha (lockfile) y migraciones con versión propia ([#31](https://github.com/restcasatomascrevillent/admin-casatomas/pull/31))
+
+### Otros
+- Instagram, Facebook y editor IA de fotos y vídeos ([#27](https://github.com/restcasatomascrevillent/admin-casatomas/pull/27))
+
 ## [1.2.0] - 2026-11-09
 
 Objetivo: Puntuaciones Parker con fuente por añada y búsqueda desde la foto de la etiqueta

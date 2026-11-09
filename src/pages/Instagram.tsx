@@ -110,6 +110,18 @@ function marcaInicial(): FiltroMarca {
  * dentro. Sin medida (jsdom) cae al layout normal.
  */
 export default function Instagram() {
+  return (
+    <DashboardLayout>
+      <ContenidoInstagram />
+    </DashboardLayout>
+  );
+}
+
+/**
+ * Todo lo de Instagram sin el marco: lo monta la pestaña «Instagram» de RRSS
+ * (src/pages/RRSS.tsx, 08/11/2026) y, con el marco, la página de arriba.
+ */
+export function ContenidoInstagram() {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_INSTAGRAM);
   // null hasta abrir «Reels» (el reel de partida sale del motor, que se carga con la pestaña).
@@ -207,8 +219,8 @@ export default function Instagram() {
   };
 
   return (
-    <DashboardLayout>
-      {/* Sin título de página: «Instagram» activo en el menú lateral ya dice dónde estás. */}
+    <>
+      {/* Sin título de página: «RRSS › Instagram» activo ya dice dónde estás. */}
       <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
         <Tabs value={pestanaVisible} onValueChange={setPestana} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
           <PestanasPagina
@@ -360,6 +372,6 @@ export default function Instagram() {
           </TabsContent>
         </Tabs>
       </div>
-    </DashboardLayout>
+    </>
   );
 }
