@@ -557,13 +557,19 @@ export function pendientesServicios(args: {
   const enUso = servicios.filter((s) => s.activo !== false);
   const salida: Pendiente[] = [];
 
-  for (const a of avisosConsumo(enUso, lecturas)) {
+  // Una línea por servicio (09/11/2026: GitHub salía dos veces, minutos y dólares, con el mismo
+  // exceso, y el contador de la pestaña no cuadraba con el titular): la métrica más alta y cuántas más.
+  const porServicio = new Map<string, AvisoConsumo[]>();
+  for (const a of avisosConsumo(enUso, lecturas)) porServicio.set(a.proveedor, [...(porServicio.get(a.proveedor) ?? []), a]);
+  for (const [proveedor, lista] of porServicio) {
+    const [a] = lista; // de mayor a menor
+    const mas = lista.length - 1;
     salida.push({
-      clave: `consumo:${a.proveedor}:${a.clave}`,
-      gravedad: a.semaforo === "rojo" ? "rojo" : "ambar",
-      titulo: `${a.nombre} · ${a.etiqueta}`,
+      clave: `consumo:${proveedor}:${a.clave}`,
+      gravedad: lista.some((x) => x.semaforo === "rojo") ? "rojo" : "ambar",
+      titulo: `${a.nombre} · ${a.etiqueta}${mas > 0 ? ` y ${mas} más` : ""}`,
       detalle: `${formatearPorcentaje(a.porcentaje)} del límite${a.textoValor && a.textoLimite ? ` (${a.textoValor} de ${a.textoLimite})` : ""}`,
-      destino: { pestana: "servicios", proveedor: a.proveedor },
+      destino: { pestana: "servicios", proveedor },
       accion: "Ver",
     });
   }
@@ -954,6 +960,28 @@ export const TEXTO_ESTADO: Record<EstadoServicio, string> = {
   gris: "Sin datos",
 };
 
+/** Una métrica con límite, para un anillo de la ficha. */
+export interface AnilloEstado {
+  clave: string;
+  /** Una o dos palabras bajo el anillo: «Visitas», «Base de datos». */
+  corta: string;
+  etiqueta: string;
+  porcentaje: number;
+  semaforo: Semaforo;
+  textoValor: string | null;
+  textoLimite: string | null;
+}
+
+/** Un dato sin límite que se enseña en la ficha (cobros, llamadas, crecimiento de la BD…). */
+export interface DatoEstado {
+  clave: string;
+  corta: string;
+  /** La cifra corta: «63.021», «10,00 €», «+259 MB», «en 111 días». */
+  texto: string;
+  /** Para el «title» y el lector de pantalla: etiqueta entera, cifra con unidad y periodo. */
+  completo: string;
+}
+
 export interface FichaEstado {
   proveedor: string;
   /** Sin la aclaración entre paréntesis: «Vapi», no «Vapi (asistente telefónico)». */
@@ -963,8 +991,72 @@ export interface FichaEstado {
   estado: EstadoServicio;
   /** Dos o tres palabras: «Bien», «Al 121 %», «Falta la clave», «Renueva en 12 días». */
   motivo: string;
-  /** La métrica más cerca de su límite (para el anillo), si alguna tiene límite. */
+  /** La métrica más cerca de su límite (el primer anillo), si alguna tiene límite. */
   principal: { etiqueta: string; porcentaje: number; textoValor: string | null; textoLimite: string | null } | null;
+  /** Hasta 3 métricas con límite, de la más cerca de su límite a la que menos (09/11/2026). */
+  anillos: AnilloEstado[];
+  /** Hasta 3 datos sin límite (por su orden) y la próxima renovación, si la hay. */
+  datos: DatoEstado[];
+}
+
+/** Máximo de anillos y de datos por ficha (caben a 2 columnas en un móvil de 320 px). */
+export const MAX_ANILLOS = 3;
+export const MAX_DATOS = 3;
+
+/**
+ * Nombre corto de cada métrica en la ficha de Estado (el entero va en el «title»). Las que no
+ * están aquí usan su etiqueta sin el paréntesis final.
+ */
+export const ETIQUETA_CORTA: Record<string, string> = {
+  // Vercel
+  peticiones_cdn: "Visitas", transferencia_rapida: "Tráfico", transferencia_origen: "Tráfico del servidor",
+  invocaciones_funciones: "Funciones", cpu_activa: "CPU", memoria_funciones: "Memoria", transformaciones_imagen: "Imágenes",
+  despliegues_24h: "Despliegues", recortes_servidor_mes: "Recortes mes", recortes_servidor_dia: "Recortes hoy",
+  cpu_recortes_mes: "CPU recortes", compilaciones_30d: "Compilaciones (30 días)",
+  // Supabase
+  bd_tamano: "Base de datos", almacenamiento: "Archivos", usuarios_activos_mes: "Usuarios", conexiones: "Conexiones",
+  bd_crecimiento: "Crecimiento BD", peticiones_api_7d: "Peticiones (7 días)", invocaciones_funciones_24h: "Funciones (24 h)",
+  // GitHub
+  actions_minutos: "Minutos", actions_computo: "Cómputo", almacenamiento_artefactos: "Artefactos",
+  actions_minutos_publicos: "Minutos gratis", actions_ejecuciones: "Ejecuciones", actions_sin_arrancar: "Sin arrancar",
+  // Resend
+  correos_mes: "Correos mes", correos_hoy: "Correos hoy", contactos_marketing: "Contactos", dominios: "Dominios",
+  // Stripe
+  cobros_mes: "Cobros", importe_cobrado_mes: "Cobrado", comisiones_mes: "Comisiones", saldo_disponible: "Saldo",
+  // OpenAI
+  gasto_ia_mes: "Gasto IA", gasto_real_usd: "Ya facturado", gasto_estimado_usd: "Estimado",
+  // Vapi
+  llamadas_mes: "Llamadas", minutos_mes: "Minutos", coste_llamadas_mes: "Coste", llamadas_simultaneas: "A la vez",
+  // Hostinger
+  suscripciones_activas: "Suscripciones",
+};
+
+/** Datos que no se enseñan en la ficha (repiten otro o no dicen nada de un vistazo). */
+const DATOS_OCULTOS = new Set(["actions_computo", "saldo_pendiente", "cheques_mes", "importe_cheques_mes", "comision_cheques_mes"]);
+
+const cortaDe = (clave: string, etiqueta: string) => ETIQUETA_CORTA[clave] ?? sinAclaracion(etiqueta);
+
+/** «mes en curso» → «este mes»; «últimos 7 días» → «7 días»… (para el «title»). */
+function periodoCorto(p: string | null): string {
+  if (!p) return "";
+  if (/^ahora$/i.test(p)) return "ahora";
+  if (/mes en curso|mes natural/i.test(p)) return "este mes";
+  return p.replace(/^últim[oa]s\s+/i, "");
+}
+
+/** La cifra de un dato: sin la unidad si es una palabra («63.021»), con ella si es tamaño o moneda. */
+function textoDato(f: FilaMetrica): string {
+  const v = f.valor ?? 0;
+  const signo = /crecimiento/.test(f.clave) && v > 0 ? "+" : v < 0 ? "−" : "";
+  const abs = Math.abs(v);
+  if (esUnidadBytes(f.unidad)) {
+    // Corto: «253 MB», «6,1 GB» (sin los dos decimales de la tarjeta).
+    const b = aBytes(abs, f.unidad) ?? abs;
+    for (const u of ["tb", "gb", "mb", "kb"]) if (b >= BYTES[u]) return `${signo}${fmt(b / BYTES[u], b >= 10 * BYTES[u] ? 0 : 1)} ${u === "kb" ? "kB" : u.toUpperCase()}`;
+    return `${signo}${fmt(b, 0)} B`;
+  }
+  if (MONEDAS.has(f.unidad.trim().toUpperCase())) return `${signo}${formatearCantidad(abs, f.unidad)}`;
+  return `${signo}${fmt(abs)}`;
 }
 
 export interface EstadoInstalacion {
@@ -995,11 +1087,29 @@ export function estadoInstalacion(args: {
   const fichas: FichaEstado[] = [];
   servicios.filter((s) => s.activo !== false).forEach((s) => {
     const lectura = lecturas.get(s.proveedor) ?? null;
-    const conLimite = combinarMetricas(s, lectura).filter((f) => f.porcentaje != null && f.semaforo != null);
-    const top = conLimite.reduce<FilaMetrica | null>((m, f) => (m == null || (f.porcentaje ?? 0) > (m.porcentaje ?? 0) ? f : m), null);
+    const filas = combinarMetricas(s, lectura);
+    // De mayor a menor %; a igualdad, el orden de siempre (sort estable).
+    const conLimite = filas.filter((f) => f.porcentaje != null && f.semaforo != null).sort((a, b) => b.porcentaje! - a.porcentaje!);
+    const top = conLimite[0] ?? null;
     const principal = top
       ? { etiqueta: sinAclaracion(top.etiqueta), porcentaje: top.porcentaje!, textoValor: top.textoValor, textoLimite: top.textoLimite }
       : null;
+    const anillos: AnilloEstado[] = conLimite.slice(0, MAX_ANILLOS).map((f) => ({
+      clave: f.clave, corta: cortaDe(f.clave, f.etiqueta), etiqueta: sinAclaracion(f.etiqueta), porcentaje: f.porcentaje!, semaforo: f.semaforo!,
+      textoValor: f.textoValor, textoLimite: f.textoLimite,
+    }));
+    const datos: DatoEstado[] = filas
+      .filter((f) => f.valor != null && f.porcentaje == null && f.limite == null && !DATOS_OCULTOS.has(f.clave))
+      .slice(0, MAX_DATOS)
+      .map((f) => {
+        const periodo = periodoCorto(f.periodo);
+        const texto = textoDato(f);
+        const palabra = !esUnidadBytes(f.unidad) && !MONEDAS.has(f.unidad.trim().toUpperCase()) && f.unidad.trim() ? ` ${f.unidad.trim()}` : "";
+        return {
+          clave: f.clave, corta: cortaDe(f.clave, f.etiqueta), texto,
+          completo: `${f.etiqueta}: ${texto}${palabra}${periodo ? ` (${periodo})` : ""}`,
+        };
+      });
 
     let estado: EstadoServicio = "gris";
     let motivo = sinLector.has(s.proveedor) ? "Se mira en su panel" : "Sin datos aún";
@@ -1021,6 +1131,13 @@ export function estadoInstalacion(args: {
     const proxima = suyas[0];
     if (proxima && proxima.dias < 0) subir("rojo", "Renovación pasada");
     else if (proxima && proxima.dias <= DIAS_RENOVACION_CERCANA) subir("ambar", `Renueva ${textoDias(proxima.dias)}`);
+    // La próxima renovación lejana también es un dato útil (la cercana ya la dice el motivo).
+    if (proxima && proxima.dias > DIAS_RENOVACION_CERCANA && datos.length < MAX_DATOS) {
+      datos.push({
+        clave: "renovacion", corta: "Renueva", texto: textoDias(proxima.dias),
+        completo: `${proxima.concepto}: ${textoDias(proxima.dias)} (${fechaCorta(proxima.fecha)})`,
+      });
+    }
 
     fichas.push({
       proveedor: s.proveedor,
@@ -1030,6 +1147,8 @@ export function estadoInstalacion(args: {
       estado,
       motivo,
       principal,
+      anillos,
+      datos,
     });
   });
   fichas.sort((a, b) => RANGO_ESTADO[b.estado] - RANGO_ESTADO[a.estado]);
