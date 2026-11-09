@@ -807,6 +807,31 @@ function CasillaMesa({
   );
 }
 
+// ─── Leyenda de colores (vista Mesas) ─────────────────────────────────────────
+// Pedida por el dueño el 08/11/2026: en el móvil no se sabía qué era cada color. Mismos colores que `CasillaMesa`.
+const LEYENDA_MOVIL = [
+  { texto: "Libre", clase: "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" },
+  { texto: "Reservada", clase: "border-sky-500 bg-sky-50 dark:bg-sky-950/40" },
+  { texto: "Sentada", clase: "border-amber-500 bg-amber-50 dark:bg-amber-950/40" },
+] as const;
+
+export function LeyendaMesasMovil() {
+  return (
+    <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1 text-xs text-muted-foreground" aria-label="Leyenda de colores de las mesas" data-testid="leyenda-mesas-movil">
+      {LEYENDA_MOVIL.map((l) => (
+        <li key={l.texto} className="flex items-center gap-1">
+          <span className={cn("inline-block h-3.5 w-3.5 rounded border-2", l.clase)} aria-hidden="true" />
+          {l.texto}
+        </li>
+      ))}
+      <li className="flex items-center gap-1">
+        <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+        Fijada
+      </li>
+    </ul>
+  );
+}
+
 // ─── «Recalcular mesas» (vista Mesas) ────────────────────────────────────────
 
 /**
@@ -876,8 +901,9 @@ function RecalcularMesasMovil({
 
   if (!propuesta) {
     return (
-      <div className="flex justify-end px-2 pt-2">
-        <Button variant="ghost" size="sm" className="h-11 text-muted-foreground" onClick={calcular}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 px-2 pt-2">
+        <LeyendaMesasMovil />
+        <Button variant="ghost" size="sm" className="ml-auto h-11 text-muted-foreground" onClick={calcular}>
           <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden="true" />
           Recalcular mesas
         </Button>
