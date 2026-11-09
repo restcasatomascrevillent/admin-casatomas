@@ -44,9 +44,17 @@ export interface Vino {
   /** Se sirve por copas y su precio (20261104140000_vinos_copeo_y_parker). */
   copeo?: boolean | null;
   precio_copa_eur?: number | null;
-  /** Puntos Parker / Wine Advocate (50–100) y añada a la que corresponden. */
+  /**
+   * Puntos Parker / Wine Advocate que enseña la web y su añada (08/11/2026: los
+   * calcula la BD desde vinos_puntuacion_parker, solo verificadas y de la
+   * añada que se sirve; no se escriben desde el panel). Texto: «94», «94+», «93–95».
+   */
   puntuacion_parker?: number | null;
   puntuacion_parker_anada?: number | null;
+  puntuacion_parker_texto?: string | null;
+  /** Añada que se sirve y «sin añada» (NV) (20261118100000). */
+  anada?: number | null;
+  sin_anada?: boolean | null;
 }
 
 export interface NuevoVino {
@@ -64,8 +72,8 @@ export interface NuevoVino {
   orden?: number;
   copeo?: boolean;
   precio_copa_eur?: number | null;
-  puntuacion_parker?: number | null;
-  puntuacion_parker_anada?: number | null;
+  anada?: number | null;
+  sin_anada?: boolean;
 }
 
 /**
@@ -220,12 +228,13 @@ export function useVinos() {
             alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
             alergenos_notas: nuevoVino.alergenos_notas || null,
             orden,
-            // Copa y Parker solo si vienen (20261104140000): sin ellos el alta sigue
-            // funcionando aunque las columnas aún no existan.
+            // Copa y añada solo si vienen (20261104140000, 20261118100000): sin
+            // ellos el alta sigue funcionando aunque las columnas aún no existan.
+            // La puntuación Parker no se escribe aquí: la calcula la BD.
             ...(nuevoVino.copeo !== undefined ? { copeo: nuevoVino.copeo } : {}),
             ...(nuevoVino.precio_copa_eur !== undefined ? { precio_copa_eur: nuevoVino.precio_copa_eur } : {}),
-            ...(nuevoVino.puntuacion_parker !== undefined ? { puntuacion_parker: nuevoVino.puntuacion_parker } : {}),
-            ...(nuevoVino.puntuacion_parker_anada !== undefined ? { puntuacion_parker_anada: nuevoVino.puntuacion_parker_anada } : {}),
+            ...(nuevoVino.anada !== undefined ? { anada: nuevoVino.anada } : {}),
+            ...(nuevoVino.sin_anada !== undefined ? { sin_anada: nuevoVino.sin_anada } : {}),
             // Publicado en las dos cartas (activado = restaurante OR touza; la
             // BD lo recalcula, ver guardarCartas).
             restaurante: true,
