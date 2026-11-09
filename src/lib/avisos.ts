@@ -37,7 +37,7 @@ export function rutaDeAviso(
   if (n.referencia_tipo === "ia_modelos") return "/super-admin/servicios?tab=modelos";
   // Encargos de Instagram (20261110100000): la ficha del encargo.
   if (n.referencia_tipo === "instagram_encargo") {
-    return n.referencia_id ? `/instagram?tab=encargos&encargo=${encodeURIComponent(n.referencia_id)}` : "/instagram?tab=encargos";
+    return n.referencia_id ? `/rrss?red=instagram&tab=encargos&encargo=${encodeURIComponent(n.referencia_id)}` : "/rrss?red=instagram&tab=encargos";
   }
   return null;
 }

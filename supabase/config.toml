@@ -222,6 +222,11 @@ verify_jwt = true
 [functions.instagram-ia]
 verify_jwt = true
 
+# RRSS › editor IA (docs/rrss.md): JWT de usuario + can_edit_section('marketing'),
+# como el usuario. Secreto OPENAI_API_KEY (opcionales RRSS_IA_MODEL y RRSS_TRANSCRIPCION_MODEL).
+[functions.rrss-ia]
+verify_jwt = true
+
 # Marketing › Instagram › Métricas (docs/instagram-metricas.md). verify_jwt =
 # false porque la llama pg_cron (net.http_post, tarea instagram-metricas-diarias)
 # SIN usuario ni JWT, igual que sync-trafico-web. Autenticación real dentro:

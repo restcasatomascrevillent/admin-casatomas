@@ -17,5 +17,5 @@ export default function InstagramRapido() {
       document.title = anterior;
     };
   }, []);
-  return <CrearMovil onSalir={() => navigate("/instagram")} />;
+  return <CrearMovil onSalir={() => navigate("/rrss?red=instagram")} />;
 }

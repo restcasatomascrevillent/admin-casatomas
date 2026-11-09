@@ -396,10 +396,10 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
     const dialogo = await abrirPermisosDelCamarero();
 
     // Newsletter: sin «Ver», «Puede editar» está bloqueado.
-    expect(interruptor(dialogo, "Puede editar Newsletter")).toBeDisabled();
-    fireEvent.click(interruptor(dialogo, "Ver Newsletter"));
-    expect(interruptor(dialogo, "Puede editar Newsletter")).toBeEnabled();
-    expect(interruptor(dialogo, "Puede editar Newsletter")).not.toBeChecked();
+    expect(interruptor(dialogo, "Puede editar Newsletter y RRSS")).toBeDisabled();
+    fireEvent.click(interruptor(dialogo, "Ver Newsletter y RRSS"));
+    expect(interruptor(dialogo, "Puede editar Newsletter y RRSS")).toBeEnabled();
+    expect(interruptor(dialogo, "Puede editar Newsletter y RRSS")).not.toBeChecked();
 
     // Reservas: quitar «Ver» apaga y bloquea «Puede editar».
     fireEvent.click(interruptor(dialogo, "Ver Reservas"));
@@ -573,7 +573,7 @@ describe("ListaUsuarios · el guardado no deja a nadie con menos permisos (2026-
     expect(antes).toHaveLength(2);
     const dialogo = await abrirPermisosDelCamarero();
 
-    fireEvent.click(interruptor(dialogo, "Ver Newsletter"));
+    fireEvent.click(interruptor(dialogo, "Ver Newsletter y RRSS"));
     await guardar(dialogo);
 
     expect(toast.success).toHaveBeenCalledWith("Permisos actualizados");
