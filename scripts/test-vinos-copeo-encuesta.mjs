@@ -4,8 +4,8 @@
 //
 //   npm run test:vinos-copeo-encuesta:db
 //
-// Aplica las migraciones REALES 20261104140000, 20261104141000 y
-// 20261104142000 dos veces (idempotentes) sobre un andamiaje con las políticas
+// Aplica las migraciones REALES 20261104140000, 20261104141000, 20261120100000
+// (premio y último día del sorteo) y 20261104142000 dos veces (idempotentes) sobre un andamiaje con las políticas
 // de la demo (04/11/2026), y cubre: los CHECK de copa y Parker; que la web
 // (anon) vota solo con la votación abierta, por un vino publicado en Casa
 // Tomás, con nombre, contacto válido y bases aceptadas, una vez por contacto
@@ -20,12 +20,14 @@ import assert from "node:assert/strict";
 const leer = (ruta) => readFile(ruta, "utf8");
 const COPEO = await leer("supabase/migrations/20261104140000_vinos_copeo_y_parker.sql");
 const ENCUESTA = await leer("supabase/migrations/20261104141000_encuesta_vino_favorito.sql");
+const PREMIO_FECHA = await leer("supabase/migrations/20261120100000_encuesta_vinos_premio_fecha.sql");
 const HORARIO = await leer("supabase/migrations/20261104142000_horario_menu_tapas.sql");
 const PARKER_DATOS = await leer("supabase/migrations/20261104143000_vinos_puntuacion_parker_datos.sql");
 const PARKER_DATOS_ROLLBACK = await leer("supabase/rollbacks/20261104143000_vinos_puntuacion_parker_datos_ROLLBACK.sql");
 const VEGETARIANOS = await leer("supabase/migrations/20261104151000_platos_vegetarianos.sql");
 const VEGETARIANOS_ROLLBACK = await leer("supabase/rollbacks/20261104151000_platos_vegetarianos_ROLLBACK.sql");
 const ROLLBACKS = [
+  await leer("supabase/rollbacks/20261120100000_encuesta_vinos_premio_fecha_ROLLBACK.sql"),
   await leer("supabase/rollbacks/20261104142000_horario_menu_tapas_ROLLBACK.sql"),
   await leer("supabase/rollbacks/20261104141000_encuesta_vino_favorito_ROLLBACK.sql"),
   await leer("supabase/rollbacks/20261104140000_vinos_copeo_y_parker_ROLLBACK.sql"),
@@ -113,9 +115,10 @@ const rechaza = async (promesa, patron, msg) => { await assert.rejects(promesa, 
 for (let i = 0; i < 2; i++) {
   await db.exec(COPEO);
   await db.exec(ENCUESTA);
+  await db.exec(PREMIO_FECHA);
   await db.exec(HORARIO);
 }
-ok(true, "las tres migraciones son idempotentes");
+ok(true, "las cuatro migraciones son idempotentes");
 
 // ─── 1. Copeo y Parker ──────────────────────────────────────────────────────
 igual((await q(`select copeo, precio_copa_eur, puntuacion_parker from public."Vinos" where id = 'tinto'`)).rows,
@@ -138,11 +141,71 @@ const votar = (u, vino, nombre, contacto, bases = true, idioma = "es") =>
 await rechaza(votar("anon", "tinto", "Ana", "ana@example.com"), /encuesta_cerrada/, "con la votación apagada no se vota");
 
 // Encender: el panel con «Gestor carta» sí; sin permiso, la RLS no deja (0 filas).
-const encender = (u, valor) => como(u, async () => (await q(`update public.configuracion_web set encuesta_vinos_activa = ${valor} where id = true returning id`)).rows.length);
+// Hoy y los días de al lado, en hora de España (como mira la función).
+const HOY = (await q(`select (now() at time zone 'Europe/Madrid')::date::text as d`)).rows[0].d;
+const dia = async (n) => (await q(`select ($1::date + $2::int)::text as d`, [HOY, n])).rows[0].d;
+const AYER = await dia(-1);
+const MANANA = await dia(1);
+const ESTADO_INICIAL = (await q(`select encuesta_vinos_activa as a, encuesta_vinos_premio as p, encuesta_vinos_fin as f from public.configuracion_web`)).rows;
+igual(ESTADO_INICIAL, [{ a: false, p: null, f: null }], "la fila actual queda con la votación cerrada y sin premio ni fecha");
+
+// Premio y cierre: formato y regla de «no se abre sin ellos».
+const ajustar = (u, set) => como(u, async () => (await q(`update public.configuracion_web set ${set} where id = true returning id`)).rows.length);
+await rechaza(q(`update public.configuracion_web set encuesta_vinos_activa = true`), /configuracion_web_encuesta_vinos_completa/, "no se abre sin premio ni fecha");
+await q(`update public.configuracion_web set encuesta_vinos_premio = 'Una cena para dos', encuesta_vinos_fin = '${MANANA}'`);
+await q(`update public.configuracion_web set encuesta_vinos_premio = null`);
+await rechaza(q(`update public.configuracion_web set encuesta_vinos_activa = true`), /configuracion_web_encuesta_vinos_completa/, "no se abre sin premio");
+await q(`update public.configuracion_web set encuesta_vinos_premio = 'Una cena para dos', encuesta_vinos_fin = null`);
+await rechaza(q(`update public.configuracion_web set encuesta_vinos_activa = true`), /configuracion_web_encuesta_vinos_completa/, "no se abre sin fecha de cierre");
+await rechaza(q(`update public.configuracion_web set encuesta_vinos_premio = '   '`), /configuracion_web_encuesta_vinos_premio_valido/, "un premio solo de espacios no vale");
+await rechaza(q(`update public.configuracion_web set encuesta_vinos_premio = '   ', encuesta_vinos_fin = '${MANANA}', encuesta_vinos_activa = true`),
+  /configuracion_web_encuesta_vinos_/, "ni abriendo la votación con un premio de espacios");
+await rechaza(q(`update public.configuracion_web set encuesta_vinos_premio = ' ab '`), /configuracion_web_encuesta_vinos_premio_valido/, "premio de menos de 3 letras (sin contar los extremos)");
+await rechaza(q(`update public.configuracion_web set encuesta_vinos_premio = repeat('x', 201)`), /configuracion_web_encuesta_vinos_premio_valido/, "premio de más de 200");
+await q(`update public.configuracion_web set encuesta_vinos_premio = repeat('x', 200)`);
+await q(`update public.configuracion_web set encuesta_vinos_premio = ' abc '`);
+ok(true, "premio de 3 y de 200 caracteres válidos");
+await rechaza(q(`update public.configuracion_web set encuesta_vinos_premio = 'Una cena para dos', encuesta_vinos_fin = null, encuesta_vinos_activa = true`),
+  /configuracion_web_encuesta_vinos_completa/, "abrir y borrar la fecha a la vez: no");
+await q(`update public.configuracion_web set encuesta_vinos_premio = null, encuesta_vinos_fin = null`);
+
+// Quién escribe y quién lee las columnas nuevas.
+const PREMIO = "Una cena para dos en Casa Tomás";
+const fijar = (u, fin) => ajustar(u, `encuesta_vinos_premio = '${PREMIO}', encuesta_vinos_fin = '${fin}'`);
+igual(await fijar(U.NADA, MANANA), 0, "sin «Gestor carta» no se cambian premio ni fecha");
+igual(await fijar(U.WEB, MANANA), 0, "«Gestión web» tampoco");
+igual(await fijar(U.CARTA, MANANA), 1, "con «Gestor carta» se guardan premio y fecha");
+igual((await como("anon", () => q(`select encuesta_vinos_premio as p, encuesta_vinos_fin::text as f from public.configuracion_web`))).rows,
+  [{ p: PREMIO, f: MANANA }], "la web lee premio y fecha");
+igual((await como("anon", () => q(`update public.configuracion_web set encuesta_vinos_premio = 'hackeado' returning id`).catch(() => ({ rows: [] })))).rows.length, 0, "la web no los cambia");
+
+// Encender: el panel con «Gestor carta» sí; sin permiso, la RLS no deja (0 filas).
+const encender = (u, valor) => ajustar(u, `encuesta_vinos_activa = ${valor}`);
 igual(await encender(U.NADA, true), 0, "sin «Gestor carta» no se enciende la votación");
-igual(await encender(U.CARTA, true), 1, "con «Gestor carta» se enciende");
+igual(await encender(U.CARTA, true), 1, "con «Gestor carta» y con premio y fecha se enciende");
 igual((await como("anon", () => q(`select encuesta_vinos_activa from public.configuracion_web`))).rows, [{ encuesta_vinos_activa: true }],
   "la web lee el interruptor");
+await rechaza(como(U.CARTA, () => q(`update public.configuracion_web set encuesta_vinos_premio = null where id = true`)),
+  /configuracion_web_encuesta_vinos_completa/, "con la votación abierta no se quita el premio");
+
+// Plazo: último día INCLUIDO, en hora de Madrid.
+await q(`update public.configuracion_web set encuesta_vinos_fin = '${HOY}'`);
+await votar("anon", "tinto", "Hoy", "hoy@example.com");
+ok(true, "el último día todavía se vota (incluido)");
+await q(`update public.configuracion_web set encuesta_vinos_fin = '${AYER}'`);
+await rechaza(votar("anon", "tinto", "Tarde", "tarde@example.com"), /encuesta_cerrada/, "pasado el último día se rechaza aunque siga abierta");
+igual((await q(`select count(*)::int as n from public.votos_vino_favorito where nombre = 'Tarde'`)).rows, [{ n: 0 }], "y no se guarda el voto");
+// Sin premio (la CHECK no deja abrir así, pero la función no se fía de ello).
+await q(`update public.configuracion_web set encuesta_vinos_fin = '${MANANA}'`);
+await db.exec(`alter table public.configuracion_web drop constraint configuracion_web_encuesta_vinos_completa`);
+await q(`update public.configuracion_web set encuesta_vinos_premio = null`);
+await rechaza(votar("anon", "tinto", "SinPremio", "sinpremio@example.com"), /encuesta_cerrada/, "sin premio se rechaza");
+await q(`update public.configuracion_web set encuesta_vinos_premio = '${PREMIO}', encuesta_vinos_fin = null`);
+await rechaza(votar("anon", "tinto", "SinFecha", "sinfecha@example.com"), /encuesta_cerrada/, "sin fecha se rechaza");
+await q(`update public.configuracion_web set encuesta_vinos_fin = '${MANANA}'`);
+await db.exec(PREMIO_FECHA); // vuelve a poner la CHECK (idempotente)
+await q(`delete from public.votos_vino_favorito where nombre in ('Hoy')`);
+igual((await q(`select encuesta_vinos_activa as a from public.configuracion_web`)).rows, [{ a: true }], "dentro de plazo y con premio: abierta");
 
 const r = await votar("anon", "tinto", "  Ana  ", "Ana@Example.com");
 igual(r.rows[0].r, { ok: true, vino: "Pago de Carraovejas" }, "la web vota");
@@ -274,11 +337,25 @@ await db.exec(VEGETARIANOS_ROLLBACK);
 igual((await q(`select column_name from information_schema.columns where table_name = 'Platos' and column_name = 'etiquetas_dieteticas'`)).rows, [],
   "su rollback quita la columna");
 
+// ─── 4c. Rollback de premio y fecha, solo ese: la votación sigue, sin plazo ──
+await db.exec(ROLLBACKS[0]);
+igual((await q(`select column_name from information_schema.columns where table_name = 'configuracion_web' and column_name like 'encuesta_vinos_%' order by 1`)).rows,
+  [{ column_name: "encuesta_vinos_activa" }], "su rollback quita premio y fecha y deja el interruptor");
+await db.exec(`insert into public."Vinos" (id, nombre, categoria, precio_eur, activado, restaurante) values ('tinto', 'Pago de Carraovejas', 'VINOS TINTOS — RIBERA DEL DUERO', 50, true, true)
+  on conflict do nothing`);
+await votar("anon", "tinto", "Sin plazo", "sinplazo@example.com");
+ok(true, "tras su rollback se vota sin mirar premio ni fecha (función anterior)");
+await q(`update public.configuracion_web set encuesta_vinos_activa = false`);
+await rechaza(db.exec(PREMIO_FECHA).then(() => q(`update public.configuracion_web set encuesta_vinos_activa = true`)), /configuracion_web_encuesta_vinos_completa/,
+  "al volver a aplicarla, la votación no se abre sin premio");
+await db.exec(`delete from public.votos_vino_favorito where nombre = 'Sin plazo'`);
+await q(`update public.configuracion_web set encuesta_vinos_premio = '${PREMIO}', encuesta_vinos_fin = '${MANANA}', encuesta_vinos_activa = true`);
+
 // ─── 5. Rollbacks ───────────────────────────────────────────────────────────
 for (const rb of ROLLBACKS) await db.exec(rb);
 const columnas = (await q(`select column_name from information_schema.columns where table_schema = 'public'
   and table_name in ('Vinos', 'configuracion_web') and column_name in ('copeo', 'precio_copa_eur', 'puntuacion_parker',
-  'puntuacion_parker_anada', 'encuesta_vinos_activa', 'horario_menu_dia_casa_tomas', 'horario_tapas_casa_tomas')`)).rows;
+  'puntuacion_parker_anada', 'encuesta_vinos_activa', 'encuesta_vinos_premio', 'encuesta_vinos_fin', 'horario_menu_dia_casa_tomas', 'horario_tapas_casa_tomas')`)).rows;
 igual(columnas, [], "los rollbacks quitan las columnas");
 igual((await q(`select to_regclass('public.votos_vino_favorito') as t, to_regprocedure('public.votar_vino_favorito(text,text,text,boolean,text)') as f,
   to_regprocedure('public.horario_web_valido(jsonb)') as h`)).rows, [{ t: null, f: null, h: null }], "y la tabla y las funciones");
