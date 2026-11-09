@@ -17,7 +17,7 @@ set client_encoding = 'UTF8';
 --    verificadas, definitivas y de la añada que se sirve.
 --
 -- Solo toca ids que existen: la demo tiene 6 vinos menos que producción.
--- APLICAR (una a una, nunca `db push`), DESPUÉS de 20261118100000: demo
+-- APLICAR (una a una, nunca `db push`), DESPUÉS de 20261118103000: demo
 -- primero (sfonaclosuafvlhutkon), producción (haqmmdfdzzatdnrrcgez) solo tras
 -- aceptar el PR y con el «sí» del dueño. Idempotente. Tiene que terminar en
 -- «vinos_puntuacion_parker_revision_datos: …».
@@ -30,7 +30,7 @@ set local lock_timeout = '5s';
 do $$
 begin
   if to_regclass('public.vinos_puntuacion_parker') is null then
-    raise exception 'vinos_puntuacion_parker_revision_datos: falta la tabla vinos_puntuacion_parker (aplica antes 20261118100000_vinos_puntuacion_parker_fuentes). No se ha cambiado nada.';
+    raise exception 'vinos_puntuacion_parker_revision_datos: falta la tabla vinos_puntuacion_parker (aplica antes 20261118103000_vinos_puntuacion_parker_fuentes). No se ha cambiado nada.';
   end if;
 end
 $$;

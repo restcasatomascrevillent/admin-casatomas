@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- ROLLBACK de 20261118100000_vinos_puntuacion_parker_fuentes.sql. Aplicar a
+-- ROLLBACK de 20261118103000_vinos_puntuacion_parker_fuentes.sql. Aplicar a
 -- mano SOLO si hay que deshacerlo (y antes, si se aplicó, el rollback de
 -- 20261118110000_vinos_puntuacion_parker_revision_datos).
 --
