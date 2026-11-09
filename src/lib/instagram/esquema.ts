@@ -14,9 +14,9 @@
  */
 import { z } from "zod/v4";
 import { FORMATOS, MARCAS, type FormatoId } from "./tokens.js";
-import { AMPLIACION_MAXIMA, FOTOS, escalaParaCubrir, type Foto } from "./fotos.js";
+import { AMPLIACION_MAXIMA, FOTOS, LADO_MINIMO_MARCO, escalaParaCubrir, valeParaMarco, type Foto } from "./fotos.js";
 import { PLANTILLAS, obtenerPlantilla } from "./plantillas/index.js";
-import type { CampoPieza, DatosPieza, ElementoLista, Plantilla } from "./tipos.js";
+import { encajeDe, type CampoPieza, type DatosPieza, type ElementoLista, type Plantilla } from "./tipos.js";
 
 export const MAX_PALABRAS_TITULAR = 6;
 
@@ -206,11 +206,23 @@ export function problemasDePieza(d: EntradaPieza, plantilla: Plantilla | undefin
         p.push(`La foto «${foto.id}» es de tipo «${foto.tipo}» y la plantilla «${plantilla.id}» solo admite: ${plantilla.tiposFoto.join(", ")}`);
       }
       const f = FORMATOS[d.formato as FormatoId];
-      const escala = escalaParaCubrir(foto.ancho, foto.alto, f.ancho, f.alto);
-      if (escala > AMPLIACION_MAXIMA) {
-        p.push(
-          `La foto «${foto.id}» (${foto.ancho}×${foto.alto}) tendría que ampliarse un ${Math.round((escala - 1) * 100)} % para cubrir un ${d.formato} de ${f.ancho}×${f.alto} (máximo ${Math.round((AMPLIACION_MAXIMA - 1) * 100)} %)`,
-        );
+      if (plantilla && encajeDe(plantilla) === "marco") {
+        // Enmarcada: la foto va entera y sin ampliar; basta con que tenga resolución.
+        if (!valeParaMarco(foto)) {
+          p.push(
+            `La foto «${foto.id}» (${foto.ancho}×${foto.alto}) es demasiado pequeña: para «${plantilla.id}» su lado largo tiene que medir ${LADO_MINIMO_MARCO} px o más`,
+          );
+        }
+      } else {
+        const escala = escalaParaCubrir(foto.ancho, foto.alto, f.ancho, f.alto);
+        if (escala > AMPLIACION_MAXIMA) {
+          // Si la marca tiene plantilla enmarcada para ese formato y la foto le vale, se dice.
+          const marco = PLANTILLAS.find((x) => x.marca === d.marca && encajeDe(x) === "marco" && x.formatos.includes(d.formato as FormatoId));
+          const consejo = marco && valeParaMarco(foto) ? `. Usa la plantilla «${marco.nombre}» («${marco.id}»): la enseña entera, sin ampliarla` : "";
+          p.push(
+            `La foto «${foto.id}» (${foto.ancho}×${foto.alto}) tendría que ampliarse un ${Math.round((escala - 1) * 100)} % para cubrir un ${d.formato} de ${f.ancho}×${f.alto} (máximo ${Math.round((AMPLIACION_MAXIMA - 1) * 100)} %)${consejo}`,
+          );
+        }
       }
     }
   }

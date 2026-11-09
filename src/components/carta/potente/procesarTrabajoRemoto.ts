@@ -1,9 +1,11 @@
 /**
  * Procesa en ESTE dispositivo un trabajo de vídeo mandado desde un móvil:
  * reclamar → descargar el bruto → procesar y guardar `video_url` (pipeline
- * del vídeo del plato) → marcar listo → mover el bruto a
- * `videos-originales/<platoId>.<ext>` (para poder cambiar el fondo después;
- * si no se puede mover, se borra) → avisar por push.
+ * del vídeo del plato) → marcar listo → subir el bruto a Google Drive como
+ * vídeo ORIGINAL del plato (marketing/carta/<marca>/videos/<platoId>.<ext>,
+ * para poder cambiar el fondo después) y borrarlo del bucket (si Drive falla,
+ * se borra igual y se avisa: en Supabase solo queda el vídeo de la web) →
+ * avisar por push.
  * Si falla: marcar error y avisar igualmente (el móvil ve «no se pudo»).
  *
  * El paso «procesar y guardar» es inyectable (`procesarYGuardar`) para meter
@@ -44,9 +46,9 @@ export const procesarYGuardarDirecto: ProcesarYGuardar = async ({ platoId, bruto
   return guardarVideoPlato(platoId, r.blob, anterior, tema);
 };
 
-const conservarBrutoDirecto = async (rutaBruto: string, platoId: string) => {
+const conservarBrutoDirecto = async (rutaBruto: string, platoId: string, bruto?: Blob) => {
   const { conservarBrutoComoOriginal } = await import("../video/subirVideoPlato");
-  return conservarBrutoComoOriginal(rutaBruto, platoId);
+  return conservarBrutoComoOriginal(rutaBruto, platoId, bruto);
 };
 
 export interface DependenciasRemoto {
@@ -54,8 +56,8 @@ export interface DependenciasRemoto {
   descargar?: typeof descargarBruto;
   terminar?: typeof terminarTrabajo;
   soltar?: typeof soltarTrabajo;
-  /** Conserva el bruto como original del plato (por defecto: moverlo a videos-originales/). */
-  conservar?: (rutaBruto: string, platoId: string) => Promise<unknown>;
+  /** Conserva el bruto como original del plato (por defecto: a Google Drive y se borra del bucket). */
+  conservar?: (rutaBruto: string, platoId: string, bruto?: Blob) => Promise<unknown>;
   notificar?: typeof notificarTrabajo;
   procesarYGuardar?: ProcesarYGuardar;
 }
@@ -91,7 +93,7 @@ export async function procesarTrabajoRemoto(
       onProgreso: opts.onProgreso,
     });
     await terminar(mio.id, true);
-    await conservar(mio.ruta_original, mio.plato_id);
+    await conservar(mio.ruta_original, mio.plato_id, bruto);
     await notificar(mio.id);
     return { estado: "listo", url };
   } catch (e) {

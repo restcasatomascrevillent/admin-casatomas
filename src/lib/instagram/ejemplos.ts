@@ -177,6 +177,59 @@ export const EJEMPLOS: readonly EjemploPieza[] = [
       ]
     },
   },
+  // Foto enmarcada (08/11/2026): fotos apaisadas como las de la carta (1200×900).
+  {
+    id: "ct-marco-post",
+    json: {
+      "marca": "casa-tomas",
+      "plantilla": "ct-marco",
+      "formato": "post",
+      "foto": "ct-carne-plato",
+      "antetitulo": "De nuestra carta",
+      "titular": "Brasa, sal y paciencia",
+      "cita": "Chuleta de vaca madurada",
+      "cta": "Reservar mesa"
+    },
+  },
+  {
+    id: "ct-marco-story",
+    json: {
+      "marca": "casa-tomas",
+      "plantilla": "ct-marco",
+      "formato": "story",
+      "foto": "ct-carne-plato",
+      "antetitulo": "De nuestra carta",
+      "titular": "Brasa, sal y paciencia",
+      "cita": "Chuleta de vaca madurada",
+      "cta": "Reservar mesa"
+    },
+  },
+  {
+    id: "tz-marco-post",
+    json: {
+      "marca": "touza",
+      "plantilla": "tz-marco",
+      "formato": "post",
+      "foto": "touza-2",
+      "antetitulo": "Para empezar la noche",
+      "titular": "Un rincón para quedarse",
+      "cita": "Sofá, mármol y luz baja",
+      "cta": "Ver carta"
+    },
+  },
+  {
+    id: "tz-marco-story",
+    json: {
+      "marca": "touza",
+      "plantilla": "tz-marco",
+      "formato": "story",
+      "foto": "touza-2",
+      "antetitulo": "Para empezar la noche",
+      "titular": "Un rincón para quedarse",
+      "cita": "Sofá, mármol y luz baja",
+      "cta": "Ver carta"
+    },
+  },
 ];
 
 /** Ejemplos de una plantilla (y, si se pide, de un formato). */

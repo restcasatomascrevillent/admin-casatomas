@@ -99,10 +99,11 @@ function ContenidoSinReserva({ salaPreferida, onCerrar }: { salaPreferida: strin
       ajustesDia: ajustesDia ?? [],
       asignaciones: asignaciones ?? [],
       excluidas: new Set(configAsignacionDesde(config).mesasExcluidas),
+      alFinal: new Set(configAsignacionDesde(config).mesasAlFinal),
       configOcupacion: configServicioSalaDesde(config),
       reserva: { id: "", hora, comensales: personas, espacioId: null },
     });
-    const ordenadas = ordenarParaSinReserva(r.caben);
+    const ordenadas = ordenarParaSinReserva(r.caben, new Set(configAsignacionDesde(config).mesasAlFinal));
     const lista = salaPreferida
       ? [...ordenadas.filter((m) => m.espacioId === salaPreferida), ...ordenadas.filter((m) => m.espacioId !== salaPreferida)]
       : ordenadas;

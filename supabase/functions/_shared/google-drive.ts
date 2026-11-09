@@ -279,6 +279,73 @@ export class ClienteDrive {
     );
   }
 
+  /**
+   * Cambia el contenido (y el nombre) de un fichero que ya existe, sin
+   * moverlo de carpeta: se conserva su id (originales de la carta).
+   */
+  async reemplazar(id: string, nombre: string, tipo: string, bytes: Uint8Array, descripcion?: string): Promise<FicheroDrive> {
+    if (!esIdDrive(id)) throw new ErrorDrive("Id de fichero no válido", "respuesta");
+    const frontera = `frontera-${crypto.randomUUID()}`;
+    const meta = JSON.stringify({ name: nombre, ...(descripcion ? { description: descripcion } : {}) });
+    const cod = new TextEncoder();
+    const cabeza = cod.encode(`--${frontera}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${frontera}\r\nContent-Type: ${tipo}\r\n\r\n`);
+    const cola = cod.encode(`\r\n--${frontera}--`);
+    const cuerpo = new Uint8Array(cabeza.length + bytes.length + cola.length);
+    cuerpo.set(cabeza, 0);
+    cuerpo.set(bytes, cabeza.length);
+    cuerpo.set(cola, cabeza.length + bytes.length);
+    return await this.json<FicheroDrive>(
+      `${URL_SUBIDA}/files/${id}?uploadType=multipart&supportsAllDrives=true&fields=${encodeURIComponent("id,name,mimeType,size,parents,createdTime")}`,
+      { method: "PATCH", headers: { "Content-Type": `multipart/related; boundary=${frontera}` }, body: cuerpo, signal: AbortSignal.timeout(60_000) },
+    );
+  }
+
+  /**
+   * Subida reanudable (para ficheros grandes: los vídeos originales de la
+   * carta, hasta 50 MB). Crea el fichero en `carpeta` o, con `reemplazarId`,
+   * cambia el contenido (y el nombre) de uno que ya existe sin cambiar su id.
+   * Dos peticiones: la que abre la sesión (con el token) y la que manda los
+   * bytes a la URL de sesión que da Google (solo si es de www.googleapis.com).
+   */
+  async subirReanudable(o: {
+    carpeta?: string;
+    reemplazarId?: string;
+    nombre: string;
+    tipo: string;
+    datos: Blob | Uint8Array;
+    descripcion?: string;
+  }): Promise<FicheroDrive> {
+    if (o.reemplazarId !== undefined && !esIdDrive(o.reemplazarId)) throw new ErrorDrive("Id de fichero no válido", "respuesta");
+    if (o.reemplazarId === undefined && !esIdDrive(o.carpeta)) throw new ErrorDrive("Id de carpeta no válido", "respuesta");
+    const largo = o.datos instanceof Uint8Array ? o.datos.byteLength : o.datos.size;
+    const meta = { name: o.nombre, ...(o.descripcion ? { description: o.descripcion } : {}), ...(o.reemplazarId ? {} : { parents: [o.carpeta] }) };
+    const campos = encodeURIComponent("id,name,mimeType,size,parents,createdTime");
+    const url = o.reemplazarId
+      ? `${URL_SUBIDA}/files/${o.reemplazarId}?uploadType=resumable&supportsAllDrives=true&fields=${campos}`
+      : `${URL_SUBIDA}/files?uploadType=resumable&supportsAllDrives=true&fields=${campos}`;
+    const r = await this.pedir(url, {
+      method: o.reemplazarId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Type": o.tipo, "X-Upload-Content-Length": String(largo) },
+      body: JSON.stringify(meta),
+    });
+    const sesion = r.headers.get("location") ?? "";
+    await r.body?.cancel().catch(() => undefined);
+    if (!esUrlSesionSubida(sesion)) throw new ErrorDrive("Google Drive no dio una URL de subida válida", "respuesta", r.status);
+    const cuerpo = o.datos instanceof Uint8Array ? (o.datos as Uint8Array<ArrayBuffer>) : o.datos;
+    return await this.json<FicheroDrive>(sesion, { method: "PUT", headers: { "Content-Type": o.tipo }, body: cuerpo, signal: AbortSignal.timeout(300_000) });
+  }
+
+  /** Ficheros (no en la papelera) de una carpeta cuyo nombre contiene `texto`. */
+  async buscarEnCarpeta(carpeta: string, texto: string, maximo = 20): Promise<FicheroDrive[]> {
+    if (!esIdDrive(carpeta)) throw new ErrorDrive("Id de carpeta no válido", "respuesta");
+    const q = `'${carpeta}' in parents and trashed=false and name contains '${texto.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+    const campos = "files(id,name,mimeType,size,parents,trashed,createdTime)";
+    const j = await this.json<{ files?: FicheroDrive[] }>(
+      `${URL_DRIVE}/files?q=${encodeURIComponent(q)}&fields=${encodeURIComponent(campos)}&pageSize=${Math.min(100, maximo)}&supportsAllDrives=true&includeItemsFromAllDrives=true`,
+    );
+    return j.files ?? [];
+  }
+
   /** Contenido de un fichero. */
   async descargar(id: string): Promise<{ bytes: Uint8Array; tipo: string }> {
     if (!esIdDrive(id)) throw new ErrorDrive("Id de fichero no válido", "respuesta");
@@ -303,6 +370,17 @@ export class ClienteDrive {
       return null;
     }
   }
+}
+
+/** true si es la URL de una sesión de subida de Drive (https://www.googleapis.com/upload/drive/v3/files…). */
+export function esUrlSesionSubida(url: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  return u.protocol === "https:" && u.hostname === "www.googleapis.com" && !u.port && !u.username && !u.password && u.pathname.startsWith("/upload/drive/v3/files");
 }
 
 /** thumbnailLink → URL con el tamaño pedido; null si no es https de *.googleusercontent.com. */
