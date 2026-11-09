@@ -355,6 +355,90 @@ describe("Estado de la instalación y lo que requiere atención", () => {
     expect([vacio.general, titularEstado(vacio)]).toEqual(["gris", "Todavía sin datos"]);
   });
 
+  // 09/11/2026: «añade diferentes circulitos por proveedor que haga falta, por ejemplo en Vercel CDN
+  // requests, en Supabase algo más de info».
+  it("estadoInstalacion: hasta 3 anillos (de más a menos lleno) y hasta 3 datos sin límite por servicio", () => {
+    const vercelLleno = servicio({
+      proveedor: "vercel", nombre: "Vercel", limites: {
+        peticiones_cdn: { orden: 1, etiqueta: "Visitas a las webs (peticiones al CDN)", limite: 1_000_000, unidad: "peticiones" },
+        transferencia_rapida: { orden: 2, etiqueta: "Datos servidos", limite: 100, unidad: "GB" },
+        despliegues_24h: { orden: 7, etiqueta: "Publicaciones (despliegues)", limite: 100, unidad: "despliegues" },
+        recortes_servidor_mes: { orden: 8, etiqueta: "Recortes", limite: 600, unidad: "fotos" },
+      },
+    });
+    const supaMas = servicio({ proveedor: "supabase", nombre: "Supabase", limites: { bd_tamano: { orden: 1, etiqueta: "Tamaño de la base de datos", limite: 500, unidad: "MB" } } });
+    const stripe = servicio({ proveedor: "stripe", nombre: "Stripe" });
+    const hostinger = servicio({ proveedor: "hostinger", nombre: "Hostinger", renovacion: "2027-02-28" });
+    const lect = new Map<string, LecturaServicio>([
+      ["vercel", lectura("vercel", { metricas: {
+        peticiones_cdn: { valor: 257_218, unidad: "peticiones" },
+        transferencia_rapida: { valor: 6.07 * 1024 ** 3, unidad: "bytes" },
+        despliegues_24h: { valor: 58, unidad: "despliegues" },
+        recortes_servidor_mes: { valor: 0, unidad: "fotos" },
+        compilaciones_30d: { orden: 7.5, etiqueta: "Compilaciones", valor: 527, unidad: "compilaciones", periodo: "últimos 30 días" },
+      } })],
+      ["supabase", lectura("supabase", { metricas: {
+        bd_tamano: { valor: 331 * 1024 ** 2, unidad: "bytes" },
+        bd_crecimiento: { orden: 1.5, etiqueta: "Crecimiento de la base de datos", valor: 259 * 1024 ** 2, unidad: "bytes", periodo: "últimos 7 días" },
+        conexiones: { orden: 4, etiqueta: "Conexiones a la base de datos", valor: 22, unidad: "conexiones", limite: 60, unidad_limite: "conexiones" },
+        invocaciones_funciones_24h: { orden: 6, etiqueta: "Ejecuciones de funciones", valor: 258, unidad: "invocaciones", periodo: "últimas 24 h" },
+        peticiones_api_7d: { orden: 7, etiqueta: "Peticiones a la API", valor: 63_021, unidad: "peticiones", periodo: "últimos 7 días" },
+      } })],
+      ["stripe", lectura("stripe", { metricas: {
+        cobros_mes: { orden: 1, etiqueta: "Cobros este mes", valor: 1, unidad: "cobros", periodo: "mes en curso" },
+        importe_cobrado_mes: { orden: 2, etiqueta: "Importe cobrado este mes", valor: 10, unidad: "EUR", periodo: "mes en curso" },
+        comisiones_mes: { orden: 3, etiqueta: "Comisiones de Stripe este mes", valor: 0.4, unidad: "EUR", periodo: "mes en curso" },
+        saldo_pendiente: { orden: 5, etiqueta: "Saldo pendiente", valor: -0.4, unidad: "EUR" },
+      } })],
+      ["hostinger", lectura("hostinger", { metricas: { suscripciones_activas: { orden: 1, etiqueta: "Suscripciones activas", valor: 2, unidad: "suscripciones" } } })],
+    ]);
+    const servs = [vercelLleno, supaMas, stripe, hostinger];
+    const e = estadoInstalacion({ servicios: servs, lecturas: lect, renovaciones: proximasRenovaciones(servs, lect, HOY) });
+    const ficha = (p: string) => e.fichas.find((f) => f.proveedor === p)!;
+    const sinNbsp = (t: string) => t.replace(/\u00a0/g, " ");
+
+    // Vercel: despliegues 58 %, visitas 26 % y datos 6 %; los recortes (0 %) no caben.
+    expect(ficha("vercel").anillos.map((a) => [a.clave, a.corta, Math.round(a.porcentaje), a.semaforo])).toEqual([
+      ["despliegues_24h", "Despliegues", 58, "verde"],
+      ["peticiones_cdn", "Visitas", 26, "verde"],
+      ["transferencia_rapida", "Tráfico", 6, "verde"],
+    ]);
+    expect(ficha("vercel").principal).toMatchObject({ etiqueta: "Publicaciones", textoValor: "58" });
+    expect(ficha("vercel").datos).toEqual([{ clave: "compilaciones_30d", corta: "Compilaciones (30 días)", texto: "527", completo: "Compilaciones: 527 compilaciones (30 días)" }]);
+
+    // Supabase: base de datos y conexiones con anillo; crecimiento, funciones y peticiones como datos.
+    expect(ficha("supabase").anillos.map((a) => [a.corta, Math.round(a.porcentaje)])).toEqual([["Base de datos", 66], ["Conexiones", 37]]);
+    expect(ficha("supabase").datos.map((d) => [d.corta, sinNbsp(d.texto)])).toEqual([
+      ["Crecimiento BD", "+259 MB"], ["Funciones (24 h)", "258"], ["Peticiones (7 días)", "63.021"],
+    ]);
+    expect(sinNbsp(ficha("supabase").datos[0].completo)).toBe("Crecimiento de la base de datos: +259 MB (7 días)");
+
+    // Stripe (sin límites): sin anillos, con sus cifras del mes; el saldo pendiente no se enseña.
+    expect(ficha("stripe").anillos).toEqual([]);
+    expect(ficha("stripe").datos.map((d) => [d.corta, sinNbsp(d.texto)])).toEqual([["Cobros", "1"], ["Cobrado", "10,00 €"], ["Comisiones", "0,40 €"]]);
+
+    // Hostinger: la próxima renovación lejana es un dato (la cercana ya sale en el motivo).
+    expect(ficha("hostinger").datos.map((d) => [d.corta, d.texto])).toEqual([["Suscripciones", "2"], ["Renueva", "en 117 días"]]);
+    expect(ficha("hostinger").datos[1].completo).toBe("Renovación del plan: en 117 días (28/02/2027)");
+    expect(ficha("hostinger").motivo).toBe("Bien");
+  });
+
+  it("pendientesServicios: una sola línea por servicio aunque tenga varias métricas al límite", () => {
+    const gh = servicio({ proveedor: "github", nombre: "GitHub", limites: {
+      actions_computo: { orden: 1, etiqueta: "Pruebas automáticas (GitHub Actions)", limite: 12, unidad: "USD" },
+      actions_minutos: { orden: 2, etiqueta: "Minutos de Actions", limite: 2000, unidad: "minutos" },
+    } });
+    const lect = new Map<string, LecturaServicio>([["github", lectura("github", { metricas: {
+      actions_computo: { valor: 18, unidad: "USD" },
+      actions_minutos: { valor: 3148, unidad: "minutos" },
+    } })]]);
+    const r = pendientesServicios({ servicios: [gh], lecturas: lect, renovaciones: [], resumen: { sinPrecio: [], porConfirmar: [] } });
+    expect(r.map((p) => [p.clave, p.gravedad, p.titulo])).toEqual([["consumo:github:actions_minutos", "rojo", "GitHub · Minutos de Actions y 1 más"]]);
+    const e = estadoInstalacion({ servicios: [gh], lecturas: lect, renovaciones: [] });
+    expect(e.cuenta.rojo).toBe(1);
+    expect(e.fichas[0].anillos.map((a) => a.clave)).toEqual(["actions_minutos", "actions_computo"]);
+  });
+
   it("sinAclaracion quita solo el paréntesis final", () => {
     expect(sinAclaracion("Vapi (asistente telefónico)")).toBe("Vapi");
     expect(sinAclaracion("Visitas a las webs (peticiones al CDN)")).toBe("Visitas a las webs");

@@ -452,6 +452,26 @@ describe("lectores", () => {
     expect(con.metricas.cpu_activa?.nota).toMatch(/42 fotos, 4.2 min/);
   });
 
+  it("Vercel: memoria de las funciones, reparto por proyecto, caché y compilaciones", async () => {
+    const dia = (fecha: string, hit: number, miss: number, reparto: Array<[string, number]>) => ({
+      date: fecha, request_hit_count: hit, request_miss_count: miss, bandwidth_outgoing_bytes: 1000,
+      function_invocation_successful_count: 5, function_execution_successful_gb_hours: 0.05, function_execution_error_gb_hours: 0.01,
+      breakdown: { requests: reparto.map(([name, percent]) => ({ name, percent, id: `prj_${name}` })) },
+    });
+    const rutas = rutasCompletas({
+      "api.vercel.com/v2/usage": (url) => url.searchParams.get("type") === "builds"
+        ? resp({ data: [{ date: "2026-11-01", build_completed_count: 40, build_failed_count: 2, build_build_seconds: 9000 }, { date: "2026-11-02", build_completed_count: 10, build_build_seconds: 1800 }] })
+        : resp({ data: [dia("2026-11-01", 800, 200, [["admin-casatomas", 80], ["web-casatomas", 20]]), dia("2026-11-02", 900, 100, [["web-casatomas", 60], ["admin-casatomas", 40]])] }),
+    });
+    const r = await LECTORES.vercel(ctx(SECRETOS, rutas));
+    expect(r.metricas.peticiones_cdn).toMatchObject({ valor: 2000, nota: "Por proyecto: admin 60 % · web 40 %. 85 % servidas desde la caché del CDN." });
+    expect(r.detalles).toMatchObject({ peticiones_por_proyecto: [{ proyecto: "admin-casatomas", peticiones: 1200 }, { proyecto: "web-casatomas", peticiones: 800 }], aciertos_cache: 85 });
+    expect(r.metricas.memoria_funciones).toMatchObject({ valor: 0.12, unidad: "GB-hora", limite: 360 });
+    expect(r.metricas.compilaciones_30d).toMatchObject({ valor: 52, nota: expect.stringMatching(/^2 fallidas · 3,0 h compilando/) });
+    // El límite de servicios_contratados manda sobre el del plan que trae la lectura.
+    expect(aplicarLimites(r.metricas, { memoria_funciones: { limite: 1000, unidad: "GB-hora" } }).memoria_funciones.limite).toBe(1000);
+  });
+
   it("Vercel: equipo configurable", async () => {
     const rutas = rutasCompletas();
     const f = fetchSimulado(rutas);
@@ -519,6 +539,50 @@ describe("lectores", () => {
     expect(r.metricas.actions_computo).toBeUndefined();
     expect(r.detalles!.permiso_faltante).toMatch(/Plan/);
     expect(r.detalles!.avisos).toBeUndefined();
+  });
+
+  // 09/11/2026: web, admin y touza son públicos. GitHub no cobra sus minutos ni los cuenta en los
+  // 2.000 incluidos, pero el informe los suma: la tarjeta marcaba un «157 %» rojo que no lo era.
+  const reposPublicos = (visibles: Record<string, boolean>) => Object.fromEntries(Object.entries(visibles).map(([repo, publico]) => [
+    `api.github.com/repos/restcasatomascrevillent/${repo}`,
+    () => resp({ name: repo, private: !publico, visibility: publico ? "public" : "private" }),
+  ]));
+
+  it("GitHub: los minutos de repositorios públicos no cuentan para el límite (informe detallado)", async () => {
+    const f = fetchSimulado(rutasCompletas({
+      ...reposPublicos({ "web-casatomas": true, "admin-casatomas": true, "touza-casatomas": true }),
+      "api.github.com/users/restcasatomascrevillent/settings/billing/usage": () => resp({ usageItems: [
+        { date: "2026-11-02", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 2000, pricePerUnit: 0.006, grossAmount: 12, discountAmount: 12, netAmount: 0, repositoryName: "restcasatomascrevillent/admin-casatomas" },
+        { date: "2026-11-03", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 1148, pricePerUnit: 0.006, grossAmount: 6.888, discountAmount: 6.888, netAmount: 0, repositoryName: "restcasatomascrevillent/web-casatomas" },
+        { date: "2026-11-03", product: "actions", sku: "actions_linux", unitType: "Minutes", quantity: 30, pricePerUnit: 0.006, grossAmount: 0.18, discountAmount: 0.18, netAmount: 0, repositoryName: "restcasatomascrevillent/becarios" },
+      ] }),
+    }));
+    const r = await LECTORES.github({ ...ctx(SECRETOS, {}), fetch: f.fn });
+    expect(r.error).toBeFalsy();
+    expect(r.metricas.actions_minutos).toMatchObject({ valor: 30, etiqueta: "Minutos de Actions en repositorios privados", nota: expect.stringContaining("no cuentan") });
+    expect(r.metricas.actions_minutos_publicos).toMatchObject({ valor: 3148, unidad: "minutos" });
+    expect(r.metricas.actions_computo).toMatchObject({ valor: 0.18, unidad: "USD", nota: expect.stringContaining("3178 minutos este mes (19,07 US$") });
+    expect(r.detalles!.repos_publicos).toEqual(["web-casatomas", "admin-casatomas", "touza-casatomas"]);
+    expect(r.coste_variable).toMatchObject({ importe: 0 });
+    // Con el informe detallado no hace falta el resumen.
+    expect(f.llamadas.some((l) => l.url.pathname.endsWith("/usage/summary"))).toBe(false);
+    // Frente a los 2.000 minutos del plan: 30 (1,5 %), no 3.178 (159 %).
+    const conLimite = aplicarLimites(r.metricas, { actions_minutos: { limite: 2000, unidad: "minutos" } });
+    expect(conLimite.actions_minutos).toMatchObject({ valor: 30, limite: 2000 });
+  });
+
+  it("GitHub: solo con el resumen y repositorios públicos, los privados se estiman con sus ejecuciones", async () => {
+    const r = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
+      ...reposPublicos({ "web-casatomas": true, "admin-casatomas": false, "touza-casatomas": true }),
+      ...rutasEjecuciones({
+        "web-casatomas": [ejecucion("2026-11-02T10:00:00Z", 6000)],
+        "admin-casatomas": [ejecucion("2026-11-02T09:00:00Z", 120)],
+        "touza-casatomas": [],
+      }),
+    })));
+    expect(r.metricas.actions_minutos).toMatchObject({ valor: 2, nota: expect.stringContaining("Estimación") });
+    expect(r.metricas.actions_minutos_publicos).toMatchObject({ valor: 1098 });
+    expect(r.metricas.actions_computo.valor).toBeCloseTo((7 / 1100) * 2, 2);
   });
 
   it("GitHub: sin acceso a un repositorio lo dice", async () => {
@@ -599,6 +663,59 @@ describe("lectores", () => {
     expect(String(r.detalles?.avisos)).toContain("500");
   });
 
+  it("Supabase: conexiones y tablas que más ocupan (RPC nueva), crecimiento de la BD y peticiones por tipo", async () => {
+    const c = ctx(SECRETOS, rutasCompletas());
+    const rpcBase = c.admin.rpc;
+    // Lecturas guardadas de Supabase (servicios_uso), de la más reciente a la más antigua.
+    const guardadas = [
+      { tomado_en: "2026-10-30T12:00:00Z", metricas: { bd_tamano: { valor: 40_000_000 } } },
+      { tomado_en: "2026-10-27T12:00:00Z", metricas: { bd_tamano: { valor: 30_000_000 } } },
+    ];
+    const consultas: Array<Record<string, unknown>> = [];
+    const r = await LECTORES.supabase({
+      ...c,
+      admin: {
+        rpc: (fn: string, args?: Record<string, unknown>) => fn === "servicios_metricas_bd_extra"
+          ? Promise.resolve({ data: { conexiones: 22, conexiones_max: 60, tablas_mayores: [{ tabla: "productos_factura", bytes: 167_772_160 }, { tabla: "audit_log", bytes: 74_448_896 }, { tabla: "facturas", bytes: 34_603_008 }, { tabla: "x", bytes: 1 }] }, error: null })
+          : rpcBase(fn, args),
+        from: () => {
+          const q: Record<string, unknown> = {};
+          const cadena = {
+            select: () => cadena,
+            eq: (k: string, v: unknown) => { q[k] = v; return cadena; },
+            lte: (_k: string, v: string) => { q.hasta = v; return cadena; },
+            order: (_k: string, o: { ascending: boolean }) => { q.asc = o.ascending; return cadena; },
+            limit: async () => {
+              consultas.push({ ...q });
+              const filas = guardadas.filter((g) => g.tomado_en <= String(q.hasta));
+              return { data: q.asc ? [...filas].reverse() : filas, error: null };
+            },
+          };
+          return cadena;
+        },
+      },
+    });
+    expect(r.metricas.conexiones).toMatchObject({ valor: 22, limite: 60, unidad: "conexiones" });
+    expect(r.metricas.bd_tamano.nota).toBe("Lo que más ocupa: productos_factura 160 MB · audit_log 71 MB · facturas 33 MB.");
+    expect(r.detalles!.tablas_mayores).toHaveLength(4);
+    // Hace 7 días (27/10 12:00) había 30 MB; ahora 50,6 MB.
+    expect(r.metricas.bd_crecimiento).toMatchObject({ valor: 50_632_371 - 30_000_000, unidad: "bytes", periodo: "últimos 7 días", nota: "+20 MB en 7 días." });
+    expect(consultas[0]).toMatchObject({ proveedor: "supabase", hasta: "2026-10-27T12:00:00.000Z", asc: false });
+    expect(r.metricas.peticiones_api_7d.nota).toMatch(/^base de datos 900 · archivos 85 · inicio de sesión 10 · tiempo real 5\./);
+    expect(r.detalles!.peticiones_por_tipo).toEqual({ "base de datos": 900, archivos: 85, "inicio de sesión": 10, "tiempo real": 5 });
+
+    // Sin lecturas de hace 7 días: la más antigua de hace al menos un día.
+    guardadas.splice(1, 1);
+    guardadas[0].tomado_en = "2026-11-01T12:00:00Z";
+    const r2 = await LECTORES.supabase({ ...c, admin: { rpc: rpcBase, from: () => ({
+      select: () => ({ eq: () => ({ lte: (_k: string, hasta: string) => ({ order: () => ({ limit: async () => ({ data: guardadas.filter((g) => g.tomado_en <= hasta), error: null }) }) }) }) }),
+    }) } });
+    expect(r2.metricas.bd_crecimiento).toMatchObject({ periodo: "desde el 01/11/2026", nota: "+10 MB en 2 días." });
+    // Sin la RPC nueva (base sin 20261120100000): ni conexiones ni tablas, lo demás igual.
+    expect(r2.metricas.conexiones).toBeUndefined();
+    expect(r2.metricas.bd_tamano).toBeDefined();
+  });
+
   it("metricasBd: una sola llamada a la RPC por contexto", async () => {
     const c = ctx({}, {});
     await Promise.all([metricasBd(c), metricasBd(c), LECTORES.openai(c), LECTORES.vapi(c)]);
@@ -644,8 +761,14 @@ describe("utilidades", () => {
     expect(resumirUsoVercel(null).claves).toEqual([]);
   });
   it("resumirUsoGithub ignora lo que no es Actions (salvo en lo facturado)", () => {
-    expect(resumirUsoGithub(GITHUB_RESUMEN)).toEqual({ computoUsd: 7, minutos: 1100, almacenamientoGbHoras: 3.6, netoUsd: 1 });
-    expect(resumirUsoGithub({})).toEqual({ computoUsd: 0, minutos: 0, almacenamientoGbHoras: 0, netoUsd: null });
+    expect(resumirUsoGithub(GITHUB_RESUMEN)).toEqual({ computoUsd: 7, minutos: 1100, almacenamientoGbHoras: 3.6, netoUsd: 1, minutosPublicos: 0, computoPublicoUsd: 0, conRepositorio: false });
+    expect(resumirUsoGithub({})).toEqual({ computoUsd: 0, minutos: 0, almacenamientoGbHoras: 0, netoUsd: null, minutosPublicos: 0, computoPublicoUsd: 0, conRepositorio: false });
+    // Con el repositorio de cada línea: los públicos aparte («dueño/repo» o solo el nombre).
+    const detalle = { usageItems: [
+      { product: "Actions", unitType: "Minutes", quantity: 3000, grossAmount: 18, netAmount: 0, repositoryName: "restcasatomascrevillent/web-casatomas" },
+      { product: "Actions", unitType: "Minutes", quantity: 100, grossAmount: 0.6, netAmount: 0, repositoryName: "becarios" },
+    ] };
+    expect(resumirUsoGithub(detalle, new Set(["web-casatomas"]))).toMatchObject({ minutos: 3100, minutosPublicos: 3000, computoPublicoUsd: 18, conRepositorio: true });
   });
   it("resumirAnaliticaVapi y resumirSuscripcionesHostinger", () => {
     expect(resumirAnaliticaVapi([{ name: "servicios_mes", result: [{ sumCost: 1, countId: 2 }, { sumCost: 0.5, countId: 1 }] }])).toEqual({ coste: 1.5, llamadas: 3 });
