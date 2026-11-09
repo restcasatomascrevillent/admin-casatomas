@@ -352,3 +352,32 @@ html {
     height: 28px;
   }
 }
+
+/* Menú lateral (SidebarContent): sin la barra blanca con flechas del
+   navegador. Fina, sin fondo, y el tirador solo se ve al pasar por encima;
+   en la tablet se desliza con el dedo igual. Fuera de @layer para que
+   Tailwind no la descarte (es un selector de atributo, no una clase). */
+[data-sidebar="content"] {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+[data-sidebar="content"]:hover,
+[data-sidebar="content"]:focus-within {
+  scrollbar-color: hsl(var(--sidebar-foreground) / 0.25) transparent;
+}
+[data-sidebar="content"]::-webkit-scrollbar {
+  width: 6px;
+}
+[data-sidebar="content"]::-webkit-scrollbar-button {
+  display: none;
+}
+[data-sidebar="content"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-sidebar="content"]::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+[data-sidebar="content"]:hover::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--sidebar-foreground) / 0.25);
+}
