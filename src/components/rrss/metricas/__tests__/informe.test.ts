@@ -90,7 +90,7 @@ function datosBase(): DatosInformeRrss {
 
 const informeOk = (d: DatosInformeRrss, mes = "2026-10", hoy = "2026-11-09"): InformeRrss => {
   const i = construirInformeRrss(d, { mes, hoy });
-  if (i.vacio) throw new Error(`Informe vacío: ${i.motivo}`);
+  if (i.vacio === true) throw new Error(`Informe vacío: ${i.motivo}`);
   return i;
 };
 
