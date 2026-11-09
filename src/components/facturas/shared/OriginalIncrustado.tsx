@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, FileText, ImageOff, Loader2, RefreshCw } from "lucide-react";
+import { ExternalLink, FileText, FileX2, ImageOff, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ImagenZoom } from "./ImagenZoom";
 import { urlSegura } from "@/lib/url-segura";
+import { vistaPreviaDrive } from "@/lib/facturas/documentosCifra";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 const BUCKET = "facturas-originales";
@@ -54,12 +55,28 @@ function VisorPantallaCompleta({ url, abierto, onCerrar, titulo }: { url: string
   );
 }
 
+/** Cabecera común del visor: título pequeño y, a la derecha, un único enlace para abrirlo fuera. */
+function CabeceraVisor({ enlace }: { enlace: ReactNode }) {
+  return (
+    <div className="flex shrink-0 items-center justify-between gap-2">
+      <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+        <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Documento original
+      </h3>
+      {enlace}
+    </div>
+  );
+}
+
 /**
- * Original del documento incrustado al final de la ficha (Compras › Documentos).
+ * EL sitio de la ficha (Compras › Documentos) donde se ve el original — no hay
+ * otro botón «Original» en la cabecera (dueño, 09/11/2026: ver el papel AL LADO
+ * de los datos, sin abrir otra pestaña).
+ *   - `drive_url` de Drive  -> vista previa incrustada (`/file/d/<id>/preview`) + «Abrir en Drive».
  *   - `archivo_path` imagen -> foto en un recuadro con zoom/arrastre/giro; botón de pantalla completa.
- *   - `archivo_path` PDF    -> primera vista con <object> + enlace «Abrir PDF».
- *   - solo `drive_url`      -> una línea con el enlace (Drive no se incrusta: pide permisos).
- *   - nada                  -> no pinta nada.
+ *   - `archivo_path` PDF    -> PDF incrustado + enlace «Abrir PDF».
+ *   - `drive_url` sin id    -> una línea con el enlace (no se sabe incrustar).
+ *   - nada                  -> estado vacío discreto, en una línea.
+ * Drive va primero: `archivo_path` es la copia TEMPORAL mientras Drive no la tiene.
  * Solo se monta con la ficha abierta, así que la URL firmada no se pide antes.
  */
 export function OriginalIncrustado({
@@ -75,19 +92,48 @@ export function OriginalIncrustado({
   relleno?: boolean;
 }) {
   const driveUrl = urlSegura(driveUrlBruta); // CT-REM-FE-06
+  const previa = vistaPreviaDrive(driveUrl);
+  if (previa && driveUrl) return <OriginalDeDrive previa={previa} driveUrl={driveUrl} titulo={titulo} relleno={relleno} />;
   if (archivoPath) return <OriginalDeStorage archivoPath={archivoPath} titulo={titulo} relleno={relleno} />;
   if (driveUrl) {
     return (
-      <p className="flex flex-wrap items-center gap-x-1.5 rounded-lg border border-dashed border-border px-3 text-sm text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-x-1.5 rounded-lg border border-dashed border-border px-3 text-sm text-muted-foreground" data-tour="facturas-original">
         <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span>Original en Google Drive ·</span>
         <a href={driveUrl} target="_blank" rel="noopener noreferrer" className={ENLACE}>
-          <ExternalLink className="h-4 w-4" aria-hidden="true" /> Abrir
+          <ExternalLink className="h-4 w-4" aria-hidden="true" /> Abrir en Drive
         </a>
       </p>
     );
   }
-  return null;
+  return (
+    <p role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground" data-testid="sin-original">
+      <FileX2 className="h-4 w-4 shrink-0" aria-hidden="true" /> No se guardó el original de este documento.
+    </p>
+  );
+}
+
+/** Vista previa de Drive en un <iframe> (la de VisorDocumento): pide estar dentro de la cuenta de Google con acceso. */
+function OriginalDeDrive({ previa, driveUrl, titulo, relleno }: { previa: string; driveUrl: string; titulo: string; relleno: boolean }) {
+  return (
+    <section aria-label="Documento original" className={relleno ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-2"} data-tour="facturas-original">
+      <CabeceraVisor
+        enlace={
+          <a href={driveUrl} target="_blank" rel="noopener noreferrer" className={ENLACE}>
+            <ExternalLink className="h-4 w-4" aria-hidden="true" /> Abrir en Drive
+          </a>
+        }
+      />
+      <iframe
+        src={previa}
+        title={`Original: ${titulo}`}
+        loading="lazy"
+        allow="autoplay"
+        referrerPolicy="no-referrer"
+        className={`w-full rounded-md border bg-muted/40 ${relleno ? "min-h-0 flex-1" : "h-[70dvh] min-h-80"}`}
+      />
+    </section>
+  );
 }
 
 function OriginalDeStorage({ archivoPath, titulo, relleno }: { archivoPath: string; titulo: string; relleno: boolean }) {
@@ -105,16 +151,15 @@ function OriginalDeStorage({ archivoPath, titulo, relleno }: { archivoPath: stri
   };
 
   const cabecera = (
-    <div className="flex shrink-0 items-center justify-between gap-2">
-      <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-        <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Documento original
-      </h3>
-      {url && (
-        <a href={url} target="_blank" rel="noopener noreferrer" className={ENLACE}>
-          <ExternalLink className="h-4 w-4" aria-hidden="true" /> {pdf ? "Abrir PDF" : "Abrir"}
-        </a>
-      )}
-    </div>
+    <CabeceraVisor
+      enlace={
+        url && (
+          <a href={url} target="_blank" rel="noopener noreferrer" className={ENLACE}>
+            <ExternalLink className="h-4 w-4" aria-hidden="true" /> {pdf ? "Abrir PDF" : "Abrir"}
+          </a>
+        )
+      }
+    />
   );
 
   let cuerpo;

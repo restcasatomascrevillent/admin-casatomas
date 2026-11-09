@@ -90,7 +90,10 @@ describe("FichaDocumento · permisos", () => {
     montar();
     expect(screen.getByRole("heading", { name: "Factura F-1" })).toBeInTheDocument();
     expect(screen.getByText("Merluza")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Ver original" })).toBeInTheDocument();
+    // El original se ve en el visor de la ficha (aquí simulado): ya no hay botón «Ver original»,
+    // y sin «Editar» ni IA tampoco queda la caja de acciones vacía.
+    expect(screen.queryByRole("button", { name: "Ver original" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Acciones del documento" })).not.toBeInTheDocument();
     expect(acciones()).toEqual({ editar: null, lapiz: null, anadir: null });
     expect(h.consultas).toEqual([]);
   });
