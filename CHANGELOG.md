@@ -2,6 +2,16 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.2.0] - 2026-11-09
+
+Objetivo: Puntuaciones Parker con fuente por añada y búsqueda desde la foto de la etiqueta
+
+### Cambiado
+- Parker: migración Parker con versión propia (20261118103000) ([#32](https://github.com/restcasatomascrevillent/admin-casatomas/pull/32))
+
+### Otros
+- Puntuaciones con fuente por añada, revisión de la carta y búsqueda desde la foto de la etiqueta ([#26](https://github.com/restcasatomascrevillent/admin-casatomas/pull/26))
+
 ## [1.1.0] - 2026-11-09
 
 Objetivo: Super Admin › Logs: actividad de la web, incidencias en Linear y estadísticas de comportamiento

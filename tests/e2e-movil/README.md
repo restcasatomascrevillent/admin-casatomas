@@ -22,3 +22,5 @@ Variables: `E2E_BASE_URL` (servidor ya levantado), `E2E_SUPABASE_URL` (la que se
 
 Los defectos conocidos de la auditoría móvil llevan `test.fail(...)`: mientras sigan rotos la prueba pasa en verde; cuando alguien
 los arregle, la prueba avisará («expected to fail, but passed») y habrá que quitar la marca.
+
+Capturas del flujo «foto de la etiqueta → puntuación Parker» (08/11/2026): `node tests/e2e-movil/parker-foto.capturas.mjs [carpeta]`, con el mismo build y `vite preview`. Simula la lectura de la etiqueta y la búsqueda (verificada, sin añada legible, contradicción, fallo, lista y edición).

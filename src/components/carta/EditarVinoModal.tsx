@@ -36,11 +36,16 @@ import { useLecturaEtiquetaVino } from "./lecturaEtiquetaVino";
 import { PistaPrecioVino } from "./PistaPrecioVino";
 import { CamposCopaParker } from "./CamposCopaParker";
 import { camposCopaParker, cambiosCopaParker, copaParkerParaCampos, COPA_PARKER_VACIO, exigirPrecioCopa } from "./copaParker";
+import { PanelParker } from "./parker/PanelParker";
+import { useBusquedaParker } from "./parker/useBusquedaParker";
+import { usePuntuacionesParker } from "./parker/usePuntuacionesParker";
 
 // Origen obligatorio también al editar (04/11/2026): país, región y categoría
 // con denominación. Un vino de «… — ORIGEN PENDIENTE» no se guarda hasta
 // elegirle la suya (así se corrigen los que quedan).
-// Copa y Parker (04/11/2026): ver copaParker.ts.
+// Copa y añada que se sirve: ver copaParker.ts. Parker (08/11/2026): las
+// puntuaciones con fuente se ven, confirman, buscan y añaden aquí mismo
+// (parker/PanelParker.tsx); se guardan al momento, aparte del formulario.
 const formSchema = z
   .object({
     nombre: nombreCarta,
@@ -124,9 +129,16 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       : null;
   const { limpiar: limpiarLectura } = lectura;
 
+  // Parker: filas guardadas de este vino y búsqueda bajo demanda.
+  const parker = usePuntuacionesParker();
+  const filasParker = parker.porVino(vino?.id);
+  const busquedaParker = useBusquedaParker();
+  const { limpiar: limpiarParker } = busquedaParker;
+
   useEffect(() => {
     if (!open) {
       limpiarLectura();
+      limpiarParker();
       return;
     }
     if (!vino) return;
@@ -150,7 +162,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [open, vino, form, limpiarRecorte, limpiarLectura]);
+  }, [open, vino, form, limpiarRecorte, limpiarLectura, limpiarParker]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
 
@@ -160,6 +172,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     if (!file) return;
 
     lectura.cancelar();
+    busquedaParker.limpiar();
     recorte.iniciar(file);
     setRemoveImage(false);
     setUrlRestaurada(null);
@@ -369,7 +382,30 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               avisoOrigen={avisoOrigen}
             />
 
-            <CamposCopaParker control={form.control} />
+            <CamposCopaParker
+              control={form.control}
+              parker={
+                vino ? (
+                  <PanelParker
+                    control={form.control}
+                    getValues={form.getValues}
+                    setValue={form.setValue}
+                    busqueda={busquedaParker}
+                    datosEtiqueta={lectura.datos}
+                    vinoId={vino.id}
+                    filas={filasParker}
+                    guardando={parker.guardar.isPending || parker.confirmar.isPending || parker.borrar.isPending}
+                    onGuardar={async (resultado, origen) => {
+                      await parker.guardar.mutateAsync({ vinoId: vino.id, resultado, origen });
+                      busquedaParker.limpiar();
+                      toast.success("Puntuación guardada. Si es de la añada que se sirve y está verificada, sale en la web al guardar la ficha.");
+                    }}
+                    onConfirmar={(f) => parker.confirmar.mutate(f)}
+                    onBorrar={(f) => parker.borrar.mutate(f.id)}
+                  />
+                ) : null
+              }
+            />
 
             {/* Con dedo el pie queda pegado abajo del diálogo (formulario largo o teclado abierto en
                 iOS): «Guardar» siempre a la vista. Con ratón, igual que antes. En el móvil, «Cancelar» y

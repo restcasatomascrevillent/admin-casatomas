@@ -2,11 +2,15 @@ import * as z from "zod";
 import { MENSAJES_PRECIO, normalizarPrecio } from "./precioCarta";
 
 /**
- * Vino por copas y puntuación Parker (04/11/2026, petición del dueño). Campos
- * de "Vinos" de la migración 20261104140000_vinos_copeo_y_parker: `copeo`,
- * `precio_copa_eur`, `puntuacion_parker` y `puntuacion_parker_anada`. Los
- * comparten el alta (VinoForm) y la edición (EditarVinoModal); los límites son
- * los mismos que los CHECK de la base de datos.
+ * Vino por copas (04/11/2026) y añada que se sirve (08/11/2026). Campos de
+ * "Vinos": `copeo` y `precio_copa_eur` (migración 20261104140000) y `anada` y
+ * `sin_anada` (20261118103000). Los comparten el alta (VinoForm) y la edición
+ * (EditarVinoModal); los límites son los mismos que los CHECK de la BD.
+ *
+ * La puntuación Parker YA NO se escribe a mano aquí (08/11/2026): va en
+ * vinos_puntuacion_parker con su fuente (parker/PanelParker.tsx) y la base de
+ * datos calcula `puntuacion_parker*` solo con la verificada de la añada que se
+ * sirve. Por eso este formulario manda `anada`/`sin_anada` y nunca los puntos.
  */
 export const PRECIO_COPA_MAX = 999.99;
 export const PARKER_MIN = 50;
@@ -15,8 +19,6 @@ export const PARKER_MAX = 100;
 export const MENSAJES_COPA_PARKER = {
   copaObligatoria: "Pon el precio de la copa",
   copaMaximo: "La copa no puede pasar de 999,99 €",
-  parkerRango: "La puntuación Parker va de 50 a 100",
-  parkerEntero: "La puntuación Parker es un número entero, p. ej. 94",
   anadaRango: "Pon una añada de cuatro cifras, p. ej. 2019",
 } as const;
 
@@ -40,17 +42,7 @@ const precioCopa = z.preprocess(
     .optional(),
 );
 
-const puntuacionParker = z.preprocess(
-  normalizarEntero,
-  z
-    .number({ invalid_type_error: MENSAJES_COPA_PARKER.parkerEntero })
-    .int(MENSAJES_COPA_PARKER.parkerEntero)
-    .min(PARKER_MIN, MENSAJES_COPA_PARKER.parkerRango)
-    .max(PARKER_MAX, MENSAJES_COPA_PARKER.parkerRango)
-    .optional(),
-);
-
-const anadaParker = z.preprocess(
+const anadaServida = z.preprocess(
   normalizarEntero,
   z
     .number({ invalid_type_error: MENSAJES_COPA_PARKER.anadaRango })
@@ -64,8 +56,8 @@ const anadaParker = z.preprocess(
 export const camposCopaParker = {
   copeo: z.boolean(),
   precio_copa_eur: precioCopa,
-  puntuacion_parker: puntuacionParker,
-  puntuacion_parker_anada: anadaParker,
+  anada: anadaServida,
+  sin_anada: z.boolean().optional(),
 };
 
 /** Un vino por copas necesita precio de copa (la web no tendría qué enseñar). Para `.superRefine`. */
@@ -82,30 +74,30 @@ export function exigirPrecioCopa(
 export const COPA_PARKER_VACIO = {
   copeo: false,
   precio_copa_eur: "",
-  puntuacion_parker: "",
-  puntuacion_parker_anada: "",
+  anada: "",
+  sin_anada: false,
 } as const;
 
 /** Valores del formulario al abrir la edición de un vino guardado. */
 export function copaParkerParaCampos(vino: {
   copeo?: boolean | null;
   precio_copa_eur?: number | null;
-  puntuacion_parker?: number | null;
-  puntuacion_parker_anada?: number | null;
+  anada?: number | null;
+  sin_anada?: boolean | null;
 }) {
   const texto = (n: number | null | undefined) => (n === null || n === undefined ? "" : String(n));
   return {
     copeo: vino.copeo === true,
     precio_copa_eur: texto(vino.precio_copa_eur),
-    puntuacion_parker: texto(vino.puntuacion_parker),
-    puntuacion_parker_anada: texto(vino.puntuacion_parker_anada),
+    anada: texto(vino.anada),
+    sin_anada: vino.sin_anada === true,
   };
 }
 
 /**
- * Solo los campos de copa y Parker que CAMBIAN respecto a lo guardado. Así un
- * panel desplegado antes de aplicar la migración 20261104140000 (columnas que aún
- * no existen) puede seguir editando y creando vinos mientras no se toquen estos
+ * Solo los campos de copa y añada que CAMBIAN respecto a lo guardado. Así un
+ * panel desplegado antes de aplicar las migraciones (columnas que aún no
+ * existen) puede seguir editando y creando vinos mientras no se toquen estos
  * campos: no los manda.
  */
 export function cambiosCopaParker(
@@ -116,8 +108,8 @@ export function cambiosCopaParker(
   const antes = {
     copeo: guardado.copeo === true,
     precio_copa_eur: guardado.precio_copa_eur ?? null,
-    puntuacion_parker: guardado.puntuacion_parker ?? null,
-    puntuacion_parker_anada: guardado.puntuacion_parker_anada ?? null,
+    anada: guardado.anada ?? null,
+    sin_anada: guardado.sin_anada === true,
   };
   return Object.fromEntries(
     (Object.keys(nuevo) as (keyof typeof nuevo)[]).filter((k) => nuevo[k] !== antes[k]).map((k) => [k, nuevo[k]]),
@@ -126,18 +118,20 @@ export function cambiosCopaParker(
 
 /**
  * Lo que se guarda en BD. El precio de la copa se conserva aunque se apague el
- * copeo (al volver a encenderlo ya está puesto); sin puntuación no hay añada.
+ * copeo (al volver a encenderlo ya está puesto); un vino sin añada (NV) no
+ * lleva año.
  */
 export function copaParkerParaGuardar(valores: {
   copeo?: boolean;
   precio_copa_eur?: number;
-  puntuacion_parker?: number;
-  puntuacion_parker_anada?: number;
+  anada?: number;
+  sin_anada?: boolean;
 }) {
+  const sinAnada = valores.sin_anada === true;
   return {
     copeo: valores.copeo === true,
     precio_copa_eur: valores.precio_copa_eur ?? null,
-    puntuacion_parker: valores.puntuacion_parker ?? null,
-    puntuacion_parker_anada: valores.puntuacion_parker !== undefined ? valores.puntuacion_parker_anada ?? null : null,
+    anada: sinAnada ? null : valores.anada ?? null,
+    sin_anada: sinAnada,
   };
 }
