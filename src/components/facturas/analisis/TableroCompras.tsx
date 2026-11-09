@@ -9,7 +9,7 @@
 //        · Precios          maestro-detalle: lista y gráfica del elegido;
 //        · Ahorro           mismo producto más barato en otro proveedor, explicado;
 //        · Gasto            familias frente a su media, gastos fijos, abonos…;
-//        · Proveedores      los que más gasto + Casa Tomás y Touza;
+//        · Proveedores      maestro-detalle: lista comparada con el anterior y ficha del elegido;
 //        · Por revisar      albaranes sin factura y los demás avisos.
 // (La vista «Explorar» se quitó el 08/11/2026; las gráficas fijadas salen en «Qué decidir hoy».)
 // La vista elegida se recuerda (?vista= y localStorage; la lleva ChatFacturas).
@@ -60,6 +60,7 @@ import { AlbaranesPorRevisar, EvolucionProducto, GastoPorMesModulo, ProductosMas
 import { FijadasDelTablero } from "./FijadasDelTablero";
 import { DetalleModulo } from "./DetalleModulo";
 import { ConfiguradorTablero } from "./ConfiguradorTablero";
+import { VistaProveedores } from "./VistaProveedores";
 import { AhorroExplicado, AvisosPorRevisar, Caja, PreciosMaestroDetalle, QueDecidirHoy } from "./Vistas";
 import { Cifra } from "./Cifra";
 import { FOCO, Indicador, SinDatos, TarjetaLlena, type AccionMenu } from "./piezas";
@@ -720,17 +721,37 @@ export function TableroCompras({
       break;
     }
     case "proveedores": {
-      const derecha = (["locales", "regalado"] as IdModulo[]).filter((id) => activo(id));
+      // Maestro-detalle (09/11/2026): la lista con comparación y la ficha del elegido;
+      // «Casa Tomás y Touza» va en la franja de arriba y «Regalado por proveedor», bajo la ficha.
+      const regalado = activo("regalado");
       contenido = (
-        <div className={cn(DOS, activo("proveedores") && derecha.length > 0 && "@[48rem]/tablero:grid-cols-2")}>
-          {m("proveedores")}
-          {derecha.length > 0 && <div className={COLUMNA}>{derecha.map((id) => m(id))}</div>}
-          {!activo("proveedores") && derecha.length === 0 && (
-            <Caja titulo="Proveedores">
-              <SinDatos>Has quitado los módulos de esta vista. Vuelve a ponerlos con «Personalizar el tablero».</SinDatos>
-            </Caja>
-          )}
-        </div>
+        <VistaProveedores
+          datos={datos}
+          periodo={periodo}
+          local={local}
+          decision={dec}
+          pendiente={pendiente}
+          conLocales={!!activo("locales")}
+          extra={regalado ? celda(regalado) : undefined}
+          onVerDocumentos={(f, tramo) =>
+            f.id !== null &&
+            docs(nombreCorto(f.nombre), "gasto", {
+              agrupar: "proveedor",
+              clave: String(f.id),
+              cifra: f.estado === "dejado" ? f.anterior : f.gasto,
+              desde: tramo.desde,
+              hasta: tramo.hasta,
+            })
+          }
+          onVerLocal={(l, gasto) => docs(l === "touza" ? "Touza" : "Casa Tomás", "gasto", { agrupar: "local", clave: l, cifra: gasto, sinLocal: true })}
+          onAbrirEnCompras={(id) => onIrA(enlaceProveedorCompras(id))}
+          onVerPrecio={(id) => {
+            setPrecioElegido(`a:${id}`);
+            irAVista("precios");
+          }}
+          onIrAVista={irAVista}
+          onAmpliar={ampliar("proveedores")}
+        />
       );
       break;
     }
