@@ -887,7 +887,7 @@ export function generarInforme(git, opciones = {}) {
   }
 
   s.push("### Reversión");
-  s.push(`- Inmediata: Vercel → proyecto ${proyecto} → Deployments → despliegue de producción de v${anterior ?? "anterior"} (commit \`${corto(baseSha)}\`) → **Instant Rollback**.`);
+  s.push(`- Inmediata: Vercel → proyecto ${proyecto} → Deployments → despliegue de producción de v${anterior ?? "anterior"} (commit \`${corto(baseSha)}\`) → **⋯ → Promote** (no reconstruye; un *Instant Rollback* también vale, pero deja sin publicar la siguiente release hasta pulsar *Undo Rollback*).`);
   const rollbacks = lineas(git(["diff", "--name-only", "--diff-filter=A", `${base}...${head}`, "--", "supabase/rollbacks", "supabase/migrations/*ROLLBACK*"]));
   if (rollbacks.length) s.push(`- Base de datos: vuelta atrás preparada en ${rollbacks.map((f) => `\`${f}\``).join(", ")} (aplicarla a mano, primero en la demo).`);
   s.push(`- Limitaciones: Vercel no deshace ${impacto.some((i) => i.includes("Migraciones")) ? "**las migraciones de Supabase**, " : ""}${impacto.some((i) => i.includes("Funciones")) ? "**las funciones de Supabase desplegadas**, " : ""}los datos guardados ni las variables; y \`main\` sigue en v${version} hasta que una release nueva (p. ej. v${version ? siguienteVersion(version, { tipo: "patch" }) : "?"} con \`git revert\`) lo corrija.`);
