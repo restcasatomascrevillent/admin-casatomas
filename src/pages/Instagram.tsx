@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { BarChart3, CalendarDays, Clapperboard, Flag, Home, KanbanSquare, PenLine } from "lucide-react";
+import { CalendarDays, Clapperboard, Flag, Home, KanbanSquare, PenLine } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -24,7 +24,6 @@ const CrearInstagram = lazy(() => import("@/components/instagram/crear/CrearInst
 const CampanasInstagram = lazy(() => import("@/components/instagram/campanas/CampanasInstagram").then((m) => ({ default: m.CampanasInstagram })));
 const CalendarioInstagram = lazy(() => import("@/components/instagram/programar/CalendarioInstagram").then((m) => ({ default: m.CalendarioInstagram })));
 const EncargosInstagram = lazy(() => import("@/components/instagram/encargos/EncargosInstagram").then((m) => ({ default: m.EncargosInstagram })));
-const MetricasInstagram = lazy(() => import("@/components/instagram/metricas/MetricasInstagram").then((m) => ({ default: m.MetricasInstagram })));
 // ── Crear en el móvil (instagram-movil): ver el bloque «Crear en el móvil» más abajo. ──
 const CrearMovil = lazy(() => import("@/components/instagram/movil/CrearMovil").then((m) => ({ default: m.CrearMovil })));
 // Reels: el motor y el reel de partida (crearReelDesdeBase) llegan juntos al abrir la pestaña.
@@ -64,7 +63,7 @@ const Perezosa = ({ children }: { children: ReactNode }) => <Suspense fallback={
  */
 const ALTURA_MINIMA_INSTAGRAM = 360;
 
-const PESTANAS = ["estudio", "crear", "campanas", "reels", "calendario", "encargos", "metricas"] as const;
+const PESTANAS = ["estudio", "crear", "campanas", "reels", "calendario", "encargos"] as const;
 type Pestana = (typeof PESTANAS)[number];
 
 const CONTENIDO_PESTANA = "mt-0 flex-1 min-h-0 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
@@ -100,7 +99,9 @@ function marcaInicial(): FiltroMarca {
  *  · Calendario: mes con panel del día (docs/instagram-programar.md).
  *  · Encargos: piezas automáticas y encargos a Oficiosos (docs/instagram-encargos.md).
  *    La agencia (permiso «instagram_agencia» sin Marketing) solo ve esta pestaña.
- *  · Métricas: estadísticas de la cuenta y de cada publicación (docs/instagram-metricas.md).
+ *  · Las métricas ya no son una pestaña de Instagram (09/11/2026): están en
+ *    RRSS › Métricas, un panel para todas las redes (docs/rrss.md). El enlace
+ *    «Métricas» del Estudio lleva allí (`onIrMetricas`).
  * A la derecha de la barra: la marca que filtra todas las pestañas («Las dos /
  * Casa Tomás / Touza») y el indicador «● @cuenta», que abre la conexión.
  * `?tab=<pestaña>` abre directamente esa pestaña (`&encargo=<id>` en Encargos).
@@ -121,7 +122,7 @@ export default function Instagram() {
  * Todo lo de Instagram sin el marco: lo monta la pestaña «Instagram» de RRSS
  * (src/pages/RRSS.tsx, 08/11/2026) y, con el marco, la página de arriba.
  */
-export function ContenidoInstagram() {
+export function ContenidoInstagram({ onIrMetricas }: { onIrMetricas?: () => void } = {}) {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_INSTAGRAM);
   // null hasta abrir «Reels» (el reel de partida sale del motor, que se carga con la pestaña).
@@ -256,7 +257,6 @@ export function ContenidoInstagram() {
                 tonoContador: "dorado" as const,
                 etiquetaContador: `${pendientesEncargos} pendientes`,
               },
-              { valor: "metricas", etiqueta: "Métricas", icono: <BarChart3 /> },
             ].filter((p) => !soloAgencia || p.valor === "encargos")}
           />
 
@@ -266,7 +266,7 @@ export function ContenidoInstagram() {
               <EstudioInstagram
                 className="lg:h-full"
                 marca={marca}
-                onIr={(p) => setPestana(p)}
+                onIr={(p) => (p === "metricas" ? onIrMetricas?.() : setPestana(p))}
                 onVerDia={(d) => {
                   setDiaCalendario(d);
                   setPestana("calendario");
@@ -363,13 +363,6 @@ export function ContenidoInstagram() {
             )}
           </TabsContent>
 
-          <TabsContent value="metricas" className={CONTENIDO_PESTANA}>
-            {pestana === "metricas" && (
-              <Perezosa>
-                <MetricasInstagram />
-              </Perezosa>
-            )}
-          </TabsContent>
         </Tabs>
       </div>
     </>

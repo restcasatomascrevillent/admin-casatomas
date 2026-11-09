@@ -1,4 +1,4 @@
-# RRSS: Instagram, Facebook y editor IA de fotos y vídeos
+# RRSS: Instagram, Facebook, editor IA de fotos y vídeos y métricas
 
 Sección **RRSS** del menú (ruta `/rrss`, 08/11/2026). Antes se llamaba
 «Instagram». Mismo permiso: la sección `marketing` (y el mismo interruptor del
@@ -7,15 +7,17 @@ Instagram › Encargos.
 
 | Pestaña | Qué hace | Código |
 |---|---|---|
-| **Instagram** | Todo lo de antes, sin cambios (Estudio, Crear, Campañas, Reels, Calendario, Encargos, Métricas). Ver [instagram.md](instagram.md). | `src/pages/Instagram.tsx` (`ContenidoInstagram`) |
+| **Instagram** | Todo lo de antes (Estudio, Crear, Campañas, Reels, Calendario, Encargos). Sus métricas ya no son una pestaña de Instagram: están en **Métricas**. Ver [instagram.md](instagram.md). | `src/pages/Instagram.tsx` (`ContenidoInstagram`) |
 | **Facebook** | Preparar contenido para Facebook con el mismo editor (formatos y textos de Facebook), guardar borradores, descargar y copiar. **No publica**: no hay integración con Facebook y la pantalla lo dice («No conectado»). | `src/components/rrss/facebook/FacebookRRSS.tsx` |
 | **Subida de fotos** — *Editor IA de fotos y vídeos* | Subir fotos y vídeos, elegir destino, contenido y estilo, que la IA proponga la edición y el motor la haga de verdad; ajustar, regenerar una parte, guardar y descargar. Y «Dame ideas para grabar». | `src/components/rrss/editor/`, `src/components/rrss/ideas/` |
+| **Métricas** (09/11/2026) | Un solo panel para todas las redes y **«Generar informe»** mensual en diapositivas y PDF, como el de Tráfico web. Ver [Métricas](#métricas). | `src/components/rrss/metricas/` |
 
 **Rutas antiguas**: `/instagram?…` redirige a `/rrss?red=instagram&…`
 conservando `tab`, `encargo`, `pieza`… (marcadores, avisos y los enlaces de
 `notificar-video` siguen funcionando). `/instagram/rapido` (acceso directo del
-móvil) no cambia. `?red=instagram|facebook|editor` abre una pestaña y
-`?trabajo=<id>` un trabajo del editor.
+móvil) no cambia. `?red=instagram|facebook|editor|metricas` abre una pestaña y
+`?trabajo=<id>` un trabajo del editor. El antiguo `?tab=metricas` de Instagram
+(y `/instagram?tab=metricas`) abre RRSS › Métricas.
 
 ## La IA propone, el motor transforma
 
@@ -187,9 +189,58 @@ el PR y lo pida.
 - Facebook: sin integración de publicación (lo que haría falta está en la
   pestaña, en «Para Oficiosos»).
 
+## Métricas
+
+Pedido del dueño (09/11/2026): «un panel de métricas globales en RRSS y no uno
+por cada cosa, y que generen un informe como el de tráfico web». La pestaña
+«Métricas» de dentro de Instagram desaparece y pasa a ser la pestaña
+**RRSS › Métricas**, para todas las redes.
+
+**Panel** (`MetricasRRSS.tsx`):
+
+| Tarjeta | Qué enseña | De dónde sale |
+|---|---|---|
+| Instagram | Seguidores (y los ganados), alcance e interacciones de los últimos 28 días frente a los 28 anteriores, y cuándo se actualizó. | Edge Function `instagram-metricas` («leer»), la misma lectura que el detalle. |
+| Facebook | «No conectado», **sin ninguna cifra**. El panel no lee nada de Facebook. | — |
+| Web desde redes | Visitas a las webs (Casa Tomás y Touza) que llegan desde un enlace en redes, por red, y qué parte son del total. | RPC `trafico_web_desglose_resumen` (procedencias). Solo para quien puede ver Tráfico web (hoy, Super Admin: la RLS exige `can_read_section('trafico_web')`). |
+
+Debajo, **Instagram en detalle**: el mismo componente de antes
+(`src/components/instagram/metricas/MetricasInstagram.tsx`, ver
+[instagram-metricas.md](instagram-metricas.md)), con la gráfica, «Qué
+funciona», el ranking de publicaciones y «Actualizar ahora».
+
+**Informe mensual** («Generar informe», `informe/`): diapositivas 16:9 con vista
+previa y descarga en PDF, con las mismas piezas, letra, colores y exportación
+que el de Tráfico web (`src/components/trafico-web/informe/piezas.tsx`,
+`DiapositivaEscalada.tsx`, `pdf.ts`). Se elige el mes (por defecto, el último
+cerrado; también el mes en curso). Diapositivas:
+
+1. Portada (dice que Facebook no está conectado y no lleva sus datos).
+2. Resumen de Instagram: alcance del mes frente al anterior, visualizaciones,
+   interacciones y seguidores.
+3. Alcance día a día, con el mismo día del mes anterior y el día de más alcance.
+4. Lo que se publicó: cuántas publicaciones, por tipo (reel, foto, carrusel,
+   historia…) y su alcance medio.
+5. Las cinco publicaciones que más llegaron.
+6. Visitas a la web desde redes (solo con permiso de Tráfico web).
+7. Conclusiones redactadas a partir de los datos y notas.
+
+Las diapositivas sin datos no salen (sin publicaciones en el mes, sin permiso
+de Tráfico web…). La comparación con el mes anterior sigue las reglas del
+informe de tráfico: con los dos meses completos, totales; si falta algún día o
+el mes está en curso, la media por día; con menos de 7 días medidos, no se
+compara. El alcance del mes es la suma del alcance diario, como en el detalle de
+Instagram, y el informe lo explica. El modelo (`informe/modelo.ts`) es puro y
+tiene pruebas (`__tests__/informe.test.ts`). Los datos se leen como el usuario
+(`datos.ts`): `instagram_metricas_cuenta` e
+`instagram_metricas_publicacion_ultima` con la RLS de Marketing.
+
 ## Capturas
 
 En `docs/rrss/capturas/` (con datos sintéticos y resultados reales del motor;
 se rehacen con `tests/e2e-movil/rrss.capturas.mjs`, ver su cabecera):
 pestaña Instagram, Facebook, estilos, resultado con comparador, ajustes,
-vídeo, ideas para grabar y el editor en el móvil.
+vídeo, ideas para grabar y el editor en el móvil. Las de Métricas (09–12: panel
+en escritorio y en el móvil, vista previa del informe y todas sus
+diapositivas) se rehacen con `tests/e2e-movil/rrss-metricas.capturas.mjs`, que
+además descarga el PDF y comprueba que tiene una página por diapositiva.
