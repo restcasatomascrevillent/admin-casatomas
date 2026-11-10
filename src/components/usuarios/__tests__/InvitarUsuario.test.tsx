@@ -175,3 +175,43 @@ it("un alta normal creada cuyo acceso de superadmin falla muestra solo el aviso 
   expect(toast.success).not.toHaveBeenCalled();
   expect(screen.getByLabelText("Nombre de Usuario")).toHaveValue("");
 });
+
+describe("InvitarUsuario · tipos de usuario «Reservas» y «Albaranes» (10/11/2026)", () => {
+  const conAcceso = (filas: Fila[]) => filas.filter((f) => f.can_view || f.can_edit).map((f) => f.section_key);
+  const rolEnviado = () => {
+    const [, opciones] = vi.mocked(supabase.functions.invoke).mock.calls.find(([nombre]) => nombre === "admin-create-user")!;
+    return (opciones as { body: { role: string } }).body.role;
+  };
+
+  it("«Reservas»: crea el usuario con solo «Ver» en Reservas y «Reservas · Crear», rol Staff", async () => {
+    render(<InvitarUsuario />);
+    await elegirRol("Reservas");
+    expect(screen.getByTestId("ayuda-configuracion-acceso")).toHaveTextContent(/ver y crear reservas/);
+    expect(interruptor("Puede crear: Reservas · Crear")).toBeChecked();
+    expect(interruptor("Ver Dashboard")).not.toBeChecked();
+    rellenarYCrear();
+
+    const filas = await permisosEnviados();
+    expect(conAcceso(filas)).toEqual(["reservas", "reservas_crear"]);
+    expect(filas.every((f) => !f.can_edit)).toBe(true);
+    expect(rolEnviado()).toBe("staff");
+  });
+
+  it("«Albaranes»: crea el usuario con solo «Facturas · Solo fotos», rol Staff", async () => {
+    render(<InvitarUsuario />);
+    await elegirRol("Albaranes");
+    expect(interruptor("Puede subir fotos: Facturas · Solo fotos (albaranes)")).toBeChecked();
+    rellenarYCrear();
+
+    const filas = await permisosEnviados();
+    expect(conAcceso(filas)).toEqual(["facturas_albaranes"]);
+    expect(rolEnviado()).toBe("staff");
+  });
+
+  it("tocar un permiso a mano deja de ser el tipo elegido", async () => {
+    render(<InvitarUsuario />);
+    await elegirRol("Albaranes");
+    fireEvent.click(interruptor("Ver Dashboard"));
+    expect(screen.getByRole("combobox")).toHaveTextContent("Configuración manual");
+  });
+});

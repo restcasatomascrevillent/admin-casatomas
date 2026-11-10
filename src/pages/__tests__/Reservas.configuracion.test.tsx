@@ -30,7 +30,9 @@ vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("@/components/reservas/VistaHoy", () => ({ VistaHoy: () => <div data-testid="vista-hoy" /> }));
-vi.mock("@/components/reservas/FormularioReserva", () => ({ FormularioReserva: () => null }));
+vi.mock("@/components/reservas/FormularioReserva", () => ({
+  FormularioReserva: ({ soloCrear }: { soloCrear?: boolean }) => <div data-testid="formulario-alta" data-solo-crear={String(!!soloCrear)} />,
+}));
 vi.mock("@/components/reservas/ListaReservasAvanzada", () => ({ ListaReservasAvanzada: () => null }));
 vi.mock("@/components/reservas/CalendarioOcupacion", () => ({ CalendarioOcupacion: () => null }));
 vi.mock("@/components/reservas/PlanoEspacio2D", () => ({ PlanoEspacio2D: () => null }));
@@ -240,5 +242,45 @@ describe("Reservas › Configuración · permiso propio «Reservas · Configurac
     expect(screen.getByRole("tab", { name: "Hoy" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("vista-hoy")).toBeInTheDocument();
     expect(screen.queryByTestId("editor-plantillas")).not.toBeInTheDocument();
+  });
+});
+
+describe("Reservas · tipo de usuario «Reservas» (10/11/2026: solo ver y crear)", () => {
+  it("con «Ver» + «Reservas · Crear» sale «Nueva Reserva» y la etiqueta «Solo ver y crear»; sin Configuración", async () => {
+    h.permisos = new Set(["reservas:view", "reservas_crear:view"]);
+    montar();
+
+    expect(screen.getByText("Solo ver y crear")).toBeInTheDocument();
+    expect(screen.queryByText("Solo lectura")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Configuración" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Nueva Reserva/ }));
+    // El formulario sabe que solo crea (sin «Ocupa la sala entera»).
+    expect(await screen.findByTestId("formulario-alta")).toHaveAttribute("data-solo-crear", "true");
+  });
+
+  it("«Reservas · Crear» guardado en can_edit también vale", () => {
+    h.permisos = new Set(["reservas:view", "reservas_crear:edit"]);
+    montar();
+    expect(screen.getByRole("button", { name: /Nueva Reserva/ })).toBeInTheDocument();
+  });
+
+  it("«Reservas · Crear» sin «Ver» en Reservas no da el botón", () => {
+    h.permisos = new Set(["reservas_crear:view"]);
+    montar();
+    expect(screen.queryByRole("button", { name: /Nueva Reserva/ })).not.toBeInTheDocument();
+  });
+
+  it("con solo «Ver», como antes: «Solo lectura» y sin «Nueva Reserva»", () => {
+    h.permisos = new Set(["reservas:view"]);
+    montar();
+    expect(screen.getByText("Solo lectura")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Nueva Reserva/ })).not.toBeInTheDocument();
+  });
+
+  it("con «Editar», el formulario completo (no solo crear)", async () => {
+    h.permisos = new Set(["reservas:view", "reservas:edit"]);
+    montar();
+    fireEvent.click(screen.getByRole("button", { name: /Nueva Reserva/ }));
+    expect(await screen.findByTestId("formulario-alta")).toHaveAttribute("data-solo-crear", "false");
   });
 });

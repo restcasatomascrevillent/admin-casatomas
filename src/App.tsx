@@ -34,6 +34,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Cheques = lazy(CARGADORES_SECCION["/cheques"]);
 const Tienda = lazy(CARGADORES_SECCION["/tienda"]);
 const Facturas = lazy(CARGADORES_SECCION["/facturas"]);
+const Albaranes = lazy(CARGADORES_SECCION["/albaranes"]);
 const Usuarios = lazy(CARGADORES_SECCION["/usuarios"]);
 const Ayuda = lazy(CARGADORES_SECCION["/ayuda"]);
 const Avisos = lazy(CARGADORES_SECCION["/avisos"]);
@@ -198,6 +199,8 @@ const App = () => (
                         (mismo árbol, no se desmonta al ir y volver). La IA exige «Editar»: sin él, la
                         página vuelve a /facturas (con solo «Facturas · Subida», a Cargar). */}
                     <Route path="/facturas/ia" element={pagina(<Facturas />, ["facturas", "facturas_subida"])} />
+                    {/* «Subir albaranes» (10/11/2026): tipo de usuario «Albaranes» («Facturas · Solo fotos»), pensada para el móvil. */}
+                    <Route path="/albaranes" element={pagina(<Albaranes />, "facturas_albaranes")} />
                     <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                     {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
                     {/* Historial de avisos (campana): para todos los roles. */}

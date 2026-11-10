@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import type { ManagedUser } from "@/hooks/useUsersManagement";
 import { Badge } from "@/components/ui/badge";
+import { tipoQueCoincide } from "@/components/usuarios/tiposUsuario";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Eye, LockKeyhole, Pencil, Search, ShieldCheck, X } from "lucide-react";
@@ -133,8 +134,15 @@ export function AccesoUsuario({ user, accessCount, editCount, className }: Omit<
       </div>
     );
   }
+  // Tipo de usuario fijo (10/11/2026): «Reservas» o «Albaranes» dicen más que «2 secciones».
+  const tipo = tipoQueCoincide(user.permissions ?? []);
   return (
     <div className={cn("flex min-w-0 flex-wrap items-center gap-1.5", className)}>
+      {tipo && (
+        <span className={cn(CHIP, "border-primary/30 bg-primary/5 text-primary")} title={tipo.descripcion} data-testid="chip-tipo-usuario">
+          {`Tipo: ${tipo.nombre}`}
+        </span>
+      )}
       {accessCount === 0 ? (
         <span className={cn(CHIP, "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200")}>
           Sin secciones

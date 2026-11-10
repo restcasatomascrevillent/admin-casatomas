@@ -14,6 +14,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { LayoutGrid, Utensils } from "lucide-react";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useCanAccessSection } from "@/hooks/useUserRole";
+import { usePuedeCrearReservas } from "@/hooks/usePuedeCrearReservas";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import {
   ETIQUETAS_SUBPESTANA_CONFIGURACION,
@@ -174,6 +175,9 @@ export default function Reservas() {
   // «Reservas». Sin él (solo «Ver», 06/11/2026) cada vista OCULTA lo que escribe y aquí, junto a las
   // pestañas, sale la etiqueta común «Solo lectura» en lugar de «Nueva Reserva».
   const { canAccess: puedeEditarReservas, loading: cargandoEdicion } = useCanAccessSection("reservas", "edit");
+  // Tipo de usuario «Reservas» (10/11/2026): con «Reservas · Crear» sale «Nueva Reserva» aunque no
+  // tenga «Editar»; lo demás sigue en solo lectura (la BD solo le deja el alta, 20261122143500).
+  const { puedeCrear: puedeCrearReservas, soloCrear } = usePuedeCrearReservas();
   const soloLectura = !cargandoEdicion && !puedeEditarReservas;
   const listaRef = useRef<HTMLElement | null>(null);
 
@@ -392,8 +396,11 @@ export default function Reservas() {
             <>
             {/* Avisos de reservas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral). */}
             <BotonAvisosSeccion seccion="reservas" />
-            {soloLectura && <EtiquetaSoloLectura />}
-            {puedeEditarReservas && (
+            {soloLectura && (soloCrear ? <EtiquetaSoloLectura
+                  texto="Solo ver y crear"
+                  detalle="Puedes ver las reservas y crear reservas nuevas, pero no modificarlas, cambiar su estado ni configurar. Si necesitas más, pídeselo a un administrador."
+                /> : <EtiquetaSoloLectura />)}
+            {puedeCrearReservas && (
               <Dialog open={openDialog} onOpenChange={setOpenDialog}>
                 <DialogTrigger asChild>
                   <Button className="touch-hit h-9 shrink-0 pointer-coarse:h-9">
@@ -409,6 +416,7 @@ export default function Reservas() {
                     <FormularioReserva
                       datosPreseleccionados={datosNuevaReserva}
                       onSuccess={() => setOpenDialog(false)}
+                      soloCrear={soloCrear}
                     />,
                   )}
                 </DialogContent>

@@ -34,6 +34,11 @@ export const SECTIONS = [
   // correo), con permiso propio desde el 04/11/2026, como las pestañas del
   // Gestor Web. Sin «Ver» en «Reservas» no se llega a ella (está en /reservas).
   { key: "reservas_configuracion", label: "Reservas · Configuración" },
+  // Crear reservas sin «Editar» (10/11/2026, tipo de usuario «Reservas»): con
+  // «Ver» en Reservas, «Nueva reserva» y nada más (ni modificar, ni cambiar el
+  // estado, ni mesas). Un solo interruptor («Puede crear», en can_view). En la
+  // BD: reservas_puede_crear() (migración 20261122143500).
+  { key: "reservas_crear", label: "Reservas · Crear" },
   // "trabajadores" (Personal) retirada el 2026-09-23 (decisión del dueño).
   // Filas de user_permissions con section_key="trabajadores" que puedan
   // quedar en la BD se ignoran sin más: ningún componente busca ya esa key.
@@ -57,6 +62,12 @@ export const SECTIONS = [
   // Un solo interruptor («Puede subir», guardado en can_view). En la BD:
   // facturas_puede_subir() (migración 20261106510000).
   { key: "facturas_subida", label: "Facturas · Subida" },
+  // Solo subir fotos de albaranes y facturas (10/11/2026, tipo de usuario
+  // «Albaranes»): pantalla /albaranes, pensada para el móvil. Sin ver lo leído
+  // ni importes ni el resto de Facturas. Un solo interruptor («Puede subir
+  // fotos», en can_view). En la BD: facturas_puede_subir_fotos() y
+  // albaranes_mis_subidas() (migración 20261122143500).
+  { key: "facturas_albaranes", label: "Facturas · Solo fotos (albaranes)" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
 // Nota: Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web,
