@@ -1,7 +1,11 @@
 # Instagram en el panel: métricas
 
 Complementa a [instagram.md](instagram.md) (crear y publicar piezas). Este
-documento solo cubre la pestaña **Métricas**.
+documento solo cubre las métricas de Instagram.
+
+> Desde el 09/11/2026 no son una pestaña de Instagram: se ven en
+> **RRSS › Métricas** (panel de todas las redes, con informe mensual), en el
+> bloque «Instagram en detalle». Ver [rrss.md](rrss.md#métricas).
 
 ## Métricas
 

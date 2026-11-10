@@ -1,47 +1,46 @@
-# Flujo CI/CD · Casa Tomás
+# CI/CD · referencia técnica
 
-> **Proceso vigente:** [PROCESO-DE-CAMBIOS.md](PROCESO-DE-CAMBIOS.md) (desarrollo → demo → PR → aceptación del dueño). Este documento queda como referencia técnica del CI y de Vercel.
+> **Proceso y guía práctica:** [PROCESO-DE-CAMBIOS.md](PROCESO-DE-CAMBIOS.md). Aquí solo qué pieza hace qué. Es igual en la web y en el panel salvo donde se indica.
 
-## Ramas y entornos
+## Quién despliega qué
 
-- `feature/*` / `fix/*`: implementar cambios; abrir PR a `staging`.
-- `staging`: integración y aceptación. El CI se ejecuta en cada push y PR. Conectar esta rama a **Vercel Preview** y asignarle un dominio fijo de staging.
-- `main`: código aprobado para producción. Abrir PR **staging → main**; revisar, validar checks y fusionar solo tras aprobar las pruebas.
-- No desarrollar directamente en `main`. No hacer merges inversos automáticos ni forzar pushes.
+| Evento | Vercel | GitHub Actions |
+|---|---|---|
+| Push a `feature/*`, `fix/*` | nada (`git.deploymentEnabled`) | CI en su PR |
+| Push a `staging` | **Demo** (Supabase demo) | CI |
+| Push a `release/X.Y.Z` | **Preview de la candidata** (Supabase demo) | CI y *Release · candidata* en el PR |
+| PR `release/X.Y.Z` → `main` aceptado | **Producción**, si el merge viene de `release/X.Y.Z` y `versionado.json` coincide (`scripts/vercel-produccion.mjs`) | *Release · publicar* |
+| Cualquier otro commit en `main` | cancelado (*Ignored Build Step*) | aviso, sin versión |
 
-**Limitación importante:** la comprobación de promoción en Actions falla para PR a main que no vengan de staging, pero no impide que alguien con permisos pulse «merge» ni que haga un push directo si no hay reglas de protección activas. Activar Branch Protection/Rulesets en GitHub cuando el plan lo permita; exigir PR, aprobación y los checks CI.
+## Workflows (`.github/workflows/`)
 
-## Vercel
+| Fichero | Cuándo | Qué hace |
+|---|---|---|
+| `ci.yml` | PR, push a `staging`/`main`, a mano | Tests, build y e2e (web) o PGlite (panel); calidad; en PR a `main`, **Validar release a producción** (`release.mjs comprobar`) |
+| `release-preparar.yml` | A mano | `release.mjs preparar` con la selección, sube `release/X.Y.Z`, abre el PR con el informe y lanza el CI y la candidata |
+| `release-candidata.yml` | PR `release/*` → `main` | Espera la preview de Vercel, comprueba versión y commit (`comprobar-despliegue.mjs`), humo (web), capturas antes/después con datos de prueba (`capturas-release.mjs`, a la rama `capturas-release`) y regenera el informe del PR |
+| `release.yml` | Push a `main`, a mano | Etiqueta `vX.Y.Z`, GitHub Release con el CHANGELOG, integra `main` en `staging` y comprueba producción (`esperar-despliegue.mjs` + `comprobar-despliegue.mjs`) |
+| `humo.yml` (web) | A mano o tras desplegar producción | Prueba rápida de solo lectura; en producción exige el commit y la versión de `versionado.json` |
 
-1. Comprobar cuál es el proyecto Vercel conectado y que la *Production Branch* sea `main`.
-2. Verificar que los pushes de `staging` generan previews y asociar un alias/dominio estable a staging. **No intercambiar los dominios de producción**.
-3. Configurar variables de entorno separadas para Preview/Staging y Production (Supabase y cualquier servicio con efectos reales).
-4. Nunca ejecutar pruebas de pago, facturación, reservas o envíos reales sobre datos de producción desde staging.
-5. Probar completamente la versión de staging antes de fusionar el PR a main. La versión de producción se construye en su propio entorno.
-6. Revisar el estado de despliegue y disponer de rollback en Vercel para incidencias.
+## Scripts (`scripts/`)
 
-## CI
+| Script | Uso |
+|---|---|
+| `release.mjs` | `pendientes`, `preparar`, `comprobar`, `informe`, `notas`. Selección, dependencias, conflictos, versión y CHANGELOG. Pruebas: `scripts/__tests__/release.test.mjs` |
+| `version.mjs` | Versión del build (`/version.json` y etiqueta del panel) a partir de `versionado.json` y la rama |
+| `vercel-produccion.mjs` | *Ignored Build Step* de Vercel: qué commits de `main` se publican |
+| `comprobar-despliegue.mjs` | Que una URL sirve la versión y el commit esperados |
+| `esperar-despliegue.mjs` | Espera el despliegue de Vercel de un commit (deployments de GitHub) y da su URL |
+| `capturas-release.mjs` | Capturas antes/después en móvil y escritorio con datos de prueba |
 
-- El workflow `.github/workflows/ci.yml` se ejecuta en PR, push a staging y push a main.
-- Los jobs de tests/build son bloqueantes a nivel de workflow; las deudas heredadas de ESLint/typecheck siguen siendo no bloqueantes.
-- Se incluye la comprobación de origen de promoción a main.
-- En GitHub configurar los checks como **required** y exigir al menos una aprobación cuando el plan permita protección de ramas.
+## Ficheros de versión
 
-## Versiones
-
-Automáticas, sin etiquetas manuales ni cambios en `package.json`: formato `M.N` calculado del historial por `scripts/version.mjs` (cada commit suma 1, los merges no). Al aceptar el PR `staging → main`, el workflow `release.yml` crea la etiqueta `vM.N` y la GitHub Release. Detalle en [PROCESO-DE-CAMBIOS.md](PROCESO-DE-CAMBIOS.md#versiones).
+- `versionado.json` → `{"version": "X.Y.Z"}`: la de producción en `main`, la candidata en `release/X.Y.Z`.
+- `CHANGELOG.md` → una entrada por release (la crea la primera).
+- Etiquetas `vX.Y.Z` y GitHub Releases (las `v0.N` anteriores son del sistema viejo).
 
 ## Seguridad y datos
 
-- `adminpanelct` tenía `Reinicio` como rama predeterminada aunque `main` contiene muchos más cambios. No sustituir main por Reinicio.
-- Existe un archivo `.env` versionado en la rama `Reinicio` del panel: revisar su contenido localmente, eliminar secretos del historial si procede y rotar credenciales afectadas. No imprimir ni copiar secretos.
-- Para un staging auténticamente aislado, crear un proyecto Supabase de pruebas y credenciales de pasarela de pago sandbox; no basta con una URL distinta.
-- Migrations de Supabase: pasar por staging con datos ficticios, respaldar antes de producción y validar compatibilidad entre versiones de ambas apps.
-
-## Orden recomendado
-
-1. Configurar y verificar Vercel, alias staging y variables.
-2. Ejecutar CI en staging, reparar fallos bloqueantes.
-3. Revisar PR staging → main.
-4. Fusionar tras aprobación, comprobar deployment prod.
-5. La etiqueta y la GitHub Release se crean solas al aceptar el PR (`release.yml`).
+- Los workflows no usan secretos de Supabase ni de Stripe; las capturas usan datos de prueba (web: build de los e2e; panel: Supabase falso de `tests/e2e-movil`).
+- Las previews (demo y candidatas) usan el Supabase de la demo, que es una copia de los datos reales sin Stripe ni Resend.
+- No ejecutar pruebas de pago, reservas o envíos reales contra producción.

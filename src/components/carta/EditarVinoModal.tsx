@@ -21,7 +21,8 @@ import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { toast } from "sonner";
 import { CamposVino } from "./CamposVino";
-import { rutaOriginalDesdeCarta } from "./fotoCartaVino";
+import { esFotoCarta, rutaOriginalDesdeCarta } from "./fotoCartaVino";
+import { obtenerOriginalFoto } from "./originalDrive";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
@@ -36,11 +37,16 @@ import { useLecturaEtiquetaVino } from "./lecturaEtiquetaVino";
 import { PistaPrecioVino } from "./PistaPrecioVino";
 import { CamposCopaParker } from "./CamposCopaParker";
 import { camposCopaParker, cambiosCopaParker, copaParkerParaCampos, COPA_PARKER_VACIO, exigirPrecioCopa } from "./copaParker";
+import { PanelParker } from "./parker/PanelParker";
+import { useBusquedaParker } from "./parker/useBusquedaParker";
+import { usePuntuacionesParker } from "./parker/usePuntuacionesParker";
 
 // Origen obligatorio también al editar (04/11/2026): país, región y categoría
 // con denominación. Un vino de «… — ORIGEN PENDIENTE» no se guarda hasta
 // elegirle la suya (así se corrigen los que quedan).
-// Copa y Parker (04/11/2026): ver copaParker.ts.
+// Copa y añada que se sirve: ver copaParker.ts. Parker (08/11/2026): las
+// puntuaciones con fuente se ven, confirman, buscan y añaden aquí mismo
+// (parker/PanelParker.tsx); se guardan al momento, aparte del formulario.
 const formSchema = z
   .object({
     nombre: nombreCarta,
@@ -124,9 +130,16 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       : null;
   const { limpiar: limpiarLectura } = lectura;
 
+  // Parker: filas guardadas de este vino y búsqueda bajo demanda.
+  const parker = usePuntuacionesParker();
+  const filasParker = parker.porVino(vino?.id);
+  const busquedaParker = useBusquedaParker();
+  const { limpiar: limpiarParker } = busquedaParker;
+
   useEffect(() => {
     if (!open) {
       limpiarLectura();
+      limpiarParker();
       return;
     }
     if (!vino) return;
@@ -150,7 +163,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [open, vino, form, limpiarRecorte, limpiarLectura]);
+  }, [open, vino, form, limpiarRecorte, limpiarLectura, limpiarParker]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
 
@@ -160,23 +173,50 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     if (!file) return;
 
     lectura.cancelar();
+    busquedaParker.limpiar();
     recorte.iniciar(file);
     setRemoveImage(false);
     setUrlRestaurada(null);
     setImagePreview(null);
   };
 
-  const original = !imageFile && !removeImage && !urlRestaurada ? rutaOriginalDesdeCarta(vino?.imagen_url) : null;
-  const volverAOriginal = () => {
-    if (!original) return;
-    const url = `${original}?t=${Date.now()}`;
-    setUrlRestaurada(url);
-    setImagePreview(url);
+  // «Volver a la foto original»: solo si la foto guardada lleva fondo de carta.
+  const original = !imageFile && !removeImage && !urlRestaurada && esFotoCarta(vino?.imagen_url);
+  const [buscandoOriginal, setBuscandoOriginal] = useState(false);
+  /**
+   * El original vive en Google Drive (08/11/2026): se carga en el formulario
+   * con «Usar foto original» elegido y, al guardar, pasa a ser la foto de la
+   * web. Mientras no se haya movido a Drive, el original antiguo del bucket
+   * (`<id>.<ext>`): la ficha vuelve a apuntar a él, como antes.
+   */
+  const volverAOriginal = async () => {
+    if (!original || !vino) return;
+    setBuscandoOriginal(true);
+    try {
+      const { original: o, errorDrive } = await obtenerOriginalFoto("Vinos", vino.id, vino.imagen_url);
+      if (!o) {
+        toast.error("No hay original guardado de esta foto", { description: errorDrive ? `Google Drive: ${errorDrive}` : "Vuelve a subir la foto." });
+        return;
+      }
+      if (o.origen === "bucket") {
+        const url = `${rutaOriginalDesdeCarta(vino.imagen_url) ?? o.archivo.name}?t=${Date.now()}`;
+        setUrlRestaurada(url);
+        setImagePreview(url);
+        return;
+      }
+      lectura.cancelar();
+      recorte.iniciar(o.archivo);
+      recorte.setEleccion("original");
+      setRemoveImage(false);
+      setUrlRestaurada(null);
+      setImagePreview(null);
+    } finally {
+      setBuscandoOriginal(false);
+    }
   };
 
-  // Foto que leería la IA: la nueva o, si no, la guardada (mejor su original, sin el fondo de carta).
-  const fotoParaLeer: File | string | null =
-    recorte.original ?? (imagePreview ? rutaOriginalDesdeCarta(imagePreview) ?? imagePreview : null);
+  // Foto que leería la IA: la nueva o, si no, la guardada (la de la web: el original ya no está en Supabase).
+  const fotoParaLeer: File | string | null = recorte.original ?? imagePreview;
 
   const clearImage = () => {
     lectura.cancelar();
@@ -321,6 +361,8 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                 </Button>
                 <BotonCambiarFondo
                   recorte={recorte}
+                  tabla="Vinos"
+                  id={vino?.id}
                   url={removeImage || urlRestaurada ? null : vino?.imagen_url}
                   onIniciado={() => {
                     setRemoveImage(false);
@@ -329,8 +371,8 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                   }}
                 />
                 {original && (
-                  <Button type="button" variant="outline" onClick={volverAOriginal}>
-                    <Undo2 className="mr-2 h-4 w-4" />
+                  <Button type="button" variant="outline" onClick={() => void volverAOriginal()} disabled={buscandoOriginal}>
+                    {buscandoOriginal ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
                     Volver a la foto original
                   </Button>
                 )}
@@ -369,7 +411,30 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               avisoOrigen={avisoOrigen}
             />
 
-            <CamposCopaParker control={form.control} />
+            <CamposCopaParker
+              control={form.control}
+              parker={
+                vino ? (
+                  <PanelParker
+                    control={form.control}
+                    getValues={form.getValues}
+                    setValue={form.setValue}
+                    busqueda={busquedaParker}
+                    datosEtiqueta={lectura.datos}
+                    vinoId={vino.id}
+                    filas={filasParker}
+                    guardando={parker.guardar.isPending || parker.confirmar.isPending || parker.borrar.isPending}
+                    onGuardar={async (resultado, origen) => {
+                      await parker.guardar.mutateAsync({ vinoId: vino.id, resultado, origen });
+                      busquedaParker.limpiar();
+                      toast.success("Puntuación guardada. Si es de la añada que se sirve y está verificada, sale en la web al guardar la ficha.");
+                    }}
+                    onConfirmar={(f) => parker.confirmar.mutate(f)}
+                    onBorrar={(f) => parker.borrar.mutate(f.id)}
+                  />
+                ) : null
+              }
+            />
 
             {/* Con dedo el pie queda pegado abajo del diálogo (formulario largo o teclado abierto en
                 iOS): «Guardar» siempre a la vista. Con ratón, igual que antes. En el móvil, «Cancelar» y

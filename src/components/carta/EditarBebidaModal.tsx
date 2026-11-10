@@ -285,6 +285,8 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
                 </Button>
                 <BotonCambiarFondo
                   recorte={fotoCarta}
+                  tabla="Bebidas"
+                  id={bebida?.id}
                   url={removeImage ? null : bebida?.imagen_url}
                   onIniciado={() => {
                     setRemoveImage(false);

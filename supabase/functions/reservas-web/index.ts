@@ -74,6 +74,8 @@ import {
   filtrarEspaciosPorMarca,
   esCaracteristicaPrivada,
   idsSalasPrivadas,
+  salasCerradasPorEventoDesdeFilas,
+  type SalaCerradaPorEvento,
   type ConfiguracionTurnoInput,
   type ReservaOcupante,
 } from "../_shared/disponibilidad.ts";
@@ -142,6 +144,7 @@ import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-cl
 import {
   puedeEnviarCorreoRechazo,
   reservarCupoCrear,
+  reservarCupoDisponibilidad,
   respuestaDemasiadasSolicitudes,
   respuestaLimitadorNoDisponible,
 } from "./limitador.ts";
@@ -180,7 +183,9 @@ const EMAILS_RESERVA_URL = `${SUPABASE_URL}/functions/v1/emails-reserva/notifica
 const EMAILS_RESERVA_TIMEOUT_MS = 20_000;
 
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-const resend = new Resend(RESEND_API_KEY);
+// Sin RESEND_API_KEY (la demo no manda correos) `new Resend("")` lanza al ARRANCAR
+// y la función entera da WORKER_ERROR: se crea solo si hay clave (ver `sendEmail`).
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -287,6 +292,33 @@ async function leerServiciosCerrados(desde: string, hasta: string): Promise<Serv
 }
 async function turnosCerradosDe(fecha: string): Promise<TurnoServicio[]> {
   return turnosCerradosEn(await leerServiciosCerrados(fecha, fecha), fecha);
+}
+
+// --- Salas cerradas por un EVENTO (20261119100000) ---
+// Filas de `salas_cerradas_servicio` con `reserva_id`: esa sala está entera
+// para un evento ese día y turno. Restan su capacidad del aforo de su turno y
+// el evento no consume aforo (igual que el trigger). Si la tabla o la columna
+// aún no existen (migración sin aplicar) o falla la lectura, no se resta nada:
+// el trigger sigue siendo la última palabra.
+async function salasCerradasPorEventoDe(
+  fecha: string,
+  espacios: ReadonlyArray<{ id?: string | null; capacidad_maxima?: number | null; caracteristicas?: unknown }> | null,
+  marca: string,
+): Promise<SalaCerradaPorEvento[]> {
+  try {
+    const { data, error } = await supabase
+      .from("salas_cerradas_servicio")
+      .select("espacio_id, turno, reserva_id")
+      .eq("fecha", fecha);
+    if (error) return [];
+    return salasCerradasPorEventoDesdeFilas(
+      data as Array<{ espacio_id: string; turno: string; reserva_id: string | null }> | null,
+      espacios,
+      marca,
+    );
+  } catch {
+    return [];
+  }
 }
 
 // --- Blacklist ---
@@ -462,8 +494,16 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
   // El "17:00" ya no está escrito a mano aquí: sale de `HORA_CORTE_TURNO`,
   // la misma constante que usa el motor compartido y que copia el trigger.
   const esTurnoComida = horaConsulta ? horaConsulta < HORA_CORTE_TURNO : null;
+  // Salas cerradas por un evento en el turno consultado: fuera del aforo y
+  // del desglose; el evento que está en ellas no ocupa.
+  const cerradasEvento = esTurnoComida === null
+    ? []
+    : (await salasCerradasPorEventoDe(fecha, espaciosRaw as Array<{ id: string; capacidad_maxima: number; caracteristicas: unknown }> | null, marca))
+        .filter((c) => c.turno === (esTurnoComida ? "comida" : "cena"));
+  const idsCerradasEvento = new Set(cerradasEvento.map((c) => c.espacio_id));
   const reservasMismoTurno = (reservas || []).filter((r: { hora: string; espacio_id?: string | null }) => {
     if (r.espacio_id && idsPrivadas.includes(r.espacio_id)) return false;
+    if (r.espacio_id && idsCerradasEvento.has(r.espacio_id)) return false;
     if (esTurnoComida === null) return true;
     const rEsComida = r.hora < `${HORA_CORTE_TURNO}:00`;
     return rEsComida === esTurnoComida;
@@ -474,7 +514,7 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
     if (r.espacio_id) ocupacionPorEspacio[r.espacio_id] = (ocupacionPorEspacio[r.espacio_id] || 0) + r.numero_comensales;
   }
 
-  const resultado: EspacioOcupacion[] = espaciosDeLaMarca.filter((e) => !e.privada).map((e) => ({
+  const resultado: EspacioOcupacion[] = espaciosDeLaMarca.filter((e) => !e.privada && !idsCerradasEvento.has(e.id)).map((e) => ({
     id: e.id,
     nombre: e.nombre,
     capacidad_maxima: e.capacidad_maxima,
@@ -482,7 +522,10 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
     disponible: e.capacidad_maxima - (ocupacionPorEspacio[e.id] || 0),
   }));
 
-  const capacidadTotal = sumarCapacidadPorMarca(espaciosDeLaMarca, marca);
+  const capacidadTotal = Math.max(
+    0,
+    sumarCapacidadPorMarca(espaciosDeLaMarca, marca) - cerradasEvento.reduce((s, c) => s + c.capacidad_maxima, 0),
+  );
   const ocupacionTotal = (reservasMismoTurno as Array<{ numero_comensales: number }>).reduce((s, r) => s + (r.numero_comensales || 0), 0);
 
   return { espacios: resultado, capacidadTotal, ocupacionTotal };
@@ -599,7 +642,7 @@ function negocioDeReserva(reserva: Pick<Reserva, "marca">): DatosNegocio {
 // EMAIL — Resend (plantillas HTML de Gmail/n8n, preservadas tal cual)
 // ============================================================
 async function sendEmail(to: string, subject: string, htmlBody: string): Promise<{ ok: boolean; error?: string }> {
-  if (!RESEND_API_KEY) {
+  if (!RESEND_API_KEY || !resend) {
     console.error("[EMAIL] RESEND_API_KEY no configurado — email no enviado");
     return { ok: false, error: "resend_not_configured" };
   }
@@ -956,6 +999,14 @@ function pageTokenInvalido(): string {
 //
 // En error (4xx/5xx) el cuerpo sigue siendo `{ ok:false, error }`: hay
 // que comprobar `response.ok` ANTES de mapear.
+// GET /salud — sonda de keep-warm (CT-REM-FN-07c). Sin BD y sin secretos: solo
+// mantiene caliente el isolate de la función para evitar el arranque en frío
+// (~22 s en la 1.ª petición tras un rato de inactividad). La llama el cron
+// `reservas-web-keep-warm` (migración 20261119120000). No revela nada.
+function handleSalud(): Response {
+  return json({ ok: true, servicio: "reservas-web" });
+}
+
 async function handleDisponibilidad(req: Request): Promise<Response> {
   if (!checkSharedSecret(req)) return json({ ok: false, error: "unauthorized" }, 401);
   let body: Record<string, unknown>;
@@ -966,6 +1017,19 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
   }
   const fecha = typeof body?.fecha === "string" ? body.fecha : "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ ok: false, error: "fecha_invalida" }, 400);
+
+  // CT-REM-FN-07b: limitador por IP de /disponibilidad (solo lectura). Tras
+  // validar la fecha y ANTES de cualquier consulta a la BD: una consulta
+  // throttled no toca la BD. FALLA EN ABIERTO a propósito —al revés que
+  // /crear—: disponibilidad es el corazón del flujo de reserva, así que si el
+  // limitador no está disponible la consulta se SIRVE igual; solo se bloquea
+  // cuando dice "denegado" (se superó el límite por IP/hora o el diario).
+  const cupoDisponibilidad = await reservarCupoDisponibilidad(supabase, req, IP_SALT);
+  if (cupoDisponibilidad.estado === "denegado") {
+    console.warn(`[reservas-web] /disponibilidad bloqueada por el limitador (${cupoDisponibilidad.motivo})`);
+    const r = respuestaDemasiadasSolicitudes(RESTAURANTE_TEL_TEXTO);
+    return json(r.cuerpo, r.status);
+  }
 
   const comensalesRaw = parseInt(String(body?.numero_comensales ?? body?.comensales ?? ""), 10);
   const comensales = Number.isFinite(comensalesRaw) && comensalesRaw > 0 ? comensalesRaw : 1;
@@ -1063,6 +1127,8 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
     // Las reservas en una sala privada (fuera de aforo) no ocupan turno.
     salasPrivadas: idsSalasPrivadas(espaciosRaw as Array<{ id: string; caracteristicas: unknown }> | null),
     capacidadTotal,
+    // Salas cerradas por un evento: la web y el bot solo ofrecen las que quedan.
+    salasCerradasPorEvento: await salasCerradasPorEventoDe(fecha, espaciosRaw as Array<{ id: string; capacidad_maxima: number; caracteristicas: unknown }> | null, marca),
     serviciosCerrados: turnosCerrados,
     ahora: ahoraEnMadrid(),
     politica: {
@@ -1520,6 +1586,11 @@ async function handleCrear(req: Request): Promise<Response> {
         })),
         marcaTemprana,
       ),
+      salasCerradasPorEvento: await salasCerradasPorEventoDe(
+        fecha,
+        espaciosCrear as Array<{ id: string; capacidad_maxima: number; caracteristicas: unknown }> | null,
+        marcaTemprana,
+      ),
       serviciosCerrados: turnosCerradosCrear,
       ahora: null,
     });
@@ -1782,6 +1853,7 @@ serve(conAuditoriaDePeticion("reservas-web", createClientBase, async (req: Reque
       case "confirmar": return await handleConfirmar(req);
       case "cancelar": return await handleCancelarPreview(req);
       case "cancelar/ejecutar": return await handleCancelarEjecutar(req);
+      case "salud": return handleSalud();
       default: return json({ ok: false, error: "not_found", route: rutaDelPath(pathname) }, 404);
     }
   } catch (err) {

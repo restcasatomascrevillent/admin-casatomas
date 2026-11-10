@@ -14,6 +14,9 @@ on:
   pull_request:
   push:
     branches: [staging, main]
+  # Lo lanza «Release · preparar» sobre la rama release/X.Y.Z: los PR que abre Actions con su
+  # token no disparan otros workflows (docs/PROCESO-DE-CAMBIOS.md).
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -78,12 +81,18 @@ jobs:
         run: npm run test:reservas-configuracion:db
       - name: Solo «Ver» canjea cheques; migración y rollback (PGlite)
         run: npm run test:permisos-solo-ver:db
+      - name: Logs web, incidencias y estadísticas de comportamiento (PGlite)
+        run: npm run test:logs-web:db
       - name: Facturas, «Ver» solo consulta y permiso «Facturas · Subida» (PGlite)
         run: npm run test:permisos-facturas-subida:db
       - name: Vino por copas, Parker, votación del vino favorito, horario de menú y tapas y platos vegetarianos (PGlite)
         run: npm run test:vinos-copeo-encuesta:db
+      - name: Puntuaciones Parker con fuente, solo verificadas en la web (PGlite)
+        run: npm run test:vinos-parker:db
       - name: Instagram, bucket y piezas por la sección marketing (PGlite)
         run: npm run test:instagram:db
+      - name: Originales de las fotos de la carta en Drive (PGlite)
+        run: npm run test:carta-originales:db
       - name: Instagram, publicaciones programadas, RPC y cron del programador (PGlite)
         run: npm run test:instagram-programar:db
       - name: Métricas de Instagram, tablas, RLS y cron (PGlite)
@@ -104,10 +113,14 @@ jobs:
         run: npm run test:instagram-seguridad:db
       - name: Carruseles de Instagram, diapositivas, programar con el texto y limpieza de todas las imágenes (PGlite)
         run: npm run test:instagram-carrusel:db
+      - name: RRSS, editor IA, generación única por trabajo, topes diarios, cubo privado y rollback (PGlite)
+        run: npm run test:rrss:db
       - name: «Editar» para escribir en la carta y en el newsletter; con solo «Ver», consulta (PGlite)
         run: npm run test:permisos-carta-newsletter:db
       - name: Mesa fijada de una reserva, migración y rollback (PGlite)
         run: npm run test:mesa-fijada:db
+      - name: Evento con la sala entera, aforo y cierre que sigue a la reserva (PGlite)
+        run: npm run test:sala-evento:db
       - name: Versiones de migración sin repetir (salvo las históricas)
         run: npm run test:migraciones
       - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)
@@ -163,16 +176,25 @@ jobs:
             echo "::warning::Bajaste a $n errores de ESLint: baja TOPE_ESLINT a $n en .github/workflows/ci.yml."
           fi
 
-  control-promocion:
-    name: Validar promoción a producción
+  control-release:
+    name: Validar release a producción
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    timeout-minutes: 5
+    # Producción solo acepta PR desde release/X.Y.Z (scripts/release.mjs comprobar): nada de
+    # staging entero, versión y CHANGELOG coherentes y basada en el último main.
+    if: >-
+      (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+      (github.event_name == 'workflow_dispatch' && startsWith(github.ref_name, 'release/'))
     steps:
-      - name: Solo staging puede promocionarse a main
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Rama, versión, CHANGELOG y base de la release
         env:
-          SOURCE_BRANCH: ${{ github.head_ref }}
-        run: |
-          if [ "$SOURCE_BRANCH" != "staging" ]; then
-            echo "::error::Producción solo admite PR desde staging (rama recibida: $SOURCE_BRANCH)"
-            exit 1
-          fi
+          RAMA: ${{ github.head_ref || github.ref_name }}
+        run: node scripts/release.mjs comprobar --base origin/main --head HEAD --rama "$RAMA"

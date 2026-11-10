@@ -61,6 +61,44 @@ export function useGuardarAjustesTienda() {
 }
 
 /**
+ * Interruptor «Visible en la web» de arriba de Panel › Tienda (10/11/2026,
+ * petición del dueño: un botón para encender o apagar la tienda de la web).
+ * Solo cambia `activa`: no pisa el descuento ni los textos que alguien esté
+ * editando en Ajustes. Misma RLS que Ajustes (`can_write_section('tienda')`).
+ * Se ve al momento (optimista) y se deshace si falla. La web lo lee en vivo
+ * al cargar cada página (quita «Tienda» del menú, del pie y de los cheques
+ * regalo): sin republicar.
+ */
+export function useCambiarTiendaVisible() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (activa: boolean) => {
+      const { data, error } = await supabase.from("configuracion_tienda").update({ activa }).eq("id", true).select("*");
+      if (error) throw error;
+      // La RLS no da error: simplemente no actualiza ninguna fila.
+      if (!data || data.length === 0) {
+        throw new ErrorNegocio("No se ha guardado: tu usuario no tiene permiso para cambiar la tienda.");
+      }
+      return normalizarConfiguracionTienda(data[0] as Record<string, unknown>);
+    },
+    onMutate: async (activa) => {
+      await qc.cancelQueries({ queryKey: CLAVE_CONFIG });
+      const previo = qc.getQueryData<ResultadoConfiguracionTienda>(CLAVE_CONFIG);
+      if (previo?.disponible) {
+        qc.setQueryData<ResultadoConfiguracionTienda>(CLAVE_CONFIG, { disponible: true, config: { ...previo.config, activa } });
+      }
+      return { previo };
+    },
+    onError: (_e, _v, contexto) => {
+      if (contexto?.previo) qc.setQueryData(CLAVE_CONFIG, contexto.previo);
+    },
+    onSuccess: (config) => {
+      qc.setQueryData<ResultadoConfiguracionTienda>(CLAVE_CONFIG, { disponible: true, config });
+    },
+  });
+}
+
+/**
  * Pone (`aLaVenta: true`) o quita de la venta unos vinos. La RPC toca solo
  * esos ids, así que dos personas a la vez no se pisan. Se ve al momento
  * (optimista) y se deshace si falla.

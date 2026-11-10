@@ -1,4 +1,5 @@
-import { Award, Wine } from "lucide-react";
+import type { ReactNode } from "react";
+import { Wine } from "lucide-react";
 import { useWatch, type Control, type FieldValues, type Path } from "react-hook-form";
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -8,21 +9,20 @@ import { propsCampoPrecio } from "./precioCarta";
 export interface CamposCopaParkerValores extends FieldValues {
   copeo?: boolean;
   precio_copa_eur?: unknown;
-  puntuacion_parker?: unknown;
-  puntuacion_parker_anada?: unknown;
 }
 
 /**
- * «Se sirve por copas» + precio de la copa, y la puntuación Parker (04/11/2026,
- * petición del dueño). En la web, la copa sale como un botón con una copa en la
- * tarjeta del vino que enseña este precio, y la puntuación como un icono con los
- * puntos. Mismo bloque en el alta y en la edición.
+ * «Se sirve por copas» + precio de la copa (04/11/2026) y, al lado, el bloque
+ * de la puntuación Parker (`parker`: parker/PanelParker.tsx, 08/11/2026). En la
+ * web, la copa sale como un botón con una copa en la tarjeta del vino que
+ * enseña este precio, y la puntuación verificada como un icono con los puntos.
+ * Mismo bloque en el alta y en la edición.
  */
-export function CamposCopaParker<T extends CamposCopaParkerValores>({ control }: { control: Control<T> }) {
+export function CamposCopaParker<T extends CamposCopaParkerValores>({ control, parker }: { control: Control<T>; parker?: ReactNode }) {
   const n = (k: keyof CamposCopaParkerValores) => k as Path<T>;
   const copeo = useWatch({ control, name: n("copeo") }) === true;
   return (
-    <div className="grid grid-cols-1 gap-4 rounded-lg border p-3 sm:grid-cols-2 [&>*]:min-w-0">
+    <div className="grid grid-cols-1 gap-4 rounded-lg border p-3 [&>*]:min-w-0">
       <div className="space-y-3">
         <FormField
           control={control}
@@ -57,41 +57,7 @@ export function CamposCopaParker<T extends CamposCopaParkerValores>({ control }:
         )}
       </div>
 
-      <div className="space-y-2">
-        <p className="flex items-center gap-2 text-sm font-medium">
-          <Award className="h-4 w-4 text-primary" aria-hidden="true" />
-          Puntuación Parker
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <FormField
-            control={control}
-            name={n("puntuacion_parker")}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-xs text-muted-foreground">Puntos (50–100)</FormLabel>
-                <FormControl>
-                  <Input {...field} type="text" inputMode="numeric" autoComplete="off" value={(field.value as string | number | undefined) ?? ""} placeholder="Ej.: 94" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={control}
-            name={n("puntuacion_parker_anada")}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-xs text-muted-foreground">Añada</FormLabel>
-                <FormControl>
-                  <Input {...field} type="text" inputMode="numeric" autoComplete="off" value={(field.value as string | number | undefined) ?? ""} placeholder="Ej.: 2019" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        <p className="text-xs text-muted-foreground">Vacío = sin puntuación: la web no pinta el icono.</p>
-      </div>
+      {parker && <div className="border-t pt-3">{parker}</div>}
     </div>
   );
 }

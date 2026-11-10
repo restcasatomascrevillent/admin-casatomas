@@ -13,8 +13,11 @@ const TONO: Record<VersionApp["entorno"], string> = {
  * Versión y entorno, arriba del todo en el menú (cabecera del Admin Panel y del Super
  * Admin) y en la barra superior de tablet/móvil (petición del dueño, 2026-11-03; antes
  * iba en el pie). Así se sabe de un vistazo si se está en la demo o en producción y qué
- * versión tiene cada una (la demo va igual o por delante). Al pasar el ratón: versión,
- * entorno, commit y, si falta el número (`v0.?`), el motivo.
+ * versión tiene cada una. La versión es la de una PUBLICACIÓN (docs/PROCESO-DE-CAMBIOS.md):
+ * producción y la candidata llevan la suya exacta; la demo enseña la última publicada (sobre
+ * la que lleva cambios sin publicar) y el tooltip lo dice con la versión completa
+ * (`v1.2.3+abc1234`) y el commit. La etiqueta no crece: cabe junto al título del menú igual
+ * que antes (las 0.N.0 de la transición se ven como `v0.N`).
  *
  * `colapsado` (menú plegado a iconos, y junto al título del menú desplegado): solo el
  * número, en el color del entorno; el entorno sigue en el tooltip y para el lector de
@@ -31,8 +34,17 @@ export function VersionPanel({
 }) {
   const entorno = NOMBRE_ENTORNO[version.entorno];
   // Sin build (tests, `vite` sin el script de versión) no hay número: solo el entorno.
-  const numero = version.version && version.version !== "local" ? `v${version.version}` : null;
-  const detalle = [numero ? `${numero} · ${entorno}` : entorno, version.commit && `Commit ${version.commit}`, version.aviso]
+  const hayVersion = !!version.version && version.version !== "local";
+  // Etiqueta corta (la versión publicada); el tooltip lleva la completa («v1.2.3+abc1234»).
+  const conV = (t: string) => (/^\d/.test(t) ? `v${t}` : t);
+  const corta = (t: string) => t.replace(/^0\.(\d+)\.0$/, "0.$1");
+  const numero = !hayVersion ? null : conV(corta(version.publicada ?? version.version));
+  const detalle = [
+    hayVersion ? `${conV(version.version)} · ${entorno}` : entorno,
+    hayVersion && version.desarrollo && version.publicada && `cambios sin publicar sobre la v${version.publicada}`,
+    version.commit && `Commit ${version.commit}`,
+    version.aviso,
+  ]
     .filter(Boolean)
     .join(" · ");
   return (

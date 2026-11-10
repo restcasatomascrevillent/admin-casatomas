@@ -1,6 +1,6 @@
 {
   "ignoreCommand": "node scripts/vercel-produccion.mjs",
-  "git": { "deploymentEnabled": { "**": false, "staging": true, "main": true } },
+  "git": { "deploymentEnabled": { "**": false, "staging": true, "main": true, "release/**": true } },
   "framework": "vite",
   "regions": ["fra1"],
   "functions": {
@@ -13,6 +13,16 @@
       "maxDuration": 60,
       "includeFiles": "{node_modules/@sparticuz/chromium/bin/**,public/instagram/**}",
       "excludeFiles": "{public/modelos/**,public/ffmpeg/**,node_modules/onnxruntime-node/**,node_modules/onnxruntime-web/**,node_modules/@ffmpeg/**,node_modules/ffmpeg-static/**}"
+    },
+    "api/rrss-foto.ts": {
+      "maxDuration": 120,
+      "includeFiles": "{api/_lib/rrss/fuentes/**,public/instagram/logos/**,public/modelos/isnet-general-use-u8.onnx,node_modules/onnxruntime-node/bin/napi-v6/linux/x64/**}",
+      "excludeFiles": "{node_modules/onnxruntime-node/bin/napi-v6/{win32,darwin,linux/arm64}/**,node_modules/@sparticuz/**,node_modules/ffmpeg-static/**,public/ffmpeg/**,node_modules/@ffmpeg/**,node_modules/onnxruntime-web/**}"
+    },
+    "api/rrss-video.ts": {
+      "maxDuration": 300,
+      "includeFiles": "{api/_lib/rrss/fuentes/**,public/instagram/logos/**,node_modules/ffmpeg-static/ffmpeg}",
+      "excludeFiles": "{public/modelos/**,public/ffmpeg/**,node_modules/onnxruntime-node/**,node_modules/onnxruntime-web/**,node_modules/@ffmpeg/**,node_modules/@sparticuz/**}"
     }
   },
   "trailingSlash": false,

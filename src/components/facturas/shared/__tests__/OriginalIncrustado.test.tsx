@@ -1,5 +1,5 @@
 /**
- * Original incrustado al final de la ficha: imagen, PDF, solo Drive o nada.
+ * Visor del original en la ficha: Drive (vista previa), imagen, PDF, enlace suelto o nada.
  * `supabase.storage` va simulado; la llamada siempre va ligada (`.from(...).createSignedUrl(...)`).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -55,16 +55,35 @@ describe("OriginalIncrustado", () => {
     expect(container.querySelector('object[type="application/pdf"]')).toHaveAttribute("data", "https://x.test/firmada");
   });
 
-  it("solo Drive: una línea con el enlace y sin pedir nada a Storage", () => {
-    montar({ driveUrl: "https://drive.google.com/file/d/abc", archivoPath: null });
-    expect(screen.getByText(/original en google drive/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /abrir/i })).toHaveAttribute("href", "https://drive.google.com/file/d/abc");
+  it("Drive: vista previa incrustada (/preview) con «Abrir en Drive», sin pedir nada a Storage", () => {
+    const url = "https://drive.google.com/file/d/1AbCdEfGhIjK_lm-no/view?usp=drivesdk";
+    montar({ driveUrl: url, archivoPath: null });
+    const marco = screen.getByTitle("Original: Factura F-1");
+    expect(marco.tagName).toBe("IFRAME");
+    expect(marco).toHaveAttribute("src", "https://drive.google.com/file/d/1AbCdEfGhIjK_lm-no/preview");
+    expect(screen.getByRole("link", { name: /abrir en drive/i })).toHaveAttribute("href", url);
+    // Un solo enlace para abrirlo fuera: nada de la antigua fila «Original en Google Drive · Abrir».
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.queryByText(/original en google drive/i)).not.toBeInTheDocument();
     expect(base.firmar).not.toHaveBeenCalled();
   });
 
-  it("sin original: no pinta nada", () => {
-    const { container } = montar({ driveUrl: null, archivoPath: null });
-    expect(container).toBeEmptyDOMElement();
+  it("Drive y copia en Storage: manda Drive (la copia es temporal)", () => {
+    const { container } = montar({ driveUrl: "https://drive.google.com/open?id=1AbCdEfGhIjK", archivoPath: "facturas/1.jpeg" });
+    expect(container.querySelector("iframe")).toHaveAttribute("src", "https://drive.google.com/file/d/1AbCdEfGhIjK/preview");
+    expect(base.firmar).not.toHaveBeenCalled();
+  });
+
+  it("enlace de Drive del que no sale el id: una línea con «Abrir en Drive»", () => {
+    const { container } = montar({ driveUrl: "https://drive.google.com/drive/folders", archivoPath: null });
+    expect(container.querySelector("iframe")).toBeNull();
+    expect(screen.getByRole("link", { name: /abrir en drive/i })).toHaveAttribute("href", "https://drive.google.com/drive/folders");
+  });
+
+  it("sin original: estado vacío discreto y sin pedir nada", () => {
+    montar({ driveUrl: null, archivoPath: null });
+    expect(screen.getByTestId("sin-original")).toHaveTextContent("No se guardó el original de este documento.");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(base.firmar).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@ import { useSuperAdmin } from "./useSuperAdmin";
 import { precargarFeatureToggles } from "@/lib/precargaToggles";
 import { alRevalidarSesion } from "@/lib/revalidacion-sesion";
 import { SUPER_ADMIN_EMAILS, isSuperAdmin as checkIsSuperAdmin } from "@/config/permissions";
+import { guardarPermisosRecordados, leerPermisosRecordados } from "@/lib/cachePermisos";
 
 export type AppRole = "admin" | "manager" | "staff";
 
@@ -19,6 +20,11 @@ export interface UserRoleData {
   isAdmin: boolean;
   permissions: UserPermissions[];
   loading: boolean;
+  /**
+   * Ya se han leído del servidor (o se intentó) para este usuario. Con `false` lo que hay puede ser lo
+   * recordado en el dispositivo (`lib/cachePermisos.ts`): vale para dejar pasar, no para echar a nadie.
+   */
+  verificado?: boolean;
 }
 
 export const SECTIONS = [
@@ -33,15 +39,15 @@ export const SECTIONS = [
   // quedar en la BD se ignoran sin más: ningún componente busca ya esa key.
   { key: "gestor_carta", label: "Gestor Web · Carta" },
   { key: "gestion_web", label: "Gestor Web · Novedades, menús y tapas" },
-  { key: "marketing", label: "Newsletter" },
+  { key: "marketing", label: "Newsletter y RRSS" },
   // Usuarios de la agencia (Oficiosos) en los encargos de Instagram, 10/11/2026:
   // aceptan, entregan versiones y comentan (pestaña Instagram › Encargos). Ver
   // docs/instagram-encargos.md. Con «Marketing» se es el restaurante.
-  { key: "instagram_agencia", label: "Instagram · Agencia (Oficiosos)" },
+  { key: "instagram_agencia", label: "RRSS · Instagram · Agencia (Oficiosos)" },
   // Usuario del equipo que genera los vídeos de los reels (scripts/instagram/
   // render-reels.mjs), 11/11/2026: con «Editar» solo reclama, genera, sube y
   // cierra sus trabajos. Sin Marketing. Ver docs/instagram-video.md.
-  { key: "instagram_render", label: "Instagram · Render (equipo de vídeo)" },
+  { key: "instagram_render", label: "RRSS · Instagram · Render (equipo de vídeo)" },
   { key: "cheques", label: "Cheques regalo" },
   // Tienda de vinos de la web (escaparate: se compra en el restaurante), 2026-11-03.
   { key: "tienda", label: "Tienda" },
@@ -63,6 +69,19 @@ export type SectionKey = typeof SECTIONS[number]["key"];
 
 const UserRoleContext = createContext<UserRoleData | null>(null);
 
+/** Guarda rol y permisos en el dispositivo solo si las DOS lecturas fueron bien (PGRST116 = sin rol, vale). */
+function recordarSiCompleto(
+  userId: string,
+  roleData: { role: string } | null,
+  roleError: { code?: string } | null,
+  permData: UserPermissions[] | null,
+  permError: unknown,
+) {
+  if (permError || !permData) return;
+  if (roleError && roleError.code !== "PGRST116") return;
+  guardarPermisosRecordados(userId, { role: (roleData?.role as AppRole | undefined) ?? null, permissions: permData });
+}
+
 /**
  * Única consulta de rol/permisos para toda la app (2026-09-25).
  *
@@ -79,6 +98,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [permissions, setPermissions] = useState<UserPermissions[]>([]);
   const [loading, setLoading] = useState(true);
+  const [verificado, setVerificado] = useState(false);
 
   // Se depende de valores primitivos (id, email), NO del objeto `user`:
   // supabase-js re-emite SIGNED_IN / TOKEN_REFRESHED al volver a la app y eso
@@ -103,10 +123,12 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
       setRole(null);
       setPermissions([]);
       setLoading(false);
+      setVerificado(true);
       return;
     }
 
     let isMounted = true;
+    setVerificado(false);
 
     // Este efecto solo corre al cargar o al cambiar de usuario (nunca en un
     // refresco de token), así que es seguro descartar lo del usuario anterior.
@@ -119,21 +141,31 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
 
+    // Lo último que se leyó para ESTE usuario en este dispositivo (09/11/2026, mala cobertura): se pinta
+    // ya y se vuelve a leer abajo igualmente; si ha cambiado, se corrige al llegar (`lib/cachePermisos.ts`).
+    const recordado = leerPermisosRecordados(userId);
+    if (recordado?.permissions) {
+      setRole(recordado.role ?? (isSuperAdminUser ? "admin" : null));
+      setPermissions(recordado.permissions);
+      setLoading(false);
+    }
+
     // El menú lateral los necesita en cuanto pase ProtectedRoute: se piden ya, en paralelo.
     precargarFeatureToggles();
 
     const fetchRoleAndPermissions = async () => {
-      // Si no es super admin, mostramos loading
-      if (!isSuperAdminUser) setLoading(true);
+      // Si no es super admin (ni hay nada recordado), mostramos loading
+      if (!isSuperAdminUser && !recordado?.permissions) setLoading(true);
 
       try {
         // Rol y permisos A LA VEZ (07/11/2026): no dependen uno del otro y en serie eran dos
         // viajes seguidos al entrar (con cobertura de móvil se notaba). Se aplican igual que antes.
-        const [{ data: roleData }, { data: permData }] = await Promise.all([
+        const [{ data: roleData, error: roleError }, { data: permData, error: permError }] = await Promise.all([
           supabase.from("user_roles").select("role").eq("user_id", userId).single(),
           supabase.from("user_permissions").select("section_key, can_view, can_edit").eq("user_id", userId),
         ]);
         if (!isMounted) return;
+        recordarSiCompleto(userId, roleData, roleError, permData, permError);
 
         if (roleData) {
           setRole(roleData.role as AppRole);
@@ -148,6 +180,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         console.error("Error fetching role/permissions:", error);
       } finally {
         if (isMounted && !isSuperAdminUser) setLoading(false);
+        if (isMounted) setVerificado(true);
       }
     };
 
@@ -175,6 +208,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
           supabase.from("user_permissions").select("section_key, can_view, can_edit").eq("user_id", userId),
         ]);
         if (!vivo) return;
+        recordarSiCompleto(userId, roleData, roleError, permData, permError);
         // PGRST116 = sin fila: el rol se ha retirado de verdad.
         const roleOk = !roleError || roleError.code === "PGRST116";
         if (roleOk) {
@@ -206,6 +240,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
     isAdmin,
     permissions,
     loading,
+    verificado,
   };
 
   return <UserRoleContext.Provider value={value}>{children}</UserRoleContext.Provider>;

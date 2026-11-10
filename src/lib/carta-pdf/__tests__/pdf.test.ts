@@ -12,7 +12,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { contenidoPlatos, contenidoVinos, type FilaPlato, type FilaVino } from "../datos";
 import { cargarFontkit, crearFuentesKit, crearMedidor, limpiarTexto, type BytesFuentes, type FuentesKit } from "../fuentes";
 import { maquetarCarta, mm, type Medidor, type TamanoCarta } from "../maquetacion";
-import { crearPdfCarta, tramosRuta, trozosConInterletraje, type RecursosPdf } from "../pdf";
+import { crearPdfCarta, SeccionNoCabeError, tramosRuta, trozosConInterletraje, type RecursosPdf } from "../pdf";
 
 const carpeta = resolve(__dirname, "../../../assets/fuentes/carta-pdf");
 const leer = (nombre: string) => new Uint8Array(readFileSync(resolve(carpeta, nombre)));
@@ -44,7 +44,7 @@ const VINOS: FilaVino[] = [
 
 async function generar(tamano: TamanoCarta, sangrado: boolean, tipo: "platos" | "vinos" = "platos") {
   const contenido = tipo === "platos" ? contenidoPlatos(PLATOS, { carta: "restaurante", idioma: "es" }) : contenidoVinos(VINOS, { carta: "restaurante", idioma: "es" });
-  const paginas = maquetarCarta(medidor, contenido, tamano);
+  const { paginas } = maquetarCarta(medidor, contenido, tamano);
   const bytes = await crearPdfCarta(paginas, recursos, { sangrado, titulo: "Casa Tomás · Carta", idioma: "es", tamano, fecha: new Date("2026-11-05T10:00:00Z") });
   return { paginas, bytes, doc: await PDFDocument.load(bytes) };
 }
@@ -83,6 +83,28 @@ describe("crearPdfCarta", () => {
     );
     const sangrado = pagina.getBleedBox();
     expect(sangrado.width).toBeCloseTo(ancho + 2 * mm(3), 1);
+  });
+
+  it("una sección larga sale en varias páginas; solo se niega con un texto que no cabe ni en una página entera", async () => {
+    const muchos: FilaPlato[] = Array.from({ length: 40 }, (_, i) => ({
+      id: `m${i}`,
+      nombre: `Mariscada número ${i + 1} con su nombre largo de verdad`,
+      categoria: "MARISCOS",
+      precio_eur: 20 + i,
+      descripcion: "Una descripción que ocupa dos líneas en la carta impresa, como las de verdad, con su producto y su punto.",
+      activado: true,
+      restaurante: true,
+    }));
+    const maqueta = maquetarCarta(medidor, contenidoPlatos(muchos, { carta: "restaurante", idioma: "es" }), "A5");
+    expect(maqueta.secciones[0]).toMatchObject({ cabe: true });
+    expect(maqueta.secciones[0].caras).toBeGreaterThan(1);
+    const doc = await PDFDocument.load(await crearPdfCarta(maqueta.paginas, recursos, { sangrado: false, titulo: "Carta", idioma: "es", tamano: "A5" }));
+    expect(doc.getPageCount()).toBe(maqueta.secciones[0].caras + 2);
+
+    const imposible: FilaPlato[] = [{ id: "x", nombre: `Plato${"o".repeat(120)}`, categoria: "CARNES", precio_eur: 9, activado: true, restaurante: true }];
+    const mala = maquetarCarta(medidor, contenidoPlatos(imposible, { carta: "restaurante", idioma: "es" }), "A5");
+    expect(mala.secciones[0].cabe).toBe(false);
+    await expect(crearPdfCarta(mala.paginas, recursos, { sangrado: false, titulo: "Carta", idioma: "es", tamano: "A5" })).rejects.toBeInstanceOf(SeccionNoCabeError);
   });
 
   it("lleva incrustadas las tres Libre Baskerville (texto vectorial, no imágenes)", async () => {

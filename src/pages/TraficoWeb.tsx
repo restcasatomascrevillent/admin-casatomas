@@ -24,6 +24,7 @@ import { TopPaginas } from "@/components/trafico-web/TopPaginas";
 import { Desgloses } from "@/components/trafico-web/Desgloses";
 import { EditorPesoPaginas } from "@/components/trafico-web/EditorPesoPaginas";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { SeccionComportamiento } from "@/components/trafico-web/comportamiento/SeccionComportamiento";
 
 // Informe mensual en diapositivas (y su PDF): solo se descarga al abrirlo.
 const InformeTraficoDialog = lazy(() => import("@/components/trafico-web/informe/InformeTraficoDialog"));
@@ -107,13 +108,12 @@ export default function TraficoWeb() {
   return (
     <SuperAdminLayout>
       <div ref={setRaiz} className="flex flex-col gap-3" style={alto ? { height: alto } : undefined}>
-        {/* Sin título "Tráfico web" (2026-09-25): ya lo dice la pestaña activa del menú lateral. Filtros y «Pesos por
-            página» (una acción) en una sola fila; el origen de los datos (Vercel Web Analytics, con estimación de la
-            transferencia) va como nota discreta a la derecha. */}
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        {/* Sin título "Tráfico web" (2026-09-25): ya lo dice la pestaña activa del menú lateral. Filtros a la izquierda y
+            las dos acciones a la derecha, en una sola fila; el origen de los datos (Vercel Web Analytics, con estimación
+            de la transferencia) y la hora del último sync van en la línea discreta de debajo de las cifras. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <FiltrosTrafico proyecto={proyecto} onProyectoChange={setProyecto} dias={dias} onDiasChange={setDias} />
-          <div className="flex items-center gap-3">
-            <p className="hidden text-xs text-muted-foreground xl:block">Vercel Web Analytics · la transferencia es una estimación</p>
+          <div className="flex items-center gap-2">
             <Button variant="outline" className="h-11 gap-2" onClick={() => setInformeAbierto(true)}>
               <FileBarChart2 className="h-4 w-4" aria-hidden />
               Generar informe
@@ -123,7 +123,16 @@ export default function TraficoWeb() {
         </div>
 
         {/* KPIs fijos bajo los filtros. Mientras cargan, su esqueleto va en la región (CargandoPagina). */}
-        {kpisListos && <KpisTrafico actual={actual} anterior={anterior} tendencia={tendenciaQ.data} dias={dias} />}
+        {kpisListos && (
+          <KpisTrafico
+            actual={actual}
+            anterior={anterior}
+            tendencia={tendenciaQ.data}
+            dias={dias}
+            proyecto={proyecto}
+            estadosSync={syncQ.data}
+          />
+        )}
 
         {/* Región con scroll. Los avisos van aquí (y no fijos arriba) porque pueden
             ser varios y dejarían sin sitio al resto. `min-h-48`: suelo de la región;
@@ -140,7 +149,7 @@ export default function TraficoWeb() {
             </>
           ) : (
             <>
-              <AvisosTrafico proyecto={proyecto} estados={syncQ.data} diasConDato={actual.diasConDato} />
+              <AvisosTrafico proyecto={proyecto} estados={syncQ.data} diasConDato={actual.diasConDato} mostrarUltimoSync={false} />
 
               {tendenciaQ.isError && (
                 <EstadoErrorCarga titulo="la tendencia" error={tendenciaQ.error} onReintentar={() => tendenciaQ.refetch()} />
@@ -161,6 +170,9 @@ export default function TraficoWeb() {
 
               <TopPaginas proyecto={proyecto} desde={desde} hasta={hasta} />
               <Desgloses proyecto={proyecto} desde={desde} hasta={hasta} />
+              {/* Comportamiento (eventos propios con consentimiento, Super Admin › Logs): mismo periodo y mismas
+                  definiciones que Logs › Estadísticas. Solo la web de Casa Tomás lleva el rastreador. */}
+              {proyecto !== "touza-restaurant-website" && <SeccionComportamiento desde={desde} hasta={hasta} />}
             </>
           )}
         </div>

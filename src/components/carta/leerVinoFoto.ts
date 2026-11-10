@@ -3,6 +3,7 @@ import { redimensionarFoto } from "./redimensionarFoto";
 import { recortarFoto, type RecorteNormalizado } from "./recorteFoto";
 import type { ResultadoFotoCarta } from "./fotoCartaVino";
 import { mensajeErrorFuncion } from "@/hooks/useEnviarNewsletter";
+import type { PuntuacionEtiqueta } from "./parker/parker";
 
 export interface FuentePrecioMercado {
   tienda: string;
@@ -29,6 +30,18 @@ export interface DatosVinoFoto {
   /** Hasta 3 tiendas donde se vio el precio. */
   precio_mercado_fuentes?: FuentePrecioMercado[];
   recorte?: RecorteNormalizado | null;
+  /**
+   * Para la puntuación Parker (08/11/2026). Pueden no venir si la función
+   * desplegada es anterior. `anada` solo si se lee en la etiqueta (nunca
+   * adivinada); las puntuaciones impresas nunca se dan por Parker.
+   */
+  bodega?: string | null;
+  cuvee?: string | null;
+  anada?: number | null;
+  sin_anada?: boolean;
+  identificacion_ambigua?: boolean;
+  motivo_ambiguedad?: string | null;
+  puntuaciones_etiqueta?: PuntuacionEtiqueta[];
 }
 
 export interface VinoDesdeFoto {

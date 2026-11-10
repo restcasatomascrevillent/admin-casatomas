@@ -28,8 +28,9 @@ function opciones(marca: MarcaId, id: string) {
 
 /** Foto del catálogo + su copia → lo que piden la vista previa y el render. */
 export function fotoListaDe(base: Foto, copia: Copia): FotoLista {
-  const ancho = base.ancho || copia.ancho || 0;
-  const alto = base.alto || copia.alto || 0;
+  // Valen las medidas del fichero preparado (el original de Drive si lo hay).
+  const ancho = copia.ancho || base.ancho || 0;
+  const alto = copia.alto || base.alto || 0;
   return {
     foto: { ...base, ruta: copia.ruta, ancho, alto },
     ruta: copia.ruta,

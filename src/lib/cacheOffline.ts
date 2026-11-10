@@ -60,19 +60,29 @@ export function fechaLocal(d: Date = new Date()): string {
  *   · ["reservas-hoy", "pendientes-mesa", hoy] (VistaHoy) y ["reservas-kanban", hoy] (kanban);
  *   · ["asignaciones_mesa", hoy, …] (useAsignacionesMesa) y ["ajustes_mesa_servicio", "dia", hoy];
  *   · ["mesas"] / ["mesas", sala] (no la variante «con-inactivas» de Configuración);
- *   · ["espacios_reserva"] y ["configuracion-reservas"].
+ *   · ["espacios_reserva"] y ["configuracion-reservas"];
+ *   · desde el 09/11/2026: ["reservas-hoy", "canceladas", hoy], ["planos_espacio", sala], los ajustes de una
+ *     sala y turno de hoy y ["salas_cerradas_servicio", …] de hoy (eventos y «Sala cerrada»).
  */
 export function esConsultaDeHoy(clave: QueryKey, hoy: string): boolean {
-  const [a, b, c] = clave as readonly unknown[];
+  const [a, b, c, d] = clave as readonly unknown[];
   switch (a) {
     case "reservas-hoy":
-      return clave.length === 3 && b === "pendientes-mesa" && c === hoy;
+      // 09/11/2026: también las canceladas de hoy (lista de escritorio).
+      return clave.length === 3 && (b === "pendientes-mesa" || b === "canceladas") && c === hoy;
     case "reservas-kanban":
       return clave.length === 2 && b === hoy;
     case "asignaciones_mesa":
       return b === hoy;
     case "ajustes_mesa_servicio":
-      return clave.length === 3 && b === "dia" && c === hoy;
+      // Las del día (todas las salas) y, desde el 09/11/2026, las de una sala y turno de hoy (plano).
+      return (clave.length === 3 && b === "dia" && c === hoy) || (clave.length === 4 && c === hoy);
+    case "salas_cerradas_servicio":
+      // 09/11/2026: eventos de hoy y el interruptor «Sala cerrada» de una sala hoy.
+      return (clave.length === 4 && b === "eventos" && c === hoy && d === hoy) || (clave.length === 4 && b !== "eventos" && c === hoy);
+    case "planos_espacio":
+      // 09/11/2026: el plano de cada sala (sin él, el plano de «Hoy» esperaba a la red).
+      return clave.length === 2 && typeof b === "string";
     case "mesas":
       return clave.length <= 2;
     case "espacios_reserva":

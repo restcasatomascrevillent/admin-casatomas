@@ -16,6 +16,7 @@ import {
   tipoMimeBruto,
   type TrabajoVideo,
 } from "./colaPendientes";
+import { esOriginalDrive } from "../video/originalVideo";
 
 // trabajos_video y suscripciones_push aún no están en types.ts (generado).
 const sb = supabase as unknown as SupabaseClient;
@@ -80,9 +81,11 @@ export async function mandarAPotente(opts: { platoId: string; archivo: Blob & { 
 }
 
 /**
- * Cambio de fondo en un dispositivo potente: copia (en el servidor) el
- * original guardado a `pendientes/` y crea el trabajo con el tema nuevo. Al
- * terminar, el dispositivo potente devuelve el bruto a `videos-originales/`.
+ * Cambio de fondo en un dispositivo potente: pone una COPIA TEMPORAL del
+ * original en `pendientes/` y crea el trabajo con el tema nuevo. El original
+ * está en Google Drive (`drive:<id>.<ext>`): se baja aquí y se sube a
+ * `pendientes/`; si es uno antiguo del bucket, se copia en el servidor. Al
+ * terminar, el dispositivo potente lo deja en Drive y borra `pendientes/`.
  */
 export async function mandarOriginalAPotente(opts: { platoId: string; rutaOriginal: string; tema: string }): Promise<TrabajoVideo> {
   const { platoId, rutaOriginal, tema } = opts;
@@ -91,8 +94,15 @@ export async function mandarOriginalAPotente(opts: { platoId: string; rutaOrigin
   const ext = extensionBruto({ name: rutaOriginal });
   const ruta = `pendientes/${uuid()}.${ext}`;
   const almacen = sb.storage.from(BUCKET_BRUTO);
-  const { error: eCopia } = await almacen.copy(rutaOriginal, ruta);
-  if (eCopia) throw eCopia;
+  if (esOriginalDrive(rutaOriginal)) {
+    const { descargarOriginalVideo } = await import("../video/subirVideoPlato");
+    const archivo = await descargarOriginalVideo(rutaOriginal);
+    const { error: eSubida } = await almacen.upload(ruta, archivo, { upsert: false, contentType: tipoMimeBruto(ext) });
+    if (eSubida) throw eSubida;
+  } else {
+    const { error: eCopia } = await almacen.copy(rutaOriginal, ruta);
+    if (eCopia) throw eCopia;
+  }
   const { data, error } = await sb
     .from("trabajos_video")
     .insert({ plato_id: platoId, ruta_original: ruta, tema, creado_por: u.user.id, dispositivo_origen: describirDispositivo() })

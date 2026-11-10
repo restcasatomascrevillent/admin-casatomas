@@ -9,7 +9,7 @@ import {
   Shield,
   Settings,
   HelpCircle,
-  Instagram,
+  Share2,
   ChartNoAxesCombined,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
@@ -39,7 +39,6 @@ import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
 import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
 import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
-import { InstalarApp, useModoInstalacion } from "@/components/panel/InstalarApp";
 import { ShoppingBag } from "lucide-react";
 
 // `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
@@ -89,12 +88,12 @@ const menuItems: {
     sectionKey: "marketing",
     toggleKey: "marketing",
   },
-  // Instagram (05/11/2026): sección propia, antes era una pestaña de Newsletter.
-  // Mismo permiso y mismo interruptor del Super Admin que Newsletter («marketing»).
+  // RRSS (08/11/2026, antes «Instagram», sección propia desde el 05/11/2026): Instagram, Facebook y el
+  // editor IA de fotos y vídeos. Mismo permiso y mismo interruptor del Super Admin que Newsletter («marketing»).
   {
-    title: "Instagram",
-    url: "/instagram",
-    icon: Instagram,
+    title: "RRSS",
+    url: "/rrss",
+    icon: Share2,
     // La agencia (Oficiosos) también entra, solo a «Encargos» (docs/instagram-encargos.md).
     sectionKey: ["marketing", "instagram_agencia"],
     toggleKey: "marketing",
@@ -151,7 +150,6 @@ export function AppSidebar() {
   const { isAdmin, role, permissions, loading } = useUserRole();
   const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
   const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
-  const modoInstalacion = useModoInstalacion();
 
   // También en sus subrutas: /facturas/ia (la IA a pantalla completa) sigue marcando «Facturas».
   const isActive = (path: string) => currentPath === path || (path !== "/" && currentPath.startsWith(`${path}/`));
@@ -279,12 +277,6 @@ export function AppSidebar() {
             rol={role ?? null}
             permisos={permissions ?? []}
           />
-          {/* «Instalar app» (07/11/2026): solo si el navegador lo permite y aún no está instalada. */}
-          {(modoInstalacion === "android" || modoInstalacion === "ios") && (
-            <SidebarMenuItem>
-              <InstalarApp colapsado={isCollapsed} />
-            </SidebarMenuItem>
-          )}
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Cerrar sesión"

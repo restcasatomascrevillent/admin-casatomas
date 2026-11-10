@@ -57,7 +57,8 @@ const estado = {
 
 function fetchFalso() {
   return vi.fn(async (url: string, init: RequestInit = {}) => {
-    if (url.startsWith(`${URL_DRIVE}?accion=miniatura`)) return new Response(new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }), { status: 200, headers: { "content-type": "image/jpeg" } });
+    // Bytes y no un Blob: el Blob de jsdom no tiene stream() y el Response de Node lo rechaza.
+    if (url.startsWith(`${URL_DRIVE}?accion=miniatura`)) return new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { "content-type": "image/jpeg" } });
     if (url === `${URL_DRIVE}?accion=subir`) return estado.subida!(init.body as FormData);
     if (url === URL_DRIVE) {
       const cuerpo = JSON.parse(String(init.body));

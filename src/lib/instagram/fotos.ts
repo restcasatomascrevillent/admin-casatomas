@@ -49,6 +49,8 @@ export interface Foto {
   vinoId?: string;
   /** URL pública de la foto en la carta (bucket «platos» o «vinos»): solo para la miniatura. */
   urlCarta?: string;
+  /** Fotos de la carta: true si tiene ORIGINAL en Drive (medidas del original), false si solo la versión web (originalesCarta.ts). */
+  original?: boolean;
 }
 
 // <catalogo> — generado por scripts/instagram/subir-recursos.mjs: no editar a mano.

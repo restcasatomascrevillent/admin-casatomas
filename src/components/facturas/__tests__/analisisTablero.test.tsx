@@ -263,7 +263,7 @@ describe("tablero: sale hecho al abrir la pestaña", () => {
     const porVista: Record<string, string[]> = {
       Precios: ["Lo que más ha subido"],
       Gasto: ["Gasto por familia", "Gastos fijos al mes", "Abonos por proveedor"],
-      Proveedores: ["Proveedores con más gasto", "Casa Tomás y Touza"],
+      Proveedores: ["Tus proveedores"],
     };
     for (const [vista, titulos] of Object.entries(porVista)) {
       verVista(vista);
@@ -271,7 +271,8 @@ describe("tablero: sale hecho al abrir la pestaña", () => {
       if (vista !== "Gasto") expect(within(tablero()).queryByRole("region", { name: "Gastos fijos al mes" })).not.toBeInTheDocument();
     }
     verVista("Proveedores");
-    expect(within(tablero()).getByRole("region", { name: "Proveedores con más gasto" })).toHaveAccessibleDescription(/Los que más: Proveedor 1 9\.000 €/);
+    // La ficha del primero sale ya elegida.
+    expect(await within(tablero()).findByRole("region", { name: "Proveedor 1" })).toBeInTheDocument();
     // Nada del copiloto de antes en la pantalla principal.
     // (El desplegable «Al instante» del chat; la vista «Explorar» se quitó el 08/11/2026.)
     expect(screen.queryByRole("button", { name: /^al instante$/i })).not.toBeInTheDocument();
@@ -291,15 +292,31 @@ describe("tablero: sale hecho al abrir la pestaña", () => {
     await waitFor(() => expect(llamadasTablero()).toContainEqual({ p_desde: null, p_hasta: null, p_local: "touza" }));
   });
 
-  it("proveedores: 5 a la vista y «Ver los 7»", async () => {
-    montar();
+  it("proveedores (09/11/2026): lista comparada con el anterior, ficha del elegido y reparto de locales en la franja", async () => {
+    const onIrA = vi.fn();
+    montar({ onIrA });
     await screen.findByText("1.362.491,57 €");
     verVista("Proveedores");
-    const tarjeta = await screen.findByRole("region", { name: "Proveedores con más gasto" });
-    const lista = within(tarjeta).getByRole("list", { name: "Proveedores por gasto" });
-    expect(within(lista).getAllByRole("button")).toHaveLength(5);
-    fireEvent.click(within(tarjeta).getByRole("button", { name: "Ver los 7" }));
-    expect(within(lista).getAllByRole("button")).toHaveLength(7);
+    // Pide el periodo y el anterior equivalente (el anterior está cargado: 1.700 de 1.884 documentos).
+    await waitFor(() => expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_desde: "2026-01-01", p_hasta: "2026-12-31", p_medida: "gasto", p_agrupar: "proveedor", p_top: 50 })));
+    await waitFor(() => expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_desde: "2025-01-01", p_hasta: "2025-11-05", p_medida: "gasto", p_agrupar: "proveedor" })));
+    const lista = await screen.findByRole("listbox", { name: "Proveedores: Todos" });
+    expect(within(lista).getAllByRole("option")).toHaveLength(3);
+    // Con comparación, los filtros de cambio.
+    const filtros = screen.getByRole("group", { name: "Qué proveedores ver" });
+    expect(within(filtros).getByRole("button", { name: "Gastas más (0)" })).toBeInTheDocument();
+    expect(within(filtros).getByRole("button", { name: "Ya no compras (0)" })).toBeInTheDocument();
+    expect(screen.getByTestId("franja-proveedores")).toHaveTextContent(/245 proveedores con compras/);
+    expect(screen.getByTestId("franja-locales")).toHaveTextContent(/Casa Tomás 1\.333\.190 €/);
+    // Elegir otro: su ficha, con cifras, y sus botones.
+    fireEvent.click(within(lista).getByRole("option", { name: /Proveedor 2/ }));
+    const ficha = await screen.findByRole("region", { name: "Proveedor 2" });
+    expect(within(ficha).getByTestId("cifras-proveedor")).toHaveTextContent(/8\.000,00\s€/);
+    expect(within(ficha).getByTestId("cifras-proveedor")).toHaveTextContent(/antes 8\.000 €/);
+    fireEvent.click(within(ficha).getByRole("button", { name: "Abrir en Compras" }));
+    expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=proveedores&prov=301");
+    fireEvent.click(within(ficha).getByRole("button", { name: "Ver documentos" }));
+    await waitFor(() => expect(llamadas("documentos_de_cifra").length).toBeGreaterThan(0));
   });
 
   it("familias: avisa de las líneas sin clasificar y «Clasificar con IA» lleva a Productos", async () => {
@@ -359,18 +376,17 @@ describe("tablero: menús de las filas", () => {
     montar({ onIrA });
     await screen.findByText("1.362.491,57 €");
     verVista("Proveedores");
-    fireEvent.click(screen.getByRole("button", { name: /^PROVEEDOR 1, S\.L\.: 9\.000,00\s€/ }));
-    fireEvent.click(await screen.findByRole("button", { name: "Abrir en Compras" }));
+    fireEvent.click(await screen.findByRole("option", { name: /Proveedor 1/ }));
+    fireEvent.click(within(await screen.findByRole("region", { name: "Proveedor 1" })).getByRole("button", { name: "Abrir en Compras" }));
     expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=proveedores&prov=300");
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     verVista("Gasto");
     fireEvent.click(within(screen.getByRole("region", { name: "Abonos por proveedor" })).getByRole("button", { name: /CATRAL/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Abrir en Compras" }));
     expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=proveedores&prov=377");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     verVista("Proveedores");
-    fireEvent.click(screen.getByRole("button", { name: /^PROVEEDOR 2, S\.L\./ }));
-    expect(await screen.findByRole("button", { name: "Ver documentos" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("option", { name: /Proveedor 2/ }));
+    expect(within(await screen.findByRole("region", { name: "Proveedor 2" })).getByRole("button", { name: "Ver documentos" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Ver su gasto por mes/ })).not.toBeInTheDocument();
   });
 
@@ -678,7 +694,7 @@ describe("QA 05/11/2026: cifras de otro periodo, tramos y documentos", () => {
       expect(ind).toHaveClass("opacity-60");
       for (const b of within(ind).getAllByRole("button")) expect(b).toBeDisabled();
       // Las filas de las tarjetas, desactivadas.
-      expect(screen.getByRole("button", { name: /^PROVEEDOR 1, S\.L\.: 9\.000,00\s€/ })).toBeDisabled();
+      expect(screen.getByRole("option", { name: /Proveedor 1/ })).toBeDisabled();
       await act(async () => soltar({ data: TABLERO, error: null }));
       await waitFor(() => expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Gasto del periodo/ })).toBeEnabled());
     } finally {

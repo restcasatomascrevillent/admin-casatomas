@@ -294,8 +294,30 @@ export interface UsoVercel {
   bytesOrigen?: number;
   invocaciones?: number;
   cpuHoras?: number;
+  /** Memoria aprovisionada de las funciones (GB-hora). */
+  gbHoras?: number;
   imagenes?: number;
+  /** % de las peticiones servidas desde la caché del CDN (aciertos / total). */
+  aciertosCache?: number;
+  /** Peticiones de cada proyecto (del reparto diario «breakdown.requests»), de más a menos. */
+  porProyecto: Array<{ proyecto: string; peticiones: number }>;
   claves: string[];
+}
+
+/** Reparte las peticiones de cada día entre los proyectos según `breakdown.requests` (en %). */
+function peticionesPorProyecto(json: unknown): Array<{ proyecto: string; peticiones: number }> {
+  const suma = new Map<string, number>();
+  for (const fila of filasDeUso(json)) {
+    const total = (numero(fila.request_hit_count) ?? 0) + (numero(fila.request_miss_count) ?? 0);
+    const reparto = esObjeto(fila.breakdown) && Array.isArray(fila.breakdown.requests) ? fila.breakdown.requests.filter(esObjeto) : [];
+    for (const r of reparto) {
+      const nombre = typeof r.name === "string" ? r.name : typeof r.title === "string" ? r.title : null;
+      const pct = numero(r.percent);
+      if (nombre && pct != null) suma.set(nombre, (suma.get(nombre) ?? 0) + (total * pct) / 100);
+    }
+  }
+  return [...suma].map(([proyecto, peticiones]) => ({ proyecto, peticiones: Math.round(peticiones) }))
+    .sort((a, b) => b.peticiones - a.peticiones);
 }
 
 /**
@@ -319,10 +341,32 @@ export function resumirUsoVercel(json: unknown): UsoVercel {
       sumaDe(s, /^function_invocation_.*_count$/i) ??
       sumaDe(s, /^(function_|serverless_function_)?invocations?(_count)?$/i),
     cpuHoras: ms != null ? ms / 3_600_000 : sumaDe(s, /active_cpu.*hours?$/i),
+    gbHoras: sumaDe(s, /^function_execution_.*gb_hours?$/i) ?? sumaDe(s, /(provisioned_memory|memory).*gb_hours?$/i),
     imagenes: sumaDe(s, /image.*(transformation|optimization).*count|^source_images?(_count)?$/i),
+    aciertosCache: (() => {
+      const aciertos = sumaDe(s, /^request_hit_count$/i);
+      const fallos = sumaDe(s, /^request_miss_count$/i);
+      return aciertos != null && fallos != null && aciertos + fallos > 0 ? (aciertos / (aciertos + fallos)) * 100 : undefined;
+    })(),
+    porProyecto: peticionesPorProyecto(json),
     claves: Object.keys(s).sort(),
   };
 }
+
+/** Compilaciones (/v2/usage?type=builds): cuántas, cuántas fallaron y horas compilando. */
+export function resumirCompilacionesVercel(json: unknown): { total: number; fallidas: number; horas: number } | null {
+  const s = sumarCampos(json);
+  const ok = sumaDe(s, /^build_completed_count$/i);
+  const mal = sumaDe(s, /^build_failed_count$/i);
+  if (ok == null && mal == null) return null;
+  return { total: (ok ?? 0) + (mal ?? 0), fallidas: mal ?? 0, horas: (sumaDe(s, /^build_build_seconds$/i) ?? 0) / 3600 };
+}
+
+/** «admin 68 % · web 31 % · touza 1 %». */
+const textoReparto = (lista: Array<{ proyecto: string; peticiones: number }>) => {
+  const total = lista.reduce((t, x) => t + x.peticiones, 0);
+  return total > 0 ? lista.map((x) => `${x.proyecto.replace(/-casatomas$/, "")} ${Math.round((x.peticiones / total) * 100)} %`).join(" · ") : "";
+};
 
 /**
  * Recortes de fotos en el servidor (api/recortar-foto del panel, migración
@@ -379,7 +423,18 @@ export const leerVercel: Lector = async (ctx) => {
   if (u.ok) {
     const r = resumirUsoVercel(u.json);
     const periodo = "últimos 30 días";
-    if (r.peticiones != null) metricas.peticiones_cdn = { orden: 1, etiqueta: "Visitas a las webs (peticiones al CDN)", valor: Math.round(r.peticiones), unidad: "peticiones", periodo };
+    if (r.peticiones != null) {
+      const notas = [
+        r.porProyecto.length ? `Por proyecto: ${textoReparto(r.porProyecto)}.` : "",
+        r.aciertosCache != null ? `${Math.round(r.aciertosCache)} % servidas desde la caché del CDN.` : "",
+      ].filter(Boolean);
+      metricas.peticiones_cdn = {
+        orden: 1, etiqueta: "Visitas a las webs (peticiones al CDN)", valor: Math.round(r.peticiones), unidad: "peticiones", periodo,
+        ...(notas.length ? { nota: notas.join(" ") } : {}),
+      };
+    }
+    if (r.porProyecto.length) detalles.peticiones_por_proyecto = r.porProyecto.slice(0, 10);
+    if (r.aciertosCache != null) detalles.aciertos_cache = Math.round(r.aciertosCache);
     if (r.bytesServidos != null) metricas.transferencia_rapida = { orden: 2, etiqueta: "Datos servidos a los visitantes (Fast Data Transfer)", valor: Math.round(r.bytesServidos), unidad: "bytes", periodo };
     if (r.bytesOrigen != null) metricas.transferencia_origen = { orden: 3, etiqueta: "Datos desde el servidor (Fast Origin Transfer)", valor: Math.round(r.bytesOrigen), unidad: "bytes", periodo };
     if (r.invocaciones != null) metricas.invocaciones_funciones = { orden: 4, etiqueta: "Ejecuciones de funciones", valor: Math.round(r.invocaciones), unidad: "invocaciones", periodo };
@@ -387,6 +442,13 @@ export const leerVercel: Lector = async (ctx) => {
       metricas.cpu_activa = { orden: 5, etiqueta: "Tiempo de CPU de las funciones", valor: redondear(r.cpuHoras, 3), unidad: "horas", periodo };
       const rec = recortes.recortes_servidor_mes;
       if (rec) metricas.cpu_activa.nota = `De ellas, recortes de fotos este mes: ${rec.valor} fotos, ${recortes.cpu_recortes_mes?.valor ?? 0} min (este proyecto de Supabase).`;
+    }
+    if (r.gbHoras != null) {
+      metricas.memoria_funciones = {
+        orden: 5.5, etiqueta: "Memoria de las funciones", valor: redondear(r.gbHoras, 3), unidad: "GB-hora", periodo,
+        // Límite del plan Hobby si servicios_contratados no tiene uno (20261120100000 lo añade, editable).
+        limite: 360, unidad_limite: "GB-hora",
+      };
     }
     if (r.imagenes != null) metricas.transformaciones_imagen = { orden: 6, etiqueta: "Imágenes optimizadas", valor: Math.round(r.imagenes), unidad: "transformaciones", periodo };
     if (r.peticiones == null && r.bytesServidos == null && r.invocaciones == null) {
@@ -397,12 +459,66 @@ export const leerVercel: Lector = async (ctx) => {
     avisos.push(`No se pudo leer el uso de los últimos 30 días (respuesta ${u.status}).`);
   }
 
+  // 3. Compilaciones de los últimos 30 días (misma API interna). Informativo: el plan no las limita.
+  if (u.ok) {
+    const b = await pedir(
+      ctx,
+      `https://api.vercel.com/v2/usage?type=builds&granularity=day&teamId=${encodeURIComponent(equipo)}&from=${encodeURIComponent(desde30)}&to=${encodeURIComponent(ctx.ahora.toISOString())}`,
+      cab,
+    ).catch(() => null);
+    const c = b?.ok ? resumirCompilacionesVercel(b.json) : null;
+    if (c) {
+      metricas.compilaciones_30d = {
+        orden: 7.5, etiqueta: "Compilaciones", valor: c.total, unidad: "compilaciones", periodo: "últimos 30 días",
+        nota: `${c.fallidas.toLocaleString("es-ES")} fallidas · ${fmtNum(c.horas, 1)} h compilando. Cada cambio que se sube compila las webs que toca.`,
+      };
+    }
+  }
+
   if (avisos.length) detalles.avisos = avisos;
   if (Object.keys(metricas).length === Object.keys(recortes).length) return { metricas, error: "error_api", detalles };
   return { metricas, detalles };
 };
 
 // ─── Supabase ───────────────────────────────────────────────────────────────
+
+/** «12,3 MB»: tamaño corto para las notas. */
+const tamanoCorto = (bytes: number) => {
+  for (const [u, f] of [["GB", GIB], ["MB", 1024 ** 2], ["kB", 1024]] as const) if (bytes >= f) return `${fmtNum(bytes / f, bytes >= 10 * f ? 0 : 1)} ${u}`;
+  return `${Math.round(bytes)} B`;
+};
+
+/**
+ * Cuánto ha crecido la base de datos: la lectura de Supabase de hace 7 días (o, si aún no hay
+ * tantas, la más antigua de hace al menos un día) frente a ahora. null si no hay con qué comparar.
+ */
+export async function crecimientoBd(ctx: ContextoLector, bytesAhora: number): Promise<{ bytes: number; dias: number; desde: string } | null> {
+  const anterior = async (hasta: Date, masReciente: boolean) => {
+    try {
+      const { data, error } = await ctx.admin.from("servicios_uso").select("tomado_en, metricas")
+        .eq("proveedor", "supabase").lte("tomado_en", hasta.toISOString())
+        .order("tomado_en", { ascending: !masReciente }).limit(5);
+      if (error || !Array.isArray(data)) return null;
+      return (data as Array<Record<string, unknown>>).find((f) => esObjeto(f.metricas) && esObjeto(f.metricas.bd_tamano) && numero(f.metricas.bd_tamano.valor) != null) ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const hace7 = new Date(ctx.ahora.getTime() - 7 * 86_400_000);
+  const fila = (await anterior(hace7, true)) ?? (await anterior(new Date(ctx.ahora.getTime() - 86_400_000), false));
+  if (!fila) return null;
+  const antes = numero((fila.metricas as Record<string, Record<string, unknown>>).bd_tamano.valor)!;
+  const desde = String(fila.tomado_en);
+  const dias = Math.max(1, Math.round((ctx.ahora.getTime() - Date.parse(desde)) / 86_400_000));
+  return { bytes: bytesAhora - antes, dias, desde };
+}
+
+const TIPOS_PETICION: Array<[RegExp, string]> = [
+  [/rest/, "base de datos"],
+  [/auth/, "inicio de sesión"],
+  [/storage/, "archivos"],
+  [/realtime/, "tiempo real"],
+];
 
 export const leerSupabase: Lector = async (ctx) => {
   const metricas: Record<string, Metrica> = {};
@@ -415,7 +531,17 @@ export const leerSupabase: Lector = async (ctx) => {
     avisos.push("No se pudo medir la base de datos (falta la migración de Servicios o no responde).");
   } else {
     const bd = numero(data.bd_bytes);
-    if (bd != null) metricas.bd_tamano = { orden: 1, etiqueta: "Tamaño de la base de datos", valor: bd, unidad: "bytes", periodo: "ahora" };
+    if (bd != null) {
+      metricas.bd_tamano = { orden: 1, etiqueta: "Tamaño de la base de datos", valor: bd, unidad: "bytes", periodo: "ahora" };
+      const c = await crecimientoBd(ctx, bd);
+      if (c) {
+        metricas.bd_crecimiento = {
+          orden: 1.5, etiqueta: "Crecimiento de la base de datos", valor: c.bytes, unidad: "bytes",
+          periodo: c.dias === 7 ? "últimos 7 días" : `desde el ${fechaEs(c.desde)}`,
+          nota: `${c.bytes >= 0 ? "+" : "−"}${tamanoCorto(Math.abs(c.bytes))} en ${c.dias} día${c.dias === 1 ? "" : "s"}.`,
+        };
+      }
+    }
     const sto = numero(data.storage_bytes);
     if (sto != null) {
       const n = numero(data.storage_objetos);
@@ -431,6 +557,29 @@ export const leerSupabase: Lector = async (ctx) => {
         orden: 3, etiqueta: "Usuarios activos este mes", valor: mau, unidad: "usuarios", periodo: "mes en curso",
         ...(total != null ? { nota: `${total.toLocaleString("es-ES")} usuarios dados de alta en este proyecto.` } : {}),
       };
+    }
+  }
+
+  // 1b. Conexiones abiertas y tablas que más ocupan (RPC de 20261120100000; sin ella, no salen).
+  const extra = await Promise.resolve(ctx.admin.rpc("servicios_metricas_bd_extra")).catch(() => null);
+  const ex = extra && !extra.error && esObjeto(extra.data) ? extra.data : null;
+  if (ex) {
+    const n = numero(ex.conexiones);
+    const max = numero(ex.conexiones_max);
+    if (n != null) {
+      metricas.conexiones = {
+        orden: 4, etiqueta: "Conexiones a la base de datos", valor: n, unidad: "conexiones", periodo: "ahora",
+        ...(max != null && max > 0 ? { limite: max, unidad_limite: "conexiones" } : {}),
+        nota: "Las abiertas ahora mismo (panel, webs y servicios de Supabase). El máximo lo fija el tamaño del servidor.",
+      };
+    }
+    const tablas = Array.isArray(ex.tablas_mayores)
+      ? ex.tablas_mayores.filter(esObjeto).filter((t) => typeof t.tabla === "string" && numero(t.bytes) != null)
+        .slice(0, 5).map((t) => ({ tabla: String(t.tabla).slice(0, 80), bytes: numero(t.bytes)! }))
+      : [];
+    if (tablas.length) {
+      detalles.tablas_mayores = tablas;
+      if (metricas.bd_tamano) metricas.bd_tamano.nota = `Lo que más ocupa: ${tablas.slice(0, 3).map((t) => `${t.tabla} ${tamanoCorto(t.bytes)}`).join(" · ")}.`;
     }
   }
 
@@ -450,12 +599,21 @@ export const leerSupabase: Lector = async (ctx) => {
       avisos.push("El token de gestión no tiene permiso de lectura de «Usage Analytics».");
     } else if (c.ok && esObjeto(c.json) && Array.isArray(c.json.result)) {
       let total = 0;
+      const porTipo: Record<string, number> = {};
       for (const fila of c.json.result.filter(esObjeto)) {
-        for (const [k, v] of Object.entries(fila)) if (/^total_.*requests$/.test(k)) total += numero(v) ?? 0;
+        for (const [k, v] of Object.entries(fila)) {
+          if (!/^total_.*requests$/.test(k)) continue;
+          const n = numero(v) ?? 0;
+          total += n;
+          const tipo = TIPOS_PETICION.find(([re]) => re.test(k))?.[1] ?? "otras";
+          porTipo[tipo] = (porTipo[tipo] ?? 0) + n;
+        }
       }
+      const reparto = Object.entries(porTipo).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+      if (reparto.length) detalles.peticiones_por_tipo = Object.fromEntries(reparto);
       metricas.peticiones_api_7d = {
         orden: 7, etiqueta: "Peticiones a la API", valor: total, unidad: "peticiones", periodo: "últimos 7 días",
-        nota: "Base de datos, inicio de sesión, archivos y tiempo real. Informativo: el plan Free no las limita.",
+        nota: `${reparto.length ? `${reparto.map(([t, n]) => `${t} ${n.toLocaleString("es-ES")}`).join(" · ")}. ` : ""}Informativo: el plan Free no las limita.`,
       };
     } else {
       avisos.push(`No se pudieron leer las peticiones a la API (respuesta ${c.status}).`);
@@ -497,26 +655,59 @@ export interface UsoGithub {
   almacenamientoGbHoras: number;
   /** Lo que de verdad se factura (netAmount, tras descontar lo incluido); null si el informe no lo trae. */
   netoUsd: number | null;
+  /**
+   * Minutos y dólares (precio de lista) de los repositorios PÚBLICOS: GitHub no los cobra ni
+   * cuentan para los 2.000 minutos incluidos (09/11/2026: web, admin y touza son públicos y el
+   * informe los sumaba, con un «157 %» rojo que no lo era). Solo con el informe detallado, que
+   * dice el repositorio de cada línea; sin él, 0.
+   */
+  minutosPublicos: number;
+  computoPublicoUsd: number;
+  /** Alguna línea dice su repositorio (informe detallado). */
+  conRepositorio: boolean;
 }
 
-/** Suma los `usageItems` del informe de facturación (resumen o detalle). */
-export function resumirUsoGithub(json: unknown): UsoGithub {
+/** «restcasatomascrevillent/web-casatomas» o «web-casatomas» → «web-casatomas». */
+const nombreRepo = (v: unknown): string | null => {
+  const t = typeof v === "string" ? v.trim() : "";
+  return t ? (t.split("/").pop() ?? t).toLowerCase() : null;
+};
+
+/**
+ * Suma los `usageItems` del informe de facturación (resumen o detalle). `publicos`: repositorios
+ * que se sabe que son públicos (sus minutos van aparte). Una línea sin repositorio, o de uno que no
+ * se sabe, cuenta como privada: mejor un aviso de más que uno de menos.
+ */
+export function resumirUsoGithub(json: unknown, publicos: ReadonlySet<string> = new Set()): UsoGithub {
   const items = esObjeto(json) && Array.isArray(json.usageItems) ? json.usageItems.filter(esObjeto) : [];
-  const r: UsoGithub = { computoUsd: 0, minutos: 0, almacenamientoGbHoras: 0, netoUsd: null };
+  const r: UsoGithub = { computoUsd: 0, minutos: 0, almacenamientoGbHoras: 0, netoUsd: null, minutosPublicos: 0, computoPublicoUsd: 0, conRepositorio: false };
   for (const it of items) {
     const producto = String(it.product ?? "");
     const unidad = String(it.unitType ?? "");
     const cantidad = numero(it.grossQuantity) ?? numero(it.quantity) ?? 0;
     const neto = numero(it.netAmount);
+    const repo = nombreRepo(it.repositoryName);
+    if (repo) r.conRepositorio = true;
     if (neto != null) r.netoUsd = (r.netoUsd ?? 0) + neto;
     if (/actions/i.test(producto) && /minute/i.test(unidad)) {
+      const usd = numero(it.grossAmount) ?? cantidad * (numero(it.pricePerUnit) ?? 0);
       r.minutos += cantidad;
-      r.computoUsd += numero(it.grossAmount) ?? cantidad * (numero(it.pricePerUnit) ?? 0);
+      r.computoUsd += usd;
+      if (repo && publicos.has(repo)) {
+        r.minutosPublicos += cantidad;
+        r.computoPublicoUsd += usd;
+      }
     } else if (/(gigabyte|gb).*hour/i.test(unidad)) {
       r.almacenamientoGbHoras += cantidad;
     }
   }
   return r;
+}
+
+/** Visibilidad de un repositorio (`private` de la API); null si no se puede saber. */
+async function repoEsPublico(ctx: ContextoLector, cab: Record<string, string>, cuenta: string, repo: string): Promise<boolean | null> {
+  const r = await pedir(ctx, `https://api.github.com/repos/${encodeURIComponent(cuenta)}/${encodeURIComponent(repo)}`, cab).catch(() => null);
+  return r?.ok && esObjeto(r.json) && typeof r.json.private === "boolean" ? !r.json.private : null;
 }
 
 /** Repositorios cuyas ejecuciones de GitHub Actions se cuentan (06/11/2026). */
@@ -634,26 +825,72 @@ export const leerGithub: Lector = async (ctx) => {
   const anio = ctx.ahora.getUTCFullYear();
   const mes = ctx.ahora.getUTCMonth() + 1;
   const base = `https://api.github.com/users/${encodeURIComponent(cuenta)}/settings/billing/usage`;
-  let r = await pedir(ctx, `${base}/summary?year=${anio}&month=${mes}`, cab);
-  if (r.status === 404) r = await pedir(ctx, `${base}?year=${anio}&month=${mes}`, cab);
-  const uso = r.ok ? resumirUsoGithub(r.json) : null;
 
-  const porRepo = await Promise.all(repos.map((repo) => ejecucionesRepo(ctx, cab, cuenta, repo).catch(() => null)));
+  // Visibilidad de cada repositorio y ejecuciones del mes, en paralelo.
+  const [visibles, porRepo] = await Promise.all([
+    Promise.all(repos.map((repo) => repoEsPublico(ctx, cab, cuenta, repo))),
+    Promise.all(repos.map((repo) => ejecucionesRepo(ctx, cab, cuenta, repo).catch(() => null))),
+  ]);
+  const publicos = new Set(repos.filter((_, i) => visibles[i] === true).map((x) => x.toLowerCase()));
+  const esPublico = (repo: string) => publicos.has(repo.toLowerCase());
+
+  // El informe detallado dice el repositorio de cada línea (para apartar los públicos); si no
+  // está, el resumen del mes.
+  let r: Http | null = await pedir(ctx, `${base}?year=${anio}&month=${mes}`, cab).catch(() => null);
+  let uso = r?.ok && esObjeto(r.json) && Array.isArray(r.json.usageItems) ? resumirUsoGithub(r.json, publicos) : null;
+  if (!uso) {
+    r = await pedir(ctx, `${base}/summary?year=${anio}&month=${mes}`, cab);
+    uso = r.ok ? resumirUsoGithub(r.json, publicos) : null;
+  }
+
   const conAcceso = repos.filter((_, i) => porRepo[i] !== null);
   const ejecuciones = conAcceso.length ? resumirEjecucionesGithub(porRepo.flatMap((e) => e ?? [])) : null;
 
-  if (!uso && !ejecuciones) return rechazoHttp(r.status, { cuenta, permiso_necesario: "Plan (lectura)" });
+  if (!uso && !ejecuciones) return rechazoHttp(r?.status ?? 502, { cuenta, permiso_necesario: "Plan (lectura)" });
 
   const horasMes = Math.max(1, (ctx.ahora.getTime() - inicioMesUtc(ctx.ahora).getTime()) / 3_600_000);
   const metricas: Record<string, Metrica> = {};
   const detalles: Record<string, unknown> = { cuenta };
   const avisos: string[] = [];
+  if (publicos.size) detalles.repos_publicos = repos.filter(esPublico);
+
+  // Minutos de las ejecuciones (estimación) de los repositorios privados y de los públicos.
+  const estimados = (publicosSi: boolean) =>
+    ejecuciones ? conAcceso.filter((x) => esPublico(x) === publicosSi).reduce((t, x) => t + (ejecuciones.porRepo[x]?.minutos ?? 0), 0) : null;
+
+  // Lo que cuenta para los 2.000 minutos incluidos: solo los repositorios privados.
+  let privados: number | null;
+  let publicosMin: number | null;
+  let usdPrivado: number | null = null;
+  let notaMinutos: string;
+  if (uso && (uso.conRepositorio || publicos.size === 0)) {
+    privados = uso.minutos - uso.minutosPublicos;
+    publicosMin = uso.minutosPublicos;
+    usdPrivado = uso.computoUsd - uso.computoPublicoUsd;
+    notaMinutos = "Dato de GitHub.";
+  } else if (uso) {
+    // Resumen sin repositorio por línea y algún repositorio público: los privados, por sus ejecuciones.
+    privados = estimados(false);
+    publicosMin = privados == null ? null : Math.max(0, uso.minutos - privados);
+    usdPrivado = privados == null || uso.minutos <= 0 ? null : (uso.computoUsd / uso.minutos) * privados;
+    notaMinutos = "Estimación con la duración de las ejecuciones de los repositorios privados: el informe de GitHub no separa los públicos.";
+  } else {
+    privados = estimados(false);
+    publicosMin = publicos.size ? estimados(true) : null;
+    notaMinutos = "Estimación con la duración de cada ejecución (GitHub cuenta cada trabajo por separado: el gasto real es algo mayor).";
+  }
+  if (publicos.size) notaMinutos += ` Los repositorios públicos (${repos.filter(esPublico).map((x) => x.replace(/-casatomas$/, "")).join(", ")}) no cuentan: GitHub no cobra sus minutos.`;
 
   if (uso) {
-    metricas.actions_computo = {
-      orden: 1, etiqueta: "Pruebas automáticas (GitHub Actions)", valor: redondear(uso.computoUsd), unidad: "USD", periodo: "mes en curso",
-      nota: `${Math.round(uso.minutos).toLocaleString("es-ES")} minutos este mes (precio de lista, antes de descontar lo incluido).`,
-    };
+    if (usdPrivado != null) {
+      const totalMin = Math.round(uso.minutos).toLocaleString("es-ES");
+      metricas.actions_computo = {
+        orden: 1, etiqueta: "Pruebas automáticas (GitHub Actions)", valor: redondear(Math.max(0, usdPrivado)), unidad: "USD", periodo: "mes en curso",
+        nota: publicosMin
+          ? `Precio de lista de los minutos de repositorios privados. En total, ${totalMin} minutos este mes (${fmtNum(uso.computoUsd)} US$ a precio de lista); los de repositorios públicos son gratis.`
+          : `${totalMin} minutos este mes (precio de lista, antes de descontar lo incluido).`,
+      };
+    }
     metricas.almacenamiento_artefactos = {
       orden: 4, etiqueta: "Almacenamiento de artefactos y paquetes", valor: Math.round((uso.almacenamientoGbHoras / horasMes) * GIB), unidad: "bytes",
       periodo: "media del mes",
@@ -662,12 +899,16 @@ export const leerGithub: Lector = async (ctx) => {
     detalles.permiso_faltante = "Plan (lectura): sin él, los minutos son una estimación y no se ve lo facturado.";
   }
 
-  metricas.actions_minutos = uso
-    ? { orden: 2, etiqueta: "Minutos de Actions", valor: Math.round(uso.minutos), unidad: "minutos", periodo: "mes en curso", nota: "Dato de GitHub." }
-    : {
-      orden: 2, etiqueta: "Minutos de Actions", valor: ejecuciones!.minutosEstimados, unidad: "minutos", periodo: "mes en curso",
-      nota: "Estimación con la duración de cada ejecución (GitHub cuenta cada trabajo por separado: el gasto real es algo mayor).",
+  metricas.actions_minutos = {
+    orden: 2, etiqueta: publicos.size ? "Minutos de Actions en repositorios privados" : "Minutos de Actions",
+    valor: privados == null ? null : Math.round(Math.max(0, privados)), unidad: "minutos", periodo: "mes en curso", nota: notaMinutos,
+  };
+  if (publicosMin != null && (publicos.size || publicosMin > 0)) {
+    metricas.actions_minutos_publicos = {
+      orden: 2.5, etiqueta: "Minutos de Actions en repositorios públicos (gratis)", valor: Math.round(publicosMin), unidad: "minutos", periodo: "mes en curso",
+      nota: "GitHub no cobra los minutos de los repositorios públicos ni los cuenta en los 2.000 incluidos del plan gratuito.",
     };
+  }
 
   if (ejecuciones) {
     // En el orden configurado y con los que no tienen ninguna (0), para comparar de un vistazo.

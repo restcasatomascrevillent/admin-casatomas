@@ -30,11 +30,20 @@
 //   20261106500000, resuelta con el JWT del usuario; con solo «Ver» no se gasta IA).
 // - Clave del proceso «vinos»: OPENAI_API_KEY_VINOS (si falta, OPENAI_API_KEY).
 //
+// - Parker (08/11/2026): además devuelve bodega, cuvee, la añada SOLO si se lee
+//   en la etiqueta (anada; null si no se distingue), sin_anada (espumoso NV),
+//   identificacion_ambigua + motivo_ambiguedad, y las puntuaciones impresas
+//   (puntuaciones_etiqueta) con la entidad tal cual se lee y su tipo
+//   (parker / otra / desconocida, _shared/parker.ts). Ninguna se da por Parker:
+//   la puntuación la busca después el panel con buscar-puntuacion-parker.
+//
 // Body: { imagen: "<base64 JPEG, con o sin prefijo data:>", categorias?: string[] }
 // Respuesta: { ok: true, vino: {nombre, categoria, descripcion, ingredientes,
 //   denominacion_origen, ubicacion_region, ubicacion_pais, contiene_sulfitos,
 //   precio_sugerido, precio_razon, precio_mercado, precio_mercado_fuentes:
-//   {tienda,url,precio}[], recorte} } | { ok: false, error }
+//   {tienda,url,precio}[], recorte, bodega, cuvee, anada, sin_anada,
+//   identificacion_ambigua, motivo_ambiguedad, puntuaciones_etiqueta:
+//   {texto,puntos,entidad,entidad_tipo,anada}[]} } | { ok: false, error }
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { claveOpenAI } from "../_shared/clave-openai.ts";
@@ -44,6 +53,7 @@ import { comprobarPermisoSeccion, type ClientePermiso } from "../_shared/permiso
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { ejemplosUbicacion, elegirRegion, type UbicacionCarta } from "../_shared/ubicacion-vino.ts";
 import { motivoErrorOpenAI } from "../_shared/error-openai.ts";
+import { limpiarPuntuacionesEtiqueta } from "../_shared/parker.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -219,6 +229,12 @@ function buildSystem(categorias: string[], resumenCat: string[], nombres: string
     "- contiene_sulfitos: true solo si la etiqueta dice 'contiene sulfitos'/'contains sulphites'.",
     "- categoria: OBLIGATORIO elegir una de la lista exacta según tipo + D.O. + uva. Si es un blanco de una D.O. sin categoría propia → la de 'OTRAS DENOMINACIONES' del mismo tipo. Solo null si no es posible saber ni el tipo de vino.",
     ...(categorias.length ? ["  Categorías de la carta:", ...resumenCat] : ["  No hay categorías: categoria = null."]),
+    "- bodega: nombre de la bodega o productor tal como se lee (sin 'Bodegas' si no forma parte del nombre); null si no se lee.",
+    "- cuvee: cuvée, variedad o tipo que distingue este vino de otros de la misma bodega ('Cuesta de las Liebres', 'Albariño', 'Reserva', 'Blanc de Blancs'…); null si no hay.",
+    "- anada: año de cosecha SOLO si se lee con claridad en la etiqueta, el collarín o la cápsula (número de 4 cifras). Si no se ve o no estás seguro: null. NUNCA lo deduzcas ni lo adivines.",
+    "- sin_anada: true solo si es un espumoso (Champagne, Cava…) que claramente no lleva añada (NV, Brut sin año, número de edición/saca en vez de año). En cualquier otro caso false.",
+    "- identificacion_ambigua: true si la etiqueta no deja claro cuál de los vinos de la bodega es (p. ej. solo se ve el nombre de la bodega, o la bodega tiene varios vinos con ese nombre). motivo_ambiguedad: una frase breve; null si no es ambigua.",
+    "- puntuaciones_etiqueta: puntuaciones o medallas IMPRESAS en la botella (pegatinas, collarín). Para cada una: texto literal, puntos (número o null), entidad tal como se lee ('Robert Parker', 'Guía Peñín', 'James Suckling'…; null si no se lee) y anada a la que se refiere si lo dice (null si no). No inventes la entidad: si no se lee, null. Lista vacía si no hay.",
     "- recorte: caja que encierra la botella completa (incluida la cápsula) en coordenadas normalizadas 0-1 sobre la imagen recibida: x,y = esquina superior izquierda, w,h = ancho y alto. Deja un pequeño margen. null si no hay una botella clara.",
     "- descripcion: ver REGLAS DE LA DESCRIPCIÓN.",
     "Nombre, D.O. y sulfitos: solo lo que se lea con claridad o se deduzca con seguridad. Nunca incluyas precio.",
@@ -249,6 +265,7 @@ function schemaLectura(categorias: string[]) {
         required: [
           "nombre", "categoria", "descripcion", "ingredientes", "denominacion_origen",
           "ubicacion_region", "ubicacion_pais", "contiene_sulfitos", "recorte",
+          "bodega", "cuvee", "anada", "sin_anada", "identificacion_ambigua", "motivo_ambiguedad", "puntuaciones_etiqueta",
         ],
         properties: {
           nombre: texto,
@@ -259,6 +276,26 @@ function schemaLectura(categorias: string[]) {
           ubicacion_region: texto,
           ubicacion_pais: texto,
           contiene_sulfitos: { type: "boolean" },
+          bodega: texto,
+          cuvee: texto,
+          anada: { type: ["integer", "null"] },
+          sin_anada: { type: "boolean" },
+          identificacion_ambigua: { type: "boolean" },
+          motivo_ambiguedad: texto,
+          puntuaciones_etiqueta: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["texto", "puntos", "entidad", "anada"],
+              properties: {
+                texto: { type: "string" },
+                puntos: { type: ["number", "null"] },
+                entidad: { type: ["string", "null"] },
+                anada: { type: ["integer", "null"] },
+              },
+            },
+          },
           recorte: {
             anyOf: [
               {
@@ -662,6 +699,29 @@ async function buscarFichaMercado(
   }
 }
 
+/**
+ * Lo que el panel necesita para buscar la puntuación Parker: añada solo si se
+ * leyó (nunca adivinada), NV, ambigüedad y puntuaciones impresas clasificadas.
+ */
+export function datosParker(raw: Record<string, unknown>) {
+  const anioActual = new Date().getFullYear();
+  const sinAnada = raw.sin_anada === true;
+  const anada =
+    !sinAnada && typeof raw.anada === "number" && Number.isInteger(raw.anada) && raw.anada >= 1900 && raw.anada <= anioActual
+      ? raw.anada
+      : null;
+  const ambigua = raw.identificacion_ambigua === true;
+  return {
+    bodega: textoONull(raw.bodega, 120),
+    cuvee: textoONull(raw.cuvee, 120),
+    anada,
+    sin_anada: sinAnada,
+    identificacion_ambigua: ambigua,
+    motivo_ambiguedad: ambigua ? textoONull(raw.motivo_ambiguedad, 200) : null,
+    puntuaciones_etiqueta: limpiarPuntuacionesEtiqueta(raw.puntuaciones_etiqueta),
+  };
+}
+
 serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -717,7 +777,7 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   try {
     const raw = await llamarOpenAI({
       temperature: 0.3,
-      max_tokens: 800,
+      max_tokens: 1000,
       response_format: schemaLectura(categorias),
       messages: [
         {
@@ -747,6 +807,7 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
     const categoria = textoONull(raw.categoria, 100);
     vino.categoria = categoria && categorias.includes(categoria) ? categoria : null;
     vino.contiene_sulfitos = raw.contiene_sulfitos === true;
+    Object.assign(vino, datosParker(raw));
 
     // Búsqueda web (precio de tienda + ficha). Si falla, se sigue sin ella.
     const mercado = await buscarFichaMercado(vino, ejemplosTono(carta), usoBusqueda, usoLlamadasBusqueda);

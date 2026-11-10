@@ -242,7 +242,7 @@ proveedor + número). Coste orientativo: ~11 k tokens de subagente por PDF.
 ## 7. Estado actual y pasos a producción
 
 **Producción** (`main`) está en el PR #21 (04/11/2026). Todo lo de Facturas posterior está solo en la
-**demo**. Cuando el dueño acepte el PR `staging → main` y diga «sí», en este orden:
+**demo**. Cuando el dueño acepte el PR de la release que lo incluya y diga «sí», en este orden:
 
 **A. Migraciones** (orden numérico; todas en la demo):
 

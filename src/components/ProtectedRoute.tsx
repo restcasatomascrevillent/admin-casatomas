@@ -20,8 +20,9 @@ const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   "/reservas": "reservas",
   // "/trabajadores" ya no requiere permiso: la ruta solo redirige a "/".
   "/marketing": "marketing",
-  // Instagram: sección propia del menú, mismo permiso que Newsletter. La
-  // agencia (Oficiosos, «instagram_agencia») entra solo a la pestaña Encargos.
+  // RRSS (antes Instagram): mismo permiso que Newsletter. La agencia
+  // (Oficiosos, «instagram_agencia») entra solo a Instagram › Encargos.
+  "/rrss": ["marketing", "instagram_agencia"],
   "/instagram": ["marketing", "instagram_agencia"],
   "/tienda": "tienda",
   // «Facturas · Subida» (06/11/2026) entra también, solo a la pestaña Cargar.
@@ -47,13 +48,17 @@ const DESTINOS_RECHAZO: { ruta: string; secciones: SectionKey[] }[] = [
   { ruta: "/cheques", secciones: ["cheques"] },
   { ruta: "/tienda", secciones: ["tienda"] },
   { ruta: "/facturas", secciones: ["facturas", "facturas_subida"] },
-  { ruta: "/instagram", secciones: ["instagram_agencia"] },
+  { ruta: "/rrss", secciones: ["instagram_agencia"] },
 ];
 
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
-  const { isAdmin, permissions, loading: roleLoading } = useUserRole();
-  const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
+  const { isAdmin, permissions, loading: roleLoading, verificado: rolVerificado = true } = useUserRole();
+  const { isSuperAdmin, loading: superAdminLoading, verificado: superVerificado = true } = useSuperAdmin();
+  // Rol y permisos pueden venir de lo recordado en el dispositivo (09/11/2026, `lib/cachePermisos.ts`):
+  // sirven para DEJAR PASAR al momento, pero no para echar a nadie hasta confirmarlos con el servidor
+  // (un permiso recién dado no estaría en la copia).
+  const verificado = rolVerificado && superVerificado;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -100,10 +105,10 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
     const puedeVer = sectionKeys.some(
       (key) => permissions.find((p) => p.section_key === key)?.can_view,
     );
-    if (!puedeVer) {
+    if (!puedeVer && verificado) {
       rechazar();
     }
-  }, [user, loading, isAdmin, isSuperAdmin, permissions, location.pathname, location.key, requiredSection, navigate]);
+  }, [user, loading, verificado, isAdmin, isSuperAdmin, permissions, location.pathname, location.key, requiredSection, navigate]);
 
   if (loading) {
     return (
@@ -119,6 +124,13 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
 
   const required = requiredSection ?? ROUTE_TO_SECTION[location.pathname];
   const keys = Array.isArray(required) ? required : required ? [required] : [];
-  if (!isSuperAdmin && keys.length && !keys.some(key => permissions.some(p => p.section_key === key && p.can_view))) return null;
+  if (!isSuperAdmin && keys.length && !keys.some(key => permissions.some(p => p.section_key === key && p.can_view))) {
+    // Sin permiso según lo recordado: se espera a la lectura del servidor antes de decidir.
+    return verificado ? null : (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
   return <>{children}</>;
 };

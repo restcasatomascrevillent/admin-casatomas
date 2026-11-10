@@ -244,7 +244,7 @@ describe("Encargos · agencia", () => {
 
 describe("Avisos y calendario", () => {
   it("la campana lleva a la ficha del encargo", () => {
-    expect(rutaDeAviso({ tipo: "instagram_encargo", referencia_tipo: "instagram_encargo", referencia_id: ID_REV })).toBe(`/instagram?tab=encargos&encargo=${ID_REV}`);
+    expect(rutaDeAviso({ tipo: "instagram_encargo", referencia_tipo: "instagram_encargo", referencia_id: ID_REV })).toBe(`/rrss?red=instagram&tab=encargos&encargo=${ID_REV}`);
   });
 
   it("un fallo del push no rompe nada", async () => {

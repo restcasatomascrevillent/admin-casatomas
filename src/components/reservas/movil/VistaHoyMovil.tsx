@@ -71,6 +71,7 @@ import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useAlDiaMovil } from "@/hooks/useAlDiaMovil";
 import { useSalaCerradaServicio } from "@/hooks/useSalaCerradaServicio";
+import { eventosDelTurno, textoEvento, useSalasEvento, type SalaCerradaEvento } from "@/hooks/useSalaEvento";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { deshacerSinReserva, useSentarSinReserva } from "@/hooks/useSentarSinReserva";
 import {
@@ -228,6 +229,9 @@ export function VistaHoyMovil({
       : filtroTurno;
   const terraza = salas.find((s) => /terraza/i.test(s.nombre)) ?? null;
   const cierre = useSalaCerradaServicio(terraza?.id ?? null, fecha, turno);
+  // «Evento: sala entera» (20261119100000): esas salas salen como «Evento: <nombre>».
+  const { data: eventosDia } = useSalasEvento(fecha);
+  const salasEvento = useMemo(() => eventosDelTurno(eventosDia, fecha, turno), [eventosDia, fecha, turno]);
 
   const mesasDe = useMemo(() => {
     const mapa = new Map<string, string[]>();
@@ -413,6 +417,7 @@ export function VistaHoyMovil({
             reservas={reservas}
             turno={turno}
             terrazaCerradaId={cierre.cerrada ? (terraza?.id ?? null) : null}
+            salasEvento={salasEvento}
             onLibre={(mesa, prevista) => setMesaLibre({ mesa, prevista })}
             onOcupada={(id) => abrirFicha(id)}
           />
@@ -666,6 +671,7 @@ function CuadriculaMesas({
   reservas,
   turno,
   terrazaCerradaId,
+  salasEvento,
   onLibre,
   onOcupada,
 }: {
@@ -676,6 +682,8 @@ function CuadriculaMesas({
   reservas: ReservaMovil[];
   turno: TurnoServicio;
   terrazaCerradaId: string | null;
+  /** «Evento: sala entera» (20261119100000): salas de un evento en este turno. */
+  salasEvento?: ReadonlyMap<string, SalaCerradaEvento>;
   /** Libre o solo prevista para alguien que no ha llegado: sentar aquí. */
   onLibre: (m: MesaOpcion, prevista: PrevistaMesa | null) => void;
   onOcupada: (reservaId: string) => void;
@@ -719,15 +727,25 @@ function CuadriculaMesas({
       {porSala
         .filter((s) => s.casillas.length > 0)
         .map(({ sala, casillas }) => {
-          const cerrada = sala.id === terrazaCerradaId;
+          const evento = salasEvento?.get(sala.id) ?? null;
+          const cerrada = sala.id === terrazaCerradaId || !!evento;
           const libres = casillas.filter((c) => !estados.has(c.opcion.id)).length;
           return (
             <section key={sala.id} aria-label={sala.nombre}>
-              <h3 className="mb-1 flex items-center justify-between px-1 text-sm font-semibold">
+              <h3 className="mb-1 flex items-center justify-between gap-2 px-1 text-sm font-semibold">
                 <span>{sala.nombre}</span>
-                <span className="text-xs font-normal text-muted-foreground">
-                  {cerrada ? "Cerrada en este servicio" : `${libres} libres de ${casillas.length}`}
-                </span>
+                {evento ? (
+                  <span
+                    className="min-w-0 truncate rounded bg-violet-100 px-1.5 py-0.5 text-xs font-semibold text-violet-900 dark:bg-violet-900/40 dark:text-violet-100"
+                    data-testid="movil-evento-sala"
+                  >
+                    {textoEvento(evento)}
+                  </span>
+                ) : (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {cerrada ? "Cerrada en este servicio" : `${libres} libres de ${casillas.length}`}
+                  </span>
+                )}
               </h3>
               {!cerrada && (
                 <div className="grid grid-cols-3 gap-2">
@@ -807,6 +825,31 @@ function CasillaMesa({
   );
 }
 
+// ─── Leyenda de colores (vista Mesas) ─────────────────────────────────────────
+// Pedida por el dueño el 08/11/2026: en el móvil no se sabía qué era cada color. Mismos colores que `CasillaMesa`.
+const LEYENDA_MOVIL = [
+  { texto: "Libre", clase: "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" },
+  { texto: "Reservada", clase: "border-sky-500 bg-sky-50 dark:bg-sky-950/40" },
+  { texto: "Sentada", clase: "border-amber-500 bg-amber-50 dark:bg-amber-950/40" },
+] as const;
+
+export function LeyendaMesasMovil() {
+  return (
+    <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1 text-xs text-muted-foreground" aria-label="Leyenda de colores de las mesas" data-testid="leyenda-mesas-movil">
+      {LEYENDA_MOVIL.map((l) => (
+        <li key={l.texto} className="flex items-center gap-1">
+          <span className={cn("inline-block h-3.5 w-3.5 rounded border-2", l.clase)} aria-hidden="true" />
+          {l.texto}
+        </li>
+      ))}
+      <li className="flex items-center gap-1">
+        <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+        Fijada
+      </li>
+    </ul>
+  );
+}
+
 // ─── «Recalcular mesas» (vista Mesas) ────────────────────────────────────────
 
 /**
@@ -876,8 +919,9 @@ function RecalcularMesasMovil({
 
   if (!propuesta) {
     return (
-      <div className="flex justify-end px-2 pt-2">
-        <Button variant="ghost" size="sm" className="h-11 text-muted-foreground" onClick={calcular}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 px-2 pt-2">
+        <LeyendaMesasMovil />
+        <Button variant="ghost" size="sm" className="ml-auto h-11 text-muted-foreground" onClick={calcular}>
           <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden="true" />
           Recalcular mesas
         </Button>
