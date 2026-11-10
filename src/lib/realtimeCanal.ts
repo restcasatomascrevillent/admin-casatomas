@@ -5,7 +5,8 @@ import type { REALTIME_SUBSCRIBE_STATES } from "@supabase/supabase-js";
 // ----------------------------------------------------------------------------
 // Módulo sin React ni Supabase (solo tipos). Lo usan los hooks que escuchan
 // `postgres_changes`: campana, solicitudes, «Hoy»/Calendario
-// (`useReservasEnVivo`), rejilla de salas, modo servicio y Asignación.
+// (`useReservasEnVivo`), Lista (`useListaReservasEnVivo`), rejilla de salas,
+// modo servicio y Asignación.
 //
 // NOMBRE ÚNICO POR SUSCRIPCIÓN. realtime-js (2.81) devuelve el MISMO canal si
 // ya hay uno ABIERTO con ese nombre. Con dos instancias del mismo hook a la vez

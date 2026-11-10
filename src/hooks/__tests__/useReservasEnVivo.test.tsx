@@ -6,7 +6,7 @@
  *   · INVALIDACIÓN DIFERIDA: una ráfaga corta = UNA invalidación, 1 s después del último evento;
  *     con eventos sin parar (la demo: 861 altas en un minuto) una cada 5 s como mucho, no 861;
  *   · refresca lo de un cambio de ocupación (listas de Hoy, cifras, mes, asignación, mesas…) y NO
- *     la Lista (`reservas-lista`, que renuncia a realtime a propósito);
+ *     la Lista (`reservas-lista`, que tiene su propio canal: `useListaReservasEnVivo`);
  *   · al reconectar (SUBSCRIBED a partir del segundo) relee: Realtime no reenvía lo perdido;
  *   · al desmontar quita sus canales, cancela una invalidación pendiente y no avisa de su CLOSED
  *     (el doble lo emite dentro de `removeChannel`, como realtime-js);
