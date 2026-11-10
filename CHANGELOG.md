@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.12.0] - 2026-11-10
+
+Objetivo: Carta impresa: un plato por línea, cada sección en sus páginas y alineación a elegir
+
+### Añadido
+- Carta impresa: un plato por línea, secciones en varias páginas y alineación a elegir ([#58](https://github.com/restcasatomascrevillent/admin-casatomas/pull/58))
+
 ## [1.11.0] - 2026-11-10
 
 Objetivo: Panel sin el aviso flotante «Instalar app» en el móvil
