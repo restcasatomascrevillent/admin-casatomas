@@ -25,6 +25,8 @@ import {
   tituloHoja,
   type ReservaInterpretada,
 } from "@/lib/reservas/libroReservas";
+import { useArrastrarHoja } from "@/hooks/useArrastrarHoja";
+import { useDosColumnas } from "@/hooks/useDosColumnas";
 import { LienzoManuscrito, type LienzoManuscritoApi } from "./LienzoManuscrito";
 import { ReservasDeLaHoja } from "./ReservasDeLaHoja";
 
@@ -46,6 +48,18 @@ import { ReservasDeLaHoja } from "./ReservasDeLaHoja";
 // día en grande; debajo se elige «Escribir con lápiz» o «Formulario» (se
 // recuerda en el dispositivo). El formulario no repite su lista del día y, si
 // se le cambia la fecha, la hoja de arriba pasa a ese día.
+//
+// Dos columnas en horizontal (10/11/2026, petición del dueño): con ≥ 1024 px, o
+// tablet en horizontal con ≥ 900 px (`useDosColumnas`), a la izquierda la hoja
+// del día (~40 %) y a la derecha «Apuntar nueva» con el formulario o el lienzo
+// (~60 %), cada una con su scroll y a toda la altura; el formulario va en una
+// sola columna (`formulario-una-columna`, index.css) con su «Crear Reserva»
+// pegado abajo. En vertical, apilado como antes. Los avisos (toasts) salen a la
+// izquierda mientras el diálogo está abierto (`data-dialogo-nueva-reserva`),
+// para no tapar el botón de guardar.
+//
+// Pasar hojas arrastrando (`useArrastrarHoja`) SOLO en la lista de la hoja,
+// nunca en el lienzo de escribir.
 // ============================================================================
 
 type ModoApunte = "lapiz" | "formulario";
@@ -64,6 +78,10 @@ const PAPEL = "bg-[#fbf6e9] text-stone-800";
 interface Props {
   /** Solo «Reservas · Crear»: el alta sin «Ocupa la sala entera» (como «Nueva Reserva»). */
   soloCrear?: boolean;
+  /** "yyyy-MM-dd": el libro se abre en esa hoja y el formulario con ese día (desde «Añadir reserva a este día»). */
+  fechaInicial?: string | null;
+  /** Al crear una reserva (por formulario o lápiz). */
+  onReservaCreada?: (reserva: { id: string; fecha: string }) => void;
 }
 
 function fechaCorta(clave: string): string {
@@ -108,14 +126,15 @@ function PorPasarALimpio({
   );
 }
 
-export function LibroReservas({ soloCrear = false }: Props) {
+export function LibroReservas({ soloCrear = false, fechaInicial = null, onReservaCreada }: Props) {
   const queryClient = useQueryClient();
   const { data: espaciosData } = useEspaciosReserva();
   const espacios = useMemo(
     () => ((espaciosData ?? []) as Array<{ id: string; nombre: string; activa?: boolean }>).filter((e) => e.activa !== false),
     [espaciosData],
   );
-  const [fecha, setFecha] = useState(() => claveDia(new Date()));
+  const [fecha, setFecha] = useState(() => fechaInicial ?? claveDia(new Date()));
+  const dosColumnas = useDosColumnas();
   const [calendarioAbierto, setCalendarioAbierto] = useState(false);
   const [trazos, setTrazos] = useState(0);
   const [interpretando, setInterpretando] = useState(false);
@@ -153,6 +172,11 @@ export function LibroReservas({ soloCrear = false }: Props) {
   const irA = (clave: string) => {
     setFecha(clave);
     setResaltada(null);
+  };
+  // Arrastrar con el dedo en la LISTA de la hoja (no en el lienzo): a la izquierda, día siguiente.
+  const { manejadores: arrastre, desplazamiento } = useArrastrarHoja((delta) => irA(pasarHoja(fecha, delta)));
+  const avisarCreada = (creada: { id?: string | null; fecha?: string | null } | null | undefined) => {
+    if (creada?.id && creada.fecha) onReservaCreada?.({ id: creada.id, fecha: creada.fecha });
   };
 
   const nuevaReserva = () => {
@@ -211,7 +235,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col" data-dialogo-nueva-reserva="">
       {/* Cabecera: pasar hojas */}
       <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2 pr-12">
         <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label="Día anterior" onClick={() => irA(pasarHoja(fecha, -1))}>
@@ -267,8 +291,22 @@ export function LibroReservas({ soloCrear = false }: Props) {
       </div>
 
       {/* Hoja: lo apuntado + renglón para escribir */}
-      <div className={cn("flex min-h-0 flex-1 flex-col", PAPEL, revisando && "hidden")}>
-        <div className="min-h-[22dvh] flex-1 overflow-y-auto overscroll-contain border-l-4 border-rose-300/70 px-6 py-4">
+      <div
+        className={cn("flex min-h-0 flex-1", dosColumnas ? "flex-row" : "flex-col", PAPEL, revisando && "hidden")}
+        data-columnas={dosColumnas ? "2" : "1"}
+      >
+        <div
+          className={cn(
+            "min-h-[22dvh] touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain border-l-4 border-rose-300/70 px-6 py-5",
+            dosColumnas ? "w-2/5 shrink-0 border-r border-r-stone-300" : "flex-1",
+          )}
+          data-testid="lista-hoja-libro"
+          {...arrastre}
+        >
+          <div
+            style={desplazamiento ? { transform: `translateX(${desplazamiento}px)` } : undefined}
+            className={cn(!desplazamiento && "transition-transform duration-200")}
+          >
           <PorPasarALimpio
             borradores={pendientesHoja}
             ocupado={interpretando || resolverBorrador.isPending}
@@ -276,8 +314,15 @@ export function LibroReservas({ soloCrear = false }: Props) {
             onDescartar={descartarBorrador}
           />
           <ReservasDeLaHoja fecha={fecha} resaltada={resaltada} />
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 border-t-2 border-dashed border-stone-300 px-6 pt-2">
+        <div className={cn("flex min-h-0 flex-col", dosColumnas && "min-w-0 flex-1")} data-testid="columna-apuntar">
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-3 px-6",
+            dosColumnas ? "border-b border-stone-300 py-4" : "border-t-2 border-dashed border-stone-300 pt-3",
+          )}
+        >
           <span className="text-base font-semibold text-stone-600">Apuntar nueva:</span>
           <div role="group" aria-label="Cómo apuntarla" className="inline-flex rounded-lg border-2 border-stone-700/70 bg-white p-0.5">
             <Button
@@ -303,8 +348,13 @@ export function LibroReservas({ soloCrear = false }: Props) {
           </div>
         </div>
         {modo === "formulario" ? (
-          <div className="max-h-[58dvh] overflow-y-auto overscroll-contain bg-background px-4 pb-4 pt-3 text-foreground sm:px-6">
-            <div className="mx-auto max-w-4xl">
+          <div
+            className={cn(
+              "overflow-y-auto overscroll-contain bg-background px-6 pb-6 pt-4 text-foreground",
+              dosColumnas ? "formulario-una-columna min-h-0 flex-1" : "max-h-[58dvh]",
+            )}
+          >
+            <div className={cn("mx-auto", dosColumnas ? "max-w-2xl" : "max-w-4xl")}>
               <FormularioReserva
                 key={altaFormulario}
                 datosPreseleccionados={datosFormulario}
@@ -318,13 +368,14 @@ export function LibroReservas({ soloCrear = false }: Props) {
                   if (creada?.fecha) setFecha(creada.fecha);
                   setResaltada(creada?.id ?? null);
                   setAltaFormulario((n) => n + 1);
+                  avisarCreada(creada);
                 }}
               />
             </div>
           </div>
         ) : (
-        <div className="px-6 pb-3 pt-2">
-          <p className="mb-1 text-base text-stone-500">
+        <div className={cn("px-6 pb-4 pt-3", dosColumnas && "min-h-0 flex-1 overflow-y-auto overscroll-contain")}>
+          <p className="mb-2 text-base text-stone-500">
             Escribe la reserva con el lápiz, p. ej. <span className="font-medium">«Esther 2px salón 14:15»</span>. Sin fecha, se apunta el {fechaCorta(fecha)}.
           </p>
           <div className="h-[clamp(11rem,32dvh,20rem)] overflow-hidden rounded-md border border-stone-300 bg-white/70">
@@ -368,6 +419,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
           )}
         </div>
         )}
+        </div>
       </div>
 
       {/* Vista previa: el trazo al lado del alta manual prellenada */}
@@ -416,6 +468,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
                 nuevaReserva();
                 if (creada?.fecha) setFecha(creada.fecha);
                 setResaltada(creada?.id ?? null);
+                avisarCreada(creada);
               }}
             />
           </div>

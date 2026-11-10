@@ -75,6 +75,7 @@ import { SolicitudCard, MOTIVO_LABELS, ESTADO_LABELS } from "./GestionSolicitude
 import { FormularioReserva, type ReservaCreadaDesdeFormulario } from "./FormularioReserva";
 import { SolicitudGestionPanel } from "./SolicitudGestionPanel";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { telefonoEnGrupos } from "@/lib/reservas/telefono";
 import { DialogoAccionReserva, type AccionDialogo } from "./DialogoAccionReserva";
 import { useListaReservasEnVivo } from "@/hooks/useListaReservasEnVivo";
 import { EstadoPropuestaBadge } from "./EstadoPropuestaBadge";
@@ -242,9 +243,15 @@ function etiquetaPropuestaCorta(vista: EstadoPropuestaVista, enviadaAt: string |
 // solo 38: el nombre se ve con «…», pero sin scroll horizontal (el menú, en esa
 // anchura, arranca plegado a iconos).
 // 10/11/2026: casilla 24 + principal 136 + «Más» ~82 + huecos 2×8 + relleno 16 + borde 1 = 275 → 280.
-// Acciones: relleno 32 + casilla 24 + principal 152 + «Más» ~96 + huecos 2×12 + borde 1 = 329 → 336.
-const ANCHO_ACCIONES = "w-[336px]";
-const ANCHO_FECHA = "w-[120px]";
+// Acciones al ancho JUSTO (10/11/2026, petición del dueño: la columna era enorme y vacía con «Más» tras un hueco):
+//   · con alguna acción principal en la página: relleno 32 + casilla 24 + principal 152 + «Más» ~100 + huecos 2×12
+//     + borde 1 = 333 → 336;
+//   · sin ninguna (todas confirmadas, p. ej.): relleno 32 + casilla 24 + «Más» ~100 + hueco 12 + borde 1 = 169 → 176.
+// Sin hueco reservado: en una fila sin acción principal, «Más» va justo detrás de la casilla. Lo que sobra es de Cliente.
+const ANCHO_ACCIONES_CON_PRINCIPAL = "w-[336px]";
+const ANCHO_ACCIONES_SOLO_MAS = "w-[176px]";
+// «Fecha y hora» en una línea en la cabecera: 92 px de texto + 32 de relleno.
+const ANCHO_FECHA = "w-[136px]";
 /** Envoltorio del nombre: ocupa lo que le deje la celda, ni más ni menos. */
 const ANCHO_NOMBRE = "min-w-0 flex-1";
 const ANCHO_PAX = "w-[84px]";
@@ -282,10 +289,13 @@ const FONDOS = {
  */
 function CeldaAcciones({
   fondo,
+  ancho,
   franja = false,
   children,
 }: {
   fondo: string;
+  /** `ANCHO_ACCIONES_CON_PRINCIPAL` o `ANCHO_ACCIONES_SOLO_MAS`, el mismo que la cabecera. */
+  ancho: string;
   /** Franja ámbar de "esto es una solicitud, no una reserva". */
   franja?: boolean;
   children: ReactNode;
@@ -296,7 +306,7 @@ function CeldaAcciones({
         // Relleno propio, más apretado que `CELDA`: esta columna es la más
         // ancha de todas y sus 6 ranuras no cambian de tamaño con la pantalla.
         "px-4 py-3 align-middle",
-        ANCHO_ACCIONES,
+        ancho,
         "sticky left-0 z-10 border-r border-border/60",
         // La franja va como sombra interior y NO como `border-l-4` en la fila:
         // con `border-collapse`, un borde de verdad empuja el contenido 2 px y
@@ -836,6 +846,11 @@ export function ListaReservasAvanzada({
   // La barra de "N solicitudes seleccionadas" va DENTRO del bloque de la lista, encima de la tabla: al
   // aparecer, la tabla encoge por dentro y el alto del bloque no cambia (nada que volver a medir).
   const barraSeleccionVisible = canEdit && seleccionadas.size > 0;
+  // ¿Alguna fila de la página tiene acción principal? Si no, la columna de acciones se queda al ancho de «Más».
+  const hayAccionPrincipal = filasPagina.some((f) =>
+    f.tipo === "solicitud" ? esSolicitudAbierta(f.solicitud.estado) : f.reserva.estado === "pendiente" || f.reserva.estado === "verificada",
+  );
+  const anchoAcciones = hayAccionPrincipal ? ANCHO_ACCIONES_CON_PRINCIPAL : ANCHO_ACCIONES_SOLO_MAS;
 
   // Al cambiar cualquier filtro se vuelve a la primera página (si no, filtrar desde la página 7 dejaba la
   // lista en blanco) y las filas vuelven arriba: los resultados nuevos se ven desde el principio. SOLO al
@@ -1279,7 +1294,7 @@ export function ListaReservasAvanzada({
                   {canEdit && (
                     <TableHead
                       aria-label="Acciones"
-                      className={cn("sticky left-0 z-30 h-12 border-r border-border/60 bg-card", ANCHO_ACCIONES, CELDA)}
+                      className={cn("sticky left-0 z-30 h-12 border-r border-border/60 bg-card", anchoAcciones, CELDA)}
                     >
                       <RanuraSeleccion>
                         <Checkbox
@@ -1292,7 +1307,7 @@ export function ListaReservasAvanzada({
                     </TableHead>
                   )}
                   <TableHead className={cn("h-12 bg-card text-base", ANCHO_FECHA, CELDA)}>
-                    Fecha<span className="hidden xl:inline"> y hora</span>
+                    <span className="whitespace-nowrap">Fecha y hora</span>
                   </TableHead>
                   {/* Cliente SIN ancho: en una tabla `table-fixed` se queda con lo que dejan las demás. */}
                   <TableHead className={cn("h-12 bg-card text-base", CELDA)}>Cliente</TableHead>
@@ -1312,6 +1327,7 @@ export function ListaReservasAvanzada({
                     <FilaSolicitud
                       key={fila.id}
                       solicitud={fila.solicitud}
+                      anchoAcciones={anchoAcciones}
                       canEdit={canEdit}
                       onConvertir={() => abrirConversion(fila.solicitud)}
                       onGestionar={() => setSolicitudGestionId(fila.solicitud.id)}
@@ -1333,7 +1349,7 @@ export function ListaReservasAvanzada({
                           que no aplica va deshabilitado, nunca se quita. Sin
                           permiso de edición no hay columna (06/11/2026). */}
                       {canEdit && (
-                        <CeldaAcciones fondo={fondo.acciones}>
+                        <CeldaAcciones fondo={fondo.acciones} ancho={anchoAcciones}>
                           <AccionesReserva
                             variante="fila"
                             reserva={reservation}
@@ -1355,14 +1371,14 @@ export function ListaReservasAvanzada({
                           <EstrellaImportante reserva={reservation} canEdit={canEdit} variante="fila" onClick={al.importante} />
                           <div className={cn(ANCHO_NOMBRE, "space-y-1")}>
                             <div className="flex min-w-0 items-center gap-2">
-                              <p className="truncate text-xl font-semibold leading-tight" title={nombre}>{nombre}</p>
+                              <p className="min-w-0 break-words text-xl font-semibold leading-tight" title={nombre}>{nombre}</p>
                               <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} className="hidden px-2 py-0.5 text-sm xl:inline-flex" />
                               <InsigniaMenuCerrado reserva={reservation as { menu_cerrado?: boolean | null; menu_precio?: number | string | null }} className="hidden px-2 py-0.5 text-sm xl:inline-flex" />
                               <InsigniaZona reserva={reservation as { zona_preferida?: string | null }} className="hidden px-2 py-0.5 text-sm xl:inline-flex" />
                             </div>
                             {reservation.telefono && (
-                              <p className="truncate text-base leading-tight text-muted-foreground" title={reservation.telefono}>
-                                {reservation.telefono}
+                              <p className="whitespace-nowrap text-base leading-tight text-muted-foreground tabular-nums" title={reservation.telefono}>
+                                {telefonoEnGrupos(reservation.telefono)}
                               </p>
                             )}
                           </div>
@@ -1594,11 +1610,13 @@ export function ListaReservasAvanzada({
 /** Fila de la tabla (escritorio) para una solicitud pendiente del bot. */
 function FilaSolicitud({
   solicitud,
+  anchoAcciones,
   canEdit,
   onConvertir,
   onGestionar,
 }: {
   solicitud: SolicitudPendiente;
+  anchoAcciones: string;
   canEdit: boolean;
   onConvertir: () => void;
   onGestionar: () => void;
@@ -1637,7 +1655,7 @@ function FilaSolicitud({
           deshabilitado, no desaparece. Sin permiso de edición, ni la columna
           (06/11/2026: solo «Ver» no gestiona solicitudes). */}
       {canEdit && (
-        <CeldaAcciones franja fondo={FONDOS.destacada.acciones}>
+        <CeldaAcciones franja fondo={FONDOS.destacada.acciones} ancho={anchoAcciones}>
           <RanurasDeAcciones
             seleccion={null}
             principal={{
@@ -1667,15 +1685,15 @@ function FilaSolicitud({
       <TableCell className={CELDA}>
         <div className={ANCHO_NOMBRE}>
           <div className="flex min-w-0 items-center gap-1.5">
-            <p className="truncate font-medium leading-tight" title={nombre}>{nombre}</p>
+            <p className="min-w-0 break-words text-xl font-semibold leading-tight" title={nombre}>{nombre}</p>
           </div>
           {solicitud.telefono && (
             <a
               href={`tel:${solicitud.telefono}`}
               title={solicitud.telefono}
-              className="block truncate text-sm leading-tight text-muted-foreground hover:underline"
+              className="mt-1 block whitespace-nowrap text-base leading-tight text-muted-foreground tabular-nums hover:underline"
             >
-              {solicitud.telefono}
+              {telefonoEnGrupos(solicitud.telefono)}
             </a>
           )}
         </div>
