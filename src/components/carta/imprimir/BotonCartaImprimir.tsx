@@ -16,8 +16,8 @@ interface Props {
 /**
  * «PDF Carta» (carta para imprimir en A5/A4) en la barra de acciones de Gestor Web › Carta
  * — texto corto a petición del dueño (05/11/2026: «el botón es muy grande») —
- * (platos y vinos). Solo lee la carta: lo ve quien ve la pestaña (permiso
- * «Gestor Web · Carta»), como el resto de la pestaña.
+ * (platos y vinos). Solo lee la carta, pero desde el 10/11/2026 (petición del dueño) solo lo
+ * ve quien tiene «Editar» en «Gestor Web · Carta» o es super admin: lo decide TabCarta.
  */
 export function BotonCartaImprimir({ tipo, platos, vinos, className }: Props) {
   const [abierto, setAbierto] = useState(false);

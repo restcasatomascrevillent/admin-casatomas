@@ -100,10 +100,12 @@ describe("Pestañas según el permiso (06/11/2026)", () => {
   beforeEach(() => { mock.plantillaError = null; mock.rpc.mockReset(); mock.edit = true; mock.rpc.mockResolvedValue({ data: valido, error: null }); });
   const pestanas = () => screen.getAllByRole("tab").map((t) => t.textContent?.trim());
 
-  it("con solo «Ver»: expedición, verificar y Stripe; sin compra manual, configuración ni plantilla, y con la etiqueta «Solo lectura»", async () => {
+  it("con solo «Ver»: expedición y verificar; sin compra manual, configuración, plantilla ni Stripe (10/11/2026), y con la etiqueta «Solo lectura»", async () => {
     mock.edit = false;
     render(<Cheques />);
-    expect(pestanas()).toEqual(["Expedición de tickets", "Verificar cheque", "Stripe"]);
+    expect(pestanas()).toEqual(["Expedición de tickets", "Verificar cheque"]);
+    expect(screen.queryByRole("tab", { name: /Stripe/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Generar informe/ })).toBeNull();
     expect(screen.getByTestId("etiqueta-solo-lectura")).toHaveTextContent("Solo lectura");
     // Ni siquiera montadas (la compra manual iba con `forceMount`).
     expect(screen.queryByText("Personaliza tu factura")).toBeNull();

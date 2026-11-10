@@ -32,9 +32,10 @@ Deno.serve(async (req) => {
   const { data: { user }, error: userError } = await userClient.auth.getUser();
   if (userError || !user) return json({ error: "No autorizado" }, 401);
 
-  // Mismo permiso que el resto de la página: can_read_section('cheques').
-  const { data: puedeVer, error: permError } = await userClient.rpc("can_read_section", { _section: "cheques" });
-  if (permError || !puedeVer) return json({ error: "No tienes permiso para consultar Stripe" }, 403);
+  // La pestaña Stripe es solo para «Editar» en Cheques (o super admin) desde el
+  // 10/11/2026 (migración 20261122164100): antes bastaba con «Ver».
+  const { data: puedeEditar, error: permError } = await userClient.rpc("can_edit_section", { _section: "cheques" });
+  if (permError || !puedeEditar) return json({ error: "No tienes permiso para consultar Stripe: hace falta «Editar» en Cheques" }, 403);
 
   const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
   if (!STRIPE_SECRET_KEY) return json({ configurado: false });

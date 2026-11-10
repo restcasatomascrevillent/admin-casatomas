@@ -173,7 +173,9 @@ export const INFORMES: DefinicionInforme[] = [
     titulo: "Informe de cheques regalo",
     descripcion: "Ventas, canjes, pendiente de canjear, caducidades y comisiones de Stripe del mes, comparado con el anterior.",
     seccion: "cheques",
-    permiso: { tipo: "seccion", seccion: "cheques", nivel: "view" },
+    // «Editar» en Cheques (10/11/2026, petición del dueño): como la pestaña Stripe de la que sale.
+    // La RPC informe_cheques_regalo también lo exige (migración 20261122164100).
+    permiso: { tipo: "seccion", seccion: "cheques", nivel: "edit" },
     periodo: "mes",
     formatos: ["pdf"],
     origen: { etiqueta: "Cheques › Stripe", ruta: "/cheques" },
