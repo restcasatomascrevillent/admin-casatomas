@@ -1,10 +1,12 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, MinusCircle, Search, SearchX, Wine, X, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CheckCircle2, EyeOff, MinusCircle, Search, SearchX, Wine, WifiOff, X, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TiraCifras } from "@/components/panel/TiraCifras";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -30,9 +32,7 @@ import {
   porcentaje,
   precioTienda,
   puedeVenderse,
-  urlTiendaWeb,
 } from "@/lib/tienda";
-import { VERSION_APP } from "@/lib/version";
 import { cn } from "@/lib/utils";
 
 const TODAS = "__todas__";
@@ -66,9 +66,6 @@ interface Props {
   puedeEditar: boolean;
 }
 
-/** `/tienda` de la web del mismo entorno (demo o producción). */
-const URL_TIENDA_WEB = urlTiendaWeb(VERSION_APP.entorno, import.meta.env.VITE_WEB_URL as string | undefined);
-
 /**
  * Tienda › Vinos: los vinos activos de la carta con su precio de carta y el de
  * tienda (con el descuento vigente) y el interruptor «A la venta», que gestiona
@@ -77,13 +74,16 @@ const URL_TIENDA_WEB = urlTiendaWeb(VERSION_APP.entorno, import.meta.env.VITE_WE
  * salen con su motivo y el interruptor bloqueado: se arreglan en Gestor Web ›
  * Carta. La web solo los enseña; se compran en el restaurante.
  *
- * Arriba, fijos: el resumen, los filtros (buscador, categoría y a la venta /
+ * Arriba, fijos: el aviso si la tienda está oculta en la web, la tira de cifras
+ * (a la venta, quitados, sin poder salir y descuento; estilo `TiraCifras` del
+ * panel), los filtros (buscador, categoría y a la venta /
  * fuera, con cuántos hay de cada) y debajo el contador y las acciones sobre los
  * mostrados. Desde 768 px, tabla (vino con su categoría debajo, precios a la
  * derecha con cifras tabulares, el de tienda destacado, y el estado con su
  * interruptor) que hace scroll por dentro con la cabecera pegada arriba cuando
  * Tienda.tsx mide el alto. En el móvil, una tarjeta por vino y scroll de la
- * pestaña entera.
+ * pestaña entera. Sin botón para abrir la tienda de la web (10/11/2026,
+ * petición del dueño: «quitar botón de abrir tienda web»).
  */
 export function VinosTienda({ config, puedeEditar }: Props) {
   const consulta = useVinosTienda();
@@ -125,7 +125,12 @@ export function VinosTienda({ config, puedeEditar }: Props) {
   }, [consulta.data, config, busqueda, categoria, venta]);
 
   const total = consulta.data?.length ?? 0;
-  const aLaVenta = (consulta.data ?? []).filter((v) => motivoNoVendible(v, config) === null).length;
+  // Cifras de la carta entera (no de lo filtrado): a la venta, quitados con el interruptor y los que no pueden salir.
+  const resumen = useMemo(() => {
+    const r = { venta: 0, excluido: 0, "no-vendible": 0 } satisfies Record<EstadoVino, number>;
+    for (const v of consulta.data ?? []) r[estadoDe(motivoNoVendible(v, config))]++;
+    return r;
+  }, [consulta.data, config]);
   const conmutables = filas.filter(({ conmutable }) => conmutable);
   const paraPoner = conmutables.filter(({ motivo }) => motivo === "excluido").map(({ vino }) => vino.id);
   const paraQuitar = conmutables.filter(({ motivo }) => motivo === null).map(({ vino }) => vino.id);
@@ -161,14 +166,14 @@ export function VinosTienda({ config, puedeEditar }: Props) {
     />
   );
 
-  if (consulta.isLoading) {
-    return <p role="status" className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Cargando vinos…</p>;
-  }
+  if (consulta.isLoading) return <CargandoVinos esMovil={esMovil} />;
   if (consulta.isError) {
     return (
-      <div role="alert" className="flex flex-col items-start gap-2 rounded-xl border border-destructive/40 p-4 text-sm">
-        <p>No se pudieron cargar los vinos. Comprueba la conexión.</p>
-        <Button variant="outline" onClick={() => void consulta.refetch()}>Reintentar</Button>
+      <div role="alert" className="flex flex-col items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-10 text-center">
+        <WifiOff className="mb-1 h-8 w-8 text-destructive/60" aria-hidden="true" />
+        <p className="text-sm font-medium">No se pudieron cargar los vinos</p>
+        <p className="text-xs text-muted-foreground">Comprueba la conexión y vuelve a intentarlo.</p>
+        <Button variant="outline" className="mt-2 h-11" onClick={() => void consulta.refetch()}>Reintentar</Button>
       </div>
     );
   }
@@ -179,23 +184,30 @@ export function VinosTienda({ config, puedeEditar }: Props) {
     // En escritorio ocupa el alto de la pestaña (flex-1) para que la tabla haga scroll por dentro;
     // en el móvil crece con las tarjetas y hace scroll la pestaña entera.
     <div className={cn("flex min-w-0 flex-col gap-3", !esMovil && "min-h-0 flex-1")} data-vista={esMovil ? "tarjetas" : "tabla"}>
-      <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          <strong className="tabular-nums text-foreground">{aLaVenta} de {total}</strong> vinos activos a la venta con un {porcentaje(config.descuento_pct)} de descuento sobre la carta.
-          {!config.activa && (
-            <span className="ml-1 font-medium text-amber-800 dark:text-amber-300">
-              {puedeEditar ? "La tienda está oculta en la web (actívala en Ajustes)." : "La tienda está oculta en la web."}
-            </span>
-          )}
-        </p>
-        <Button asChild variant="outline" className="h-11 shrink-0 gap-2 self-start">
-          <a href={URL_TIENDA_WEB} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="h-4 w-4" aria-hidden="true" />
-            Ver la tienda en la web
-            <span className="sr-only"> (se abre en otra pestaña)</span>
-          </a>
-        </Button>
-      </div>
+      {!config.activa && (
+        <div
+          role="status"
+          data-testid="aviso-tienda-oculta"
+          className="flex shrink-0 items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          <EyeOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>
+            <strong className="font-semibold">La tienda está oculta en la web.</strong>{" "}
+            {puedeEditar ? "Los clientes no la ven; enciéndela arriba con «Visible en la web»." : "Los clientes no la ven ahora mismo."}
+          </p>
+        </div>
+      )}
+
+      <TiraCifras
+        data-testid="resumen-tienda"
+        className="shrink-0 py-1"
+        cifras={[
+          { etiqueta: "A la venta", valor: resumen.venta, detalle: `de ${total} ${vinos(total)}` },
+          { etiqueta: "Quitados", valor: resumen.excluido },
+          { etiqueta: "No pueden salir", valor: resumen["no-vendible"], tono: resumen["no-vendible"] > 0 ? "ambar" : undefined },
+          { etiqueta: "Descuento", valor: porcentaje(config.descuento_pct) },
+        ]}
+      />
 
       {/* Filtros: buscador (lo que sobra), categoría y a la venta / fuera, en una fila si caben. */}
       <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -330,7 +342,7 @@ const CELDA = "px-3 py-2.5 align-middle first:pl-4 last:pr-4";
 function TablaVinos({ filas, interruptor }: VistaVinosProps) {
   return (
     <table aria-label="Vinos de la tienda" className="w-full table-fixed text-sm">
-      <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+      <thead className="sticky top-0 z-10 bg-muted/60 shadow-[0_1px_0_0_hsl(var(--border))] backdrop-blur supports-[backdrop-filter]:bg-muted/50">
         <tr>
           <th scope="col" className={cn(CABECERA, "text-left")}>Vino</th>
           <th scope="col" className={cn(CABECERA, "w-28 text-right lg:w-32")}>Precio de carta</th>
@@ -448,6 +460,34 @@ function SinVinos({ hayFiltro, onQuitarFiltros }: { hayFiltro: boolean; onQuitar
           Quitar filtros
         </Button>
       )}
+    </div>
+  );
+}
+
+/** Carga: la silueta de la tabla (o de las tarjetas en el móvil), sin saltos cuando llegan los vinos. */
+function CargandoVinos({ esMovil }: { esMovil: boolean }) {
+  return (
+    <div role="status" aria-label="Cargando vinos" className="flex min-w-0 flex-col gap-3">
+      <span className="sr-only">Cargando vinos…</span>
+      <Skeleton className="h-11 w-full max-w-lg" />
+      <div className="flex flex-wrap gap-2">
+        <Skeleton className="h-11 min-w-0 flex-1 basis-full sm:basis-64" />
+        <Skeleton className="h-11 w-full sm:w-56" />
+        <Skeleton className="h-11 w-full sm:w-64" />
+      </div>
+      <div className={cn("flex flex-col", esMovil ? "gap-2" : "divide-y rounded-xl border bg-card")}>
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className={cn("flex items-center gap-4", esMovil ? "rounded-xl border bg-card p-3" : "px-4 py-3")}>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Skeleton className="h-4 w-2/3 max-w-64" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="h-4 w-16" />
+            {!esMovil && <Skeleton className="h-4 w-16" />}
+            <Skeleton className="h-6 w-11 rounded-full" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
