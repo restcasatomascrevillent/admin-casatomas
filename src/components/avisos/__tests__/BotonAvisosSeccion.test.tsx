@@ -52,9 +52,12 @@ const pintar = (seccion: "reservas" | "facturas") =>
 beforeEach(() => {
   bd.updates = [];
   bd.filas = [
-    aviso("r1", "solicitud_pendiente", false, { referencia_tipo: "solicitud" }),
-    aviso("r2", "reserva_sin_asignar"),
-    aviso("r3", "reserva_nueva", true),
+    aviso("r1", "reserva_nueva", false, { referencia_tipo: "reserva" }),
+    aviso("r2", "reserva_cancelada", false, { referencia_tipo: "reserva" }),
+    aviso("r3", "reserva_nueva", true, { referencia_tipo: "reserva" }),
+    // Ya no salen en el botón de Reservas (10/11/2026): solo nuevas y canceladas.
+    aviso("s1", "solicitud_pendiente", false, { referencia_tipo: "solicitud" }),
+    aviso("s2", "reserva_sin_asignar"),
     aviso("f1", "subida_precio"),
     aviso("o1", "instagram_encargo"),
   ];
@@ -82,14 +85,14 @@ describe("Botón «Avisos» de cada sección", () => {
     await waitFor(() => expect(within(modal).getAllByRole("listitem")).toHaveLength(2));
     fireEvent.click(within(modal).getByRole("button", { name: "Todos" }));
     await waitFor(() => expect(within(modal).getAllByRole("listitem")).toHaveLength(3));
-    fireEvent.click(within(modal).getByRole("button", { name: "Sin sala o mesa" }));
+    fireEvent.click(within(modal).getByRole("button", { name: "Canceladas" }));
     await waitFor(() => expect(within(modal).getAllByRole("listitem")).toHaveLength(1));
     expect(within(modal).getByText("Aviso r2")).toBeInTheDocument();
     fireEvent.click(within(modal).getByRole("button", { name: "Marcar todos como revisados" }));
     await waitFor(() => expect(bd.updates).toHaveLength(1));
     expect(bd.updates[0].filtros).toEqual([
       ["eq", "leida", false],
-      ["in", "tipo", ["solicitud_pendiente", "reserva_nueva", "reserva_sin_asignar"]],
+      ["in", "tipo", ["reserva_nueva", "reserva_cancelada"]],
     ]);
   });
 
@@ -99,7 +102,7 @@ describe("Botón «Avisos» de cada sección", () => {
     const modal = await screen.findByRole("dialog");
     fireEvent.click(await within(modal).findByRole("button", { name: "Ver: Aviso r1" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(screen.getByTestId("ruta")).toHaveTextContent("/reservas?tab=reservas&status=solicitudes");
+    expect(screen.getByTestId("ruta")).toHaveTextContent("/reservas?tab=reservas");
     expect(bd.updates[0]).toMatchObject({ cambios: { leida: true }, filtros: [["eq", "id", "r1"]] });
   });
 });
