@@ -11,18 +11,31 @@
 // misma. Cada estado tiene además su FORMA de pintar la mesa —contorno
 // discontinuo, solo contorno, relleno— y su icono (`Icono`), que el plano pinta
 // en una esquina de la mesa:
-//   libre        contorno gris DISCONTINUO, sin relleno
-//   reservada    contorno azul GRUESO, sin relleno            (reloj)
-//   retrasada    contorno ámbar DISCONTINUO y grueso, relleno claro (aviso)
-//   ocupada      RELLENA de verde, contorno fino               (cubiertos)
-//   por_liberar  RELLENA de rojo, contorno DOBLE                (reloj tachado)
-// Las insignias (`badge`) cumplen contraste AA (≥ 4,5:1) con texto blanco o
-// muy oscuro: sky-700, amber-800, emerald-700, rose-700 y slate-200/800.
+//   libre        verde, contorno DISCONTINUO                   (círculo discontinuo)
+//   reservada    azul, contorno GRUESO                         (reloj)
+//   retrasada    rojo, contorno DISCONTINUO y grueso           (aviso)
+//   ocupada      RELLENA de ámbar, contorno fino               (cubiertos)
+//   por_liberar  RELLENA de violeta, contorno DOBLE            (reloj tachado)
+// Los colores y formas viven en `src/lib/reservas/coloresMesa.ts` (10/11/2026: los
+// mismos que el móvil; antes aquí la libre era gris y la ocupada verde).
 // ============================================================================
 
 import { AlertTriangle, CircleDashed, Clock, TimerOff, Utensils } from "lucide-react";
 import type { EstadoMesaServicio } from "@/lib/reservas/servicioSala";
+import { COLORES_MESA } from "@/lib/reservas/coloresMesa";
 
+/** Icono de cada estado, en la esquina de la mesa y en la leyenda. */
+const ICONO_ESTADO: Record<EstadoMesaServicio, typeof Clock> = {
+  libre: CircleDashed,
+  reservada: Clock,
+  retrasada: AlertTriangle,
+  ocupada: Utensils,
+  por_liberar: TimerOff,
+};
+
+/**
+ * Colores y forma: `COLORES_MESA` (`src/lib/reservas/coloresMesa.ts`), la MISMA tabla que el móvil (10/11/2026).
+ */
 export const CONFIG_ESTADO_MESA: Record<
   EstadoMesaServicio,
   {
@@ -35,43 +48,12 @@ export const CONFIG_ESTADO_MESA: Record<
     /** Color del icono de la esquina de la mesa (sobre su relleno). */
     icono: string;
   }
-> = {
-  libre: {
-    etiqueta: "Libre",
-    Icono: CircleDashed,
-    clases: "border-2 border-dashed border-slate-400 bg-white dark:bg-slate-900/30 dark:border-slate-500",
-    badge: "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-100",
-    icono: "text-slate-600 dark:text-slate-300",
-  },
-  reservada: {
-    etiqueta: "Reservada",
-    Icono: Clock,
-    clases: "border-[3px] border-solid border-sky-600 bg-white dark:bg-sky-950/30 dark:border-sky-500",
-    badge: "bg-sky-700 text-white",
-    icono: "text-sky-700 dark:text-sky-300",
-  },
-  retrasada: {
-    etiqueta: "Retrasada",
-    Icono: AlertTriangle,
-    clases: "border-[3px] border-dashed border-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:border-amber-500",
-    badge: "bg-amber-800 text-white",
-    icono: "text-amber-800 dark:text-amber-300",
-  },
-  ocupada: {
-    etiqueta: "Ocupada",
-    Icono: Utensils,
-    clases: "border-2 border-solid border-emerald-700 bg-emerald-200 dark:bg-emerald-900/60 dark:border-emerald-500",
-    badge: "bg-emerald-700 text-white",
-    icono: "text-emerald-900 dark:text-emerald-200",
-  },
-  por_liberar: {
-    etiqueta: "Por liberar",
-    Icono: TimerOff,
-    clases: "border-4 border-double border-rose-700 bg-rose-200 dark:bg-rose-900/60 dark:border-rose-500",
-    badge: "bg-rose-700 text-white",
-    icono: "text-rose-900 dark:text-rose-200",
-  },
-};
+> = Object.fromEntries(
+  (Object.keys(ICONO_ESTADO) as EstadoMesaServicio[]).map((estado) => {
+    const c = COLORES_MESA[estado];
+    return [estado, { etiqueta: c.etiqueta, Icono: ICONO_ESTADO[estado], clases: c.mesa, badge: c.badge, icono: c.icono }];
+  }),
+) as Record<EstadoMesaServicio, { etiqueta: string; Icono: typeof Clock; clases: string; badge: string; icono: string }>;
 
 /**
  * El chip de tiempo de una mesa: «en 15 min» (aún no es su hora), «5 min tarde» (dentro del margen),
