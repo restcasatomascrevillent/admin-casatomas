@@ -4374,6 +4374,8 @@ export type Database = {
           /** Doble opt-in del newsletter: solo existen si 20261003184500_newsletter_doble_optin_y_email_normalizado.sql está aplicada. Las escribe la BD/Edge Functions; el panel no puede cambiarlas. */
           email_verificado_at: string | null
           consentimiento_newsletter_at: string | null
+          /** «Cómo se hizo la reserva» (20261122121500_reservas_origen.sql). Solo reservas web; la escribe reservas-web. Ver src/lib/reservas/origenReserva.ts. */
+          origen: Json | null
         }
         Insert: {
           canal?: string | null
@@ -4399,6 +4401,7 @@ export type Database = {
           salida_at?: string | null
           email_verificado_at?: string | null
           consentimiento_newsletter_at?: string | null
+          origen?: Json | null
         }
         Update: {
           canal?: string | null
@@ -4424,6 +4427,7 @@ export type Database = {
           salida_at?: string | null
           email_verificado_at?: string | null
           consentimiento_newsletter_at?: string | null
+          origen?: Json | null
         }
         Relationships: [
           {
