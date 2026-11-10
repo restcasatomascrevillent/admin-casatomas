@@ -160,6 +160,8 @@ vi.mock("@/hooks/useEdicionReserva", () => ({
   useEdicionReserva: () => ({ editarReserva: supa.editarReserva, dialogoEdicion: null }),
 }));
 vi.mock("@/components/reservas/ModalVerificacionReserva", () => ({ ModalVerificacionReserva: () => null }));
+// El día de la reserva del diálogo de aceptar/confirmar/verificar tiene sus propios tests (DialogoAccionReserva).
+vi.mock("@/components/reservas/ElDiaDeLaReserva", () => ({ ElDiaDeLaReserva: () => <div data-testid="el-dia" /> }));
 vi.mock("@/components/reservas/BlacklistModal", () => ({ BlacklistModal: () => null }));
 vi.mock("@/components/reservas/SolicitudGestionPanel", () => ({
   SolicitudGestionPanel: (props: unknown) => {
@@ -281,6 +283,16 @@ const accionesDeFila = (fila: HTMLElement) =>
     etiqueta: b.getAttribute("aria-label") ?? b.textContent?.trim() ?? "",
     deshabilitado: b.hasAttribute("disabled"),
   }));
+
+/**
+ * 10/11/2026: «Aceptar» / «Confirmar» de la fila ya no actúan al momento: abren el diálogo con los datos y el día,
+ * y su botón verde hace lo de siempre. Pulsa el botón de la fila y luego el del diálogo.
+ */
+async function pulsarConDialogo(boton: HTMLElement) {
+  fireEvent.click(boton);
+  const dialogo = await screen.findByRole("dialog");
+  fireEvent.click(within(dialogo).getByRole("button", { name: /^(Aceptar reserva|Confirmar reserva|Verificar)$/ }));
+}
 
 /** Fila de la tabla que habla de ese cliente. */
 const filaDe = (tabla: HTMLElement, texto: string) =>
@@ -520,7 +532,7 @@ describe("ListaReservasAvanzada · reservas sin email", () => {
     const { tabla } = await montar();
     const [confirmar] = botonesDeFila(filaDe(tabla, "Berta Verificada"));
     expect(confirmar.textContent).toMatch(/Confirmar/);
-    fireEvent.click(confirmar);
+    await pulsarConDialogo(confirmar);
   };
 
   it("«Confirmar» una verificada sin email cambia el estado y avisa de que no sale ningún correo", async () => {
@@ -575,7 +587,7 @@ describe("ListaReservasAvanzada · solicitudes: solo Casa Tomás", () => {
     expect(within(tabla).getByText("Familia Ballester")).toBeInTheDocument();
     expect(screen.queryByText("Grupo Touza")).not.toBeInTheDocument();
     // Una sola fila de solicitud: la de Casa Tomás.
-    expect(within(tabla).getAllByText(/^Solicitud ·/)).toHaveLength(1);
+    expect(within(tabla).getAllByText(/^Solicitud/)).toHaveLength(1);
   });
 
   it("convertir una solicitud de Casa Tomás no pasa ningún negocio al alta", async () => {
@@ -715,8 +727,8 @@ describe("ListaReservasAvanzada · editar una reserva, siempre", () => {
     expect(supa.editarReserva).toHaveBeenCalledWith("res-confirmada");
 
     supa.editarReserva.mockClear();
-    fireEvent.click(principalDe(filaDe(tabla, "Ana Pendiente"))!);
     fireEvent.click(within(filaDe(tabla, "Ana Pendiente")).getByRole("checkbox"));
+    fireEvent.click(principalDe(filaDe(tabla, "Ana Pendiente"))!);
     expect(supa.editarReserva).not.toHaveBeenCalled();
   });
 
@@ -779,7 +791,7 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
     // cambio acordado con el dueño (2026-10-01): antes el UPDATE llevaba también `hora` y `espacio_id` (los pedidos).
     const { tabla } = await montar();
 
-    fireEvent.click(botones(tabla, "Ana Pendiente")[0]);
+    await pulsarConDialogo(botones(tabla, "Ana Pendiente")[0]);
 
     await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" }));
     expect(supa.eq).toHaveBeenCalledWith("id", "res-pendiente");
@@ -805,7 +817,7 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
     ];
     const { tabla } = await montar();
 
-    fireEvent.click(botones(tabla, "Ana ConSala")[0]);
+    await pulsarConDialogo(botones(tabla, "Ana ConSala")[0]);
 
     await waitFor(() => expect(supa.update).toHaveBeenCalledTimes(1));
     expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" });
@@ -819,7 +831,7 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
     ];
     const { tabla } = await montar();
 
-    fireEvent.click(botones(tabla, "Ana Editada")[0]);
+    await pulsarConDialogo(botones(tabla, "Ana Editada")[0]);
 
     await waitFor(() => expect(supa.update).toHaveBeenCalledTimes(1));
     expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" });
@@ -831,7 +843,7 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
     supa.respuestas = [{ data: [] }];
     const { tabla } = await montar();
 
-    fireEvent.click(botones(tabla, "Ana Pendiente")[0]);
+    await pulsarConDialogo(botones(tabla, "Ana Pendiente")[0]);
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/^No se pudo guardar: no tienes permiso/)),
@@ -843,7 +855,7 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
   it("«Confirmar» (verificada) escribe solo si sigue verificada y avisa al cliente con `{ id, estado }` (antes, la fila entera de la reserva)", async () => {
     const { tabla } = await montar();
 
-    fireEvent.click(botones(tabla, "Berta Verificada")[0]);
+    await pulsarConDialogo(botones(tabla, "Berta Verificada")[0]);
 
     await waitFor(() => expect(supa.en).toHaveBeenCalledWith("estado", ["verificada"]));
     await waitFor(() => expect(notificaciones()).toHaveLength(1));
@@ -956,7 +968,7 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
     const { tabla } = await montar();
     const cargasAntes = supa.cargas.mock.calls.length;
 
-    fireEvent.click(botones(tabla, "Ana Pendiente")[0]);
+    await pulsarConDialogo(botones(tabla, "Ana Pendiente")[0]);
 
     await waitFor(() => expect(supa.cargas.mock.calls.length).toBeGreaterThan(cargasAntes));
   });
@@ -986,7 +998,7 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
     const { tabla } = await montarSeis();
 
     for (const [, estado, nombre] of SEIS) {
-      const insignia = filaDe(tabla, nombre).querySelectorAll("td")[5].firstElementChild!;
+      const insignia = filaDe(tabla, nombre).querySelectorAll("td")[4].firstElementChild!;
       const ficha = ESTADOS_RESERVA[estado];
       expect(insignia.textContent?.trim(), estado).toBe(ficha.etiqueta);
       for (const clase of ficha.insignia.split(/\s+/)) expect(insignia.classList.contains(clase), `${estado}: ${clase}`).toBe(true);
@@ -995,8 +1007,8 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
       unmount();
     }
     // Cancelada y «No vino» van con SU variante del Badge, como antes (su fondo al pasar el ratón).
-    expect(filaDe(tabla, "Diana Cancelada").querySelectorAll("td")[5].firstElementChild!.className).toMatch(/hover:bg-destructive\/80/);
-    expect(filaDe(tabla, "Fede NoVino").querySelectorAll("td")[5].firstElementChild!.className).toMatch(/hover:bg-secondary\/80/);
+    expect(filaDe(tabla, "Diana Cancelada").querySelectorAll("td")[4].firstElementChild!.className).toMatch(/hover:bg-destructive\/80/);
+    expect(filaDe(tabla, "Fede NoVino").querySelectorAll("td")[4].firstElementChild!.className).toMatch(/hover:bg-secondary\/80/);
   });
 
   it("CAMBIO ACORDADO: nada dice «servida»; una «Llegó» no tiene acción principal (nada que confirmar)", async () => {
@@ -1032,7 +1044,7 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
       const fila = filaDe(tabla, nombre);
       expect(within(fila).queryAllByRole("button"), estado).toEqual([]);
       // Primera celda: la fecha (antes, la de acciones).
-      expect(fila.querySelectorAll("td")).toHaveLength(5);
+      expect(fila.querySelectorAll("td")).toHaveLength(4);
     }
     expect(tabla.innerHTML).not.toMatch(/No tienes permiso/);
   });
@@ -1235,7 +1247,7 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva»: una fila, sin c
 
       expect(filasDeDatos(tabla), estado).toHaveLength(cuantas[i]);
       for (const fila of filasDeDatos(tabla)) {
-        expect(fila.querySelectorAll("td")[5], estado).toHaveTextContent(NOMBRES_EN_ORDEN[i]);
+        expect(fila.querySelectorAll("td")[4], estado).toHaveTextContent(NOMBRES_EN_ORDEN[i]);
       }
       expect(pulsados(), estado).toEqual(SEIS_SIN_PULSAR.map((_, j) => (j === i ? "true" : "false")));
     }
@@ -1829,7 +1841,7 @@ describe("ListaReservasAvanzada · lee todo el histórico por lotes", () => {
     const senalDeLaRecarga = supa.lecturas.peticiones[numeroDeLaRecarga - 1].signal!;
 
     // «Aceptar»: el ejecutor de acciones empieza cancelando las consultas de las listas, entre ellas esta.
-    fireEvent.click(botonesDeFila(filaDe(tabla, "Ana Pendiente"))[0]);
+    await pulsarConDialogo(botonesDeFila(filaDe(tabla, "Ana Pendiente"))[0]);
     await waitFor(() => expect(senalDeLaRecarga.aborted).toBe(true));
     await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" }));
     await act(async () => {
@@ -2057,8 +2069,9 @@ describe("ListaReservasAvanzada · más alto para las filas: sin recuento, sin s
     expect(tabla).toHaveClass("table-fixed", "w-full");
     expect([...tabla.classList].some((c) => c.startsWith("min-w"))).toBe(false);
     const conAncho = [...tabla.querySelectorAll("thead th")].map((th) => [...th.classList].some((c) => /^w-\[/.test(c)));
-    // Acciones, Fecha, Cliente (sin ancho), Pax, Canal, Estado.
-    expect(conAncho).toEqual([true, true, false, true, true, true]);
+    // Acciones, Fecha, Cliente (sin ancho), Pax, Estado. Canal salió de la fila el 10/11/2026 (va en el diálogo).
+    expect(conAncho).toEqual([true, true, false, true, true]);
+    expect(within(tabla).queryByRole("columnheader", { name: "Canal" })).toBeNull();
     // Lo largo de Cliente se recorta con «…» y va entero en el `title`.
     const fila = filaDe(tabla, "Ana Pendiente");
     expect(within(fila).getByText("Ana Pendiente")).toHaveClass("truncate");
@@ -2068,17 +2081,20 @@ describe("ListaReservasAvanzada · más alto para las filas: sin recuento, sin s
     expect(tabla).toHaveAccessibleName("Reservas y solicitudes");
   });
 
-  it("la acción principal (o su hueco) mide lo mismo en todas las filas y es grande: 44 px de alto y texto a 16 px", async () => {
+  it("la acción principal (o su hueco) mide lo mismo en todas las filas y es grande: 52 px de alto y texto a 17 px", async () => {
     const { tabla } = await montar();
     const filas = [...tabla.querySelectorAll("tbody tr")] as HTMLElement[];
 
     const principales = filas.map(principalDe).filter((b): b is HTMLButtonElement => !!b);
     expect(principales.map((b) => b.textContent?.trim())).toEqual(expect.arrayContaining(["Aceptar", "Confirmar", "Convertir"]));
-    for (const b of principales) expect(b).toHaveClass("w-[8.5rem]", "h-11", "text-base");
+    for (const b of principales) expect(b).toHaveClass("w-[9.5rem]", "h-[52px]", "text-[17px]");
     // Las filas sin nada que hacer dejan el hueco del mismo ancho: «Más» cae en la misma X.
     const huecos = filas.flatMap((f) => [...f.querySelectorAll('[data-testid="sin-accion-principal"]')]);
     expect(huecos.length).toBe(filas.length - principales.length);
-    for (const h of huecos) expect(h).toHaveClass("w-[8.5rem]");
+    for (const h of huecos) expect(h).toHaveClass("w-[9.5rem]");
+    // Filas altas y con aire (dueño: «ojo con los padding y los márgenes»).
+    for (const f of filas) expect(f).toHaveClass("h-[76px]");
+    for (const td of filas[0].querySelectorAll("td")) expect(td).toHaveClass("px-4", "py-3");
   });
   // ── La posición de las filas ────────────────────────────────────────────────
 
@@ -2108,7 +2124,7 @@ describe("ListaReservasAvanzada · más alto para las filas: sin recuento, sin s
     const scroller = tabla.parentElement as HTMLElement;
     scroller.scrollTop = 300;
 
-    fireEvent.click(botonesDeFila(filaDe(tabla, "Ana Pendiente"))[0]);
+    await pulsarConDialogo(botonesDeFila(filaDe(tabla, "Ana Pendiente"))[0]);
     await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" }));
     await waitFor(() => expect(supa.cargas.mock.calls.length).toBeGreaterThanOrEqual(2));
 
@@ -2201,5 +2217,46 @@ describe("ListaReservasAvanzada · filtro rápido «Menú del día / Carta»", (
     fireEvent.click(carta);
     await waitFor(() => expect(within(tabla).getByText("Mara Menú")).toBeInTheDocument());
     expect(within(tabla).getByText("Carla Carta")).toBeInTheDocument();
+  });
+});
+
+// 10/11/2026 (dueño: «para aceptar cualquier reserva o verificarla, se abre el pop-up para ver el día»).
+describe("ListaReservasAvanzada · aceptar, confirmar y verificar abren el diálogo con el día", () => {
+  it("«Aceptar» abre el diálogo con los datos y el día y NO escribe nada hasta su botón verde", async () => {
+    const { tabla } = await montar();
+    fireEvent.click(principalDe(filaDe(tabla, "Ana Pendiente"))!);
+
+    const dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByRole("heading", { name: /Aceptar reserva · Ana Pendiente/ })).toBeInTheDocument();
+    expect(within(dialogo).getByRole("link", { name: "+34 600 111 222" })).toBeInTheDocument();
+    expect(within(dialogo).getByTestId("el-dia")).toBeInTheDocument();
+    expect(supa.update).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Aceptar reserva" }));
+    await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("«Cerrar» no hace nada; «Editar» abre el editor de esa reserva", async () => {
+    const { tabla } = await montar();
+    fireEvent.click(principalDe(filaDe(tabla, "Berta Verificada"))!);
+    let dialogo = await screen.findByRole("dialog");
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Cerrar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(supa.update).not.toHaveBeenCalled();
+
+    fireEvent.click(principalDe(filaDe(tabla, "Berta Verificada"))!);
+    dialogo = await screen.findByRole("dialog");
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Editar" }));
+    expect(supa.editarReserva).toHaveBeenCalledWith("res-verificada");
+    expect(supa.update).not.toHaveBeenCalled();
+  });
+
+  it("«Verificar» de «Más» también pasa por el diálogo antes de abrir el de verificar", async () => {
+    const { tabla } = await montar();
+    fireEvent.click(opcionMas(filaDe(tabla, "Ana Pendiente"), "Verificar"));
+    const dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByRole("heading", { name: /Verificar reserva · Ana Pendiente/ })).toBeInTheDocument();
+    expect(within(dialogo).getByRole("button", { name: "Verificar" })).toBeInTheDocument();
   });
 });
