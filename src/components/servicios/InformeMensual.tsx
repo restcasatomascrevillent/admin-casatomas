@@ -10,7 +10,6 @@ import {
   type InformeMes,
   TEXTO_FALTA,
   TEXTO_ORIGEN,
-  informeCsv,
   informeMes,
   mesAnterior,
   nombreArchivoInforme,
@@ -23,6 +22,7 @@ import {
 import { type ServicioContratado, formatearEur } from "@/lib/servicios";
 import { cn } from "@/lib/utils";
 import { Bloque } from "./Bloque";
+import { csvInformeServicios } from "./generarInformeServicios";
 
 /** Cuántos meses se pueden elegir (las lecturas se guardan 400 días). */
 export const MESES_INFORME = 12;
@@ -83,7 +83,7 @@ export function InformeMensual({ servicios, eurPorUsd, onMeterCoste, hoy: hoyPro
 
   const descargarCsv = () => {
     if (!informe) return;
-    descargarBlob(new Blob(["\ufeff" + informeCsv(informe)], { type: "text/csv;charset=utf-8" }), `${nombreArchivoInforme(informe.mes)}.csv`);
+    descargarBlob(csvInformeServicios(informe), `${nombreArchivoInforme(informe.mes)}.csv`);
   };
   const descargarPdf = async () => {
     if (!informe) return;
