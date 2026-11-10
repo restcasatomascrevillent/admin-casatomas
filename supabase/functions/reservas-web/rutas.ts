@@ -24,12 +24,15 @@ export type RutaReservasWeb =
   | "cierres"
   | "confirmar"
   | "cancelar"
-  | "cancelar/ejecutar";
+  | "cancelar/ejecutar"
+  | "salud";
 
 /** Única fuente de verdad de las rutas que atiende la función. Todas son
- * PÚBLICAS: las dos POST las llama el navegador desde casa-tomas-story /
- * touza-restaurant-website, y las tres GET son enlaces de correo que se
- * autentican con su propio token HMAC (`verifyReservaToken` en index.ts). */
+ * PÚBLICAS: las POST las llama el navegador desde casa-tomas-story /
+ * touza-restaurant-website, las tres GET de correo se autentican con su propio
+ * token HMAC (`verifyReservaToken` en index.ts), y `GET /salud` es una sonda
+ * sin efectos (CT-REM-FN-07c): la llama el cron de keep-warm para evitar el
+ * arranque en frío de la función; no toca la BD ni revela nada. */
 export const RUTAS_RESERVAS_WEB: ReadonlyArray<{ metodo: "GET" | "POST"; ruta: RutaReservasWeb }> = [
   { metodo: "POST", ruta: "disponibilidad" },
   { metodo: "POST", ruta: "crear" },
@@ -37,6 +40,7 @@ export const RUTAS_RESERVAS_WEB: ReadonlyArray<{ metodo: "GET" | "POST"; ruta: R
   { metodo: "GET", ruta: "confirmar" },
   { metodo: "GET", ruta: "cancelar" },
   { metodo: "GET", ruta: "cancelar/ejecutar" },
+  { metodo: "GET", ruta: "salud" },
 ];
 
 /** Parte de la URL detrás de `reservas-web/` (o el path entero si no
