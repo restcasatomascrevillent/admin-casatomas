@@ -310,7 +310,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
 
       {/* Hoja: lo apuntado + renglón para escribir */}
       <div className={cn("flex min-h-0 flex-1 flex-col", PAPEL, revisando && "hidden")}>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-l-4 border-rose-300/70 px-6 py-4">
+        <div className="min-h-[28dvh] flex-1 overflow-y-auto overscroll-contain border-l-4 border-rose-300/70 px-6 py-4">
           <PorPasarALimpio
             borradores={pendientesHoja}
             ocupado={interpretando || resolverBorrador.isPending}
@@ -323,7 +323,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
           <p className="mb-1 text-base text-stone-500">
             Escribe la reserva con el lápiz, p. ej. <span className="font-medium">«Esther 2px salón 14:15»</span>. Sin fecha, se apunta el {fechaCorta(fecha)}.
           </p>
-          <div className="h-72 overflow-hidden rounded-md border border-stone-300 bg-white/70 lg:h-96">
+          <div className="h-[clamp(11rem,32dvh,20rem)] overflow-hidden rounded-md border border-stone-300 bg-white/70">
             <LienzoManuscrito ref={lienzo} onCambio={setTrazos} />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
