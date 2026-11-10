@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({ rpc: vi.fn(), invoke: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: mock.rpc, functions: { invoke: mock.invoke } } }));
@@ -14,6 +14,7 @@ const texto = (euros: string) => new RegExp(`^${euros.replace(",", "\\,")}\\s€
 
 describe("Pestaña Stripe de Cheques", () => {
   beforeEach(() => {
+    mock.rpc.mockReset();
     mock.invoke.mockResolvedValue({ data: { configurado: false }, error: null });
   });
 
@@ -40,5 +41,52 @@ describe("Pestaña Stripe de Cheques", () => {
     render(<PanelStripe />);
     expect(await screen.findByText("Ganancia neta con cheques")).toBeTruthy();
     expect(screen.queryByText("Gastos de gestión cobrados")).toBeNull();
+  });
+
+  it("compara con el periodo anterior de la misma duración", async () => {
+    mock.rpc.mockImplementation((_n: string, p: { p_desde: string; p_hasta: string }) => {
+      // La primera llamada es la del rango elegido (termina hoy); la otra, la del periodo anterior.
+      const actual = p.p_hasta >= new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+      return Promise.resolve({ data: { ...base, pagos: actual ? 3 : 2, bruto_eur: actual ? 150 : 100, valor_cheques_eur: actual ? 150 : 100, gastos_gestion_eur: 0, pagos_con_gastos: 0, comision_eur: 2, neto_eur: 148 }, error: null });
+    });
+    render(<PanelStripe />);
+    expect(await screen.findAllByText("+50 % vs. anterior")).toHaveLength(2); // pagos y cobrado
+    expect(mock.rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("con la cuenta en producción y todo activo, recoge los pasos de activación", async () => {
+    mock.invoke.mockResolvedValue({ data: { configurado: true, modo: "live", cobros_activos: true, payouts_activos: true, detalles_completos: true }, error: null });
+    mock.rpc.mockResolvedValue({ data: { ...base, pagos: 0, bruto_eur: 0, comision_eur: 0, neto_eur: 0 }, error: null });
+    render(<PanelStripe />);
+    const desplegable = await screen.findByRole("button", { name: /Pasos de activación \(ya completados\)/ });
+    expect(screen.queryByText("Pasos para pasar a producción")).toBeNull();
+    expect(screen.queryByText("Activar la cuenta de Stripe")).toBeNull();
+    fireEvent.click(desplegable);
+    expect(screen.getByText("Activar la cuenta de Stripe")).toBeTruthy();
+  });
+
+  it("en modo de pruebas enseña los pasos para pasar a producción", async () => {
+    mock.invoke.mockResolvedValue({ data: { configurado: true, modo: "test", cobros_activos: true, payouts_activos: false, detalles_completos: true }, error: null });
+    mock.rpc.mockResolvedValue({ data: { ...base, pagos: 0, bruto_eur: 0, comision_eur: 0, neto_eur: 0 }, error: null });
+    render(<PanelStripe />);
+    expect(await screen.findByText("Pasos para pasar a producción")).toBeTruthy();
+    expect(screen.getByText("Modo de pruebas")).toBeTruthy();
+  });
+
+  it("sin pagos lo dice y siempre ofrece generar el informe", async () => {
+    mock.rpc.mockResolvedValue({ data: { ...base, pagos: 0, bruto_eur: 0, comision_eur: 0, neto_eur: 0 }, error: null });
+    render(<PanelStripe />);
+    expect(await screen.findByText(/Sin pagos por Stripe en este rango de fechas/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Generar informe/ })).toBeTruthy();
+  });
+
+  it("las fechas al revés no consultan y avisan", async () => {
+    mock.rpc.mockResolvedValue({ data: { ...base, bruto_eur: 0, comision_eur: 0, neto_eur: 0 }, error: null });
+    render(<PanelStripe />);
+    await screen.findByText("Ganancia neta con cheques");
+    mock.rpc.mockClear();
+    fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2099-01-01" } });
+    expect(await screen.findByText("La fecha «desde» no puede ser posterior a «hasta».")).toBeTruthy();
+    expect(mock.rpc).not.toHaveBeenCalled();
   });
 });
