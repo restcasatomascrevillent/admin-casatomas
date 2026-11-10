@@ -2,6 +2,15 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.19.0] - 2026-11-10
+
+Objetivo: Ver el gasto de leer las reservas escritas a mano
+
+### Añadido
+- Reservas: gasto de leer las reservas escritas a mano en Super Admin › Servicios › Costes y en el libro ([#104](https://github.com/restcasatomascrevillent/admin-casatomas/pull/104))
+
+Nota: montada igualando producción con staging; entrada escrita a mano, no por scripts/release.mjs.
+
 ## [1.18.0] - 2026-11-10
 
 Objetivo: Un solo «Nueva Reserva» con formulario o libro, más contraste en Reservas, libro proporcionado en el ordenador y «Sentar sin reserva» eligiendo entre todas las mesas
