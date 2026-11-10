@@ -579,11 +579,10 @@ describe("solicitudes pendientes: la casilla del newsletter ya no se pierde", ()
     ]);
   });
 
-  it("para hoy (reserva_hoy) también la guarda", async () => {
+  it("para hoy por la noche ya no se rechaza por «reserva_hoy» (desde el 10/11/2026)", async () => {
     const r = await crear(reserva({ fecha: "2026-10-01", hora: "21:00", consentimiento_newsletter: true }));
 
-    expect(r.cuerpo.motivo).toBe("reserva_hoy");
-    expect(db.tabla("solicitudes_pendientes")).toEqual([expect.objectContaining({ consentimiento_newsletter: true })]);
+    expect(r.cuerpo.motivo).not.toBe("reserva_hoy");
   });
 
   it("función desplegada antes que la migración: la solicitud se guarda igual, sin las casillas", async () => {

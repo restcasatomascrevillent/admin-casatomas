@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, type ReactNode } from "react";
+import { InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import {
   CalendarPlus,
   SlidersHorizontal,
   X,
+  Store,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -369,6 +371,7 @@ const OPCIONES_FILTRO_CANAL: { value: string; label: string; corta?: string }[] 
   { value: "telefono", label: "📞 Tel", corta: "Teléfono" },
   { value: "web", label: "🌐 Web", corta: "Web" },
   { value: "manual", label: "✏️ Manual", corta: "Manual" },
+  { value: "presencial", label: "🏠 En local", corta: "En local" },
 ];
 
 /**
@@ -711,6 +714,14 @@ export function ListaReservasAvanzada({
             <span className={ETIQUETA_CANAL}>Web</span>
           </Badge>
         );
+      case 'presencial':
+        // Sentados sin reserva («Sin reserva 13:35»): antes caían en el «Web» por defecto.
+        return (
+          <Badge title="Canal: en el local, sin reserva" className={cn(INSIGNIA, "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300")}>
+            <Store className="h-3 w-3" />
+            <span className={ETIQUETA_CANAL}>En local</span>
+          </Badge>
+        );
       case 'manual':
         return (
           <Badge title="Canal: alta manual" className={cn(INSIGNIA, "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300")}>
@@ -880,7 +891,8 @@ export function ListaReservasAvanzada({
             soloPorAtender
               ? "bg-primary-foreground text-primary"
               : cuantasPorAtender > 0
-                ? "bg-muted text-foreground"
+                ? // Con algo por atender, en rojo y más grande (10/11/2026: «que se vea más»).
+                  "min-w-6 bg-red-600 text-center text-sm text-white motion-safe:animate-pulse"
                 : "text-muted-foreground",
           )}
         >
@@ -1134,6 +1146,7 @@ export function ListaReservasAvanzada({
                       <span className="text-base font-semibold">{reservation.nombre || "Sin nombre"}</span>
                     </div>
                     <InsigniaEstado estado={reservation.estado} />
+                    <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span>{new Date(reservation.fecha).toLocaleDateString("es-ES")}</span>
@@ -1276,6 +1289,7 @@ export function ListaReservasAvanzada({
                           <div className={ANCHO_NOMBRE}>
                             <div className="flex min-w-0 items-center gap-1.5">
                               <p className="truncate font-medium leading-tight" title={nombre}>{nombre}</p>
+                              <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} className="px-1.5 py-0 text-[10px]" />
                             </div>
                             {reservation.telefono && (
                               <p className="truncate text-[11px] pointer-coarse:text-xs leading-tight text-muted-foreground xl:text-xs" title={reservation.telefono}>

@@ -65,13 +65,18 @@ export function seRefrescaEnVivo(queryKey: readonly unknown[]): boolean {
  */
 export const ReservasEnVivoContexto = createContext(false);
 
-export function useReservasEnVivo(): void {
+/** Consulta de la campana («Por gestionar»): la refresca cualquier cambio de `reservas`. */
+const CLAVE_POR_GESTIONAR_EN_VIVO = "reservas-por-gestionar";
+
+/** `activo=false`: no abre canales (p. ej. la campana de quien no tiene permiso de Reservas). */
+export function useReservasEnVivo({ activo = true }: { activo?: boolean } = {}): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (!activo) return;
     // UNA llamada para todas las claves: TanStack Query marca y vuelve a pedir en una sola pasada.
     const diferida = crearInvalidacionDiferida(() => {
-      void queryClient.invalidateQueries({ predicate: (consulta) => seRefrescaEnVivo(consulta.queryKey) });
+      void queryClient.invalidateQueries({ predicate: (consulta) => seRefrescaEnVivo(consulta.queryKey) || consulta.queryKey[0] === CLAVE_POR_GESTIONAR_EN_VIVO });
     });
 
     const canales = TABLAS_RESERVAS_EN_VIVO.map((tabla) => {
@@ -97,5 +102,5 @@ export function useReservasEnVivo(): void {
         supabase.removeChannel(canal);
       }
     };
-  }, [queryClient]);
+  }, [queryClient, activo]);
 }

@@ -20,6 +20,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { VistaHoyMovil } from "./movil/VistaHoyMovil";
 import { BotonSentarSinReserva } from "./SentarSinReserva";
+import { InterruptoresServiciosOnline } from "./InterruptoresServiciosOnline";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -227,11 +228,13 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             ) : undefined
           }
         />
+        {/* Bloqueo de comida / cena online del día (10/11/2026). */}
+        <InterruptoresServiciosOnline fecha={hoy} />
 
         {/* 07/11/2026: a la izquierda la lista completa del turno, por estados, en filas de una línea (con su
             scroll); a la derecha el plano de mesas grandes, una sala a la vez. Cada columna mide lo que queda de
-            pantalla. Lista de 22 rem (tablet), 26,25 rem (420 px, desde 1280) y 30 rem (480 px, desde 1536). */}
-        <div className="grid min-h-0 grid-cols-[minmax(0,22rem)_minmax(0,1fr)] items-start gap-3 xl:grid-cols-[26.25rem_minmax(0,1fr)] 2xl:grid-cols-[30rem_minmax(0,1fr)]">
+            pantalla. Lista de 24 rem (tablet), 28,75 rem (460 px, desde 1280) y 31 rem (496 px, desde 1536). */}
+        <div className="grid min-h-0 grid-cols-[minmax(0,24rem)_minmax(0,1fr)] items-start gap-3 xl:grid-cols-[28.75rem_minmax(0,1fr)] 2xl:grid-cols-[31rem_minmax(0,1fr)]">
           <section aria-label="Reservas por llegar" className="min-w-0">
             {errorReservasHoy ? (
               <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />

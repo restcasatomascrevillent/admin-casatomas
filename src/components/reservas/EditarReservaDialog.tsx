@@ -41,6 +41,7 @@ import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
 import { OPCIONES_FILTRO_ESTADO } from "@/lib/reservas/vistaUnificada";
 import type { ReservaEditable } from "@/lib/reservas/edicionReserva";
 import { FormularioReserva } from "./FormularioReserva";
+import { ComoSeHizoReserva, type ReservaConOrigen } from "./ComoSeHizoReserva";
 
 /** Clave de caché de la fila en edición. `FormularioReserva` la invalida al guardar (prefijo "reserva-edicion"). */
 const CLAVE_RESERVA_EDICION = "reserva-edicion";
@@ -49,6 +50,7 @@ const ETIQUETA_CANAL: Record<string, string> = {
   telefono: "Teléfono",
   web: "Web",
   manual: "Manual",
+  presencial: "En local",
 };
 
 async function cargarReserva(id: string): Promise<ReservaEditable | null> {
@@ -163,16 +165,20 @@ export function EditarReservaDialog({ reservaId, onClose }: EditarReservaDialogP
     );
   } else {
     cuerpo = (
-      <FormularioReserva
-        // `key`: si cambia de reserva, el formulario arranca de cero con sus datos.
-        key={reserva.data.id}
-        reservaAEditar={reserva.data}
-        mesasAsignadas={mesas.data ?? []}
-        onSuccess={onClose}
-        onCambiosSinGuardar={(hay) => {
-          hayCambiosSinGuardar.current = hay;
-        }}
-      />
+      <>
+        <FormularioReserva
+          // `key`: si cambia de reserva, el formulario arranca de cero con sus datos.
+          key={reserva.data.id}
+          reservaAEditar={reserva.data}
+          mesasAsignadas={mesas.data ?? []}
+          onSuccess={onClose}
+          onCambiosSinGuardar={(hay) => {
+            hayCambiosSinGuardar.current = hay;
+          }}
+        />
+        {/* «Cómo se hizo la reserva»: hora, canal, tiempo en el formulario, dispositivo e historial. */}
+        <ComoSeHizoReserva reserva={reserva.data as unknown as ReservaConOrigen} />
+      </>
     );
   }
 

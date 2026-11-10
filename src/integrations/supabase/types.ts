@@ -4359,6 +4359,8 @@ export type Database = {
           hora: string
           id: string
           importante: boolean
+          /** «Menú del día» (martes a jueves, comida): marca de la reserva. Solo existe si la migración de servicios_bloqueados/menu_del_dia está aplicada. */
+          menu_del_dia: boolean
           /** «Fijar mesa» (20261107120000_reservas_mesa_fijada.sql): los recálculos no la mueven. */
           mesa_fijada: boolean
           nombre: string | null
@@ -4372,6 +4374,8 @@ export type Database = {
           /** Doble opt-in del newsletter: solo existen si 20261003184500_newsletter_doble_optin_y_email_normalizado.sql está aplicada. Las escribe la BD/Edge Functions; el panel no puede cambiarlas. */
           email_verificado_at: string | null
           consentimiento_newsletter_at: string | null
+          /** «Cómo se hizo la reserva» (20261122121500_reservas_origen.sql). Solo reservas web; la escribe reservas-web. Ver src/lib/reservas/origenReserva.ts. */
+          origen: Json | null
         }
         Insert: {
           canal?: string | null
@@ -4386,6 +4390,7 @@ export type Database = {
           hora: string
           id?: string
           importante?: boolean
+          menu_del_dia?: boolean
           mesa_fijada?: boolean
           nombre?: string | null
           notas_cliente?: string | null
@@ -4396,6 +4401,7 @@ export type Database = {
           salida_at?: string | null
           email_verificado_at?: string | null
           consentimiento_newsletter_at?: string | null
+          origen?: Json | null
         }
         Update: {
           canal?: string | null
@@ -4410,6 +4416,7 @@ export type Database = {
           hora?: string
           id?: string
           importante?: boolean
+          menu_del_dia?: boolean
           mesa_fijada?: boolean
           nombre?: string | null
           notas_cliente?: string | null
@@ -4420,6 +4427,7 @@ export type Database = {
           salida_at?: string | null
           email_verificado_at?: string | null
           consentimiento_newsletter_at?: string | null
+          origen?: Json | null
         }
         Relationships: [
           {
@@ -4525,6 +4533,30 @@ export type Database = {
         Relationships: []
       }
       // Super Admin › Servicios (migraciones 20261103120000 y 20261103160000).
+      servicios_bloqueados: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          fecha: string
+          motivo: string | null
+          turno: "comida" | "cena"
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          fecha: string
+          motivo?: string | null
+          turno: "comida" | "cena"
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          fecha?: string
+          motivo?: string | null
+          turno?: "comida" | "cena"
+        }
+        Relationships: []
+      }
       servicios_config: {
         Row: {
           actualizado_en: string

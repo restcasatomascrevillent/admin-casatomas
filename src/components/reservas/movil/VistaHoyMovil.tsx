@@ -35,7 +35,7 @@
 // Lógica: `src/lib/reservas/hoyMovil.ts`, `sentarAhora.ts` y `confirmarMesa.ts` (con tests).
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -52,6 +52,7 @@ import {
   Search,
   StickyNote,
   Undo2,
+  UserPlus,
   Users,
   UserX,
   X,
@@ -81,7 +82,10 @@ import {
   type TurnoServicio,
 } from "@/hooks/useAjustesMesaServicio";
 import { BotonSentarSinReserva } from "@/components/reservas/SentarSinReserva";
+import { BotonPersonas } from "@/components/reservas/CambiarPersonas";
+import { InterruptoresServiciosOnline, InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
+import { COLORES_MESA, estadoColorMovil } from "@/lib/reservas/coloresMesa";
 import { configServicioSalaDesde, type ReservaMesaServicio } from "@/lib/reservas/servicioSala";
 import { turnoDeHora } from "@/lib/reservas/asignacionMesas";
 import { ESTADOS_RESERVA, type EstadoReserva } from "@/lib/reservas/estadosReserva";
@@ -390,6 +394,7 @@ export function VistaHoyMovil({
         <BotonSentarSinReserva soloIcono className="shrink-0" />
       </div>
       )}
+      {!columna && <InterruptoresServiciosOnline fecha={fecha} className="shrink-0 px-1" />}
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border bg-card" data-testid="hoy-movil-lista">
         {reservas === undefined ? (
@@ -575,10 +580,8 @@ export function FilaReservaMovil({
         <div className="flex items-center gap-2">
           <span className="w-14 shrink-0 text-lg font-semibold leading-tight tabular-nums">{horaCorta(reserva.hora)}</span>
           <span className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight">{reserva.nombre || "Sin nombre"}</span>
-          <span className="flex shrink-0 items-center gap-1 text-xl font-bold leading-none tabular-nums" aria-hidden="true">
-            <Users className="h-5 w-5 text-muted-foreground" />
-            {reserva.numero_comensales}
-          </span>
+          {/* Tocar el número cambia las personas (10/11/2026). */}
+          <BotonPersonas reserva={reserva} className="text-xl font-bold leading-none" />
           {/* Teléfono (15/10/2026, petición del dueño): icono de 44 px con márgenes negativos para no
               hacer la fila más alta. Desde 375 px: a 320 px dejaba el nombre en ~100 px. */}
           {tel && (
@@ -618,6 +621,7 @@ export function FilaReservaMovil({
             ) : (
               info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
             )}
+            <InsigniaMenuDelDia reserva={reserva} />
           </span>
           {/* La protagonista es la MESA (07/11/2026, petición del dueño): «Sentar» pequeño encima y debajo, en
               grande, sala y mesa. Un toque = sentar en ella (con `decidirSentarPrevista`). Sin mesa (o con la
@@ -796,11 +800,11 @@ function CasillaMesa({
       type="button"
       onClick={pulsar}
       className={cn(
-        "flex min-h-20 flex-col items-start justify-between rounded-lg border-2 p-2 text-left active:scale-[0.98]",
-        estado.tipo === "libre" && "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40",
-        estado.tipo === "sentada" && "border-amber-500 bg-amber-50 dark:bg-amber-950/40",
-        estado.tipo === "reservada" && "border-sky-500 bg-sky-50 dark:bg-sky-950/40",
+        "flex min-h-20 flex-col items-start justify-between rounded-lg p-2 text-left active:scale-[0.98]",
+        // Mismos colores que el plano de escritorio (`coloresMesa.ts`, 10/11/2026).
+        COLORES_MESA[estadoColorMovil(estado.tipo)].mesa,
       )}
+      data-estado={estadoColorMovil(estado.tipo)}
       aria-label={`Mesa ${opcion.nombre}, ${opcion.plazas} plazas, ${estado.tipo === "libre" ? "libre" : estado.tipo === "sentada" ? `sentada: ${estado.nombre}` : `${fijada ? "fijada" : "prevista"} a las ${horaCorta(estado.hora)} para ${estado.nombre || "una reserva"}`}`}
     >
       <span className="flex w-full items-baseline justify-between gap-1">
@@ -826,11 +830,12 @@ function CasillaMesa({
 }
 
 // ─── Leyenda de colores (vista Mesas) ─────────────────────────────────────────
-// Pedida por el dueño el 08/11/2026: en el móvil no se sabía qué era cada color. Mismos colores que `CasillaMesa`.
+// Pedida por el dueño el 08/11/2026: en el móvil no se sabía qué era cada color. Desde el 10/11/2026 los colores
+// salen de `coloresMesa.ts`, los mismos que el plano y la leyenda de escritorio («Sentada» = «Ocupada»).
 const LEYENDA_MOVIL = [
-  { texto: "Libre", clase: "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" },
-  { texto: "Reservada", clase: "border-sky-500 bg-sky-50 dark:bg-sky-950/40" },
-  { texto: "Sentada", clase: "border-amber-500 bg-amber-50 dark:bg-amber-950/40" },
+  { texto: "Libre", estado: "libre" },
+  { texto: "Reservada", estado: "reservada" },
+  { texto: "Sentada", estado: "ocupada" },
 ] as const;
 
 export function LeyendaMesasMovil() {
@@ -838,7 +843,7 @@ export function LeyendaMesasMovil() {
     <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1 text-xs text-muted-foreground" aria-label="Leyenda de colores de las mesas" data-testid="leyenda-mesas-movil">
       {LEYENDA_MOVIL.map((l) => (
         <li key={l.texto} className="flex items-center gap-1">
-          <span className={cn("inline-block h-3.5 w-3.5 rounded border-2", l.clase)} aria-hidden="true" />
+          <span className={cn("inline-block h-3.5 w-3.5 rounded", COLORES_MESA[l.estado].mesa)} aria-hidden="true" data-muestra={l.estado} />
           {l.texto}
         </li>
       ))}
@@ -1102,8 +1107,18 @@ function ConfirmarDesplazamiento({
 
 // ─── Ficha de una mesa libre (o solo prevista) ───────────────────────────────
 
-const PERSONAS = [1, 2, 3, 4, 5, 6, 7, 8];
+/** Botones de «Sentar sin reserva» en la hoja de una mesa (10/11/2026: de 1 a 12, más un campo para otro número). */
+const PERSONAS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
+/**
+ * Hoja de una mesa LIBRE o solo PREVISTA (10/11/2026, petición del dueño: «al hacer clic en la mesa tiene que ser
+ * para sentar a alguien, con o sin reserva»). De arriba abajo:
+ *   1. Prevista para una reserva: «Sentar a <nombre>» (llegó) en grande.
+ *   2. «Sentar sin reserva»: abre cuántos son (1-12 o un número) y el nombre opcional; crea la reserva walk-in
+ *      (`useSentarSinReserva`, el mismo flujo que el botón «Sin reserva») ya sentada en ESTA mesa.
+ *   3. Las reservas del turno que aún no han llegado, para sentarlas aquí con un toque.
+ * `extra`: botones al final (escritorio: «Ver detalle de la mesa», lo que hacía antes el clic).
+ */
 export function PanelMesaLibre({
   mesa,
   prevista = null,
@@ -1119,6 +1134,7 @@ export function PanelMesaLibre({
   mesasExcluidas = [],
   mesasAlFinal = [],
   onVerReserva,
+  extra,
   onCerrar,
 }: {
   mesa: MesaOpcion;
@@ -1137,6 +1153,8 @@ export function PanelMesaLibre({
   mesasExcluidas?: readonly string[];
   mesasAlFinal?: readonly string[];
   onVerReserva?: (reservaId: string) => void;
+  /** Acciones de más al pie del contenido (escritorio: «Ver detalle de la mesa»). */
+  extra?: ReactNode;
   onCerrar: () => void;
 }) {
   const sentarSinReserva = useSentarSinReserva();
@@ -1190,7 +1208,21 @@ export function PanelMesaLibre({
       }),
     [reservas, mesa.id, mesa.plazas, turno, minutoAhora, mesasDeReserva],
   );
-  const hayCandidatas = candidatas.encajan.length + candidatas.otras.length + candidatas.fijadasOtra.length > 0;
+  // La reserva prevista va arriba, en su propio botón: no se repite en la lista.
+  const sinPrevista = <T extends { reserva: ReservaMovil }>(filas: readonly T[]) => filas.filter((c) => c.reserva.id !== prevista?.reservaId);
+  const grupos = [
+    ["Encajan aquí", sinPrevista(candidatas.encajan), false],
+    ["Otras", sinPrevista(candidatas.otras), false],
+    ["Con otra mesa fijada", sinPrevista(candidatas.fijadasOtra), true],
+  ] as const;
+  const hayCandidatas = grupos.some(([, filas]) => filas.length > 0);
+  const reservaPrevista = prevista ? (reservas.find((r) => r.id === prevista.reservaId) ?? null) : null;
+
+  // «Sentar sin reserva»: cerrado hasta tocarlo; dentro, cuántos son y el nombre (opcional).
+  const [sinReservaAbierto, setSinReservaAbierto] = useState(false);
+  const [personasSR, setPersonasSR] = useState<number | null>(null);
+  const [otrasSR, setOtrasSR] = useState("");
+  const [nombreSR, setNombreSR] = useState("");
 
   // Para quien entra sin reserva: ¿pisa la franja de ahora a alguien?
   const [horaAhora] = useState(() => horaActual());
@@ -1215,7 +1247,7 @@ export function PanelMesaLibre({
   const sinReservaYa = (personas: number, desplazadas: readonly Desplazamiento[]) =>
     ejecutar(async () => {
       const deshacerDesplazar = await desplazar(desplazadas);
-      const r = await sentarSinReserva.mutateAsync({ fecha, hora: horaActual(), personas, mesa });
+      const r = await sentarSinReserva.mutateAsync({ fecha, hora: horaActual(), personas, nombre: nombreSR, mesa });
       if (r.errorMesa) await deshacerDesplazar();
       const deshacer = {
         label: "Deshacer",
@@ -1229,10 +1261,14 @@ export function PanelMesaLibre({
     });
 
   const sinReserva = (personas: number) => {
-    if (estadoSinReserva.tipo === "prevista") {
-      const desplazadas = recolocar(estadoSinReserva.desplazadas);
-      setPendiente({ texto: textoDesplazamiento(mesa.nombre, desplazadas, nombreMesa), ejecutar: () => sinReservaYa(personas, desplazadas) });
-    } else if (estadoSinReserva.tipo === "libre") void sinReservaYa(personas, []);
+    if (estadoSinReserva.tipo !== "prevista" && estadoSinReserva.tipo !== "libre") return;
+    const desplazadas = estadoSinReserva.tipo === "prevista" ? recolocar(estadoSinReserva.desplazadas) : [];
+    const textos = [
+      personas > mesa.plazas ? `Son ${personas} y la mesa ${mesa.nombre} es de ${mesa.plazas}.` : "",
+      desplazadas.length > 0 ? textoDesplazamiento(mesa.nombre, desplazadas, nombreMesa) : "",
+    ].filter(Boolean);
+    if (textos.length > 0) setPendiente({ texto: textos.join(" "), ejecutar: () => sinReservaYa(personas, desplazadas) });
+    else void sinReservaYa(personas, []);
   };
 
   const sentarUna = (r: ReservaMovil) => {
@@ -1290,12 +1326,6 @@ export function PanelMesaLibre({
         </p>
       )}
 
-      {prevista && onVerReserva && (
-        <Button variant="outline" className="h-11 w-full" onClick={() => onVerReserva(prevista.reservaId)}>
-          Ver la ficha de {prevista.nombre || "la reserva"}
-        </Button>
-      )}
-
       {pendiente ? (
         <ConfirmarDesplazamiento
           pendiente={pendiente}
@@ -1305,16 +1335,100 @@ export function PanelMesaLibre({
         />
       ) : (
         <>
+          {puedeEditar && reservaPrevista && (
+            <Button
+              className="h-auto min-h-16 w-full flex-col gap-0.5 py-2 text-lg font-bold"
+              disabled={ocupado}
+              onClick={() => sentarUna(reservaPrevista)}
+              data-testid="sentar-prevista"
+            >
+              <span>Sentar a {reservaPrevista.nombre || "la reserva"}</span>
+              <span className="text-sm font-normal opacity-90">
+                {horaCorta(reservaPrevista.hora)} · {reservaPrevista.numero_comensales} personas · ha llegado
+              </span>
+            </Button>
+          )}
+          {puedeEditar && reservaPrevista && (
+            <p className="-mt-2 flex items-center justify-end gap-2 text-sm text-muted-foreground">
+              ¿Vienen más o menos?
+              <BotonPersonas reserva={reservaPrevista} className="text-base font-semibold text-foreground" icono="h-4 w-4" />
+            </p>
+          )}
+
+          {puedeEditar && !ocupadaAhora && (
+            <section aria-label="Sentar sin reserva" className="space-y-3">
+              <Button
+                variant={reservaPrevista ? "secondary" : "default"}
+                className="h-16 w-full gap-2 text-lg font-bold"
+                aria-expanded={sinReservaAbierto}
+                disabled={ocupado}
+                onClick={() => setSinReservaAbierto((v) => !v)}
+              >
+                <UserPlus className="h-6 w-6" aria-hidden="true" />
+                Sentar sin reserva
+              </Button>
+              {sinReservaAbierto && (
+                <div className="space-y-3 rounded-lg border p-3" data-testid="sin-reserva-mesa">
+                  <p className="text-base font-semibold">¿Cuántos son?</p>
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                    {PERSONAS.map((n) => (
+                      <Button
+                        key={n}
+                        variant={personasSR === n && !otrasSR ? "default" : "outline"}
+                        className="h-14 text-lg font-semibold"
+                        disabled={ocupado}
+                        aria-pressed={personasSR === n && !otrasSR}
+                        onClick={() => {
+                          setPersonasSR(n);
+                          setOtrasSR("");
+                        }}
+                      >
+                        {n}
+                      </Button>
+                    ))}
+                  </div>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    placeholder="Otro número…"
+                    value={otrasSR}
+                    className="h-12 text-base"
+                    aria-label="Número de personas"
+                    onChange={(e) => {
+                      setOtrasSR(e.target.value);
+                      const n = parseInt(e.target.value, 10);
+                      setPersonasSR(Number.isFinite(n) && n > 0 ? n : null);
+                    }}
+                  />
+                  <Input
+                    value={nombreSR}
+                    onChange={(e) => setNombreSR(e.target.value)}
+                    placeholder="Nombre (opcional)"
+                    className="h-12 text-base"
+                    aria-label="Nombre (opcional)"
+                  />
+                  {personasSR !== null && personasSR > mesa.plazas && (
+                    <p className="text-sm text-amber-800 dark:text-amber-300">
+                      Son {personasSR} y la mesa es de {mesa.plazas}: quizá haya que juntar mesas.
+                    </p>
+                  )}
+                  <Button
+                    className="h-14 w-full text-base font-semibold"
+                    disabled={ocupado || personasSR === null}
+                    onClick={() => personasSR !== null && sinReserva(personasSR)}
+                  >
+                    {personasSR === null ? "Elige cuántos son" : `Sentar ${personasSR} en mesa ${mesa.nombre}`}
+                  </Button>
+                </div>
+              )}
+            </section>
+          )}
+
           {puedeEditar && hayCandidatas && (
-            <section aria-label="Sentar una reserva" className="space-y-3">
-              <p className="text-base font-semibold">Sentar una reserva</p>
-              {(
-                [
-                  ["Encajan aquí", candidatas.encajan, false],
-                  ["Otras", candidatas.otras, false],
-                  ["Con otra mesa fijada", candidatas.fijadasOtra, true],
-                ] as const
-              ).map(
+            <section aria-label="Sentar una reserva" className="space-y-3 border-t pt-4">
+              <p className="text-base font-semibold">{reservaPrevista ? "Otra reserva" : "Sentar una reserva"}</p>
+              {grupos.map(
                 ([titulo, filas, atenuadas]) =>
                   filas.length > 0 && (
                     <div key={titulo} className="space-y-1.5" data-grupo={titulo}>
@@ -1326,7 +1440,7 @@ export function PanelMesaLibre({
                             candidata={c}
                             plazasMesa={mesa.plazas}
                             atenuada={atenuadas}
-                            destacada={c.reserva.id === prevista?.reservaId}
+                            destacada={false}
                             disabled={ocupado}
                             onSentar={() => sentarUna(c.reserva)}
                           />
@@ -1337,31 +1451,15 @@ export function PanelMesaLibre({
               )}
             </section>
           )}
-
-          {puedeEditar && !ocupadaAhora && (
-            <section aria-label="Sentar sin reserva" className="space-y-2 border-t pt-4">
-              <p className="text-base font-semibold">Sin reserva: ¿cuántos son?</p>
-              <div className="grid grid-cols-4 gap-2">
-                {PERSONAS.map((n) => (
-                  <Button
-                    key={n}
-                    variant="outline"
-                    className="h-14 text-lg font-semibold"
-                    disabled={ocupado || n > mesa.plazas}
-                    title={n > mesa.plazas ? `Más de ${mesa.plazas}: hay que juntar mesas` : undefined}
-                    onClick={() => sinReserva(n)}
-                  >
-                    {n}
-                  </Button>
-                ))}
-              </div>
-              {mesa.plazas < PERSONAS.length && (
-                <p className="text-xs text-muted-foreground">Más de {mesa.plazas}: junta mesas antes de sentarlos.</p>
-              )}
-            </section>
-          )}
         </>
       )}
+
+      {prevista && onVerReserva && (
+        <Button variant="outline" className="h-11 w-full" onClick={() => onVerReserva(prevista.reservaId)}>
+          Ver la ficha de {prevista.nombre || "la reserva"}
+        </Button>
+      )}
+      {extra}
       </div>
 
       <div className="shrink-0 border-t px-4 py-2">
@@ -1370,6 +1468,60 @@ export function PanelMesaLibre({
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * `PanelMesaLibre` con sus datos (10/11/2026): para el plano de «Hoy» de escritorio, que solo sabe la mesa tocada.
+ * Lee salas, mesas, asignaciones, ajustes y configuración con las MISMAS consultas que la lista de la izquierda
+ * (misma caché: no pide nada nuevo).
+ */
+export function HojaMesaSentar({
+  mesa,
+  prevista,
+  fecha,
+  turno,
+  reservas,
+  extra,
+  onCerrar,
+}: {
+  mesa: MesaOpcion;
+  prevista: PrevistaMesa | null;
+  fecha: string;
+  turno: TurnoServicio;
+  reservas: ReservaMovil[];
+  extra?: ReactNode;
+  onCerrar: () => void;
+}) {
+  const minutoAhora = useMinutoAhora();
+  const { data: espacios } = useEspaciosReserva();
+  const { data: mesas } = useMesas();
+  const { data: asignaciones } = useAsignacionesMesa(fecha);
+  const { data: ajustesDia } = useAjustesMesaDia(fecha);
+  const { data: config } = useConfiguracionReservas();
+  const salas = useMemo(
+    () => ((espacios ?? []) as Array<{ id: string; nombre: string }>).map((e) => ({ id: e.id, nombre: e.nombre })),
+    [espacios],
+  );
+  const asignacion = configAsignacionDesde(config);
+  return (
+    <PanelMesaLibre
+      mesa={mesa}
+      prevista={prevista}
+      fecha={fecha}
+      turno={turno}
+      reservas={reservas}
+      mesas={mesas ?? []}
+      asignaciones={asignaciones ?? []}
+      configOcupacion={configServicioSalaDesde(config)}
+      minutoAhora={minutoAhora}
+      salas={salas}
+      ajustesDia={ajustesDia ?? []}
+      mesasExcluidas={asignacion.mesasExcluidas}
+      mesasAlFinal={asignacion.mesasAlFinal}
+      extra={extra}
+      onCerrar={onCerrar}
+    />
   );
 }
 
@@ -1703,11 +1855,15 @@ export function PanelReservaMovil({
         <SheetTitle className="flex items-center gap-2">
           <span className="truncate">{reserva.nombre || "Sin nombre"}</span>
           {info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>}
+          <InsigniaMenuDelDia reserva={reserva} />
         </SheetTitle>
         <SheetDescription asChild>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-1"><Clock className="h-4 w-4" aria-hidden />{horaCorta(reserva.hora)}</span>
-            <span className="flex items-center gap-1"><Users className="h-4 w-4" aria-hidden />{reserva.numero_comensales} pax</span>
+            <span className="flex items-center gap-1">
+              <BotonPersonas reserva={reserva} className="text-base font-semibold" icono="h-4 w-4" />
+              pax
+            </span>
             <span className="flex items-center gap-1">
               <MapPin className="h-4 w-4" aria-hidden />
               {salaNombre(reserva.espacio_id)} · {textoMesaConfirmada(nombresMesa, sentada)}

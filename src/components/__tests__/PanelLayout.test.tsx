@@ -22,6 +22,7 @@ vi.mock("@/components/notificaciones/CentroNotificaciones", () => ({
   CentroNotificaciones: () => <button type="button">Notificaciones</button>,
 }));
 vi.mock("@/components/carta/recorte/PrecargaRecorte", () => ({ PrecargaRecorte: () => null }));
+vi.mock("@/components/notificaciones/AvisosEnVivo", () => ({ AvisosEnVivo: () => null }));
 vi.mock("@/components/NavAutoCollapse", () => ({ NavAutoCollapse: () => null, defaultSidebarOpen: () => true }));
 vi.mock("@/lib/audit-access", () => ({ auditDeniedAccess: vi.fn() }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" }, loading: false }) }));

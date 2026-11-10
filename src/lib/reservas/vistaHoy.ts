@@ -24,7 +24,7 @@ import { turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad"
  * por nombre en `useReservasServicioDia`: las dos migraciones están en todos los proyectos.
  */
 export const COLUMNAS_RESERVAS_HOY =
-  "id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, importante, en_blacklist, notas_cliente, marca, llegada_at, salida_at, mesa_fijada";
+  "id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, importante, en_blacklist, notas_cliente, marca, llegada_at, salida_at, mesa_fijada, menu_del_dia";
 
 /** Las dos vistas de «Hoy». Por defecto, el kanban (la de siempre). */
 export type ModoVistaHoy = "kanban" | "plano";
@@ -128,6 +128,15 @@ export function coincideFiltroHoy(
 export function turnoDelPlano(filtroTurno: FiltroTurnoHoy, ahora: Date): "comida" | "cena" {
   if (filtroTurno === "comida" || filtroTurno === "cena") return filtroTurno;
   return turnoDeHora(ahora.getHours() * 60 + ahora.getMinutes());
+}
+
+/**
+ * ¿Ese turno de HOY ya ha terminado? (10/11/2026, «tocar una mesa en turno es para sentar»). Solo la comida
+ * puede estar cerrada: a partir de la hora de la cena (`turnoDelPlano("todo")`) ya no se sienta a nadie en
+ * la comida. La cena no se cierra en el día (la tablet sigue en «Hoy» hasta medianoche).
+ */
+export function turnoYaCerrado(turno: "comida" | "cena", ahora: Date): boolean {
+  return turno === "comida" && turnoDelPlano("todo", ahora) === "cena";
 }
 
 /**

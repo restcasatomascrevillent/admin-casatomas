@@ -139,8 +139,11 @@ import {
   ALTURA_MINIMA_PLANO_HOY_MOVIL,
   coincideFiltroHoy,
   turnoDelPlano,
+  turnoYaCerrado,
   type FiltroTurnoHoy,
 } from "@/lib/reservas/vistaHoy";
+import { HojaMesaSentar, type PrevistaMesa } from "../movil/VistaHoyMovil";
+import type { MesaOpcion } from "@/lib/reservas/hoyMovil";
 import { BlacklistModal } from "../BlacklistModal";
 import { ReservaCard } from "../ReservaCard";
 import { CONFIG_ESTADO_MESA, textoMinutosMesa } from "./estadosMesa";
@@ -479,6 +482,28 @@ export function VistaPlanoHoy({
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
   );
 
+  /**
+   * EN TURNO (10/11/2026, petición del dueño: «al hacer clic en la mesa tiene que ser para sentar a alguien, con o
+   * sin reserva»): una mesa LIBRE o solo PREVISTA (reservada / retrasada, aún no han llegado) abre la hoja «Mesa N ·
+   * Sala» para sentar (`HojaMesaSentar`, la misma del móvil). Ocupada, «Organizar», solo «Ver» o el turno ya
+   * cerrado: el detalle de siempre, que sigue a mano desde la hoja con «Ver detalle de la mesa».
+   */
+  const [mesaSentar, setMesaSentar] = useState<{ mesa: MesaOpcion; prevista: PrevistaMesa | null; mesaId: string } | null>(null);
+  useEffect(() => setMesaSentar(null), [sala?.id, proponiendo]);
+  const abrirSentar = (mesa: Mesa): boolean => {
+    if (proponiendo || !puedeEditar || !sala || turnoYaCerrado(turno, ahora)) return false;
+    const e = estados.get(mesa.id);
+    const estado = e?.estado ?? "libre";
+    if (estado !== "libre" && estado !== "reservada" && estado !== "retrasada") return false;
+    const r = estado === "libre" ? null : e?.reserva ?? null;
+    setMesaSelId(null);
+    setMesaSentar({
+      mesaId: mesa.id,
+      mesa: { id: mesa.id, nombre: mesa.nombre, espacioId: sala.id, salaNombre: sala.title, plazas: mesa.capacidad },
+      prevista: r ? { reservaId: r.id, nombre: r.nombre ?? "", hora: r.hora, fijada: !!r.mesa_fijada } : null,
+    });
+    return true;
+  };
   const tocarMesa = (mesa: Mesa) => {
     if (eligiendoPara && puedeEditar) {
       const r = eligiendoPara;
@@ -486,6 +511,7 @@ export function VistaPlanoHoy({
       void soltar(r, mesa);
       return;
     }
+    if (abrirSentar(mesa)) return;
     setMesaSelId((actual) => (actual === mesa.id ? null : mesa.id));
   };
 
@@ -1054,6 +1080,7 @@ export function VistaPlanoHoy({
                   <p className="flex items-center justify-between gap-2 text-sm">
                     <span className="min-w-0 truncate">
                       <span className="tabular-nums">{hora}</span> · {r.nombre || "Sin nombre"}
+                      {r.importante && <Star className="ml-1 inline h-3.5 w-3.5 fill-amber-400 text-amber-600" aria-label="Importante" />}
                     </span>
                     <span className={cn("shrink-0 text-[13px] tabular-nums", noCaben ? "font-medium text-amber-800 dark:text-amber-300" : "text-muted-foreground")}>
                       {sentando === r.id ? <Loader2 className="h-4 w-4 animate-spin" aria-label="Guardando" /> : `${pax} pax${noCaben ? " · no caben" : ""}`}
@@ -1472,6 +1499,37 @@ export function VistaPlanoHoy({
       )}
 
       {/* Por debajo de 1280 px: la mesa tocada y la lista por sentar, en hojas (de lado en tablet, desde abajo en móvil). */}
+      <Sheet open={!!mesaSentar} onOpenChange={(abierta) => !abierta && setMesaSentar(null)}>
+        <SheetContent
+          side={esMovil ? "bottom" : "right"}
+          className={cn("flex flex-col gap-0 p-0", esMovil ? "h-[92dvh] max-h-[92dvh] rounded-t-2xl" : "w-[min(92vw,32rem)] sm:max-w-none")}
+        >
+          {mesaSentar && (
+            <HojaMesaSentar
+              key={mesaSentar.mesaId}
+              mesa={mesaSentar.mesa}
+              prevista={mesaSentar.prevista}
+              fecha={hoy}
+              turno={turno}
+              reservas={lista}
+              onCerrar={() => setMesaSentar(null)}
+              extra={
+                <Button
+                  variant="outline"
+                  className="h-12 w-full"
+                  onClick={() => {
+                    const id = mesaSentar.mesaId;
+                    setMesaSentar(null);
+                    setMesaSelId(id);
+                  }}
+                >
+                  Ver detalle de la mesa
+                </Button>
+              }
+            />
+          )}
+        </SheetContent>
+      </Sheet>
       {enHojas && (
         <>
           <Sheet open={!!mesaSel} onOpenChange={(abierta) => !abierta && setMesaSelId(null)}>

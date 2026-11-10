@@ -40,7 +40,7 @@ import {
   debeNotificarAltaPanel,
   emailParaGuardar,
   errorEmailOpcional,
-  errorTelefono,
+  errorTelefonoOpcional,
   esErrorSinPermiso,
   PEDIR_PERMISO_EDICION,
 } from "./altaPanel";
@@ -250,14 +250,14 @@ export function errorNombreEdicion(nuevo: string | null | undefined, original: s
 
 /**
  * Igual para el teléfono: lo heredado sin tocar (incluso vacío o raro) no
- * bloquea; lo que se toca se valida como en el alta (`errorTelefono`).
+ * bloquea; lo que se toca se valida como en el alta (`errorTelefonoOpcional`).
  */
 export function errorTelefonoEdicion(
   nuevo: string | null | undefined,
   original: string | null | undefined,
 ): string | null {
   if ((nuevo ?? "").trim() === (original ?? "").trim()) return null;
-  return errorTelefono(nuevo);
+  return errorTelefonoOpcional(nuevo);
 }
 
 /**

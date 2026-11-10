@@ -109,6 +109,7 @@ import {
   type ResultadoNotificarEmailsReserva,
 } from "./plantillas.ts";
 import { resolverRuta, rutaDelPath, secretoCompartidoValido } from "./rutas.ts";
+import { construirOrigenReserva } from "./origen.ts";
 // Cierres de reservas (lunes, jueves, domingo noche + calendario del panel).
 import {
   normalizarServiciosCerrados,
@@ -137,11 +138,21 @@ import {
   faltaColumnaConsentimientoSolicitud,
   interpretarSondeoDobleOptin,
   consentimientoNewsletterParaGuardar,
+  turnosBloqueadosDesdeFilas,
+  rechazoServicioBloqueado,
+  rechazoMismoDiaTelefono,
+  rechazoMenuDelDia,
+  leerMenuDelDia,
+  motivoHoraNoOfrecidaWeb,
+  type TurnoWeb,
   type ConsentimientosReserva,
   type EstadoDobleOptin,
 } from "./reglas.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 import {
+  hashIp,
+  ipCliente,
+  IP_DESCONOCIDA,
   puedeEnviarCorreoRechazo,
   reservarCupoCrear,
   reservarCupoDisponibilidad,
@@ -317,6 +328,24 @@ async function salasCerradasPorEventoDe(
       marca,
     );
   } catch {
+    return [];
+  }
+}
+
+// --- Servicios bloqueados para la web (20261122100000) ---
+// Turnos de ese día que el panel ha cerrado a las reservas online. Si la tabla
+// aún no existe (migración sin aplicar) o falla la lectura, no se bloquea
+// nada (se avisa en el log): la web sigue funcionando como antes.
+async function turnosBloqueadosDe(fecha: string): Promise<TurnoWeb[]> {
+  try {
+    const { data, error } = await supabase.from("servicios_bloqueados").select("turno").eq("fecha", fecha);
+    if (error) {
+      console.warn("[BLOQUEOS] servicios_bloqueados no legible:", error.message);
+      return [];
+    }
+    return turnosBloqueadosDesdeFilas(data as Array<{ turno: unknown }> | null);
+  } catch (err) {
+    console.warn("[BLOQUEOS] servicios_bloqueados no legible:", (err as Error)?.message || err);
     return [];
   }
 }
@@ -1132,9 +1161,9 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
     serviciosCerrados: turnosCerrados,
     ahora: ahoraEnMadrid(),
     politica: {
-      // `/crear` rechaza SIEMPRE las reservas para hoy (motivo `reserva_hoy`).
-      // Ofrecer huecos de hoy sería mandar al visitante a un rechazo seguro.
-      permitirMismoDia: false,
+      // Desde el 10/11/2026 la web admite reservas para hoy (con el corte
+      // horario), salvo 12:30-16:00, que va por teléfono (reglas.ts).
+      permitirMismoDia: true,
       minutosCorte: config.minutos_corte_antes_servicio || 60,
       diasMaxAntelacion: config.dias_max_antelacion || 60,
       maxComensales: config.max_comensales_por_reserva || null,
@@ -1177,14 +1206,34 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
   }));
 
   // --- `hueco`: LO QUE HAY QUE PINTAR ---
-  const huecosOut = resultado.huecos.map((h) => ({
-    ...h,
-    fecha,
-    kind: "hueco" as const,
-  }));
+  // Bloqueos solo de la web (reglas.ts): servicio bloqueado desde el panel y
+  // «hoy 12:30-16:00 solo por teléfono». Esas horas salen de `hueco` y pasan
+  // a `descartado` con su código, igual que las rechaza /crear.
+  const fechaHoy = ahoraEnMadrid().fechaHoy;
+  const turnosBloqueados = await turnosBloqueadosDe(fecha);
+  const descartadosWeb: Array<Record<string, unknown>> = [];
+  const huecosOut = resultado.huecos
+    .filter((h) => {
+      const motivoWeb = motivoHoraNoOfrecidaWeb(fecha, h.hora, fechaHoy, turnosBloqueados);
+      if (!motivoWeb) return true;
+      descartadosWeb.push({
+        hora: h.hora,
+        nivel: h.nivel,
+        minutos_nivel: h.minutos_nivel,
+        periodo: h.periodo,
+        motivo: motivoWeb,
+        detalle: `${h.hora} no se puede reservar online (${motivoWeb})`,
+      });
+      return false;
+    })
+    .map((h) => ({
+      ...h,
+      fecha,
+      kind: "hueco" as const,
+    }));
 
   // --- `descartado`: por qué NO se ofrece cada hora (diagnóstico) ---
-  const descartadosOut = resultado.descartados.slice(0, 200).map((d) => ({
+  const descartadosOut = [...descartadosWeb, ...resultado.descartados].slice(0, 200).map((d) => ({
     ...d,
     fecha,
     kind: "descartado" as const,
@@ -1207,6 +1256,9 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
     // NUEVO (2026-10-13): servicios sin reservas ese día ("comida" | "cena").
     // Con los dos, `cerrado = true` y `motivo_cierre = "cierre_reservas"`.
     servicios_cerrados: turnosCerrados,
+    // NUEVO (2026-11-10): servicios bloqueados a la web desde el panel
+    // ("comida" | "cena"); sus horas no salen como `hueco`.
+    servicios_bloqueados: turnosBloqueados,
     aforo_turno: {
       comida: resultado.aforo.comida,
       cena: resultado.aforo.cena,
@@ -1261,6 +1313,8 @@ async function handleCierres(req: Request): Promise<Response> {
 // ============================================================
 async function handleCrear(req: Request): Promise<Response> {
   if (!checkSharedSecret(req)) return json({ ok: false, error: "unauthorized" }, 401);
+  // Hora de llegada de la petición: va a `reservas.origen` («Cómo se hizo la reserva»).
+  const recibidoAt = new Date();
 
   let body: Record<string, unknown>;
   try {
@@ -1450,6 +1504,27 @@ async function handleCrear(req: Request): Promise<Response> {
     );
   }
 
+  // Bloqueos solo de la web (reglas.ts), sin solicitud pendiente ni correo,
+  // igual que el cierre: hoy 12:30-16:00 solo por teléfono (ANTES del
+  // `reserva_hoy` genérico, para dar el mensaje concreto), servicio bloqueado
+  // desde el panel y las condiciones del menú del día.
+  const rechazoMismoDia = rechazoMismoDiaTelefono(fecha, hora, ahoraEnMadrid().fechaHoy);
+  if (rechazoMismoDia) return json(rechazoMismoDia.cuerpo, rechazoMismoDia.status);
+  const rechazoBloqueo = rechazoServicioBloqueado(hora, await turnosBloqueadosDe(fecha));
+  if (rechazoBloqueo) return json(rechazoBloqueo.cuerpo, rechazoBloqueo.status);
+  const menuDelDia = leerMenuDelDia(body);
+  if (menuDelDia) {
+    // Sala que pide el cliente (aunque en Casa Tomás no se guarde): por nombre
+    // o, si manda `espacio_id`, el nombre de ese espacio.
+    let salaPedida: string | null = salaNombreBody && salaNombreBody.trim() ? salaNombreBody : null;
+    if (!salaPedida && espacioIdBody) {
+      const { data: espacioPedido } = await supabase.from("espacios_reserva").select("nombre").eq("id", espacioIdBody).maybeSingle();
+      salaPedida = (espacioPedido?.nombre as string | undefined) ?? espacioIdBody;
+    }
+    const rechazoMenu = rechazoMenuDelDia(true, fecha, hora, salaPedida);
+    if (rechazoMenu) return json(rechazoMenu.cuerpo, rechazoMenu.status);
+  }
+
   // Blacklist — igual que fnCreateReservation: NO se registra en
   // solicitudes_pendientes (ya está fichado) y el motivo devuelto al
   // cliente es genérico, para no confirmarle que está en la lista.
@@ -1487,9 +1562,8 @@ async function handleCrear(req: Request): Promise<Response> {
   const hoyRef = hoyEnMadrid();
   const reservaDateRef = new Date(fecha + "T00:00:00Z");
   const diffDiasRef = Math.ceil((reservaDateRef.getTime() - hoyRef.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDiasRef === 0) {
-    return await avisar("reserva_hoy", "Intentó reservar para hoy desde la web.", "Las reservas para hoy se gestionan por teléfono.", 422);
-  }
+  // Hoy ya se admite (10/11/2026): lo frenan el corte horario y la franja
+  // 12:30-16:00 solo por teléfono (más arriba).
   // Fecha pasada y fecha demasiado lejana: la fecha es válida y parseable,
   // lo que incumple es una regla de negocio corregible -> 422, no 400.
   if (diffDiasRef < 0) {
@@ -1699,6 +1773,23 @@ async function handleCrear(req: Request): Promise<Response> {
       : false,
     condiciones_aceptadas_at: consentimientos.aceptaCondiciones ? new Date().toISOString() : null,
   };
+  // Solo si es true: con false manda el DEFAULT de la columna, y así una
+  // reserva normal no se cae si la función sale antes que la migración
+  // 20261122100000.
+  if (menuDelDia) filaReserva.menu_del_dia = true;
+  // «Cómo se hizo la reserva» (columna `origen`, migración 2026112212…): lo
+  // que manda la web (opcional y validado en origen.ts) más lo que ve la
+  // función. Nunca hace fallar la reserva: si algo va mal, sin `origen`.
+  try {
+    const ipHashOrigen = await hashIp(ipCliente(req) ?? IP_DESCONOCIDA, IP_SALT);
+    filaReserva.origen = construirOrigenReserva(body?.origen, {
+      recibidoAt,
+      userAgent: req.headers.get("user-agent"),
+      ipHash: ipHashOrigen,
+    });
+  } catch (e) {
+    console.error("[CREAR] No se pudo preparar origen:", e instanceof Error ? e.message : e);
+  }
 
   let { data: inserted, error: insertError } = await supabase
     .from("reservas")
@@ -1717,6 +1808,18 @@ async function handleCrear(req: Request): Promise<Response> {
     ({ data: inserted, error: insertError } = await supabase
       .from("reservas")
       .insert(filaSinCondiciones)
+      .select("id")
+      .single());
+  }
+
+  // Igual para `origen`: si la función sale antes que su migración, se guarda
+  // la reserva sin esa columna (solo se pierde el «cómo se hizo»).
+  if (insertError && esColumnaInexistente(insertError, "origen")) {
+    console.error("[CREAR] Falta la columna reservas.origen (¿migración 2026112212 sin aplicar?). Se guarda la reserva sin ella.");
+    delete filaReserva.origen;
+    ({ data: inserted, error: insertError } = await supabase
+      .from("reservas")
+      .insert(filaReserva)
       .select("id")
       .single());
   }

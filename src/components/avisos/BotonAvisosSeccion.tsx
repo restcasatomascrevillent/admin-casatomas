@@ -7,6 +7,9 @@ import { useAvisosSeccion, useContadorAvisosSeccion, type FiltrosAvisosSeccion }
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { agruparPorDia, EVENTO_ABRIR_AVISOS, horaAviso, rutaDeAviso, SECCIONES_AVISOS, TIPO_ICON, type SeccionAvisos } from "@/lib/avisos";
 import { cn } from "@/lib/utils";
+import { AjustesAvisosEnVivo } from "@/components/notificaciones/AvisosEnVivo";
+import { useEstadoAvisosEnVivo } from "@/hooks/useAvisosEnVivo";
+import { avisosEnVivo } from "@/lib/avisosEnVivo/preferencias";
 
 /**
  * Botón «Avisos» de una sección (Reservas, Facturas). 06/11/2026, petición del dueño: los avisos
@@ -27,6 +30,9 @@ export function BotonAvisosSeccion({ seccion, className, compacto = false }: { s
   }, [seccion]);
   const pendientes = useContadorAvisosSeccion(seccion);
   const conPendientes = pendientes > 0;
+  // En Reservas, late mientras haya algo nuevo sin mirar (AvisosEnVivo); abrirlo lo da por visto.
+  const { sinVer } = useEstadoAvisosEnVivo();
+  const late = seccion === "reservas" && sinVer > 0;
   const etiqueta = conPendientes
     ? `Avisos: ${pendientes} sin revisar`
     : "Avisos: ninguno sin revisar";
@@ -36,8 +42,15 @@ export function BotonAvisosSeccion({ seccion, className, compacto = false }: { s
       <Button
         type="button"
         variant={conPendientes ? "destructive" : "outline"}
-        className={cn("relative h-9 shrink-0 gap-1.5 px-3 pointer-coarse:h-9", className)}
-        onClick={() => setAbierto(true)}
+        className={cn(
+          "relative h-9 shrink-0 gap-1.5 px-3 pointer-coarse:h-9",
+          late && "bg-red-600 text-white ring-2 ring-red-500 ring-offset-2 ring-offset-background hover:bg-red-700 motion-safe:animate-pulse",
+          className,
+        )}
+        onClick={() => {
+          setAbierto(true);
+          if (seccion === "reservas") avisosEnVivo.marcarVistos();
+        }}
         aria-label={etiqueta}
         title={etiqueta}
         data-testid={`avisos-${seccion}`}
@@ -47,7 +60,7 @@ export function BotonAvisosSeccion({ seccion, className, compacto = false }: { s
         {conPendientes && (
           <span
             aria-hidden="true"
-            className="ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold leading-5 text-destructive"
+            className="ml-0.5 inline-flex min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-sm font-bold leading-6 text-destructive"
           >
             {pendientes > 99 ? "99+" : pendientes}
           </span>
@@ -117,6 +130,8 @@ function ModalAvisos({
             ha generado.
           </DialogDescription>
         </DialogHeader>
+
+        {seccion === "reservas" && <AjustesAvisosEnVivo className="shrink-0 rounded-md border px-3 py-2" />}
 
         <div className="flex shrink-0 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrar por estado">

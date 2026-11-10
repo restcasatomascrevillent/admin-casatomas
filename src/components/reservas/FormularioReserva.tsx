@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format, addDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, Armchair, CalendarIcon, CheckCircle, ChevronDown, Info, MapPin, Minus, Plus, ShieldBan } from "lucide-react";
+import { AlertTriangle, Armchair, CalendarIcon, CheckCircle, ChevronDown, Info, MapPin, Minus, Plus, ShieldBan, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +26,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { verificarAforoTurno } from "@/hooks/useDisponibilidad";
 import { useCierresReserva } from "@/hooks/useCierresReserva";
-import { textoTurnosCerrados, turnoDeHoraServicio, turnosCerradosEn } from "../../../supabase/functions/_shared/cierres";
+import {
+  diasAbiertosSinReservaOnlineDesde,
+  separarCierres,
+  textoTurnosCerrados,
+  turnoDeHoraServicio,
+  turnosCerradosEn,
+} from "../../../supabase/functions/_shared/cierres";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -42,13 +48,15 @@ import {
   horaCorta,
 } from "@/lib/reservas/ocupacionSalas";
 import { OcupacionSalas } from "./OcupacionSalas";
-import { DisponibilidadCuartos, useRejillaCuartos } from "./DisponibilidadCuartos";
+import { useRejillaCuartos } from "./DisponibilidadCuartos";
+import { ReservasDelDia } from "./ReservasDelDia";
+import { admiteMenuDelDia } from "@/lib/reservas/menuDelDia";
 import { formatearTelefonoReserva, variantesTelefono } from "@/lib/reservas/telefono";
 import {
   debeNotificarAltaPanel,
   emailParaGuardar,
   errorEmailOpcional,
-  errorTelefono,
+  errorTelefonoOpcional,
   esErrorSinPermiso,
   estadoInicialAltaPanel,
   MENSAJE_SIN_PERMISO_ALTA,
@@ -86,16 +94,18 @@ import {
   type ReservaEditable,
 } from "@/lib/reservas/edicionReserva";
 
-// Teléfono obligatorio. El email es OPCIONAL (cambio 2026-09-30; antes era
+// Teléfono y email OPCIONALES. El email es OPCIONAL (cambio 2026-09-30; antes era
 // obligatorio por decisión del dueño de 2026-09-23): con email, el cliente recibe
 // un correo para confirmar la reserva; sin él no se manda nada y se guarda
 // `null`. Reglas en src/lib/reservas/altaPanel.ts.
 const formSchema = z.object({
   nombre: z.string({ required_error: "El nombre es obligatorio" }).trim().min(2, "El nombre es obligatorio"),
+  // Teléfono OPCIONAL (2026-11-10): si se rellena, se valida.
   telefono: z
-    .string({ required_error: "El teléfono es obligatorio" })
+    .string()
+    .optional()
     .superRefine((v, ctx) => {
-      const mensaje = errorTelefono(v);
+      const mensaje = errorTelefonoOpcional(v);
       if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
     }),
   // No se usa `.email()` de zod: rechaza la cadena vacía, que es justo lo que
@@ -118,7 +128,7 @@ const formSchema = z.object({
   // 2026-10-01). El alta escribe siempre `marca: MARCA_POR_DEFECTO` (ver `onSubmit`).
   /** Sala asignada (null = sin asignar). Interna y opcional. */
   espacio_id: z.string().nullable().optional(),
-  /** Solo al EDITAR: marca de «importante» (en el alta no existe). */
+  /** Marca de «importante» (reserva del jefe): en el alta y al editar. */
   importante: z.boolean().optional(),
 });
 
@@ -137,7 +147,7 @@ function esquemaEdicion(original: ReservaEditable) {
       const mensaje = errorNombreEdicion(v, original.nombre);
       if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
     }),
-    telefono: z.string().superRefine((v, ctx) => {
+    telefono: z.string().optional().superRefine((v, ctx) => {
       const mensaje = errorTelefonoEdicion(v, original.telefono);
       if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
     }),
@@ -323,6 +333,8 @@ export const FormularioReserva = ({
   // guardado (al editar) o «no» (en el alta).
   const eventoGuardado = useSalaEventoDeReserva(reservaAEditar?.id);
   const [ocupaSalaElegido, setOcupaSalaElegido] = useState<boolean | null>(null);
+  // «Menú del día» (solo en el alta, martes a jueves antes de las 17:00).
+  const [menuDelDia, setMenuDelDia] = useState(false);
 
   const esquema = useMemo(() => (reservaAEditar ? esquemaEdicion(reservaAEditar) : formSchema), [reservaAEditar]);
   const form = useForm<FormValues>({
@@ -369,6 +381,7 @@ export const FormularioReserva = ({
   const watchedEspacio = form.watch("espacio_id") ?? null;
   const fechaStr = watchedFecha ? format(watchedFecha, "yyyy-MM-dd") : null;
   // Sin sala no hay evento: la casilla se desactiva y no cuenta.
+  const puedeMenuDelDia = !reservaAEditar && admiteMenuDelDia(watchedFecha, watchedHora);
   const ocupaSalaGuardado = !!eventoGuardado.data;
   const ocupaSala = !!watchedEspacio && (ocupaSalaElegido ?? ocupaSalaGuardado);
 
@@ -378,7 +391,14 @@ export const FormularioReserva = ({
   // Cierres de reservas (lunes, jueves, domingo noche, calendario): el panel
   // NO bloquea, solo avisa — el personal puede hacer una excepción.
   const { data: cierresFecha } = useCierresReserva(isPublic ? null : fechaStr, isPublic ? null : fechaStr);
-  const turnosCerradosFecha = fechaStr ? turnosCerradosEn(cierresFecha?.cierres ?? [], fechaStr) : [];
+  // Jueves de tapas (dueño, 2026-11-10: «Abierto, sin reservas web»): el local abre y el personal
+  // apunta reservas sin aviso de día cerrado; solo una nota de que la web y el teléfono no las cogen.
+  const { cerrados: cierresDeVerdad, sinReservaOnline: sinOnlineFecha } = separarCierres(
+    cierresFecha?.cierres ?? [],
+    diasAbiertosSinReservaOnlineDesde(configReservas),
+  );
+  const turnosCerradosFecha = fechaStr ? turnosCerradosEn(cierresDeVerdad, fechaStr) : [];
+  const soloSinReservaWeb = !!fechaStr && turnosCerradosFecha.length === 0 && sinOnlineFecha.length > 0;
   const cierreAfectaHora =
     turnosCerradosFecha.length === 2 ||
     (!!watchedHora && turnosCerradosFecha.includes(turnoDeHoraServicio(watchedHora)));
@@ -955,6 +975,8 @@ export const FormularioReserva = ({
         canal: isPublic ? "web" : datosPreseleccionados?.canal ?? "manual",
         en_blacklist: !!blacklisted,
       };
+      if (values.importante) fila.importante = true;
+      if (puedeMenuDelDia && menuDelDia) fila.menu_del_dia = true;
       if (datosPreseleccionados?.solicitud_id) fila.solicitud_id = datosPreseleccionados.solicitud_id;
 
       const insertar = (valores: Record<string, unknown>) =>
@@ -1086,7 +1108,7 @@ export const FormularioReserva = ({
             name="telefono"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Teléfono</FormLabel>
+                <FormLabel>Teléfono (opcional)</FormLabel>
                 <FormControl>
                   <Input type="tel" inputMode="tel" autoComplete="tel" placeholder="612345678" {...field} />
                 </FormControl>
@@ -1315,9 +1337,8 @@ export const FormularioReserva = ({
 
         {!isPublic && (
           <div className="rounded-lg border p-3">
-            <DisponibilidadCuartos
+            <ReservasDelDia
               fecha={fechaStr}
-              comensales={Number(watchedComensales) || 0}
               hora={watchedHora || null}
               excluirReservaId={reservaAEditar?.id}
               onSeleccionarHora={(hora) => {
@@ -1441,21 +1462,39 @@ export const FormularioReserva = ({
           )}
         />
 
-        {/* Solo al EDITAR: en el alta la estrella no existe (se marca después,
-            desde la lista o el Kanban); aquí se puede hacer en el mismo paso. */}
-        {editando && (
-          <FormField
-            control={form.control}
-            name="importante"
-            render={({ field }) => (
-              <FormItem className="flex min-h-11 flex-row items-center gap-2 space-y-0">
-                <FormControl>
-                  <Checkbox checked={!!field.value} onCheckedChange={(valor) => field.onChange(valor === true)} />
-                </FormControl>
-                <FormLabel className="font-normal">Marcar como importante</FormLabel>
-              </FormItem>
-            )}
-          />
+        {/* Interruptor de «importante» (las reservas del jefe), en el alta y al editar.
+            Mismo icono y color que la estrella de la Lista. */}
+        <FormField
+          control={form.control}
+          name="importante"
+          render={({ field }) => (
+            <FormItem className="space-y-0">
+              <FormControl>
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-pressed={!!field.value}
+                  onClick={() => field.onChange(!field.value)}
+                  className={cn(
+                    "h-12 w-full justify-start gap-2 text-base",
+                    field.value && "border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-200",
+                  )}
+                >
+                  <Star className={cn("h-5 w-5", field.value ? "fill-amber-400 text-amber-500" : "text-muted-foreground")} aria-hidden="true" />
+                  {field.value ? "Importante" : "Marcar como importante (reserva del jefe)"}
+                </Button>
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        {puedeMenuDelDia && (
+          <div className="flex min-h-11 flex-row items-center gap-2">
+            <Checkbox id="menu-del-dia" checked={menuDelDia} onCheckedChange={(v) => setMenuDelDia(v === true)} />
+            <Label htmlFor="menu-del-dia" className="font-normal">
+              Menú del día
+            </Label>
+          </div>
         )}
 
         {erroresValidacion.length > 0 && (
@@ -1488,6 +1527,12 @@ export const FormularioReserva = ({
               {cierreAfectaHora ? " Puedes guardarla igualmente si es una excepción." : ""}
             </AlertDescription>
           </Alert>
+        )}
+
+        {!isPublic && soloSinReservaWeb && (
+          <p data-testid="nota-sin-reservas-web" className="text-sm text-muted-foreground">
+            Ese día la web y el teléfono no cogen reservas, pero el restaurante abre: puedes apuntarla aquí.
+          </p>
         )}
 
         {!isPublic && datosDia?.cerrado && (

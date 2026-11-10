@@ -2,6 +2,32 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.14.0] - 2026-11-10
+
+Objetivo: Reservas: bloqueo de servicio, menú del día, reservas del mismo día, campana y avisos, Hoy mejorado (sentar al tocar mesa, colores, personas, tamaños), estrella importante, registro de origen y jueves de tapas
+
+### Añadido
+- Reservas: bloquear servicio a la web, hoy a mediodía solo por teléfono y menú del día ([ddab644](https://github.com/restcasatomascrevillent/admin-casatomas/commit/ddab644c967735ad320be815ad52c731dfefe081))
+- Reservas: teléfono opcional, bloqueo de comida/cena online desde Hoy y menú del día ([0b6c72b](https://github.com/restcasatomascrevillent/admin-casatomas/commit/0b6c72bdddf813922a518bcd3efd00ce2a900cfa))
+- Reservas: la campana muestra las reservas y solicitudes por gestionar ([355f9b2](https://github.com/restcasatomascrevillent/admin-casatomas/commit/355f9b23317d590f9671f368011cb1126354d559))
+- Reservas-web: se puede reservar para hoy desde la web ([af8693d](https://github.com/restcasatomascrevillent/admin-casatomas/commit/af8693d7258dbc8fa1ba18d947b3cd5d83aa8160))
+- Reservas: en turno, tocar una mesa libre o prevista es para sentar ([d759c1a](https://github.com/restcasatomascrevillent/admin-casatomas/commit/d759c1a252c4869ee749c44ee4e571b8556362fe))
+- Reservas: cambiar el número de personas desde Hoy con un toque ([d9f05d2](https://github.com/restcasatomascrevillent/admin-casatomas/commit/d9f05d2b93c062702630a1b7a40978b2802ab7f1))
+- Reservas: Hoy en escritorio con lista mas grande y mesas mas pequenas ([5735a8a](https://github.com/restcasatomascrevillent/admin-casatomas/commit/5735a8aa02bdd2dfbb5f8085c4e569faf39ccb6c))
+- Reservas: avisos en vivo más visibles y canal «En local» para sin reserva ([df57b1f](https://github.com/restcasatomascrevillent/admin-casatomas/commit/df57b1fc74d4fa8815827820037c45846af5a598))
+- Reservas: lista de reservas del día en Nueva reserva en lugar de la disponibilidad ([5b52066](https://github.com/restcasatomascrevillent/admin-casatomas/commit/5b5206686f31b8a4e60b4bb7ef4d67f45e48c6d3))
+- Reservas: «Cómo se hizo la reserva» — columna origen, reservas-web y ficha ([ae0ab0b](https://github.com/restcasatomascrevillent/admin-casatomas/commit/ae0ab0bf70ae1db1ee2733bd75266fe842431b7f))
+- Reservas: marcar como importante (reserva del jefe) en Nueva reserva ([f91910c](https://github.com/restcasatomascrevillent/admin-casatomas/commit/f91910cb4891949681ef9cc7b36eb815b99b6ced))
+
+### Cambiado
+- Movil: decidir teléfono también por pantalla y puntero táctil ([90344ac](https://github.com/restcasatomascrevillent/admin-casatomas/commit/90344ac0438cfd6f4ecb81bc03127300d97e54b1))
+- Rama fix/calendario-jueves ([#69](https://github.com/restcasatomascrevillent/admin-casatomas/pull/69))
+- Reservas: mismos colores de mesa en móvil y escritorio ([4e593ef](https://github.com/restcasatomascrevillent/admin-casatomas/commit/4e593efbc641452bbe67f57afdd8e17e074d5bfc))
+- Reservas: una mesa liberada se puede volver a dar enseguida ([322d7df](https://github.com/restcasatomascrevillent/admin-casatomas/commit/322d7dfb2c6684167ee37cd1adcbd04fcac6fe57))
+
+### Otros
+- Reservas: el teléfono vacío ya vale al editar ([843954b](https://github.com/restcasatomascrevillent/admin-casatomas/commit/843954bf0a4e4f77d3ca83d31babbd094c64fd0d))
+
 ## [1.13.0] - 2026-11-10
 
 Objetivo: Instagram: plantillas por papel (portada, plato, cierre, frase) que no parecen de IA

@@ -196,11 +196,11 @@ function TarjetaMesa({
   // Se puede SOLTAR una reserva encima (como en el plano). Sin `DndContext` alrededor no hace nada.
   const { setNodeRef, isOver } = useDroppable({ id: `mesa-grande-${principal.id}`, data: { mesaId: principal.id } });
 
-  // Escala por tamaño: el número baja de 30 a 14 px (y cabe a lo ancho); el resto se va quitando.
+  // Escala por tamaño: el número baja de 30 a 18 px; el texto, 13 px como mínimo (y cabe a lo ancho); el resto se va quitando.
   const a = ancho;
   const h = alto;
-  const tamanoNumero = Math.round(Math.max(14, Math.min(30, h * 0.3, (a - 16) / (Math.max(2, numero.length) * 0.62))));
-  const letra = a < 96 || h < 72 ? 11 : 13;
+  const tamanoNumero = Math.round(Math.max(18, Math.min(30, h * 0.3, (a - 16) / (Math.max(2, numero.length) * 0.62))));
+  const letra = 13;
   const conPlazas = h >= 72;
   const conNombre = h >= 92 && a >= 84;
   const conJuntas = juntas && h >= 112;

@@ -37,6 +37,7 @@ import { type ReservaParaVerificar, difiereSolicitudDeOferta } from "@/hooks/use
 // que la escritura de verdad se ha guardado, la condiciona al estado de partida, refresca la caché
 // y avisa al cliente con la respuesta comprobada).
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
+import { etiquetaCanal } from "@/lib/reservas/etiquetaCanal";
 
 interface ModalVerificacionReservaProps {
   reserva: ReservaParaVerificar | null;
@@ -218,7 +219,7 @@ export function ModalVerificacionReserva({
               <Users className="h-3.5 w-3.5 shrink-0" /> {reserva.numero_comensales} comensales
               {reserva.canal && (
                 <Badge variant="outline" className="ml-1 text-[10px] pointer-coarse:text-xs font-normal">
-                  {reserva.canal}
+                  {etiquetaCanal(reserva.canal)}
                 </Badge>
               )}
             </p>
