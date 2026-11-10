@@ -107,8 +107,9 @@ export function BotonSentarFuera({
           CLASE_AZUL_FUERA,
           variante === "grande" && "h-14 w-full text-base",
           variante === "fila" && "h-14 w-14 shrink-0 flex-col gap-0 px-0 text-xs leading-tight pointer-coarse:h-14 pointer-coarse:w-14 pointer-coarse:px-0",
-          // Fila de escritorio: solo el icono en tablet (la lista mide 24 rem) y con «Fuera» desde 1280 px.
-          variante === "compacto" && "h-11 w-11 shrink-0 gap-1 px-0 text-sm pointer-coarse:px-0 xl:w-auto xl:px-2.5 xl:pointer-coarse:px-2.5",
+          // Fila de escritorio: solo el icono (44 × 44), a cualquier ancho: el sitio es para el nombre (10/11/2026).
+          // Lo dicen el `title` y el `aria-label`.
+          variante === "compacto" && "h-11 w-11 shrink-0 gap-1 px-0 text-sm pointer-coarse:px-0",
           className,
         )}
         disabled={disabled}
@@ -124,7 +125,7 @@ export function BotonSentarFuera({
         {variante === "grande" ? (
           yaFuera ? "Cambiar sitio de fuera" : "Sentar fuera"
         ) : (
-          <span className={variante === "compacto" ? "hidden xl:inline" : undefined}>Fuera</span>
+          <span className={variante === "compacto" ? "sr-only" : undefined}>Fuera</span>
         )}
       </Button>
       <DialogoSentarFuera

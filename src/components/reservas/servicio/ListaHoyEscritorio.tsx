@@ -2,9 +2,10 @@
 // «HOY» DE ESCRITORIO — la lista completa del turno, por estados
 // ----------------------------------------------------------------------------
 // Petición del dueño (07/11/2026, al ver la v0.386 en el ordenador): «eso era para
-// el móvil». En vez de las tarjetas grandes del móvil, filas compactas de UNA línea
-// (≈52 px): hora · nombre · pax · mesa («Sin mesa» resaltado) · iconos (nota,
-// alergia, teléfono) · estado · acción corta («Sentar», «Liberar»). Agrupadas:
+// el móvil». En vez de las tarjetas grandes del móvil, filas compactas de 56 px en
+// dos líneas (10/11/2026, para que el nombre se lea entero): arriba hora · NOMBRE ·
+// pax · acción corta («Fuera» en icono, «Sentar», «Liberar»); debajo mesa («Sin
+// mesa» resaltado) · iconos (menú, alergia, nota) · estado. Agrupadas:
 // «Por llegar», «Sentadas» y, al final y plegadas, «Terminadas / No vino /
 // Canceladas» (`listaHoyEscritorio`).
 //
@@ -26,6 +27,7 @@ import type { ReservaMesaServicio } from "@/lib/reservas/servicioSala";
 import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
 import { estaSentadaFuera } from "@/lib/reservas/sentarFuera";
 import { EtiquetaFuera } from "@/components/reservas/SentarFuera";
+import { FilasPorMenu, type ServicioMostrado } from "./FilasPorMenu";
 
 type Reserva = ReservaMesaServicio;
 
@@ -50,6 +52,8 @@ export interface ListaHoyEscritorioProps {
   /** La reserva señalada (resaltada aquí y en el plano). */
   señalada?: string | null;
   onSeñalar?: (id: string | null) => void;
+  /** Fecha y turno a la vista: la comida de martes a jueves va en «Menú del día» / «Carta» / «Resto» (10/11/2026). */
+  servicio?: ServicioMostrado | null;
 }
 
 export function ListaHoyEscritorio({
@@ -63,6 +67,7 @@ export function ListaHoyEscritorio({
   ocupadaId = null,
   señalada = null,
   onSeñalar,
+  servicio = null,
 }: ListaHoyEscritorioProps) {
   const [verTerminadas, setVerTerminadas] = useState(false);
   const pax = (filas: Array<{ reserva: Reserva }>) => filas.reduce((s, f) => s + (f.reserva.numero_comensales || 0), 0);
@@ -77,7 +82,7 @@ export function ListaHoyEscritorio({
         <Button
           type="button"
           size="sm"
-          className="pointer-events-auto h-11 w-20 shrink-0 px-2 text-base"
+          className="pointer-events-auto h-11 w-[4.25rem] shrink-0 px-1 text-sm font-semibold"
           disabled={ocupadaId === r.id}
           onClick={() => onSentar(r)}
           aria-label={elegir ? `Sentar a ${r.nombre || "la reserva"}: elegir mesa` : `Sentar a ${r.nombre || "la reserva"} en ${textoMesas(f.mesas).toLowerCase()}`}
@@ -92,7 +97,7 @@ export function ListaHoyEscritorio({
           type="button"
           size="sm"
           variant="outline"
-          className="pointer-events-auto h-11 w-20 shrink-0 px-2 text-base"
+          className="pointer-events-auto h-11 w-[4.25rem] shrink-0 px-1 text-sm font-semibold"
           disabled={ocupadaId === r.id}
           onClick={() => onLiberar(r)}
           aria-label={`Liberar ${textoMesas(f.mesas).toLowerCase()} de ${r.nombre || "la reserva"}`}
@@ -134,7 +139,7 @@ export function ListaHoyEscritorio({
         {lista.porLlegar.length === 0 ? (
           <p className="px-3 py-2 text-base text-muted-foreground">Nadie por llegar.</p>
         ) : (
-          <ul className="divide-y">{lista.porLlegar.map((f) => fila(f, "porLlegar"))}</ul>
+          <FilasPorMenu filas={lista.porLlegar} servicio={servicio} pintar={(f) => fila(f, "porLlegar")} />
         )}
       </section>
       <section aria-label="Sentadas">
@@ -142,7 +147,7 @@ export function ListaHoyEscritorio({
         {lista.sentadas.length === 0 ? (
           <p className="px-3 py-2 text-base text-muted-foreground">Nadie sentado.</p>
         ) : (
-          <ul className="divide-y">{lista.sentadas.map((f) => fila(f, "sentadas"))}</ul>
+          <FilasPorMenu filas={lista.sentadas} servicio={servicio} pintar={(f) => fila(f, "sentadas")} />
         )}
       </section>
       <section aria-label="Terminadas, no vino y canceladas">
@@ -226,57 +231,60 @@ function FilaEscritorio({
         aria-label={`${horaCorta(reserva.hora)} ${nombre}, ${reserva.numero_comensales} personas, ${fuera ? `fuera, ${reserva.fuera_lugar}` : sinMesa ? "sin mesa" : `${sala ? `${sala}, ` : ""}${textoMesas(mesas).toLowerCase()}`}${estado ? `, ${estado.texto}` : ""}`}
         className="absolute inset-0 h-full w-full touch-manipulation select-none hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted/70"
       />
-      <div className="pointer-events-none relative flex min-h-14 items-center gap-1.5 px-3 py-1">
-        {/* Por debajo de 1536 px no cabe la etiqueta: el estado va en un punto de color junto a la hora. */}
-        {estado && <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full 2xl:hidden", estado.clase)} title={estado.texto} aria-hidden="true" />}
-        <span className="w-12 shrink-0 text-base font-semibold tabular-nums">{horaCorta(reserva.hora)}</span>
-        <span className="min-w-0 flex-1 truncate text-base font-semibold" title={nombre}>
-          {nombre}
-        </span>
-        {/* Tocar el número cambia las personas (10/11/2026). */}
-        <BotonPersonas reserva={reserva} className="gap-0.5 text-base font-bold" icono="hidden h-4 w-4 xl:inline" />
-        {fuera ? (
-          <EtiquetaFuera reserva={reserva} compacta className="max-w-[8rem] shrink-0 text-sm" />
-        ) : (
-        <span
-          className={cn(
-            "inline-flex max-w-[6rem] shrink-0 items-center gap-0.5 truncate rounded-md px-1.5 py-0.5 text-sm font-semibold",
-            sinMesa
-              ? "bg-amber-100 text-amber-900 ring-1 ring-amber-400 dark:bg-amber-950/60 dark:text-amber-200"
-              : "bg-muted text-foreground",
-          )}
-          data-testid="mesa-fila"
-          title={sinMesa ? undefined : `${sala ? `${sala} · ` : ""}${textoMesas(mesas)}`}
-        >
-          {fijada && <Lock className="h-3 w-3 shrink-0" aria-label="Mesa fijada" />}
-          {sinMesa ? textoMesa : `M ${textoMesa}`}
-        </span>
-        )}
-        <span className="flex shrink-0 items-center gap-0.5">
-          {reserva.menu_del_dia && (
-            <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-900 dark:bg-violet-950/60 dark:text-violet-200" title="Menú del día">
-              Menú
-            </span>
-          )}
-          {alergia && <AlertTriangle className="h-5 w-5 text-red-600" aria-label="Alergia" />}
-          {notas && !alergia && <StickyNote className="h-5 w-5 text-amber-700 dark:text-amber-300" aria-label="Notas del cliente" />}
-          {notas && <span className="sr-only">{notas}</span>}
-          {tel && (
-            <a
-              href={tel}
-              aria-label={`Llamar a ${nombre}`}
-              title={telefonoLegible(reserva.telefono) ?? undefined}
-              className="pointer-events-auto -mx-2 -my-2 hidden h-11 w-11 items-center justify-center rounded-md text-primary hover:bg-muted active:bg-muted 2xl:inline-flex"
-            >
-              <Phone className="h-5 w-5" aria-hidden="true" />
-            </a>
-          )}
-        </span>
-        {estado && (
-          <span className={cn("hidden w-[5rem] shrink-0 truncate rounded-full px-1 py-0.5 text-center text-xs font-medium 2xl:inline-block", estado.clase)}>
-            {estado.texto}
+      {/* 10/11/2026 («los nombres no se ven, y eso es lo primordial»): DOS líneas. Arriba, la hora y el nombre
+          con todo el ancho que dejan las personas y los botones; debajo, la mesa, los avisos y el estado. Así el
+          nombre ya no compite con «Sin mesa», el estado y los iconos (antes se quedaba en 3-6 letras). */}
+      <div className="pointer-events-none relative flex min-h-14 items-center gap-1 px-2 py-1">
+        <span className="w-11 shrink-0 self-start pt-0.5 text-base font-semibold tabular-nums">{horaCorta(reserva.hora)}</span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate text-base font-semibold leading-6" title={nombre} data-testid="nombre-fila">
+            {nombre}
           </span>
+          <span className="flex min-w-0 items-center gap-1 overflow-hidden">
+            {fuera ? (
+              <EtiquetaFuera reserva={reserva} compacta className="max-w-[8rem] shrink-0 text-sm" />
+            ) : (
+              <span
+                className={cn(
+                  "inline-flex max-w-[6rem] shrink-0 items-center gap-0.5 truncate rounded-md px-1.5 text-sm font-semibold leading-5",
+                  sinMesa
+                    ? "bg-amber-100 text-amber-900 ring-1 ring-amber-400 dark:bg-amber-950/60 dark:text-amber-200"
+                    : "bg-muted text-foreground",
+                )}
+                data-testid="mesa-fila"
+                title={sinMesa ? undefined : `${sala ? `${sala} · ` : ""}${textoMesas(mesas)}`}
+              >
+                {fijada && <Lock className="h-3 w-3 shrink-0" aria-label="Mesa fijada" />}
+                {sinMesa ? textoMesa : `M ${textoMesa}`}
+              </span>
+            )}
+            {reserva.menu_del_dia && (
+              <span className="shrink-0 rounded-full bg-violet-100 px-1.5 text-xs font-medium leading-5 text-violet-900 dark:bg-violet-950/60 dark:text-violet-200" title="Menú del día">
+                Menú
+              </span>
+            )}
+            {alergia && <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" aria-label="Alergia" />}
+            {notas && !alergia && <StickyNote className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-label="Notas del cliente" />}
+            {notas && <span className="sr-only">{notas}</span>}
+            {estado && (
+              <span className={cn("min-w-0 truncate rounded-full px-1.5 text-xs font-medium leading-5", estado.clase)} data-testid="estado-fila">
+                {estado.texto}
+              </span>
+            )}
+          </span>
+        </span>
+        {tel && (
+          <a
+            href={tel}
+            aria-label={`Llamar a ${nombre}`}
+            title={telefonoLegible(reserva.telefono) ?? undefined}
+            className="pointer-events-auto hidden h-11 w-11 shrink-0 items-center justify-center rounded-md text-primary hover:bg-muted active:bg-muted 2xl:inline-flex"
+          >
+            <Phone className="h-5 w-5" aria-hidden="true" />
+          </a>
         )}
+        {/* Tocar el número cambia las personas (10/11/2026). */}
+        <BotonPersonas reserva={reserva} className="my-0 gap-0.5 text-base font-bold" icono="hidden h-4 w-4 2xl:inline" />
         {accion}
       </div>
     </li>

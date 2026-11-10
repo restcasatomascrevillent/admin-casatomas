@@ -33,6 +33,8 @@ export interface ReservaListable {
   notas_cliente?: string | null;
   /** Negocio (`reservas.marca`). Solo se listan las de Casa Tomás (`admiteReservas`). */
   marca?: string | null;
+  /** «Menú del día» (true) o «Carta» (false); null en las antiguas. */
+  menu_del_dia?: boolean | null;
 }
 
 export type FilaUnificada<R extends ReservaListable = ReservaListable> =
@@ -125,6 +127,11 @@ export interface FiltrosListaUnificada {
   canal?: string;
   /** "yyyy-MM-dd" */
   fecha?: string | null;
+  /**
+   * Filtro rápido (10/11/2026): "menu" = solo reservas de «Menú del día», "carta" = solo las de «Carta»
+   * (las que no tienen ese dato y las solicitudes no salen con ninguno de los dos). "all" o nada: todas.
+   */
+  servicio?: "all" | "menu" | "carta";
 }
 
 const normalizarHora = (hora: string | null | undefined) =>
@@ -192,6 +199,7 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
   const estado = filtros.estado ?? "all";
   const canal = filtros.canal ?? "all";
   const fecha = filtros.fecha ?? null;
+  const servicio = filtros.servicio ?? "all";
 
   // «Por atender»: reservas y solicitudes a la vez, pero solo lo que espera al personal (`estaPorAtender`).
   const porAtender = estado === FILTRO_POR_ATENDER;
@@ -201,6 +209,7 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
     if (porAtender && !estaPorAtender(f)) return false;
 
     if (f.tipo === "solicitud") {
+      if (servicio !== "all") return false;
       const s = f.solicitud;
       if (estado === FILTRO_SOLICITUDES && !esSolicitudAbierta(s.estado)) return false;
       if (estado === FILTRO_SOLICITUDES_CERRADAS && esSolicitudAbierta(s.estado)) return false;
@@ -222,6 +231,8 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
     if (estado === FILTRO_SOLICITUDES || estado === FILTRO_SOLICITUDES_CERRADAS) return false;
     if (estado !== "all" && !porAtender && r.estado !== estado) return false;
     if (canal !== "all" && (r.canal || "web") !== canal) return false;
+    if (servicio === "menu" && r.menu_del_dia !== true) return false;
+    if (servicio === "carta" && r.menu_del_dia !== false) return false;
     return coincideBusqueda([r.nombre, r.telefono, r.email, r.notas_cliente], termino);
   });
 }

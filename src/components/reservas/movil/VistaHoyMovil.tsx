@@ -129,6 +129,7 @@ import type { ConfigOcupacionMesa } from "@/lib/reservas/ocupacionMesa";
 import { proponerRecalculo, recolocarDesplazadas, textoSinSitio } from "@/lib/reservas/recalcularMesas";
 import { useFijarMesa } from "@/hooks/useMesaFijada";
 import { ListaHoyEscritorio } from "@/components/reservas/servicio/ListaHoyEscritorio";
+import { FilasPorMenu } from "@/components/reservas/servicio/FilasPorMenu";
 import { BotonSentarFuera, EtiquetaFuera } from "@/components/reservas/SentarFuera";
 import { estaSentadaFuera, puedeSentarseFuera } from "@/lib/reservas/sentarFuera";
 import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
@@ -439,6 +440,7 @@ export function VistaHoyMovil({
             ocupadaId={sentandoId ?? (señalada && liberando?.(señalada) ? señalada : null)}
             señalada={señalada}
             onSeñalar={setSeñaladaRaton}
+            servicio={{ fecha, filtroTurno }}
           />
         ) : vacia ? (
           <p className="p-4 text-sm text-muted-foreground">No hay reservas para este filtro.</p>
@@ -463,7 +465,11 @@ export function VistaHoyMovil({
                     {lista.porLlegar.length} {lista.porLlegar.length === 1 ? "reserva" : "reservas"} · {pax(lista.porLlegar)} pax
                   </span>
                 </h3>
-                <ul className="divide-y">{lista.porLlegar.map((f) => fila(f.reserva, f.mesas, { tarde: f.tarde }))}</ul>
+                <FilasPorMenu
+                  filas={lista.porLlegar}
+                  servicio={{ fecha, filtroTurno }}
+                  pintar={(f) => fila(f.reserva, f.mesas, { tarde: f.tarde })}
+                />
               </section>
             )}
             {/* Sentadas fuera (Touza, Terraza Touza…): no están en ninguna mesa de «Mesas», así que se ven aquí,

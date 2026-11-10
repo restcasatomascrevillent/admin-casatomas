@@ -47,6 +47,15 @@ describe("«Sentar fuera»", () => {
     await waitFor(() => expect(h.quitarFuera).toHaveBeenCalledWith(fuera));
   });
 
+  it("compacto (fila de Hoy de escritorio): solo el icono, 44 × 44, con nombre accesible y title", () => {
+    render(<BotonSentarFuera reserva={base} variante="compacto" />);
+    const boton = screen.getByTestId("boton-sentar-fuera");
+    expect(boton).toHaveClass("h-11", "w-11");
+    expect(boton).not.toHaveClass("xl:w-auto");
+    expect(boton).toHaveAttribute("title", "Sentar fuera");
+    expect(boton.getAttribute("aria-label")).toMatch(/^Sentar fuera: /);
+  });
+
   it("la etiqueta solo sale si está fuera", () => {
     const { rerender } = render(<EtiquetaFuera reserva={{ estado: "completada", fuera_lugar: "Touza", fuera_mesa: "4" }} />);
     expect(screen.getByTestId("etiqueta-fuera")).toHaveTextContent("Fuera · Touza · Mesa 4");

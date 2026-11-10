@@ -8,6 +8,8 @@
 // salas reales, año, «2px», «noviempre»… Sin fecha escrita vale la de la hoja.
 // Lo interpretado prellena el alta manual de siempre (FormularioReserva).
 // ============================================================================
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { mensajeErrorFuncion } from "@/hooks/useEnviarNewsletter";
 import {
@@ -35,6 +37,12 @@ export function pasarHoja(clave: string, delta: number): string {
   const d = diaDeClave(clave);
   d.setDate(d.getDate() + delta);
   return claveDia(d);
+}
+
+/** Título de la hoja: «Martes 10 de noviembre 2026». */
+export function tituloHoja(clave: string): string {
+  const t = format(diaDeClave(clave), "EEEE d 'de' MMMM yyyy", { locale: es });
+  return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 /** Lo que espera `FormularioReserva` en `datosPreseleccionados` (alta manual). */
