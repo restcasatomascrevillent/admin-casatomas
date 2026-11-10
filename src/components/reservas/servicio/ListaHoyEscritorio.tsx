@@ -27,6 +27,7 @@ import type { ReservaMesaServicio } from "@/lib/reservas/servicioSala";
 import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
 import { estaSentadaFuera } from "@/lib/reservas/sentarFuera";
 import { EtiquetaFuera } from "@/components/reservas/SentarFuera";
+import { FilasPorMenu, type ServicioMostrado } from "./FilasPorMenu";
 
 type Reserva = ReservaMesaServicio;
 
@@ -51,6 +52,8 @@ export interface ListaHoyEscritorioProps {
   /** La reserva señalada (resaltada aquí y en el plano). */
   señalada?: string | null;
   onSeñalar?: (id: string | null) => void;
+  /** Fecha y turno a la vista: la comida de martes a jueves va en «Menú del día» / «Carta» / «Resto» (10/11/2026). */
+  servicio?: ServicioMostrado | null;
 }
 
 export function ListaHoyEscritorio({
@@ -64,6 +67,7 @@ export function ListaHoyEscritorio({
   ocupadaId = null,
   señalada = null,
   onSeñalar,
+  servicio = null,
 }: ListaHoyEscritorioProps) {
   const [verTerminadas, setVerTerminadas] = useState(false);
   const pax = (filas: Array<{ reserva: Reserva }>) => filas.reduce((s, f) => s + (f.reserva.numero_comensales || 0), 0);
@@ -135,7 +139,7 @@ export function ListaHoyEscritorio({
         {lista.porLlegar.length === 0 ? (
           <p className="px-3 py-2 text-base text-muted-foreground">Nadie por llegar.</p>
         ) : (
-          <ul className="divide-y">{lista.porLlegar.map((f) => fila(f, "porLlegar"))}</ul>
+          <FilasPorMenu filas={lista.porLlegar} servicio={servicio} pintar={(f) => fila(f, "porLlegar")} />
         )}
       </section>
       <section aria-label="Sentadas">
@@ -143,7 +147,7 @@ export function ListaHoyEscritorio({
         {lista.sentadas.length === 0 ? (
           <p className="px-3 py-2 text-base text-muted-foreground">Nadie sentado.</p>
         ) : (
-          <ul className="divide-y">{lista.sentadas.map((f) => fila(f, "sentadas"))}</ul>
+          <FilasPorMenu filas={lista.sentadas} servicio={servicio} pintar={(f) => fila(f, "sentadas")} />
         )}
       </section>
       <section aria-label="Terminadas, no vino y canceladas">
