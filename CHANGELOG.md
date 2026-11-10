@@ -2,6 +2,38 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.18.0] - 2026-11-10
+
+Objetivo: Un solo «Nueva Reserva» con formulario o libro, más contraste en Reservas, libro proporcionado en el ordenador y «Sentar sin reserva» eligiendo entre todas las mesas
+
+### Añadido
+- Reservas: un solo «Nueva Reserva» con «Formulario» o «Libro (lápiz)» dentro, recordando la elección ([#100](https://github.com/restcasatomascrevillent/admin-casatomas/pull/100))
+- Reservas: «Sentar sin reserva» eligiendo entre todas las mesas, como al sentar una reserva sin mesa ([#102](https://github.com/restcasatomascrevillent/admin-casatomas/pull/102))
+
+### Cambiado
+- Reservas: más contraste en botones, campos, textos secundarios y pestaña activa ([#100](https://github.com/restcasatomascrevillent/admin-casatomas/pull/100))
+- Reservas: el renglón del libro se ajusta al alto de la pantalla y la lista del día no queda aplastada ([#100](https://github.com/restcasatomascrevillent/admin-casatomas/pull/100))
+
+Nota: montada igualando producción con staging (como la 1.16.0 y la 1.17.0); entradas escritas a mano, no por scripts/release.mjs.
+
+## [1.17.0] - 2026-11-10
+
+Objetivo: Libro de reservas con letra legible y «Guardar sin interpretar»; formularios de reserva sin textos de ejemplo, personas escritas a mano y resumen antes de guardar
+
+### Añadido
+- Reservas: libro — guardar lo escrito sin interpretar y pasarlo a limpio luego ([#96](https://github.com/restcasatomascrevillent/admin-casatomas/pull/96))
+- Reservas: resumen de la reserva antes de guardarla en el alta ([#98](https://github.com/restcasatomascrevillent/admin-casatomas/pull/98))
+- Vinos: migraciones de vinos nuevos, precios y origen ([5232711](https://github.com/restcasatomascrevillent/admin-casatomas/commit/52327112))
+
+### Cambiado
+- Reservas: libro con letra normal y más grande ([#95](https://github.com/restcasatomascrevillent/admin-casatomas/pull/95))
+- Reservas: formularios sin textos de ejemplo y número de personas escrito a mano en alta/edición, Hoy y «Sentar sin reserva» ([#97](https://github.com/restcasatomascrevillent/admin-casatomas/pull/97))
+
+### Arreglado
+- RRSS: el script de copias de contratos reconoce el import con .js ([fad7f6f](https://github.com/restcasatomascrevillent/admin-casatomas/commit/fad7f6f7))
+
+Nota: montada igualando producción con staging (como la 1.16.0); entradas escritas a mano, no por scripts/release.mjs.
+
 ## [1.16.0] - 2026-11-10
 
 Objetivo: Publicar todo lo que quedaba en staging (lo que chocaba con producción en la 1.15.0), alineando producción con la demo
