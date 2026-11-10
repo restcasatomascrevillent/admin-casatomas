@@ -2,6 +2,16 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.13.0] - 2026-11-10
+
+Objetivo: Instagram: plantillas por papel (portada, plato, cierre, frase) que no parecen de IA
+
+### Añadido
+- Instagram: plantillas v2 por papel (portada, plato, cierre, frase) ([49f19cc](https://github.com/restcasatomascrevillent/admin-casatomas/commit/49f19cc20e805700ca1aa2b6fb6d30c484596d41))
+
+### Otros
+- Instagram: plantillas v2 por papel y papeles en montar_pieza ([26dec24](https://github.com/restcasatomascrevillent/admin-casatomas/commit/26dec24cf11088a1ad2fbf1f844029c0cc5f9a37))
+
 ## [1.12.0] - 2026-11-10
 
 Objetivo: Carta impresa: un plato por línea, cada sección en sus páginas y alineación a elegir
