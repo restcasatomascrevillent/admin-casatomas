@@ -21,6 +21,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -120,7 +130,7 @@ const formSchema = z.object({
   fecha: z.date({ required_error: "Selecciona una fecha" }),
   hora: z.string().min(1, "Selecciona una hora"),
   numero_comensales: z
-    .number({ invalid_type_error: "Indica el número de comensales" })
+    .number({ required_error: "Indica el número de comensales", invalid_type_error: "Indica el número de comensales" })
     .int("El número de comensales debe ser entero")
     .min(1, "Mínimo 1 comensal"),
   notas_cliente: z.string().optional(),
@@ -307,6 +317,11 @@ interface FormularioReservaProps {
    * (la BD tampoco le deja escribir en salas_cerradas_servicio). Lo decide Reservas con usePuedeCrearReservas.
    */
   soloCrear?: boolean;
+  /**
+   * Resumen antes de guardar (10/11/2026, petición del dueño): en el alta del panel, «Guardar» abre
+   * un resumen con «Confirmar» / «Corregir». El libro de reservas lo apaga: ya enseña lo leído al lado.
+   */
+  confirmarAntesDeGuardar?: boolean;
 }
 
 export const FormularioReserva = ({
@@ -317,7 +332,9 @@ export const FormularioReserva = ({
   mesasAsignadas = [],
   onCambiosSinGuardar,
   soloCrear: soloCrearReservas = false,
+  confirmarAntesDeGuardar = true,
 }: FormularioReservaProps) => {
+  const [resumen, setResumen] = useState<FormValues | null>(null);
   const editando = !!reservaAEditar;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -892,7 +909,7 @@ export const FormularioReserva = ({
       return;
     }
     try {
-      // El esquema exige el teléfono; el email es opcional (los flags
+      // Teléfono y email opcionales en el panel (los flags
       // telefono_obligatorio/email_obligatorio de configuracion_reservas solo
       // aplican a los canales automáticos).
 
@@ -1095,7 +1112,14 @@ export const FormularioReserva = ({
   // alta conserva la validación nativa.
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} noValidate={editando} className="space-y-6">
+      <form
+        onSubmit={form.handleSubmit((v) => {
+          if (confirmarAntesDeGuardar && !reservaAEditar && !isPublic) setResumen(v);
+          else return onSubmit(v);
+        })}
+        noValidate={editando}
+        className="space-y-6"
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -1104,7 +1128,7 @@ export const FormularioReserva = ({
               <FormItem>
                 <FormLabel>Nombre completo</FormLabel>
                 <FormControl>
-                  <Input placeholder="Juan Pérez" autoComplete="name" autoCapitalize="words" {...field} />
+                  <Input autoComplete="name" autoCapitalize="words" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -1118,7 +1142,7 @@ export const FormularioReserva = ({
               <FormItem>
                 <FormLabel>Teléfono (opcional)</FormLabel>
                 <FormControl>
-                  <Input type="tel" inputMode="tel" autoComplete="tel" placeholder="612345678" {...field} />
+                  <Input type="tel" inputMode="tel" autoComplete="tel" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -1133,7 +1157,7 @@ export const FormularioReserva = ({
             <FormItem>
               <FormLabel>Email (opcional)</FormLabel>
               <FormControl>
-                <Input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="juan@email.com" {...field} />
+                <Input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -1279,20 +1303,25 @@ export const FormularioReserva = ({
                   <Minus className="h-4 w-4" aria-hidden />
                 </Button>
                 <FormControl>
+                  {/* Se escribe a mano (10/11/2026, petición del dueño: «que se pueda poner manual un
+                      número de personas, por ejemplo 3 o 5»): texto con teclado numérico en vez de
+                      `type=number`, que en la tablet no dejaba borrar y teclear otro. Al tocarlo se
+                      selecciona para sobrescribir. Mínimo y máximo se validan al guardar (onSubmit). */}
                   <Input
-                    type="number"
+                    type="text"
                     inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="off"
                     className="pointer-coarse:text-center"
-                    // Al editar, el navegador no debe bloquear el envío por el mínimo
-                    // configurado: una reserva antigua con menos comensales tiene que
-                    // poder cambiar de nombre. El mínimo se exige en `guardarEdicion`,
-                    // y solo si se cambia este número.
-                    min={editando ? 1 : configReservas?.min_comensales_por_reserva || 1}
-                    // Solo la web pública se limita al máximo automático; el
-                    // personal puede dar de alta grupos grandes (ver onSubmit).
-                    max={isPublic ? configReservas?.max_comensales_por_reserva || 100 : undefined}
-                    {...field}
-                    onChange={(e) => field.onChange(parseInt(e.target.value))}
+                    name={field.name}
+                    ref={field.ref}
+                    onBlur={field.onBlur}
+                    value={Number.isFinite(field.value) ? String(field.value) : ""}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onChange={(e) => {
+                      const d = e.target.value.replace(/\D/g, "").slice(0, 3);
+                      field.onChange(d === "" ? undefined : Number(d));
+                    }}
                   />
                 </FormControl>
                 <Button
@@ -1464,10 +1493,7 @@ export const FormularioReserva = ({
             <FormItem>
               <FormLabel>Notas adicionales (opcional)</FormLabel>
               <FormControl>
-                <Textarea
-                  placeholder="Alergias, preferencias, ocasión especial..."
-                  {...field}
-                />
+                <Textarea {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -1721,6 +1747,61 @@ export const FormularioReserva = ({
         </Button>
         </div>
       </form>
+      <AlertDialog open={!!resumen} onOpenChange={(abierto) => !abierto && setResumen(null)}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Guardamos esta reserva?</AlertDialogTitle>
+            <AlertDialogDescription>Revisa los datos antes de crearla.</AlertDialogDescription>
+          </AlertDialogHeader>
+          {resumen && (
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg border bg-muted/40 p-4 text-base" data-testid="resumen-reserva">
+              <dt className="text-muted-foreground">Nombre</dt>
+              <dd className="font-semibold">{resumen.nombre?.trim() || "—"}</dd>
+              <dt className="text-muted-foreground">Día</dt>
+              <dd className="font-semibold">{resumen.fecha ? format(resumen.fecha, "EEEE d 'de' MMMM", { locale: es }) : "—"}</dd>
+              <dt className="text-muted-foreground">Hora</dt>
+              <dd className="font-semibold">{resumen.hora || "—"}</dd>
+              <dt className="text-muted-foreground">Personas</dt>
+              <dd className="font-semibold">{resumen.numero_comensales}</dd>
+              <dt className="text-muted-foreground">Sala</dt>
+              <dd>{salas.find((s) => s.id === resumen.espacio_id)?.nombre ?? "Sin asignar"}</dd>
+              <dt className="text-muted-foreground">Teléfono</dt>
+              <dd>{resumen.telefono?.trim() || "—"}</dd>
+              {resumen.email?.trim() ? (
+                <>
+                  <dt className="text-muted-foreground">Email</dt>
+                  <dd className="break-all">{resumen.email.trim()}</dd>
+                </>
+              ) : null}
+              {resumen.notas_cliente?.trim() ? (
+                <>
+                  <dt className="text-muted-foreground">Notas</dt>
+                  <dd>{resumen.notas_cliente.trim()}</dd>
+                </>
+              ) : null}
+              {resumen.importante ? (
+                <>
+                  <dt className="text-muted-foreground">Importante</dt>
+                  <dd>★ Sí</dd>
+                </>
+              ) : null}
+            </dl>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel className="h-11">Corregir</AlertDialogCancel>
+            <AlertDialogAction
+              className="h-11 bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={() => {
+                const v = resumen;
+                setResumen(null);
+                if (v) void onSubmit(v);
+              }}
+            >
+              Confirmar y guardar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Form>
   );
 };
