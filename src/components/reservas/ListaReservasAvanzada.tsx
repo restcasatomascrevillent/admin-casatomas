@@ -24,6 +24,7 @@ import {
   CalendarPlus,
   SlidersHorizontal,
   X,
+  Store,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -370,6 +371,7 @@ const OPCIONES_FILTRO_CANAL: { value: string; label: string; corta?: string }[] 
   { value: "telefono", label: "📞 Tel", corta: "Teléfono" },
   { value: "web", label: "🌐 Web", corta: "Web" },
   { value: "manual", label: "✏️ Manual", corta: "Manual" },
+  { value: "presencial", label: "🏠 En local", corta: "En local" },
 ];
 
 /**
@@ -712,6 +714,14 @@ export function ListaReservasAvanzada({
             <span className={ETIQUETA_CANAL}>Web</span>
           </Badge>
         );
+      case 'presencial':
+        // Sentados sin reserva («Sin reserva 13:35»): antes caían en el «Web» por defecto.
+        return (
+          <Badge title="Canal: en el local, sin reserva" className={cn(INSIGNIA, "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300")}>
+            <Store className="h-3 w-3" />
+            <span className={ETIQUETA_CANAL}>En local</span>
+          </Badge>
+        );
       case 'manual':
         return (
           <Badge title="Canal: alta manual" className={cn(INSIGNIA, "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300")}>
@@ -881,7 +891,8 @@ export function ListaReservasAvanzada({
             soloPorAtender
               ? "bg-primary-foreground text-primary"
               : cuantasPorAtender > 0
-                ? "bg-muted text-foreground"
+                ? // Con algo por atender, en rojo y más grande (10/11/2026: «que se vea más»).
+                  "min-w-6 bg-red-600 text-center text-sm text-white motion-safe:animate-pulse"
                 : "text-muted-foreground",
           )}
         >

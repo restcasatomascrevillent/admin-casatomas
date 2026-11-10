@@ -35,7 +35,7 @@ export function useReservasPorGestionar(habilitado: boolean) {
       const [reservas, solicitudes] = await Promise.all([
         supabase
           .from("reservas")
-          .select("id, nombre, fecha, hora, numero_comensales, estado, marca")
+          .select("id, nombre, fecha, hora, numero_comensales, estado, marca, canal")
           .in("estado", [...ESTADOS_RESERVA_POR_GESTIONAR])
           .gte("fecha", hoy)
           .order("fecha", { ascending: true })
@@ -59,5 +59,5 @@ export function useReservasPorGestionar(habilitado: boolean) {
   });
 
   const items = consulta.data ?? [];
-  return { items, count: habilitado ? items.length : 0, loading: habilitado && consulta.isLoading };
+  return { items, count: habilitado ? items.length : 0, loading: habilitado && consulta.isLoading, listo: habilitado && consulta.isSuccess };
 }

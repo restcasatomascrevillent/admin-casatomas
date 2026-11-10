@@ -10,6 +10,7 @@ vi.mock("@/components/notificaciones/CentroNotificaciones", () => ({
   CentroNotificaciones: () => <button type="button">Notificaciones</button>,
 }));
 vi.mock("@/components/carta/recorte/PrecargaRecorte", () => ({ PrecargaRecorte: () => null }));
+vi.mock("@/components/notificaciones/AvisosEnVivo", () => ({ AvisosEnVivo: () => null }));
 vi.mock("@/components/NavAutoCollapse", () => ({ NavAutoCollapse: () => null, defaultSidebarOpen: () => true }));
 
 import { DashboardLayout } from "@/components/DashboardLayout";

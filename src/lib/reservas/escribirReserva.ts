@@ -31,6 +31,7 @@
 //    recuerda y se reintenta sin ella (con los mismos filtros).
 // ============================================================================
 
+import { marcarCambioPropio } from "./cambiosPropios";
 import { supabase } from "@/integrations/supabase/client";
 import { etiquetaEstadoReserva } from "./estadosReserva";
 import { esErrorColumnaLlegadaInexistente } from "./servicioSala";
@@ -120,6 +121,8 @@ export async function escribirReserva(
   cambios: CambiosReserva,
   { desdeEstados }: OpcionesEscritura = {},
 ): Promise<{ id: string }[]> {
+  // Antes de escribir: el cambio puede llegar por realtime antes que la respuesta.
+  marcarCambioPropio(id);
   const payload: Record<string, unknown> = { ...cambios };
   if ("llegada_at" in payload && columnaLlegadaDisponible === false) {
     delete payload.llegada_at;
