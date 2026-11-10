@@ -227,6 +227,11 @@ verify_jwt = true
 [functions.rrss-ia]
 verify_jwt = true
 
+# Newsletter › «Crear con IA» (newsletter-ia/ia.ts): JWT de usuario + «Editar»
+# en Marketing; la propuesta nunca se envía sola.
+[functions.newsletter-ia]
+verify_jwt = true
+
 # Marketing › Instagram › Métricas (docs/instagram-metricas.md). verify_jwt =
 # false porque la llama pg_cron (net.http_post, tarea instagram-metricas-diarias)
 # SIN usuario ni JWT, igual que sync-trafico-web. Autenticación real dentro:

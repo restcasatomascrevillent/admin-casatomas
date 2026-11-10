@@ -53,6 +53,7 @@
     "test:instagram-carrusel:db": "node scripts/test-instagram-carrusel.mjs",
     "test:rrss:db": "node scripts/test-rrss.mjs",
     "test:permisos-carta-newsletter:db": "node scripts/test-permisos-carta-newsletter.mjs",
+    "test:newsletter-plantillas:db": "node scripts/test-newsletter-plantillas.mjs",
     "test:mesa-fijada:db": "node scripts/test-reservas-mesa-fijada.mjs",
     "test:sala-evento:db": "node scripts/test-sala-entera-evento.mjs",
     "test:logs-web:db": "node scripts/test-logs-web.mjs",
