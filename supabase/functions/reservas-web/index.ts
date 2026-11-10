@@ -109,6 +109,7 @@ import {
   type ResultadoNotificarEmailsReserva,
 } from "./plantillas.ts";
 import { resolverRuta, rutaDelPath, secretoCompartidoValido } from "./rutas.ts";
+import { construirOrigenReserva } from "./origen.ts";
 // Cierres de reservas (lunes, jueves, domingo noche + calendario del panel).
 import {
   normalizarServiciosCerrados,
@@ -149,6 +150,9 @@ import {
 } from "./reglas.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 import {
+  hashIp,
+  ipCliente,
+  IP_DESCONOCIDA,
   puedeEnviarCorreoRechazo,
   reservarCupoCrear,
   reservarCupoDisponibilidad,
@@ -1309,6 +1313,8 @@ async function handleCierres(req: Request): Promise<Response> {
 // ============================================================
 async function handleCrear(req: Request): Promise<Response> {
   if (!checkSharedSecret(req)) return json({ ok: false, error: "unauthorized" }, 401);
+  // Hora de llegada de la petición: va a `reservas.origen` («Cómo se hizo la reserva»).
+  const recibidoAt = new Date();
 
   let body: Record<string, unknown>;
   try {
@@ -1771,6 +1777,19 @@ async function handleCrear(req: Request): Promise<Response> {
   // reserva normal no se cae si la función sale antes que la migración
   // 20261122100000.
   if (menuDelDia) filaReserva.menu_del_dia = true;
+  // «Cómo se hizo la reserva» (columna `origen`, migración 2026112212…): lo
+  // que manda la web (opcional y validado en origen.ts) más lo que ve la
+  // función. Nunca hace fallar la reserva: si algo va mal, sin `origen`.
+  try {
+    const ipHashOrigen = await hashIp(ipCliente(req) ?? IP_DESCONOCIDA, IP_SALT);
+    filaReserva.origen = construirOrigenReserva(body?.origen, {
+      recibidoAt,
+      userAgent: req.headers.get("user-agent"),
+      ipHash: ipHashOrigen,
+    });
+  } catch (e) {
+    console.error("[CREAR] No se pudo preparar origen:", e instanceof Error ? e.message : e);
+  }
 
   let { data: inserted, error: insertError } = await supabase
     .from("reservas")
@@ -1789,6 +1808,18 @@ async function handleCrear(req: Request): Promise<Response> {
     ({ data: inserted, error: insertError } = await supabase
       .from("reservas")
       .insert(filaSinCondiciones)
+      .select("id")
+      .single());
+  }
+
+  // Igual para `origen`: si la función sale antes que su migración, se guarda
+  // la reserva sin esa columna (solo se pierde el «cómo se hizo»).
+  if (insertError && esColumnaInexistente(insertError, "origen")) {
+    console.error("[CREAR] Falta la columna reservas.origen (¿migración 2026112212 sin aplicar?). Se guarda la reserva sin ella.");
+    delete filaReserva.origen;
+    ({ data: inserted, error: insertError } = await supabase
+      .from("reservas")
+      .insert(filaReserva)
       .select("id")
       .single());
   }
