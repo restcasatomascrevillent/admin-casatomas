@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQueryClient } from "@tanstack/react-query";
@@ -82,6 +82,14 @@ interface Props {
   fechaInicial?: string | null;
   /** Al crear una reserva (por formulario o lápiz). */
   onReservaCreada?: (reserva: { id: string; fecha: string }) => void;
+  /**
+   * Solo apuntar (10/11/2026, petición del dueño): abierto desde «+ Añadir reserva a este día» del libro de la
+   * Lista, que ya enseña la hoja detrás. Sin la hoja del día: «Apuntar nueva» a todo el ancho (formulario centrado,
+   * máx. 48rem; lienzo a todo el ancho y alto). El día se sigue pudiendo cambiar con ← → y el calendario.
+   */
+  soloApuntar?: boolean;
+  /** Cada vez que cambia el día de la hoja (para el título del diálogo). */
+  onCambioFecha?: (fecha: string) => void;
 }
 
 function fechaCorta(clave: string): string {
@@ -126,7 +134,7 @@ function PorPasarALimpio({
   );
 }
 
-export function LibroReservas({ soloCrear = false, fechaInicial = null, onReservaCreada }: Props) {
+export function LibroReservas({ soloCrear = false, fechaInicial = null, onReservaCreada, soloApuntar = false, onCambioFecha }: Props) {
   const queryClient = useQueryClient();
   const { data: espaciosData } = useEspaciosReserva();
   const espacios = useMemo(
@@ -134,7 +142,14 @@ export function LibroReservas({ soloCrear = false, fechaInicial = null, onReserv
     [espaciosData],
   );
   const [fecha, setFecha] = useState(() => fechaInicial ?? claveDia(new Date()));
-  const dosColumnas = useDosColumnas();
+  const anchoParaDos = useDosColumnas();
+  // Con `soloApuntar` no hay hoja: una sola columna, la de apuntar, a todo el ancho y alto.
+  const dosColumnas = anchoParaDos && !soloApuntar;
+  // La columna de apuntar ocupa el alto disponible (formulario y lienzo con su propio scroll).
+  const apuntarAlto = dosColumnas || soloApuntar;
+  useEffect(() => {
+    onCambioFecha?.(fecha);
+  }, [fecha, onCambioFecha]);
   const [calendarioAbierto, setCalendarioAbierto] = useState(false);
   const [trazos, setTrazos] = useState(0);
   const [interpretando, setInterpretando] = useState(false);
@@ -294,11 +309,12 @@ export function LibroReservas({ soloCrear = false, fechaInicial = null, onReserv
       <div
         className={cn("flex min-h-0 flex-1", dosColumnas ? "flex-row" : "flex-col", PAPEL, revisando && "hidden")}
         data-columnas={dosColumnas ? "2" : "1"}
+        data-solo-apuntar={soloApuntar ? "" : undefined}
       >
         <div
           className={cn(
             "min-h-[22dvh] touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain border-l-4 border-rose-300/70 px-6 py-5",
-            dosColumnas ? "w-2/5 shrink-0 border-r border-r-stone-300" : "flex-1",
+            soloApuntar ? "hidden" : dosColumnas ? "w-2/5 shrink-0 border-r border-r-stone-300" : "flex-1",
           )}
           data-testid="lista-hoja-libro"
           {...arrastre}
@@ -316,11 +332,11 @@ export function LibroReservas({ soloCrear = false, fechaInicial = null, onReserv
           <ReservasDeLaHoja fecha={fecha} resaltada={resaltada} />
           </div>
         </div>
-        <div className={cn("flex min-h-0 flex-col", dosColumnas && "min-w-0 flex-1")} data-testid="columna-apuntar">
+        <div className={cn("flex min-h-0 flex-col", apuntarAlto && "min-w-0 flex-1")} data-testid="columna-apuntar">
         <div
           className={cn(
             "flex flex-wrap items-center gap-3 px-6",
-            dosColumnas ? "border-b border-stone-300 py-4" : "border-t-2 border-dashed border-stone-300 pt-3",
+            apuntarAlto ? "border-b border-stone-300 py-4" : "border-t-2 border-dashed border-stone-300 pt-3",
           )}
         >
           <span className="text-base font-semibold text-stone-600">Apuntar nueva:</span>
@@ -350,11 +366,14 @@ export function LibroReservas({ soloCrear = false, fechaInicial = null, onReserv
         {modo === "formulario" ? (
           <div
             className={cn(
-              "overflow-y-auto overscroll-contain bg-background px-6 pb-6 pt-4 text-foreground",
-              dosColumnas ? "formulario-una-columna min-h-0 flex-1" : "max-h-[58dvh]",
+              "overflow-y-auto overscroll-contain bg-background px-6 pt-4 text-foreground",
+              // En dos columnas, SIN relleno inferior: el `sticky bottom-0` del pie se pega al borde del relleno del
+              // contenedor, y con `pb-6` quedaba una franja de 24 px por debajo del botón por la que asomaban los
+              // campos («Dentro | Fuera»). El pie lleva su propio fondo y borde (`.formulario-una-columna`, index.css).
+              apuntarAlto ? "formulario-una-columna min-h-0 flex-1 pb-0" : "max-h-[58dvh] pb-6",
             )}
           >
-            <div className={cn("mx-auto", dosColumnas ? "max-w-2xl" : "max-w-4xl")}>
+            <div className={cn("mx-auto", soloApuntar ? "max-w-3xl" : dosColumnas ? "max-w-2xl" : "max-w-4xl")}>
               <FormularioReserva
                 key={altaFormulario}
                 datosPreseleccionados={datosFormulario}
@@ -374,14 +393,25 @@ export function LibroReservas({ soloCrear = false, fechaInicial = null, onReserv
             </div>
           </div>
         ) : (
-        <div className={cn("px-6 pb-4 pt-3", dosColumnas && "min-h-0 flex-1 overflow-y-auto overscroll-contain")}>
-          <p className="mb-2 text-base text-stone-500">
+        <div
+          className={cn("px-6 pb-4 pt-3", apuntarAlto && "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain")}
+          data-testid="zona-lapiz"
+        >
+          <p className="mb-2 shrink-0 text-base text-stone-500">
             Escribe la reserva con el lápiz, p. ej. <span className="font-medium">«Esther 2px salón 14:15»</span>. Sin fecha, se apunta el {fechaCorta(fecha)}.
           </p>
-          <div className="h-[clamp(11rem,32dvh,20rem)] overflow-hidden rounded-md border border-stone-300 bg-white/70">
+          {/* En dos columnas el renglón ocupa todo el alto que queda (mínimo 280 px) y los botones van abajo
+              (10/11/2026: con alto fijo quedaba media columna vacía). Apilado, el alto de siempre. */}
+          <div
+            className={cn(
+              "overflow-hidden rounded-md border border-stone-300 bg-white/70",
+              apuntarAlto ? "min-h-[280px] flex-1" : "h-[clamp(11rem,32dvh,20rem)]",
+            )}
+            data-testid="caja-lienzo"
+          >
             <LienzoManuscrito ref={lienzo} onCambio={setTrazos} />
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-4 flex shrink-0 flex-wrap items-center gap-3">
             <Button type="button" variant="outline" className="h-11 bg-white" onClick={() => lienzo.current?.borrar()} disabled={!trazos || interpretando}>
               <Eraser className="mr-2 h-4 w-4" />
               Borrar
@@ -411,7 +441,7 @@ export function LibroReservas({ soloCrear = false, fechaInicial = null, onReserv
             </Button>
           </div>
           {gastoLectura && gastoLectura.mes.lecturas > 0 && (
-            <p className="mt-2 text-right text-xs text-stone-500" data-testid="gasto-lectura">
+            <p className="mt-2 shrink-0 text-right text-xs text-stone-500" data-testid="gasto-lectura">
               Este mes: {gastoLectura.mes.lecturas} {gastoLectura.mes.lecturas === 1 ? "lectura" : "lecturas"} ·{" "}
               {formatearEurPequeno(gastoLectura.mes.eur)}
               {gastoLectura.mes.eurPorLectura != null && <> ({formatearEurPequeno(gastoLectura.mes.eurPorLectura)} cada una)</>}

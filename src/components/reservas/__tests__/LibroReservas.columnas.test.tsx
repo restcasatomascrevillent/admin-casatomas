@@ -99,6 +99,26 @@ describe("LibroReservas · dos columnas en horizontal, una en vertical", () => {
     fireEvent.click(screen.getByRole("button", { name: /Formulario/ }));
     const caja = screen.getByTestId("formulario").parentElement!.parentElement!;
     expect(caja).toHaveClass("formulario-una-columna", "overflow-y-auto", "flex-1");
+    // Sin relleno inferior: con él, por debajo del «Crear Reserva» fijo asomaban los campos.
+    expect(caja).toHaveClass("pb-0");
+    expect(caja).not.toHaveClass("pb-6");
+  });
+
+  it("en ancho, el renglón del lápiz ocupa el alto de la columna (mínimo 280 px) con los botones abajo", () => {
+    pantalla(true);
+    montar();
+    expect(screen.getByTestId("zona-lapiz")).toHaveClass("flex", "flex-col", "flex-1");
+    const caja = screen.getByTestId("caja-lienzo");
+    expect(caja).toHaveClass("flex-1", "min-h-[280px]");
+    expect(caja).not.toHaveClass("h-[clamp(11rem,32dvh,20rem)]");
+    // Los botones, después del renglón.
+    expect(caja.nextElementSibling!.textContent).toMatch(/Borrar.*Deshacer.*Guardar sin interpretar.*Interpretar/);
+  });
+
+  it("apilado, el renglón del lápiz conserva su alto de siempre", () => {
+    pantalla(false);
+    montar();
+    expect(screen.getByTestId("caja-lienzo")).toHaveClass("h-[clamp(11rem,32dvh,20rem)]");
   });
 
   it("en estrecho (o sin matchMedia): apilado como antes", () => {
@@ -112,6 +132,37 @@ describe("LibroReservas · dos columnas en horizontal, una en vertical", () => {
   it("los avisos se apartan de «Crear Reserva» mientras el diálogo está abierto (marca para el CSS)", () => {
     montar();
     expect(document.querySelector("[data-dialogo-nueva-reserva]")).not.toBeNull();
+  });
+});
+
+describe("LibroReservas · solo apuntar (desde «Añadir reserva a este día»)", () => {
+  it("sin la hoja del día: la columna de apuntar a todo el ancho, aunque la pantalla sea ancha", () => {
+    pantalla(true);
+    montar({ fechaInicial: FECHA, soloApuntar: true });
+    expect(screen.getByTestId("lista-hoja-libro")).toHaveClass("hidden");
+    expect(screen.getByTestId("columna-apuntar")).toHaveClass("flex-1");
+    expect(screen.getByTestId("lista-hoja-libro").parentElement).toHaveAttribute("data-columnas", "1");
+    // El lienzo, a todo el alto; el día sigue a la vista y se puede cambiar.
+    expect(screen.getByTestId("caja-lienzo")).toHaveClass("flex-1", "min-h-[280px]");
+    expect(fechaVisible()).toHaveTextContent(tituloHoja(FECHA));
+    fireEvent.click(screen.getByRole("button", { name: "Día siguiente" }));
+    expect(fechaVisible()).toHaveTextContent(tituloHoja(pasarHoja(FECHA, 1)));
+  });
+
+  it("el formulario centrado en una columna cómoda (máx. 48rem)", () => {
+    montar({ fechaInicial: FECHA, soloApuntar: true });
+    fireEvent.click(screen.getByRole("button", { name: /Formulario/ }));
+    const centro = screen.getByTestId("formulario").parentElement!;
+    expect(centro).toHaveClass("mx-auto", "max-w-3xl");
+    expect(centro.parentElement).toHaveClass("formulario-una-columna", "flex-1");
+  });
+
+  it("avisa del día de la hoja (para el título del diálogo)", () => {
+    const onCambioFecha = vi.fn();
+    montar({ fechaInicial: FECHA, soloApuntar: true, onCambioFecha });
+    expect(onCambioFecha).toHaveBeenLastCalledWith(FECHA);
+    fireEvent.click(screen.getByRole("button", { name: "Día siguiente" }));
+    expect(onCambioFecha).toHaveBeenLastCalledWith(pasarHoja(FECHA, 1));
   });
 });
 
