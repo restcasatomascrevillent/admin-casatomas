@@ -41,6 +41,7 @@ vi.mock("@/components/facturas/ChatFacturas", () => ({
   )),
 }));
 vi.mock("@/components/facturas/SubidaFacturas", () => ({ SubidaFacturas: () => <p>Contenido de la subida</p> }));
+vi.mock("@/components/analisis/margenes/MargenesCarta", () => ({ MargenesCarta: () => <p data-testid="margenes">Márgenes</p> }));
 vi.mock("@/hooks/useListaCompras", () => ({
   useListaCompras: () => ({
     data: { cabeceras: [{ id: 1, proveedor: "Marta" }, { id: 2, proveedor: null }, { id: 3, proveedor: "Marta" }], completos: null },
@@ -121,12 +122,14 @@ describe("Facturas · importación histórica (solo administradores)", () => {
 });
 
 describe("Facturas · pestañas", () => {
-  it("son tres: Análisis · Compras · Cargar, y se entra en Análisis (ya no hay Documentos ni Productos)", () => {
+  it("son cuatro: Análisis · Márgenes · Compras · Cargar, y se entra en Análisis (ya no hay Documentos ni Productos)", () => {
     montar();
     const pestanas = within(screen.getByRole("tablist")).getAllByRole("tab");
-    expect(pestanas.map((p) => p.textContent?.replace(/\d+$/, "").trim())).toEqual(["Análisis", "Compras", "Cargar"]);
+    expect(pestanas.map((p) => p.textContent?.replace(/\d+$/, "").trim())).toEqual(["Análisis", "Márgenes", "Compras", "Cargar"]);
     expect(screen.getByRole("tab", { name: /^Análisis/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Contenido del chat")).toBeInTheDocument();
+    // Márgenes (antes «Análisis general», 10/11/2026) tampoco se monta hasta que se visita.
+    expect(screen.queryByTestId("margenes")).not.toBeInTheDocument();
     // Compras no se monta hasta que se visita: entrar por Análisis no descarga su lista.
     expect(screen.queryByTestId("compras")).not.toBeInTheDocument();
     for (const p of pestanas) expect(p.className).toContain("min-h-11");

@@ -11,7 +11,7 @@ import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
 import { MODOS_COMPRAS, PARAMS_ENLACE_COMPRAS, esNavegacionDeFicha, type ModoCompras } from "@/lib/facturas/compras";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
-import { Upload, BarChart3, ShoppingCart, History } from "lucide-react";
+import { Upload, BarChart3, ShoppingCart, History, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImportacionHistoricaDialog } from "@/components/facturas/ImportacionHistoricaDialog";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -25,12 +25,16 @@ import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useColaSubidaOpcional } from "@/hooks/useColaSubida";
 import { ALTURA_MINIMA_FACTURAS } from "@/lib/facturas/alturaCargar";
 import { esRutaIaCompleta } from "@/lib/facturas/copilotoCompleto";
+import { MargenesCarta } from "@/components/analisis/margenes/MargenesCarta";
+import { leerArticuloEnlace } from "@/lib/dashboard/margenesDashboard";
 
 // Rediseño del 08/10/2026: «Documentos» y «Productos» (las pestañas de antes) son
 // ahora modos de Compras; sus enlaces antiguos (`?tab=productos` de la campana,
 // marcadores) siguen funcionando. Desde el 05/11/2026 (petición del dueño) el orden
-// es Análisis · Compras · Cargar y se entra en Análisis (valor `chat`).
-const PESTANAS = ["chat", "compras", "cargar"] as const;
+// es Análisis · Compras · Cargar y se entra en Análisis (valor `chat`). Desde el 10/11/2026
+// (petición del dueño) «Márgenes» va detrás de Análisis: antes era la sección «Análisis
+// general» del menú (/analisis, que ahora lleva a `?tab=margenes`).
+const PESTANAS = ["chat", "margenes", "compras", "cargar"] as const;
 /** Pestaña al entrar en /facturas sin `?tab=`. */
 const PESTANA_INICIAL = "chat";
 const pestanaDeUrl = (v: string | null): PestanaFacturas | null => {
@@ -117,6 +121,7 @@ const Facturas = () => {
       p.set("tab", v);
       // El enlace profundo ya se aplicó: que no vuelva a abrir el documento al volver a Compras.
       for (const k of PARAMS_ENLACE_COMPRAS) p.delete(k);
+      p.delete("articulo");
       return p;
     }, { replace: true });
   };
@@ -149,6 +154,8 @@ const Facturas = () => {
   // (Análisis: el explorador, el copiloto abierto y la conversación; QA 05/11/2026).
   const [comprasMontada, setComprasMontada] = useState(activeTab === "compras");
   const [analisisMontada, setAnalisisMontada] = useState(activeTab === "chat");
+  // Márgenes: `?articulo=plato:<id>` (enlace del Dashboard) abre esa ficha.
+  const articuloPedido = leerArticuloEnlace(searchParams.get("articulo"));
   const veAnalisisYCompras = visibles.includes("chat");
   const veCargar = visibles.includes("cargar");
   // «Solo lectura» en Análisis y Compras para quien los consulta sin «Editar» (en Cargar sube y corrige lo suyo).
@@ -205,6 +212,7 @@ const Facturas = () => {
             accionesDebajoEnMovil={barraUnica ? "muyAncho" : undefined}
             pestanas={[
               { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, tour: "facturas-pestana-ia" },
+              { valor: "margenes", etiqueta: "Márgenes", icono: <Percent />, tour: "facturas-pestana-margenes" },
               { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
               { valor: "cargar", etiqueta: "Cargar", icono: <Upload />, contador: activosSubida, etiquetaContador: `${activosSubida} procesando`, contadorEnMovil: true, tour: "facturas-pestana-cargar" },
             ].filter((p) => visibles.includes(p.valor as PestanaFacturas))}
@@ -259,6 +267,15 @@ const Facturas = () => {
                     />
                   )}
                 </div>
+              </TabsContent>
+            )}
+
+            {/* PESTAÑA MÁRGENES (10/11/2026; antes, la sección «Análisis general»): la carta frente a lo que cuesta
+                comprar sus ingredientes. Se monta solo al verla (su consulta es aparte). Editar escandallos, vinos y
+                umbrales, con «Editar». */}
+            {veAnalisisYCompras && (
+              <TabsContent value="margenes" className="h-full m-0 outline-none data-[state=inactive]:hidden">
+                {activeTab === "margenes" && <MargenesCarta puedeEditar={permisos.editar} articuloInicial={articuloPedido} />}
               </TabsContent>
             )}
 

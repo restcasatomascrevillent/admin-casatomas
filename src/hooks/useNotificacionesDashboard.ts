@@ -16,6 +16,8 @@ export interface NotificacionDashboard {
   prioridad?: string | null;
   caduca_en?: string | null;
   datos?: { enlace?: string | null; [k: string]: unknown } | null;
+  /** Clave de las alertas generadas por cron (no se duplican por ella). */
+  clave?: string | null;
 }
 
 /**
@@ -28,6 +30,13 @@ export interface NotificacionDashboard {
  * al mes: 20261115100000_facturas_decision) solo se ven en Facturas › Análisis.
  */
 export const vaALaCampana = (n: Pick<NotificacionDashboard, "datos">): boolean => n.datos?.campana !== false;
+
+/**
+ * ¿Es una alerta diaria de Facturas (cron facturas-alertas, 20261107300000)? Se reconocen por su
+ * `referencia_tipo` y su `clave` (la que el cron usa para no duplicarlas).
+ */
+export const esAlertaFacturas = (n: Pick<NotificacionDashboard, "tipo" | "referencia_tipo"> & { clave?: string | null }): boolean =>
+  n.referencia_tipo === "facturas_alerta" || (n.tipo.startsWith("facturas_") && !!n.clave);
 
 export const PREFIJO_CANAL_NOTIFICACIONES = "notificaciones_realtime";
 
@@ -132,10 +141,19 @@ export function useNotificacionesDashboard() {
       setCountNoLeidas((prev) => Math.max(0, prev - 1));
     }
 
-    const { error } = await supabase
-      .from("notificaciones_dashboard")
-      .delete()
-      .eq("id", id);
+    // Las alertas diarias de Facturas (cron facturas-alertas) NO se borran: de ellas salen las cifras de
+    // Facturas › Análisis («Puedes ahorrar», «Precios que han subido»…), que se quedaban a 0 € hasta que el
+    // cron las volvía a crear a la mañana siguiente (10/11/2026). Se quitan de la campana (leídas y con
+    // `datos.campana = false`, como las subidas pequeñas) y siguen contando en Análisis.
+    const { error } = esAlertaFacturas(notif)
+      ? await supabase
+          .from("notificaciones_dashboard")
+          .update({ leida: true, datos: { ...(notif.datos ?? {}), campana: false } })
+          .eq("id", id)
+      : await supabase
+          .from("notificaciones_dashboard")
+          .delete()
+          .eq("id", id);
 
     if (error) {
       console.error("Error eliminando notificación:", error);

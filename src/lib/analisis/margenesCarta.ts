@@ -299,7 +299,7 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
 }
 
 // ─── Formato ──────────────────────────────────────────────────────────────
-const fmt = (n: number, dec: number) => n.toLocaleString("es-ES", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+export const fmt = (n: number, dec: number) => n.toLocaleString("es-ES", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 export const euros = (n: number | null, dec = 2) => (n === null ? "—" : `${fmt(n, dec)} €`);
 export const porcentaje = (n: number | null) => (n === null ? "—" : `${fmt(n, 0)} %`);
 export const veces = (n: number | null) => (n === null ? "—" : `${fmt(n, 2)}×`);
