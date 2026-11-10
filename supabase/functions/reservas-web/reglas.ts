@@ -273,3 +273,132 @@ export function consentimientoNewsletterParaGuardar(
 ): boolean {
   return consentimientos.consentimientoNewsletter === true && dobleOptin === "activo";
 }
+
+// ============================================================================
+// BLOQUEOS DE LA WEB: servicio bloqueado, mismo día solo por teléfono y menú
+// del día (migración 20261122100000, 10/11/2026)
+// ============================================================================
+// Solo afectan a la web/bot (esta función). Las reservas manuales del panel
+// NO pasan por aquí: el trigger de aforo no sabe nada de esto a propósito.
+// Turno: comida = hora < 17:00, como `validar_capacidad_reserva`.
+// ============================================================================
+
+/** Mismo día: franja (ambas incluidas, "HH:MM") que solo se reserva por teléfono. */
+export const MISMO_DIA_TELEFONO_DESDE = "12:30";
+export const MISMO_DIA_TELEFONO_HASTA = "16:00";
+/** Días del menú del día (0 = domingo … 6 = sábado): martes, miércoles y jueves. */
+export const DIAS_MENU_DEL_DIA: ReadonlyArray<number> = [2, 3, 4];
+/** Salas en las que se sirve el menú del día (nombre sin tildes ni mayúsculas). */
+export const SALAS_MENU_DEL_DIA: ReadonlyArray<string> = ["comedor", "terraza"];
+
+export const CODIGO_SERVICIO_BLOQUEADO = "SERVICIO_BLOQUEADO";
+export const CODIGO_MISMO_DIA_TELEFONO = "MISMO_DIA_TELEFONO";
+export const CODIGO_MENU_DIA_NO_DISPONIBLE = "MENU_DIA_NO_DISPONIBLE";
+
+export type TurnoWeb = "comida" | "cena";
+
+export interface RechazoBloqueoWeb {
+  status: 422;
+  cuerpo: { ok: false; motivo: string; error: string; mensaje: string };
+}
+
+function rechazo(codigo: string, mensaje: string): RechazoBloqueoWeb {
+  return { status: 422, cuerpo: { ok: false, motivo: codigo, error: codigo, mensaje } };
+}
+
+/** "HH:MM" (o "HH:MM:SS") recortada a "HH:MM". */
+function hhmm(hora: string): string {
+  return String(hora || "").slice(0, 5);
+}
+
+/** Turno con el criterio del trigger de aforo: comida si hora < 17:00. */
+export function turnoDeHoraWeb(hora: string): TurnoWeb {
+  return hhmm(hora) < "17:00" ? "comida" : "cena";
+}
+
+/** Lista de turnos válidos desde las filas de `servicios_bloqueados` de UN día. */
+export function turnosBloqueadosDesdeFilas(filas: ReadonlyArray<{ turno?: unknown }> | null | undefined): TurnoWeb[] {
+  const set = new Set<TurnoWeb>();
+  for (const f of filas || []) {
+    if (f?.turno === "comida" || f?.turno === "cena") set.add(f.turno);
+  }
+  return [...set];
+}
+
+/** ¿La hora cae en un servicio bloqueado? */
+export function horaEnServicioBloqueado(hora: string, turnosBloqueados: ReadonlyArray<TurnoWeb>): boolean {
+  return turnosBloqueados.includes(turnoDeHoraWeb(hora));
+}
+
+/** ¿Es hoy y la hora está en la franja que solo se reserva por teléfono? */
+export function esMismoDiaSoloTelefono(fecha: string, hora: string, fechaHoy: string): boolean {
+  if (fecha !== fechaHoy) return false;
+  const h = hhmm(hora);
+  return h >= MISMO_DIA_TELEFONO_DESDE && h <= MISMO_DIA_TELEFONO_HASTA;
+}
+
+export function rechazoServicioBloqueado(hora: string, turnosBloqueados: ReadonlyArray<TurnoWeb>): RechazoBloqueoWeb | null {
+  if (!horaEnServicioBloqueado(hora, turnosBloqueados)) return null;
+  return rechazo(CODIGO_SERVICIO_BLOQUEADO, "Ese servicio ya no admite reservas online. Llámanos por teléfono.");
+}
+
+export function rechazoMismoDiaTelefono(fecha: string, hora: string, fechaHoy: string): RechazoBloqueoWeb | null {
+  if (!esMismoDiaSoloTelefono(fecha, hora, fechaHoy)) return null;
+  return rechazo(CODIGO_MISMO_DIA_TELEFONO, "Para comer hoy hay que reservar por teléfono.");
+}
+
+/** Solo `=== true` es sí (igual que las casillas RGPD). */
+export function leerMenuDelDia(body: Record<string, unknown> | null | undefined): boolean {
+  return body?.menu_del_dia === true;
+}
+
+function sinTildes(texto: string): string {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+}
+
+/** 0 = domingo … 6 = sábado, sin zona horaria. */
+function diaSemana(fecha: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
+  if (!m) return null;
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay();
+}
+
+/**
+ * Menú del día: martes a jueves, turno de comida y, si se pide sala, solo
+ * Comedor o Terraza. `salaPedida` = nombre de la sala que manda el cliente
+ * (o el del `espacio_id` que manda); `null` si no pide ninguna.
+ */
+export function rechazoMenuDelDia(
+  menuDelDia: boolean,
+  fecha: string,
+  hora: string,
+  salaPedida: string | null,
+): RechazoBloqueoWeb | null {
+  if (!menuDelDia) return null;
+  const dia = diaSemana(fecha);
+  if (dia === null || !DIAS_MENU_DEL_DIA.includes(dia)) {
+    return rechazo(CODIGO_MENU_DIA_NO_DISPONIBLE, "El menú del día solo se sirve de martes a jueves al mediodía.");
+  }
+  if (turnoDeHoraWeb(hora) !== "comida") {
+    return rechazo(CODIGO_MENU_DIA_NO_DISPONIBLE, "El menú del día solo se sirve al mediodía (comida).");
+  }
+  if (salaPedida && !SALAS_MENU_DEL_DIA.includes(sinTildes(salaPedida))) {
+    return rechazo(CODIGO_MENU_DIA_NO_DISPONIBLE, "El menú del día solo se sirve en el Comedor o en la Terraza.");
+  }
+  return null;
+}
+
+/**
+ * Para /disponibilidad: por qué NO se ofrece una hora a la web aunque el motor
+ * la dé por libre (`null` si se puede ofrecer).
+ */
+export function motivoHoraNoOfrecidaWeb(
+  fecha: string,
+  hora: string,
+  fechaHoy: string,
+  turnosBloqueados: ReadonlyArray<TurnoWeb>,
+): typeof CODIGO_SERVICIO_BLOQUEADO | typeof CODIGO_MISMO_DIA_TELEFONO | null {
+  if (horaEnServicioBloqueado(hora, turnosBloqueados)) return CODIGO_SERVICIO_BLOQUEADO;
+  if (esMismoDiaSoloTelefono(fecha, hora, fechaHoy)) return CODIGO_MISMO_DIA_TELEFONO;
+  return null;
+}
