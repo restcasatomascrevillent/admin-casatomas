@@ -14,11 +14,37 @@
 
 import { urlSinConsulta } from "./saneado.ts";
 
+/**
+ * Quita el hash de Vite de un nombre de fichero (`app-C0ct-iG8.js` → `app.js`).
+ * El hash son 8 caracteres base64url, que PUEDEN llevar «-» y «_»: antes no se
+ * contaba el guion y `app-C0ct-iG8.js` daba una huella nueva en cada despliegue
+ * (incidencias duplicadas del mismo fallo; visto en la demo el 09/11/2026).
+ */
+export function quitarHashVite(texto: string): string {
+  return texto.replace(/-[A-Za-z0-9_-]{8}(?=\.(?:m?js|css|avif|webp|png|jpe?g|gif|svg|woff2?)\b)/g, "");
+}
+
+/**
+ * Fichero de una versión anterior que ya no existe tras publicar (el navegador
+ * tenía abierta la web vieja). Todos estos mensajes son el MISMO problema, sea
+ * cual sea el fichero o el tipo (excepción, promesa o pintado de React).
+ */
+export const PATRON_CHUNK_CADUCADO =
+  /failed to fetch dynamically imported module|importing a module script failed|error loading dynamically imported module|unable to preload css|chunkloaderror|loading (css )?chunk \S+ failed|'text\/html' is not a valid javascript mime type/i;
+
+/**
+ * Fallos de pg_cron que no dependen de la tarea sino de la base de datos
+ * (no pudo arrancar ninguna): una sola incidencia para todas las tareas, no una
+ * por tarea (el 08/11/2026 se abrieron 6 tickets por la misma caída).
+ */
+export const PATRON_CRON_PLATAFORMA =
+  /job startup timeout|could not start background process|out of background worker slots|too many (clients|connections)|remaining connection slots are reserved|the database system is (starting up|shutting down|in recovery mode)/i;
+
 /** Mensaje normalizado: sin números, sin contenido entre comillas, sin URLs con consulta. */
 export function normalizarMensaje(mensaje: string | null | undefined): string {
   if (!mensaje) return "";
   return mensaje
-    .replace(/\bhttps?:\/\/[^\s"'<>()]+/gi, (u) => urlSinConsulta(u).replace(/-[A-Za-z0-9_]{6,12}(\.(m?js|css))/g, "$1"))
+    .replace(/\bhttps?:\/\/[^\s"'<>()]+/gi, (u) => quitarHashVite(urlSinConsulta(u)))
     .replace(/(["'`])(?:(?!\1).){0,200}\1/g, "$1…$1")
     .replace(/\[(id|num|tel|token|email|oculto)\]/g, "#")
     .replace(/\b0x[0-9a-f]+\b/gi, "#")
@@ -45,7 +71,7 @@ export function marcoPrincipal(pila: string | null | undefined): string {
     const funcion = (m[1] ?? "").replace(/^Object\./, "").slice(0, 80);
     let fichero = m[2] ?? "";
     fichero = urlSinConsulta(fichero).replace(/^https?:\/\/[^/]+/, "");
-    fichero = fichero.replace(/-[A-Za-z0-9_]{6,12}(\.(m?js|css))$/, "$1");
+    fichero = quitarHashVite(fichero);
     if (!fichero) continue;
     return `${funcion}@${fichero}`;
   }
@@ -69,13 +95,20 @@ export interface DatosHuella {
 /** Texto canónico que se resume en la huella (exportado para las pruebas). */
 export function textoHuella(d: DatosHuella): string {
   const partes = [d.fuente, d.tipo];
+  // Fichero caducado tras publicar: misma incidencia aunque cambien el fichero o el tipo.
+  if (["error_js", "error_promesa", "error_react"].includes(d.tipo) && PATRON_CHUNK_CADUCADO.test(d.mensaje ?? "")) {
+    return [d.fuente, "chunk_caducado"].join("|");
+  }
+  if (d.tipo === "error_integracion" && String(d.objetivo ?? "").startsWith("cron:") && PATRON_CRON_PLATAFORMA.test(d.mensaje ?? "")) {
+    return [d.fuente, d.tipo, "cron:*", normalizarMensaje(d.mensaje)].join("|");
+  }
   switch (d.tipo) {
     case "error_404":
       // Un 404 es «esta ruta no existe»: la ruta ES el problema.
       partes.push(rutaPlantilla(d.ruta));
       break;
     case "error_recurso":
-      partes.push(urlSinConsulta(d.objetivo ?? "").replace(/-[A-Za-z0-9_]{6,12}(\.(m?js|css))$/, "$1"));
+      partes.push(quitarHashVite(urlSinConsulta(d.objetivo ?? "")));
       break;
     case "error_peticion":
       partes.push(String(d.objetivo ?? ""), String(d.codigo ?? ""));

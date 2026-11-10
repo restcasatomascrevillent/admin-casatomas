@@ -206,6 +206,21 @@ describe("errores del servidor", () => {
     const e = await eventoErrorServidor({ fuente: "reservas-web", subruta: "/crear", status: 500, mensaje: "fallo con ana@x.es", duracionMs: 120 });
     expect(e).toMatchObject({ tipo: "error_servidor", fuente: "servidor", objetivo: "reservas-web/crear", gravedad: "critico" });
     expect(e.mensaje).toBe("reservas-web/crear: fallo con [email]");
+    expect(e.pila).toBeNull();
+    expect(e.propiedades).toEqual({ status: 500 });
+  });
+  it("si la función lanzó: método, marca de excepción y pila saneada (antes no se sabía la línea)", async () => {
+    const e = await eventoErrorServidor({
+      fuente: "registrar-metrica", subruta: "", status: 500, mensaje: "TypeError: dns error", duracionMs: 30, metodo: "POST", excepcion: true,
+      pila: "TypeError: dns error\n    at insertar (file:///var/tmp/functions/registrar-metrica/index.ts:39:5)\n    at ana@x.es",
+    });
+    expect(e.propiedades).toEqual({ status: 500, metodo: "POST", excepcion: true });
+    expect(e.pila).toContain("registrar-metrica/index.ts:39:5");
+    expect(e.pila).not.toContain("ana@x.es");
+    // La huella no depende de la pila: misma incidencia aunque cambie la línea.
+    const otra = await eventoErrorServidor({ fuente: "registrar-metrica", subruta: "", status: 500, mensaje: "TypeError: dns error", duracionMs: 9, pila: "otra" });
+    expect(otra.huella).toBe(e.huella);
+    expect((await eventoErrorServidor({ fuente: "x", subruta: "", status: 500, mensaje: null, duracionMs: 1, metodo: "DROP TABLE" })).propiedades).toEqual({ status: 500 });
   });
   it("solo llama a un proyecto real de Supabase y nunca lanza", async () => {
     const fetchFn = vi.fn(async () => new Response("{}"));

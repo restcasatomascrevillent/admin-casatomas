@@ -14,6 +14,7 @@
 
 import { sanearPila, sanearTexto } from "../_shared/logs-web/saneado.ts";
 import { marcoPrincipal } from "../_shared/logs-web/huella.ts";
+import { causaConocida, type CausaConocida } from "../_shared/logs-web/causas.ts";
 
 export interface IncidenciaTicket {
   id: number;
@@ -128,6 +129,41 @@ function reparto(muestras: EventoTicket[], clave: (e: EventoTicket) => string | 
   return [...n.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k} ${Math.round((100 * v) / total)} %`).join(" · ");
 }
 
+/** Claves de `propiedades` que se citan en el ticket (todas técnicas, ya saneadas en la ingesta). */
+export const CLAVES_DATOS = ["endpoint", "metodo", "status", "tarea", "componente", "etiqueta", "proyecto", "despliegue", "rama", "codigo"] as const;
+
+/** Los errores del servidor, integraciones y despliegues no tienen navegador, página ni sesión. */
+export const esDeNavegador = (i: Pick<IncidenciaTicket, "fuente">) => i.fuente === "navegador";
+
+/** Objetivos afectados (tarea, endpoint, recurso, componente) con su número de muestras. */
+export function objetivosAfectados(muestras: EventoTicket[]): Array<{ objetivo: string; n: number }> {
+  const n = new Map<string, number>();
+  for (const e of muestras) if (e.objetivo) n.set(e.objetivo, (n.get(e.objetivo) ?? 0) + 1);
+  return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([objetivo, v]) => ({ objetivo, n: v }));
+}
+
+/** Datos clave de las muestras: valores distintos de las propiedades técnicas conocidas. */
+export function datosClave(muestras: EventoTicket[]): Array<{ clave: string; valores: string[] }> {
+  const salida: Array<{ clave: string; valores: string[] }> = [];
+  for (const clave of CLAVES_DATOS) {
+    const v = new Map<string, number>();
+    for (const e of muestras) {
+      const x = e.propiedades?.[clave];
+      if (x === undefined || x === null || x === "" || typeof x === "object") continue;
+      const k = String(x).slice(0, 80);
+      v.set(k, (v.get(k) ?? 0) + 1);
+    }
+    if (v.size) salida.push({ clave, valores: [...v.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k]) => k) });
+  }
+  return salida;
+}
+
+/** Causa conocida de la incidencia (mira el mensaje, la pila y la muestra más reciente). */
+export function causaDeIncidencia(i: IncidenciaTicket, muestras: EventoTicket[]): CausaConocida | null {
+  const m = muestras[0];
+  return causaConocida({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo: m?.objetivo ?? null, propiedades: m?.propiedades ?? null });
+}
+
 /** Una línea legible de un evento del recorrido (sin datos personales: todo viene saneado). */
 export function describirEvento(e: EventoTicket): string {
   const obj = e.objetivo ? ` ${enLinea(e.objetivo, 80)}` : "";
@@ -165,6 +201,12 @@ export function pasosDesdeRecorrido(entrada: EntradaTicket): string[] {
     .slice(-6);
   const pasos: string[] = [];
   const m = muestras[0];
+  if (!esDeNavegador(incidencia)) {
+    const objetivos = objetivosAfectados(muestras);
+    if (objetivos.length) pasos.push(`Revisar ${objetivos.slice(0, 3).map((o) => enLinea(o.objetivo, 80)).join(", ")} en ${NOMBRE_ENTORNO[incidencia.entorno] ?? incidencia.entorno} (logs de la función o tarea a la hora indicada).`);
+    pasos.push(`Resultado observado: ${NOMBRE_TIPO[incidencia.tipo] ?? incidencia.tipo} — ${enLinea(incidencia.mensaje ?? incidencia.titulo, 160)}.`);
+    return pasos;
+  }
   if (m?.dispositivo || m?.navegador) {
     pasos.push(`Usar ${[m.dispositivo, m.navegador, m.so].filter(Boolean).join(" · ")} (lo más frecuente en las ocurrencias).`);
   }
@@ -185,26 +227,45 @@ export function construirTicket(entrada: EntradaTicket): { titulo: string; descr
   const { incidencia: i, muestras, recorrido, analisis, urlPanel } = entrada;
   const enlace = `${urlPanel.replace(/\/+$/, "")}/super-admin/logs?incidencia=${i.id}`;
   const pct = (n: number) => `${n} ${n === 1 ? "sesión" : "sesiones"}`;
+  const navegador = esDeNavegador(i);
+  const causa = causaDeIncidencia(i, muestras);
+  const objetivos = objetivosAfectados(muestras);
+  const datos = datosClave(muestras);
   const l: string[] = [];
 
   l.push(`> Ticket creado automáticamente por Super Admin › Logs (${NOMBRE_ENTORNO[i.entorno] ?? i.entorno}). Los apartados marcados **IA · sin verificar** son hipótesis; el resto sale de los datos registrados.`);
   l.push("");
   l.push("## Impacto");
   l.push(`- **Gravedad:** ${NOMBRE_GRAVEDAD[i.gravedad] ?? i.gravedad} · **Tipo:** ${NOMBRE_TIPO[i.tipo] ?? i.tipo} · **Fuente:** ${i.fuente}`);
-  l.push(`- **Frecuencia:** ${i.ocurrencias} ocurrencias (${i.ocurrencias_24h} en las últimas 24 h) en ${pct(i.sesiones_afectadas)} observadas.`);
+  l.push(navegador
+    ? `- **Frecuencia:** ${i.ocurrencias} ocurrencias (${i.ocurrencias_24h} en las últimas 24 h) en ${pct(i.sesiones_afectadas)} observadas.`
+    : `- **Frecuencia:** ${i.ocurrencias} ocurrencias (${i.ocurrencias_24h} en las últimas 24 h). Error del servidor: no hay visitantes ni sesiones asociadas.`);
   if (i.motivo_ticket) l.push(`- **Por qué se abre:** ${textoIa(i.motivo_ticket, 300)}`);
   if (i.reabierta_veces > 0) l.push(`- **Reaparecida** ${i.reabierta_veces} ${i.reabierta_veces === 1 ? "vez" : "veces"} tras marcarse como resuelta.`);
   if (analisis?.impacto) l.push(`- **Impacto estimado (IA · sin verificar):** ${textoIa(analisis.impacto, 300)}`);
-  l.push("- «Sesiones» = navegadores o cargas de página distintas: los errores se registran de todos los visitantes, pero el recorrido solo existe si aceptaron «Estadísticas». Los bots no cuentan.");
+  if (navegador) l.push("- «Sesiones» = navegadores o cargas de página distintas: los errores se registran de todos los visitantes, pero el recorrido solo existe si aceptaron «Estadísticas». Los bots no cuentan.");
   l.push("");
+  if (objetivos.length || datos.length) {
+    l.push("## Qué falla");
+    if (objetivos.length) l.push(`- **Afecta a:** ${objetivos.slice(0, 8).map((o) => `${enLinea(o.objetivo, 80)} (${o.n})`).join(", ")}${objetivos.length > 8 ? ` y ${objetivos.length - 8} más` : ""} _(en las últimas ${muestras.length} ocurrencias)_`);
+    for (const d of datos) l.push(`- **${d.clave}:** ${d.valores.map((v) => enLinea(v, 60)).join(", ")}`);
+    l.push("");
+  }
+  if (causa) {
+    l.push("## Causa conocida");
+    l.push(`**${causa.titulo}.** ${causa.explicacion}`);
+    for (const a of causa.acciones) l.push(`- ${a}`);
+    if (causa.ruidoSiAislado) l.push("- Si se queda en pocas sesiones, se puede ignorar.");
+    l.push("");
+  }
   l.push("## Entorno, versión y despliegue");
   l.push(`- **Entorno:** ${NOMBRE_ENTORNO[i.entorno] ?? i.entorno} · **Proyecto:** ${enLinea(i.proyecto, 60)}`);
   l.push(`- **Versión:** primera vista en ${enLinea(i.version_primera ?? "desconocida", 40)}, última en ${enLinea(i.version_ultima ?? "desconocida", 40)}${i.despliegue_ultimo ? ` · despliegue ${enLinea(i.despliegue_ultimo, 80)}` : ""}`);
   l.push(`- **Primera detección:** ${fecha(i.primera_vez)} · **Última:** ${fecha(i.ultima_vez)} (hora de Madrid)`);
   l.push("");
   l.push("## Evidencias técnicas (depuradas)");
-  if (i.rutas.length) l.push(`- **Páginas:** ${i.rutas.map((r) => `${enLinea(r.ruta, 80)} (${r.n})`).join(", ")}`);
-  if (muestras.length) {
+  if (navegador && i.rutas.length) l.push(`- **Páginas:** ${i.rutas.map((r) => `${enLinea(r.ruta, 80)} (${r.n})`).join(", ")}`);
+  if (navegador && muestras.length) {
     l.push(`- **Navegador:** ${reparto(muestras, (e) => e.navegador)}`);
     l.push(`- **Dispositivo:** ${reparto(muestras, (e) => e.dispositivo)} · **Sistema:** ${reparto(muestras, (e) => e.so)}`);
     l.push(`- **Versiones en las muestras:** ${reparto(muestras, (e) => e.version)}`);
@@ -214,18 +275,20 @@ export function construirTicket(entrada: EntradaTicket): { titulo: string; descr
   l.push("");
   l.push(bloque([sanearTexto(i.mensaje, 500) ?? "(sin mensaje)", sanearPila(i.pila) ?? ""].filter(Boolean).join("\n\n")));
   l.push("");
-  l.push("## Recorrido previo (última ocurrencia con sesión)");
-  if (recorrido.length) {
-    const inicio = new Date(recorrido[0].ocurrido_en).getTime();
-    for (const e of recorrido) {
-      const seg = Math.max(0, Math.round((new Date(e.ocurrido_en).getTime() - inicio) / 1000));
-      const marcaError = e.id !== undefined && e.id === entrada.eventoErrorId ? " ← **aquí falla**" : "";
-      l.push(`- +${seg} s · ${describirEvento(e)}${marcaError}`);
+  if (navegador) {
+    l.push("## Recorrido previo (última ocurrencia con sesión)");
+    if (recorrido.length) {
+      const inicio = new Date(recorrido[0].ocurrido_en).getTime();
+      for (const e of recorrido) {
+        const seg = Math.max(0, Math.round((new Date(e.ocurrido_en).getTime() - inicio) / 1000));
+        const marcaError = e.id !== undefined && e.id === entrada.eventoErrorId ? " ← **aquí falla**" : "";
+        l.push(`- +${seg} s · ${describirEvento(e)}${marcaError}`);
+      }
+    } else {
+      l.push("- No hay recorrido: el error llegó de un navegador sin consentimiento «Estadísticas». Falta contexto de navegación.");
     }
-  } else {
-    l.push("- No hay recorrido: el error llegó de un navegador sin consentimiento «Estadísticas» o del servidor. Falta contexto de navegación.");
+    l.push("");
   }
-  l.push("");
   l.push("## Pasos de reproducción");
   pasosDesdeRecorrido(entrada).forEach((p, n) => l.push(`${n + 1}. ${p}`));
   if (analisis?.pasos_reproduccion.length) {
@@ -258,6 +321,7 @@ export function construirTicket(entrada: EntradaTicket): { titulo: string; descr
   l.push("");
   l.push("## Propuesta de solución (IA · no verificada)");
   if (analisis?.propuesta.length) for (const p of analisis.propuesta.slice(0, 5)) l.push(`- ${textoIa(p)}`);
+  else if (causa) l.push(`- Ver «Causa conocida» arriba.`);
   else l.push(`- Sin propuesta concreta: falta contexto. Empezar por reproducir con los pasos de arriba${marco ? ` y revisar ${enLinea(marco, 120)}` : ""}.`);
   l.push("");
   l.push("## Cómo validar la corrección");
