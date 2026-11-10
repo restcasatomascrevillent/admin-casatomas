@@ -11,7 +11,7 @@ import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { VistaHoy } from "@/components/reservas/VistaHoy";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { LayoutGrid, Utensils } from "lucide-react";
+import { BookOpen, LayoutGrid, Table2, Utensils } from "lucide-react";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { usePuedeCrearReservas } from "@/hooks/usePuedeCrearReservas";
@@ -48,6 +48,10 @@ const LibroReservas = lazy(() =>
 );
 const ListaReservasAvanzada = lazy(() =>
   import("@/components/reservas/ListaReservasAvanzada").then((m) => ({ default: m.ListaReservasAvanzada })),
+);
+// La Lista vista como el libro (10/11/2026): hojas por día que se pasan.
+const ListaComoLibro = lazy(() =>
+  import("@/components/reservas/libro/ListaComoLibro").then((m) => ({ default: m.ListaComoLibro })),
 );
 const CalendarioOcupacion = lazy(() =>
   import("@/components/reservas/CalendarioOcupacion").then((m) => ({ default: m.CalendarioOcupacion })),
@@ -94,9 +98,58 @@ const bajoDemanda = (contenido: ReactNode) => <Suspense fallback={<CargandoPesta
  * pestaña que no se ve, con «Hoy» abierta ya no se pide nada de solicitudes. Sigue habiendo UNA sola
  * instancia (ver aviso de realtime en el hook).
  */
-function PestanaLista(props: Omit<ComponentProps<typeof ListaReservasAvanzada>, "solicitudesState">) {
+function TablaLista(props: Omit<ComponentProps<typeof ListaReservasAvanzada>, "solicitudesState">) {
   const solicitudesState = useSolicitudesPendientes();
   return bajoDemanda(<ListaReservasAvanzada {...props} solicitudesState={solicitudesState} />);
+}
+
+/** Cómo se ve la Lista: como el libro de hojas por día o como la tabla con filtros. Se recuerda en el dispositivo. */
+type VistaLista = "libro" | "tabla";
+const CLAVE_VISTA_LISTA = "reservas.vistaLista";
+
+function leerVistaLista(): VistaLista {
+  try {
+    return localStorage.getItem(CLAVE_VISTA_LISTA) === "tabla" ? "tabla" : "libro";
+  } catch {
+    return "libro";
+  }
+}
+
+/**
+ * La pestaña «Lista» (10/11/2026, petición del dueño: «hacer o simular como el libro, que tenga hojas que
+ * vas pasando»): por defecto el LIBRO (una hoja por día, `ListaComoLibro`) y, con el conmutador, la TABLA de
+ * siempre con sus filtros, intacta. Si se llega con un filtro en la URL (la campana, «Por atender»…) se abre
+ * la tabla, que es la que filtra, sin cambiar lo recordado.
+ */
+function PestanaLista(props: Omit<ComponentProps<typeof ListaReservasAvanzada>, "solicitudesState">) {
+  const conFiltro = !!(props.initialStatusFilter || props.initialDateFilter);
+  const [vista, setVista] = useState<VistaLista>(() => (conFiltro ? "tabla" : leerVistaLista()));
+  const elegir = (v: string) => {
+    if (v !== "libro" && v !== "tabla") return;
+    setVista(v);
+    try {
+      localStorage.setItem(CLAVE_VISTA_LISTA, v);
+    } catch {
+      // Sin almacenamiento (modo privado): vale para esta visita.
+    }
+  };
+  const conmutador = (
+    <ToggleGroup type="single" value={vista} onValueChange={elegir} className="rounded-md border p-1" aria-label="Ver la lista como">
+      <ToggleGroupItem value="libro" className="h-10 gap-1.5 px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+        <BookOpen className="h-4 w-4" /> Libro
+      </ToggleGroupItem>
+      <ToggleGroupItem value="tabla" className="h-10 gap-1.5 px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+        <Table2 className="h-4 w-4" /> Tabla
+      </ToggleGroupItem>
+    </ToggleGroup>
+  );
+  if (vista === "libro") return bajoDemanda(<ListaComoLibro extra={conmutador} />);
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex justify-end">{conmutador}</div>
+      <TablaLista {...props} />
+    </div>
+  );
 }
 
 /**

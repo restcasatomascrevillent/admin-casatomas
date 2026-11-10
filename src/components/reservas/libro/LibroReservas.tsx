@@ -5,31 +5,28 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CalendarIcon, ChevronLeft, ChevronRight, Eraser, Loader2, PenLine, Save, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
-import { agruparReservasDelDia } from "@/components/reservas/ReservasDelDia";
-import { useReservasServicioDia, CLAVE_RESERVAS_SERVICIO_DIA } from "@/hooks/useReservasServicioDia";
+import { CLAVE_RESERVAS_SERVICIO_DIA } from "@/hooks/useReservasServicioDia";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useGastoLecturaManuscrita } from "@/hooks/useGastoLecturaManuscrita";
 import { formatearEurPequeno } from "@/lib/reservas/gastoLecturaManuscrita";
 import { useBorradoresPendientes, useGuardarBorrador, useResolverBorrador, type BorradorManuscrito } from "@/hooks/useBorradoresManuscritos";
-import { ETIQUETA_TURNO, horaCorta } from "@/lib/reservas/ocupacionSalas";
-import { ESTADO_NO_SHOW, infoEstadoReserva } from "@/lib/reservas/estadosReserva";
 import {
   claveDia,
   datosAltaDesdeInterpretada,
   diaDeClave,
   interpretarReservaEscrita,
   pasarHoja,
+  tituloHoja,
   type ReservaInterpretada,
 } from "@/lib/reservas/libroReservas";
 import { LienzoManuscrito, type LienzoManuscritoApi } from "./LienzoManuscrito";
+import { ReservasDeLaHoja } from "./ReservasDeLaHoja";
 
 // ============================================================================
 // LIBRO DE RESERVAS — «Escribir reserva» (10/11/2026, petición del dueño)
@@ -51,81 +48,8 @@ interface Props {
   soloCrear?: boolean;
 }
 
-function fechaHoja(clave: string): string {
-  const t = format(diaDeClave(clave), "EEEE d 'de' MMMM yyyy", { locale: es });
-  return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
 function fechaCorta(clave: string): string {
   return format(diaDeClave(clave), "d 'de' MMMM", { locale: es });
-}
-
-/** Lo ya apuntado en la hoja del día. */
-function ReservasDeLaHoja({ fecha, resaltada }: { fecha: string; resaltada: string | null }) {
-  const { data: reservas, isLoading, isError, refetch } = useReservasServicioDia(fecha);
-  const { data: espacios } = useEspaciosReserva();
-  const nombreSala = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const e of (espacios ?? []) as Array<{ id: string; nombre: string }>) m.set(e.id, e.nombre);
-    return m;
-  }, [espacios]);
-  const grupos = useMemo(() => agruparReservasDelDia(reservas), [reservas]);
-
-  if (isLoading) return <Skeleton className="h-24 w-full bg-stone-200/60" />;
-  if (isError) {
-    return (
-      <p role="alert" className="text-sm text-red-700">
-        No se pudieron cargar las reservas de este día.{" "}
-        <button type="button" className="underline" onClick={() => void refetch()}>
-          Reintentar
-        </button>
-      </p>
-    );
-  }
-  if (!grupos.length) return <p className="py-4 text-base italic text-stone-500">Hoja en blanco: aún no hay reservas este día.</p>;
-
-  return (
-    <div className="space-y-4">
-      {grupos.map((g) => (
-        <section key={g.turno} aria-label={ETIQUETA_TURNO[g.turno]}>
-          <h3 className="mb-1 text-base font-semibold uppercase tracking-wide text-stone-500">
-            {ETIQUETA_TURNO[g.turno]} · {g.reservas.length} {g.reservas.length === 1 ? "reserva" : "reservas"} · {g.pax} pax
-          </h3>
-          <ul>
-            {g.reservas.map((r) => {
-              const info = infoEstadoReserva(r.estado);
-              const sala = r.espacio_id ? nombreSala.get(r.espacio_id) : null;
-              return (
-                <li
-                  key={r.id}
-                  className={cn(
-                    "flex min-h-14 items-center gap-4 border-b border-sky-300/60 px-1 py-2 text-xl",
-                    r.estado === ESTADO_NO_SHOW && "opacity-60",
-                    resaltada === r.id && "bg-amber-200/50",
-                  )}
-                >
-                  <span className="w-16 shrink-0 font-semibold tabular-nums">{horaCorta(r.hora) ?? r.hora}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium">
-                    {r.nombre || "Sin nombre"}
-                    {r.notas_cliente ? <span className="ml-2 text-lg font-normal text-stone-500">· {r.notas_cliente}</span> : null}
-                  </span>
-                  <span className="shrink-0 font-semibold tabular-nums">
-                    {r.numero_comensales} px
-                  </span>
-                  <span className="hidden w-32 shrink-0 truncate text-lg text-stone-600 sm:inline">{sala ?? "—"}</span>
-                  {info && (
-                    <Badge className={cn("shrink-0 text-sm", info.insignia)} variant={info.varianteInsignia}>
-                      {info.etiqueta}
-                    </Badge>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
-    </div>
-  );
 }
 
 /** Escritas a mano y guardadas sin interpretar en esta hoja: se pasan a limpio cuando haya tiempo. */
@@ -267,7 +191,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
           <PopoverTrigger asChild>
             <Button type="button" variant="outline" className="h-11 min-w-[16rem] justify-start text-base font-semibold">
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {fechaHoja(fecha)}
+              {tituloHoja(fecha)}
             </Button>
           </PopoverTrigger>
           {/* Sin Portal (10/11/2026): portado fuera del diálogo, el foco atrapado del libro cerraba el

@@ -33,6 +33,7 @@ vi.mock("@/components/reservas/FormularioReserva", () => ({
   },
 }));
 vi.mock("@/components/reservas/ListaReservasAvanzada", () => ({ ListaReservasAvanzada: () => null }));
+vi.mock("@/components/reservas/libro/ListaComoLibro", () => ({ ListaComoLibro: () => null }));
 vi.mock("@/components/reservas/CalendarioOcupacion", () => ({ CalendarioOcupacion: () => null }));
 vi.mock("@/components/reservas/PlanoEspacio2D", () => ({ PlanoEspacio2D: () => null }));
 vi.mock("@/components/reservas/servicio/ModoServicioPlano", () => ({ ModoServicioPlano: () => null }));
