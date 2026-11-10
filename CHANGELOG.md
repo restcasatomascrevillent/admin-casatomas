@@ -2,6 +2,16 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.5.0] - 2026-11-09
+
+Objetivo: Premio y último día del sorteo «Vota tu vino favorito» desde el panel (bases legales)
+
+### Añadido
+- Carta: premio y último día del sorteo «Vota tu vino favorito» desde el panel ([fc3d515](https://github.com/restcasatomascrevillent/admin-casatomas/commit/fc3d51596e0af88ce0a44e97ca236e6c341a7fe1))
+
+### Cambiado
+- Carta: la migración del premio cierra una votación abierta sin premio ni fecha ([bd169eb](https://github.com/restcasatomascrevillent/admin-casatomas/commit/bd169eb6d2ba01f29123e96b2547dae0fa9cde82))
+
 ## [1.4.0] - 2026-11-09
 
 Objetivo: Reservas (mesas al final, eventos con la sala entera, móvil), Facturas «Proveedores», originales de la carta en Drive e Instagram «Foto enmarcada»
