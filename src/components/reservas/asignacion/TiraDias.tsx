@@ -110,13 +110,13 @@ export function TiraDias({ dias, hoy, ventanaHoras, activo, tiraRef }: TiraDiasP
             type="button"
             variant="outline"
             size="icon"
-            className="hidden h-9 w-9 shrink-0 pointer-coarse:h-11 pointer-coarse:w-11 sm:inline-flex"
+            className="hidden h-11 w-11 shrink-0 sm:inline-flex"
             tabIndex={-1}
             aria-label="Ver días anteriores"
             disabled={!borde.izquierda}
             onClick={() => desplazar(-1)}
           >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
           </Button>
         )}
 
@@ -140,9 +140,9 @@ export function TiraDias({ dias, hoy, ventanaHoras, activo, tiraRef }: TiraDiasP
                     data-fecha={d.fecha}
                     aria-label={[etiquetas.corta, estado, ventana].filter(Boolean).join(", ")}
                     title={[etiquetas.titulo, estado, ventana].filter(Boolean).join(" · ")}
-                    className="h-9 min-w-[3.25rem] shrink-0 cursor-pointer touch-manipulation gap-1.5 px-2.5 hover:bg-background/60 data-[state=active]:hover:bg-background pointer-coarse:h-11 sm:px-3"
+                    className="h-11 min-w-[4rem] shrink-0 cursor-pointer touch-manipulation gap-1.5 px-3.5 text-base font-semibold hover:bg-background/60 data-[state=active]:hover:bg-background sm:px-4"
                   >
-                    {d.enVentana && <Clock className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />}
+                    {d.enVentana && <Clock className="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />}
                     <span>{etiquetas.corta}</span>
                     <InsigniaDia dia={d} />
                   </TabsTrigger>
@@ -170,13 +170,13 @@ export function TiraDias({ dias, hoy, ventanaHoras, activo, tiraRef }: TiraDiasP
             type="button"
             variant="outline"
             size="icon"
-            className="hidden h-9 w-9 shrink-0 pointer-coarse:h-11 pointer-coarse:w-11 sm:inline-flex"
+            className="hidden h-11 w-11 shrink-0 sm:inline-flex"
             tabIndex={-1}
             aria-label="Ver días siguientes"
             disabled={!borde.derecha}
             onClick={() => desplazar(1)}
           >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            <ChevronRight className="h-5 w-5" aria-hidden="true" />
           </Button>
         )}
       </div>
@@ -195,9 +195,9 @@ function InsigniaDia({ dia }: { dia: ResumenPestana }) {
     return (
       <span
         aria-hidden="true"
-        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
+        className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
       >
-        <Check className="h-3 w-3" strokeWidth={3} />
+        <Check className="h-3.5 w-3.5" strokeWidth={3} />
       </span>
     );
   }
@@ -205,7 +205,7 @@ function InsigniaDia({ dia }: { dia: ResumenPestana }) {
     <span
       aria-hidden="true"
       className={cn(
-        "inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] pointer-coarse:text-xs font-semibold tabular-nums",
+        "inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full px-1.5 text-sm font-bold tabular-nums",
         dia.enVentana
           ? "bg-amber-200 text-amber-950 dark:bg-amber-900/70 dark:text-amber-100"
           : "border border-border bg-background text-foreground",

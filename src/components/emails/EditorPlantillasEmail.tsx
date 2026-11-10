@@ -47,7 +47,7 @@ export function EditorPlantillasEmail() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="reservas-legible space-y-3">
       {/* Sin título: ya lo dicen la pestaña «Configuración» y el chip «Plantillas email». El texto completo,
           en el tooltip. */}
       <p className="truncate text-sm text-muted-foreground" title={AYUDA}>

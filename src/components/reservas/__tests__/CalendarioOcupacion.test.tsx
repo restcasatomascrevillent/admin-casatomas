@@ -216,7 +216,7 @@ describe("CalendarioOcupacion · la cifra grande son los comensales", () => {
     await mesPintado();
     const pequeno = within(casilla(20)).getByTestId("reservas-casilla");
     expect(pequeno).toHaveTextContent("3 res.");
-    expect(pequeno.className).toMatch(/text-\[10px\]/);
+    expect(pequeno.className).toMatch(/\btext-sm\b/);
     // Y no compite con la cifra grande: son elementos distintos.
     expect(pequeno).not.toBe(comensales(20));
   });

@@ -546,7 +546,7 @@ export function GestionMesasEspacios() {
   }
 
   return (
-    <Card>
+    <Card className="reservas-legible">
       <CardHeader>
         <div className="flex items-center gap-2">
           <LayoutGrid className="h-5 w-5 text-primary" aria-hidden="true" />
