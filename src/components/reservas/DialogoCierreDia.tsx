@@ -4,11 +4,16 @@
 // Encargo del dueño (2026-10-15): el calendario va a todo el ancho, sin panel
 // lateral («para no duplicar cosas»); al pulsar CUALQUIER día sale este pop-up
 // para cerrar las reservas de ese día: Comida, Cena o Las dos, y abrirlo si
-// estaba cerrado (también un día que cierra por defecto: un lunes especial).
+// estaba cerrado (también un día que cierra por defecto: un jueves especial).
 // Sustituye a `CierreDiaControl` (13/10), que iba encima del panel del día.
 // Misma lógica: `useCambiarCierre` (tabla `cierres_reserva`) y los cierres de
 // la RPC `servicios_cerrados_reserva`. Las reservas manuales del panel siguen
 // siendo posibles (solo avisan).
+//
+// Jueves de tapas (dueño, 2026-11-10: «Abierto, sin reservas web»): un servicio
+// que la regla semanal deja sin reservas en un día de
+// `dias_abiertos_sin_reserva_online` no es un cierre del local: se dice «Sin
+// reservas web (el restaurante abre)» y sin rojo. «Abrir» lo abre a la web.
 //
 // Solo «Ver» en Reservas (06/11/2026, decisión del dueño): el pop-up enseña cómo
 // está el día, sin los botones de abrir y cerrar (se ocultan, no se desactivan).
@@ -27,6 +32,8 @@ import {
   TURNOS_SERVICIO,
   cierraPorSemana,
   cierreSemanalDesde,
+  diasAbiertosSinReservaOnlineDesde,
+  esSoloSinReservaOnline,
   type ServicioCerrado,
   type TurnoServicio,
 } from "../../../supabase/functions/_shared/cierres";
@@ -57,6 +64,8 @@ export function DialogoCierreDia({ fecha, onClose, cierres, esPasado, esquemaPen
   const cambiar = useCambiarCierre();
   const { data: configuracion } = useConfiguracionReservas();
   const semanal = cierreSemanalDesde(configuracion);
+  const abiertosSinOnline = diasAbiertosSinReservaOnlineDesde(configuracion);
+  const soloSinWeb = (c: ServicioCerrado | undefined) => !!c && esSoloSinReservaOnline(c, abiertosSinOnline);
 
   const cerrado = (t: TurnoServicio) => cierres.find((c) => c.turno === t);
   const todoCerrado = TURNOS_SERVICIO.every((t) => cerrado(t));
@@ -80,6 +89,7 @@ export function DialogoCierreDia({ fecha, onClose, cierres, esPasado, esquemaPen
 
   const estado = (t: TurnoServicio) => {
     const c = cerrado(t);
+    if (c && soloSinWeb(c)) return "Sin reservas web (el restaurante abre)";
     if (c) return c.origen === "semanal" ? "Cerrada (cierre semanal)" : "Cerrada a mano";
     if (fecha && cierraPorSemana(fecha, t, semanal)) return "Abierta (excepción: normalmente cierra)";
     return "Abierta";
@@ -99,22 +109,23 @@ export function DialogoCierreDia({ fecha, onClose, cierres, esPasado, esquemaPen
             <ul className="space-y-2" aria-label="Estado del día">
               {TURNOS_SERVICIO.map((t) => {
                 const c = cerrado(t);
+                const rojo = !!c && !soloSinWeb(c);
                 return (
                   <li
                     key={t}
                     data-testid={`estado-${t}`}
                     className={cn(
                       "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-base",
-                      c ? "border-destructive/40 bg-destructive/5" : "border-border",
+                      rojo ? "border-destructive/40 bg-destructive/5" : "border-border",
                     )}
                   >
                     {c ? (
-                      <Lock className="h-5 w-5 shrink-0 text-destructive" aria-hidden="true" />
+                      <Lock className={cn("h-5 w-5 shrink-0", rojo ? "text-destructive" : "text-muted-foreground")} aria-hidden="true" />
                     ) : (
                       <LockOpen className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                     )}
                     <span className="font-semibold">{NOMBRE_TURNO[t]}:</span>
-                    <span className={cn(c ? "text-destructive" : "text-muted-foreground")}>{estado(t)}</span>
+                    <span className={cn(rojo ? "text-destructive" : "text-muted-foreground")}>{estado(t)}</span>
                   </li>
                 );
               })}

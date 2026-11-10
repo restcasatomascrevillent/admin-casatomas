@@ -27,7 +27,7 @@ const todoElDia: ServicioCerrado[] = [
   { fecha: DOMINGO, turno: "cena", origen: "manual" },
 ];
 
-function pintar(cierres: ServicioCerrado[] | undefined, densidad?: DensidadCasilla) {
+function pintar(cierres: ServicioCerrado[] | undefined, densidad?: DensidadCasilla, sinReservaWeb?: ServicioCerrado[]) {
   return render(
     <TooltipProvider>
       <CasillaOcupacion
@@ -35,6 +35,7 @@ function pintar(cierres: ServicioCerrado[] | undefined, densidad?: DensidadCasil
         fechaISO={DOMINGO}
         resumen={resumen}
         cierres={cierres}
+        sinReservaWeb={sinReservaWeb}
         esPasado={false}
         esHoy={false}
         seleccionada={false}
@@ -80,6 +81,29 @@ describe("CasillaOcupacion — etiqueta de cierre", () => {
     expect(screen.getByTestId("comensales-casilla")).toHaveAttribute("data-fuente", "14");
     expect(screen.queryByTestId("reservas-casilla")).toBeNull();
     expect(screen.getByRole("button").getAttribute("aria-label")).toMatch(/Sin cena para reservas/);
+  });
+
+  // Jueves de tapas (dueño, 2026-11-10: «Abierto, sin reservas web»).
+  it("jueves de tapas: «Sin reservas web» discreto, sin «Cerrado» ni rayado", () => {
+    const JUEVES = "2026-11-19";
+    pintar(undefined, "compacta", [
+      { fecha: JUEVES, turno: "comida", origen: "semanal" },
+      { fecha: JUEVES, turno: "cena", origen: "semanal" },
+    ]);
+    const etiqueta = screen.getByTestId("cierre-casilla");
+    expect(etiqueta).toHaveTextContent("Sin reservas web");
+    expect(etiqueta.className).not.toMatch(/text-destructive|uppercase|\btruncate\b|\bhidden\b/);
+    expect(etiqueta.className).toMatch(/\bshrink-0\b/);
+    const boton = screen.getByRole("button");
+    expect(boton).toHaveAttribute("data-cierre", "sin-web");
+    expect(boton.className).not.toMatch(/repeating-linear-gradient/);
+    expect(boton.getAttribute("aria-label")).toMatch(/Abierto, sin reservas por la web ni por teléfono/);
+    expect(boton.getAttribute("aria-label")).not.toMatch(/Cerrado/);
+  });
+
+  it("si además hay un cierre de verdad, manda el cierre", () => {
+    pintar(sinCena, "completa", [{ fecha: DOMINGO, turno: "comida", origen: "semanal" }]);
+    expect(screen.getByTestId("cierre-casilla")).toHaveTextContent("Sin cena");
   });
 
   it("sin cierres no hay etiqueta", () => {

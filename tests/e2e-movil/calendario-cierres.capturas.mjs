@@ -6,8 +6,8 @@
 //   npx vite preview --port 4173 --strictPort --host 127.0.0.1 &
 //   node tests/e2e-movil/calendario-cierres.capturas.mjs [carpeta-de-capturas]
 //
-// Cierres simulados: la regla semanal (lunes entero y domingo noche, sin jueves desde el 10/11/2026), un sábado
-// sin comida y un martes cerrado a mano. Saca tablet (768×1024, 820×1180 y 1024×768) y escritorio (1280×800 y
+// Cierres simulados: la regla semanal (lunes entero, jueves sin reservas web —el panel lo enseña abierto con
+// «Sin reservas web» desde el 10/11/2026— y domingo noche), un sábado sin comida y un martes cerrado a mano. Saca tablet (768×1024, 820×1180 y 1024×768) y escritorio (1280×800 y
 // 1440×900); en un teléfono (< 768 px) Reservas solo enseña «Hoy» (07/11/2026) y no hay calendario. No entra en `npm test`; sale con código 1 si alguna etiqueta queda cortada.
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
@@ -20,11 +20,8 @@ const BASE = process.env.E2E_BASE_URL ?? "http://127.0.0.1:4173";
 const URL_SUPABASE = process.env.E2E_SUPABASE_URL ?? "https://e2e-falso.supabase.co";
 const SALIDA = process.argv[2] ?? "capturas-calendario-cierres";
 
-// `E2E_REGLA=antigua` simula la configuración de antes del 10/11/2026 (lunes, JUEVES y domingo noche).
-const REGLA = process.env.E2E_REGLA === "antigua" ? { comida: [1, 4], cena: [0, 1, 4] } : undefined;
-
 function cierres({ p_desde, p_hasta }) {
-  const semanales = serviciosCerradosPorSemana(p_desde, p_hasta, REGLA);
+  const semanales = serviciosCerradosPorSemana(p_desde, p_hasta);
   const extra = [];
   const mes = p_desde.slice(0, 8);
   // Un sábado sin comida y un martes entero cerrados a mano (busca el primero de cada uno en el mes).

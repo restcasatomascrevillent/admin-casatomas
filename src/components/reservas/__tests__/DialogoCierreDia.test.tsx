@@ -30,7 +30,7 @@ import type { ServicioCerrado } from "../../../../supabase/functions/_shared/cie
 
 const MARTES = "2026-10-20";
 const LUNES = "2026-10-19"; // cierra por defecto (cierre semanal)
-const JUEVES = "2026-10-22"; // abre por defecto desde el 2026-11-10
+const JUEVES = "2026-10-22"; // sin reservas web por defecto, pero el restaurante abre (tapas)
 
 function abrir(fecha: string | null, cierres: ServicioCerrado[] = [], extra: { esPasado?: boolean } = {}) {
   const onClose = vi.fn();
@@ -93,16 +93,34 @@ describe("DialogoCierreDia", () => {
     expect(mutate).toHaveBeenCalledWith({ fecha: LUNES, turnos: ["comida", "cena"], cerrar: false }, expect.anything());
   });
 
-  it("un lunes abierto a mano lo dice: es una excepción", () => {
-    abrir(LUNES, []);
-    expect(screen.getByTestId("estado-comida")).toHaveTextContent("excepción");
+  it("un jueves de tapas se puede abrir a la web (excepción)", () => {
+    abrir(JUEVES, [
+      { fecha: JUEVES, turno: "comida", origen: "semanal", motivo: null },
+      { fecha: JUEVES, turno: "cena", origen: "semanal", motivo: null },
+    ]);
+    fireEvent.click(boton(/Abrir las dos/));
+    expect(mutate).toHaveBeenCalledWith({ fecha: JUEVES, turnos: ["comida", "cena"], cerrar: false }, expect.anything());
   });
 
-  it("un jueves sin cierres está abierto sin más (ya no cierra por defecto)", () => {
+  it("jueves de tapas: la regla semanal lo deja sin reservas web, pero se dice que el restaurante abre (sin rojo)", () => {
+    abrir(JUEVES, [
+      { fecha: JUEVES, turno: "comida", origen: "semanal", motivo: null },
+      { fecha: JUEVES, turno: "cena", origen: "semanal", motivo: null },
+    ]);
+    const comida = screen.getByTestId("estado-comida");
+    expect(comida).toHaveTextContent("Sin reservas web (el restaurante abre)");
+    expect(comida).not.toHaveTextContent("Cerrada");
+    expect(comida.className).not.toMatch(/destructive/);
+  });
+
+  it("un jueves cerrado a mano sí es un cierre", () => {
+    abrir(JUEVES, [{ fecha: JUEVES, turno: "cena", origen: "manual", motivo: null }]);
+    expect(screen.getByTestId("estado-cena")).toHaveTextContent("Cerrada a mano");
+  });
+
+  it("un jueves abierto a mano lo dice: es una excepción", () => {
     abrir(JUEVES, []);
-    expect(screen.getByTestId("estado-comida")).toHaveTextContent("Abierta");
-    expect(screen.getByTestId("estado-comida")).not.toHaveTextContent("excepción");
-    expect(screen.getByTestId("estado-cena")).not.toHaveTextContent("excepción");
+    expect(screen.getByTestId("estado-comida")).toHaveTextContent("excepción");
   });
 
   it("un día pasado no se puede cambiar", () => {
