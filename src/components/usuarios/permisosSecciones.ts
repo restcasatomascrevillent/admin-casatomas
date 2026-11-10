@@ -49,7 +49,7 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   reservas_crear:
     "«Nueva reserva»: crear reservas (nacen verificadas o pendientes y el cliente las confirma por correo), sin modificarlas, cambiar su estado (ni «Ha llegado»), dar mesa, cancelar ni configurar. Necesita «Ver» en Reservas. Es el tipo de usuario «Reservas».",
   gestor_carta:
-    "añadir, cambiar y borrar platos, vinos, bebidas y cócteles: ajustar y restaurar precios, ordenar, visibilidad, fotos (quitar el fondo y vídeos), «Añadir vino» y «Varias botellas» con IA, traducciones y la votación del vino favorito. Con solo «Ver» se consulta la carta y se descarga el «PDF Carta».",
+    "añadir, cambiar y borrar platos, vinos, bebidas y cócteles: ajustar y restaurar precios, ordenar, visibilidad, fotos (quitar el fondo y vídeos), «Añadir vino» y «Varias botellas» con IA, traducciones y la votación del vino favorito, y el «PDF Carta» (carta de platos y de vinos para imprimir). Con solo «Ver» se consulta la carta, sin el «PDF Carta».",
   gestion_web:
     "sin efecto: en Novedades, Menús diarios y Tapas basta con «Ver» para cambiarlo todo (decisión del dueño, 06/11/2026).",
   marketing:
@@ -57,7 +57,7 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   instagram_agencia: "aceptar, entregar y comentar los encargos de Instagram como la agencia (Oficiosos). Con solo «Ver», los consulta.",
   instagram_render:
     "obligatorio para el usuario del equipo de vídeo: reclamar, generar y subir los vídeos de los reels. No le des Marketing.",
-  cheques: "compra manual, configuración del cheque y plantilla de factura. Con solo «Ver» se consultan y se canjean cheques regalo.",
+  cheques: "compra manual, configuración del cheque, plantilla de factura y la pestaña Stripe (cobros, comisiones e «Informe de cheques regalo»). Con solo «Ver» se consultan y se canjean cheques regalo, sin ver Stripe.",
   tienda: "poner o quitar vinos de la tienda y la pestaña Ajustes (visible, descuento y textos). Con solo «Ver» se consulta la lista de vinos.",
   facturas:
     "modificar, verificar y borrar documentos, clasificar productos, cambiar los ajustes de Facturas y usar la IA; también subir (pestaña Cargar). Con solo «Ver» se consultan Análisis y Compras.",

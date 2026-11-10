@@ -5,11 +5,12 @@ import { describe, expect, it } from "vitest";
 import { AYUDA_EDICION, seccionesConPermisos } from "../permisosSecciones";
 
 describe("AYUDA_EDICION · carta, Gestor Web y newsletter", () => {
-  it("Carta: «Editar» ya se usa; con solo «Ver» se consulta y se descarga el «PDF Carta»", () => {
+  it("Carta: «Editar» ya se usa e incluye el «PDF Carta» (10/11/2026); con solo «Ver» se consulta sin él", () => {
     expect(AYUDA_EDICION.gestor_carta).not.toMatch(/aún no se usa/);
     expect(AYUDA_EDICION.gestor_carta).toMatch(/precios/);
     expect(AYUDA_EDICION.gestor_carta).toMatch(/fotos/);
-    expect(AYUDA_EDICION.gestor_carta).toMatch(/Con solo «Ver» se consulta la carta y se descarga el «PDF Carta»/);
+    expect(AYUDA_EDICION.gestor_carta).toMatch(/y el «PDF Carta»/);
+    expect(AYUDA_EDICION.gestor_carta).toMatch(/Con solo «Ver» se consulta la carta, sin el «PDF Carta»/);
   });
 
   it("Gestor Web: no cambia, con «Ver» se cambia todo", () => {

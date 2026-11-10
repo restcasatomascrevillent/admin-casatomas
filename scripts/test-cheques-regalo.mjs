@@ -9,7 +9,8 @@
 // contadores, verificación, canje único (desde el 06/11/2026 basta con «Ver»
 // en Cheques: migración 20261106520000), caducidad (último día incluido),
 // reembolso, factura única y compra manual idempotente (esa sigue pidiendo
-// «Editar»).
+// «Editar»), y la pestaña Stripe (métricas e informe), que desde el 10/11/2026
+// también pide «Editar» (migración 20261122164100).
 import { PGlite } from "@electric-sql/pglite";
 import { readdir, readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -267,7 +268,10 @@ await falla(sql(`select public.crear_cheque_manual($1, $2)`, ["60000000-0000-000
 // --- 10. Gastos de gestión: factura y métricas de la pestaña Stripe -----------------------------
 await como(AJENO);
 await falla(sql(`select public.metricas_cheques_regalo()`), /permiso/, "sin permiso de Cheques no hay métricas");
+// Desde el 10/11/2026 (migración 20261122164100) la pestaña Stripe es solo para «Editar».
 await como(LECTOR);
+await falla(sql(`select public.metricas_cheques_regalo()`), /Editar/, "con solo «Ver» en Cheques no hay métricas de Stripe");
+await como(EDITOR);
 const metricas = async () => (await una(`select public.metricas_cheques_regalo() as m`)).m;
 const antes = await metricas();
 // Cheque de 50 € con 1,02 € de gastos y la comisión real que guarda el webhook (1,02 €).
@@ -281,7 +285,6 @@ await pagar(await crearPendiente(100, { gastos_gestion_eur: 1.78 }), "CT-HHHH888
 // Una compra manual nunca entra en las métricas de Stripe.
 await como(EDITOR);
 await sql(`select public.crear_cheque_manual_v2($1, $2)`, ["70000000-0000-0000-0000-000000000007", { ...datos, importe_eur: 40 }]);
-await como(LECTOR);
 const despues = await metricas();
 const delta = (campo) => Math.round((Number(despues[campo]) - Number(antes[campo])) * 100) / 100;
 igual([delta("pagos"), delta("pagos_con_gastos")], [2, 2], "cuenta los dos pagos web con gastos y no la compra manual");
@@ -294,6 +297,8 @@ igual(despues.comision_incompleta, true, "avisa de que hay comisiones estimadas"
 await como(AJENO);
 await falla(sql(`select public.informe_cheques_regalo('2026-01-01', '2026-01-31')`), /permiso/, "sin permiso de Cheques no hay informe");
 await como(LECTOR);
+await falla(sql(`select public.informe_cheques_regalo('2026-01-01', '2026-01-31')`), /Editar/, "con solo «Ver» en Cheques no hay informe");
+await como(EDITOR);
 await falla(sql(`select public.informe_cheques_regalo('2026-02-01', '2026-01-01')`), /Rango/, "rango al revés");
 await falla(sql(`select public.informe_cheques_regalo(null, '2026-01-01')`), /Rango/, "rango sin inicio");
 // Filas con fechas fijas (sin el trigger de caducidad, que pondría la de hoy). Fechas en hora de Madrid.
@@ -334,7 +339,17 @@ igual(Object.keys(j).sort(), ["caduca_el", "canal", "canjeado", "creado", "estad
 igual(JSON.stringify(inf).includes("privada"), false, "ningún dato personal en la respuesta");
 igual([inf.desde, inf.hasta, inf.hoy], ["2026-01-01", "2026-01-31", hoy], "devuelve el periodo y el día de hoy en Madrid");
 
-// La vuelta atrás quita la RPC del informe y nada más.
+// La vuelta atrás de 20261122164100 devuelve las dos RPC a «Ver».
+const sinNotify = async (ruta) => (await readFile(ruta, "utf8")).replace(/^set client_encoding.*$/m, "").replace(/notify pgrst.*$/m, "");
+await db.exec(await sinNotify("supabase/rollbacks/20261122164100_cheques_stripe_solo_editar_ROLLBACK.sql"));
+await como(LECTOR);
+igual(Number((await una(`select public.metricas_cheques_regalo() as m`)).m.pagos) >= 2, true, "tras el rollback, «Ver» vuelve a ver las métricas");
+igual(Array.isArray((await una(`select public.informe_cheques_regalo('2026-01-01', '2026-01-31') as r`)).r.cheques), true, "tras el rollback, «Ver» vuelve a ver el informe");
+await como(AJENO);
+await falla(sql(`select public.informe_cheques_regalo('2026-01-01', '2026-01-31')`), /permiso/, "tras el rollback, sin permiso sigue sin informe");
+
+// La vuelta atrás del informe quita la RPC del informe y nada más.
+await como(null);
 await db.exec("reset role");
 await db.exec((await readFile("supabase/rollbacks/20261122093700_informe_cheques_regalo_ROLLBACK.sql", "utf8")).replace(/^set client_encoding.*$/m, "").replace(/notify pgrst.*$/m, ""));
 igual((await una(`select to_regprocedure('public.informe_cheques_regalo(date,date)') is null as quitada`)).quitada, true, "el rollback quita la RPC del informe");

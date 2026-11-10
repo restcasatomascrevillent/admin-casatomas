@@ -41,14 +41,19 @@ const informe = (cambios: Partial<InformeMes> = {}): InformeMes => ({
 });
 
 describe("Super Admin › Informes · servicios y cheques (lote del 10/11/2026)", () => {
-  it("los dos informes están en el registro: servicios solo para super admin, cheques con «Ver» en Cheques", () => {
+  it("los dos informes están en el registro: servicios solo para super admin, cheques con «Editar» en Cheques", () => {
     const servicios = INFORMES.find((i) => i.id === "servicios-mensual");
     const cheques = INFORMES.find((i) => i.id === "cheques-mensual");
     expect(servicios?.seccion).toBe("servicios");
     expect(cheques?.seccion).toBe("cheques");
-    const conCheques = { esSuperAdmin: false, permisos: [{ section_key: "cheques", can_view: true, can_edit: false }] };
-    expect(puedeVerInforme(servicios!, conCheques)).toBe(false);
-    expect(puedeVerInforme(cheques!, conCheques)).toBe(true);
+    expect(cheques?.permiso).toEqual({ tipo: "seccion", seccion: "cheques", nivel: "edit" });
+    const editorCheques = { esSuperAdmin: false, permisos: [{ section_key: "cheques", can_view: true, can_edit: true }] };
+    const lectorCheques = { esSuperAdmin: false, permisos: [{ section_key: "cheques", can_view: true, can_edit: false }] };
+    expect(puedeVerInforme(servicios!, editorCheques)).toBe(false);
+    expect(puedeVerInforme(cheques!, editorCheques)).toBe(true);
+    // Con solo «Ver» ya no (10/11/2026): como la pestaña Stripe.
+    expect(puedeVerInforme(cheques!, lectorCheques)).toBe(false);
+    expect(puedeVerInforme(cheques!, { esSuperAdmin: true, permisos: [] })).toBe(true);
     expect(puedeVerInforme(cheques!, { esSuperAdmin: false, permisos: [] })).toBe(false);
   });
 
