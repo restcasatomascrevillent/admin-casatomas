@@ -1080,6 +1080,7 @@ export function VistaPlanoHoy({
                   <p className="flex items-center justify-between gap-2 text-sm">
                     <span className="min-w-0 truncate">
                       <span className="tabular-nums">{hora}</span> · {r.nombre || "Sin nombre"}
+                      {r.importante && <Star className="ml-1 inline h-3.5 w-3.5 fill-amber-400 text-amber-600" aria-label="Importante" />}
                     </span>
                     <span className={cn("shrink-0 text-[13px] tabular-nums", noCaben ? "font-medium text-amber-800 dark:text-amber-300" : "text-muted-foreground")}>
                       {sentando === r.id ? <Loader2 className="h-4 w-4 animate-spin" aria-label="Guardando" /> : `${pax} pax${noCaben ? " · no caben" : ""}`}

@@ -1265,7 +1265,7 @@ describe("FormularioReserva · edición · sala, importante y mesa", () => {
     expect(screen.queryByLabelText("Negocio")).not.toBeInTheDocument();
     expect(screen.queryByText(/cancela la reserva y crea otra/i)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Marcar como importante" }));
+    fireEvent.click(screen.getByRole("button", { name: /marcar como importante/i }));
     fireEvent.click(await guardar());
     await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
     expect(bd.update.mock.calls[0][0]).not.toHaveProperty("marca");
@@ -1275,7 +1275,7 @@ describe("FormularioReserva · edición · sala, importante y mesa", () => {
     const bd = prepararBD();
     montar();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Marcar como importante" }));
+    fireEvent.click(screen.getByRole("button", { name: /marcar como importante/i }));
     fireEvent.click(await guardar());
 
     await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));

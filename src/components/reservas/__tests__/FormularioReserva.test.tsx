@@ -183,6 +183,28 @@ describe("FormularioReserva · siempre Casa Tomás, sala interna", () => {
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
   });
 
+  it("«Marcar como importante» en el alta guarda importante: true y cambia a «Importante»", async () => {
+    const insert = espiarInsert();
+    montar({ espacio_id: null });
+
+    const boton = screen.getByRole("button", { name: /marcar como importante \(reserva del jefe\)/i });
+    expect(boton).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(boton);
+    expect(screen.getByRole("button", { name: "Importante" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    expect(insert.mock.calls[0][0]).toMatchObject({ importante: true });
+  });
+
+  it("sin marcar, el alta no manda importante", async () => {
+    const insert = espiarInsert();
+    montar({ espacio_id: null });
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("importante");
+  });
+
   it("aunque llegue una marca de otro negocio en los datos de partida, se guarda como Casa Tomás", async () => {
     const insert = espiarInsert();
     montar({ marca: "touza" });
