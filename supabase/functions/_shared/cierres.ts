@@ -4,7 +4,9 @@
 // Encargo del dueño (2026-10-13): no se cogen reservas los LUNES y JUEVES
 // (todo el día) ni los DOMINGOS por la noche; el personal puede cerrar un
 // día o servicio concreto desde el calendario, y abrir uno que cierra por
-// defecto.
+// defecto. Desde el 2026-11-10 los JUEVES ABREN («en el calendario los
+// jueves aparece cerrado y están abiertos»): la regla queda en lunes todo el
+// día y domingo noche (migración 20261122100000_jueves_abiertos).
 //
 // La regla vive en la base de datos (migración 20261013120000):
 //   - semanal: `configuracion_reservas.dias_cerrados_comida/cena`
@@ -40,10 +42,10 @@ export interface CierreSemanal {
   cena: readonly number[];
 }
 
-/** Lunes y jueves todo el día; domingo, la cena. */
+/** Lunes todo el día; domingo, la cena. Los jueves abren desde el 2026-11-10. */
 export const CIERRE_SEMANAL_POR_DEFECTO: CierreSemanal = {
-  comida: [1, 4],
-  cena: [0, 1, 4],
+  comida: [1],
+  cena: [0, 1],
 };
 
 /** Corte comida/cena: el mismo que `turnoDeHora` y el trigger de aforo. */

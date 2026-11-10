@@ -107,7 +107,11 @@ export function CasillaOcupacion({
     cierraComida && cierraCena ? "Cerrado" : cierraComida ? "Sin comida" : cierraCena ? "Sin cena" : null;
   const fija = densidad !== undefined;
   const compacta = densidad === "compacta";
-  const verReservas = fija && densidad === "completa";
+  // Con etiqueta de cierre (o de evento) la casilla de alto fijo tiene una línea más: la cifra cede
+  // ese alto y «N res.» se calla (sigue en el tooltip y el aria-label) para que nada se monte ni se
+  // corte por abajo (el tamaño de `medirCasilla` no cuenta con ella).
+  const lineasExtra = (textoCierre ? 1 : 0) + (eventos && eventos.length > 0 && !compacta ? 1 : 0);
+  const verReservas = fija && densidad === "completa" && lineasExtra === 0;
   const verPorcentaje = fija && densidad !== "compacta";
   const nivel = resumen?.nivel ?? "vacio";
   // Un día pasado se ve atenuado, tenga o no reservas.
@@ -147,16 +151,18 @@ export function CasillaOcupacion({
   // sale de la casilla medida (px); sin ella, del ancho (`cqw`).
   // Una cifra de 2-3 dígitos nunca puede ser más ancha que la casilla: el tamaño en px es el techo y `cqw` lo recorta por nº de dígitos (P-01).
   const digitos = String(resumen?.comensales ?? 0).length;
+  const fuenteCifra = fuenteComensales ? Math.max(14, fuenteComensales - lineasExtra * (compacta ? 8 : 10)) : 0;
   const cifra = conReservas ? (
     <span
       data-testid="comensales-casilla"
+      data-fuente={fija && fuenteComensales ? fuenteCifra : undefined}
       aria-hidden="true"
       className={cn(
         "font-bold leading-none",
         "text-center",
         !fija && "[font-size:clamp(1.125rem,30cqw,2rem)]",
       )}
-      style={fija && fuenteComensales ? { fontSize: `min(${fuenteComensales}px, calc(100cqw / ${(digitos * 0.62 + 0.3).toFixed(2)}))` } : undefined}
+      style={fija && fuenteComensales ? { fontSize: `min(${fuenteCifra}px, calc(100cqw / ${(digitos * 0.62 + 0.3).toFixed(2)}))` } : undefined}
     >
       {resumen.comensales}
     </span>
@@ -207,13 +213,16 @@ export function CasillaOcupacion({
         {!compacta && <span className="flex shrink-0 items-center gap-0.5">{indicadores}</span>}
       </span>
 
+      {/* La etiqueta de cierre no se recorta nunca (dueño, 2026-11-10: «la palabra cerrado se ve
+          cortada»): `shrink-0` para que la columna flex no la aplaste contra la cifra en una casilla
+          de alto fijo, sin `truncate` (si un día no cabe en una línea, parte en dos) y también en la
+          densidad compacta, donde antes los días de medio servicio la escondían. */}
       {textoCierre && (
         <span
           data-testid="cierre-casilla"
           className={cn(
-            "truncate text-[10px] pointer-coarse:text-xs font-semibold uppercase leading-none tracking-wide",
+            "block shrink-0 break-words text-[10px] pointer-coarse:text-xs font-semibold uppercase leading-none",
             cierraComida && cierraCena ? "text-destructive" : "text-muted-foreground",
-            compacta && !(cierraComida && cierraCena) && "hidden",
           )}
         >
           {textoCierre}
@@ -224,7 +233,7 @@ export function CasillaOcupacion({
           data-testid="evento-casilla"
           aria-hidden="true"
           className={cn(
-            "truncate rounded bg-violet-100 px-1 text-[10px] pointer-coarse:text-xs font-semibold leading-tight text-violet-900 dark:bg-violet-900/40 dark:text-violet-100",
+            "shrink-0 truncate rounded bg-violet-100 px-1 text-[10px] pointer-coarse:text-xs font-semibold leading-tight text-violet-900 dark:bg-violet-900/40 dark:text-violet-100",
             compacta && "hidden",
           )}
         >

@@ -14,20 +14,34 @@ import { calcularDisponibilidad, validarHoraOfrecida } from "../disponibilidad";
 
 // Octubre 2026: lunes 12, jueves 15, sábado 17, domingo 18.
 describe("regla semanal por defecto", () => {
-  it("lunes y jueves todo el día, domingo la cena", () => {
+  it("lunes todo el día y domingo la cena; los jueves abren (2026-11-10)", () => {
     const c = serviciosCerradosPorSemana("2026-10-12", "2026-10-18");
     expect(turnosCerradosEn(c, "2026-10-12")).toEqual(["comida", "cena"]);
     expect(turnosCerradosEn(c, "2026-10-13")).toEqual([]);
-    expect(turnosCerradosEn(c, "2026-10-15")).toEqual(["comida", "cena"]);
+    expect(turnosCerradosEn(c, "2026-10-15")).toEqual([]);
     expect(turnosCerradosEn(c, "2026-10-17")).toEqual([]);
     expect(turnosCerradosEn(c, "2026-10-18")).toEqual(["cena"]);
-    expect(Object.keys(cierresPorDia(c))).toEqual(["2026-10-12", "2026-10-15", "2026-10-18"]);
+    expect(Object.keys(cierresPorDia(c))).toEqual(["2026-10-12", "2026-10-18"]);
+  });
+  it("ningún jueves sale cerrado en un año entero (ni con cambio de hora)", () => {
+    const c = serviciosCerradosPorSemana("2026-11-01", "2027-10-31");
+    const jueves = c.filter((s) => new Date(`${s.fecha}T12:00:00Z`).getUTCDay() === 4);
+    expect(jueves).toEqual([]);
+    // Y los lunes siguen cerrados enteros: 52 semanas × 2 servicios.
+    expect(c.filter((s) => new Date(`${s.fecha}T12:00:00Z`).getUTCDay() === 1)).toHaveLength(104);
   });
   it("lee la configuración y descarta basura", () => {
     expect(cierreSemanalDesde({ dias_cerrados_comida: [2, 9], dias_cerrados_cena: null })).toEqual({
       comida: [2],
-      cena: [0, 1, 4],
+      cena: [0, 1],
     });
+  });
+  it("si la configuración aún cierra los jueves (migración sin aplicar), se respeta", () => {
+    const semanal = cierreSemanalDesde({ dias_cerrados_comida: [1, 4], dias_cerrados_cena: [0, 1, 4] });
+    expect(turnosCerradosEn(serviciosCerradosPorSemana("2026-10-15", "2026-10-15", semanal), "2026-10-15")).toEqual([
+      "comida",
+      "cena",
+    ]);
   });
   it("normaliza filas de la RPC", () => {
     expect(
@@ -41,9 +55,13 @@ describe("regla semanal por defecto", () => {
 });
 
 describe("cambioCierre", () => {
-  it("abrir un jueves guarda una excepción abierta; volver a cerrarlo la borra", () => {
-    expect(cambioCierre("2026-10-15", "comida", false)).toEqual({ tipo: "guardar", abierto: true });
-    expect(cambioCierre("2026-10-15", "comida", true)).toEqual({ tipo: "borrar" });
+  it("abrir un lunes guarda una excepción abierta; volver a cerrarlo la borra", () => {
+    expect(cambioCierre("2026-10-12", "comida", false)).toEqual({ tipo: "guardar", abierto: true });
+    expect(cambioCierre("2026-10-12", "comida", true)).toEqual({ tipo: "borrar" });
+  });
+  it("un jueves abre por defecto: cerrarlo guarda una excepción cerrada", () => {
+    expect(cambioCierre("2026-10-15", "cena", true)).toEqual({ tipo: "guardar", abierto: false });
+    expect(cambioCierre("2026-10-15", "cena", false)).toEqual({ tipo: "borrar" });
   });
   it("cerrar un sábado guarda una excepción cerrada; reabrirlo la borra", () => {
     expect(cambioCierre("2026-10-17", "cena", true)).toEqual({ tipo: "guardar", abierto: false });

@@ -1,8 +1,9 @@
 // ============================================================================
 // CIERRES DE RESERVAS en el panel (encargo del dueño, 2026-10-13)
 // ----------------------------------------------------------------------------
-// Lunes y jueves (todo el día) y domingo noche no se cogen reservas por la web
-// ni por teléfono; desde el calendario se cierra/abre un día o un servicio.
+// Lunes (todo el día) y domingo noche no se cogen reservas por la web
+// ni por teléfono (los jueves cerraban hasta el 2026-11-10: ya abren); desde el
+// calendario se cierra/abre un día o un servicio.
 // La regla es la RPC `servicios_cerrados_reserva` (migración
 // 20261013120000_cierres_reserva.sql), la misma que usan reservas-web y el bot.
 // La lógica pura está en `supabase/functions/_shared/cierres.ts`.

@@ -29,7 +29,8 @@ import { DialogoCierreDia } from "@/components/reservas/DialogoCierreDia";
 import type { ServicioCerrado } from "../../../../supabase/functions/_shared/cierres";
 
 const MARTES = "2026-10-20";
-const JUEVES = "2026-10-22"; // cierra por defecto (cierre semanal)
+const LUNES = "2026-10-19"; // cierra por defecto (cierre semanal)
+const JUEVES = "2026-10-22"; // abre por defecto desde el 2026-11-10
 
 function abrir(fecha: string | null, cierres: ServicioCerrado[] = [], extra: { esPasado?: boolean } = {}) {
   const onClose = vi.fn();
@@ -82,19 +83,26 @@ describe("DialogoCierreDia", () => {
     expect(mutate).toHaveBeenCalledWith({ fecha: MARTES, turnos: ["cena"], cerrar: false }, expect.anything());
   });
 
-  it("un día cerrado por la regla semanal se puede abrir entero (jueves especial)", () => {
-    abrir(JUEVES, [
-      { fecha: JUEVES, turno: "comida", origen: "semanal", motivo: null },
-      { fecha: JUEVES, turno: "cena", origen: "semanal", motivo: null },
+  it("un día cerrado por la regla semanal se puede abrir entero (lunes especial)", () => {
+    abrir(LUNES, [
+      { fecha: LUNES, turno: "comida", origen: "semanal", motivo: null },
+      { fecha: LUNES, turno: "cena", origen: "semanal", motivo: null },
     ]);
     expect(screen.getByTestId("estado-comida")).toHaveTextContent("Cerrada (cierre semanal)");
     fireEvent.click(boton(/Abrir las dos/));
-    expect(mutate).toHaveBeenCalledWith({ fecha: JUEVES, turnos: ["comida", "cena"], cerrar: false }, expect.anything());
+    expect(mutate).toHaveBeenCalledWith({ fecha: LUNES, turnos: ["comida", "cena"], cerrar: false }, expect.anything());
   });
 
-  it("un jueves abierto a mano lo dice: es una excepción", () => {
-    abrir(JUEVES, []);
+  it("un lunes abierto a mano lo dice: es una excepción", () => {
+    abrir(LUNES, []);
     expect(screen.getByTestId("estado-comida")).toHaveTextContent("excepción");
+  });
+
+  it("un jueves sin cierres está abierto sin más (ya no cierra por defecto)", () => {
+    abrir(JUEVES, []);
+    expect(screen.getByTestId("estado-comida")).toHaveTextContent("Abierta");
+    expect(screen.getByTestId("estado-comida")).not.toHaveTextContent("excepción");
+    expect(screen.getByTestId("estado-cena")).not.toHaveTextContent("excepción");
   });
 
   it("un día pasado no se puede cambiar", () => {

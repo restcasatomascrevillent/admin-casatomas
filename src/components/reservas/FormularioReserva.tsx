@@ -375,7 +375,7 @@ export const FormularioReserva = ({
   // Reservas + salas del día de Casa Tomás (una sola consulta, compartida con
   // las rejillas por la clave de React Query). La sala es asignación interna.
   const { data: datosDia } = useOcupacionSalasDia(fechaStr);
-  // Cierres de reservas (lunes, jueves, domingo noche, calendario): el panel
+  // Cierres de reservas (lunes, domingo noche, calendario): el panel
   // NO bloquea, solo avisa — el personal puede hacer una excepción.
   const { data: cierresFecha } = useCierresReserva(isPublic ? null : fechaStr, isPublic ? null : fechaStr);
   const turnosCerradosFecha = fechaStr ? turnosCerradosEn(cierresFecha?.cierres ?? [], fechaStr) : [];

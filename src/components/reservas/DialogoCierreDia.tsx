@@ -4,7 +4,7 @@
 // Encargo del dueño (2026-10-15): el calendario va a todo el ancho, sin panel
 // lateral («para no duplicar cosas»); al pulsar CUALQUIER día sale este pop-up
 // para cerrar las reservas de ese día: Comida, Cena o Las dos, y abrirlo si
-// estaba cerrado (también un día que cierra por defecto: un jueves especial).
+// estaba cerrado (también un día que cierra por defecto: un lunes especial).
 // Sustituye a `CierreDiaControl` (13/10), que iba encima del panel del día.
 // Misma lógica: `useCambiarCierre` (tabla `cierres_reserva`) y los cierres de
 // la RPC `servicios_cerrados_reserva`. Las reservas manuales del panel siguen

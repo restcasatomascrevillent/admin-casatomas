@@ -109,7 +109,7 @@ import {
   type ResultadoNotificarEmailsReserva,
 } from "./plantillas.ts";
 import { resolverRuta, rutaDelPath, secretoCompartidoValido } from "./rutas.ts";
-// Cierres de reservas (lunes, jueves, domingo noche + calendario del panel).
+// Cierres de reservas (lunes, domingo noche + calendario del panel).
 import {
   normalizarServiciosCerrados,
   serviciosCerradosPorSemana,

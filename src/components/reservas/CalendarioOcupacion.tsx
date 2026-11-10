@@ -276,7 +276,7 @@ export function CalendarioOcupacion() {
     [espacios],
   );
 
-  // Cierres de reservas del mes (lunes, jueves, domingo noche + los manuales).
+  // Cierres de reservas del mes (lunes, domingo noche + los manuales; los jueves abren desde el 2026-11-10).
   const { data: cierresMes } = useCierresReserva(
     format(startOfMonth(currentMonth), "yyyy-MM-dd"),
     format(endOfMonth(currentMonth), "yyyy-MM-dd"),
