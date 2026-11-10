@@ -15,17 +15,20 @@
 // «Mover») tiene sus propios botones (kanban + `ControlLlegada`): las dos leen la
 // misma fuente de verdad pero NO comparten botonera (decisión del dueño).
 //
-// LAS RANURAS: siempre las mismas, en el mismo orden y en la misma X
+// UNA ACCIÓN CLARA + «MÁS» (10/11/2026, petición del dueño: «hay que limpiarlo
+// de botones para que quede claro lo que se tiene que hacer, y los botones de
+// acción y las cosas más grandes»)
 // ----------------------------------------------------------------------------
-//   [casilla] · principal · dar mesa · verificar · editar · cancelar · lista negra
-// Lo que no aplica a una fila sale DESHABILITADO y nunca se quita (2026-09-26,
-// petición del dueño: los botones no bailan de sitio al bajar por la lista), con
-// el motivo a la vista al pasar el ratón (`ConMotivo`: un botón deshabilitado no
-// recibe el ratón). Las filas de SOLICITUD del bot usan el mismo molde
-// (`RanurasDeAcciones`) con sus propias ranuras, así que caen en la misma X.
+//   [casilla] · principal (grande, con texto) · «⋯ Más»
+// Antes eran seis ranuras fijas de icono, con lo que no aplicaba deshabilitado.
+// Ahora solo se ve la acción que toca; si no hay ninguna, un hueco del mismo
+// ancho (nunca un botón deshabilitado de algo ya hecho), así «Más» cae en la
+// misma X. En «Más», con texto, solo lo que se puede usar: dar mesa, verificar,
+// editar/gestionar y, al final y en rojo, cancelar y lista negra. Las filas de
+// SOLICITUD del bot usan el mismo molde (`RanurasDeAcciones`).
 //
-//   · principal   «Aceptar» si está pendiente y «Confirmar» en el resto (sin
-//                 permiso dice «Aceptar» en todas las filas, como siempre).
+//   · principal   «Aceptar» si está pendiente y «Confirmar» si está verificada;
+//                 en el resto no hay.
 //   · dar mesa    lo decide `resolverSaltoAsignacion` (compartido con Hoy), no
 //                 `accionesDisponibles`.
 //   · editar      el lápiz. Su texto empieza por «Gestionar» porque «Dar mesa» sin
@@ -48,6 +51,7 @@ import {
   CheckCircle,
   ClipboardCheck,
   Loader2,
+  MoreHorizontal,
   Settings2,
   ShieldBan,
   SquarePen,
@@ -56,6 +60,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { accionesDisponibles, type AccionReserva, type EstadoAccion } from "@/lib/reservas/accionesReserva";
 import { resolverSaltoAsignacion, type DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
@@ -88,86 +99,17 @@ export type AlPulsar = Partial<Record<AccionReserva, () => void>>;
 export const TITULO_DAR_MESA_SIN_PLANO = "Dar mesa: esta pantalla no lleva al plano de sala";
 
 /**
- * Acción secundaria de una fila: solo icono, con tooltip y `aria-label`. Las
- * destructivas (Cancelar, lista negra) van en rojo y se rellenan al pasar por
- * encima, para que no se confundan con las normales.
- *
- * SIEMPRE se pinta, aplique o no a esa fila: cuando no aplica va `disabled`,
- * nunca se quita. Así la columna mide lo mismo en todas las filas. El motivo va
- * también en el envoltorio (`ConMotivo`) porque un botón deshabilitado no recibe
- * eventos de ratón y no llegaría a enseñar su `title`.
+ * Ancho FIJO de la acción principal (o de su hueco cuando no hay): así el botón «Más» cae en la misma X en
+ * todas las filas. Cabe «Confirmar» / «Convertir» con su icono a 16 px. La columna de acciones de la Lista
+ * cuenta con él (`ANCHO_ACCIONES` en ListaReservasAvanzada.tsx).
  */
-function AccionIcono({
-  etiqueta,
-  onClick,
-  destructiva = false,
-  textoVisible,
-  children,
-}: {
-  etiqueta: string;
-  onClick?: () => void;
-  destructiva?: boolean;
-  /**
-   * Texto corto visible junto al icono (tarjeta de tablet vertical). Con dedo no hay
-   * `title` que valga: cinco iconos pegados no se saben distinguir. `undefined` = solo icono
-   * (la tabla, donde no cabe el texto).
-   */
-  textoVisible?: string;
-  children: ReactNode;
-}) {
-  const deshabilitada = !onClick;
-  return (
-    <ConMotivo
-      className={cn("shrink-0", textoVisible === "Cancelar" && "sm:ml-auto")}
-      motivo={deshabilitada ? etiqueta : undefined}
-    >
-      <Button
-        type="button"
-        variant="outline"
-        size={textoVisible ? "sm" : "icon"}
-        // `title` nativo en vez de <Tooltip> de Radix a propósito: con 375+
-        // filas había ~750 tooltips montados y repintar la lista entera (p. ej.
-        // al vaciar el buscador) costaba ~590 ms. Con `title` baja a ~250 ms sin
-        // perder la pista de qué hace cada icono. `aria-label` mantiene el
-        // nombre accesible para lectores de pantalla.
-        title={etiqueta}
-        aria-label={etiqueta}
-        disabled={deshabilitada}
-        onClick={onClick}
-        className={cn(
-          // 24 px de 1024 a 1279 px, 28 px a partir de ahí: con las seis
-          // ranuras (5 iconos + 6 huecos) son ~32 px los que se ahorran aquí
-          // en `lg`, y se los queda la columna Cliente, que es la que peor lo
-          // pasa en pantalla estrecha.
-          textoVisible ? "shrink-0 gap-1.5 px-3" : "h-6 w-6 shrink-0 [&_svg]:size-3.5 xl:h-7 xl:w-7",
-          destructiva && "border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground",
-        )}
-      >
-        {children}
-        {textoVisible && <span>{textoVisible}</span>}
-      </Button>
-    </ConMotivo>
-  );
-}
-
-// Ancho FIJO de la acción principal. Es la única con texto y las etiquetas
-// miden distinto ("Aceptar", "Confirmar", "Convertir"), así que sin fijarlo
-// los iconos de al lado caerían en una X distinta según la fila. Si algún día
-// apareciera scroll horizontal a 1024 px, esto (o el hueco entre ranuras) es lo
-// primero que se aprieta; "Confirmar" es la etiqueta más larga y ya va justa.
-// En táctil el botón sube a 44 px de alto y el texto a 14 px: 76 px ya no dejaban sitio a «Confirmar».
-// Ahí va a 100 px FIJOS con relleno de 8 px (en vez del `px-4` de `ui/button`): cabe «Confirmar» con su
-// icono (97 px medidos) y los iconos de al lado vuelven a caer en la misma X en todas las filas (con el
-// ancho del texto, de 100 a 113 px, bailaban). La columna de acciones de la Lista, con reparto fijo,
-// cuenta con estos 100 px (`ANCHO_ACCIONES` en ListaReservasAvanzada.tsx).
-const ANCHO_PRINCIPAL = "w-[76px] xl:w-[88px] pointer-coarse:w-[6.25rem] pointer-coarse:px-2";
+const ANCHO_PRINCIPAL = "w-[8.5rem]";
 
 /**
- * Acción PRINCIPAL de la fila: la única con texto, para que se distinga de un
- * vistazo cuál es lo siguiente que hacer con esa fila. Cuando no hay nada que
- * hacer (reserva ya confirmada, solicitud cerrada…) se queda deshabilitada,
- * pero ocupando exactamente el mismo sitio. Sin `aria-label`: su nombre
- * accesible es su texto.
+ * Acción PRINCIPAL de la fila: la única a la vista, grande y con texto, para que se vea de un vistazo qué
+ * toca hacer. Si no hay nada que hacer (reserva ya confirmada, solicitud cerrada) NO se pinta ningún botón
+ * deshabilitado (10/11/2026, petición del dueño): queda un hueco del mismo ancho. Sin `aria-label`: su
+ * nombre accesible es su texto.
  */
 function AccionPrincipal({
   etiqueta,
@@ -182,21 +124,18 @@ function AccionPrincipal({
   cargando?: boolean;
   children: ReactNode;
 }) {
-  const deshabilitada = !onClick;
+  if (!onClick && !cargando) return <span aria-hidden className={cn("shrink-0", ANCHO_PRINCIPAL)} data-testid="sin-accion-principal" />;
   return (
-    <ConMotivo className="shrink-0" motivo={deshabilitada ? titulo : undefined}>
-      <Button
-        type="button"
-        size="sm"
-        title={titulo}
-        disabled={deshabilitada}
-        onClick={onClick}
-        className={cn("h-6 shrink-0 justify-center gap-1 px-1 text-[11px] pointer-coarse:text-xs pointer-coarse:text-sm [&_svg]:size-3.5 xl:h-7", ANCHO_PRINCIPAL)}
-      >
-        {cargando ? <Loader2 className="animate-spin" /> : children}
-        {etiqueta}
-      </Button>
-    </ConMotivo>
+    <Button
+      type="button"
+      title={titulo}
+      disabled={!onClick}
+      onClick={onClick}
+      className={cn("h-11 shrink-0 justify-center gap-2 px-3 text-base [&_svg]:size-4", ANCHO_PRINCIPAL)}
+    >
+      {cargando ? <Loader2 className="animate-spin" /> : children}
+      {etiqueta}
+    </Button>
   );
 }
 
@@ -207,15 +146,26 @@ function AccionPrincipal({
  * botones de todas las filas empiecen en la misma X.
  */
 export function RanuraSeleccion({ children }: { children?: ReactNode }) {
-  return <span className="inline-flex w-4 shrink-0 items-center justify-center pointer-coarse:w-6">{children}</span>;
+  return <span className="inline-flex w-6 shrink-0 items-center justify-center">{children}</span>;
+}
+
+/** Una opción del menú «Más»: solo las que se pueden usar en esa fila. */
+interface OpcionMas {
+  clave: string;
+  texto: string;
+  titulo: string;
+  icono: ReactNode;
+  onClick?: () => void;
+  destructiva?: boolean;
+  cargando?: boolean;
 }
 
 /**
- * El MOLDE de la celda de acciones, el mismo para reservas y solicitudes: casilla
- * (si hay) · principal · dar mesa · verificar · gestionar/editar · cancelar ·
- * lista negra. Pinta lo que le den; qué va en cada ranura lo decide quien lo usa
- * (`AccionesReserva` para una reserva, la fila de solicitud de la Lista para una
- * solicitud del bot).
+ * El MOLDE de la celda de acciones, el mismo para reservas y solicitudes (10/11/2026, petición del dueño:
+ * «hay que limpiarlo de botones para que quede claro lo que se tiene que hacer, y los botones de acción y
+ * las cosas más grandes»): casilla (si hay) · la acción principal grande con texto · «⋯ Más». En «Más», con
+ * texto, solo lo que se puede usar en esa fila: dar mesa, verificar, gestionar/editar y, al final y en
+ * rojo, cancelar y lista negra (cada una con la confirmación que ya tenía). Lo que no aplica no sale.
  */
 export function RanurasDeAcciones({
   seleccion,
@@ -225,10 +175,8 @@ export function RanurasDeAcciones({
   gestionar,
   cancelar,
   listaNegra,
-  conTexto = false,
+  nombre,
 }: {
-  /** Texto corto visible junto a cada icono (tarjetas; ver `AccionIcono`). */
-  conTexto?: boolean;
   /** `undefined` = no hay ranura de selección en toda la lista (sin permiso de edición). */
   seleccion?: ReactNode;
   principal: RanuraAccion & { etiqueta: string; icono: ReactNode };
@@ -239,37 +187,76 @@ export function RanurasDeAcciones({
   gestionar: RanuraAccion & { icono?: ReactNode; etiqueta?: string };
   cancelar: RanuraAccion;
   listaNegra: RanuraAccion;
+  /** Para el nombre accesible de «Más» («Más acciones de Ana»). */
+  nombre?: string | null;
 }) {
+  const todas: OpcionMas[] = [
+    { clave: "darMesa", texto: "Dar mesa", titulo: darMesa.titulo, icono: <Armchair />, onClick: darMesa.onClick },
+    { clave: "verificar", texto: "Verificar", titulo: verificar.titulo, icono: <ClipboardCheck />, onClick: verificar.onClick },
+    {
+      clave: "gestionar",
+      texto: gestionar.etiqueta ?? "Gestionar",
+      titulo: gestionar.titulo,
+      icono: gestionar.icono ?? <Settings2 />,
+      onClick: gestionar.onClick,
+    },
+    {
+      clave: "cancelar",
+      texto: cancelar.cargando ? "Cancelando…" : "Cancelar reserva",
+      titulo: cancelar.titulo,
+      icono: cancelar.cargando ? <Loader2 className="animate-spin" /> : <XCircle />,
+      onClick: cancelar.onClick,
+      destructiva: true,
+      cargando: cancelar.cargando,
+    },
+    { clave: "listaNegra", texto: "Lista negra", titulo: listaNegra.titulo, icono: <ShieldBan />, onClick: listaNegra.onClick, destructiva: true },
+  ];
+  const opciones = todas.filter((o) => o.onClick || o.cargando);
+  const normales = opciones.filter((o) => !o.destructiva);
+  const destructivas = opciones.filter((o) => o.destructiva);
+
+  const item = (o: OpcionMas) => (
+    <DropdownMenuItem
+      key={o.clave}
+      title={o.titulo}
+      disabled={!o.onClick}
+      onSelect={() => o.onClick?.()}
+      className={cn(
+        "min-h-11 gap-3 px-3 text-base [&_svg]:size-5",
+        o.destructiva && "text-destructive focus:bg-destructive focus:text-destructive-foreground",
+      )}
+    >
+      {o.icono}
+      {o.texto}
+    </DropdownMenuItem>
+  );
+
   return (
     <>
       {seleccion !== undefined && <RanuraSeleccion>{seleccion}</RanuraSeleccion>}
-      <AccionPrincipal
-        etiqueta={principal.etiqueta}
-        titulo={principal.titulo}
-        onClick={principal.onClick}
-        cargando={principal.cargando}
-      >
+      <AccionPrincipal etiqueta={principal.etiqueta} titulo={principal.titulo} onClick={principal.onClick} cargando={principal.cargando}>
         {principal.icono}
       </AccionPrincipal>
-      {/* "Dar mesa" va SIN `destructiva` a propósito: "con sala pero sin mesa" es
-          trabajo pendiente normal, no un error, y el rojo diría lo contrario (ver
-          el encabezado de `saltoAsignacion.ts`). El sillón es el mismo icono con
-          el que el plano dibuja las mesas. */}
-      <AccionIcono etiqueta={darMesa.titulo} onClick={darMesa.onClick} textoVisible={conTexto ? "Mesa" : undefined}>
-        <Armchair />
-      </AccionIcono>
-      <AccionIcono etiqueta={verificar.titulo} onClick={verificar.onClick} textoVisible={conTexto ? "Verificar" : undefined}>
-        <ClipboardCheck />
-      </AccionIcono>
-      <AccionIcono etiqueta={gestionar.titulo} onClick={gestionar.onClick} textoVisible={conTexto ? gestionar.etiqueta ?? "Gestionar" : undefined}>
-        {gestionar.icono ?? <Settings2 />}
-      </AccionIcono>
-      <AccionIcono destructiva etiqueta={cancelar.titulo} onClick={cancelar.onClick} textoVisible={conTexto ? "Cancelar" : undefined}>
-        {cancelar.cargando ? <Loader2 className="animate-spin" /> : <XCircle />}
-      </AccionIcono>
-      <AccionIcono destructiva etiqueta={listaNegra.titulo} onClick={listaNegra.onClick} textoVisible={conTexto ? "Blacklist" : undefined}>
-        <ShieldBan />
-      </AccionIcono>
+      {opciones.length > 0 && (
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 shrink-0 gap-1.5 px-3 text-base [&_svg]:size-5"
+              aria-label={nombre ? `Más acciones de ${nombre}` : "Más acciones"}
+            >
+              <MoreHorizontal />
+              Más
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-[14rem]">
+            {normales.map(item)}
+            {normales.length > 0 && destructivas.length > 0 && <DropdownMenuSeparator />}
+            {destructivas.map(item)}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </>
   );
 }
@@ -437,7 +424,7 @@ export function AccionesReserva({
       }}
       verificar={ranura(acc.verificar, al.verificar)}
       gestionar={{ ...ranura(acc.editar, al.editar), icono: <SquarePen />, etiqueta: "Editar" }}
-      conTexto={variante === "tarjeta"}
+      nombre={reserva.nombre || "Sin nombre"}
       cancelar={{ ...ranura(acc.cancelar, ocupada ? undefined : al.cancelar), cargando: ocupada }}
       listaNegra={ranura(acc.listaNegra, al.listaNegra)}
     />
