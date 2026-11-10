@@ -31,7 +31,7 @@ function Muestra({ nivel }: { nivel: NivelCalendario }) {
     <span
       aria-hidden="true"
       data-nivel-muestra={nivel}
-      className={cn("h-4 w-4 shrink-0 rounded border", estiloNivel(nivel).muestra)}
+      className={cn("h-5 w-5 shrink-0 rounded border", estiloNivel(nivel).muestra)}
     />
   );
 }
@@ -56,7 +56,7 @@ export function LeyendaOcupacion({
       <Card className="shrink-0" data-testid="leyenda-compacta">
         <CardContent className="flex items-center gap-2 p-2">
           <ul
-            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-xs"
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1 text-[15px] leading-snug"
             aria-label="Escala de ocupación"
           >
             <li className="flex items-center gap-1.5">
@@ -77,7 +77,7 @@ export function LeyendaOcupacion({
               <span>Día pasado</span>
             </li>
             <li className="flex items-center gap-1.5">
-              <span aria-hidden="true" className={cn("mx-0.5 h-3 w-3 shrink-0", CLASES_PUNTO_SIN_SALA)} />
+              <span aria-hidden="true" className={cn("mx-0.5 h-3.5 w-3.5 shrink-0", CLASES_PUNTO_SIN_SALA)} />
               <span>Sin sala ({ventanaHoras} h)</span>
             </li>
             {aforoNoDisponible && (
@@ -90,13 +90,13 @@ export function LeyendaOcupacion({
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="touch-target flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="touch-target flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border px-3 py-1 text-[15px] font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <Info className="h-4 w-4" aria-hidden="true" />
+                <Info className="h-5 w-5" aria-hidden="true" />
                 Cómo se lee
               </button>
             </PopoverTrigger>
-            <PopoverContent side="top" align="end" className="w-80 space-y-2 text-xs">
+            <PopoverContent side="top" align="end" className="w-96 max-w-[calc(100vw-2rem)] space-y-2 text-[15px] leading-snug">
               <p>
                 Color: ocupación del turno más lleno del día (comida o cena)
                 {aforo !== null && <> sobre el aforo de {aforo} comensales por turno</>}. Día pasado: lo que se reservó, sin
@@ -119,11 +119,11 @@ export function LeyendaOcupacion({
     <Card>
       <CardContent className="space-y-3 p-3 sm:p-4">
         <div>
-          <p className="mb-2 text-xs font-medium text-muted-foreground">
+          <p className="mb-2 text-[15px] font-medium text-muted-foreground">
             Color: ocupación del turno más lleno del día (comida o cena)
             {aforo !== null && <> sobre el aforo de {aforo} comensales por turno</>}
           </p>
-          <ul className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm" aria-label="Escala de ocupación">
+          <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[15px] sm:text-base" aria-label="Escala de ocupación">
             <li className="flex items-center gap-2">
               <Muestra nivel="vacio" />
               <span>Sin reservas</span>
@@ -140,7 +140,7 @@ export function LeyendaOcupacion({
           </ul>
         </div>
 
-        <ul className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm">
+        <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[15px] sm:text-base">
           <li className="flex items-center gap-2">
             <Muestra nivel="pasado" />
             <span>Día pasado: lo que se reservó, sin porcentaje</span>
@@ -155,13 +155,13 @@ export function LeyendaOcupacion({
           </li>
         </ul>
 
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[15px] text-muted-foreground">
           Cifra grande: comensales del día. Cifra pequeña: reservas. Barras: comida (izquierda) y cena (derecha). Cuentan las
           reservas pendientes, verificadas y confirmadas.
         </p>
 
         {aforoNoDisponible && (
-          <p role="status" className="text-xs font-medium text-muted-foreground">
+          <p role="status" className="text-[15px] font-medium text-muted-foreground">
             No se ha podido leer el aforo de las salas: se enseñan los comensales sin porcentaje.
           </p>
         )}

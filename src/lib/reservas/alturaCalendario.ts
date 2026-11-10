@@ -96,11 +96,11 @@ export function tamanoCasilla(
 export type DensidadCasilla = "completa" | "media" | "compacta";
 
 /** Alto de fila (px) desde el que una casilla enseña TODO: nº de reservas incluido. */
-export const FILA_COMPLETA = 110;
+export const FILA_COMPLETA = 124;
 /** Alto de fila (px) desde el que cabe la cifra con barras y % escrito. Por debajo: una sola línea. */
-export const FILA_MEDIA = 84;
+export const FILA_MEDIA = 88;
 /** Ancho de casilla (px) por debajo del cual se baja un nivel (no cabe número + indicadores + cifra). */
-export const ANCHO_ESTRECHO = 56;
+export const ANCHO_ESTRECHO = 60;
 
 const entre = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
@@ -114,7 +114,9 @@ const entre = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
  * el ancho (con `cqw` una casilla ancha y baja desbordaba). Los umbrales y los
  * `alto - N` salen de sumar lo que cada densidad apila (relleno + número de 24 +
  * huecos + «N res.» de 10 + barras y % de 18), medido en el navegador el
- * 2026-10-04: con ellos la cifra más grande aún cabe en su fila.
+ * 2026-10-04: con ellos la cifra más grande aún cabe en su fila. El 10/11/2026
+ * (dueño: «letra más grande») el número del día pasó a 18 px (28 de alto) y
+ * «N res.» y el % a 14 px: los umbrales suben a 124/88 y la cifra va de 20 a 44.
  */
 export function medirCasilla({ ancho, alto }: { ancho: number; alto: number }): {
   densidad: DensidadCasilla;
@@ -125,9 +127,9 @@ export function medirCasilla({ ancho, alto }: { ancho: number; alto: number }): 
 
   const fuente =
     densidad === "completa"
-      ? entre(Math.min(ancho * 0.3, alto * 0.28, alto - 84), 20, 40)
+      ? entre(Math.min(ancho * 0.3, alto * 0.28, alto - 98), 24, 44)
       : densidad === "media"
-        ? entre(Math.min(ancho * 0.28, alto * 0.3, alto - 68), 16, 28)
-        : entre(alto * 0.4, 16, 22);
+        ? entre(Math.min(ancho * 0.28, alto * 0.3, alto - 72), 20, 30)
+        : entre(alto * 0.4, 20, 24);
   return { densidad, fuenteComensales: Math.round(fuente) };
 }

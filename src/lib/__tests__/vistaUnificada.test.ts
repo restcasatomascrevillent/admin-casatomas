@@ -181,8 +181,17 @@ describe("OPCIONES_FILTRO_ESTADO (el desplegable «Estado»)", () => {
 });
 
 describe("resolverDeepLinkReservas", () => {
+  it("?tab=hoy abre «Hoy»; con filtro sigue yendo a la Lista", () => {
+    expect(resolverDeepLinkReservas({ tab: "hoy" })).toEqual({ tab: "hoy", status: undefined, date: undefined });
+    expect(resolverDeepLinkReservas({ tab: "hoy", status: "pendiente" }).tab).toBe("reservas");
+    expect(resolverDeepLinkReservas({ tab: "hoy", date: "today" }).tab).toBe("reservas");
+  });
+
+  it("?tab=proximas abre «Próximas reservas»", () => {
+    expect(resolverDeepLinkReservas({ tab: "proximas" }).tab).toBe("asignacion");
+  });
+
   it("redirige las pestañas antiguas a 'reservas' conservando filtros", () => {
-    expect(resolverDeepLinkReservas({ tab: "hoy" })).toEqual({ tab: "reservas", status: undefined, date: undefined });
     expect(resolverDeepLinkReservas({ tab: "lista", status: "pendiente", date: "today" })).toEqual({
       tab: "reservas",
       status: "pendiente",

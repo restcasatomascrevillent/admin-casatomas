@@ -249,7 +249,7 @@ export function ConfiguracionGeneralReservas({ parte }: { parte: ParteConfigurac
   const IconoCabecera = cabecera.icono;
 
   return (
-    <Card>
+    <Card className="reservas-legible">
       <CardHeader>
         <div className="flex items-center gap-2">
           <IconoCabecera className="h-5 w-5 text-primary" />

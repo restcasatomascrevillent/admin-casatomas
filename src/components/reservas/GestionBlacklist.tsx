@@ -90,38 +90,46 @@ export function GestionBlacklist() {
     await eliminarBlacklist.mutateAsync(id);
   };
 
+  // Acciones con texto y 48 px (10/11/2026, dueño: «botones claros»): «Editar» y «Quitar», del mismo
+  // tamaño; quitar sigue pidiendo confirmación.
   const accionesEntrada = (entry: NonNullable<typeof blacklist>[number]) => !puedeEditar ? null : (
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(entry)}
-                        aria-label={`Editar la entrada ${entry.valor}`}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label={`Eliminar ${entry.valor} de la lista negra`}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Eliminar de la lista negra?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción permitirá que este {entry.tipo === "email" ? "email" : "teléfono"} pueda realizar reservas nuevamente.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(entry.id)}>
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button
+        variant="outline"
+        className="h-12 gap-2 px-4 text-base"
+        onClick={() => handleEdit(entry)}
+        aria-label={`Editar la entrada ${entry.valor}`}
+      >
+        <Edit className="h-5 w-5" aria-hidden="true" />
+        Editar
+      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="outline"
+            className="h-12 gap-2 px-4 text-base text-destructive hover:text-destructive"
+            aria-label={`Eliminar ${entry.valor} de la lista negra`}
+          >
+            <Trash2 className="h-5 w-5" aria-hidden="true" />
+            Quitar
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar de la lista negra?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción permitirá que este {entry.tipo === "email" ? "email" : "teléfono"} pueda realizar reservas nuevamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleDelete(entry.id)}>
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 
   if (isLoading) {
@@ -149,21 +157,21 @@ export function GestionBlacklist() {
 
       <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldBan className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <ShieldBan className="h-6 w-6" />
               Lista Negra
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-base">
               {puedeEditar ? "Gestiona emails y teléfonos bloqueados para reservas" : "Emails y teléfonos bloqueados para reservas"}
             </CardDescription>
           </div>
           {puedeEditar && (
             <Dialog open={openDialog} onOpenChange={handleOpenChange}>
               <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button className="h-12 px-5 text-base">
+                  <Plus className="mr-2 h-5 w-5" />
                   Añadir
                 </Button>
               </DialogTrigger>
@@ -173,7 +181,7 @@ export function GestionBlacklist() {
                     {editingEntry ? "Editar entrada" : "Añadir a lista negra"}
                   </DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="reservas-legible space-y-4">
                   <div className="space-y-2">
                     <Label>Tipo</Label>
                     <Select
@@ -224,10 +232,10 @@ export function GestionBlacklist() {
                   </div>
 
                   <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+                    <Button type="button" variant="outline" className="h-12 px-5 text-base" onClick={() => handleOpenChange(false)}>
                       Cancelar
                     </Button>
-                    <Button type="submit" disabled={!formData.valor.trim()}>
+                    <Button type="submit" className="h-12 px-5 text-base" disabled={!formData.valor.trim()}>
                       {editingEntry ? "Guardar" : "Añadir"}
                     </Button>
                   </div>
@@ -239,107 +247,66 @@ export function GestionBlacklist() {
       </CardHeader>
       <CardContent>
         {!blacklist || blacklist.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="py-8 text-center text-lg text-muted-foreground">
             No hay entradas en la lista negra
           </div>
         ) : (
           <>
-          {/* Tablet vertical / portátil pequeño: tarjetas. Siete columnas no caben y «Acciones» quedaba
-              a la derecha, fuera de la vista; el motivo se cortaba sin forma de leerlo entero. */}
+          {/* Tablet vertical / portátil pequeño: tarjetas (las columnas no caben y «Acciones» quedaba
+              fuera de la vista). Desde el 10/11/2026 con letra de 17-18 px, como la Lista. */}
           <div className="space-y-3 xl:hidden">
             {blacklist.map((entry) => (
-              <div key={entry.id} className="space-y-2 rounded-lg border p-3">
-                <div className="flex items-start justify-between gap-2">
+              <div key={entry.id} className="space-y-2 rounded-lg border p-4 text-[17px]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">
-                    <Badge variant="outline" className="gap-1">
-                      {entry.tipo === "email" ? <Mail className="h-3 w-3" /> : <Phone className="h-3 w-3" />}
-                      {entry.tipo === "email" ? "Email" : "Teléfono"}
-                    </Badge>
-                    <p className="break-all font-mono text-sm">{entry.valor}</p>
-                    {entry.nombre && <p className="text-sm">{entry.nombre}</p>}
+                    <p className="text-lg font-semibold">{entry.nombre || "Sin nombre"}</p>
+                    <p className="flex flex-wrap items-center gap-2">
+                      <TipoEntrada tipo={entry.tipo} />
+                      <span className="break-all font-mono">{entry.valor}</span>
+                    </p>
                   </div>
                   {accionesEntrada(entry)}
                 </div>
-                {entry.motivo && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{entry.motivo}</p>}
-                {entry.aprobada_en && (
-                  <p className="flex items-center gap-1 text-[11px] pointer-coarse:text-xs text-muted-foreground">
-                    <ShieldCheck className="h-3 w-3 shrink-0" />
-                    Aprobada el {format(new Date(entry.aprobada_en), "dd MMM yyyy", { locale: es })}
-                  </p>
-                )}
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span>Desde {format(new Date(entry.created_at), "dd MMM yyyy", { locale: es })}</span>
-                  {entry.caduca_el ? (
-                    <Badge variant="outline" className="gap-1 border-amber-300 font-normal text-amber-700 dark:text-amber-400">
-                      <ShieldCheck className="h-3 w-3" />
-                      Caduca {format(new Date(`${entry.caduca_el}T00:00:00`), "dd MMM yyyy", { locale: es })}
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
-                      <CalendarOff className="h-3 w-3" />
-                      Sin caducidad
-                    </Badge>
-                  )}
-                </div>
+                {entry.motivo && <p className="whitespace-pre-wrap text-muted-foreground">{entry.motivo}</p>}
+                <DatosEntrada entry={entry} />
               </div>
             ))}
           </div>
 
+          {/* Escritorio: tabla como la de la Lista (10/11/2026, dueño: «letra más grande, botones
+              claros»). Cinco columnas en vez de siete: el tipo va junto al valor y la fecha de alta y
+              la aprobación bajan debajo del motivo. Filas de ~72 px con texto de 17-18 px. */}
           <div className="hidden xl:block">
-          <Table>
+          <Table className="text-[17px]">
             <TableHeader>
               <TableRow>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Motivo</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Caduca</TableHead>
-                {puedeEditar && <TableHead className="text-right">Acciones</TableHead>}
+                <TableHead className="h-12 text-base font-semibold text-foreground">Nombre</TableHead>
+                <TableHead className="h-12 text-base font-semibold text-foreground">Email o teléfono</TableHead>
+                <TableHead className="h-12 text-base font-semibold text-foreground">Motivo</TableHead>
+                <TableHead className="h-12 text-base font-semibold text-foreground">Caduca</TableHead>
+                {puedeEditar && <TableHead className="h-12 text-right text-base font-semibold text-foreground">Acciones</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {blacklist.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell>
-                    <Badge variant="outline" className="gap-1">
-                      {entry.tipo === "email" ? (
-                        <Mail className="h-3 w-3" />
-                      ) : (
-                        <Phone className="h-3 w-3" />
-                      )}
-                      {entry.tipo === "email" ? "Email" : "Teléfono"}
-                    </Badge>
+                <TableRow key={entry.id} className="h-[72px]">
+                  <TableCell className="py-3 text-lg font-semibold">{entry.nombre || "Sin nombre"}</TableCell>
+                  <TableCell className="py-3">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <TipoEntrada tipo={entry.tipo} />
+                      <span className="break-all font-mono">{entry.valor}</span>
+                    </span>
                   </TableCell>
-                  <TableCell className="font-mono text-sm">{entry.valor}</TableCell>
-                  <TableCell>{entry.nombre || "-"}</TableCell>
-                  <TableCell className="max-w-[200px]">
-                    <p className="truncate">{entry.motivo || "-"}</p>
-                    {entry.aprobada_en && (
-                      <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                        <ShieldCheck className="h-3 w-3 shrink-0" />
-                        Aprobada el {format(new Date(entry.aprobada_en), "dd MMM yyyy", { locale: es })}
-                      </p>
-                    )}
+                  <TableCell className="max-w-[22rem] py-3">
+                    <p className="line-clamp-2" title={entry.motivo || undefined}>{entry.motivo || "—"}</p>
+                    <p className="mt-0.5 text-[15px] text-muted-foreground">
+                      Desde {format(new Date(entry.created_at), "dd MMM yyyy", { locale: es })}
+                      {entry.aprobada_en && <> · aprobada el {format(new Date(entry.aprobada_en), "dd MMM yyyy", { locale: es })}</>}
+                    </p>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {format(new Date(entry.created_at), "dd MMM yyyy", { locale: es })}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {entry.caduca_el ? (
-                      <Badge variant="outline" className="text-amber-700 dark:text-amber-400 border-amber-300 font-normal gap-1">
-                        <ShieldCheck className="h-3 w-3" />
-                        {format(new Date(`${entry.caduca_el}T00:00:00`), "dd MMM yyyy", { locale: es })}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-muted-foreground font-normal gap-1">
-                        <CalendarOff className="h-3 w-3" />
-                        Sin caducidad
-                      </Badge>
-                    )}
-                  </TableCell>
+                  <TableCell className="py-3"><InsigniaCaducidad caducaEl={entry.caduca_el} /></TableCell>
                   {puedeEditar && (
-                    <TableCell className="text-right">
+                    <TableCell className="py-3 text-right">
                       {accionesEntrada(entry)}
                     </TableCell>
                   )}
@@ -352,6 +319,46 @@ export function GestionBlacklist() {
         )}
       </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/** «Email» o «Teléfono», insignia de 14 px. */
+function TipoEntrada({ tipo }: { tipo: BlacklistEntry["tipo"] }) {
+  return (
+    <Badge variant="outline" className="gap-1 px-2 py-0.5 text-sm font-medium">
+      {tipo === "email" ? <Mail className="h-4 w-4" aria-hidden="true" /> : <Phone className="h-4 w-4" aria-hidden="true" />}
+      {tipo === "email" ? "Email" : "Teléfono"}
+    </Badge>
+  );
+}
+
+function InsigniaCaducidad({ caducaEl }: { caducaEl: string | null | undefined }) {
+  return caducaEl ? (
+    <Badge variant="outline" className="gap-1 border-amber-400 px-2 py-0.5 text-sm font-medium text-amber-800 dark:text-amber-300">
+      <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+      {format(new Date(`${caducaEl}T00:00:00`), "dd MMM yyyy", { locale: es })}
+    </Badge>
+  ) : (
+    <Badge variant="outline" className="gap-1 px-2 py-0.5 text-sm font-medium text-muted-foreground">
+      <CalendarOff className="h-4 w-4" aria-hidden="true" />
+      Sin caducidad
+    </Badge>
+  );
+}
+
+/** Alta, aprobación y caducidad de una entrada (vista en tarjetas). */
+function DatosEntrada({ entry }: { entry: BlacklistEntry }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-[15px] text-muted-foreground">
+      <span>Desde {format(new Date(entry.created_at), "dd MMM yyyy", { locale: es })}</span>
+      {entry.aprobada_en && (
+        <span className="flex items-center gap-1">
+          <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Aprobada el {format(new Date(entry.aprobada_en), "dd MMM yyyy", { locale: es })}
+        </span>
+      )}
+      <InsigniaCaducidad caducaEl={entry.caduca_el} />
     </div>
   );
 }

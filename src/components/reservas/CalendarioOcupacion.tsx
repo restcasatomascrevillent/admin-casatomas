@@ -125,6 +125,7 @@ async function leerReservasDelMes(inicio: string, fin: string): Promise<ReservaC
   for (let pagina = 0; pagina < PAGINAS_MAXIMAS; pagina++) {
     const desde = pagina * FILAS_POR_PAGINA;
     const { data, error, count } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `marca` no está en los tipos generados (ver arriba)
       .from("reservas" as any)
       .select("id, fecha, hora, numero_comensales, estado, marca, espacio_id", { count: "exact" })
       .gte("fecha", inicio)
@@ -193,19 +194,18 @@ function BloqueErrorMes({
       <div className="flex min-w-0 items-start gap-2">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
         <div className="min-w-0 space-y-1">
-          <p className="text-sm font-medium">No se han podido leer las reservas de este mes</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-base font-medium">No se han podido leer las reservas de este mes</p>
+          <p className="text-sm text-muted-foreground">
             No se enseña ninguna cifra para no dar por buenos unos datos que no se han llegado a leer. Vuelve a
             intentarlo.
           </p>
-          {detalle && <p className="break-words text-xs text-muted-foreground/80">{detalle}</p>}
+          {detalle && <p className="break-words text-sm text-muted-foreground">{detalle}</p>}
         </div>
       </div>
       <Button
         type="button"
         variant="outline"
-        size="sm"
-        className="mt-3 gap-2"
+        className="mt-3 h-12 gap-2 text-base"
         onClick={onReintentar}
         disabled={reintentando}
       >
@@ -390,14 +390,14 @@ export function CalendarioOcupacion() {
         <Card className={cn(medida && "h-14 shrink-0")}>
           <CardContent className={cn("p-4", medida && "flex h-full items-center px-2 py-0")}>
             <div className="flex w-full items-center justify-between">
-              <Button variant="ghost" onClick={() => cambiarMes(-1)} aria-label="Mes anterior">
-                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              <Button variant="ghost" className="h-12 w-12" onClick={() => cambiarMes(-1)} aria-label="Mes anterior">
+                <ChevronLeft className="h-6 w-6" aria-hidden="true" />
               </Button>
-              <h3 className="text-xl font-semibold capitalize">
+              <h3 className="text-2xl font-semibold capitalize">
                 {format(currentMonth, "MMMM yyyy", { locale: es })}
               </h3>
-              <Button variant="ghost" onClick={() => cambiarMes(1)} aria-label="Mes siguiente">
-                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              <Button variant="ghost" className="h-12 w-12" onClick={() => cambiarMes(1)} aria-label="Mes siguiente">
+                <ChevronRight className="h-6 w-6" aria-hidden="true" />
               </Button>
             </div>
           </CardContent>
@@ -428,7 +428,7 @@ export function CalendarioOcupacion() {
                       <div
                         key={day}
                         className={cn(
-                          "text-center text-xs font-medium text-muted-foreground sm:text-sm",
+                          "text-center text-sm font-semibold text-foreground sm:text-base",
                           medida ? "py-0.5" : "py-1 sm:py-2",
                         )}
                       >
