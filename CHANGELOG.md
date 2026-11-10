@@ -2,6 +2,20 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.18.0] - 2026-11-10
+
+Objetivo: Un solo «Nueva Reserva» con formulario o libro, más contraste en Reservas, libro proporcionado en el ordenador y «Sentar sin reserva» eligiendo entre todas las mesas
+
+### Añadido
+- Reservas: un solo «Nueva Reserva» con «Formulario» o «Libro (lápiz)» dentro, recordando la elección ([#100](https://github.com/restcasatomascrevillent/admin-casatomas/pull/100))
+- Reservas: «Sentar sin reserva» eligiendo entre todas las mesas, como al sentar una reserva sin mesa ([#102](https://github.com/restcasatomascrevillent/admin-casatomas/pull/102))
+
+### Cambiado
+- Reservas: más contraste en botones, campos, textos secundarios y pestaña activa ([#100](https://github.com/restcasatomascrevillent/admin-casatomas/pull/100))
+- Reservas: el renglón del libro se ajusta al alto de la pantalla y la lista del día no queda aplastada ([#100](https://github.com/restcasatomascrevillent/admin-casatomas/pull/100))
+
+Nota: montada igualando producción con staging (como la 1.16.0 y la 1.17.0); entradas escritas a mano, no por scripts/release.mjs.
+
 ## [1.17.0] - 2026-11-10
 
 Objetivo: Libro de reservas con letra legible y «Guardar sin interpretar»; formularios de reserva sin textos de ejemplo, personas escritas a mano y resumen antes de guardar
