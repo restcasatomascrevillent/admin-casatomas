@@ -59,31 +59,30 @@ function montar(props: Partial<ComponentProps<typeof AccionesReserva>> & { reser
   return { al, onAsignarMesa, celda };
 }
 
-/** La acción principal de la celda (el botón con texto que no es «Más»), o null. */
-const principal = (celda: HTMLElement) =>
-  within(celda)
-    .queryAllByRole("button")
-    .find((b) => !/^Más acciones/.test(b.getAttribute("aria-label") ?? "") && b.getAttribute("role") !== "checkbox") ?? null;
+/** La acción principal (en verde) de la celda, o null. */
+const principal = (celda: HTMLElement) => celda.querySelector<HTMLButtonElement>("button[data-principal]");
 
-/** Abre «Más» y devuelve sus opciones, en orden. */
+/**
+ * Los demás botones de la celda, en orden. Desde el 10/11/2026 («no pongas el Más, que se vean los botones») van
+ * todos a la vista: el nombre se conserva para no reescribir cada prueba.
+ */
 function abrirMas(celda: HTMLElement) {
-  const disparador = within(celda).getByRole("button", { name: /^Más acciones/ });
-  fireEvent.pointerDown(disparador, { button: 0, ctrlKey: false });
-  return screen.getAllByRole("menuitem");
+  return [...celda.querySelectorAll<HTMLButtonElement>("button:not([data-principal]):not([role=checkbox])")];
 }
 const textos = (items: HTMLElement[]) => items.map((i) => i.textContent?.trim());
 
 // Con permiso, sala y fecha, y una pantalla que lleva al plano.
 const CON_PERMISO: Record<Estado, { principal: string | null; mas: string[] }> = {
-  pendiente: { principal: "Aceptar", mas: ["Dar mesa", "Verificar", "Editar", "Cancelar reserva", "Lista negra"] },
-  verificada: { principal: "Confirmar", mas: ["Dar mesa", "Editar", "Cancelar reserva", "Lista negra"] },
-  confirmada: { principal: null, mas: ["Dar mesa", "Editar", "Cancelar reserva", "Lista negra"] },
+  // «Verificar» (antes «Aceptar», 10/11/2026) es la principal; «Más» ya no la repite.
+  pendiente: { principal: "Verificar", mas: ["Dar mesa", "Editar", "Cancelar", "Lista negra"] },
+  verificada: { principal: "Confirmar", mas: ["Dar mesa", "Editar", "Cancelar", "Lista negra"] },
+  confirmada: { principal: null, mas: ["Dar mesa", "Editar", "Cancelar", "Lista negra"] },
   completada: { principal: null, mas: ["Dar mesa", "Editar", "Lista negra"] }, // «Llegó» no se cancela
   cancelada: { principal: null, mas: ["Editar", "Lista negra"] },
   no_show: { principal: null, mas: ["Dar mesa", "Editar", "Lista negra"] }, // «No vino» no se cancela
 };
 
-describe("AccionesReserva · una acción clara y «Más», por estado y permiso", () => {
+describe("AccionesReserva · la acción principal y los demás botones a la vista, por estado y permiso", () => {
   describe.each(["fila", "tarjeta"] as const)("variante %s", (variante) => {
     describe("canEdit=true", () => {
       it.each(ESTADOS)("%s", (estado) => {
@@ -108,46 +107,40 @@ describe("AccionesReserva · una acción clara y «Más», por estado y permiso"
     });
   });
 
-  it("sin acción principal no queda hueco: «Más» va justo detrás de la casilla (10/11/2026)", () => {
+  it("sin acción principal no queda hueco: solo los botones que se pueden usar (10/11/2026)", () => {
     const { celda } = montar({ reserva: reserva("confirmada") });
-    expect(within(celda).queryByTestId("sin-accion-principal")).toBeNull();
-    const botones = within(celda).getAllByRole("button");
-    expect(botones).toHaveLength(1);
-    expect(botones[0]).toHaveAccessibleName("Más acciones de Ana");
-    cleanup();
-    const { celda: otra } = montar({ reserva: reserva("pendiente") });
-    expect(principal(otra)!.className).toContain("w-[9.5rem]");
+    expect(principal(celda)).toBeNull();
+    expect(within(celda).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual(["Dar mesa", "Editar", "Cancelar", "Lista negra"]);
   });
-  it("grande: la principal y «Más» miden 52 px de alto y llevan texto a 17 px", () => {
+  it("grande y a la vista: 48 px de alto, texto a 16 px, separados con gap-3; la principal en verde; sin «Más»", () => {
     const { celda } = montar({ reserva: reserva("pendiente") });
-    const mas = within(celda).getByRole("button", { name: "Más acciones de Ana" });
-    for (const b of [principal(celda)!, mas]) {
-      expect(b.className).toContain("h-[52px]");
-      expect(b.className).toContain("text-[17px]");
+    expect(within(celda).queryByRole("button", { name: /^Más/ })).toBeNull();
+    for (const b of within(celda).getAllByRole("button").filter((x) => x.getAttribute("role") !== "checkbox")) {
+      expect(b.className).toContain("h-12");
+      expect(b.className).toContain("text-base");
     }
-    expect(mas).toHaveTextContent("Más");
+    expect(principal(celda)!.className).toContain("bg-emerald-600");
+    expect(celda.querySelector('[data-testid="acciones-fila"]')!.className).toContain("gap-3");
+    expect(celda.querySelector('[data-testid="acciones-fila"]')!.className).toContain("flex-wrap");
   });
-
   it("CAMBIO ACORDADO (2026-10-01): «Aceptar» acepta la reserva tal como está, no «como la pidió el cliente»", () => {
     const { celda } = montar({ reserva: reserva("pendiente") });
     expect(principal(celda)!.getAttribute("title")).toBe(
-      "Aceptar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email",
+      "Verificar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email",
     );
   });
 
-  it("en «Más», las destructivas van al final, en rojo y tras un separador; cada opción explica en su `title`", () => {
+  it("las destructivas van al final, separadas y en rojo contorneado; cada botón explica en su `title`", () => {
     const { celda } = montar({ reserva: reserva("confirmada") });
     const items = abrirMas(celda);
-    const rojas = items.map((i) => /text-destructive/.test(i.className));
-    expect(rojas).toEqual([false, false, true, true]);
-    expect(screen.getByRole("separator")).toBeInTheDocument();
+    expect(items.map((i) => /text-destructive/.test(i.className))).toEqual([false, false, true, true]);
+    expect(celda.querySelector('[data-testid="acciones-destructivas"]')!.className).toContain("border-l-2");
     expect(items.map((i) => i.getAttribute("title"))).toEqual([
       "Abrir el plano en Comedor para darle mesa",
       "Gestionar: editar la reserva de Ana — datos, día, hora, comensales y sala",
       "Cancelar la reserva de Ana — pedirá confirmación",
       "Añadir a Ana a la lista negra",
     ]);
-    // Iconos: sillón, lápiz, aspa y escudo.
     const iconos = items.map((i) => i.querySelector("svg")?.getAttribute("class") ?? "");
     expect(iconos[0]).toMatch(/armchair/);
     expect(iconos[1]).toMatch(/square-pen/);
@@ -163,11 +156,12 @@ describe("AccionesReserva · qué hace cada botón", () => {
     expect(al.aceptar).toHaveBeenCalledTimes(1);
     expect(al.confirmar).not.toHaveBeenCalled();
 
-    for (const texto of ["Dar mesa", "Verificar", "Editar", "Cancelar reserva", "Lista negra"]) {
+    for (const texto of ["Dar mesa", "Editar", "Cancelar", "Lista negra"]) {
       const item = abrirMas(celda).find((i) => i.textContent?.trim() === texto)!;
       fireEvent.click(item);
     }
-    expect(al.verificar).toHaveBeenCalledTimes(1);
+    // Una sola «Verificar»: la de la fila (la de elegir hora va desde su diálogo).
+    expect(al.verificar).not.toHaveBeenCalled();
     expect(al.editar).toHaveBeenCalledTimes(1);
     expect(al.cancelar).toHaveBeenCalledTimes(1);
     expect(al.listaNegra).toHaveBeenCalledTimes(1);
@@ -219,7 +213,7 @@ describe("AccionesReserva · mientras hay una petición en curso", () => {
     fireEvent.click(p);
     expect(al.aceptar).not.toHaveBeenCalled();
     const cancelar = abrirMas(celda).find((i) => /Cancelando/.test(i.textContent ?? ""))!;
-    expect(cancelar).toHaveAttribute("data-disabled");
+    expect(cancelar).toBeDisabled();
     expect(cancelar.querySelector("svg")?.getAttribute("class")).toMatch(/animate-spin/);
     fireEvent.click(cancelar);
     expect(al.cancelar).not.toHaveBeenCalled();
@@ -234,7 +228,7 @@ describe("AccionesReserva · mientras hay una petición en curso", () => {
     const { celda } = montar({ reserva: reserva("verificada"), bloqueEnCurso: true });
     expect(principal(celda)).toBeDisabled();
     expect(principal(celda)!.querySelector("svg")?.getAttribute("class")).toMatch(/animate-spin/);
-    expect(textos(abrirMas(celda))).toContain("Cancelar reserva");
+    expect(textos(abrirMas(celda))).toContain("Cancelar");
   });
 
   it("sin permiso no pinta nada aunque esté ocupada (no hay nada que pulsar)", () => {
@@ -262,46 +256,34 @@ describe("AccionesReserva · «Dar mesa»", () => {
 });
 
 describe("AccionesReserva · variantes", () => {
-  it("`fila` con permiso: la primera ranura es la de la casilla, con casilla solo en las pendientes", () => {
+  it("`fila`: sin casilla (la casilla de «aceptar en bloque» va en su propia columna de la Lista)", () => {
     for (const estado of ESTADOS) {
       const { celda } = montar({ reserva: reserva(estado) });
-      const primera = celda.firstElementChild as HTMLElement;
-      expect(primera.tagName, estado).toBe("SPAN");
-      expect(primera.className, estado).toContain("w-6");
-      expect(within(celda).queryAllByRole("checkbox"), estado).toHaveLength(estado === "pendiente" ? 1 : 0);
+      expect(within(celda).queryAllByRole("checkbox"), estado).toHaveLength(0);
       cleanup();
     }
   });
-
-  it("`fila` sin permiso: ni ranura ni casilla (la cabecera tampoco la lleva)", () => {
+  it("`fila` sin permiso: nada", () => {
     const { celda } = montar({ reserva: reserva("pendiente"), canEdit: false });
-    expect(within(celda).queryByRole("checkbox")).toBeNull();
-    expect(celda.querySelector("span.w-6")).toBeNull();
+    expect(celda.querySelector('[data-testid="acciones-fila"]')).toBeNull();
   });
-
-  it("`fila`: la casilla marca y desmarca para aceptar en bloque", () => {
-    const { al, celda } = montar({ reserva: reserva("pendiente"), seleccionada: true });
-    const casilla = within(celda).getByRole("checkbox", { name: "Seleccionar para aceptar en bloque" });
-    expect(casilla.getAttribute("aria-checked")).toBe("true");
-    fireEvent.click(casilla);
-    expect(al.seleccionar).toHaveBeenCalledTimes(1);
+  it("`fila`: debajo de los datos del cliente, con aire (mt-3)", () => {
+    const { celda } = montar({ reserva: reserva("pendiente") });
+    expect(celda.querySelector('[data-testid="acciones-fila"]')!.className).toContain("mt-3");
   });
-
-  it("`tarjeta`: principal y «Más» en una fila propia y SIN casilla (va junto al nombre)", () => {
+  it("`tarjeta`: los mismos botones en una fila propia que pasa de línea", () => {
     const { celda } = montar({ reserva: reserva("pendiente"), variante: "tarjeta" });
     const fila = celda.firstElementChild as HTMLElement;
-    expect(fila.tagName).toBe("DIV");
     expect(fila.className).toBe("flex flex-wrap items-center gap-3 pt-2");
     expect(within(celda).queryByRole("checkbox")).toBeNull();
-    expect(principal(celda)).toHaveTextContent("Aceptar");
-    expect(within(celda).getByRole("button", { name: "Más acciones de Ana" })).toBeInTheDocument();
+    expect(principal(celda)).toHaveTextContent("Verificar");
+    expect(within(celda).getByRole("button", { name: "Editar" })).toBeInTheDocument();
   });
 });
 
 describe("AccionesReserva · textos de una reserva sin nombre (la BD lo permite)", () => {
   it.each([null, undefined, ""])("nombre %j: «este cliente»", (nombre) => {
     const { celda } = montar({ reserva: reserva("confirmada", { nombre }) });
-    expect(within(celda).getByRole("button", { name: "Más acciones de Sin nombre" })).toBeInTheDocument();
     expect(abrirMas(celda).map((i) => i.getAttribute("title"))).toEqual([
       "Abrir el plano en Comedor para darle mesa",
       "Gestionar: editar la reserva de este cliente — datos, día, hora, comensales y sala",
@@ -317,21 +299,17 @@ describe("RanurasDeAcciones · el molde que comparten reservas y solicitudes", (
     const { container } = render(
       <div>
         <RanurasDeAcciones
-          seleccion={null}
           principal={{ etiqueta: "Convertir", titulo: "Convertir la solicitud en una reserva", icono: null, onClick: vi.fn() }}
           darMesa={{ titulo: "Todavía no es una reserva" }}
           verificar={{ titulo: "Verificar: solo para reservas" }}
           gestionar={{ titulo: "Gestionar: propuesta al cliente, salas y notas", onClick: onGestionar }}
           cancelar={{ titulo: "Descartar la solicitud: se hace desde «Gestionar»" }}
           listaNegra={{ titulo: "Lista negra: solo para reservas" }}
-          nombre="Luis"
         />
       </div>,
     );
     const celda = container.firstElementChild as HTMLElement;
     expect(principal(celda)).toHaveTextContent("Convertir");
-    // `seleccion={null}`: la ranura de la casilla está, vacía (misma X que una reserva con permiso).
-    expect((celda.firstElementChild as HTMLElement).className).toContain("w-6");
     const items = abrirMas(celda);
     expect(textos(items)).toEqual(["Gestionar"]);
     expect(items[0].querySelector("svg")?.getAttribute("class")).toMatch(/settings-?2/);
@@ -339,7 +317,7 @@ describe("RanurasDeAcciones · el molde que comparten reservas y solicitudes", (
     expect(onGestionar).toHaveBeenCalledTimes(1);
   });
 
-  it("sin principal ni opciones: nada, ni hueco ni «Más»", () => {
+  it("sin principal ni otros botones: nada", () => {
     const { container } = render(
       <div>
         <RanurasDeAcciones
