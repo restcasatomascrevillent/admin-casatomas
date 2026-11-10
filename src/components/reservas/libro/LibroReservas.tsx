@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
+import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -190,17 +191,23 @@ export function LibroReservas({ soloCrear = false }: Props) {
               {fechaHoja(fecha)}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          {/* Sin Portal (10/11/2026): portado fuera del diálogo, el foco atrapado del libro cerraba el
+              calendario o se comía el toque y no dejaba cambiar de fecha. Dentro del diálogo funciona. */}
+          <PopoverPrimitive.Content
+            align="start"
+            sideOffset={4}
+            className="z-[60] rounded-md border bg-popover p-0 text-popover-foreground shadow-md outline-none"
+          >
             <Calendar
               mode="single"
               selected={diaDeClave(fecha)}
+              defaultMonth={diaDeClave(fecha)}
               onSelect={(d) => {
                 if (d) irA(claveDia(d));
                 setCalendarioAbierto(false);
               }}
-              initialFocus
             />
-          </PopoverContent>
+          </PopoverPrimitive.Content>
         </Popover>
         <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label="Día siguiente" onClick={() => irA(pasarHoja(fecha, 1))}>
           <ChevronRight className="h-5 w-5" />
@@ -225,7 +232,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
           <p className="mb-1 text-sm text-stone-500">
             Escribe la reserva con el lápiz, p. ej. <span style={{ fontFamily: LETRA_MANUSCRITA }}>«Esther 2px salón 14:15»</span>. Sin fecha, se apunta el {fechaCorta(fecha)}.
           </p>
-          <div className="h-44 overflow-hidden rounded-md border border-stone-300 bg-white/70">
+          <div className="h-72 overflow-hidden rounded-md border border-stone-300 bg-white/70 lg:h-96">
             <LienzoManuscrito ref={lienzo} onCambio={setTrazos} />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
