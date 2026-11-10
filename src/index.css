@@ -381,3 +381,24 @@ html {
 [data-sidebar="content"]:hover::-webkit-scrollbar-thumb {
   background-color: hsl(var(--sidebar-foreground) / 0.25);
 }
+
+/* Reservas con más contraste (10/11/2026, petición del dueño: «que se vean los botones a tener en
+   cuenta»). Bordes de botones y campos más oscuros, texto secundario más fuerte y la pestaña activa
+   en relleno. Solo dentro de Reservas (.reservas-contraste en la página y en sus diálogos). */
+.reservas-contraste {
+  --input: 25 8% 50%;
+  --border: 25 10% 70%;
+  --muted-foreground: 15 6% 24%;
+}
+.dark .reservas-contraste {
+  --input: 206 8% 58%;
+  --border: 206 10% 45%;
+  --muted-foreground: 25 13% 84%;
+}
+.reservas-contraste [role="tab"][data-state="active"] {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+.reservas-contraste [role="tab"][data-state="inactive"] {
+  color: hsl(var(--foreground));
+}
