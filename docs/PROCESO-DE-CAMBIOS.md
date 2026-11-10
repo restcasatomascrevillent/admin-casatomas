@@ -40,7 +40,7 @@ Hasta el 08/11/2026 había un único PR `staging → main` que se actualizaba so
 
 1. Rama desde `staging`: `feature/<tema>` para algo nuevo, `fix/<tema>` para un arreglo. **Un cambio por rama**: es la unidad que luego se puede publicar o dejar fuera.
 2. Commits con tipo: `feat(reservas): …`, `fix(carta): …`, `refactor`, `perf`, `docs`, `test`, `chore`. Si cambia un comportamiento, añade en el cuerpo dos líneas `Antes: …` y `Ahora: …`: salen tal cual en el informe del PR de la release.
-3. Tests en local (`npm test`; en la web también `npm run test:e2e` si tocas reservas, carta, cheques o maquetación; en el panel `npm run test:cheques:db` y `npm run build`).
+3. **Antes de subir a staging:** `npm run test:cambios` + typecheck (`npx tsc --noEmit -p tsconfig.app.json`). `test:cambios` pasa solo los tests afectados por lo cambiado respecto a `origin/staging` (o a la base que le pases: `npm run test:cambios -- origin/main`) y la suite completa si cambia algo global (package.json, lockfile, config de vite/vitest, tsconfig, setup de tests, tipos de Supabase). En el panel, si cambian `supabase/migrations`, lanza también todas las pruebas PGlite. `npm run lint:cambios` revisa con ESLint solo los ficheros cambiados. En la web, `npm run test:e2e` solo si tocas reservas, carta, cheques o maquetación. **La suite completa** (`npm test`, en el panel `npm run test:cheques:db` y demás PGlite, `npm run build`) **solo al preparar una release** (sobre la rama `release/X.Y.Z`).
 4. PR de la rama a `staging` y fusión con **Create a merge commit** (o *Squash*). Así el cambio se puede elegir luego por su número (`#12`). Si se integra en local, el mensaje debe llevar el número: `Merge branch 'fix/x' into staging (#12)`.
 5. Vercel publica la demo en 1–3 minutos. Se prueba ahí.
 
@@ -87,7 +87,7 @@ En el PR de la release corren solos:
 
 | Check | Qué valida |
 |---|---|
-| **CI** (`tests-y-e2e`/`tests-y-build`, `calidad`) | Tests, build y e2e de `main` + la selección, no de staging |
+| **CI** (`tests-y-e2e`/`tests-y-build`, `calidad`) | Modo completo: todos los tests, build y e2e de `main` + la selección, no de staging. En `staging` y ramas de trabajo CI va en modo ligero (typecheck, ESLint y tests de lo cambiado; ver la cabecera de `.github/workflows/ci.yml`) |
 | **Validar release a producción** | La rama es `release/X.Y.Z`, `versionado.json` y el CHANGELOG dicen esa versión, parte del último `main` y la etiqueta no existe |
 | **Release · candidata** | Vercel despliega la rama; su `/version.json` lleva la versión y el commit exactos; en la web, la prueba rápida (humo) contra esa preview; capturas antes/después si hay cambios visuales. Actualiza el informe del PR con los resultados |
 
@@ -136,7 +136,7 @@ Dónde se ve:
 
 ## Qué protege producción
 
-- **Vercel** solo publica producción si el último commit de `main` es la aceptación de un PR desde `release/X.Y.Z` **y** `versionado.json` dice esa versión (`scripts/vercel-produccion.mjs`, en `vercel.json` → `ignoreCommand`). Un push directo, un *squash*, un *rebase* o un PR desde `staging` se cancelan (*Canceled by Ignored Build Step*).
+- **Vercel** solo publica producción si el último commit de `main` es la aceptación de un PR desde `release/X.Y.Z` **y** `versionado.json` dice esa versión (`scripts/vercel-produccion.mjs`, en `vercel.json` → `ignoreCommand`). Un push directo, un *squash*, un *rebase* o un PR desde `staging` se cancelan (*Canceled by Ignored Build Step*). La demo (`staging`) tampoco se construye si desde su último despliegue solo cambian docs, Markdown, tests, `e2e/` o `.github/` (ahorra despliegues); las previews `release/*` se construyen siempre.
 - El check **Validar release a producción** falla en cualquier PR a `main` que no sea una release correcta.
 - **Claude** no empuja a `main` ni fusiona PR hacia `main` (`CLAUDE.md`).
 - **Límite conocido:** en repos privados del plan gratuito GitHub no permite reglas de protección; alguien con permiso de escritura podría escribir en `main`, pero no se publicaría. Con GitHub Team se cierra del todo (ver abajo).

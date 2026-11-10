@@ -65,7 +65,9 @@
     "test:logs-web:db": "node scripts/test-logs-web.mjs",
     "test:migraciones": "node scripts/comprobar-versiones-migraciones.mjs",
     "instagram:recursos": "node scripts/instagram/subir-recursos.mjs",
-    "instagram:render-reels": "node scripts/instagram/render-reels.mjs"
+    "instagram:render-reels": "node scripts/instagram/render-reels.mjs",
+    "test:cambios": "node scripts/tests-cambios.mjs",
+    "lint:cambios": "node scripts/lint-cambios.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { debeConstruir, versionAceptada } from "../vercel-produccion.mjs";
+import { debeConstruir, saltarDemo, soloDocsOTests, versionAceptada } from "../vercel-produccion.mjs";
 
 const PROD = { VERCEL_ENV: "production" };
 
@@ -24,5 +24,25 @@ describe("solo se publica en producción una release aceptada en un PR", () => {
   it("la demo y las previews (también las de release/*) se construyen siempre", () => {
     expect(debeConstruir({ VERCEL_ENV: "preview" }, "cualquier cosa", null)).toBe(true);
     expect(debeConstruir({}, "", null)).toBe(true);
+  });
+});
+
+describe("la demo no se construye si solo cambian docs o tests", () => {
+  const DEMO = { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "staging" };
+  it("salta staging con solo docs, Markdown o tests", () => {
+    expect(soloDocsOTests(["docs/PROCESO-DE-CAMBIOS.md", "CLAUDE.md", "src/__tests__/a.test.ts", "e2e/x.spec.ts", ".github/workflows/ci.yml", ""])).toBe(true);
+    expect(saltarDemo(DEMO, ["README.md", "src/hooks/__tests__/useX.test.ts"])).toBe(true);
+  });
+  it("construye si cambia código, config o la lista está vacía", () => {
+    expect(soloDocsOTests(["docs/a.md", "src/App.tsx"])).toBe(false);
+    expect(soloDocsOTests(["vercel.json"])).toBe(false);
+    expect(soloDocsOTests(["public/robots.txt"])).toBe(false);
+    expect(soloDocsOTests(["scripts/release.mjs"])).toBe(false);
+    expect(soloDocsOTests([])).toBe(false);
+    expect(soloDocsOTests(null)).toBe(false);
+  });
+  it("nunca salta producción ni las previews de release/*", () => {
+    expect(saltarDemo({ VERCEL_ENV: "production", VERCEL_GIT_COMMIT_REF: "main" }, ["docs/a.md"])).toBe(false);
+    expect(saltarDemo({ VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "release/1.2.0" }, ["CHANGELOG.md"])).toBe(false);
   });
 });
