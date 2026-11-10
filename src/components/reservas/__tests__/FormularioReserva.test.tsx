@@ -224,12 +224,26 @@ describe("FormularioReserva · siempre Casa Tomás, sala interna", () => {
     expect(screen.getByRole("button", { name: "Fecha" })).toHaveClass("h-14");
   });
 
-  it("el «Menú del día» sigue siendo su casilla aparte (martes a mediodía) y no marca el menú cerrado", async () => {
+  const proximo = (dia: number) => {
+    const d = addDays(new Date(), 7);
+    while (d.getDay() !== dia) d.setDate(d.getDate() + 1);
+    return d;
+  };
+
+  it("martes a mediodía hay que elegir «Menú del día» o «Carta»: sin elegir no crea la reserva", async () => {
     const insert = espiarInsert();
-    const martes = addDays(new Date(), 7);
-    while (martes.getDay() !== 2) martes.setDate(martes.getDate() + 1);
-    montar({ espacio_id: null, fecha: martes, hora: "14:00" });
-    fireEvent.click(screen.getByRole("checkbox", { name: "Menú del día" }));
+    montar({ espacio_id: null, fecha: proximo(2), hora: "14:00" });
+    expect(screen.getByTestId("servicio-menu_del_dia")).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByTestId("servicio-carta")).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    expect((await screen.findAllByText("Elige «Menú del día» o «Carta»")).length).toBeGreaterThan(0);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("«Menú del día» guarda menu_del_dia: true (y no el menú cerrado)", async () => {
+    const insert = espiarInsert();
+    montar({ espacio_id: null, fecha: proximo(3), hora: "14:00" });
+    fireEvent.click(screen.getByTestId("servicio-menu_del_dia"));
     fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
     await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
     expect(insert.mock.calls[0][0]).toMatchObject({ menu_del_dia: true });
@@ -237,12 +251,36 @@ describe("FormularioReserva · siempre Casa Tomás, sala interna", () => {
     expect(insert.mock.calls[0][0]).not.toHaveProperty("menu_precio");
   });
 
-  it("un sábado por la noche no sale la casilla «Menú del día», pero sí el menú cerrado", () => {
+  it("«Carta» crea la reserva sin menú del día", async () => {
+    const insert = espiarInsert();
+    montar({ espacio_id: null, fecha: proximo(4), hora: "13:30" });
+    fireEvent.click(screen.getByTestId("servicio-carta"));
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("menu_del_dia");
+  });
+
+  it("menú del día en el Salón: avisa de que es en Comedor o Terraza; con carta, no", () => {
     espiarInsert();
-    const sabado = addDays(new Date(), 7);
-    while (sabado.getDay() !== 6) sabado.setDate(sabado.getDate() + 1);
-    montar({ espacio_id: null, fecha: sabado, hora: "21:00" });
-    expect(screen.queryByRole("checkbox", { name: "Menú del día" })).not.toBeInTheDocument();
+    montar({ espacio_id: "salon", fecha: proximo(2), hora: "14:00" });
+    fireEvent.click(screen.getByTestId("servicio-menu_del_dia"));
+    expect(screen.getByTestId("aviso-sala-servicio")).toHaveTextContent("El menú del día es en Comedor o Terraza, no en Salón");
+    fireEvent.click(screen.getByTestId("servicio-carta"));
+    expect(screen.queryByTestId("aviso-sala-servicio")).not.toBeInTheDocument();
+  });
+
+  it("el resumen dice «Comida: Menú del día»", async () => {
+    espiarInsert();
+    montar({ espacio_id: null, fecha: proximo(2), hora: "14:00" }, false, true);
+    fireEvent.click(screen.getByTestId("servicio-menu_del_dia"));
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    expect(await screen.findByTestId("resumen-servicio-comida")).toHaveTextContent("Menú del día");
+  });
+
+  it("un sábado por la noche (o martes de cena) no hay elección, pero sí el menú cerrado", () => {
+    espiarInsert();
+    montar({ espacio_id: null, fecha: proximo(6), hora: "21:00" });
+    expect(screen.queryByTestId("servicio-menu_del_dia")).not.toBeInTheDocument();
     expect(screen.getByTestId("menu-cerrado-si")).toBeInTheDocument();
   });
 

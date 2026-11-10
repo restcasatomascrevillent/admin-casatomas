@@ -60,7 +60,7 @@ import {
 import { OcupacionSalas } from "./OcupacionSalas";
 import { useRejillaCuartos } from "./DisponibilidadCuartos";
 import { ReservasDelDia } from "./ReservasDelDia";
-import { admiteMenuDelDia } from "@/lib/reservas/menuDelDia";
+import { eligeMenuOCarta, salaAdmiteServicio, textoSalasDeServicio } from "@/lib/reservas/menuDelDia";
 import { errorPrecioMenu, formatearPrecioMenu, leerPrecioMenu } from "@/lib/reservas/menuCerrado";
 import { formatearTelefonoReserva, variantesTelefono } from "@/lib/reservas/telefono";
 import {
@@ -143,6 +143,8 @@ const formSchema = z.object({
   importante: z.boolean().optional(),
   /** «Menú cerrado» (de grupo): No / Sí, cualquier día. NO es el «Menú del día» (`menu_del_dia`). */
   menu_cerrado: z.boolean().optional(),
+  /** Martes a jueves comida: «Menú del día» o «Carta» (obligatorio al crear esos días). */
+  servicio_comida: z.enum(["menu_del_dia", "carta"]).optional(),
   /** «Precio del menú (€)», escrito a mano ("18" o "18,50"); vacío = sin precio. */
   menu_precio: z
     .string()
@@ -418,9 +420,10 @@ export const FormularioReserva = ({
   const fechaStr = watchedFecha ? format(watchedFecha, "yyyy-MM-dd") : null;
   // Sin sala no hay evento: la casilla se desactiva y no cuenta.
   const watchedMenuCerrado = !!form.watch("menu_cerrado");
-  // «Menú del día» (solo en el alta, martes a jueves antes de las 17:00): casilla aparte del menú cerrado.
-  const [menuDelDia, setMenuDelDia] = useState(false);
-  const puedeMenuDelDia = !reservaAEditar && admiteMenuDelDia(watchedFecha, watchedHora);
+  // Martes a jueves en la comida (antes de las 17:00) cada reserva es «Menú del día» o «Carta»
+  // (`menu_del_dia` true/false), en el alta y al editar. Aparte del menú cerrado.
+  const eligeServicio = eligeMenuOCarta(watchedFecha, watchedHora);
+  const watchedServicio = form.watch("servicio_comida");
   const ocupaSalaGuardado = !!eventoGuardado.data;
   const ocupaSala = !!watchedEspacio && (ocupaSalaElegido ?? ocupaSalaGuardado);
 
@@ -444,7 +447,10 @@ export const FormularioReserva = ({
   const salas = useMemo(() => datosDia?.espacios ?? [], [datosDia]);
   // «Menú del día» solo en Comedor o Terraza: con otra sala elegida, aviso (no bloquea).
   const nombreSalaMenu = watchedEspacio ? salas.find((e) => e.id === watchedEspacio)?.nombre ?? null : null;
-  const salaFueraDeMenuDelDia = !!nombreSalaMenu && !/comedor|terraza/i.test(nombreSalaMenu);
+  // Menú del día → Comedor o Terraza; Carta → Salón, Comedor o Terraza. Aviso (no bloquea).
+  const servicioElegido = eligeServicio ? watchedServicio ?? null : null;
+  const salaNoValeServicio = !!servicioElegido && !!nombreSalaMenu && !salaAdmiteServicio(nombreSalaMenu, servicioElegido);
+  const salasQueValen = servicioElegido ? salas.filter((e) => salaAdmiteServicio(e.nombre, servicioElegido)) : [];
   const { rejilla } = useRejillaCuartos({
     fecha: fechaStr,
     comensales: Number(watchedComensales) || 0,
@@ -712,6 +718,7 @@ export const FormularioReserva = ({
           espacio_id: watchedEspacio,
           importante: valoresActuales.importante,
           menu_cerrado: valoresActuales.menu_cerrado,
+          servicio_comida: valoresActuales.servicio_comida ?? null,
           menu_precio: valoresActuales.menu_precio,
         })
       : null;
@@ -774,6 +781,7 @@ export const FormularioReserva = ({
         espacio_id: values.espacio_id,
         importante: values.importante,
         menu_cerrado: values.menu_cerrado,
+        servicio_comida: values.servicio_comida ?? null,
         menu_precio: values.menu_precio,
       };
       let cambios = calcularCambiosEdicion(original, editado);
@@ -1022,7 +1030,7 @@ export const FormularioReserva = ({
         en_blacklist: !!blacklisted,
       };
       if (values.importante) fila.importante = true;
-      if (puedeMenuDelDia && menuDelDia) fila.menu_del_dia = true;
+      if (eligeMenuOCarta(values.fecha, values.hora) && values.servicio_comida === "menu_del_dia") fila.menu_del_dia = true;
       if (values.menu_cerrado) {
         fila.menu_cerrado = true;
         const precioMenu = leerPrecioMenu(values.menu_precio);
@@ -1152,6 +1160,11 @@ export const FormularioReserva = ({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit((v) => {
+          // Martes a jueves comida: al CREAR hay que decir si es menú del día o carta.
+          if (!reservaAEditar && eligeMenuOCarta(v.fecha, v.hora) && !v.servicio_comida) {
+            form.setError("servicio_comida", { message: "Elige «Menú del día» o «Carta»" });
+            return;
+          }
           if (confirmarAntesDeGuardar && !reservaAEditar && !isPublic) setResumen(v);
           else return onSubmit(v);
         })}
@@ -1471,6 +1484,9 @@ export const FormularioReserva = ({
                         {salas.map((e) => (
                           <SelectItem key={e.id} value={e.id}>
                             {e.nombre} ({e.capacidad_maxima} plazas)
+                            {servicioElegido && !salaAdmiteServicio(e.nombre, servicioElegido)
+                              ? ` · no vale para ${servicioElegido === "menu_del_dia" ? "menú del día" : "carta"}`
+                              : ""}
                           </SelectItem>
                         ))}
                         {/* Al editar, la sala que ya tenía puede estar desactivada
@@ -1532,22 +1548,82 @@ export const FormularioReserva = ({
           </Collapsible>
         )}
 
-        {/* «Menú del día» (martes a jueves a mediodía; solo en el alta): sirve para organizar el
-            servicio. Solo Comedor o Terraza: con otra sala se avisa, sin bloquear. */}
-        {puedeMenuDelDia && (
-          <div className="space-y-1">
-            <div className="flex min-h-11 flex-row items-center gap-2">
-              <Checkbox id="menu-del-dia" checked={menuDelDia} onCheckedChange={(v) => setMenuDelDia(v === true)} />
-              <Label htmlFor="menu-del-dia" className="font-normal">
-                Menú del día
-              </Label>
-            </div>
-            {menuDelDia && salaFueraDeMenuDelDia && (
-              <p data-testid="aviso-menu-del-dia-sala" className="text-sm text-amber-700 dark:text-amber-300">
-                El menú del día es solo en Comedor o Terraza: revisa la sala.
-              </p>
+        {/* «Menú del día | Carta» (martes a jueves a mediodía, alta y edición): sirve para organizar
+            el servicio. Menú del día → Comedor o Terraza; Carta → Salón, Comedor o Terraza. */}
+        {eligeServicio && (
+          <FormField
+            control={form.control}
+            name="servicio_comida"
+            render={({ field }) => (
+              <FormItem className="space-y-2">
+                <FormLabel id="etiqueta-servicio-comida">¿Menú del día o carta?</FormLabel>
+                <div role="radiogroup" aria-labelledby="etiqueta-servicio-comida" className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      { valor: "menu_del_dia", texto: "Menú del día" },
+                      { valor: "carta", texto: "Carta" },
+                    ] as const
+                  ).map((opcion) => {
+                    const elegido = field.value === opcion.valor;
+                    return (
+                      <Button
+                        key={opcion.valor}
+                        type="button"
+                        role="radio"
+                        aria-checked={elegido}
+                        variant="outline"
+                        data-testid={`servicio-${opcion.valor}`}
+                        onClick={() => {
+                          field.onChange(opcion.valor);
+                          form.clearErrors("servicio_comida");
+                        }}
+                        className={cn(
+                          "h-14 text-lg",
+                          elegido &&
+                            (opcion.valor === "menu_del_dia"
+                              ? "border-violet-400 bg-violet-100 font-semibold text-violet-900 hover:bg-violet-100 dark:bg-violet-950/60 dark:text-violet-200"
+                              : "border-sky-400 bg-sky-100 font-semibold text-sky-900 hover:bg-sky-100 dark:bg-sky-950/60 dark:text-sky-200"),
+                        )}
+                      >
+                        {opcion.texto}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <FormMessage />
+                {servicioElegido && salaNoValeServicio && (
+                  <Alert
+                    data-testid="aviso-sala-servicio"
+                    className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="space-y-2">
+                      <p>
+                        {servicioElegido === "menu_del_dia" ? "El menú del día" : "La carta"} es en{" "}
+                        {textoSalasDeServicio(servicioElegido)}, no en {nombreSalaMenu}.
+                      </p>
+                      {salasQueValen.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {salasQueValen.map((e) => (
+                            <Button
+                              key={e.id}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-10"
+                              onClick={() => form.setValue("espacio_id", e.id, { shouldValidate: true, shouldDirty: true })}
+                            >
+                              Pasar a {e.nombre}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </FormItem>
             )}
-          </div>
+          />
         )}
 
         {/* «Menú cerrado» (de grupo, p. ej. 55 €): No / Sí y, con «Sí», su precio (dueño, 10/11/2026).
@@ -1902,10 +1978,12 @@ export const FormularioReserva = ({
                   <dd>{resumen.notas_cliente.trim()}</dd>
                 </>
               ) : null}
-              {puedeMenuDelDia && menuDelDia ? (
+              {eligeMenuOCarta(resumen.fecha, resumen.hora) ? (
                 <>
-                  <dt className="text-muted-foreground">Menú del día</dt>
-                  <dd data-testid="resumen-menu-del-dia">Sí</dd>
+                  <dt className="text-muted-foreground">Comida</dt>
+                  <dd data-testid="resumen-servicio-comida" className="font-semibold">
+                    {resumen.servicio_comida === "menu_del_dia" ? "Menú del día" : "Carta"}
+                  </dd>
                 </>
               ) : null}
               <dt className="text-muted-foreground">Menú cerrado</dt>

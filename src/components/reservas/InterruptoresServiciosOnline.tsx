@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
+import { servicioComidaDeReserva } from "@/lib/reservas/menuDelDia";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Info, Lock, LockOpen } from "lucide-react";
@@ -155,15 +156,32 @@ export function InterruptoresServiciosOnline({
   );
 }
 
-/** Insignia pequeña «Menú del día» de una reserva (Hoy, ficha y lista). Nada si no lo es. */
+/**
+ * Insignia pequeña «Menú del día» de una reserva (Hoy, ficha y lista). De martes a jueves en la
+ * comida, si la reserva trae `fecha` y `hora` y NO es de menú, sale «Carta» (discreta) para ver el
+ * reparto del servicio. Nada en el resto de casos.
+ */
 export function InsigniaMenuDelDia({
   reserva,
   className,
 }: {
-  reserva: { menu_del_dia?: boolean | null };
+  reserva: { menu_del_dia?: boolean | null; fecha?: string | null; hora?: string | null };
   className?: string;
 }) {
-  if (!reserva.menu_del_dia) return null;
+  if (!reserva.menu_del_dia) {
+    if (servicioComidaDeReserva({ fecha: reserva.fecha, hora: reserva.hora, menu_del_dia: false }) !== "carta") return null;
+    return (
+      <span
+        data-testid="insignia-carta"
+        className={cn(
+          "inline-flex shrink-0 items-center rounded-full border border-sky-300 px-2 py-0.5 text-xs font-medium text-sky-800 dark:border-sky-800 dark:text-sky-300",
+          className,
+        )}
+      >
+        Carta
+      </span>
+    );
+  }
   return (
     <span
       className={cn(

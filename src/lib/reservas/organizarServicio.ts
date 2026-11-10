@@ -16,6 +16,9 @@
 //   7. «Terraza cerrada»: no se asigna nada ahí y lo que hubiera se recoloca.
 //   8. Las importantes se colocan antes y se mueven menos.
 //   9. Las que no caben salen con el motivo.
+//  11. (10/11/2026) De martes a jueves en la comida: las de «Menú del día» solo
+//      van al Comedor o la Terraza; las de «Carta», al Salón, Comedor o Terraza
+//      (`servicioComida`, ver `menuDelDia.ts`). Una mesa en otra sala no vale.
 //  10. (13/10/2026) Lo automático es SENCILLO: hasta 7 comensales (lo que admite la
 //      web), en UNA mesa o como mucho DOS (juntas, o una que recibe piezas de otra;
 //      piezas de 2 + pico: 6 + pico = 7). Nunca combina 3 o más mesas solo.
@@ -57,6 +60,7 @@ import {
   type ReservaEnMesas,
 } from "./piezasMesa";
 import type { FilaMesaSala } from "./sentarAhora";
+import { salaAdmiteServicio, type ServicioComida } from "./menuDelDia";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -81,6 +85,11 @@ export interface ReservaOrg {
   fijada?: boolean;
   /** «Liberar mesa»: ya se fue; su mesa no cuenta como ocupada. */
   salidaAt?: string | null;
+  /**
+   * Martes a jueves comida: «Menú del día» (solo Comedor/Terraza) o «Carta» (Salón, Comedor o
+   * Terraza). `null`/ausente = sin regla de sala (`servicioComidaDeReserva`).
+   */
+  servicioComida?: ServicioComida | null;
 }
 
 export interface DestinoOrg {
@@ -259,6 +268,12 @@ function mismoConjunto(a: string[], b: string[]): boolean {
 
 // ─── Colocar una reserva ─────────────────────────────────────────────────────
 
+/** Menú del día → Comedor/Terraza; Carta → Salón, Comedor o Terraza; sin servicio, cualquiera. */
+function salaValeParaReserva(ctx: Contexto, r: ReservaOrg, salaId: string | undefined): boolean {
+  if (!r.servicioComida) return true;
+  return salaAdmiteServicio(salaId ? ctx.salaPorId.get(salaId)?.nombre : null, r.servicioComida);
+}
+
 function mejorColocacion(
   ctx: Contexto,
   r: ReservaOrg,
@@ -269,7 +284,11 @@ function mejorColocacion(
 ): Colocacion | null {
   const excluidas = ctx.entrada.excluidas ?? new Set<string>();
   const salaOk = new Set(ctx.salasActivas.map((s) => s.id));
-  const libre = (id: string) => !usadas.has(id) && !excluidas.has(id) && salaOk.has(ctx.mesaPorId.get(id)?.salaId ?? "");
+  const libre = (id: string) =>
+    !usadas.has(id) &&
+    !excluidas.has(id) &&
+    salaOk.has(ctx.mesaPorId.get(id)?.salaId ?? "") &&
+    salaValeParaReserva(ctx, r, ctx.mesaPorId.get(id)?.salaId);
   const factor = (r.importante ? COSTES.factorImportante : 1) * (empezado ? COSTES.factorEmpezado : 1);
   const costeMover = (salaId: string, mesaIds: string[]) => {
     if (r.mesaIds.length === 0) return 0;
@@ -533,7 +552,9 @@ export function organizarServicio(entrada: EntradaOrg): ResultadoOrg {
   // Su mesa vale tal cual: existe, en una sala abierta, y caben (con las plazas de ahora).
   const mesaValida = (r: ReservaOrg) =>
     r.mesaIds.length > 0 &&
-    r.mesaIds.every((id) => ctx.mesaPorId.has(id) && salaOk.has(ctx.mesaPorId.get(id)!.salaId)) &&
+    r.mesaIds.every(
+      (id) => ctx.mesaPorId.has(id) && salaOk.has(ctx.mesaPorId.get(id)!.salaId) && salaValeParaReserva(ctx, r, ctx.mesaPorId.get(id)!.salaId),
+    ) &&
     r.mesaIds.reduce((s, id) => s + plazasDe(ctx, ctx.estadoInicial, id), 0) >= r.comensales;
 
   // Grupos de 8 o más: no se colocan solos. Si ya tienen mesa se respeta (fija); si no, a revisar.

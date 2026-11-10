@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { errorPrecioMenu, leerPrecioMenu, precioMenuParaCampo, textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
+import { eligeMenuOCarta, salaAdmiteServicio, servicioComidaDeReserva } from "@/lib/reservas/menuDelDia";
 import { calcularCambiosEdicion, valoresFormularioDesdeReserva, type ReservaEditable } from "@/lib/reservas/edicionReserva";
 
 describe("menú cerrado: precio", () => {
@@ -55,5 +56,42 @@ describe("edición: diff del menú cerrado (no toca el menú del día)", () => {
     expect(editar({ ...base, menu_cerrado: true, menu_precio: 18 }, true, "20")).toEqual({ menu_precio: 20 });
     expect(editar({ ...base, menu_cerrado: true, menu_precio: 18 }, false, "")).toEqual({ menu_cerrado: false, menu_precio: null });
     expect(editar({ ...base, menu_cerrado: true }, false, "")).toEqual({ menu_cerrado: false });
+  });
+});
+
+describe("menú del día o carta (martes a jueves, comida)", () => {
+  it("solo martes a jueves antes de las 17:00", () => {
+    expect(eligeMenuOCarta("2026-11-17", "14:00")).toBe(true); // martes
+    expect(eligeMenuOCarta("2026-11-19", "16:59")).toBe(true); // jueves
+    expect(eligeMenuOCarta("2026-11-17", "21:00")).toBe(false);
+    expect(eligeMenuOCarta("2026-11-21", "14:00")).toBe(false); // sábado
+    expect(servicioComidaDeReserva({ fecha: "2026-11-18", hora: "14:00:00", menu_del_dia: true })).toBe("menu_del_dia");
+    expect(servicioComidaDeReserva({ fecha: "2026-11-18", hora: "14:00", menu_del_dia: false })).toBe("carta");
+    expect(servicioComidaDeReserva({ fecha: "2026-11-21", hora: "14:00", menu_del_dia: true })).toBeNull();
+  });
+
+  it("salas: menú del día → Comedor o Terraza; carta → Salón, Comedor o Terraza", () => {
+    expect(salaAdmiteServicio("Comedor", "menu_del_dia")).toBe(true);
+    expect(salaAdmiteServicio("Terraza", "menu_del_dia")).toBe(true);
+    expect(salaAdmiteServicio("Salón", "menu_del_dia")).toBe(false);
+    expect(salaAdmiteServicio("Reservado", "menu_del_dia")).toBe(false);
+    expect(salaAdmiteServicio("Salón", "carta")).toBe(true);
+    expect(salaAdmiteServicio("Reservado", "carta")).toBe(false);
+    expect(salaAdmiteServicio("Reservado", null)).toBe(true);
+  });
+
+  it("edición: elegir menú del día / carta cambia menu_del_dia; fuera de esos días queda en false", () => {
+    const martes: ReservaEditable = {
+      id: "r", nombre: "Ana", telefono: null, email: null, fecha: "2026-11-17", hora: "14:00",
+      numero_comensales: 2, estado: "confirmada", notas_cliente: null, espacio_id: null,
+    };
+    const v = valoresFormularioDesdeReserva(martes);
+    expect(v.servicio_comida).toBe("carta");
+    expect(calcularCambiosEdicion(martes, { ...v, servicio_comida: "menu_del_dia" })).toEqual({ menu_del_dia: true });
+    const conMenu = { ...martes, menu_del_dia: true };
+    expect(valoresFormularioDesdeReserva(conMenu).servicio_comida).toBe("menu_del_dia");
+    expect(calcularCambiosEdicion(conMenu, { ...valoresFormularioDesdeReserva(conMenu), servicio_comida: "carta" })).toEqual({ menu_del_dia: false });
+    // Pasarla a la cena: deja de ser menú del día.
+    expect(calcularCambiosEdicion(conMenu, { ...valoresFormularioDesdeReserva(conMenu), hora: "21:00" })).toEqual({ hora: "21:00", menu_del_dia: false });
   });
 });
