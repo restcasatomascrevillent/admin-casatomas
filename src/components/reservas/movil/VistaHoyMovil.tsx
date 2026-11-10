@@ -85,7 +85,7 @@ import { BotonSentarSinReserva } from "@/components/reservas/SentarSinReserva";
 import { ConfirmarDesplazamiento, SelectorMesaMovil, type Pendiente } from "@/components/reservas/SelectorMesa";
 import { useAsignarConCambioLocal, useDesplazar } from "@/hooks/useDesplazarReservas";
 import { BotonPersonas } from "@/components/reservas/CambiarPersonas";
-import { InterruptoresServiciosOnline, InsigniaMenuCerrado, InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
+import { InterruptoresServiciosOnline, InsigniaMenuCerrado, InsigniaMenuDelDia, InsigniaZona } from "@/components/reservas/InterruptoresServiciosOnline";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { COLORES_MESA, estadoColorMovil } from "@/lib/reservas/coloresMesa";
 import { configServicioSalaDesde, type ReservaMesaServicio } from "@/lib/reservas/servicioSala";
@@ -649,6 +649,7 @@ export function FilaReservaMovil({
             )}
             <InsigniaMenuDelDia reserva={reserva} />
             <InsigniaMenuCerrado reserva={reserva} />
+            <InsigniaZona reserva={reserva} />
           </span>
           {/* La protagonista es la MESA (07/11/2026, petición del dueño): «Sentar» pequeño encima y debajo, en
               grande, sala y mesa. Un toque = sentar en ella (con `decidirSentarPrevista`). Sin mesa (o con la
@@ -1714,6 +1715,7 @@ export function PanelReservaMovil({
           {info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>}
           <InsigniaMenuDelDia reserva={reserva} />
           <InsigniaMenuCerrado reserva={reserva} />
+            <InsigniaZona reserva={reserva} />
         </SheetTitle>
         <SheetDescription asChild>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">

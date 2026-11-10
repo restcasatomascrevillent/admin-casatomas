@@ -82,6 +82,8 @@ export interface EspacioSala {
   capacidad_maxima: number;
   /** Sala privada (`caracteristicas.privada`): una reserva viva se queda la sala entera en su turno. */
   privada?: boolean;
+  /** Sala de fuera (Terraza): `caracteristicas.exterior` o el nombre (ver `zonaPreferida.ts`). */
+  exterior?: boolean;
 }
 
 export interface ReservaOcupacionSala {

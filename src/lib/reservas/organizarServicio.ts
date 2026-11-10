@@ -19,6 +19,9 @@
 //  11. (10/11/2026) De martes a jueves en la comida: las de «Menú del día» solo
 //      van al Comedor o la Terraza; las de «Carta», al Salón, Comedor o Terraza
 //      (`servicioComida`, ver `menuDelDia.ts`). Una mesa en otra sala no vale.
+//  12. (10/11/2026) «¿Dentro o fuera?» (`zonaPreferida`, ver `zonaPreferida.ts`): «fuera» solo va a salas
+//      exteriores (Terraza) y «dentro» solo a interiores. Se suma a la regla 11 (menú + fuera → Terraza).
+//      Sin zona, cualquiera.
 //  10. (13/10/2026) Lo automático es SENCILLO: hasta 7 comensales (lo que admite la
 //      web), en UNA mesa o como mucho DOS (juntas, o una que recibe piezas de otra;
 //      piezas de 2 + pico: 6 + pico = 7). Nunca combina 3 o más mesas solo.
@@ -61,6 +64,7 @@ import {
 } from "./piezasMesa";
 import type { FilaMesaSala } from "./sentarAhora";
 import { salaAdmiteServicio, type ServicioComida } from "./menuDelDia";
+import type { ZonaPreferida } from "./zonaPreferida";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -69,6 +73,8 @@ export interface SalaOrg {
   nombre: string;
   /** La sala flexible (sitios de plazas variables). La que se puede cerrar. */
   terraza: boolean;
+  /** Sala de fuera («¿Dentro o fuera?»). Sin el dato, la Terraza es la de fuera. */
+  exterior?: boolean;
 }
 
 export interface ReservaOrg {
@@ -90,6 +96,8 @@ export interface ReservaOrg {
    * Terraza). `null`/ausente = sin regla de sala (`servicioComidaDeReserva`).
    */
   servicioComida?: ServicioComida | null;
+  /** «¿Dentro o fuera?» que pidió (`reservas.zona_preferida`): fuera → salas exteriores; dentro → interiores. */
+  zonaPreferida?: ZonaPreferida | null;
 }
 
 export interface DestinoOrg {
@@ -268,10 +276,18 @@ function mismoConjunto(a: string[], b: string[]): boolean {
 
 // ─── Colocar una reserva ─────────────────────────────────────────────────────
 
-/** Menú del día → Comedor/Terraza; Carta → Salón, Comedor o Terraza; sin servicio, cualquiera. */
+/**
+ * Menú del día → Comedor/Terraza; Carta → Salón, Comedor o Terraza; sin servicio, cualquiera. Y
+ * «¿Dentro o fuera?»: fuera → solo salas exteriores; dentro → solo interiores; sin zona, cualquiera.
+ */
 function salaValeParaReserva(ctx: Contexto, r: ReservaOrg, salaId: string | undefined): boolean {
+  const sala = salaId ? ctx.salaPorId.get(salaId) : undefined;
+  if (r.zonaPreferida) {
+    if (!sala) return false;
+    if ((sala.exterior ?? sala.terraza) !== (r.zonaPreferida === "fuera")) return false;
+  }
   if (!r.servicioComida) return true;
-  return salaAdmiteServicio(salaId ? ctx.salaPorId.get(salaId)?.nombre : null, r.servicioComida);
+  return salaAdmiteServicio(sala?.nombre ?? null, r.servicioComida);
 }
 
 function mejorColocacion(
@@ -640,7 +656,7 @@ export function organizarServicio(entrada: EntradaOrg): ResultadoOrg {
       motivo:
         r.comensales > maxPlazas * 2
           ? `Ninguna mesa ni unión llega a ${r.comensales} plazas`
-          : `No queda mesa libre para ${r.comensales}${entrada.terrazaCerrada ? " (Terraza cerrada)" : ""}`,
+          : `No queda mesa libre ${r.zonaPreferida === "fuera" ? "fuera " : r.zonaPreferida === "dentro" ? "dentro " : ""}para ${r.comensales}${entrada.terrazaCerrada ? " (Terraza cerrada)" : ""}`,
     }));
 
   const yaOrganizado = movimientos.length === 0 && sinSitio.length === 0 && revisarAMano.length === 0;

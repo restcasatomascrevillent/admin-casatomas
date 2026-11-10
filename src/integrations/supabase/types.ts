@@ -4380,6 +4380,8 @@ export type Database = {
           consentimiento_newsletter_at: string | null
           /** «Cómo se hizo la reserva» (20261122121500_reservas_origen.sql). Solo reservas web; la escribe reservas-web. Ver src/lib/reservas/origenReserva.ts. */
           origen: Json | null
+          /** «¿Dentro o fuera?» (20261122200000_reservas_zona_preferida): 'dentro' | 'fuera' | null (no se dijo). Ver src/lib/reservas/zonaPreferida.ts. */
+          zona_preferida: string | null
         }
         Insert: {
           canal?: string | null
@@ -4408,6 +4410,7 @@ export type Database = {
           email_verificado_at?: string | null
           consentimiento_newsletter_at?: string | null
           origen?: Json | null
+          zona_preferida?: string | null
         }
         Update: {
           canal?: string | null
@@ -4436,6 +4439,7 @@ export type Database = {
           email_verificado_at?: string | null
           consentimiento_newsletter_at?: string | null
           origen?: Json | null
+          zona_preferida?: string | null
         }
         Relationships: [
           {
