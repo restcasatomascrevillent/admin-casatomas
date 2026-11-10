@@ -103,7 +103,7 @@ export const TITULO_DAR_MESA_SIN_PLANO = "Dar mesa: esta pantalla no lleva al pl
  * todas las filas. Cabe «Confirmar» / «Convertir» con su icono a 16 px. La columna de acciones de la Lista
  * cuenta con él (`ANCHO_ACCIONES` en ListaReservasAvanzada.tsx).
  */
-const ANCHO_PRINCIPAL = "w-[8.5rem]";
+const ANCHO_PRINCIPAL = "w-[9.5rem]";
 
 /**
  * Acción PRINCIPAL de la fila: la única a la vista, grande y con texto, para que se vea de un vistazo qué
@@ -131,7 +131,7 @@ function AccionPrincipal({
       title={titulo}
       disabled={!onClick}
       onClick={onClick}
-      className={cn("h-11 shrink-0 justify-center gap-2 px-3 text-base [&_svg]:size-4", ANCHO_PRINCIPAL)}
+      className={cn("h-[52px] shrink-0 justify-center gap-2 px-4 text-[17px] font-semibold [&_svg]:size-5", ANCHO_PRINCIPAL)}
     >
       {cargando ? <Loader2 className="animate-spin" /> : children}
       {etiqueta}
@@ -222,7 +222,7 @@ export function RanurasDeAcciones({
       disabled={!o.onClick}
       onSelect={() => o.onClick?.()}
       className={cn(
-        "min-h-11 gap-3 px-3 text-base [&_svg]:size-5",
+        "min-h-12 gap-3 px-4 py-3 text-lg [&_svg]:size-5",
         o.destructiva && "text-destructive focus:bg-destructive focus:text-destructive-foreground",
       )}
     >
@@ -243,14 +243,14 @@ export function RanurasDeAcciones({
             <Button
               type="button"
               variant="outline"
-              className="h-11 shrink-0 gap-1.5 px-3 text-base [&_svg]:size-5"
+              className="h-[52px] shrink-0 gap-2 px-4 text-[17px] [&_svg]:size-5"
               aria-label={nombre ? `Más acciones de ${nombre}` : "Más acciones"}
             >
               <MoreHorizontal />
               Más
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-[14rem]">
+          <DropdownMenuContent align="start" className="min-w-[16rem] p-2">
             {normales.map(item)}
             {normales.length > 0 && destructivas.length > 0 && <DropdownMenuSeparator />}
             {destructivas.map(item)}
@@ -430,5 +430,5 @@ export function AccionesReserva({
     />
   );
 
-  return variante === "tarjeta" ? <div className="flex flex-wrap items-center gap-2 pt-1">{ranuras}</div> : ranuras;
+  return variante === "tarjeta" ? <div className="flex flex-wrap items-center gap-3 pt-2">{ranuras}</div> : ranuras;
 }
