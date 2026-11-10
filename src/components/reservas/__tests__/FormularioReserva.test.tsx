@@ -57,6 +57,7 @@ vi.mock("@/hooks/useOcupacionSalasDia", async (importOriginal) => {
   };
 });
 vi.mock("@/components/reservas/OcupacionSalas", () => ({ OcupacionSalas: () => null }));
+vi.mock("@/components/reservas/ReservasDelDia", () => ({ ReservasDelDia: () => null }));
 vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
   DisponibilidadCuartos: () => null,
   useRejillaCuartos: () => ({
