@@ -17,6 +17,8 @@ import type { QueryClient } from "@tanstack/react-query";
 import { emitirRevalidacionSesion } from "@/lib/revalidacion-sesion";
 import { borrarCopiasLista } from "@/lib/facturas/copiaListaCompras";
 import { activarCopiaHoy, borrarCopiaHoy } from "@/lib/cacheOffline";
+import { borrarPermisosRecordados } from "@/lib/cachePermisos";
+import { lanzarPrecargaHoy } from "@/lib/precargaSecciones";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
 import {
   limpiarAvisoSesionCaducada,
@@ -190,6 +192,8 @@ export function AuthProvider({
     // También la copia de la lista de Compras guardada en el dispositivo, y la de «Hoy» (cacheOffline.ts).
     borrarCopiasLista();
     borrarCopiaHoy();
+    // Y el rol y los permisos recordados (`cachePermisos.ts`).
+    borrarPermisosRecordados();
     const qc = clienteConsultas.current;
     if (!qc) return;
     void qc.cancelQueries();
@@ -226,7 +230,12 @@ export function AuthProvider({
   useEffect(() => {
     const qc = clienteConsultas.current;
     if (!qc || !idUsuario) return;
-    return activarCopiaHoy(qc, idUsuario);
+    const parar = activarCopiaHoy(qc, idUsuario);
+    // Abrir el panel en «Reservas › Hoy» (09/11/2026, mala cobertura): con la sesión confirmada y la copia
+    // ya cargada, las lecturas de «Hoy» salen todas a la vez, sin esperar a rol y permisos ni al fichero de la
+    // página. Solo la primera vez y solo si se arrancó en «Hoy» (`lib/precargaSecciones.ts`).
+    lanzarPrecargaHoy(qc, { escritorio: window.innerWidth >= 768 });
+    return parar;
   }, [idUsuario]);
 
   useEffect(() => {

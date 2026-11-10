@@ -26,6 +26,8 @@ const MIGRACION_3 = await readFile("supabase/migrations/20261104121000_servicios
 const ROLLBACK_3 = await readFile("supabase/rollbacks/20261104121000_servicios_configurables_ROLLBACK.sql", "utf8");
 const MIGRACION_4 = await readFile("supabase/migrations/20261112120000_servicios_github_minutos.sql", "utf8");
 const ROLLBACK_4 = await readFile("supabase/rollbacks/20261112120000_servicios_github_minutos_ROLLBACK.sql", "utf8");
+const MIGRACION_5 = await readFile("supabase/migrations/20261120110000_servicios_estado_detalle.sql", "utf8");
+const ROLLBACK_5 = await readFile("supabase/rollbacks/20261120110000_servicios_estado_detalle_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
@@ -456,5 +458,38 @@ ok(!("actions_minutos" in (await limitesGithub())), "el rollback deja el límite
 await limpia.exec(`update public.servicios_contratados set limites = coalesce(limites, '{}'::jsonb) || '{"actions_minutos": {"limite": 3000, "etiqueta": "Minutos de Actions"}}' where proveedor = 'github'`);
 await limpia.exec(MIGRACION_4);
 igual((await limitesGithub()).actions_minutos.limite, 3000, "la migración pisa un límite de minutos editado en el panel");
+
+// 14. Estado con más detalle (20261120100000): conexiones y tablas que más ocupan
+// solo para service_role; GitHub con un solo límite (los minutos) y Vercel con el
+// de la memoria de las funciones. Idempotente, sin pisar lo editado, y su rollback.
+await limpia.exec(`update public.servicios_contratados set limites = (limites - 'actions_minutos') || '{"actions_minutos": {"limite": 2000, "unidad": "minutos", "etiqueta": "Minutos de Actions"}}' where proveedor = 'github'`);
+await limpia.exec(MIGRACION_5);
+const extra = (await limpia.query("select public.servicios_metricas_bd_extra() m")).rows[0].m;
+ok(Number.isInteger(extra.conexiones) && extra.conexiones >= 0 && extra.conexiones_max > 0, "servicios_metricas_bd_extra() no da las conexiones");
+ok(Array.isArray(extra.tablas_mayores) && extra.tablas_mayores.length > 0 && extra.tablas_mayores.length <= 5
+  && extra.tablas_mayores.every((t, i, a) => typeof t.tabla === "string" && t.bytes >= 0 && (i === 0 || a[i - 1].bytes >= t.bytes)),
+  "servicios_metricas_bd_extra() no da las tablas que más ocupan, de mayor a menor");
+ok(!extra.tablas_mayores.some((t) => /^(pg_catalog|information_schema|pg_toast)\./.test(t.tabla)), "las tablas del sistema salen entre las que más ocupan");
+ok(!(await limpia.query("select has_function_privilege('authenticated', 'public.servicios_metricas_bd_extra()', 'execute') p")).rows[0].p, "authenticated puede leer las conexiones");
+ok(!(await limpia.query("select has_function_privilege('anon', 'public.servicios_metricas_bd_extra()', 'execute') p")).rows[0].p, "anon puede leer las conexiones");
+ok((await limpia.query("select has_function_privilege('service_role', 'public.servicios_metricas_bd_extra()', 'execute') p")).rows[0].p, "service_role no puede leer las conexiones");
+const g5 = await limitesGithub();
+ok(!("limite" in g5.actions_computo) && g5.actions_computo.unidad === "USD", "GitHub sigue con el límite de 12 US$ (aviso repetido)");
+igual(g5.actions_minutos.etiqueta, "Minutos de Actions en repositorios privados", "el límite de minutos no dice que es de los repositorios privados");
+const limitesVercel = async () => (await limpia.query("select limites from public.servicios_contratados where proveedor = 'vercel'")).rows[0].limites;
+ok((await limitesVercel()).memoria_funciones?.limite === 360, "Vercel no tiene el límite de memoria de las funciones");
+await limpia.exec(MIGRACION_5);
+igual(await limitesGithub(), g5, "reaplicar la del estado con más detalle cambia GitHub");
+await limpia.exec(ROLLBACK_5);
+igual((await limpia.query("select to_regprocedure('public.servicios_metricas_bd_extra()') f")).rows[0].f, null, "el rollback deja servicios_metricas_bd_extra()");
+const g5r = await limitesGithub();
+ok(g5r.actions_computo.limite === 12 && g5r.actions_minutos.etiqueta === "Minutos de Actions", "el rollback no devuelve los límites de GitHub");
+ok(!("memoria_funciones" in (await limitesVercel())), "el rollback deja el límite de memoria de Vercel");
+// No pisa lo editado: un límite de cómputo cambiado por el dueño se queda; uno de memoria, también.
+await limpia.exec(`update public.servicios_contratados set limites = jsonb_set(limites, '{actions_computo,limite}', '20') where proveedor = 'github'`);
+await limpia.exec(`update public.servicios_contratados set limites = limites || '{"memoria_funciones": {"limite": 1000, "unidad": "GB-hora"}}' where proveedor = 'vercel'`);
+await limpia.exec(MIGRACION_5);
+igual((await limitesGithub()).actions_computo.limite, 20, "la migración pisa un límite de cómputo editado en el panel");
+igual((await limitesVercel()).memoria_funciones.limite, 1000, "la migración pisa un límite de memoria editado en el panel");
 
 console.log(`servicios_contratados + planes_costes + configurables (PGlite): ${comprobaciones} comprobaciones OK`);

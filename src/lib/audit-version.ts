@@ -10,26 +10,33 @@ import { supabase } from '@/integrations/supabase/client';
 //  · Solo se recuerda «activa» (versión 2): la versión no vuelve atrás. «Antigua»
 //    (PGRST202) se vuelve a preguntar cada vez, para no quedarse en el camino viejo
 //    cuando se aplica la migración. Los errores tampoco se recuerdan.
-//  · En memoria y en sessionStorage (sobrevive a recargar la pestaña, no a cerrarla).
+//  · En memoria, en sessionStorage y en localStorage (desde el 09/11/2026: sobrevive a cerrar la app).
 //  · Una sola petición en vuelo: quien llega mientras tanto espera a la misma.
 const CLAVE_SESION = 'ct.auditoria-panel.v2';
 
 let activaEnMemoria = false;
 let enVuelo: Promise<boolean> | null = null;
 
+// 09/11/2026 (abrir «Hoy» con mala cobertura): también en localStorage, para que volver a abrir la app
+// (pestaña nueva, PWA) no repita la pregunta. Es seguro por lo mismo que arriba: la versión no vuelve atrás.
 function leerSesion(): boolean {
-  try {
-    return typeof sessionStorage !== 'undefined' && sessionStorage.getItem(CLAVE_SESION) === '1';
-  } catch {
-    return false;
+  for (const almacen of [() => sessionStorage, () => localStorage]) {
+    try {
+      if (almacen().getItem(CLAVE_SESION) === '1') return true;
+    } catch {
+      /* sin almacén */
+    }
   }
+  return false;
 }
 
 function guardarSesion() {
-  try {
-    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(CLAVE_SESION, '1');
-  } catch {
-    /* modo privado o almacenamiento bloqueado: basta la memoria */
+  for (const almacen of [() => sessionStorage, () => localStorage]) {
+    try {
+      almacen().setItem(CLAVE_SESION, '1');
+    } catch {
+      /* modo privado o almacenamiento bloqueado: basta la memoria */
+    }
   }
 }
 
@@ -73,9 +80,11 @@ export function precargarVersionAuditoria(): void {
 export function reiniciarCacheVersionAuditoria(): void {
   activaEnMemoria = false;
   enVuelo = null;
-  try {
-    if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(CLAVE_SESION);
-  } catch {
-    /* nada */
+  for (const almacen of [() => sessionStorage, () => localStorage]) {
+    try {
+      almacen().removeItem(CLAVE_SESION);
+    } catch {
+      /* nada */
+    }
   }
 }

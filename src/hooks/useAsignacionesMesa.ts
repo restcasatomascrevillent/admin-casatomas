@@ -70,6 +70,58 @@ export interface AsignacionConDetalles extends AsignacionMesa {
 }
 
 /**
+ * Lee las asignaciones (con su reserva y su mesa) de un día, sala y turno. La usa el hook y, para «Hoy»,
+ * la precarga al abrir el panel (`consultaAsignacionesMesa`, `lib/reservas/precargaHoy.ts`).
+ */
+async function leerAsignacionesMesa(fecha?: string, espacioId?: string, turno?: Turno): Promise<AsignacionConDetalles[]> {
+  // Columnas por nombre (07/11/2026; antes `*`): son todas las de la tabla, sin sorpresas si crece.
+  let query = supabase
+    .from("asignaciones_mesa")
+    .select(`
+      id, reserva_id, mesa_id, created_at, fecha, turno, espacio_id, asignada_por,
+      reservas!inner (
+        id,
+        nombre,
+        hora,
+        numero_comensales,
+        estado,
+        fecha,
+        salida_at,
+        mesa_fijada
+      ),
+      mesas!inner (
+        id,
+        nombre,
+        capacidad,
+        espacio_id
+      )
+    `);
+
+  // Filtrar por fecha y espacio en el propio servidor (PostgREST) en vez de
+  // descargar todas las asignaciones y filtrar en JS.
+  if (fecha) {
+    query = query.eq("reservas.fecha", fecha);
+  }
+
+  if (espacioId) {
+    query = query.eq("mesas.espacio_id", espacioId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const filas = (data || []) as unknown as AsignacionConDetalles[];
+  if (!turno) return filas;
+  return filas.filter((a) => a && turnoDeHora(a.reservas?.hora ?? "") === turno);
+}
+
+/** Consulta de las asignaciones de un día (todas las salas, sin turno): la misma clave que `useAsignacionesMesa(fecha)`. */
+export const consultaAsignacionesMesa = (fecha: string) => ({
+  queryKey: [CLAVE_ASIGNACIONES_MESA, fecha, undefined] as const,
+  queryFn: () => leerAsignacionesMesa(fecha),
+});
+
+/**
  * Asignaciones de un día (y opcionalmente de una sala y de un turno).
  *
  * `turno` es un parámetro NUEVO y va al final para no romper las llamadas de
@@ -101,47 +153,7 @@ export function useAsignacionesMesa(
     queryKey: turno
       ? [CLAVE_ASIGNACIONES_MESA, fecha, espacioId, turno]
       : [CLAVE_ASIGNACIONES_MESA, fecha, espacioId],
-    queryFn: async () => {
-      // Columnas por nombre (07/11/2026; antes `*`): son todas las de la tabla, sin sorpresas si crece.
-      let query = supabase
-        .from("asignaciones_mesa")
-        .select(`
-          id, reserva_id, mesa_id, created_at, fecha, turno, espacio_id, asignada_por,
-          reservas!inner (
-            id,
-            nombre,
-            hora,
-            numero_comensales,
-            estado,
-            fecha,
-            salida_at,
-            mesa_fijada
-          ),
-          mesas!inner (
-            id,
-            nombre,
-            capacidad,
-            espacio_id
-          )
-        `);
-
-      // Filtrar por fecha y espacio en el propio servidor (PostgREST) en vez de
-      // descargar todas las asignaciones y filtrar en JS.
-      if (fecha) {
-        query = query.eq("reservas.fecha", fecha);
-      }
-
-      if (espacioId) {
-        query = query.eq("mesas.espacio_id", espacioId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const filas = (data || []) as unknown as AsignacionConDetalles[];
-      if (!turno) return filas;
-      return filas.filter((a) => a && turnoDeHora(a.reservas?.hora ?? "") === turno);
-    },
+    queryFn: () => leerAsignacionesMesa(fecha, espacioId, turno),
     enabled: true,
   });
 }

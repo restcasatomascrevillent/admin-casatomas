@@ -117,7 +117,9 @@ export default function SuperAdminServicios() {
     () => pendientesServicios({ servicios: enUso, lecturas: porProveedor, renovaciones, resumen, sinLector, ia: avisosIa }),
     [enUso, porProveedor, renovaciones, resumen, sinLector, avisosIa],
   );
-  const urgentes = pendientes.filter((p) => p.gravedad === "rojo").length;
+  // Servicios en rojo, como el titular de Estado («1 servicio necesita atención»): antes contaba
+  // líneas de «Qué mirar» y un servicio con dos métricas al límite sumaba 2 (09/11/2026).
+  const urgentes = estadoGeneral.cuenta.rojo;
   const ultima = useMemo(() => {
     const fechas = (lecturas.data?.lecturas ?? []).map((l) => l.tomado_en).filter(Boolean).sort();
     return fechas.length ? fechas[fechas.length - 1] : null;

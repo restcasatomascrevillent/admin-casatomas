@@ -50,17 +50,19 @@ export function useSalaEventoDeReserva(reservaId: string | null | undefined) {
   });
 }
 
+/** Consulta de los eventos entre dos fechas; exportada para precargar «Hoy» (`lib/reservas/precargaHoy.ts`). */
+export const consultaSalasEvento = (desde: string | null, hasta: string | null = desde) => ({
+  queryKey: [CLAVE_SALAS_CERRADAS, "eventos", desde, hasta] as const,
+  queryFn: async (): Promise<SalaCerradaEvento[]> => {
+    const { data, error } = await tabla().select(COLUMNAS).gte("fecha", desde).lte("fecha", hasta);
+    if (error) return [];
+    return soloEventos(data);
+  },
+});
+
 /** Salas cerradas por un evento entre dos fechas (`YYYY-MM-DD`, ambas incluidas). Vacío si falla. */
 export function useSalasEvento(desde: string | null, hasta: string | null = desde) {
-  return useQuery({
-    queryKey: [CLAVE_SALAS_CERRADAS, "eventos", desde, hasta],
-    enabled: !!desde && !!hasta,
-    queryFn: async (): Promise<SalaCerradaEvento[]> => {
-      const { data, error } = await tabla().select(COLUMNAS).gte("fecha", desde).lte("fecha", hasta);
-      if (error) return [];
-      return soloEventos(data);
-    },
-  });
+  return useQuery({ ...consultaSalasEvento(desde, hasta), enabled: !!desde && !!hasta });
 }
 
 /** Mapa sala → evento de ESE turno (para pintar «Evento: <nombre>» y para Organizar). */

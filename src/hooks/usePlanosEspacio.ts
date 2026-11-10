@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -31,9 +31,33 @@ function detalleError(error: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Los planos cambian poco (09/11/2026, «Hoy» con mala cobertura): 5 min sin volver a pedirlos. Lo que se
+ * guarda en ESTE dispositivo invalida `["planos_espacio"]` y se relee al momento.
+ */
+export const FRESCURA_PLANOS_MS = 5 * 60_000;
+
+/**
+ * TODOS los planos en UNA lectura, repartidos en la caché por sala (`["planos_espacio", espacioId]`, la
+ * clave de `usePlanoEspacio`). Para precargar «Hoy» (`lib/reservas/precargaHoy.ts`): el plano de la sala
+ * ya está cuando se elige, sin esperar a saber cuál es. Solo rellena las que no tienen datos o están viejas.
+ */
+export async function precargarPlanosEspacio(qc: QueryClient): Promise<void> {
+  const { data, error } = await supabase.from("planos_espacio").select("*");
+  if (error || !data) return;
+  const ahora = Date.now();
+  for (const plano of data as unknown as PlanoEspacio[]) {
+    const clave = ["planos_espacio", plano.espacio_id];
+    const estado = qc.getQueryState(clave);
+    if (estado?.data !== undefined && ahora - estado.dataUpdatedAt < FRESCURA_PLANOS_MS) continue;
+    qc.setQueryData(clave, plano);
+  }
+}
+
 export function usePlanoEspacio(espacioId?: string) {
   return useQuery({
     queryKey: ["planos_espacio", espacioId],
+    staleTime: FRESCURA_PLANOS_MS,
     queryFn: async () => {
       if (!espacioId) return null;
 
