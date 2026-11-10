@@ -4,7 +4,10 @@ import { rutaDeAviso, TIPO_ICON } from "@/lib/avisos";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Bell, Check, CheckCheck, Info, Trash2 } from "lucide-react";
+import { Bell, CalendarClock, Check, CheckCheck, Info, Trash2 } from "lucide-react";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import { useReservasPorGestionar } from "@/hooks/useReservasPorGestionar";
+import { contarAvisosSinLeer } from "@/lib/reservas/porGestionar";
 import { useNotificacionesDashboard } from "@/hooks/useNotificacionesDashboard";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +37,11 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
     useNotificacionesDashboard();
   const navigate = useNavigate();
   const [abierto, setAbierto] = useState(false);
+  // «Por gestionar»: reservas sin confirmar y solicitudes del bot. Solo con permiso de Reservas.
+  const { canAccess: veReservas } = useCanAccessSection("reservas");
+  const { items: porGestionar, count: countPorGestionar } = useReservasPorGestionar(veReservas);
+  // Los avisos de solicitud ya salen en «Por gestionar»: no se cuentan dos veces.
+  const total = countPorGestionar + contarAvisosSinLeer(notificaciones, veReservas);
 
   const handleClick = (notif: (typeof notificaciones)[0]) => {
     marcarLeida(notif.id);
@@ -55,15 +63,15 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
             className
           )}
           aria-label={
-            countNoLeidas > 0
-              ? `${countNoLeidas} notificaciones sin leer`
+            total > 0
+              ? `${total} pendientes de gestionar o sin leer`
               : "Notificaciones"
           }
         >
           <Bell className="h-4 w-4" />
-          {countNoLeidas > 0 && (
+          {total > 0 && (
             <Badge className="absolute -top-1 -right-1 h-5 min-w-[20px] animate-in justify-center rounded-full px-1 text-[10px] pointer-coarse:text-xs leading-none tabular-nums zoom-in-50 bg-destructive text-destructive-foreground">
-              {countNoLeidas > 99 ? "99+" : countNoLeidas}
+              {total > 99 ? "99+" : total}
             </Badge>
           )}
         </Button>
@@ -89,6 +97,38 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
             </Button>
           )}
         </div>
+
+        {veReservas && porGestionar.length > 0 && (
+          <div className="border-b" data-testid="campana-por-gestionar">
+            <p className="px-3 pt-2 text-xs font-medium text-muted-foreground">Por gestionar ({porGestionar.length})</p>
+            <div className="max-h-[min(200px,25vh)] divide-y overflow-y-auto overscroll-contain">
+              {porGestionar.map((it) => (
+                <button
+                  key={it.clave}
+                  type="button"
+                  className="flex w-full min-w-0 items-start gap-3 p-3 text-left transition-colors hover:bg-muted/50"
+                  onClick={() => {
+                    setAbierto(false);
+                    navigate(it.ruta);
+                  }}
+                >
+                  <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {it.nombre}
+                      {it.personas ? ` · ${it.personas} pers.` : ""}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {it.fecha ? it.fecha.split("-").reverse().slice(0, 2).join("/") : "Sin fecha"}
+                      {it.hora ? ` · ${it.hora}` : ""} · {it.tipo === "solicitud" ? "Solicitud: " : ""}
+                      {it.detalle}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Lista */}
         <div className="max-h-[min(320px,50vh)] overflow-y-auto overscroll-contain custom-scrollbar">
