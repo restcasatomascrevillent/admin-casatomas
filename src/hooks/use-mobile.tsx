@@ -50,9 +50,33 @@ export function useIsBelow(breakpoint: number) {
   return below;
 }
 
-/** Teléfono (< 768 px). */
+/**
+ * Lado corto de la PANTALLA (no de la ventana) por debajo del cual un aparato táctil es un teléfono.
+ * Los teléfonos rondan 360-430; las tablets pequeñas (iPad mini 744) y los plegables abiertos quedan por encima.
+ */
+export const TELEFONO_LADO_CORTO_MAX = 600;
+
+/**
+ * ¿Es un teléfono táctil aunque la ventana diga otra cosa? (10/11/2026) En Chrome Android con «Sitio de
+ * escritorio» activado (también se hereda en la app instalada) se ignora `<meta name="viewport">` y la página
+ * se maqueta a ~980 px: `innerWidth` y las media queries de ancho dicen «tablet» y salía la vista de escritorio
+ * de Reservas › Hoy en miniatura. Ese modo NO cambia `screen` ni el tipo de puntero, así que se decide también
+ * por ellos: dedo como puntero principal + pantalla con lado corto de teléfono.
+ */
+export function esTelefonoTactil(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  const pantalla = window.screen;
+  const ladoCorto = Math.min(pantalla?.width || 0, pantalla?.height || 0);
+  if (!(ladoCorto > 0 && ladoCorto < TELEFONO_LADO_CORTO_MAX)) return false;
+  return window.matchMedia("(pointer: coarse)").matches === true;
+}
+
+/** Teléfono: ventana < 768 px, o teléfono táctil con la página maquetada más ancha (modo «sitio de escritorio»). */
 export function useIsMobile() {
-  return useIsBelow(MOBILE_BREAKPOINT);
+  const estrecha = useIsBelow(MOBILE_BREAKPOINT);
+  // `screen` y el puntero no cambian al girar ni al redimensionar: basta con leerlo una vez.
+  const [telefono] = React.useState(esTelefonoTactil);
+  return estrecha || telefono;
 }
 
 /**
