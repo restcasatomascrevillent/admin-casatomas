@@ -68,9 +68,13 @@ function fechaLegible(fecha: string): string {
 export function InterruptoresServiciosOnline({
   fecha,
   className,
+  compacta = false,
 }: {
   fecha: string;
   className?: string;
+  /** Móvil (10/11/2026): los dos botones y la ayuda (i) en UNA fila, sin saltar de línea (antes, a 375 px, la (i)
+   * se quedaba sola en una fila entera). Si aun así no cabe, el texto de los botones se corta con «…». */
+  compacta?: boolean;
 }) {
   const { estaBloqueado, cambiar, disponible, guardando } =
     useServiciosBloqueados(fecha);
@@ -80,7 +84,7 @@ export function InterruptoresServiciosOnline({
   const cerrando = activo ? !estaBloqueado(activo.turno) : false;
   return (
     <div
-      className={cn("flex flex-wrap items-center gap-2", className)}
+      className={cn("flex items-center", compacta ? "flex-nowrap gap-1.5" : "flex-wrap gap-2", className)}
       data-testid="interruptores-servicios-online"
     >
       {TURNOS.map(({ turno, abrir, cerrado }) => {
@@ -91,7 +95,7 @@ export function InterruptoresServiciosOnline({
             type="button"
             size="sm"
             variant={bloqueado ? "destructive" : "outline"}
-            className="touch-hit min-h-11 gap-2"
+            className={cn("touch-hit min-h-11", compacta ? "min-w-0 shrink gap-1.5 px-2.5" : "gap-2")}
             data-testid={`boton-servicio-online-${turno}`}
             aria-pressed={bloqueado}
             disabled={!disponible || !puedeEditar || guardando}
@@ -102,7 +106,7 @@ export function InterruptoresServiciosOnline({
             ) : (
               <LockOpen className="h-4 w-4" aria-hidden />
             )}
-            {bloqueado ? cerrado : abrir}
+            <span className={compacta ? "truncate" : undefined}>{bloqueado ? cerrado : abrir}</span>
           </Button>
         );
       })}
@@ -112,7 +116,7 @@ export function InterruptoresServiciosOnline({
             <button
               type="button"
               aria-label="Qué hace cerrar un servicio"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground"
+              className={cn("inline-flex h-11 shrink-0 items-center justify-center rounded-md text-muted-foreground", compacta ? "w-10" : "w-11")}
             >
               <Info className="h-4 w-4" aria-hidden />
             </button>
