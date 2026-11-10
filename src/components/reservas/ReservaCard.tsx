@@ -50,6 +50,8 @@ import { etiquetaEstadoReserva, infoEstadoReserva, ocupaEspacio } from "@/lib/re
 import { columnaDeReserva, type Columna } from "@/lib/reservas/columnasServicio";
 import type { ReservaServicio } from "@/lib/reservas/servicioSala";
 import { ControlLlegada } from "./ControlLlegada";
+import { EtiquetaFuera } from "./SentarFuera";
+import { estaSentadaFuera } from "@/lib/reservas/sentarFuera";
 import { accionesSoloIcono } from "./kanbanLayout";
 
 type Acciones = ReturnType<typeof useAccionesServicioReserva>;
@@ -381,10 +383,15 @@ export function ReservaCard({
               <span>{typeof reserva.hora === "string" ? reserva.hora.substring(0, 5) : reserva.hora}</span>
               <span>· {reserva.numero_comensales} p.</span>
               <span aria-hidden="true">·</span>
+              {estaSentadaFuera(reserva) ? (
+                // «Sentar fuera» (10/11/2026): fuera de las salas, sin mesa.
+                <EtiquetaFuera reserva={reserva} compacta className="text-[11px]" />
+              ) : (
               <span className={cn("inline-flex items-center gap-0.5", !textoMesas && sinMesa && "text-amber-700 dark:text-amber-400")}>
                 {textoMesas && reserva.mesa_fijada && <Lock className="h-3 w-3" aria-label="Mesa fijada" />}
                 {textoMesas || (sinMesa ? "Sin mesa" : "—")}
               </span>
+              )}
               {reserva.telefono && (
                 <a
                   href={`tel:${reserva.telefono}`}

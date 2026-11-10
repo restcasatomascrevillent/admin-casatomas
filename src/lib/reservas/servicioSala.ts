@@ -248,6 +248,12 @@ export interface ReservaServicio {
   mesa_fijada?: boolean | null;
   /** «Menú del día» (martes a jueves, comida). */
   menu_del_dia?: boolean | null;
+  /** «Sentar fuera» (20261122171500): dónde se sentó fuera de las salas («Touza»…); NULL = dentro. */
+  fuera_lugar?: string | null;
+  /** «Sentar fuera»: mesa o nota del sitio de fuera. */
+  fuera_mesa?: string | null;
+  /** «Sentar fuera»: la sala que tenía antes (vuelve al deshacer). */
+  fuera_espacio_previo_id?: string | null;
 }
 
 export const haLlegado = (estado: string) => estado === ESTADO_LLEGADA;

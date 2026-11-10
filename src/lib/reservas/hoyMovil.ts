@@ -11,6 +11,7 @@
 
 import { ESTADO_LLEGADA, ESTADO_NO_SHOW } from "./estadosReserva";
 import { coincideFiltroHoy, type FiltroTurnoHoy } from "./vistaHoy";
+import { estaSentadaFuera } from "./sentarFuera";
 
 export interface ReservaHoyMovil {
   id: string;
@@ -21,6 +22,9 @@ export interface ReservaHoyMovil {
   espacio_id: string | null;
   email?: string | null;
   telefono?: string | null;
+  /** «Sentar fuera» (20261122171500): dónde está sentada fuera de las salas; NULL = dentro. */
+  fuera_lugar?: string | null;
+  fuera_mesa?: string | null;
 }
 
 export interface FilaHoyMovil<R extends ReservaHoyMovil = ReservaHoyMovil> {
@@ -42,6 +46,8 @@ export interface GrupoHoyMovil<R extends ReservaHoyMovil = ReservaHoyMovil> {
 }
 
 export const CLAVE_SIN_MESA = "sin-mesa";
+/** Grupo de las sentadas fuera de las salas (Touza, Terraza Touza…): no cuentan en ninguna sala. */
+export const CLAVE_FUERA = "fuera";
 
 export const estaTerminada = (estado: string) => estado === ESTADO_LLEGADA || estado === ESTADO_NO_SHOW;
 
@@ -78,6 +84,7 @@ export function agruparHoyMovil<R extends ReservaHoyMovil>(
   const sinMesa: FilaHoyMovil<R>[] = [];
   const porSala = new Map<string, FilaHoyMovil<R>[]>();
   const sinSala: FilaHoyMovil<R>[] = [];
+  const fuera: FilaHoyMovil<R>[] = [];
 
   for (const reserva of reservas) {
     if (reserva.estado === "cancelada") continue;
@@ -85,7 +92,9 @@ export function agruparHoyMovil<R extends ReservaHoyMovil>(
     const mesas = mesasDe(reserva.id);
     const terminada = estaTerminada(reserva.estado);
     const fila: FilaHoyMovil<R> = { reserva, mesas, terminada };
-    if (mesas.length === 0 && !terminada) sinMesa.push(fila);
+    // Sentada fuera: ni «Sin mesa» ni en ninguna sala (no cuenta en sus cifras).
+    if (estaSentadaFuera(reserva)) fuera.push(fila);
+    else if (mesas.length === 0 && !terminada) sinMesa.push(fila);
     else if (reserva.espacio_id) porSala.set(reserva.espacio_id, [...(porSala.get(reserva.espacio_id) ?? []), fila]);
     else sinSala.push(fila);
   }
@@ -100,6 +109,7 @@ export function agruparHoyMovil<R extends ReservaHoyMovil>(
   // Salas que no vienen en la lista (no debería pasar) y terminadas sin sala.
   for (const [id, filas] of porSala) grupos.push(grupo(id, "Otra sala", filas));
   if (sinSala.length > 0) grupos.push(grupo("sin-sala", "Sin sala", sinSala));
+  if (fuera.length > 0) grupos.push(grupo(CLAVE_FUERA, "Fuera", fuera));
   return grupos;
 }
 
@@ -199,6 +209,9 @@ export interface ListaHoyMovil<R extends ReservaHoyMovil = ReservaHoyMovil> {
   porLlegar: FilaLlegada<R>[];
   /** Ya sentadas («Llegó»), por hora: van abajo y plegadas. */
   sentadas: FilaHoyMovil<R>[];
+  /** Sentadas FUERA de las salas (Touza, Terraza Touza…) y aún sin irse, por hora: la lista del móvil las enseña
+   * aparte porque no están en ninguna mesa de «Mesas» (es el único sitio donde cambiarlas o deshacerlas). */
+  fuera: FilaHoyMovil<R>[];
 }
 
 /**
@@ -227,7 +240,8 @@ export function listaHoyMovil<R extends ReservaHoyMovil>(
     .filter((r) => r.estado === ESTADO_LLEGADA)
     .sort(porHora)
     .map((r) => ({ reserva: r, mesas: mesasDe(r.id), terminada: true }));
-  return { llegan, porLlegar, sentadas };
+  const fuera = sentadas.filter((f) => estaSentadaFuera(f.reserva) && !(f.reserva as { salida_at?: string | null }).salida_at);
+  return { llegan, porLlegar, sentadas, fuera };
 }
 
 // ─── Estado de cada mesa («Mesas») ───────────────────────────────────────────
