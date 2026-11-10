@@ -249,3 +249,39 @@ describe("organizarServicio · automático sencillo (13/10/2026)", () => {
     expect(m.detalle).toMatch(/pasa una pieza de la (A|B) a la D y pon pico/);
   });
 });
+
+describe("organizarServicio · menú del día o carta (martes a jueves comida)", () => {
+  it("las de menú del día solo van al Comedor o la Terraza, aunque el Salón ajuste mejor", () => {
+    const mesas = [redonda("S", "5", 2), pieza("C", "3", 3)];
+    const r = organizarServicio(entrada(mesas, [res("Menu", 2, "14:00:00", [], { servicioComida: "menu_del_dia" })]));
+    const m = r.movimientos.find((x) => x.reservaId === "Menu")!;
+    expect(m.hacia.salaNombre).toBe("Comedor");
+  });
+
+  it("una de menú del día ya puesta en el Salón se recoloca en el Comedor", () => {
+    const mesas = [redonda("S", "5", 2), pieza("C", "3", 1)];
+    const r = organizarServicio(entrada(mesas, [res("Menu", 2, "14:00:00", ["S5"], { servicioComida: "menu_del_dia" })]));
+    expect(r.movimientos.find((x) => x.reservaId === "Menu")?.hacia.salaNombre).toBe("Comedor");
+  });
+
+  it("sin sitio en Comedor/Terraza, la de menú del día se queda sin sitio (no al Salón)", () => {
+    const r = organizarServicio(entrada([redonda("S", "5", 4)], [res("Menu", 2, "14:00:00", [], { servicioComida: "menu_del_dia" })]));
+    expect(r.sinSitio.map((x) => x.reservaId)).toEqual(["Menu"]);
+  });
+
+  it("las de carta pueden ir al Salón; sin servicio, cualquier sala", () => {
+    const r = organizarServicio(
+      entrada([redonda("S", "5", 2)], [res("Carta", 2, "14:00:00", [], { servicioComida: "carta" })]),
+    );
+    expect(r.movimientos.find((x) => x.reservaId === "Carta")?.hacia.salaNombre).toBe("Salón");
+  });
+
+  it("las de carta no van a una sala que no sea Salón, Comedor o Terraza", () => {
+    const salas: SalaOrg[] = [...SALAS, { id: "R", nombre: "Reservado", terraza: false }];
+    const r = organizarServicio({
+      ...entrada([redonda("R", "1", 2)], [res("Carta", 2, "14:00:00", [], { servicioComida: "carta" })]),
+      salas,
+    });
+    expect(r.sinSitio.map((x) => x.reservaId)).toEqual(["Carta"]);
+  });
+});

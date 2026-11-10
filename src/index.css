@@ -402,3 +402,63 @@ html {
 .reservas-contraste [role="tab"][data-state="inactive"] {
   color: hsl(var(--foreground));
 }
+
+/* Carta con letra más grande y más contraste (10/11/2026, petición del dueño: «la carta también,
+   hay que poner más grandes las letras»). Mismo criterio que .reservas-contraste: bordes y texto
+   secundario más oscuros y pestaña activa en relleno; además sube los tamaños pequeños de Tailwind
+   (12 → 15 px, 14 → 16 px, 16 → 17 px) y los campos de los formularios a 48 px con 17 px de letra.
+   Solo en la barra de pestañas del Gestor Web, la pestaña Carta y sus fichas de alta y edición (no
+   en las vistas previas de la web ni en el PDF impreso). */
+.carta-contraste {
+  --input: 25 8% 50%;
+  --border: 25 10% 70%;
+  --muted-foreground: 15 6% 24%;
+}
+.dark .carta-contraste {
+  --input: 206 8% 58%;
+  --border: 206 10% 45%;
+  --muted-foreground: 25 13% 84%;
+}
+.carta-contraste [role="tab"][data-state="active"] {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+.carta-contraste [role="tab"][data-state="inactive"] {
+  color: hsl(var(--foreground));
+}
+.carta-contraste .text-\[10px\],
+.carta-contraste .text-\[11px\],
+.carta-contraste .text-\[12px\] {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+.carta-contraste .text-xs {
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
+}
+.carta-contraste .text-sm {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+.carta-contraste .text-base {
+  font-size: 1.0625rem;
+  line-height: 1.625rem;
+}
+.carta-contraste [role="tab"],
+.carta-contraste [role="tab"] span {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+.carta-contraste h3.text-lg {
+  font-size: 1.125rem;
+  line-height: 1.5rem;
+}
+.carta-contraste input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
+.carta-contraste textarea,
+.carta-contraste button[role="combobox"] {
+  min-height: 3rem;
+  font-size: 1.0625rem;
+}
+.carta-contraste label {
+  font-size: 1.0625rem;
+}

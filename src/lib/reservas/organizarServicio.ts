@@ -16,6 +16,12 @@
 //   7. «Terraza cerrada»: no se asigna nada ahí y lo que hubiera se recoloca.
 //   8. Las importantes se colocan antes y se mueven menos.
 //   9. Las que no caben salen con el motivo.
+//  11. (10/11/2026) De martes a jueves en la comida: las de «Menú del día» solo
+//      van al Comedor o la Terraza; las de «Carta», al Salón, Comedor o Terraza
+//      (`servicioComida`, ver `menuDelDia.ts`). Una mesa en otra sala no vale.
+//  12. (10/11/2026) «¿Dentro o fuera?» (`zonaPreferida`, ver `zonaPreferida.ts`): «fuera» solo va a salas
+//      exteriores (Terraza) y «dentro» solo a interiores. Se suma a la regla 11 (menú + fuera → Terraza).
+//      Sin zona, cualquiera.
 //  10. (13/10/2026) Lo automático es SENCILLO: hasta 7 comensales (lo que admite la
 //      web), en UNA mesa o como mucho DOS (juntas, o una que recibe piezas de otra;
 //      piezas de 2 + pico: 6 + pico = 7). Nunca combina 3 o más mesas solo.
@@ -57,6 +63,8 @@ import {
   type ReservaEnMesas,
 } from "./piezasMesa";
 import type { FilaMesaSala } from "./sentarAhora";
+import { salaAdmiteServicio, type ServicioComida } from "./menuDelDia";
+import type { ZonaPreferida } from "./zonaPreferida";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -65,6 +73,8 @@ export interface SalaOrg {
   nombre: string;
   /** La sala flexible (sitios de plazas variables). La que se puede cerrar. */
   terraza: boolean;
+  /** Sala de fuera («¿Dentro o fuera?»). Sin el dato, la Terraza es la de fuera. */
+  exterior?: boolean;
 }
 
 export interface ReservaOrg {
@@ -81,6 +91,13 @@ export interface ReservaOrg {
   fijada?: boolean;
   /** «Liberar mesa»: ya se fue; su mesa no cuenta como ocupada. */
   salidaAt?: string | null;
+  /**
+   * Martes a jueves comida: «Menú del día» (solo Comedor/Terraza) o «Carta» (Salón, Comedor o
+   * Terraza). `null`/ausente = sin regla de sala (`servicioComidaDeReserva`).
+   */
+  servicioComida?: ServicioComida | null;
+  /** «¿Dentro o fuera?» que pidió (`reservas.zona_preferida`): fuera → salas exteriores; dentro → interiores. */
+  zonaPreferida?: ZonaPreferida | null;
 }
 
 export interface DestinoOrg {
@@ -259,6 +276,20 @@ function mismoConjunto(a: string[], b: string[]): boolean {
 
 // ─── Colocar una reserva ─────────────────────────────────────────────────────
 
+/**
+ * Menú del día → Comedor/Terraza; Carta → Salón, Comedor o Terraza; sin servicio, cualquiera. Y
+ * «¿Dentro o fuera?»: fuera → solo salas exteriores; dentro → solo interiores; sin zona, cualquiera.
+ */
+function salaValeParaReserva(ctx: Contexto, r: ReservaOrg, salaId: string | undefined): boolean {
+  const sala = salaId ? ctx.salaPorId.get(salaId) : undefined;
+  if (r.zonaPreferida) {
+    if (!sala) return false;
+    if ((sala.exterior ?? sala.terraza) !== (r.zonaPreferida === "fuera")) return false;
+  }
+  if (!r.servicioComida) return true;
+  return salaAdmiteServicio(sala?.nombre ?? null, r.servicioComida);
+}
+
 function mejorColocacion(
   ctx: Contexto,
   r: ReservaOrg,
@@ -269,7 +300,11 @@ function mejorColocacion(
 ): Colocacion | null {
   const excluidas = ctx.entrada.excluidas ?? new Set<string>();
   const salaOk = new Set(ctx.salasActivas.map((s) => s.id));
-  const libre = (id: string) => !usadas.has(id) && !excluidas.has(id) && salaOk.has(ctx.mesaPorId.get(id)?.salaId ?? "");
+  const libre = (id: string) =>
+    !usadas.has(id) &&
+    !excluidas.has(id) &&
+    salaOk.has(ctx.mesaPorId.get(id)?.salaId ?? "") &&
+    salaValeParaReserva(ctx, r, ctx.mesaPorId.get(id)?.salaId);
   const factor = (r.importante ? COSTES.factorImportante : 1) * (empezado ? COSTES.factorEmpezado : 1);
   const costeMover = (salaId: string, mesaIds: string[]) => {
     if (r.mesaIds.length === 0) return 0;
@@ -533,7 +568,9 @@ export function organizarServicio(entrada: EntradaOrg): ResultadoOrg {
   // Su mesa vale tal cual: existe, en una sala abierta, y caben (con las plazas de ahora).
   const mesaValida = (r: ReservaOrg) =>
     r.mesaIds.length > 0 &&
-    r.mesaIds.every((id) => ctx.mesaPorId.has(id) && salaOk.has(ctx.mesaPorId.get(id)!.salaId)) &&
+    r.mesaIds.every(
+      (id) => ctx.mesaPorId.has(id) && salaOk.has(ctx.mesaPorId.get(id)!.salaId) && salaValeParaReserva(ctx, r, ctx.mesaPorId.get(id)!.salaId),
+    ) &&
     r.mesaIds.reduce((s, id) => s + plazasDe(ctx, ctx.estadoInicial, id), 0) >= r.comensales;
 
   // Grupos de 8 o más: no se colocan solos. Si ya tienen mesa se respeta (fija); si no, a revisar.
@@ -619,7 +656,7 @@ export function organizarServicio(entrada: EntradaOrg): ResultadoOrg {
       motivo:
         r.comensales > maxPlazas * 2
           ? `Ninguna mesa ni unión llega a ${r.comensales} plazas`
-          : `No queda mesa libre para ${r.comensales}${entrada.terrazaCerrada ? " (Terraza cerrada)" : ""}`,
+          : `No queda mesa libre ${r.zonaPreferida === "fuera" ? "fuera " : r.zonaPreferida === "dentro" ? "dentro " : ""}para ${r.comensales}${entrada.terrazaCerrada ? " (Terraza cerrada)" : ""}`,
     }));
 
   const yaOrganizado = movimientos.length === 0 && sinSitio.length === 0 && revisarAMano.length === 0;

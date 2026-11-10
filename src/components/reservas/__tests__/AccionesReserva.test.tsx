@@ -2,27 +2,20 @@
  * `AccionesReserva` y sus piezas: los botones de una reserva en la Lista (tabla y
  * tarjeta de móvil), pintados a partir de `accionesDisponibles(…, { vista: "lista" })`.
  *
- * Se fija el comportamiento que la Lista tenía ANTES de pasar a este componente
- * (paso 3 del refactor de acciones), con una tabla escrita a mano y no calculada
- * con la misma lógica: seis estados × con y sin permiso × las dos variantes. Lo
- * único que cambia respecto a entonces es lo acordado con el dueño: el título de
- * «Llegó» ya no dice «ya servida», «Aceptar» acepta la reserva tal como está, y
- * (06/11/2026, decisión del dueño) sin permiso de edición NO sale ninguna ranura:
- * lo que no se puede usar se oculta, no se desactiva. La estrella de una reserva
- * importante se sigue viendo, como dato, sin botón.
- *
- * Los ANCHOS no se pueden medir en jsdom (no calcula diseño): se fijan las clases
- * que los dan, que son las de siempre.
+ * 10/11/2026 (petición del dueño: «hay que limpiarlo de botones para que quede claro lo que se tiene que
+ * hacer, y los botones de acción y las cosas más grandes»): en vez de seis ranuras de icono con lo que no
+ * aplica deshabilitado, UNA acción principal grande con texto (solo si hay algo que hacer: nunca un botón
+ * deshabilitado de algo ya hecho) y «⋯ Más» con el resto, con texto y solo lo que se puede usar; las
+ * destructivas al final y en rojo. Sin permiso de edición (06/11/2026) no sale nada.
  */
 import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, within } from "@testing-library/react";
+import { fireEvent, render, screen, within, cleanup } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import {
   AccionesReserva,
   CasillaAceptarEnBloque,
   EstrellaImportante,
   RanurasDeAcciones,
-  TITULO_DAR_MESA_SIN_PLANO,
   type AlPulsar,
   type ReservaDeLaLista,
 } from "@/components/reservas/AccionesReserva";
@@ -63,48 +56,49 @@ function montar(props: Partial<ComponentProps<typeof AccionesReserva>> & { reser
     </div>,
   );
   const celda = container.querySelector<HTMLElement>('[data-testid="celda"]')!;
-  /** Los botones de las ranuras, en orden de pantalla (sin la casilla). */
-  const botones = [...celda.querySelectorAll("button")].filter((b) => b.getAttribute("role") !== "checkbox");
-  return { al, onAsignarMesa, celda, botones };
+  return { al, onAsignarMesa, celda };
 }
 
-/** ✔ habilitado · ✖ deshabilitado, en el orden de las ranuras. */
-const simbolos = (botones: HTMLElement[]) => botones.map((b) => (b.hasAttribute("disabled") ? "✖" : "✔")).join("");
+/** La acción principal de la celda (el botón con texto que no es «Más»), o null. */
+const principal = (celda: HTMLElement) =>
+  within(celda)
+    .queryAllByRole("button")
+    .find((b) => !/^Más acciones/.test(b.getAttribute("aria-label") ?? "") && b.getAttribute("role") !== "checkbox") ?? null;
 
-// ─── La tabla de lo que había ─────────────────────────────────────────────────
-// Ranuras: principal · dar mesa · verificar · editar · cancelar · lista negra.
-// «Dar mesa» lo decide `resolverSaltoAsignacion` y no mira el permiso (no escribe:
-// abre el plano); aquí, con sala y fecha, solo la cancelada no salta.
-const CON_PERMISO: Record<Estado, { principal: string; ranuras: string }> = {
-  pendiente: { principal: "Aceptar", ranuras: "✔✔✔✔✔✔" },
-  verificada: { principal: "Confirmar", ranuras: "✔✔✖✔✔✔" },
-  confirmada: { principal: "Confirmar", ranuras: "✖✔✖✔✔✔" },
-  completada: { principal: "Confirmar", ranuras: "✖✔✖✔✖✔" }, // «Llegó» ya no se cancela (cambio (a))
-  cancelada: { principal: "Confirmar", ranuras: "✖✖✖✔✖✔" },
-  no_show: { principal: "Confirmar", ranuras: "✖✔✖✔✖✔" }, // «No vino» ya no se cancela (cambio (a))
+/** Abre «Más» y devuelve sus opciones, en orden. */
+function abrirMas(celda: HTMLElement) {
+  const disparador = within(celda).getByRole("button", { name: /^Más acciones/ });
+  fireEvent.pointerDown(disparador, { button: 0, ctrlKey: false });
+  return screen.getAllByRole("menuitem");
+}
+const textos = (items: HTMLElement[]) => items.map((i) => i.textContent?.trim());
+
+// Con permiso, sala y fecha, y una pantalla que lleva al plano.
+const CON_PERMISO: Record<Estado, { principal: string | null; mas: string[] }> = {
+  pendiente: { principal: "Aceptar", mas: ["Dar mesa", "Verificar", "Editar", "Cancelar reserva", "Lista negra"] },
+  verificada: { principal: "Confirmar", mas: ["Dar mesa", "Editar", "Cancelar reserva", "Lista negra"] },
+  confirmada: { principal: null, mas: ["Dar mesa", "Editar", "Cancelar reserva", "Lista negra"] },
+  completada: { principal: null, mas: ["Dar mesa", "Editar", "Lista negra"] }, // «Llegó» no se cancela
+  cancelada: { principal: null, mas: ["Editar", "Lista negra"] },
+  no_show: { principal: null, mas: ["Dar mesa", "Editar", "Lista negra"] }, // «No vino» no se cancela
 };
 
-describe("AccionesReserva · las seis ranuras, por estado y permiso", () => {
+describe("AccionesReserva · una acción clara y «Más», por estado y permiso", () => {
   describe.each(["fila", "tarjeta"] as const)("variante %s", (variante) => {
     describe("canEdit=true", () => {
       it.each(ESTADOS)("%s", (estado) => {
-        const { botones } = montar({ reserva: reserva(estado), canEdit: true, variante });
-
-        // Siempre seis, se pueda pulsar algo o no: los botones no bailan de sitio.
-        expect(botones).toHaveLength(6);
-        expect(botones[0].textContent?.trim()).toBe(CON_PERMISO[estado].principal);
-        expect(simbolos(botones), "principal · dar mesa · verificar · editar · cancelar · lista negra").toBe(
-          CON_PERMISO[estado].ranuras,
-        );
+        const { celda } = montar({ reserva: reserva(estado), canEdit: true, variante });
+        const p = principal(celda);
+        expect(p?.textContent?.trim() ?? null).toBe(CON_PERMISO[estado].principal);
+        // Nunca un botón deshabilitado de algo ya hecho.
+        for (const b of within(celda).queryAllByRole("button")) expect(b).not.toBeDisabled();
+        expect(textos(abrirMas(celda))).toEqual(CON_PERMISO[estado].mas);
       });
     });
 
-    // 06/11/2026 (decisión del dueño): con solo «Ver» no sale ninguna ranura, ni deshabilitada; tampoco
-    // «Dar mesa» (lleva a repartir mesas) ni la casilla. La Lista quita además la columna entera.
     describe("canEdit=false: nada", () => {
       it.each(ESTADOS)("%s", (estado) => {
         const { celda, al, onAsignarMesa } = montar({ reserva: reserva(estado), canEdit: false, variante });
-
         expect(celda.querySelectorAll("button")).toHaveLength(0);
         expect(celda.querySelector('[role="checkbox"]')).toBeNull();
         expect(celda.textContent).toBe("");
@@ -114,57 +108,65 @@ describe("AccionesReserva · las seis ranuras, por estado y permiso", () => {
     });
   });
 
-  it("el orden y los nombres accesibles: la principal por su texto y los iconos por su `aria-label`", () => {
-    const { botones } = montar({ reserva: reserva("confirmada") });
-    const nombres = botones.map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim());
+  it("sin acción principal queda un hueco del mismo ancho, así «Más» cae en la misma X", () => {
+    const { celda } = montar({ reserva: reserva("confirmada") });
+    const hueco = within(celda).getByTestId("sin-accion-principal");
+    expect(hueco).toHaveAttribute("aria-hidden");
+    expect(hueco.className).toContain("w-[8.5rem]");
+    cleanup();
+    const { celda: otra } = montar({ reserva: reserva("pendiente") });
+    expect(principal(otra)!.className).toContain("w-[8.5rem]");
+  });
 
-    expect(botones[0].hasAttribute("aria-label")).toBe(false);
-    expect(nombres[0]).toBe("Confirmar");
-    expect(nombres[1]).toBe("Abrir el plano en Comedor para darle mesa");
-    expect(nombres[2]).toBe("Verificar: solo para reservas pendientes");
-    expect(nombres[3]).toBe("Gestionar: editar la reserva de Ana — datos, día, hora, comensales y sala");
-    expect(nombres[4]).toBe("Cancelar la reserva de Ana — pedirá confirmación");
-    expect(nombres[5]).toBe("Añadir a Ana a la lista negra");
-    // Cada icono lleva su texto también en `title` (el globo al pasar el ratón).
-    for (const b of botones.slice(1)) expect(b.getAttribute("title")).toBe(b.getAttribute("aria-label"));
-    // Y su icono: sillón, portapapeles, lápiz, aspa y escudo.
-    const iconos = botones.slice(1).map((b) => b.querySelector("svg")?.getAttribute("class") ?? "");
-    expect(iconos[0]).toMatch(/armchair/);
-    expect(iconos[1]).toMatch(/clipboard-check/);
-    expect(iconos[2]).toMatch(/square-pen/);
-    expect(iconos[3]).toMatch(/circle-x|x-circle/);
-    expect(iconos[4]).toMatch(/shield-ban/);
+  it("grande: la principal y «Más» miden 44 px de alto y llevan texto a 16 px", () => {
+    const { celda } = montar({ reserva: reserva("pendiente") });
+    const mas = within(celda).getByRole("button", { name: "Más acciones de Ana" });
+    for (const b of [principal(celda)!, mas]) {
+      expect(b.className).toContain("h-11");
+      expect(b.className).toContain("text-base");
+    }
+    expect(mas).toHaveTextContent("Más");
   });
 
   it("CAMBIO ACORDADO (2026-10-01): «Aceptar» acepta la reserva tal como está, no «como la pidió el cliente»", () => {
-    const { botones } = montar({ reserva: reserva("pendiente") });
-    expect(botones[0].textContent?.trim()).toBe("Aceptar");
-    expect(botones[0].getAttribute("title")).toBe(
+    const { celda } = montar({ reserva: reserva("pendiente") });
+    expect(principal(celda)!.getAttribute("title")).toBe(
       "Aceptar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email",
     );
   });
 
-  it("cancelar y lista negra son las destructivas; «Dar mesa» nunca (no es un error)", () => {
-    const { botones } = montar({ reserva: reserva("confirmada") });
-    const destructivas = botones.map((b) => /border-destructive/.test(b.className));
-    expect(destructivas).toEqual([false, false, false, false, true, true]);
+  it("en «Más», las destructivas van al final, en rojo y tras un separador; cada opción explica en su `title`", () => {
+    const { celda } = montar({ reserva: reserva("confirmada") });
+    const items = abrirMas(celda);
+    const rojas = items.map((i) => /text-destructive/.test(i.className));
+    expect(rojas).toEqual([false, false, true, true]);
+    expect(screen.getByRole("separator")).toBeInTheDocument();
+    expect(items.map((i) => i.getAttribute("title"))).toEqual([
+      "Abrir el plano en Comedor para darle mesa",
+      "Gestionar: editar la reserva de Ana — datos, día, hora, comensales y sala",
+      "Cancelar la reserva de Ana — pedirá confirmación",
+      "Añadir a Ana a la lista negra",
+    ]);
+    // Iconos: sillón, lápiz, aspa y escudo.
+    const iconos = items.map((i) => i.querySelector("svg")?.getAttribute("class") ?? "");
+    expect(iconos[0]).toMatch(/armchair/);
+    expect(iconos[1]).toMatch(/square-pen/);
+    expect(iconos[2]).toMatch(/circle-x|x-circle/);
+    expect(iconos[3]).toMatch(/shield-ban/);
   });
 });
 
 describe("AccionesReserva · qué hace cada botón", () => {
-  it("pendiente con permiso: cada botón llama a lo suyo, una vez", () => {
-    const { al, onAsignarMesa, botones } = montar({ reserva: reserva("pendiente") });
-    const [principal, darMesa, verificar, editar, cancelar, listaNegra] = botones;
-
-    fireEvent.click(principal);
-    fireEvent.click(verificar);
-    fireEvent.click(editar);
-    fireEvent.click(cancelar);
-    fireEvent.click(listaNegra);
-    fireEvent.click(darMesa);
-
+  it("pendiente: la principal acepta y cada opción de «Más» llama a lo suyo", () => {
+    const { al, onAsignarMesa, celda } = montar({ reserva: reserva("pendiente") });
+    fireEvent.click(principal(celda)!);
     expect(al.aceptar).toHaveBeenCalledTimes(1);
     expect(al.confirmar).not.toHaveBeenCalled();
+
+    for (const texto of ["Dar mesa", "Verificar", "Editar", "Cancelar reserva", "Lista negra"]) {
+      const item = abrirMas(celda).find((i) => i.textContent?.trim() === texto)!;
+      fireEvent.click(item);
+    }
     expect(al.verificar).toHaveBeenCalledTimes(1);
     expect(al.editar).toHaveBeenCalledTimes(1);
     expect(al.cancelar).toHaveBeenCalledTimes(1);
@@ -179,54 +181,23 @@ describe("AccionesReserva · qué hace cada botón", () => {
   });
 
   it("verificada: la principal es «Confirmar» y llama a confirmar (no a aceptar)", () => {
-    const { al, botones } = montar({ reserva: reserva("verificada") });
-    fireEvent.click(botones[0]);
+    const { al, celda } = montar({ reserva: reserva("verificada") });
+    fireEvent.click(principal(celda)!);
     expect(al.confirmar).toHaveBeenCalledTimes(1);
     expect(al.aceptar).not.toHaveBeenCalled();
   });
 
-  it("lo deshabilitado no llama a nada", () => {
-    for (const estado of ESTADOS) {
-      const { al, onAsignarMesa, botones } = montar({ reserva: reserva(estado), canEdit: true });
-      for (const b of botones) if (b.hasAttribute("disabled")) fireEvent.click(b);
-      const deshabilitados = simbolos(botones);
-      // Lo que salió deshabilitado no se ha llamado.
-      if (deshabilitados[0] === "✖") {
-        expect(al.aceptar, estado).not.toHaveBeenCalled();
-        expect(al.confirmar, estado).not.toHaveBeenCalled();
-      }
-      if (deshabilitados[1] === "✖") expect(onAsignarMesa, estado).not.toHaveBeenCalled();
-      if (deshabilitados[2] === "✖") expect(al.verificar, estado).not.toHaveBeenCalled();
-      if (deshabilitados[3] === "✖") expect(al.editar, estado).not.toHaveBeenCalled();
-      if (deshabilitados[4] === "✖") expect(al.cancelar, estado).not.toHaveBeenCalled();
-    }
+  it("sin manejadores no hay principal ni opciones salvo «Dar mesa» (que lleva su propio salto)", () => {
+    const { celda } = montar({ reserva: reserva("pendiente"), al: {} });
+    expect(principal(celda)).toBeNull();
+    expect(textos(abrirMas(celda))).toEqual(["Dar mesa"]);
   });
 
-  it("un botón sin manejador sale deshabilitado aunque la regla lo permita", () => {
-    const { botones } = montar({ reserva: reserva("pendiente"), al: {} });
-    // Solo «Dar mesa» lleva su propio salto (`onAsignarMesa`).
-    expect(simbolos(botones)).toBe("✖✔✖✖✖✖");
-  });
-});
-
-describe("AccionesReserva · el motivo de lo deshabilitado se ve al pasar el ratón", () => {
-  /** El `title` del envoltorio (`ConMotivo`) de un botón. */
-  const motivo = (b: HTMLElement) => b.parentElement?.getAttribute("title") ?? null;
-
-  it("deshabilitado: el envoltorio lleva el motivo; habilitado: el envoltorio no lleva nada", () => {
-    const { botones } = montar({ reserva: reserva("completada") });
-    const [principal, darMesa, verificar, editar, cancelar, listaNegra] = botones;
-
-    expect(motivo(principal)).toBe("Nada que aceptar ni confirmar: la reserva está marcada como «Llegó»");
-    expect(motivo(verificar)).toBe("Verificar: solo para reservas pendientes");
-    expect(motivo(cancelar)).toBe("No se puede cancelar una reserva que ya llegó");
-    for (const b of [darMesa, editar, listaNegra]) expect(motivo(b)).toBeNull();
-  });
-
-  it("CAMBIO ACORDADO: ningún texto dice «servida»; «Llegó» se llama «Llegó»", () => {
+  it("CAMBIO ACORDADO: ningún texto dice «servida»", () => {
     const { celda } = montar({ reserva: reserva("completada") });
+    abrirMas(celda);
     expect(celda.innerHTML).not.toMatch(/servida/i);
-    expect(within(celda).getByText("Confirmar").closest("button")!.getAttribute("title")).toMatch(/«Llegó»/);
+    expect(document.body.innerHTML).not.toMatch(/servida/i);
   });
 
   it("sin permiso ya no hay ningún «No tienes permiso…»: no hay botones (06/11/2026)", () => {
@@ -234,44 +205,36 @@ describe("AccionesReserva · el motivo de lo deshabilitado se ve al pasar el rat
       const { celda } = montar({ reserva: reserva(estado), canEdit: false });
       expect(celda.innerHTML, estado).not.toMatch(/permiso/i);
       expect(within(celda).queryByRole("button"), estado).toBeNull();
-    }
-  });
-
-  it("el envoltorio no cambia el ancho: es un `inline-flex shrink-0` pegado al botón", () => {
-    const { botones } = montar({ reserva: reserva("cancelada") });
-    for (const b of botones) {
-      expect(b.parentElement?.tagName).toBe("SPAN");
-      expect(b.parentElement?.className).toBe("inline-flex shrink-0");
+      cleanup();
     }
   });
 });
 
 describe("AccionesReserva · mientras hay una petición en curso", () => {
-  it("`ocupada` (esta reserva): la principal y cancelar giran y no se pulsan", () => {
-    const { al, botones } = montar({ reserva: reserva("pendiente"), ocupada: true });
-    expect(botones[0].hasAttribute("disabled")).toBe(true);
-    expect(botones[0].querySelector("svg")?.getAttribute("class")).toMatch(/animate-spin/);
-    expect(botones[4].hasAttribute("disabled")).toBe(true);
-    expect(botones[4].querySelector("svg")?.getAttribute("class")).toMatch(/animate-spin/);
-    fireEvent.click(botones[0]);
-    fireEvent.click(botones[4]);
+  it("`ocupada` (esta reserva): la principal gira y no se pulsa; «Cancelar» gira y no se pulsa", () => {
+    const { al, celda } = montar({ reserva: reserva("pendiente"), ocupada: true });
+    const p = principal(celda)!;
+    expect(p).toBeDisabled();
+    expect(p.querySelector("svg")?.getAttribute("class")).toMatch(/animate-spin/);
+    fireEvent.click(p);
     expect(al.aceptar).not.toHaveBeenCalled();
+    const cancelar = abrirMas(celda).find((i) => /Cancelando/.test(i.textContent ?? ""))!;
+    expect(cancelar).toHaveAttribute("data-disabled");
+    expect(cancelar.querySelector("svg")?.getAttribute("class")).toMatch(/animate-spin/);
+    fireEvent.click(cancelar);
     expect(al.cancelar).not.toHaveBeenCalled();
-    // El resto sigue igual.
-    expect(simbolos(botones).slice(1, 4)).toBe("✔✔✔");
   });
 
-  it("`ocupada` en una fila sin nada que confirmar: cancelar gira igual (como antes); la principal no", () => {
-    const { botones } = montar({ reserva: reserva("cancelada"), ocupada: true });
-    expect(botones[0].querySelector("svg")?.getAttribute("class")).not.toMatch(/animate-spin/);
-    expect(botones[4].querySelector("svg")?.getAttribute("class")).toMatch(/animate-spin/);
+  it("`ocupada` en una fila sin nada que confirmar: no aparece ninguna principal", () => {
+    const { celda } = montar({ reserva: reserva("cancelada"), ocupada: true });
+    expect(principal(celda)).toBeNull();
   });
 
   it("`bloqueEnCurso` (aceptar en bloque): solo espera la principal", () => {
-    const { botones } = montar({ reserva: reserva("verificada"), bloqueEnCurso: true });
-    expect(botones[0].hasAttribute("disabled")).toBe(true);
-    expect(botones[0].querySelector("svg")?.getAttribute("class")).toMatch(/animate-spin/);
-    expect(botones[4].hasAttribute("disabled")).toBe(false);
+    const { celda } = montar({ reserva: reserva("verificada"), bloqueEnCurso: true });
+    expect(principal(celda)).toBeDisabled();
+    expect(principal(celda)!.querySelector("svg")?.getAttribute("class")).toMatch(/animate-spin/);
+    expect(textos(abrirMas(celda))).toContain("Cancelar reserva");
   });
 
   it("sin permiso no pinta nada aunque esté ocupada (no hay nada que pulsar)", () => {
@@ -281,25 +244,20 @@ describe("AccionesReserva · mientras hay una petición en curso", () => {
 });
 
 describe("AccionesReserva · «Dar mesa»", () => {
-  it("sin sala: deshabilitado y dice qué falta y dónde se arregla («Gestionar»)", () => {
-    const { onAsignarMesa, botones } = montar({ reserva: reserva("confirmada", { espacio_id: null }) });
-    expect(botones[1].hasAttribute("disabled")).toBe(true);
-    expect(botones[1].getAttribute("aria-label")).toMatch(/sala/);
-    expect(botones[1].getAttribute("aria-label")).toMatch(/«Gestionar»/);
-    fireEvent.click(botones[1]);
-    expect(onAsignarMesa).not.toHaveBeenCalled();
+  it("sin sala no sale (se asigna desde «Editar»)", () => {
+    const { celda } = montar({ reserva: reserva("confirmada", { espacio_id: null }) });
+    expect(textos(abrirMas(celda))).not.toContain("Dar mesa");
   });
 
-  it("si la pantalla no lleva a ningún plano, sigue en su sitio, deshabilitado y lo dice", () => {
-    const { botones } = montar({ reserva: reserva("confirmada"), onAsignarMesa: undefined });
-    expect(botones).toHaveLength(6);
-    expect(botones[1].hasAttribute("disabled")).toBe(true);
-    expect(botones[1].getAttribute("aria-label")).toBe(TITULO_DAR_MESA_SIN_PLANO);
+  it("si la pantalla no lleva a ningún plano, no sale", () => {
+    const { celda } = montar({ reserva: reserva("confirmada"), onAsignarMesa: undefined });
+    expect(textos(abrirMas(celda))).not.toContain("Dar mesa");
   });
 
   it("sin nombre de sala, el texto no inventa ninguno", () => {
-    const { botones } = montar({ reserva: reserva("confirmada"), nombreSala: null });
-    expect(botones[1].getAttribute("aria-label")).toBe("Abrir el plano para darle mesa");
+    const { celda } = montar({ reserva: reserva("confirmada"), nombreSala: null });
+    const item = abrirMas(celda).find((i) => i.textContent?.trim() === "Dar mesa")!;
+    expect(item.getAttribute("title")).toBe("Abrir el plano para darle mesa");
   });
 });
 
@@ -309,15 +267,16 @@ describe("AccionesReserva · variantes", () => {
       const { celda } = montar({ reserva: reserva(estado) });
       const primera = celda.firstElementChild as HTMLElement;
       expect(primera.tagName, estado).toBe("SPAN");
-      expect(primera.className, estado).toContain("w-4");
+      expect(primera.className, estado).toContain("w-6");
       expect(within(celda).queryAllByRole("checkbox"), estado).toHaveLength(estado === "pendiente" ? 1 : 0);
+      cleanup();
     }
   });
 
   it("`fila` sin permiso: ni ranura ni casilla (la cabecera tampoco la lleva)", () => {
     const { celda } = montar({ reserva: reserva("pendiente"), canEdit: false });
     expect(within(celda).queryByRole("checkbox")).toBeNull();
-    expect(celda.querySelector("span.w-4")).toBeNull();
+    expect(celda.querySelector("span.w-6")).toBeNull();
   });
 
   it("`fila`: la casilla marca y desmarca para aceptar en bloque", () => {
@@ -328,51 +287,32 @@ describe("AccionesReserva · variantes", () => {
     expect(al.seleccionar).toHaveBeenCalledTimes(1);
   });
 
-  it("`tarjeta`: los mismos seis botones en una fila propia y SIN casilla (va junto al nombre)", () => {
-    const { celda, botones } = montar({ reserva: reserva("pendiente"), variante: "tarjeta" });
+  it("`tarjeta`: principal y «Más» en una fila propia y SIN casilla (va junto al nombre)", () => {
+    const { celda } = montar({ reserva: reserva("pendiente"), variante: "tarjeta" });
     const fila = celda.firstElementChild as HTMLElement;
     expect(fila.tagName).toBe("DIV");
-    // Tablet (03/10/2026): la fila hace wrap y los botones llevan TEXTO visible (con dedo no hay `title`).
     expect(fila.className).toBe("flex flex-wrap items-center gap-2 pt-1");
-    expect(botones).toHaveLength(6);
     expect(within(celda).queryByRole("checkbox")).toBeNull();
-    for (const texto of ["Mesa", "Verificar", "Editar", "Cancelar", "Blacklist"]) {
-      expect(within(celda).getAllByText(texto).length, texto).toBeGreaterThan(0);
-    }
-  });
-
-  it("`fila`: solo iconos (la tabla no tiene sitio para el texto)", () => {
-    const { celda } = montar({ reserva: reserva("pendiente") });
-    expect(within(celda).queryByText("Blacklist")).toBeNull();
-  });
-});
-
-describe("AccionesReserva · los anchos son los de siempre (la Lista no cambia de ancho)", () => {
-  it("principal de ancho fijo y cinco iconos de 24/28 px", () => {
-    const { botones } = montar({ reserva: reserva("pendiente") });
-    expect(botones[0].className).toContain("w-[76px]");
-    expect(botones[0].className).toContain("xl:w-[88px]");
-    expect(botones[0].className).toContain("h-6");
-    expect(botones[0].className).toContain("xl:h-7");
-    for (const b of botones.slice(1)) {
-      for (const clase of ["h-6", "w-6", "xl:h-7", "xl:w-7", "shrink-0"]) expect(b.className, clase).toContain(clase);
-    }
+    expect(principal(celda)).toHaveTextContent("Aceptar");
+    expect(within(celda).getByRole("button", { name: "Más acciones de Ana" })).toBeInTheDocument();
   });
 });
 
 describe("AccionesReserva · textos de una reserva sin nombre (la BD lo permite)", () => {
   it.each([null, undefined, ""])("nombre %j: «este cliente»", (nombre) => {
-    const { botones } = montar({ reserva: reserva("confirmada", { nombre }) });
-    expect(botones[3].getAttribute("aria-label")).toBe(
+    const { celda } = montar({ reserva: reserva("confirmada", { nombre }) });
+    expect(within(celda).getByRole("button", { name: "Más acciones de Sin nombre" })).toBeInTheDocument();
+    expect(abrirMas(celda).map((i) => i.getAttribute("title"))).toEqual([
+      "Abrir el plano en Comedor para darle mesa",
       "Gestionar: editar la reserva de este cliente — datos, día, hora, comensales y sala",
-    );
-    expect(botones[4].getAttribute("aria-label")).toBe("Cancelar la reserva de este cliente — pedirá confirmación");
-    expect(botones[5].getAttribute("aria-label")).toBe("Añadir a este cliente a la lista negra");
+      "Cancelar la reserva de este cliente — pedirá confirmación",
+      "Añadir a este cliente a la lista negra",
+    ]);
   });
 });
 
 describe("RanurasDeAcciones · el molde que comparten reservas y solicitudes", () => {
-  it("pinta lo que le den, en las mismas seis ranuras; «Gestionar» lleva el engranaje si no se le da icono", () => {
+  it("pinta la principal y en «Más» solo lo que tiene manejador; «Gestionar» lleva el engranaje si no se le da icono", () => {
     const onGestionar = vi.fn();
     const { container } = render(
       <div>
@@ -384,17 +324,36 @@ describe("RanurasDeAcciones · el molde que comparten reservas y solicitudes", (
           gestionar={{ titulo: "Gestionar: propuesta al cliente, salas y notas", onClick: onGestionar }}
           cancelar={{ titulo: "Descartar la solicitud: se hace desde «Gestionar»" }}
           listaNegra={{ titulo: "Lista negra: solo para reservas" }}
+          nombre="Luis"
         />
       </div>,
     );
-    const botones = [...container.querySelectorAll("button")];
-    expect(botones).toHaveLength(6);
-    expect(simbolos(botones)).toBe("✔✖✖✔✖✖");
-    expect(botones[3].querySelector("svg")?.getAttribute("class")).toMatch(/settings-?2/);
+    const celda = container.firstElementChild as HTMLElement;
+    expect(principal(celda)).toHaveTextContent("Convertir");
     // `seleccion={null}`: la ranura de la casilla está, vacía (misma X que una reserva con permiso).
-    expect((container.firstElementChild!.firstElementChild as HTMLElement).className).toContain("w-4");
-    fireEvent.click(botones[3]);
+    expect((celda.firstElementChild as HTMLElement).className).toContain("w-6");
+    const items = abrirMas(celda);
+    expect(textos(items)).toEqual(["Gestionar"]);
+    expect(items[0].querySelector("svg")?.getAttribute("class")).toMatch(/settings-?2/);
+    fireEvent.click(items[0]);
     expect(onGestionar).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin principal ni opciones: solo el hueco, sin «Más»", () => {
+    const { container } = render(
+      <div>
+        <RanurasDeAcciones
+          principal={{ etiqueta: "Convertir", titulo: "Ya está cerrada", icono: null }}
+          darMesa={{ titulo: "" }}
+          verificar={{ titulo: "" }}
+          gestionar={{ titulo: "" }}
+          cancelar={{ titulo: "" }}
+          listaNegra={{ titulo: "" }}
+        />
+      </div>,
+    );
+    expect(container.querySelectorAll("button")).toHaveLength(0);
+    expect(within(container as HTMLElement).getByTestId("sin-accion-principal")).toBeInTheDocument();
   });
 });
 

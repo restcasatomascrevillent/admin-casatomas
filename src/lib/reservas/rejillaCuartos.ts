@@ -14,6 +14,10 @@
 //     Mismo `t < fin` que el motor (`generarCandidatos` en disponibilidad.ts),
 //     así que con Comida 13-16 salen 13:00…15:45. La ESCALERA se ignora a
 //     propósito: aquí interesa ver el turno entero, no lo que se ofrece.
+//     EXCEPCIÓN — turnos de HORA FIJA (`horas_fijas`, jueves de tapas por la
+//     noche, 20261122200100): ese periodo solo tiene esas horas (20:30 y 22:00),
+//     así que solo salen ellas como franjas «turno» (y el alta solo ofrece
+//     ésas). La estancia de un turno fijo acaba, como mucho, en el siguiente.
 //   · TURNO: corte a las 17:00 (`turnoDeHora`), igual que el trigger
 //     `validar_capacidad_reserva`. Una reserva de las 16:45 es de comida.
 //   · LLEGAN: comensales cuya hora cae en ese cuarto (13:10 cuenta en 13:00).
@@ -36,7 +40,9 @@ import {
   diaDeLaSemana,
   ESTADOS_QUE_OCUPAN,
   horaAMinutos,
+  horasFijasDeConfig,
   minutosAHora,
+  minutosHastaSiguienteTurnoFijo,
   seleccionarConfiguraciones,
   turnoDeHora,
   type ConfiguracionTurnoInput,
@@ -51,6 +57,8 @@ const MINUTOS_DIA = 24 * 60;
 export interface PeriodoCuarto {
   inicio: number;
   fin: number;
+  /** Turnos de hora fija (minutos desde medianoche): solo esas franjas. Sin él, cada cuarto. */
+  horas?: number[];
 }
 
 /** Por qué está una franja: la da el turno, la trae una reserva o es la hora propuesta. */
@@ -122,7 +130,8 @@ export function periodosDelDia(
     let fin = horaAMinutos(c.hora_fin);
     if (inicio === null || fin === null) continue;
     if (fin <= inicio) fin += MINUTOS_DIA; // cruza medianoche
-    vistos.set(`${inicio}-${fin}`, { inicio, fin });
+    const fijas = horasFijasDeConfig(c);
+    vistos.set(`${inicio}-${fin}`, fijas ? { inicio, fin, horas: fijas } : { inicio, fin });
   }
   return Array.from(vistos.values()).sort((a, b) => a.inicio - b.inicio || a.fin - b.fin);
 }
@@ -159,7 +168,15 @@ export function construirRejillaCuartos(entrada: EntradaRejillaCuartos): Rejilla
 
   // --- Qué franjas hay y de dónde sale cada una ---
   const origenes = new Map<number, OrigenCuarto>();
+  const horasFijas: string[] = [];
   for (const p of entrada.periodos) {
+    if (p.horas && p.horas.length > 0) {
+      for (const h of p.horas) {
+        origenes.set(h % MINUTOS_DIA, "turno");
+        horasFijas.push(minutosAHora(h % MINUTOS_DIA));
+      }
+      continue;
+    }
     for (let t = Math.ceil(p.inicio / paso) * paso; t < p.fin; t += paso) {
       origenes.set(t % MINUTOS_DIA, "turno");
     }
@@ -172,7 +189,10 @@ export function construirRejillaCuartos(entrada: EntradaRejillaCuartos): Rejilla
     const minutos = horaAMinutos(r.hora);
     if (minutos === null) continue;
     const turno = turnoDeHora(minutos);
-    presentes.push({ minutos, pax: paxDe(r), estancia: turno === "comida" ? entrada.estancia.comida : entrada.estancia.cena });
+    const estanciaTurno = turno === "comida" ? entrada.estancia.comida : entrada.estancia.cena;
+    // Turno fijo: la mesa hace falta a la hora del siguiente turno (20:30 → hasta las 22:00).
+    const hastaSiguiente = minutosHastaSiguienteTurnoFijo(minutos, horasFijas);
+    presentes.push({ minutos, pax: paxDe(r), estancia: hastaSiguiente === null ? estanciaTurno : Math.min(estanciaTurno, hastaSiguiente) });
     const cuarto = cuartoDe(minutos, paso);
     if (!origenes.has(cuarto)) origenes.set(cuarto, "reserva");
   }

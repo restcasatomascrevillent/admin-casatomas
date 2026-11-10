@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ClipboardList, Clock, Mail, PenLine, Plus, Settings, SlidersHorizontal, Timer } from "lucide-react";
+import { Clock, Mail, Plus, Settings, SlidersHorizontal, Timer } from "lucide-react";
 import { EtiquetaSoloLectura } from "@/components/panel/EtiquetaSoloLectura";
 import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -11,7 +11,7 @@ import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { VistaHoy } from "@/components/reservas/VistaHoy";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { LayoutGrid, Utensils } from "lucide-react";
+import { BookOpen, LayoutGrid, Table2, Utensils } from "lucide-react";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { usePuedeCrearReservas } from "@/hooks/usePuedeCrearReservas";
@@ -39,15 +39,16 @@ import { toast } from "sonner";
 // Si tras un despliegue falta un fichero viejo, la barrera de errores recarga
 // sola (ErrorBoundary › PATRON_CHUNK_OBSOLETO), como con las páginas (App.tsx).
 // ============================================================================
-const FormularioReserva = lazy(() =>
-  import("@/components/reservas/FormularioReserva").then((m) => ({ default: m.FormularioReserva })),
-);
 // «Escribir reserva» (10/11/2026): libro de reservas con lápiz, también bajo demanda.
 const LibroReservas = lazy(() =>
   import("@/components/reservas/libro/LibroReservas").then((m) => ({ default: m.LibroReservas })),
 );
 const ListaReservasAvanzada = lazy(() =>
   import("@/components/reservas/ListaReservasAvanzada").then((m) => ({ default: m.ListaReservasAvanzada })),
+);
+// La Lista vista como el libro (10/11/2026): hojas por día que se pasan.
+const ListaComoLibro = lazy(() =>
+  import("@/components/reservas/libro/ListaComoLibro").then((m) => ({ default: m.ListaComoLibro })),
 );
 const CalendarioOcupacion = lazy(() =>
   import("@/components/reservas/CalendarioOcupacion").then((m) => ({ default: m.CalendarioOcupacion })),
@@ -94,9 +95,58 @@ const bajoDemanda = (contenido: ReactNode) => <Suspense fallback={<CargandoPesta
  * pestaña que no se ve, con «Hoy» abierta ya no se pide nada de solicitudes. Sigue habiendo UNA sola
  * instancia (ver aviso de realtime en el hook).
  */
-function PestanaLista(props: Omit<ComponentProps<typeof ListaReservasAvanzada>, "solicitudesState">) {
+function TablaLista(props: Omit<ComponentProps<typeof ListaReservasAvanzada>, "solicitudesState">) {
   const solicitudesState = useSolicitudesPendientes();
   return bajoDemanda(<ListaReservasAvanzada {...props} solicitudesState={solicitudesState} />);
+}
+
+/** Cómo se ve la Lista: como el libro de hojas por día o como la tabla con filtros. Se recuerda en el dispositivo. */
+type VistaLista = "libro" | "tabla";
+const CLAVE_VISTA_LISTA = "reservas.vistaLista";
+
+function leerVistaLista(): VistaLista {
+  try {
+    return localStorage.getItem(CLAVE_VISTA_LISTA) === "tabla" ? "tabla" : "libro";
+  } catch {
+    return "libro";
+  }
+}
+
+/**
+ * La pestaña «Lista» (10/11/2026, petición del dueño: «hacer o simular como el libro, que tenga hojas que
+ * vas pasando»): por defecto el LIBRO (una hoja por día, `ListaComoLibro`) y, con el conmutador, la TABLA de
+ * siempre con sus filtros, intacta. Si se llega con un filtro en la URL (la campana, «Por atender»…) se abre
+ * la tabla, que es la que filtra, sin cambiar lo recordado.
+ */
+function PestanaLista(props: Omit<ComponentProps<typeof ListaReservasAvanzada>, "solicitudesState">) {
+  const conFiltro = !!(props.initialStatusFilter || props.initialDateFilter);
+  const [vista, setVista] = useState<VistaLista>(() => (conFiltro ? "tabla" : leerVistaLista()));
+  const elegir = (v: string) => {
+    if (v !== "libro" && v !== "tabla") return;
+    setVista(v);
+    try {
+      localStorage.setItem(CLAVE_VISTA_LISTA, v);
+    } catch {
+      // Sin almacenamiento (modo privado): vale para esta visita.
+    }
+  };
+  const conmutador = (
+    <ToggleGroup type="single" value={vista} onValueChange={elegir} className="rounded-md border p-1" aria-label="Ver la lista como">
+      <ToggleGroupItem value="libro" className="h-10 gap-1.5 px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+        <BookOpen className="h-4 w-4" /> Libro
+      </ToggleGroupItem>
+      <ToggleGroupItem value="tabla" className="h-10 gap-1.5 px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+        <Table2 className="h-4 w-4" /> Tabla
+      </ToggleGroupItem>
+    </ToggleGroup>
+  );
+  if (vista === "libro") return bajoDemanda(<ListaComoLibro extra={conmutador} />);
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex justify-end">{conmutador}</div>
+      <TablaLista {...props} />
+    </div>
+  );
 }
 
 /**
@@ -149,22 +199,6 @@ export default function Reservas() {
   // Móvil (< 768 px): solo «Hoy» para sentar (ver más abajo).
   const esMovil = useIsMobile();
   const [openDialog, setOpenDialog] = useState(false);
-  // Formulario o libro dentro de «Nueva Reserva»; se recuerda en este dispositivo.
-  const [modoAlta, setModoAlta] = useState<"formulario" | "libro">(() => {
-    try {
-      return localStorage.getItem("reservas.modoAlta") === "libro" ? "libro" : "formulario";
-    } catch {
-      return "formulario";
-    }
-  });
-  const elegirModoAlta = (m: "formulario" | "libro") => {
-    setModoAlta(m);
-    try {
-      localStorage.setItem("reservas.modoAlta", m);
-    } catch {
-      /* sin almacenamiento: no se recuerda */
-    }
-  };
   const [selectedEspacio, setSelectedEspacio] = useState<{ id: string; nombre: string } | null>(null);
   // Dentro de una sala: "plano" es el editor/asignación de siempre
   // (PlanoEspacio2D); "servicio" es la vista en vivo del modo servicio
@@ -201,9 +235,6 @@ export default function Reservas() {
   const soloLectura = !cargandoEdicion && !puedeEditarReservas;
   const listaRef = useRef<HTMLElement | null>(null);
 
-  // Identidad estable mientras el diálogo está abierto: si se recreara en cada render,
-  // el formulario reescribiría la fecha continuamente.
-  const datosNuevaReserva = useMemo(() => ({ fecha: new Date() }), [openDialog]);
 
   // Leer parámetros de URL para controlar tab activo. `resolverDeepLinkReservas`
   // (src/lib/reservas/vistaUnificada.ts, sin tocar en el rediseño 2026-09-25)
@@ -423,8 +454,8 @@ export default function Reservas() {
                   detalle="Puedes ver las reservas y crear reservas nuevas, pero no modificarlas, cambiar su estado ni configurar. Si necesitas más, pídeselo a un administrador."
                 /> : <EtiquetaSoloLectura />)}
             {/* «Nueva Reserva» única (10/11/2026, petición del dueño: «un solo botón y dentro formulario o
-                libro»). Dentro se elige «Formulario» (el alta de siempre) o «Libro» (escribir a mano con el lápiz);
-                se recuerda la última elección en este dispositivo. Ocupa casi toda la pantalla y hace scroll por
+                libro»). Dentro, arriba la lista del día en grande y debajo
+                «Escribir con lápiz» o «Formulario» (LibroReservas; se recuerda la elección en este dispositivo). Ocupa casi toda la pantalla y hace scroll por
                 dentro: la página sigue sin desplazar. */}
             {puedeCrearReservas && (
               <Dialog open={openDialog} onOpenChange={setOpenDialog}>
@@ -437,45 +468,9 @@ export default function Reservas() {
                 <DialogContent className="reservas-contraste flex h-[94dvh] max-h-[94dvh] w-[98vw] max-w-[98vw] flex-col gap-0 overflow-hidden p-0">
                   <DialogHeader className="flex-row flex-wrap items-center gap-3 space-y-0 border-b px-4 py-2 pr-12">
                     <DialogTitle className="text-lg">Nueva reserva</DialogTitle>
-                    <DialogDescription className="sr-only">Crea la reserva con el formulario o escríbela a mano en el libro.</DialogDescription>
-                    <div role="group" aria-label="Cómo apuntarla" className="inline-flex rounded-lg border-2 border-foreground/70 p-0.5">
-                      <Button
-                        type="button"
-                        variant={modoAlta === "formulario" ? "default" : "ghost"}
-                        className="h-10 px-4 font-semibold"
-                        aria-pressed={modoAlta === "formulario"}
-                        onClick={() => elegirModoAlta("formulario")}
-                      >
-                        <ClipboardList className="mr-2 h-4 w-4" />
-                        Formulario
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={modoAlta === "libro" ? "default" : "ghost"}
-                        className="h-10 px-4 font-semibold"
-                        aria-pressed={modoAlta === "libro"}
-                        onClick={() => elegirModoAlta("libro")}
-                      >
-                        <PenLine className="mr-2 h-4 w-4" />
-                        Libro (lápiz)
-                      </Button>
-                    </div>
+                    <DialogDescription className="sr-only">Las reservas del día y, debajo, apuntar una nueva con el lápiz o con el formulario.</DialogDescription>
                   </DialogHeader>
-                  {modoAlta === "libro" ? (
-                    bajoDemanda(<LibroReservas soloCrear={soloCrear} />)
-                  ) : (
-                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
-                      <div className="mx-auto max-w-4xl">
-                        {bajoDemanda(
-                          <FormularioReserva
-                            datosPreseleccionados={datosNuevaReserva}
-                            onSuccess={() => setOpenDialog(false)}
-                            soloCrear={soloCrear}
-                          />,
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  {bajoDemanda(<LibroReservas soloCrear={soloCrear} />)}
                 </DialogContent>
               </Dialog>
             )}

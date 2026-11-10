@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Wallet } from "lucide-react";
 import { CostesIa } from "@/components/costes/CostesIa";
+import { GastoLecturaManuscrita } from "./GastoLecturaManuscrita";
 import type { CosteFaltante } from "@/lib/informeServicios";
 import type { ResumenCostes, ServicioContratado } from "@/lib/servicios";
 import { Bloque } from "./Bloque";
@@ -55,6 +56,7 @@ export function PestanaCostes({
       </Bloque>
       {resumen && costesDisponibles && <InformeMensual servicios={enUso} eurPorUsd={eurPorUsd} onMeterCoste={onMeterCoste} />}
       <CostesIa previsionTotalEur={resumen?.previsionMesEur ?? null} />
+      <GastoLecturaManuscrita eurPorUsd={eurPorUsd} />
     </div>
   );
 }

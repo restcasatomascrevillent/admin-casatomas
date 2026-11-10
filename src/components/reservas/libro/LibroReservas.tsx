@@ -2,32 +2,31 @@ import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CalendarIcon, ChevronLeft, ChevronRight, Eraser, Loader2, PenLine, Save, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { AlertTriangle, CalendarIcon, ChevronLeft, ChevronRight, ClipboardList, Eraser, Loader2, PenLine, Save, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Popover, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
-import { agruparReservasDelDia } from "@/components/reservas/ReservasDelDia";
-import { useReservasServicioDia, CLAVE_RESERVAS_SERVICIO_DIA } from "@/hooks/useReservasServicioDia";
+import { CLAVE_RESERVAS_SERVICIO_DIA } from "@/hooks/useReservasServicioDia";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { useGastoLecturaManuscrita } from "@/hooks/useGastoLecturaManuscrita";
+import { formatearEurPequeno } from "@/lib/reservas/gastoLecturaManuscrita";
 import { useBorradoresPendientes, useGuardarBorrador, useResolverBorrador, type BorradorManuscrito } from "@/hooks/useBorradoresManuscritos";
-import { ETIQUETA_TURNO, horaCorta } from "@/lib/reservas/ocupacionSalas";
-import { ESTADO_NO_SHOW, infoEstadoReserva } from "@/lib/reservas/estadosReserva";
 import {
   claveDia,
   datosAltaDesdeInterpretada,
   diaDeClave,
   interpretarReservaEscrita,
   pasarHoja,
+  tituloHoja,
   type ReservaInterpretada,
 } from "@/lib/reservas/libroReservas";
 import { LienzoManuscrito, type LienzoManuscritoApi } from "./LienzoManuscrito";
+import { ReservasDeLaHoja } from "./ReservasDeLaHoja";
 
 // ============================================================================
 // LIBRO DE RESERVAS — «Escribir reserva» (10/11/2026, petición del dueño)
@@ -40,7 +39,25 @@ import { LienzoManuscrito, type LienzoManuscritoApi } from "./LienzoManuscrito";
 // Al guardar, la reserva sale apuntada en su hoja (si lo escrito traía otra
 // fecha, el libro salta a ella). Ocupa el diálogo entero y hace scroll solo
 // por dentro: la página del panel no desplaza (regla del dueño).
+//
+// «Nueva reserva» única (10/11/2026, petición del dueño: «unifica las dos
+// listas, que salga como la segunda y después ya el formulario o para
+// escribir»): este componente ES el diálogo entero. Arriba siempre la hoja del
+// día en grande; debajo se elige «Escribir con lápiz» o «Formulario» (se
+// recuerda en el dispositivo). El formulario no repite su lista del día y, si
+// se le cambia la fecha, la hoja de arriba pasa a ese día.
 // ============================================================================
+
+type ModoApunte = "lapiz" | "formulario";
+const CLAVE_MODO = "reservas.modoAlta";
+
+function leerModo(): ModoApunte {
+  try {
+    return localStorage.getItem(CLAVE_MODO) === "formulario" ? "formulario" : "lapiz";
+  } catch {
+    return "lapiz";
+  }
+}
 
 const PAPEL = "bg-[#fbf6e9] text-stone-800";
 
@@ -49,81 +66,8 @@ interface Props {
   soloCrear?: boolean;
 }
 
-function fechaHoja(clave: string): string {
-  const t = format(diaDeClave(clave), "EEEE d 'de' MMMM yyyy", { locale: es });
-  return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
 function fechaCorta(clave: string): string {
   return format(diaDeClave(clave), "d 'de' MMMM", { locale: es });
-}
-
-/** Lo ya apuntado en la hoja del día. */
-function ReservasDeLaHoja({ fecha, resaltada }: { fecha: string; resaltada: string | null }) {
-  const { data: reservas, isLoading, isError, refetch } = useReservasServicioDia(fecha);
-  const { data: espacios } = useEspaciosReserva();
-  const nombreSala = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const e of (espacios ?? []) as Array<{ id: string; nombre: string }>) m.set(e.id, e.nombre);
-    return m;
-  }, [espacios]);
-  const grupos = useMemo(() => agruparReservasDelDia(reservas), [reservas]);
-
-  if (isLoading) return <Skeleton className="h-24 w-full bg-stone-200/60" />;
-  if (isError) {
-    return (
-      <p role="alert" className="text-sm text-red-700">
-        No se pudieron cargar las reservas de este día.{" "}
-        <button type="button" className="underline" onClick={() => void refetch()}>
-          Reintentar
-        </button>
-      </p>
-    );
-  }
-  if (!grupos.length) return <p className="py-4 text-base italic text-stone-500">Hoja en blanco: aún no hay reservas este día.</p>;
-
-  return (
-    <div className="space-y-4">
-      {grupos.map((g) => (
-        <section key={g.turno} aria-label={ETIQUETA_TURNO[g.turno]}>
-          <h3 className="mb-1 text-base font-semibold uppercase tracking-wide text-stone-500">
-            {ETIQUETA_TURNO[g.turno]} · {g.reservas.length} {g.reservas.length === 1 ? "reserva" : "reservas"} · {g.pax} pax
-          </h3>
-          <ul>
-            {g.reservas.map((r) => {
-              const info = infoEstadoReserva(r.estado);
-              const sala = r.espacio_id ? nombreSala.get(r.espacio_id) : null;
-              return (
-                <li
-                  key={r.id}
-                  className={cn(
-                    "flex min-h-14 items-center gap-4 border-b border-sky-300/60 px-1 py-2 text-xl",
-                    r.estado === ESTADO_NO_SHOW && "opacity-60",
-                    resaltada === r.id && "bg-amber-200/50",
-                  )}
-                >
-                  <span className="w-16 shrink-0 font-semibold tabular-nums">{horaCorta(r.hora) ?? r.hora}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium">
-                    {r.nombre || "Sin nombre"}
-                    {r.notas_cliente ? <span className="ml-2 text-lg font-normal text-stone-500">· {r.notas_cliente}</span> : null}
-                  </span>
-                  <span className="shrink-0 font-semibold tabular-nums">
-                    {r.numero_comensales} px
-                  </span>
-                  <span className="hidden w-32 shrink-0 truncate text-lg text-stone-600 sm:inline">{sala ?? "—"}</span>
-                  {info && (
-                    <Badge className={cn("shrink-0 text-sm", info.insignia)} variant={info.varianteInsignia}>
-                      {info.etiqueta}
-                    </Badge>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
-    </div>
-  );
 }
 
 /** Escritas a mano y guardadas sin interpretar en esta hoja: se pasan a limpio cuando haya tiempo. */
@@ -179,12 +123,26 @@ export function LibroReservas({ soloCrear = false }: Props) {
   const [interpretada, setInterpretada] = useState<ReservaInterpretada | null>(null);
   const [resaltada, setResaltada] = useState<string | null>(null);
   const lienzo = useRef<LienzoManuscritoApi | null>(null);
+  const [modo, setModo] = useState<ModoApunte>(leerModo);
+  // Cambia tras cada alta por formulario: lo vacía para la siguiente.
+  const [altaFormulario, setAltaFormulario] = useState(0);
+  const datosFormulario = useMemo(() => ({ fecha: diaDeClave(fecha) }), [fecha]);
+  const elegirModo = (m: ModoApunte) => {
+    setModo(m);
+    try {
+      localStorage.setItem(CLAVE_MODO, m);
+    } catch {
+      /* sin almacenamiento: no se recuerda */
+    }
+  };
   // Borrador que se está pasando a limpio (guardado antes sin interpretar).
   const [borradorActivo, setBorradorActivo] = useState<string | null>(null);
   const { data: pendientes = [] } = useBorradoresPendientes();
   const guardarBorrador = useGuardarBorrador();
   const resolverBorrador = useResolverBorrador();
   const pendientesHoja = pendientes.filter((b) => b.fecha === fecha);
+  // Gasto de las lecturas (10/11/2026, «monitorizar el gasto»): línea discreta bajo los botones.
+  const { data: gastoLectura } = useGastoLecturaManuscrita();
   const primerDiaPendiente = pendientes.find((b) => b.fecha !== fecha)?.fecha ?? null;
 
   const revisando = !!interpretada;
@@ -263,7 +221,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
           <PopoverTrigger asChild>
             <Button type="button" variant="outline" className="h-11 min-w-[16rem] justify-start text-base font-semibold">
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {fechaHoja(fecha)}
+              {tituloHoja(fecha)}
             </Button>
           </PopoverTrigger>
           {/* Sin Portal (10/11/2026): portado fuera del diálogo, el foco atrapado del libro cerraba el
@@ -310,7 +268,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
 
       {/* Hoja: lo apuntado + renglón para escribir */}
       <div className={cn("flex min-h-0 flex-1 flex-col", PAPEL, revisando && "hidden")}>
-        <div className="min-h-[28dvh] flex-1 overflow-y-auto overscroll-contain border-l-4 border-rose-300/70 px-6 py-4">
+        <div className="min-h-[22dvh] flex-1 overflow-y-auto overscroll-contain border-l-4 border-rose-300/70 px-6 py-4">
           <PorPasarALimpio
             borradores={pendientesHoja}
             ocupado={interpretando || resolverBorrador.isPending}
@@ -319,7 +277,53 @@ export function LibroReservas({ soloCrear = false }: Props) {
           />
           <ReservasDeLaHoja fecha={fecha} resaltada={resaltada} />
         </div>
-        <div className="border-t-2 border-dashed border-stone-300 px-6 pb-3 pt-2">
+        <div className="flex flex-wrap items-center gap-3 border-t-2 border-dashed border-stone-300 px-6 pt-2">
+          <span className="text-base font-semibold text-stone-600">Apuntar nueva:</span>
+          <div role="group" aria-label="Cómo apuntarla" className="inline-flex rounded-lg border-2 border-stone-700/70 bg-white p-0.5">
+            <Button
+              type="button"
+              variant={modo === "lapiz" ? "default" : "ghost"}
+              className="h-11 px-4 text-base font-semibold"
+              aria-pressed={modo === "lapiz"}
+              onClick={() => elegirModo("lapiz")}
+            >
+              <PenLine className="mr-2 h-4 w-4" />
+              Escribir con lápiz
+            </Button>
+            <Button
+              type="button"
+              variant={modo === "formulario" ? "default" : "ghost"}
+              className="h-11 px-4 text-base font-semibold"
+              aria-pressed={modo === "formulario"}
+              onClick={() => elegirModo("formulario")}
+            >
+              <ClipboardList className="mr-2 h-4 w-4" />
+              Formulario
+            </Button>
+          </div>
+        </div>
+        {modo === "formulario" ? (
+          <div className="max-h-[58dvh] overflow-y-auto overscroll-contain bg-background px-4 pb-4 pt-3 text-foreground sm:px-6">
+            <div className="mx-auto max-w-4xl">
+              <FormularioReserva
+                key={altaFormulario}
+                datosPreseleccionados={datosFormulario}
+                soloCrear={soloCrear}
+                ocultarReservasDelDia
+                onCambioFecha={(f) => {
+                  if (f !== fecha) irA(f);
+                }}
+                onSuccess={(creada) => {
+                  void queryClient.invalidateQueries({ queryKey: [CLAVE_RESERVAS_SERVICIO_DIA] });
+                  if (creada?.fecha) setFecha(creada.fecha);
+                  setResaltada(creada?.id ?? null);
+                  setAltaFormulario((n) => n + 1);
+                }}
+              />
+            </div>
+          </div>
+        ) : (
+        <div className="px-6 pb-3 pt-2">
           <p className="mb-1 text-base text-stone-500">
             Escribe la reserva con el lápiz, p. ej. <span className="font-medium">«Esther 2px salón 14:15»</span>. Sin fecha, se apunta el {fechaCorta(fecha)}.
           </p>
@@ -355,7 +359,15 @@ export function LibroReservas({ soloCrear = false }: Props) {
               {interpretando ? "Interpretando…" : "Interpretar"}
             </Button>
           </div>
+          {gastoLectura && gastoLectura.mes.lecturas > 0 && (
+            <p className="mt-2 text-right text-xs text-stone-500" data-testid="gasto-lectura">
+              Este mes: {gastoLectura.mes.lecturas} {gastoLectura.mes.lecturas === 1 ? "lectura" : "lecturas"} ·{" "}
+              {formatearEurPequeno(gastoLectura.mes.eur)}
+              {gastoLectura.mes.eurPorLectura != null && <> ({formatearEurPequeno(gastoLectura.mes.eurPorLectura)} cada una)</>}
+            </p>
+          )}
         </div>
+        )}
       </div>
 
       {/* Vista previa: el trazo al lado del alta manual prellenada */}

@@ -177,7 +177,7 @@ export function ListaPlatos({ platos, soloLectura = false }: ListaPlatosProps) {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1 space-y-1">
                   <EtiquetaCategoria categoria={plato.categoria} />
-                  <h3 className="font-semibold text-base leading-tight">{plato.nombre}</h3>
+                  <h3 className="font-semibold text-lg leading-tight">{plato.nombre}</h3>
                   {videosPendientes.has(plato.id) && (
                     <Badge variant="outline" className="border-amber-500/40 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
                       Vídeo pendiente

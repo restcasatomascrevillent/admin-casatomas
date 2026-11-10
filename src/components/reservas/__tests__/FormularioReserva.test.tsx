@@ -215,6 +215,136 @@ describe("FormularioReserva · siempre Casa Tomás, sala interna", () => {
     expect(insert.mock.calls[0][0]).toMatchObject({ importante: true });
   });
 
+  it("en el panel el formulario va en tamaño grande: botón «Crear Reserva» de 56 px y fecha de 56 px", async () => {
+    espiarInsert();
+    montar({ espacio_id: null });
+    const boton = await screen.findByRole("button", { name: "Crear Reserva" });
+    expect(boton.closest("form")).toHaveAttribute("data-tamano", "grande");
+    expect(boton).toHaveClass("h-14");
+    expect(screen.getByRole("button", { name: "Fecha" })).toHaveClass("h-14");
+  });
+
+  const proximo = (dia: number) => {
+    const d = addDays(new Date(), 7);
+    while (d.getDay() !== dia) d.setDate(d.getDate() + 1);
+    return d;
+  };
+
+  it("martes a mediodía hay que elegir «Menú del día» o «Carta»: sin elegir no crea la reserva", async () => {
+    const insert = espiarInsert();
+    montar({ espacio_id: null, fecha: proximo(2), hora: "14:00" });
+    expect(screen.getByTestId("servicio-menu_del_dia")).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByTestId("servicio-carta")).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    expect((await screen.findAllByText("Elige «Menú del día» o «Carta»")).length).toBeGreaterThan(0);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("«Menú del día» guarda menu_del_dia: true (y no el menú cerrado)", async () => {
+    const insert = espiarInsert();
+    montar({ espacio_id: null, fecha: proximo(3), hora: "14:00" });
+    fireEvent.click(screen.getByTestId("servicio-menu_del_dia"));
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    expect(insert.mock.calls[0][0]).toMatchObject({ menu_del_dia: true });
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("menu_cerrado");
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("menu_precio");
+  });
+
+  it("«Carta» crea la reserva sin menú del día", async () => {
+    const insert = espiarInsert();
+    montar({ espacio_id: null, fecha: proximo(4), hora: "13:30" });
+    fireEvent.click(screen.getByTestId("servicio-carta"));
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("menu_del_dia");
+  });
+
+  it("menú del día en el Salón: avisa de que es en Comedor o Terraza; con carta, no", () => {
+    espiarInsert();
+    montar({ espacio_id: "salon", fecha: proximo(2), hora: "14:00" });
+    fireEvent.click(screen.getByTestId("servicio-menu_del_dia"));
+    expect(screen.getByTestId("aviso-sala-servicio")).toHaveTextContent("El menú del día es en Comedor o Terraza, no en Salón");
+    fireEvent.click(screen.getByTestId("servicio-carta"));
+    expect(screen.queryByTestId("aviso-sala-servicio")).not.toBeInTheDocument();
+  });
+
+  it("el resumen dice «Comida: Menú del día»", async () => {
+    espiarInsert();
+    montar({ espacio_id: null, fecha: proximo(2), hora: "14:00" }, false, true);
+    fireEvent.click(screen.getByTestId("servicio-menu_del_dia"));
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    expect(await screen.findByTestId("resumen-servicio-comida")).toHaveTextContent("Menú del día");
+  });
+
+  it("un sábado por la noche (o martes de cena) no hay elección, pero sí el menú cerrado", () => {
+    espiarInsert();
+    montar({ espacio_id: null, fecha: proximo(6), hora: "21:00" });
+    expect(screen.queryByTestId("servicio-menu_del_dia")).not.toBeInTheDocument();
+    expect(screen.getByTestId("menu-cerrado-si")).toBeInTheDocument();
+  });
+
+  it("«Menú cerrado: Sí» con precio «18,50» guarda menu_cerrado y menu_precio 18.5 (cualquier día) y no toca el menú del día", async () => {
+    const insert = espiarInsert();
+    montar({ espacio_id: null });
+
+    expect(screen.getByTestId("menu-cerrado-no")).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByTestId("menu-precio")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("menu-cerrado-si"));
+    expect(screen.getByTestId("menu-cerrado-si")).toHaveAttribute("aria-checked", "true");
+    const precio = screen.getByTestId("menu-precio");
+    expect(precio).toHaveAttribute("inputmode", "decimal");
+    fireEvent.change(precio, { target: { value: "18,50" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    expect(insert.mock.calls[0][0]).toMatchObject({ menu_cerrado: true, menu_precio: 18.5 });
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("menu_del_dia");
+  });
+
+  it("«Menú cerrado: Sí» sin precio guarda solo menu_cerrado", async () => {
+    const insert = espiarInsert();
+    montar({ espacio_id: null });
+    fireEvent.click(screen.getByTestId("menu-cerrado-si"));
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    expect(insert.mock.calls[0][0]).toMatchObject({ menu_cerrado: true });
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("menu_del_dia");
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("menu_precio");
+  });
+
+  it("un precio no válido no deja crear la reserva", async () => {
+    const insert = espiarInsert();
+    montar({ espacio_id: null });
+    fireEvent.click(screen.getByTestId("menu-cerrado-si"));
+    fireEvent.change(screen.getByTestId("menu-precio"), { target: { value: "dieciocho" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    expect((await screen.findAllByText(/Escribe un precio válido/)).length).toBeGreaterThan(0);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("volver a «No» quita el precio y no manda menú", async () => {
+    const insert = espiarInsert();
+    montar({ espacio_id: null });
+    fireEvent.click(screen.getByTestId("menu-cerrado-si"));
+    fireEvent.change(screen.getByTestId("menu-precio"), { target: { value: "20" } });
+    fireEvent.click(screen.getByTestId("menu-cerrado-no"));
+    expect(screen.queryByTestId("menu-precio")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("menu_cerrado");
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("menu_precio");
+  });
+
+  it("el resumen antes de guardar dice el menú y su precio", async () => {
+    espiarInsert();
+    montar({ espacio_id: null }, false, true);
+    fireEvent.click(screen.getByTestId("menu-cerrado-si"));
+    fireEvent.change(screen.getByTestId("menu-precio"), { target: { value: "18" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    expect(await screen.findByTestId("resumen-menu-cerrado")).toHaveTextContent("Sí · 18 €");
+  });
+
   it("sin marcar, el alta no manda importante", async () => {
     const insert = espiarInsert();
     montar({ espacio_id: null });

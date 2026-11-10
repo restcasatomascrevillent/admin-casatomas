@@ -309,6 +309,13 @@ export interface ConfiguracionTurnoInput {
   dias_semana?: number[] | null;
   activo?: boolean | null;
   espacio_id?: string | null;
+  /**
+   * Turnos de HORA FIJA (migración 20261122200100, jueves de tapas: 20:30 y
+   * 22:00). `time[]` de Postgres: llega como `["20:30:00","22:00:00"]` (o en
+   * texto `{20:30:00,22:00:00}`). Con valor, el periodo ofrece SOLO esas horas
+   * (sin escalera). Ver `horasFijasDeConfig`.
+   */
+  horas_fijas?: unknown;
 }
 
 /** Una reserva viva (estado que ocupa) del día consultado. */
@@ -481,6 +488,8 @@ export interface PeriodoResuelto {
   base_umbral_capacidad: number;
   /** De dónde salió la escalera: columnas nuevas o derivada de las viejas. */
   origen_escalera: "niveles_escalera" | "legacy";
+  /** Turnos de hora fija del periodo ("HH:MM"), o `null` si va por escalera. */
+  horas_fijas?: string[] | null;
   huecos_ofrecidos: number;
   huecos_completos: number;
 }
@@ -777,6 +786,67 @@ export const BASE_UMBRAL_POR_DEFECTO: BaseUmbral = "reparto_nivel_base";
 
 export function resolverBaseUmbral(config: ConfiguracionTurnoInput): BaseUmbral {
   return config.base_umbral === "aforo_total" ? "aforo_total" : BASE_UMBRAL_POR_DEFECTO;
+}
+
+// ------------------------------------------------------------
+// TURNOS DE HORA FIJA (jueves de tapas, migración 20261122200100)
+// ------------------------------------------------------------
+
+/**
+ * Las horas fijas de un periodo, en minutos desde medianoche, ordenadas y sin
+ * repetir; `null` si el periodo va por escalera (lo de siempre). Acepta el
+ * array de PostgREST (`["20:30:00", "22:00:00"]`) o el texto de Postgres
+ * (`{20:30:00,22:00:00}`); lo ilegible se ignora.
+ */
+export function horasFijasDeConfig(config: Pick<ConfiguracionTurnoInput, "horas_fijas"> | null | undefined): number[] | null {
+  let bruto = config?.horas_fijas;
+  if (typeof bruto === "string") {
+    const texto = bruto.trim().replace(/^\{|\}$/g, "");
+    bruto = texto ? texto.split(",") : [];
+  }
+  if (!Array.isArray(bruto)) return null;
+  const minutos = new Set<number>();
+  for (const h of bruto) {
+    const m = horaAMinutos(typeof h === "string" ? h.replace(/"/g, "").trim() : h);
+    if (m !== null) minutos.add(m);
+  }
+  return minutos.size > 0 ? Array.from(minutos).sort((a, b) => a - b) : null;
+}
+
+/**
+ * Turnos de hora fija de ESE día ("HH:MM", ordenados): los de los periodos
+ * generales activos que aplican a su día de la semana. Vacío = día normal.
+ */
+export function horasFijasDelDia(
+  fecha: string | null | undefined,
+  configuraciones: readonly ConfiguracionTurnoInput[] | null | undefined,
+): string[] {
+  const dia = fecha ? diaDeLaSemana(fecha) : null;
+  if (dia === null || !Array.isArray(configuraciones)) return [];
+  const minutos = new Set<number>();
+  for (const c of seleccionarConfiguraciones([...configuraciones], null, dia)) {
+    for (const m of horasFijasDeConfig(c) ?? []) minutos.add(m);
+  }
+  return Array.from(minutos).sort((a, b) => a - b).map(minutosAHora);
+}
+
+/**
+ * Minutos desde `hora` hasta el turno fijo SIGUIENTE, o `null` si no aplica.
+ * Solo dentro de la secuencia de turnos (desde el primero): con 20:30 y 22:00,
+ * una reserva de las 20:30 (o de las 21:00) tiene 90 (30) minutos antes de que
+ * su mesa haga falta para el segundo turno; la de las 22:00, `null`.
+ * Es la misma regla que `fn_minutos_hasta_siguiente_turno_fijo` en la base de datos.
+ */
+export function minutosHastaSiguienteTurnoFijo(
+  hora: string | number | null | undefined,
+  horasFijas: readonly string[] | null | undefined,
+): number | null {
+  const m = typeof hora === "number" && Number.isFinite(hora) ? hora : horaAMinutos(hora);
+  if (m === null || !horasFijas || horasFijas.length === 0) return null;
+  const fijas = horasFijas.map((h) => horaAMinutos(h)).filter((x): x is number => x !== null).sort((a, b) => a - b);
+  if (fijas.length === 0 || m < fijas[0]) return null;
+  const siguiente = fijas.find((f) => f > m);
+  return siguiente === undefined ? null : siguiente - m;
 }
 
 // ------------------------------------------------------------
@@ -1095,7 +1165,28 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
       continue;
     }
 
-    const { candidatos, tope } = generarCandidatos(inicio, fin, escalera);
+    // Turnos de hora fija (jueves de tapas): SOLO esas horas, siempre abiertas
+    // (nivel 0, sin escalera). Las que caen fuera de [inicio, fin) no cuentan.
+    const fijas = horasFijasDeConfig(config);
+    const { candidatos, tope } = fijas
+      ? {
+          candidatos: fijas
+            .map((m) => (m < inicio ? m + MINUTOS_DIA : m))
+            .filter((m) => m >= inicio && m < fin)
+            .sort((a, b) => a - b)
+            .map<CandidatoHueco>((m) => ({
+              minutoAbs: m,
+              hora: minutosAHora(m),
+              nivel: 0,
+              minutosNivel: escalera[0].minutos,
+              umbralNivel: 0,
+              padre: null,
+              promovido: false,
+            })),
+          tope: false,
+        }
+      : generarCandidatos(inicio, fin, escalera);
+    const horasFijasPeriodo = fijas ? candidatos.map((c) => c.hora) : null;
     if (tope) avisos.add(AVISO_TOPE_HUECOS);
     if (candidatos.length === 0) {
       avisos.add(AVISO_PERIODO_SIN_HUECOS);
@@ -1110,6 +1201,7 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
         base_umbral: resolverBaseUmbral(config),
         base_umbral_capacidad: capacidadPeriodo,
         origen_escalera: origen,
+        horas_fijas: horasFijasPeriodo,
         huecos_ofrecidos: 0,
         huecos_completos: 0,
       });
@@ -1270,6 +1362,7 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
       base_umbral: baseUmbral,
       base_umbral_capacidad: Math.round(divisor * 100) / 100,
       origen_escalera: origen,
+      horas_fijas: horasFijasPeriodo,
       huecos_ofrecidos: ofrecidos,
       huecos_completos: completos,
     });

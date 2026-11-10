@@ -286,6 +286,32 @@ const accionesDeFila = (fila: HTMLElement) =>
 const filaDe = (tabla: HTMLElement, texto: string) =>
   ([...tabla.querySelectorAll("tbody tr")] as HTMLElement[]).find((f) => f.textContent?.includes(texto))!;
 
+// 10/11/2026 (petición del dueño: «hay que limpiarlo de botones»): en cada fila, UNA acción principal grande
+// con texto (solo si toca algo) y «⋯ Más» con el resto, con texto y solo lo que se puede usar.
+/** La acción principal de una fila (el botón con texto que no es «Más»), o `undefined` si no toca ninguna. */
+const principalDe = (fila: HTMLElement) =>
+  botonesDeFila(fila).find((b) => !/^Más acciones/.test(b.getAttribute("aria-label") ?? ""));
+/** El botón «⋯ Más» de una fila. */
+const botonMas = (fila: HTMLElement) => within(fila.querySelector("td")!).getByRole("button", { name: /^Más acciones/ });
+/** Abre «Más» de una fila y devuelve sus opciones, en orden. */
+function opcionesMas(fila: HTMLElement) {
+  fireEvent.pointerDown(botonMas(fila), { button: 0, ctrlKey: false });
+  return screen.getAllByRole("menuitem");
+}
+/** Los textos de las opciones de «Más» de una fila (y lo cierra). */
+function textosMas(fila: HTMLElement) {
+  const items = opcionesMas(fila);
+  const textos = items.map((i) => i.textContent?.trim());
+  fireEvent.keyDown(items[0], { key: "Escape" });
+  return textos;
+}
+/** Una opción de «Más» por su texto (con el menú abierto). */
+const opcionMas = (fila: HTMLElement, texto: string) => {
+  const item = opcionesMas(fila).find((i) => i.textContent?.trim() === texto);
+  if (!item) throw new Error(`«Más» no tiene «${texto}»`);
+  return item;
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   supa.canales.reiniciar();
@@ -363,89 +389,58 @@ describe("ListaReservasAvanzada · columna de acciones", () => {
     expect(cabeceras.some((th) => th.textContent?.includes("Acciones"))).toBe(false);
   });
 
-  it("pinta el MISMO juego de acciones, en el mismo orden, en todas las filas", async () => {
+  it("cada fila: como mucho UNA acción principal y «Más»; nunca un botón deshabilitado", async () => {
     const { tabla } = await montar();
     const filas = [...tabla.querySelectorAll("tbody tr")] as HTMLElement[];
     expect(filas.length).toBe(6); // 5 reservas + 1 solicitud
 
-    const cuantas = filas.map((f) => accionesDeFila(f).length);
-    expect(new Set(cuantas).size).toBe(1);
-    expect(cuantas[0]).toBe(6);
-
-    // El orden es siempre el mismo: principal, "dar mesa", "Verificar",
-    // "Gestionar" (en una reserva, el editor), "Cancelar" y "lista negra".
     for (const fila of filas) {
-      const acciones = accionesDeFila(fila);
-      expect(acciones[1].etiqueta).toMatch(/mesa/i);
-      expect(acciones[2].etiqueta).toMatch(/^Verificar/);
-      expect(acciones[3].etiqueta).toMatch(/^Gestionar/);
-      expect(acciones[4].etiqueta).toMatch(/cancelada|Cancelar|permiso|Descartar/i);
-      expect(acciones[5].etiqueta).toMatch(/lista negra/i);
+      const botones = botonesDeFila(fila);
+      expect(botones.length).toBeLessThanOrEqual(2);
+      expect(botonMas(fila)).toHaveTextContent("Más");
+      for (const b of botones) expect(b).not.toBeDisabled();
     }
   });
-
-  it("lo que no aplica a una fila sale deshabilitado, no se quita", async () => {
+  it("lo que no aplica a una fila no sale: la principal solo si toca algo y en «Más» solo lo que se puede usar", async () => {
     const { tabla } = await montar({ onAsignarMesa: vi.fn() });
-    const porNombre = (texto: string) => filaDe(tabla, texto);
+    const fila = (texto: string) => filaDe(tabla, texto);
 
-    // Reserva pendiente: puede aceptarse, verificarse y editarse; sin sala
-    // tampoco se le puede dar mesa todavía.
-    const pendiente = accionesDeFila(porNombre("Ana Pendiente"));
-    expect(pendiente[0].etiqueta).toBe("Aceptar");
-    expect(pendiente[0].deshabilitado).toBe(false);
-    expect(pendiente[1].deshabilitado).toBe(true); // dar mesa (todavía sin sala)
-    expect(pendiente[2].deshabilitado).toBe(false); // verificar
-    expect(pendiente[3].deshabilitado).toBe(false); // editar (siempre, en cualquier estado)
+    // Pendiente sin sala: «Aceptar»; se verifica, se edita, se cancela; sin sala no hay «Dar mesa».
+    expect(principalDe(fila("Ana Pendiente"))).toHaveTextContent("Aceptar");
+    expect(textosMas(fila("Ana Pendiente"))).toEqual(["Verificar", "Editar", "Cancelar reserva", "Lista negra"]);
 
-    // Verificada: la principal pasa a "Confirmar" y ya no se verifica.
-    const verificada = accionesDeFila(porNombre("Berta Verificada"));
-    expect(verificada[0].etiqueta).toBe("Confirmar");
-    expect(verificada[0].deshabilitado).toBe(false);
-    expect(verificada[2].deshabilitado).toBe(true);
+    // Verificada: la principal pasa a «Confirmar» y ya no se verifica.
+    expect(principalDe(fila("Berta Verificada"))).toHaveTextContent("Confirmar");
+    expect(textosMas(fila("Berta Verificada"))).toEqual(["Editar", "Cancelar reserva", "Lista negra"]);
 
-    // Confirmada: no hay nada que aceptar ni confirmar, pero el botón sigue ahí.
-    const confirmada = accionesDeFila(porNombre("Carlos Confirmado"));
-    expect(confirmada[0].deshabilitado).toBe(true);
-    expect(confirmada[4].deshabilitado).toBe(false); // cancelar sí
+    // Confirmada: nada que aceptar ni confirmar, así que NO hay principal (ni deshabilitada).
+    expect(principalDe(fila("Carlos Confirmado"))).toBeUndefined();
+    expect(textosMas(fila("Carlos Confirmado"))).toEqual(["Editar", "Cancelar reserva", "Lista negra"]);
 
     // Cancelada: tampoco se vuelve a cancelar.
-    const cancelada = accionesDeFila(porNombre("Diana Cancelada"));
-    expect(cancelada[4].deshabilitado).toBe(true);
+    expect(textosMas(fila("Diana Cancelada"))).toEqual(["Editar", "Lista negra"]);
 
     // Con sala: la única que puede saltar al plano a por su mesa.
-    const conSala = accionesDeFila(porNombre("Elena ConSala"));
-    expect(conSala[1].deshabilitado).toBe(false);
+    expect(textosMas(fila("Elena ConSala"))).toEqual(["Dar mesa", "Editar", "Cancelar reserva", "Lista negra"]);
 
-    // Solicitud del bot: su acción principal es "Convertir" y se gestiona,
-    // pero no se le da mesa, ni se verifica, ni se cancela, ni se mete en la
-    // lista negra.
-    const sol = accionesDeFila(porNombre("Familia Ballester"));
-    expect(sol[0].etiqueta).toBe("Convertir");
-    expect(sol[0].deshabilitado).toBe(false);
-    expect(sol[1].deshabilitado).toBe(true);
-    expect(sol[2].deshabilitado).toBe(true);
-    expect(sol[3].deshabilitado).toBe(false);
-    expect(sol[4].deshabilitado).toBe(true);
-    expect(sol[5].deshabilitado).toBe(true);
+    // Solicitud del bot: «Convertir» y «Gestionar»; nada de mesa, verificar, cancelar ni lista negra.
+    expect(principalDe(fila("Familia Ballester"))).toHaveTextContent("Convertir");
+    expect(textosMas(fila("Familia Ballester"))).toEqual(["Gestionar"]);
   });
 });
 
 describe("ListaReservasAvanzada · «Dar mesa» salta al plano de su sala", () => {
-  /** La ranura "dar mesa" es la segunda: principal · DAR MESA · verificar… */
-  const botonDarMesa = (tabla: HTMLElement, cliente: string) => botonesDeFila(filaDe(tabla, cliente))[1];
 
   it("con sala y fecha: abre el plano de ESA sala, en SU día y con ella señalada", async () => {
     const onAsignarMesa = vi.fn();
     const { tabla } = await montar({ onAsignarMesa });
-    const boton = botonDarMesa(tabla, "Elena ConSala");
+    const opcion = opcionMas(filaDe(tabla, "Elena ConSala"), "Dar mesa");
 
-    expect(boton.hasAttribute("disabled")).toBe(false);
-    expect(boton.getAttribute("aria-label")).toMatch(/darle mesa/i);
-    // "Con sala pero sin mesa" es trabajo pendiente normal, no un error: este
-    // botón NUNCA se pinta como destructivo (petición del dueño).
-    expect(boton.className).not.toMatch(/destructive/);
+    expect(opcion.getAttribute("title")).toMatch(/darle mesa/i);
+    // "Con sala pero sin mesa" es trabajo pendiente normal, no un error: NUNCA en rojo (petición del dueño).
+    expect(opcion.className).not.toMatch(/destructive/);
 
-    fireEvent.click(boton);
+    fireEvent.click(opcion);
     expect(onAsignarMesa).toHaveBeenCalledTimes(1);
     expect(onAsignarMesa).toHaveBeenCalledWith({
       espacioId: "esp-comedor",
@@ -457,57 +452,38 @@ describe("ListaReservasAvanzada · «Dar mesa» salta al plano de su sala", () =
       turno: "cena",
     });
   });
-
-  it("sin sala: el botón NO desaparece, se queda deshabilitado y dice qué falta", async () => {
+  it("sin sala no se ofrece «Dar mesa» (la sala se pone desde «Editar»)", async () => {
     const onAsignarMesa = vi.fn();
     const { tabla } = await montar({ onAsignarMesa });
-    const boton = botonDarMesa(tabla, "Ana Pendiente");
-
-    expect(boton).toBeInTheDocument();
-    expect(boton.hasAttribute("disabled")).toBe(true);
-    // El motivo lo escribe el módulo compartido con la pestaña Hoy: primero
-    // hay que darle sala, y se hace desde «Gestionar».
-    const titulo = boton.getAttribute("aria-label") ?? "";
-    expect(titulo).toMatch(/sala/i);
-    expect(titulo).toMatch(/Gestionar/);
-    // El `title` va también en el botón para que se vea al pasar por encima.
-    expect(boton.getAttribute("title")).toBe(titulo);
-
-    fireEvent.click(boton);
+    expect(textosMas(filaDe(tabla, "Ana Pendiente"))).not.toContain("Dar mesa");
+    expect(textosMas(filaDe(tabla, "Ana Pendiente"))).toContain("Editar");
     expect(onAsignarMesa).not.toHaveBeenCalled();
   });
-
-  it("una solicitud del bot tiene el botón, deshabilitado: todavía no es una reserva", async () => {
+  it("una solicitud del bot no ofrece «Dar mesa»: todavía no es una reserva", async () => {
     const onAsignarMesa = vi.fn();
     const { tabla } = await montar({ onAsignarMesa });
-    const boton = botonDarMesa(tabla, "Familia Ballester");
-
-    expect(boton).toBeInTheDocument();
-    expect(boton.hasAttribute("disabled")).toBe(true);
-    expect(boton.getAttribute("aria-label")).toMatch(/todavía no es una reserva/i);
-
-    fireEvent.click(boton);
+    expect(textosMas(filaDe(tabla, "Familia Ballester"))).not.toContain("Dar mesa");
     expect(onAsignarMesa).not.toHaveBeenCalled();
   });
-
-  it("una fila de solicitud tiene EXACTAMENTE los mismos botones que una de reserva", async () => {
+  it("una fila de solicitud usa el mismo molde que una de reserva: principal y «Más»", async () => {
     const { tabla } = await montar({ onAsignarMesa: vi.fn() });
-    const reservaConSala = botonesDeFila(filaDe(tabla, "Elena ConSala"));
-    const solicitudBot = botonesDeFila(filaDe(tabla, "Familia Ballester"));
-
-    expect(solicitudBot.length).toBe(reservaConSala.length);
-    expect(solicitudBot.length).toBe(6);
+    for (const cliente of ["Ana Pendiente", "Familia Ballester"]) {
+      const botones = botonesDeFila(filaDe(tabla, cliente));
+      expect(botones).toHaveLength(2);
+      expect(botones[1]).toBe(botonMas(filaDe(tabla, cliente)));
+    }
   });
 });
 
 describe("ListaReservasAvanzada · cancelar pide confirmación", () => {
   const abrirCancelacion = async () => {
     const { tabla } = await montar();
-    // Quinta ranura: principal · dar mesa · verificar · gestionar · CANCELAR.
-    fireEvent.click(accionesBotones(filaDe(tabla, "Ana Pendiente"))[4]);
+    // «Cancelar reserva» está en «Más», al final y en rojo.
+    const opcion = opcionMas(filaDe(tabla, "Ana Pendiente"), "Cancelar reserva");
+    expect(opcion.className).toMatch(/text-destructive/);
+    fireEvent.click(opcion);
     return await screen.findByRole("alertdialog");
   };
-  const accionesBotones = botonesDeFila;
 
   it("no cancela al primer clic: abre un diálogo que dice qué reserva es", async () => {
     const dialogo = await abrirCancelacion();
@@ -653,9 +629,7 @@ describe("ListaReservasAvanzada · «Convertir en reserva» pide permiso de edic
 
   it("con permiso: «Gestionar» ofrece «Convertir en reserva» y «Registrar que aceptó por teléfono»", async () => {
     const { tabla } = await montar();
-    const [, , , gestionar] = accionesDeLaSolicitud(tabla);
-
-    fireEvent.click(gestionar);
+    fireEvent.click(opcionMas(filaDe(tabla, "Familia Ballester"), "Gestionar"));
     await waitFor(() => expect(supa.panelGestion).toHaveBeenCalled());
     expect(typeof ultimasProps(supa.panelGestion).onConvertir).toBe("function");
     expect(typeof ultimasProps(supa.panelGestion).onAceptarTelefono).toBe("function");
@@ -668,7 +642,7 @@ describe("ListaReservasAvanzada · «Convertir en reserva» pide permiso de edic
 // «Gestionar», siempre deshabilitada; ahora es el editor (con lápiz), y su texto
 // sigue empezando por «Gestionar». En una solicitud sigue siendo «Gestionar».
 describe("ListaReservasAvanzada · editar una reserva, siempre", () => {
-  const botonEditar = (tabla: HTMLElement, cliente: string) => botonesDeFila(filaDe(tabla, cliente))[3];
+  const botonEditar = (tabla: HTMLElement, cliente: string) => opcionMas(filaDe(tabla, cliente), "Editar");
 
   it("la ranura de editar existe y está activa en las reservas de CUALQUIER estado", async () => {
     supa.filas = [
@@ -690,8 +664,8 @@ describe("ListaReservasAvanzada · editar una reserva, siempre", () => {
       ["Fede NoVino", "res-no-vino"],
     ]) {
       const boton = botonEditar(tabla, cliente);
-      expect(boton.getAttribute("aria-label")).toMatch(new RegExp(`^Gestionar: editar la reserva de ${cliente}`));
-      expect(boton.hasAttribute("disabled")).toBe(false);
+      expect(boton.getAttribute("title")).toMatch(new RegExp(`^Gestionar: editar la reserva de ${cliente}`));
+      expect(boton).not.toHaveAttribute("data-disabled");
       // Es un botón normal, no uno destructivo, y lleva el lápiz (no el engranaje de «Gestionar» de las solicitudes).
       expect(boton.className).not.toMatch(/destructive/);
       expect(boton.querySelector("svg")?.getAttribute("class")).toMatch(/square-pen/);
@@ -717,7 +691,6 @@ describe("ListaReservasAvanzada · editar una reserva, siempre", () => {
       ["Inés SinCanal", "res-sin-canal"],
     ]) {
       const boton = botonEditar(tabla, cliente);
-      expect(boton.hasAttribute("disabled")).toBe(false);
       fireEvent.click(boton);
       expect(supa.editarReserva).toHaveBeenLastCalledWith(id);
     }
@@ -729,39 +702,54 @@ describe("ListaReservasAvanzada · editar una reserva, siempre", () => {
 
     // (Las solicitudes abiertas van primero: la fila de la reserva se busca por su texto.)
     const boton = botonEditar(tabla, "Sin nombre");
-    expect(boton.getAttribute("aria-label")).toMatch(/^Gestionar: editar la reserva de este cliente/);
-    expect(boton.hasAttribute("disabled")).toBe(false);
+    expect(boton.getAttribute("title")).toMatch(/^Gestionar: editar la reserva de este cliente/);
   });
 
-  it("la ranura sigue en su sitio: cada fila (reservas y solicitud) mantiene sus seis botones", async () => {
+  it("tocar la fila (fuera de los botones) abre el editor de esa reserva; tocar un botón no", async () => {
     const { tabla } = await montar();
-    const filas = [...tabla.querySelectorAll("tbody tr")] as HTMLElement[];
+    const fila = filaDe(tabla, "Carlos Confirmado");
+    expect(fila).toHaveClass("cursor-pointer");
 
-    expect(filas.length).toBe(6);
-    for (const fila of filas) expect(botonesDeFila(fila).length).toBe(6);
-  });
+    fireEvent.click(within(fila).getByText("Carlos Confirmado"));
+    expect(supa.editarReserva).toHaveBeenCalledTimes(1);
+    expect(supa.editarReserva).toHaveBeenCalledWith("res-confirmada");
 
-  it("en una solicitud del bot la cuarta ranura sigue siendo «Gestionar» y no abre el editor de reservas", async () => {
-    const { tabla } = await montar();
-    const gestionar = botonEditar(tabla, "Familia Ballester");
-
-    expect(gestionar.getAttribute("aria-label")).toMatch(/^Gestionar/);
-    fireEvent.click(gestionar);
+    supa.editarReserva.mockClear();
+    fireEvent.click(principalDe(filaDe(tabla, "Ana Pendiente"))!);
+    fireEvent.click(within(filaDe(tabla, "Ana Pendiente")).getByRole("checkbox"));
     expect(supa.editarReserva).not.toHaveBeenCalled();
   });
 
-  it("en las tarjetas de móvil también está: mismo botón, mismo editor", async () => {
+  it("tocar la fila de una solicitud abre «Gestionar», no el editor de reservas", async () => {
+    const { tabla } = await montar();
+    fireEvent.click(within(filaDe(tabla, "Familia Ballester")).getByText("Familia Ballester"));
+    await waitFor(() => expect(supa.panelGestion).toHaveBeenCalled());
+    expect(supa.editarReserva).not.toHaveBeenCalled();
+  });
+  it("en una solicitud del bot «Más» ofrece «Gestionar», que no abre el editor de reservas", async () => {
+    const { tabla } = await montar();
+    const gestionar = opcionMas(filaDe(tabla, "Familia Ballester"), "Gestionar");
+
+    expect(gestionar.getAttribute("title")).toMatch(/^Gestionar/);
+    fireEvent.click(gestionar);
+    expect(supa.editarReserva).not.toHaveBeenCalled();
+  });
+  it("en las tarjetas de móvil también está: mismo «Más», mismo editor, y tocar la tarjeta también lo abre", async () => {
     await montar();
 
-    // jsdom monta a la vez la tabla y las tarjetas: el mismo nombre sale dos veces.
-    const botones = screen.getAllByRole("button", { name: /^Gestionar: editar la reserva de Diana Cancelada/ });
+    // jsdom monta a la vez la tabla y las tarjetas: el mismo «Más» sale dos veces.
+    const botones = screen.getAllByRole("button", { name: "Más acciones de Diana Cancelada" });
     expect(botones).toHaveLength(2);
     const enTarjeta = botones.find((b) => !b.closest("table"))!;
-    expect(enTarjeta.hasAttribute("disabled")).toBe(false);
-    fireEvent.click(enTarjeta);
+    fireEvent.pointerDown(enTarjeta, { button: 0, ctrlKey: false });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Editar" }));
+    expect(supa.editarReserva).toHaveBeenCalledWith("res-cancelada");
+
+    supa.editarReserva.mockClear();
+    const nombres = screen.getAllByText("Diana Cancelada");
+    fireEvent.click(nombres.find((n) => !n.closest("table"))!);
     expect(supa.editarReserva).toHaveBeenCalledWith("res-cancelada");
   });
-
   it("sin permiso de edición sobre «reservas» no hay botón de editar, ni en la tabla ni en la tarjeta (06/11/2026)", async () => {
     supa.canEdit = false;
     const { tabla } = await montar();
@@ -868,7 +856,7 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
   it("cancelar solo parte de un estado VIVO (la escritura va condicionada) y avisa al cliente con `{ id, estado }`", async () => {
     const { tabla } = await montar();
 
-    fireEvent.click(botones(tabla, "Carlos Confirmado")[4]);
+    fireEvent.click(opcionMas(filaDe(tabla, "Carlos Confirmado"), "Cancelar reserva"));
     const dialogo = await screen.findByRole("alertdialog");
     fireEvent.click(within(dialogo).getByRole("button", { name: /^Sí, cancelar/ }));
 
@@ -877,7 +865,7 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
     expect(notificaciones()[0].body).toEqual({ id: "res-confirmada", estado: "cancelada" });
   });
 
-  it("CORREGIDO (decisión del dueño): una reserva «Llegó» o «No vino» ya no se puede cancelar: el botón sale deshabilitado con el motivo", async () => {
+  it("CORREGIDO (decisión del dueño): una reserva «Llegó» o «No vino» ya no se puede cancelar: «Más» no lo ofrece", async () => {
     // Antes solo quedaba deshabilitado el de una cancelada; podía cancelarse una «Llegó» o una «No vino».
     supa.filas = [
       reserva("res-llego", "completada", "Elena Llegó"),
@@ -886,19 +874,14 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
       reserva("res-confirmada", "confirmada", "Carlos Confirmado"),
     ];
     const { tabla } = await montar();
-    const cancelar = (cliente: string) => botones(tabla, cliente)[4];
 
-    expect(cancelar("Elena Llegó").hasAttribute("disabled")).toBe(true);
-    expect(cancelar("Elena Llegó").getAttribute("aria-label")).toBe("No se puede cancelar una reserva que ya llegó");
-    expect(cancelar("Fede NoVino").hasAttribute("disabled")).toBe(true);
-    expect(cancelar("Fede NoVino").getAttribute("aria-label")).toBe("No se puede cancelar una reserva marcada como «No vino»");
-    expect(cancelar("Diana Cancelada").hasAttribute("disabled")).toBe(true);
-    expect(cancelar("Diana Cancelada").getAttribute("aria-label")).toBe("La reserva ya está cancelada");
+    for (const cliente of ["Elena Llegó", "Fede NoVino", "Diana Cancelada"]) {
+      expect(textosMas(filaDe(tabla, cliente)), cliente).not.toContain("Cancelar reserva");
+    }
     // Y una viva sigue pudiéndose cancelar.
-    expect(cancelar("Carlos Confirmado").hasAttribute("disabled")).toBe(false);
-    expect(cancelar("Carlos Confirmado").getAttribute("aria-label")).toMatch(/^Cancelar la reserva de Carlos Confirmado/);
+    const cancelar = opcionMas(filaDe(tabla, "Carlos Confirmado"), "Cancelar reserva");
+    expect(cancelar.getAttribute("title")).toMatch(/^Cancelar la reserva de Carlos Confirmado/);
   });
-
   it("la estrella: escribe `{ importante: true }` pidiendo la fila de vuelta y sin condición de estado, y avisa", async () => {
     const { tabla } = await montar();
 
@@ -1016,15 +999,12 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
     expect(filaDe(tabla, "Fede NoVino").querySelectorAll("td")[5].firstElementChild!.className).toMatch(/hover:bg-secondary\/80/);
   });
 
-  it("CAMBIO ACORDADO: nada dice «servida»; la principal de una «Llegó» lo explica con «Llegó»", async () => {
+  it("CAMBIO ACORDADO: nada dice «servida»; una «Llegó» no tiene acción principal (nada que confirmar)", async () => {
     const { tabla, container } = await montarSeis();
 
     expect(container.innerHTML).not.toMatch(/servida/i);
-    const [principal] = botonesDeFila(filaDe(tabla, "Elena Llegó"));
-    expect(principal.textContent?.trim()).toBe("Confirmar");
-    expect(principal.getAttribute("title")).toBe("Nada que aceptar ni confirmar: la reserva está marcada como «Llegó»");
+    expect(principalDe(filaDe(tabla, "Elena Llegó"))).toBeUndefined();
   });
-
   it("CAMBIO ACORDADO (2026-10-01): «Aceptar» dice que acepta la reserva tal como está", async () => {
     const { tabla } = await montarSeis();
 
@@ -1034,18 +1014,13 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
     expect(aceptar.getAttribute("title")).not.toMatch(/pidió/);
   });
 
-  it("lo deshabilitado enseña su motivo al pasar el ratón (en el envoltorio: el botón no recibe el ratón)", async () => {
+  it("ninguna fila enseña botones deshabilitados de algo ya hecho (10/11/2026)", async () => {
     const { tabla } = await montarSeis();
 
-    const cancelar = botonesDeFila(filaDe(tabla, "Elena Llegó"))[4];
-    expect(cancelar.hasAttribute("disabled")).toBe(true);
-    expect(cancelar.parentElement?.getAttribute("title")).toBe("No se puede cancelar una reserva que ya llegó");
-    // Lo habilitado lleva su texto en el propio botón y nada en el envoltorio.
-    const editar = botonesDeFila(filaDe(tabla, "Elena Llegó"))[3];
-    expect(editar.hasAttribute("disabled")).toBe(false);
-    expect(editar.parentElement?.hasAttribute("title")).toBe(false);
+    for (const [, estado, nombre] of SEIS) {
+      for (const b of botonesDeFila(filaDe(tabla, nombre))) expect(b, estado).not.toBeDisabled();
+    }
   });
-
   it("sin permiso (solo «Ver», 06/11/2026): ninguna fila tiene acciones y la tabla pierde la columna", async () => {
     supa.canEdit = false;
     const { tabla } = await montarSeis();
@@ -1081,10 +1056,11 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
     supa.filas = [{ ...reserva("res-anonima", "confirmada", ""), nombre: null }];
     const { tabla } = await montar();
     const fila = filaDe(tabla, "Sin nombre");
-    const botones = botonesDeFila(fila);
+    const titulos = opcionesMas(fila).map((i) => i.getAttribute("title"));
 
-    expect(botones[4].getAttribute("aria-label")).toBe("Cancelar la reserva de este cliente — pedirá confirmación");
-    expect(botones[5].getAttribute("aria-label")).toBe("Añadir a este cliente a la lista negra");
+    expect(titulos).toContain("Cancelar la reserva de este cliente — pedirá confirmación");
+    expect(titulos).toContain("Añadir a este cliente a la lista negra");
+    fireEvent.keyDown(screen.getAllByRole("menuitem")[0], { key: "Escape" });
     expect(within(fila).getByRole("button", { name: "Marcar este cliente como importante" })).toBeInTheDocument();
   });
 
@@ -2092,19 +2068,18 @@ describe("ListaReservasAvanzada · más alto para las filas: sin recuento, sin s
     expect(tabla).toHaveAccessibleName("Reservas y solicitudes");
   });
 
-  it("la acción principal mide lo mismo en todas las filas también con dedo (la columna de acciones cuenta con ese ancho)", async () => {
+  it("la acción principal (o su hueco) mide lo mismo en todas las filas y es grande: 44 px de alto y texto a 16 px", async () => {
     const { tabla } = await montar();
+    const filas = [...tabla.querySelectorAll("tbody tr")] as HTMLElement[];
 
-    const principales = ([...tabla.querySelectorAll("tbody tr")] as HTMLElement[]).map((f) => botonesDeFila(f)[0]);
-    expect(principales.map((b) => b.textContent?.trim())).toEqual(
-      expect.arrayContaining(["Aceptar", "Confirmar", "Convertir"]),
-    );
-    for (const b of principales) {
-      expect(b).toHaveClass("w-[76px]", "xl:w-[88px]", "pointer-coarse:w-[6.25rem]", "pointer-coarse:px-2");
-      expect(b).not.toHaveClass("pointer-coarse:w-auto");
-    }
+    const principales = filas.map(principalDe).filter((b): b is HTMLButtonElement => !!b);
+    expect(principales.map((b) => b.textContent?.trim())).toEqual(expect.arrayContaining(["Aceptar", "Confirmar", "Convertir"]));
+    for (const b of principales) expect(b).toHaveClass("w-[8.5rem]", "h-11", "text-base");
+    // Las filas sin nada que hacer dejan el hueco del mismo ancho: «Más» cae en la misma X.
+    const huecos = filas.flatMap((f) => [...f.querySelectorAll('[data-testid="sin-accion-principal"]')]);
+    expect(huecos.length).toBe(filas.length - principales.length);
+    for (const h of huecos) expect(h).toHaveClass("w-[8.5rem]");
   });
-
   // ── La posición de las filas ────────────────────────────────────────────────
 
   it("al refrescar los datos (otra lectura de `reservas-lista`, con algo nuevo) las filas conservan su posición", async () => {
@@ -2198,5 +2173,33 @@ describe("ListaReservasAvanzada · filtros en el móvil (07/11/2026)", () => {
     fireEvent.click(chips.getByRole("button", { name: /Hoy/ }));
     expect(screen.getByRole("button", { name: "Filtros" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Filtros activos")).toBeNull();
+  });
+});
+
+// 10/11/2026 (petición del dueño): filtro rápido «Menú del día / Carta» en la Tabla. Volver a pulsar el puesto lo quita.
+describe("ListaReservasAvanzada · filtro rápido «Menú del día / Carta»", () => {
+  it("«Menú del día» deja solo las de menú, «Carta» solo las de carta, y volver a pulsar lo quita", async () => {
+    supa.filas = [
+      { ...reserva("res-menu", "confirmada", "Mara Menú"), menu_del_dia: true },
+      { ...reserva("res-carta", "confirmada", "Carla Carta"), menu_del_dia: false },
+    ];
+    const { tabla } = await montar();
+    const grupo = screen.getAllByRole("group", { name: "Menú del día o carta" })[0];
+    const menu = within(grupo).getByRole("button", { name: "Menú del día" });
+    const carta = within(grupo).getByRole("button", { name: "Carta" });
+
+    fireEvent.click(menu);
+    await waitFor(() => expect(within(tabla).queryByText("Carla Carta")).toBeNull());
+    expect(within(tabla).getByText("Mara Menú")).toBeInTheDocument();
+    expect(within(tabla).queryByText("Familia Ballester")).toBeNull();
+    expect(menu).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(carta);
+    await waitFor(() => expect(within(tabla).queryByText("Mara Menú")).toBeNull());
+    expect(within(tabla).getByText("Carla Carta")).toBeInTheDocument();
+
+    fireEvent.click(carta);
+    await waitFor(() => expect(within(tabla).getByText("Mara Menú")).toBeInTheDocument());
+    expect(within(tabla).getByText("Carla Carta")).toBeInTheDocument();
   });
 });
