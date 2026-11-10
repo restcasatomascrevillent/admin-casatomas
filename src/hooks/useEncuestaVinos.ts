@@ -11,11 +11,43 @@ import { QUERY_KEY_CONFIGURACION_WEB, useConfiguracionWeb } from "@/hooks/useCon
 // escribe en «Gestor carta», con la RLS de siempre de la tabla) y los votos van
 // en votos_vino_favorito (migración 20261104141000). La web lee el interruptor
 // cada vez que se abre la carta de vinos: no hace falta republicarla.
+// 20/11/2026: el premio (encuesta_vinos_premio) y el último día para votar
+// (encuesta_vinos_fin, incluido, hora de Madrid) salen de aquí y los muestran las
+// bases legales de la web; sin ellos la base de datos no deja abrir la votación
+// (migración 20261120100000).
 // ----------------------------------------------------------------------------
 
 export type VotoVino = Pick<Tables<"votos_vino_favorito">, "id" | "vino_id" | "vino_nombre" | "nombre" | "contacto" | "idioma" | "created_at">;
 
 export const QUERY_KEY_VOTOS_VINO = ["votosVinoFavorito"] as const;
+
+export const TEXTO_PARA_ABRIR = "Para abrir la votación, pon el premio y el último día para votar. Las bases legales de la web los muestran.";
+
+export const PREMIO_MIN = 3;
+export const PREMIO_MAX = 200;
+
+/** Fecha de hoy en España (AAAA-MM-DD): el último día para votar se cuenta en hora de Madrid. */
+export function hoyEnMadrid(ahora: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(ahora);
+}
+
+/** «2026-12-31» → «31/12/2026». */
+export function fechaCorta(iso: string): string {
+  const [a, m, d] = iso.split("-");
+  return `${d}/${m}/${a}`;
+}
+
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Mensaje de error si el premio o el último día no valen para guardarse; null si valen. */
+export function validarPremioFecha(premio: string, fin: string, hoy: string = hoyEnMadrid()): string | null {
+  const texto = premio.trim();
+  if (texto.length < PREMIO_MIN) return `Escribe el premio (al menos ${PREMIO_MIN} letras).`;
+  if (texto.length > PREMIO_MAX) return `El premio no puede pasar de ${PREMIO_MAX} caracteres.`;
+  if (!FECHA_ISO.test(fin) || Number.isNaN(Date.parse(`${fin}T00:00:00Z`))) return "Elige el último día para votar.";
+  if (fin < hoy) return "El último día para votar no puede ser anterior a hoy.";
+  return null;
+}
 
 export interface RecuentoVino {
   vino: string;
@@ -63,6 +95,10 @@ export function useEncuestaVinos({ cargarVotos }: { cargarVotos: boolean }) {
 
   const disponible = typeof config?.encuesta_vinos_activa === "boolean";
   const activa = config?.encuesta_vinos_activa === true;
+  const premio = config?.encuesta_vinos_premio?.trim() ?? "";
+  const fin = config?.encuesta_vinos_fin ?? null;
+  // Se puede abrir con premio y con un último día que no haya pasado (hora de Madrid).
+  const puedeAbrir = premio.length >= PREMIO_MIN && fin !== null && fin >= hoyEnMadrid();
 
   const votos = useQuery({
     queryKey: QUERY_KEY_VOTOS_VINO,
@@ -79,6 +115,7 @@ export function useEncuestaVinos({ cargarVotos }: { cargarVotos: boolean }) {
 
   const cambiarActiva = useMutation({
     mutationFn: async (valor: boolean) => {
+      if (valor && !puedeAbrir) throw new Error(TEXTO_PARA_ABRIR);
       const { data, error } = await supabase
         .from("configuracion_web")
         .update({ encuesta_vinos_activa: valor })
@@ -96,6 +133,26 @@ export function useEncuestaVinos({ cargarVotos }: { cargarVotos: boolean }) {
     onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY_CONFIGURACION_WEB }),
   });
 
+  const guardarPremioFecha = useMutation({
+    mutationFn: async ({ premio: p, fin: f }: { premio: string; fin: string }) => {
+      const mensaje = validarPremioFecha(p, f);
+      if (mensaje) throw new Error(mensaje);
+      const { data, error } = await supabase
+        .from("configuracion_web")
+        .update({ encuesta_vinos_premio: p.trim(), encuesta_vinos_fin: f })
+        .eq("id", true)
+        // Con la votación abierta no se cambian (las bases ya los enseñan).
+        .eq("encuesta_vinos_activa", false)
+        .select("id")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("No se pudo guardar. Comprueba que la votación está cerrada y que puedes editar la carta.");
+    },
+    onSuccess: () => toast.success("Premio y último día guardados"),
+    onError: (error: Error) => toast.error("No se pudieron guardar el premio y la fecha", { description: mensajeUsuario(error) }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY_CONFIGURACION_WEB }),
+  });
+
   const vaciar = useMutation({
     mutationFn: async () => {
       // PostgREST no deja un DELETE sin filtro: este abarca todas las filas.
@@ -109,6 +166,10 @@ export function useEncuestaVinos({ cargarVotos }: { cargarVotos: boolean }) {
 
   return {
     activa,
+    premio,
+    fin,
+    puedeAbrir,
+    guardarPremioFecha,
     disponible,
     cargando: cargandoConfig,
     error: errorConfig,
