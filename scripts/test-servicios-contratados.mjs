@@ -28,6 +28,8 @@ const MIGRACION_4 = await readFile("supabase/migrations/20261112120000_servicios
 const ROLLBACK_4 = await readFile("supabase/rollbacks/20261112120000_servicios_github_minutos_ROLLBACK.sql", "utf8");
 const MIGRACION_5 = await readFile("supabase/migrations/20261120110000_servicios_estado_detalle.sql", "utf8");
 const ROLLBACK_5 = await readFile("supabase/rollbacks/20261120110000_servicios_estado_detalle_ROLLBACK.sql", "utf8");
+const MIGRACION_6 = await readFile("supabase/migrations/20261122153000_servicios_costes_mes.sql", "utf8");
+const ROLLBACK_6 = await readFile("supabase/rollbacks/20261122153000_servicios_costes_mes_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
@@ -491,5 +493,69 @@ await limpia.exec(`update public.servicios_contratados set limites = limites || 
 await limpia.exec(MIGRACION_5);
 igual((await limitesGithub()).actions_computo.limite, 20, "la migración pisa un límite de cómputo editado en el panel");
 igual((await limitesVercel()).memoria_funciones.limite, 1000, "la migración pisa un límite de memoria editado en el panel");
+
+// 15. Costes de cada mes, informe mensual y Mapbox (20261122153000): costes por
+// mes metidos a mano solo por un super admin con sesión viva (y auditados), el
+// resumen de un mes con la última lectura de ese mes, las cargas del mapa de
+// vinos solo para service_role (null sin logs de la web), notas de Drive y
+// Mapbox sin pisar lo editado, idempotente y su rollback.
+await db.exec(MIGRACION_6);
+await db.exec(MIGRACION_6); // idempotente
+igual(await triggers("servicios_costes_mes"), 1, "servicios_costes_mes sin auditar");
+const MES_PASADO = `((date_trunc('month', now(), 'UTC') - interval '1 month') at time zone 'UTC')::date`;
+await como(U.SA, () => q(`insert into public.servicios_costes_mes (proveedor, mes, importe, moneda, nota) values ('loading', ${MES_PASADO}, 12.5, 'EUR', 'Factura 123')`));
+const fila6 = (await q("select * from public.servicios_costes_mes")).rows[0];
+ok(fila6.actualizado_por === U.SA && Number(fila6.importe) === 12.5, "no guarda quién metió el coste o el importe");
+await como(U.SA2, () => q(`update public.servicios_costes_mes set importe = 13 where proveedor = 'loading'`));
+igual((await q("select actualizado_por from public.servicios_costes_mes")).rows[0].actualizado_por, U.SA2, "no apunta quién editó el coste");
+ok((await q("select count(*)::int n from public.audit_log where tabla = 'servicios_costes_mes'")).rows[0].n >= 2, "los costes por mes no se auditan");
+await rechaza(U.STAFF, `insert into public.servicios_costes_mes (proveedor, mes, importe) values ('vercel', ${MES_PASADO}, 1)`, /row-level security/, "alguien que no es super admin mete costes");
+await rechaza(U.SA_BLOQ, `insert into public.servicios_costes_mes (proveedor, mes, importe) values ('vercel', ${MES_PASADO}, 1)`, /row-level security/, "un super admin bloqueado mete costes");
+igual((await como(U.STAFF, () => q("select * from public.servicios_costes_mes"))).rows.length, 0, "alguien que no es super admin ve los costes");
+await rechaza(null, "select * from public.servicios_costes_mes", /permission denied/, "anon ve los costes", "anon");
+await rechaza(U.SA, `insert into public.servicios_costes_mes (proveedor, mes, importe) values ('vercel', ${MES_PASADO} + 3, 1)`, /servicios_costes_mes_mes_chk/, "acepta un mes que no es día 1");
+await rechaza(U.SA, `insert into public.servicios_costes_mes (proveedor, mes, importe) values ('vercel', ${MES_PASADO}, -1)`, /servicios_costes_mes_importe_chk/, "acepta un importe negativo");
+await rechaza(U.SA, `insert into public.servicios_costes_mes (proveedor, mes, importe, moneda) values ('vercel', ${MES_PASADO}, 1, 'BTC')`, /servicios_costes_mes_moneda_chk/, "acepta una moneda rara");
+await rechaza(U.SA, `insert into public.servicios_costes_mes (proveedor, mes, importe) values ('no_existe', ${MES_PASADO}, 1)`, /foreign key/, "acepta un servicio que no existe");
+await rechaza(U.SA, `update public.servicios_costes_mes set proveedor = 'vercel'`, /permission denied/, "deja cambiar el servicio de un coste");
+// Resumen: lo metido a mano y la última lectura con coste del mes (ni la de este mes ni una sin coste).
+await q(`insert into public.servicios_uso (proveedor, tomado_en, metricas, coste_variable) values
+  ('openai', date_trunc('month', now(), 'UTC') - interval '20 days', '{}', '{"importe": 1, "moneda": "USD", "periodo": "mes en curso", "origen": "api"}'),
+  ('openai', date_trunc('month', now(), 'UTC') - interval '2 days', '{}', '{"importe": 4, "moneda": "USD", "periodo": "mes en curso", "origen": "api"}'),
+  ('openai', date_trunc('month', now(), 'UTC') - interval '1 day', '{}', null),
+  ('openai', date_trunc('month', now(), 'UTC') + interval '1 hour', '{}', '{"importe": 99, "moneda": "USD", "periodo": "mes en curso", "origen": "api"}')`);
+const resumen6 = new Map((await como(U.SA, () => q(`select * from public.servicios_resumen_mes(${MES_PASADO})`))).rows.map((r) => [r.proveedor, r]));
+igual(resumen6.size, TODOS.length, "el resumen del mes no saca todos los servicios");
+igual([Number(resumen6.get("loading").manual_importe), resumen6.get("loading").manual_moneda, resumen6.get("loading").manual_nota], [13, "EUR", "Factura 123"], "el resumen no trae el coste metido a mano");
+igual(resumen6.get("openai").coste_variable.importe, 4, "el resumen no coge la última lectura con coste de ese mes");
+igual(resumen6.get("openai").lecturas, 3, "el resumen cuenta lecturas de otro mes");
+igual(resumen6.get("vercel").manual_importe, null, "el resumen se inventa un coste");
+igual((await como(U.STAFF, () => q(`select * from public.servicios_resumen_mes(${MES_PASADO})`))).rows.length, 0, "alguien que no es super admin ve el resumen");
+// Mapbox: sin logs de la web, null; con ellos, sesiones distintas de producción desde la fecha.
+igual((await como(null, () => q("select public.servicios_cargas_mapa_vinos(now() - interval '30 days') n"), "service_role")).rows[0].n, null, "sin web_eventos no devuelve null");
+await db.exec(`create table public.web_eventos (id bigserial primary key, evento_id uuid not null default gen_random_uuid(), ocurrido_en timestamptz not null default now(), entorno text, tipo text, sesion_id uuid, es_bot boolean not null default false, es_prueba boolean not null default false, es_interno boolean not null default false);
+  insert into public.web_eventos (entorno, tipo, sesion_id, es_bot, ocurrido_en) values
+    ('produccion', 'mapa_vinos', 'c0000000-0000-0000-0000-000000000001', false, now()),
+    ('produccion', 'mapa_vinos', 'c0000000-0000-0000-0000-000000000001', false, now()),
+    ('produccion', 'mapa_vinos', 'c0000000-0000-0000-0000-000000000002', false, now()),
+    ('produccion', 'mapa_vinos', null, false, now()),
+    ('produccion', 'mapa_vinos', 'c0000000-0000-0000-0000-000000000003', true, now()),
+    ('demo', 'mapa_vinos', 'c0000000-0000-0000-0000-000000000004', false, now()),
+    ('produccion', 'clic', 'c0000000-0000-0000-0000-000000000005', false, now()),
+    ('produccion', 'mapa_vinos', 'c0000000-0000-0000-0000-000000000006', false, now() - interval '40 days');`);
+igual((await como(null, () => q("select public.servicios_cargas_mapa_vinos(now() - interval '30 days') n"), "service_role")).rows[0].n, 3, "cargas del mapa mal contadas (sesiones distintas de producción, sin bots)");
+ok(!(await q("select has_function_privilege('authenticated', 'public.servicios_cargas_mapa_vinos(timestamptz)', 'execute') p")).rows[0].p, "authenticated puede leer las cargas del mapa");
+ok(!(await q("select has_function_privilege('anon', 'public.servicios_cargas_mapa_vinos(timestamptz)', 'execute') p")).rows[0].p, "anon puede leer las cargas del mapa");
+// Notas: cambian las de la semilla y no las editadas.
+const nota6 = async (p, k) => (await q(`select limites->'${k}'->>'nota' n from public.servicios_contratados where proveedor = '${p}'`)).rows[0].n;
+ok(/Lectura automática/.test(await nota6("mapbox", "cargas_mapa_web")) && /Lectura automática/.test(await nota6("google_drive", "almacenamiento")), "las notas de Mapbox y Drive siguen diciendo que no hay lectura automática");
+// Rollback: se va todo y se puede volver a aplicar; una nota editada no se toca.
+await db.exec(ROLLBACK_6);
+igual((await q("select to_regclass('public.servicios_costes_mes') t, to_regprocedure('public.servicios_resumen_mes(date)') r, to_regprocedure('public.servicios_cargas_mapa_vinos(timestamptz)') m")).rows[0], { t: null, r: null, m: null }, "el rollback de costes por mes deja restos");
+ok(/Sin lectura automática/.test(await nota6("mapbox", "cargas_mapa_web")) && /Sin lectura automática/.test(await nota6("google_drive", "almacenamiento")), "el rollback no devuelve las notas de Mapbox y Drive");
+await db.exec(`update public.servicios_contratados set limites = jsonb_set(limites, '{cargas_mapa_web,nota}', '"Mi nota"') where proveedor = 'mapbox'`);
+await db.exec(MIGRACION_6);
+igual(await nota6("mapbox", "cargas_mapa_web"), "Mi nota", "la migración pisa una nota editada");
+igual(await triggers("servicios_costes_mes"), 1, "tras reaplicar, servicios_costes_mes sin auditar");
 
 console.log(`servicios_contratados + planes_costes + configurables (PGlite): ${comprobaciones} comprobaciones OK`);

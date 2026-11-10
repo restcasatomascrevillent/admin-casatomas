@@ -5,12 +5,12 @@
 //  basta. verify_jwt = true en config.toml (prefiltro), autorización aquí.
 //
 //  Qué hace: para cada proveedor EN USO (`activo`) de `servicios_contratados`
-//  que tenga lector (Vercel, Supabase, GitHub, Resend, Stripe, OpenAI, Vapi y
-//  Hostinger) lee su consumo (por API con su secreto o de nuestra base de
+//  que tenga lector (Vercel, Supabase, GitHub, Resend, Stripe, OpenAI, Vapi,
+//  Hostinger, Google Drive y Mapbox) lee su consumo (por API con su secreto o de nuestra base de
 //  datos), le pone el límite del plan (de `servicios_contratados.limites`),
 //  calcula lo gastado por uso este mes (`coste_variable`) cuando se puede,
 //  guarda una fila en `servicios_uso` y devuelve la última lectura de cada uno.
-//  Los proveedores sin API razonable (Google, Mapbox, Loading…) salen en
+//  Los proveedores sin API razonable (Google Maps, Loading…) salen en
 //  `sin_lector`: la pantalla dice que se miren en su panel.
 //    · Caché: si la última lectura tiene < 15 min, no llama a la API salvo
 //      `?forzar=1` (o cuerpo { "forzar": true }); aun forzando, nunca más de
@@ -36,8 +36,13 @@
 //    STRIPE_SECRET_KEY       (ya existe en producción; el modo sale del prefijo)
 //    VAPI_API_KEY            (opcional; la usa vapi-analytics: coste de Vapi del mes)
 //    SERVICIOS_HOSTINGER_TOKEN (suscripciones y dominios con su caducidad)
+//    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN (ya existen si
+//                            se guardan copias de facturas en Drive: espacio de la cuenta)
+//  Mapbox no tiene API de consumo: cuenta las cargas del mapa de vinos con la
+//  RPC servicios_cargas_mapa_vinos (logs de la web; un mínimo), sin secreto.
 // ============================================================================
 import { exigirSuperAdmin, respuestaJson, type FabricaCliente } from "../_shared/autorizacion.ts";
+import { ClienteDrive, ErrorDrive, URL_DRIVE } from "../_shared/google-drive.ts";
 
 export const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -62,6 +67,9 @@ export const SECRETOS = [
   "STRIPE_SECRET_KEY",
   "VAPI_API_KEY",
   "SERVICIOS_HOSTINGER_TOKEN",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "GOOGLE_REFRESH_TOKEN",
   "SUPABASE_SERVICE_ROLE_KEY",
   "SUPABASE_ANON_KEY",
 ] as const;
@@ -1329,6 +1337,90 @@ export const leerHostinger: Lector = async (ctx) => {
   return { metricas, detalles };
 };
 
+// ─── Google Drive (espacio de la cuenta de las copias de facturas) ─────────
+// La misma cuenta y los mismos secretos que procesar-factura. `about` vale con
+// el alcance drive.file y da el espacio de TODA la cuenta (Drive, Gmail, Fotos).
+
+export const leerGoogleDrive: Lector = async (ctx) => {
+  const cliente = new ClienteDrive({
+    config: {
+      clientId: secreto(ctx, "GOOGLE_CLIENT_ID"),
+      clientSecret: secreto(ctx, "GOOGLE_CLIENT_SECRET"),
+      refreshToken: secreto(ctx, "GOOGLE_REFRESH_TOKEN"),
+    },
+    fetch: ctx.fetch,
+  });
+  if (!cliente.configurado) {
+    const falta = ["GOOGLE_REFRESH_TOKEN", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"].find((n) => !secreto(ctx, n)) ?? "GOOGLE_REFRESH_TOKEN";
+    return faltaSecreto(falta);
+  }
+  let json: unknown;
+  try {
+    json = await cliente.json(`${URL_DRIVE}/about?fields=storageQuota`);
+  } catch (e) {
+    if (e instanceof ErrorDrive) {
+      const rechazada = e.motivo === "token" || e.motivo === "permiso";
+      return { metricas: {}, error: rechazada ? "credencial_rechazada" : "error_api", detalles: e.estado ? { http: e.estado } : {} };
+    }
+    throw e;
+  }
+  const q = esObjeto(json) && esObjeto(json.storageQuota) ? json.storageQuota : null;
+  const usado = numero(q?.usage);
+  if (!q || usado == null) return { metricas: {}, error: "error_api", detalles: { avisos: ["Google Drive no ha dado el espacio usado."] } };
+  const limite = numero(q.limit);
+  const enDrive = numero(q.usageInDrive);
+  const papelera = numero(q.usageInDriveTrash);
+  const metricas: Record<string, Metrica> = {
+    almacenamiento: {
+      orden: 1, etiqueta: "Espacio de la cuenta de Google", valor: usado, unidad: "bytes",
+      ...(limite != null ? { limite: redondear(limite / GIB, 2), unidad_limite: "GB" } : {}),
+      periodo: "ahora", nota: "Todo lo que ocupa la cuenta: Drive, Gmail y Google Fotos.",
+    },
+  };
+  if (enDrive != null) metricas.en_drive = { orden: 2, etiqueta: "De ello, en Drive", valor: enDrive, unidad: "bytes", periodo: "ahora" };
+  if (papelera != null && papelera > 0) {
+    metricas.papelera = { orden: 3, etiqueta: "En la papelera de Drive", valor: papelera, unidad: "bytes", periodo: "ahora", nota: "Vaciar la papelera libera este espacio." };
+  }
+  const detalles: Record<string, unknown> = {};
+  if (limite == null) detalles.avisos = ["La cuenta no tiene límite de espacio (cuenta de empresa o almacenamiento compartido)."];
+  else detalles.plan_detectado = `${redondear(limite / GIB, 0)} GB de espacio`;
+  return { metricas, detalles };
+};
+
+// ─── Mapbox (mapa de vinos de la web) ──────────────────────────────────────
+// Mapbox no tiene API de consumo: las cargas salen de los logs de la web
+// (sesiones que abren el mapa, solo con cookies de análisis aceptadas: es un
+// mínimo). Precio de https://www.mapbox.com/pricing (03/11/2026).
+export const MAPBOX_CARGAS_GRATIS = 50_000;
+export const MAPBOX_USD_POR_MIL = 5;
+
+export const leerMapbox: Lector = async (ctx) => {
+  const periodo = "mes en curso";
+  let n: number | null = null;
+  try {
+    const { data, error } = await ctx.admin.rpc("servicios_cargas_mapa_vinos", { p_desde: inicioMesUtc(ctx.ahora).toISOString() });
+    if (error) {
+      return { metricas: {}, error: "error_api", detalles: { avisos: ["Falta aplicar la migración 20261122153000_servicios_costes_mes (cuenta las cargas del mapa)."] } };
+    }
+    n = numero(data);
+  } catch {
+    return { metricas: {}, error: "error_interno", detalles: {} };
+  }
+  if (n == null) {
+    return { metricas: {}, error: "error_api", detalles: { avisos: ["Sin los logs de la web no se pueden contar las cargas del mapa: míralas en el panel de Mapbox."] } };
+  }
+  const nota = "Sesiones de la web que abren el mapa (solo quien acepta las cookies de análisis: es un mínimo).";
+  const exceso = Math.max(0, n - MAPBOX_CARGAS_GRATIS);
+  return {
+    metricas: { cargas_mapa_web: { orden: 1, etiqueta: "Cargas del mapa de vinos (web)", valor: n, unidad: "cargas", limite: MAPBOX_CARGAS_GRATIS, periodo, nota } },
+    detalles: {},
+    coste_variable: {
+      importe: redondear((exceso / 1000) * MAPBOX_USD_POR_MIL, 2), moneda: "USD", periodo, origen: "estimado",
+      nota: `Gratis hasta ${MAPBOX_CARGAS_GRATIS.toLocaleString("es-ES")} cargas; después, ${MAPBOX_USD_POR_MIL} US$ cada 1.000.`,
+    },
+  };
+};
+
 export const LECTORES: Record<string, Lector> = {
   vercel: leerVercel,
   supabase: leerSupabase,
@@ -1338,6 +1430,8 @@ export const LECTORES: Record<string, Lector> = {
   openai: leerOpenai,
   vapi: leerVapi,
   hostinger: leerHostinger,
+  google_drive: leerGoogleDrive,
+  mapbox: leerMapbox,
 };
 
 // ─── manejador HTTP ─────────────────────────────────────────────────────────
