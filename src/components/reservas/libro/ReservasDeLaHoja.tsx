@@ -53,9 +53,10 @@ export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva }: Pr
     const contenido = (
       <>
         <span className="w-16 shrink-0 font-semibold tabular-nums">{horaCorta(r.hora) ?? r.hora}</span>
-        <span className="min-w-0 flex-1 truncate font-medium">
-          {r.nombre || "Sin nombre"}
-          {r.notas_cliente ? <span className="ml-2 text-lg font-normal text-stone-500">· {r.notas_cliente}</span> : null}
+        {/* Nombre entero (10/11/2026, «no se ven los nombres»): sin cortar, y las notas debajo en pequeño. */}
+        <span className="min-w-0 flex-1">
+          <span className="block break-words font-medium leading-snug">{r.nombre || "Sin nombre"}</span>
+          {r.notas_cliente ? <span className="block truncate text-base font-normal text-stone-500">{r.notas_cliente}</span> : null}
         </span>
         <span className="shrink-0 font-semibold tabular-nums">{r.numero_comensales} px</span>
         <span className="hidden w-32 shrink-0 truncate text-lg text-stone-600 sm:inline">{sala ?? "—"}</span>

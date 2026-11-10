@@ -112,18 +112,18 @@ describe("AccionesReserva · una acción clara y «Más», por estado y permiso"
     const { celda } = montar({ reserva: reserva("confirmada") });
     const hueco = within(celda).getByTestId("sin-accion-principal");
     expect(hueco).toHaveAttribute("aria-hidden");
-    expect(hueco.className).toContain("w-[8.5rem]");
+    expect(hueco.className).toContain("w-[9.5rem]");
     cleanup();
     const { celda: otra } = montar({ reserva: reserva("pendiente") });
-    expect(principal(otra)!.className).toContain("w-[8.5rem]");
+    expect(principal(otra)!.className).toContain("w-[9.5rem]");
   });
 
-  it("grande: la principal y «Más» miden 44 px de alto y llevan texto a 16 px", () => {
+  it("grande: la principal y «Más» miden 52 px de alto y llevan texto a 17 px", () => {
     const { celda } = montar({ reserva: reserva("pendiente") });
     const mas = within(celda).getByRole("button", { name: "Más acciones de Ana" });
     for (const b of [principal(celda)!, mas]) {
-      expect(b.className).toContain("h-11");
-      expect(b.className).toContain("text-base");
+      expect(b.className).toContain("h-[52px]");
+      expect(b.className).toContain("text-[17px]");
     }
     expect(mas).toHaveTextContent("Más");
   });
@@ -291,7 +291,7 @@ describe("AccionesReserva · variantes", () => {
     const { celda } = montar({ reserva: reserva("pendiente"), variante: "tarjeta" });
     const fila = celda.firstElementChild as HTMLElement;
     expect(fila.tagName).toBe("DIV");
-    expect(fila.className).toBe("flex flex-wrap items-center gap-2 pt-1");
+    expect(fila.className).toBe("flex flex-wrap items-center gap-3 pt-2");
     expect(within(celda).queryByRole("checkbox")).toBeNull();
     expect(principal(celda)).toHaveTextContent("Aceptar");
     expect(within(celda).getByRole("button", { name: "Más acciones de Ana" })).toBeInTheDocument();

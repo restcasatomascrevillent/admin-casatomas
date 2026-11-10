@@ -153,15 +153,12 @@ describe("ReservasDeLaHoja · la comida de martes a jueves en bloques", () => {
 });
 
 describe("ListaComoLibro · libro abierto en pantallas anchas", () => {
-  it("desde 1280 px se ven dos hojas: el día y el siguiente", () => {
+  it("aunque la pantalla sea ancha, una sola hoja (para que se lean los nombres)", () => {
     const antes = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
     try {
       render(<ListaComoLibro />);
-      expect(hojas().map((a) => a.getAttribute("aria-label"))).toEqual([
-        `Hoja del ${tituloHoja(hoy)}`,
-        `Hoja del ${tituloHoja(pasarHoja(hoy, 1))}`,
-      ]);
+      expect(hojas().map((a) => a.getAttribute("aria-label"))).toEqual([`Hoja del ${tituloHoja(hoy)}`]);
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: antes });
     }

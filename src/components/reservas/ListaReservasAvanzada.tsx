@@ -75,6 +75,7 @@ import { SolicitudCard, MOTIVO_LABELS, ESTADO_LABELS } from "./GestionSolicitude
 import { FormularioReserva, type ReservaCreadaDesdeFormulario } from "./FormularioReserva";
 import { SolicitudGestionPanel } from "./SolicitudGestionPanel";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { DialogoAccionReserva, type AccionDialogo } from "./DialogoAccionReserva";
 import { useListaReservasEnVivo } from "@/hooks/useListaReservasEnVivo";
 import { EstadoPropuestaBadge } from "./EstadoPropuestaBadge";
 import {
@@ -151,8 +152,12 @@ type Reservation = ReservaParaVerificar;
 // 10/11/2026 (petición del dueño: «los botones de acción y las cosas más grandes»): filas más altas, texto a
 // 16 px, insignias a 14 px y botones de 44 px. Para que siga sin haber scroll horizontal, la fecha va siempre en
 // dos líneas y Canal solo con su icono hasta 1536 px (`2xl`).
-const ALTO_FILA = "h-16";
-const CELDA = "px-2 py-2 align-middle";
+// 10/11/2026, segunda vuelta (dueño: «los botones un poquito más grandes y la letra más grande. Da igual que se
+// vean menos, pero que quede mucho más claro»; y «ojo con los padding y los márgenes»): filas de 76 px, texto a
+// 18 px, nombre a 20 px, celdas con px-4 py-3. Para que quepa SIN apretar márgenes sale la columna Canal (va en
+// el diálogo de la reserva) y las insignias de menú solo se ven desde 1280 px.
+const ALTO_FILA = "h-[76px]";
+const CELDA = "px-4 py-3 align-middle";
 
 /** Filas por página. Ver el comentario de "Paginación" más abajo. */
 const TAMANO_PAGINA = 50;
@@ -200,9 +205,9 @@ function subirArriba(...contenedores: (Element | null | undefined)[]) {
 // Los `lg:` encogen SOLO en la franja 1024–1279 px, que es donde falta sitio:
 // en las tarjetas de móvil y a partir de 1280 px la insignia queda a 11 px.
 const INSIGNIA =
-  "h-7 shrink-0 gap-1.5 whitespace-nowrap px-2 py-0 text-sm font-medium [&_svg]:h-4 [&_svg]:w-4";
+  "h-8 shrink-0 gap-1.5 whitespace-nowrap px-3 py-0 text-[15px] font-medium [&_svg]:h-4 [&_svg]:w-4";
 /** Segunda línea del estado (motivo, propuesta): aún más compacta. */
-const INSIGNIA_SECUNDARIA = "h-6 shrink-0 gap-1 whitespace-nowrap px-1.5 py-0 text-xs font-medium";
+const INSIGNIA_SECUNDARIA = "h-7 shrink-0 gap-1 whitespace-nowrap px-2 py-0 text-sm font-medium";
 
 /**
  * "Propuesta enviada 24/09 18:44" no cabe en la columna Estado. En la lista
@@ -237,13 +242,13 @@ function etiquetaPropuestaCorta(vista: EstadoPropuestaVista, enviadaAt: string |
 // solo 38: el nombre se ve con «…», pero sin scroll horizontal (el menú, en esa
 // anchura, arranca plegado a iconos).
 // 10/11/2026: casilla 24 + principal 136 + «Más» ~82 + huecos 2×8 + relleno 16 + borde 1 = 275 → 280.
-const ANCHO_ACCIONES = "w-[280px]";
-const ANCHO_FECHA = "w-[92px]";
+// Acciones: relleno 32 + casilla 24 + principal 152 + «Más» ~96 + huecos 2×12 + borde 1 = 329 → 336.
+const ANCHO_ACCIONES = "w-[336px]";
+const ANCHO_FECHA = "w-[120px]";
 /** Envoltorio del nombre: ocupa lo que le deje la celda, ni más ni menos. */
 const ANCHO_NOMBRE = "min-w-0 flex-1";
-const ANCHO_PAX = "w-[64px]";
-const ANCHO_CANAL = "w-[60px] 2xl:w-[130px]";
-const ANCHO_ESTADO = "w-[200px] xl:w-[220px]";
+const ANCHO_PAX = "w-[84px]";
+const ANCHO_ESTADO = "w-[200px] xl:w-[260px]";
 
 // Fondos de fila. Hay que aplicarlos también a la celda de acciones: al ser
 // `position: sticky` necesita fondo opaco propio (hoy no debería haber scroll
@@ -290,7 +295,7 @@ function CeldaAcciones({
       className={cn(
         // Relleno propio, más apretado que `CELDA`: esta columna es la más
         // ancha de todas y sus 6 ranuras no cambian de tamaño con la pantalla.
-        "px-2 py-2 align-middle",
+        "px-4 py-3 align-middle",
         ANCHO_ACCIONES,
         "sticky left-0 z-10 border-r border-border/60",
         // La franja va como sombra interior y NO como `border-l-4` en la fila:
@@ -302,7 +307,7 @@ function CeldaAcciones({
       )}
     >
       {/* Huecos de 2 px con ratón (también en `xl`: antes 4, son 12 px menos de columna); con dedo, 4. */}
-      <div className="flex items-center justify-start gap-2">{children}</div>
+      <div className="flex items-center justify-start gap-3">{children}</div>
     </TableCell>
   );
 }
@@ -345,7 +350,7 @@ function CeldaFechaHora({ dia, hora }: { dia: Date | null; hora: string | null |
   const corta = `${dd}/${mm}/${String(dia.getFullYear()).slice(-2)}`;
   return (
     <TableCell className={cn(CELDA, ANCHO_FECHA, "whitespace-nowrap tabular-nums")}>
-      <span className="flex flex-col text-base leading-tight" title={`${larga} · ${hhmm}`}>
+      <span className="flex flex-col gap-0.5 text-lg leading-tight" title={`${larga} · ${hhmm}`}>
         <span>{corta}</span>
         <span className="font-semibold">{hhmm}</span>
       </span>
@@ -464,6 +469,8 @@ export function ListaReservasAvanzada({
   // de la reserva para que no se cancele la equivocada. Un ÚNICO AlertDialog
   // para toda la lista: montar uno por fila serían 50 diálogos en el DOM.
   const [reservaACancelar, setReservaACancelar] = useState<Reservation | null>(null);
+  // Diálogo de aceptar / confirmar / verificar con los datos y el día a la vista (10/11/2026).
+  const [dialogoAccion, setDialogoAccion] = useState<{ reserva: Reservation; accion: AccionDialogo } | null>(null);
   // Selección para aceptar en bloque — solo pendientes participan.
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
   const [aceptandoBloque, setAceptandoBloque] = useState(false);
@@ -668,13 +675,23 @@ export function ListaReservasAvanzada({
    * móvil. Si se puede pulsar o no (y por qué) lo decide `AccionesReserva` con
    * `accionesDisponibles`; aquí solo se dice a quién se llama.
    */
+  /**
+   * Lo que hacían «Aceptar», «Confirmar» y «Verificar» al pulsarlos en la fila. Desde el 10/11/2026 (petición
+   * del dueño: «se abre el pop-up para ver el día, lo que hay ese día y ver si se puede») la fila abre primero
+   * `DialogoAccionReserva` con los datos y el día, y es su botón verde el que llama a esto: lo mismo de antes.
+   */
+  const ejecutarAccion = (reserva: Reservation, accion: AccionDialogo) => {
+    if (accion === "aceptar") return handleAceptarUnaClic(reserva);
+    if (accion === "confirmar") return acciones.confirmar(reserva);
+    setSelectedReservaForVerification(reserva);
+    setVerificacionModalOpen(true);
+    return undefined;
+  };
+
   const alPulsar = (reserva: Reservation): AlPulsar => ({
-    aceptar: () => void handleAceptarUnaClic(reserva),
-    confirmar: () => void acciones.confirmar(reserva),
-    verificar: () => {
-      setSelectedReservaForVerification(reserva);
-      setVerificacionModalOpen(true);
-    },
+    aceptar: () => setDialogoAccion({ reserva, accion: "aceptar" }),
+    confirmar: () => setDialogoAccion({ reserva, accion: "confirmar" }),
+    verificar: () => setDialogoAccion({ reserva, accion: "verificar" }),
     seleccionar: () => toggleSeleccion(reserva.id),
     // El editor (2026-09-30, «las reservas se editan siempre»): en CUALQUIER estado, fecha y canal.
     editar: () => editarReserva(reserva.id),
@@ -1176,7 +1193,7 @@ export function ListaReservasAvanzada({
                 className={cn((reservation as { importante?: boolean | null }).importante && "bg-amber-50/60 dark:bg-amber-950/20", canEdit && "cursor-pointer")}
                 onClick={canEdit ? alTocarFila(al.editar) : undefined}
               >
-                <CardContent className="p-3 space-y-2">
+                <CardContent className="space-y-3 p-5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <CasillaAceptarEnBloque
@@ -1250,7 +1267,7 @@ export function ListaReservasAvanzada({
                 Cliente, lo que sobra (ver «CERO scroll horizontal» al principio
                 del fichero). El nombre accesible sustituye al título que había
                 encima («Todas las reservas y solicitudes», quitado el 2026-10-06). */}
-            <Table aria-label="Reservas y solicitudes" className="table-fixed text-base">
+            <Table aria-label="Reservas y solicitudes" className="table-fixed text-lg">
               <TableHeader className="sticky top-0 z-20">
                 <TableRow className="hover:bg-transparent">
                   {/* Cabecera SIN título (2026-09-26, petición del dueño). Lo
@@ -1262,7 +1279,7 @@ export function ListaReservasAvanzada({
                   {canEdit && (
                     <TableHead
                       aria-label="Acciones"
-                      className={cn("sticky left-0 z-30 h-10 border-r border-border/60 bg-card", ANCHO_ACCIONES, CELDA)}
+                      className={cn("sticky left-0 z-30 h-12 border-r border-border/60 bg-card", ANCHO_ACCIONES, CELDA)}
                     >
                       <RanuraSeleccion>
                         <Checkbox
@@ -1274,20 +1291,19 @@ export function ListaReservasAvanzada({
                       </RanuraSeleccion>
                     </TableHead>
                   )}
-                  <TableHead className={cn("h-10 bg-card", ANCHO_FECHA, CELDA)}>
+                  <TableHead className={cn("h-12 bg-card text-base", ANCHO_FECHA, CELDA)}>
                     Fecha<span className="hidden xl:inline"> y hora</span>
                   </TableHead>
                   {/* Cliente SIN ancho: en una tabla `table-fixed` se queda con lo que dejan las demás. */}
-                  <TableHead className={cn("h-10 bg-card", CELDA)}>Cliente</TableHead>
-                  <TableHead className={cn("h-10 bg-card", ANCHO_PAX, CELDA)} title="Comensales">Pax</TableHead>
-                  <TableHead className={cn("h-10 bg-card", ANCHO_CANAL, CELDA)}>Canal</TableHead>
-                  <TableHead className={cn("h-10 bg-card", ANCHO_ESTADO, CELDA)}>Estado</TableHead>
+                  <TableHead className={cn("h-12 bg-card text-base", CELDA)}>Cliente</TableHead>
+                  <TableHead className={cn("h-12 bg-card text-base", ANCHO_PAX, CELDA)} title="Comensales">Pax</TableHead>
+                  <TableHead className={cn("h-12 bg-card text-base", ANCHO_ESTADO, CELDA)}>Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canEdit ? 6 : 5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={canEdit ? 5 : 4} className="py-10 text-center text-lg text-muted-foreground">
                       {textoListaVacia}
                     </TableCell>
                   </TableRow>
@@ -1335,17 +1351,17 @@ export function ListaReservasAvanzada({
                           ancho que hacía falta para las acciones. */}
                       <CeldaFechaHora dia={new Date(reservation.fecha)} hora={reservation.hora} />
                       <TableCell className={CELDA}>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-3">
                           <EstrellaImportante reserva={reservation} canEdit={canEdit} variante="fila" onClick={al.importante} />
-                          <div className={ANCHO_NOMBRE}>
-                            <div className="flex min-w-0 items-center gap-1.5">
-                              <p className="truncate font-medium leading-tight" title={nombre}>{nombre}</p>
-                              <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} className="px-1.5 py-0 text-[10px]" />
-                              <InsigniaMenuCerrado reserva={reservation as { menu_cerrado?: boolean | null; menu_precio?: number | string | null }} className="px-1.5 py-0 text-[10px]" />
-                              <InsigniaZona reserva={reservation as { zona_preferida?: string | null }} className="px-1.5 py-0 text-[10px]" />
+                          <div className={cn(ANCHO_NOMBRE, "space-y-1")}>
+                            <div className="flex min-w-0 items-center gap-2">
+                              <p className="truncate text-xl font-semibold leading-tight" title={nombre}>{nombre}</p>
+                              <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} className="hidden px-2 py-0.5 text-sm xl:inline-flex" />
+                              <InsigniaMenuCerrado reserva={reservation as { menu_cerrado?: boolean | null; menu_precio?: number | string | null }} className="hidden px-2 py-0.5 text-sm xl:inline-flex" />
+                              <InsigniaZona reserva={reservation as { zona_preferida?: string | null }} className="hidden px-2 py-0.5 text-sm xl:inline-flex" />
                             </div>
                             {reservation.telefono && (
-                              <p className="truncate text-sm leading-tight text-muted-foreground" title={reservation.telefono}>
+                              <p className="truncate text-base leading-tight text-muted-foreground" title={reservation.telefono}>
                                 {reservation.telefono}
                               </p>
                             )}
@@ -1353,16 +1369,15 @@ export function ListaReservasAvanzada({
                         </div>
                       </TableCell>
                       <TableCell className={cn(CELDA, ANCHO_PAX)}>
-                        <div className="flex items-center gap-1 font-medium tabular-nums" title={`${reservation.numero_comensales} comensales`}>
-                          <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="flex items-center gap-1.5 font-semibold tabular-nums" title={`${reservation.numero_comensales} comensales`}>
+                          <Users className="h-5 w-5 shrink-0 text-muted-foreground" />
                           {reservation.numero_comensales}
                         </div>
                       </TableCell>
-                      <TableCell className={cn(CELDA, ANCHO_CANAL)}>{getCanalBadge(reservation.canal)}</TableCell>
                       <TableCell className={cn(CELDA, ANCHO_ESTADO)}>
                         <InsigniaEstado estado={reservation.estado} />
                         {/* «Sentar fuera» (10/11/2026): dónde se sentó, fuera de las salas (nada si está dentro). */}
-                        <EtiquetaFuera reserva={reservation as never} compacta className="mt-0.5 flex w-fit" />
+                        <EtiquetaFuera reserva={reservation as never} compacta className="mt-1 flex w-fit" />
                       </TableCell>
                     </TableRow>
                   ); })())
@@ -1420,6 +1435,15 @@ export function ListaReservasAvanzada({
           por sí solo la lista y el resto de pantallas (`CLAVES_POR_CAMBIO.ocupacion`
           de `clavesCache.ts`, ver `FormularioReserva`). Es `null` hasta que se pide editar. */}
       {dialogoEdicion}
+
+      <DialogoAccionReserva
+        reserva={dialogoAccion?.reserva ?? null}
+        accion={dialogoAccion?.accion ?? null}
+        nombreSala={dialogoAccion ? nombreSalaDe(dialogoAccion.reserva) : null}
+        onAccion={dialogoAccion && canEdit ? () => ejecutarAccion(dialogoAccion.reserva, dialogoAccion.accion) : undefined}
+        onEditar={dialogoAccion && canEdit ? () => editarReserva(dialogoAccion.reserva.id) : undefined}
+        onCerrar={() => setDialogoAccion(null)}
+      />
 
       {/* Lista negra: NO necesita AlertDialog propio. `BlacklistModal` ya es
           en sí mismo una confirmación —enseña de quién se trata, pide el
@@ -1658,24 +1682,18 @@ function FilaSolicitud({
       </TableCell>
       <TableCell className={cn(CELDA, ANCHO_PAX)}>
         {solicitud.numero_comensales ? (
-          <div className="flex items-center gap-1 font-medium tabular-nums" title={`${solicitud.numero_comensales} comensales`}>
-            <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="flex items-center gap-1.5 font-semibold tabular-nums" title={`${solicitud.numero_comensales} comensales`}>
+            <Users className="h-5 w-5 shrink-0 text-muted-foreground" />
             {solicitud.numero_comensales}
           </div>
         ) : "—"}
       </TableCell>
-      <TableCell className={cn(CELDA, ANCHO_CANAL)}>
-        <Badge title="Canal: asistente telefónico" className={cn(INSIGNIA, "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300")}>
-          <Phone className="h-3 w-3" />
-          <span className="hidden 2xl:inline">Bot</span>
-        </Badge>
-      </TableCell>
       <TableCell className={cn(CELDA, ANCHO_ESTADO)}>
-        <div className="flex min-w-0 flex-col items-start gap-0.5">
+        <div className="flex min-w-0 flex-col items-start gap-1">
           {/* El `title` explica qué es una «Solicitud» (lo decía el subtítulo de la pestaña, quitado el 2026-10-06). */}
           <Badge className={cn(INSIGNIA, "bg-amber-500 text-white")} title={TITULO_SOLICITUD}>
             <Inbox className="h-3 w-3" />
-            Solicitud · {estadoLabel}
+            Solicitud<span className="hidden xl:inline"> · {estadoLabel}</span>
           </Badge>
           <div className="flex min-w-0 items-center gap-1">
             {hayPropuesta && (
