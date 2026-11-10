@@ -9,6 +9,10 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 
 vi.mock("@/integrations/supabase/client");
+// Solo «Ver»: el número de personas es texto (el botón para cambiarlo tiene su test, `CambiarPersonas.test.tsx`).
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: (_seccion: string, tipo: string = "view") => ({ canAccess: tipo === "view", loading: false }),
+}));
 
 import { FilaReservaMovil } from "@/components/reservas/movil/VistaHoyMovil";
 import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
