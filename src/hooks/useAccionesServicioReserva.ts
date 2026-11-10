@@ -72,7 +72,18 @@ import {
   type CambiosReserva,
 } from "@/lib/reservas/escribirReserva";
 import type { EnvioCorreoEdicion } from "@/lib/reservas/edicionReserva";
-import { ESTADO_VERIFICADA, esEstadoVivo } from "@/lib/reservas/estadosReserva";
+import { ESTADO_LLEGADA, ESTADO_VERIFICADA, esEstadoVivo, etiquetaEstadoReserva } from "@/lib/reservas/estadosReserva";
+import {
+  MENSAJE_FUERA_SIN_MIGRACION,
+  cambiosQuitarFuera,
+  cambiosSentarFuera,
+  esErrorColumnasFueraInexistentes,
+  estaSentadaFuera,
+  etiquetaFuera,
+  problemaDatosFuera,
+  puedeSentarseFuera,
+  type DatosFuera,
+} from "@/lib/reservas/sentarFuera";
 import { estadoPrevioDe, olvidarEstadoPrevio, recordarEstadoPrevio } from "@/lib/reservas/estadoPrevio";
 import {
   notificarAlCliente,
@@ -365,6 +376,100 @@ export function useAccionesServicioReserva() {
     [ejecutarAccion],
   );
 
+  // ─── «Sentar fuera» (10/11/2026) ────────────────────────────────────────────
+  // Fuera de las salas del plano (Touza, Terraza Touza…): es SENTAR («Llegó») sin sala ni mesas. La regla de la
+  // BD (trigger `trg_reservas_sentada_fuera`) quita la sala y las mesas y las devuelve al deshacer; aquí se
+  // escribe como «Ha llegado»: condicionado al estado que vio el personal (adoptando el de verdad si sigue viva)
+  // y con «Deshacer» en el aviso. Ver `src/lib/reservas/sentarFuera.ts`.
+
+  const traducirErrorFuera = (error: unknown) => (esErrorColumnasFueraInexistentes(error) ? MENSAJE_FUERA_SIN_MIGRACION : null);
+
+  /** Sentar fuera (o cambiar el sitio de una que ya está fuera). Devuelve si se ha guardado. */
+  const sentarFuera = useCallback(
+    async (reserva: ReservaServicio & { salida_at?: string | null }, datos: DatosFuera) => {
+      const problema = problemaDatosFuera(datos);
+      if (problema) {
+        toast.error(problema);
+        return false;
+      }
+      if (!puedeSentarseFuera(reserva)) {
+        toast.error(`No se puede sentar fuera una reserva «${etiquetaEstadoReserva(reserva.estado)}».`);
+        return false;
+      }
+      const yaFuera = estaSentadaFuera(reserva);
+      const yaSentada = reserva.estado === ESTADO_LLEGADA;
+      const cambios = cambiosSentarFuera(reserva, datos, new Date());
+      const escrito = await escribir(reserva.id, cambios, {
+        verbo: yaFuera ? "cambiar el sitio de fuera" : "sentar fuera",
+        desdeEstados: [reserva.estado],
+        reintentarDesdeEstadoVivo: !yaSentada,
+        traducirError: traducirErrorFuera,
+      });
+      if (!escrito.ok) return false;
+
+      const previo = escrito.estadoReal ?? reserva.estado;
+      if (previo !== ESTADO_LLEGADA) recordarEstadoPrevio(reserva.id, previo);
+      // El «Deshacer» del aviso: lo que había justo antes.
+      const deshacer: Deshacer = yaFuera
+        ? {
+            cambios: { fuera_lugar: reserva.fuera_lugar ?? null, fuera_mesa: reserva.fuera_mesa ?? null },
+            verbo: "volver al sitio de antes",
+            desde: [ESTADO_LLEGADA],
+          }
+        : yaSentada
+          ? { cambios: cambiosQuitarFuera({ fuera_espacio_previo_id: reserva.espacio_id }), verbo: "volver a sentarla dentro", desde: [ESTADO_LLEGADA] }
+          : {
+              cambios: { estado: previo, llegada_at: null, ...cambiosQuitarFuera({ fuera_espacio_previo_id: reserva.espacio_id }) },
+              verbo: "deshacer «Sentar fuera»",
+              desde: [ESTADO_LLEGADA],
+              olvidarEstadoPrevio: true,
+            };
+      const etiqueta = etiquetaFuera({ estado: ESTADO_LLEGADA, fuera_lugar: cambios.fuera_lugar, fuera_mesa: cambios.fuera_mesa });
+      mostrarAviso(
+        {
+          titulo: `${reserva.nombre || "Reserva"}: ${etiqueta}`,
+          descripcion: yaFuera ? undefined : "No cuenta en ninguna sala ni ocupa mesa.",
+          duracionMs: 10_000,
+          deshacer,
+        },
+        reserva.id,
+      );
+      return true;
+    },
+    [escribir, mostrarAviso],
+  );
+
+  /**
+   * «Sentar dentro»: deja de estar fuera y sigue «Llegó», de vuelta en su sala y SIN mesa (se le da desde la
+   * ficha o el plano). Para que no haya llegado, el «Deshacer» de siempre.
+   */
+  const quitarFuera = useCallback(
+    async (reserva: ReservaServicio) => {
+      if (!estaSentadaFuera(reserva)) return true;
+      const escrito = await escribir(reserva.id, cambiosQuitarFuera(reserva), {
+        verbo: "sentarla dentro",
+        desdeEstados: [ESTADO_LLEGADA],
+        traducirError: traducirErrorFuera,
+      });
+      if (!escrito.ok) return false;
+      mostrarAviso(
+        {
+          titulo: `${reserva.nombre || "Reserva"} vuelve dentro`,
+          descripcion: "Sigue «Llegó», sin mesa: dale mesa desde su ficha o el plano.",
+          duracionMs: 10_000,
+          deshacer: {
+            cambios: { fuera_lugar: reserva.fuera_lugar ?? null, fuera_mesa: reserva.fuera_mesa ?? null, espacio_id: null },
+            verbo: "volver a sentarla fuera",
+            desde: [ESTADO_LLEGADA],
+          },
+        },
+        reserva.id,
+      );
+      return true;
+    },
+    [escribir, mostrarAviso],
+  );
+
   // ─── Gestión (Lista y modal «Verificar solicitud») ─────────────────────────
 
   /**
@@ -507,6 +612,8 @@ export function useAccionesServicioReserva() {
     marcarLlegada,
     marcarNoShow,
     deshacerLlegadaONoShow,
+    sentarFuera,
+    quitarFuera,
     aceptar,
     verificar,
     rechazar,

@@ -24,6 +24,8 @@ import { ESTADOS_RESERVA, type EstadoReserva } from "@/lib/reservas/estadosReser
 import { textoMesas, tieneAlergia, type FilaHoyMovil, type ListaHoyEscritorio as Lista } from "@/lib/reservas/hoyMovil";
 import type { ReservaMesaServicio } from "@/lib/reservas/servicioSala";
 import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
+import { estaSentadaFuera } from "@/lib/reservas/sentarFuera";
+import { EtiquetaFuera } from "@/components/reservas/SentarFuera";
 
 type Reserva = ReservaMesaServicio;
 
@@ -39,6 +41,8 @@ export interface ListaHoyEscritorioProps {
   onSentar?: (r: Reserva) => void;
   /** «Liberar» (sentadas con mesa). Sin él no hay botón. */
   onLiberar?: (r: Reserva) => void;
+  /** El botón azul «Sentar fuera» (por llegar, 10/11/2026). Sin él (solo «Ver») no hay botón. */
+  sentarFuera?: (r: Reserva) => ReactNode;
   /** Su mesa prevista la ocupa alguien sentado: «Sentar» abrirá el selector. */
   mesaPrevistaOcupada?: (r: Reserva) => boolean;
   /** Reserva con una acción en curso (botón desactivado). */
@@ -54,6 +58,7 @@ export function ListaHoyEscritorio({
   onAbrir,
   onSentar,
   onLiberar,
+  sentarFuera,
   mesaPrevistaOcupada,
   ocupadaId = null,
   señalada = null,
@@ -67,6 +72,8 @@ export function ListaHoyEscritorio({
     if (grupo === "porLlegar" && onSentar) {
       const elegir = f.mesas.length === 0 || !!mesaPrevistaOcupada?.(r);
       accion = (
+        <>
+        {sentarFuera?.(r)}
         <Button
           type="button"
           size="sm"
@@ -77,6 +84,7 @@ export function ListaHoyEscritorio({
         >
           Sentar
         </Button>
+        </>
       );
     } else if (grupo === "sentadas" && onLiberar && f.mesas.length > 0) {
       accion = (
@@ -188,6 +196,8 @@ function FilaEscritorio({
   const notas = (reserva.notas_cliente ?? "").trim();
   const alergia = tieneAlergia(notas);
   const sinMesa = mesas.length === 0;
+  // Sentada fuera de las salas (Touza…): en vez de la mesa, la etiqueta azul (10/11/2026).
+  const fuera = estaSentadaFuera(reserva);
   const fijada = !!reserva.mesa_fijada && !sinMesa;
   const textoMesa = sinMesa ? "Sin mesa" : mesas.join("+");
   const nombre = reserva.nombre || "Sin nombre";
@@ -213,7 +223,7 @@ function FilaEscritorio({
         onClick={onAbrir}
         onFocus={() => señalar(true)}
         onBlur={() => señalar(false)}
-        aria-label={`${horaCorta(reserva.hora)} ${nombre}, ${reserva.numero_comensales} personas, ${sinMesa ? "sin mesa" : `${sala ? `${sala}, ` : ""}${textoMesas(mesas).toLowerCase()}`}${estado ? `, ${estado.texto}` : ""}`}
+        aria-label={`${horaCorta(reserva.hora)} ${nombre}, ${reserva.numero_comensales} personas, ${fuera ? `fuera, ${reserva.fuera_lugar}` : sinMesa ? "sin mesa" : `${sala ? `${sala}, ` : ""}${textoMesas(mesas).toLowerCase()}`}${estado ? `, ${estado.texto}` : ""}`}
         className="absolute inset-0 h-full w-full touch-manipulation select-none hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted/70"
       />
       <div className="pointer-events-none relative flex min-h-14 items-center gap-1.5 px-3 py-1">
@@ -225,6 +235,9 @@ function FilaEscritorio({
         </span>
         {/* Tocar el número cambia las personas (10/11/2026). */}
         <BotonPersonas reserva={reserva} className="gap-0.5 text-base font-bold" icono="hidden h-4 w-4 xl:inline" />
+        {fuera ? (
+          <EtiquetaFuera reserva={reserva} compacta className="max-w-[8rem] shrink-0 text-sm" />
+        ) : (
         <span
           className={cn(
             "inline-flex max-w-[6rem] shrink-0 items-center gap-0.5 truncate rounded-md px-1.5 py-0.5 text-sm font-semibold",
@@ -238,6 +251,7 @@ function FilaEscritorio({
           {fijada && <Lock className="h-3 w-3 shrink-0" aria-label="Mesa fijada" />}
           {sinMesa ? textoMesa : `M ${textoMesa}`}
         </span>
+        )}
         <span className="flex shrink-0 items-center gap-0.5">
           {reserva.menu_del_dia && (
             <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-900 dark:bg-violet-950/60 dark:text-violet-200" title="Menú del día">

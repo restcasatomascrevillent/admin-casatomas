@@ -59,6 +59,7 @@
     "test:permisos-carta-newsletter:db": "node scripts/test-permisos-carta-newsletter.mjs",
     "test:newsletter-plantillas:db": "node scripts/test-newsletter-plantillas.mjs",
     "test:mesa-fijada:db": "node scripts/test-reservas-mesa-fijada.mjs",
+    "test:sentar-fuera:db": "node scripts/test-reservas-sentar-fuera.mjs",
     "test:sala-evento:db": "node scripts/test-sala-entera-evento.mjs",
     "test:servicios-bloqueados:db": "node scripts/test-servicios-bloqueados.mjs",
     "test:jueves-abiertos:db": "node scripts/test-jueves-abiertos.mjs",
