@@ -77,7 +77,10 @@ export function BotonPersonas({
 export function SelectorPersonas({ reserva, onCerrar }: { reserva: ReservaPersonas; onCerrar: () => void }) {
   const cambiar = useCambiarPersonas();
   const actual = Number(reserva.numero_comensales) || 1;
-  const [valor, setValor] = useState(actual);
+  // Texto para poder escribirlo a mano (10/11/2026); los botones − / + lo cambian igual.
+  const [texto, setTexto] = useState(String(actual));
+  const valor = Number(texto) || 0;
+  const setValor = (f: (v: number) => number) => setTexto(String(f(valor)));
   const [guardando, setGuardando] = useState(false);
   const guardar = async (n: number) => {
     setGuardando(true);
@@ -105,9 +108,21 @@ export function SelectorPersonas({ reserva, onCerrar }: { reserva: ReservaPerson
         >
           <Minus className="h-7 w-7" aria-hidden="true" />
         </Button>
-        <output className="w-20 text-center text-5xl font-bold tabular-nums" aria-live="polite" aria-label="Personas">
-          {valor}
-        </output>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          autoComplete="off"
+          aria-label="Personas"
+          className="h-16 w-24 rounded-md border bg-background text-center text-5xl font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+          value={texto}
+          disabled={guardando}
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => setTexto(e.target.value.replace(/\D/g, "").slice(0, 3))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && valor >= 1 && valor !== actual) void guardar(valor);
+          }}
+        />
         <Button
           variant="outline"
           className="h-16 w-16"
@@ -118,8 +133,8 @@ export function SelectorPersonas({ reserva, onCerrar }: { reserva: ReservaPerson
           <Plus className="h-7 w-7" aria-hidden="true" />
         </Button>
       </div>
-      <Button className="h-14 w-full text-base font-semibold" disabled={guardando || valor === actual} onClick={() => void guardar(valor)}>
-        {valor === actual ? "Sin cambios" : `Guardar ${valor} personas`}
+      <Button className="h-14 w-full text-base font-semibold" disabled={guardando || valor < 1 || valor === actual} onClick={() => void guardar(valor)}>
+        {valor < 1 ? "Escribe el número" : valor === actual ? "Sin cambios" : `Guardar ${valor} personas`}
       </Button>
       <div>
         <p className="mb-2 text-sm text-muted-foreground">O toca el número (se guarda al momento):</p>

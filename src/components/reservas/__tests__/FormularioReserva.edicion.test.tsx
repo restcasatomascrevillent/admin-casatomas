@@ -486,7 +486,7 @@ describe("FormularioReserva · edición · email", () => {
     const bd = prepararBD();
     montar({ email: null, estado: "verificada" });
 
-    fireEvent.change(screen.getByPlaceholderText("juan@email.com"), { target: { value: " juan@ejemplo.com " } });
+    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: " juan@ejemplo.com " } });
     fireEvent.click(await guardar());
 
     await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
@@ -506,7 +506,7 @@ describe("FormularioReserva · edición · email", () => {
       const bd = prepararBD();
       const { unmount } = montar({ id: `res-${estado}`, email: null, estado });
 
-      fireEvent.change(screen.getByPlaceholderText("juan@email.com"), { target: { value: "juan@ejemplo.com" } });
+      fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "juan@ejemplo.com" } });
       fireEvent.click(await guardar());
 
       await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
@@ -520,7 +520,7 @@ describe("FormularioReserva · edición · email", () => {
     prepararBD();
     montar({ email: null, estado: "verificada" });
 
-    fireEvent.change(screen.getByPlaceholderText("juan@email.com"), { target: { value: "juan@ejemplo.com" } });
+    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "juan@ejemplo.com" } });
     fireEvent.click(await guardar());
 
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
@@ -531,7 +531,7 @@ describe("FormularioReserva · edición · email", () => {
     prepararBD();
     montar({ email: null, estado: "verificada", fecha: "2020-03-10" });
 
-    fireEvent.change(screen.getByPlaceholderText("juan@email.com"), { target: { value: "juan@ejemplo.com" } });
+    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "juan@ejemplo.com" } });
     fireEvent.click(await guardar());
 
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
@@ -727,7 +727,7 @@ describe("FormularioReserva · edición · el aviso dice lo que pasó de verdad 
   const ponerEmail = async () => {
     const bd = prepararBD();
     const vista = montar({ email: null, estado: "verificada" });
-    fireEvent.change(screen.getByPlaceholderText("juan@email.com"), { target: { value: "juan@ejemplo.com" } });
+    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "juan@ejemplo.com" } });
     fireEvent.click(await guardar());
     return { bd, ...vista };
   };
@@ -898,7 +898,7 @@ describe("FormularioReserva · edición · cambiar la hora rompe el enlace «Con
     montar({ estado: "verificada", email: "mal@ejemplo.com" });
 
     fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
-    fireEvent.change(screen.getByPlaceholderText("juan@email.com"), { target: { value: "bien@ejemplo.com" } });
+    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "bien@ejemplo.com" } });
     fireEvent.click(casillaAviso());
     fireEvent.click(await guardar());
 
@@ -913,7 +913,7 @@ describe("FormularioReserva · edición · cambiar la hora rompe el enlace «Con
     montar({ estado: "verificada", email: "mal@ejemplo.com" });
 
     fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
-    fireEvent.change(screen.getByPlaceholderText("juan@email.com"), { target: { value: "bien@ejemplo.com" } });
+    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "bien@ejemplo.com" } });
     fireEvent.click(await guardar());
 
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
