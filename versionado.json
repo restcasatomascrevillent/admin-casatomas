@@ -1,4 +1,4 @@
 {
-  "version": "1.12.0",
+  "version": "1.13.0",
   "_como_funciona": "Versión publicada (X.Y.Z). Solo la cambia scripts/release.mjs al preparar una release; main tiene la de producción y la etiqueta vX.Y.Z se crea al aceptar el PR. Ver docs/PROCESO-DE-CAMBIOS.md."
 }
