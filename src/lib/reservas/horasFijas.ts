@@ -1,5 +1,5 @@
 // ============================================================================
-// TURNOS DE HORA FIJA en «Reservas › Configuración › Turnos» (20261122200000)
+// TURNOS DE HORA FIJA en «Reservas › Configuración › Turnos» (20261122200100)
 // ----------------------------------------------------------------------------
 // Jueves de tapas por la noche: dos turnos, 20:30 y 22:00. Se escriben en el
 // periodo como texto («20:30, 22:00») y se guardan en

@@ -15,7 +15,7 @@
 //     así que con Comida 13-16 salen 13:00…15:45. La ESCALERA se ignora a
 //     propósito: aquí interesa ver el turno entero, no lo que se ofrece.
 //     EXCEPCIÓN — turnos de HORA FIJA (`horas_fijas`, jueves de tapas por la
-//     noche, 20261122200000): ese periodo solo tiene esas horas (20:30 y 22:00),
+//     noche, 20261122200100): ese periodo solo tiene esas horas (20:30 y 22:00),
 //     así que solo salen ellas como franjas «turno» (y el alta solo ofrece
 //     ésas). La estancia de un turno fijo acaba, como mucho, en el siguiente.
 //   · TURNO: corte a las 17:00 (`turnoDeHora`), igual que el trigger

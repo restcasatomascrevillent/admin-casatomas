@@ -28,7 +28,7 @@ export interface ConfiguracionTurno {
   niveles_escalera?: NivelEscalera[] | string | null;
   ocultar_nivel_anterior?: boolean | null;
   base_umbral?: BaseUmbral | string | null;
-  /** Turnos de hora fija (20261122200000, jueves de tapas: ["20:30:00","22:00:00"]). `null` = escalera. */
+  /** Turnos de hora fija (20261122200100, jueves de tapas: ["20:30:00","22:00:00"]). `null` = escalera. */
   horas_fijas?: string[] | null;
 }
 

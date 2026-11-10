@@ -65,7 +65,7 @@ export function minutosDeHora(hora: string): number | null {
 /**
  * Minutos que ocupa la mesa una reserva a esa hora (por el turno de esa hora).
  * Con turnos de hora fija (`config.horasFijas`, jueves de tapas 20:30 y 22:00)
- * se recorta en el turno siguiente, como `fn_franja_ocupacion_mesa` (20261122200000).
+ * se recorta en el turno siguiente, como `fn_franja_ocupacion_mesa` (20261122200100).
  */
 export function minutosOcupacionMesa(hora: string, config: ConfigOcupacionMesa = CONFIG_OCUPACION_POR_DEFECTO): number {
   const comida = turnoDeHora(hora) === "comida";
