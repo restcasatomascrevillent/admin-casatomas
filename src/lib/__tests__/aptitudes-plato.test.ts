@@ -29,4 +29,12 @@ describe("«Apto para» de un plato (mismas reglas que los filtros de la web)", 
     expect(aptitudesPlato({ alergenos: ["crustáceos"], vegetariano: true }).vegetariano.motivo).toBe("Marcado, pero lleva crustáceos");
     expect(aptitudesPlato({ alergenos: ["huevos"], vegetariano: true, descripcion: "Patata, huevo y atún" }).vegetariano.motivo).toBe("Marcado, pero el texto dice «atun»");
   });
+  it("lo decidido a mano manda sobre los alérgenos; NULL es automático", () => {
+    expect(aptitudesPlato({ alergenos: ["gluten"], aptoCeliacos: true }).celiaquia).toEqual({ apto: true, motivo: "Marcado a mano" });
+    expect(aptitudesPlato({ alergenos: ["huevos"], aptoCeliacos: false }).celiaquia).toEqual({ apto: false, motivo: "Desmarcado a mano" });
+    expect(aptitudesPlato({ alergenos: ["gluten"], sinGluten: true, aptoCeliacos: false }).celiaquia.apto).toBe(false);
+    expect(aptitudesPlato({ alergenos: [], aptoSinLactosa: true }).lactosa).toEqual({ apto: true, motivo: "Marcado a mano" });
+    expect(aptitudesPlato({ alergenos: ["huevos"], aptoSinLactosa: false }).lactosa).toEqual({ apto: false, motivo: "Desmarcado a mano" });
+    expect(aptitudesPlato({ alergenos: ["lácteos"], aptoSinLactosa: null }).lactosa.motivo).toBe("Lleva lácteos");
+  });
 });

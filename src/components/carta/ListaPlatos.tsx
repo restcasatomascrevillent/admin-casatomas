@@ -273,7 +273,19 @@ export function ListaPlatos({ platos, soloLectura = false }: ListaPlatosProps) {
 
               {plato.sin_gluten_disponible === true && (
                 <Badge variant="outline" className="border-emerald-600/30 bg-emerald-50 text-emerald-800 whitespace-normal">
-                  Se puede hacer sin gluten
+                  Se puede hacer para celíacos
+                </Badge>
+              )}
+
+              {/* «Apto para» decidido a mano en el editor (10/11/2026); en automático no se marca aquí. */}
+              {typeof plato.apto_celiacos === "boolean" && (
+                <Badge variant="outline" className={plato.apto_celiacos ? "border-emerald-600/30 bg-emerald-50 text-emerald-800 whitespace-normal" : "whitespace-normal text-muted-foreground"}>
+                  {plato.apto_celiacos ? "Apto para celíacos" : "No apto para celíacos"}
+                </Badge>
+              )}
+              {typeof plato.apto_sin_lactosa === "boolean" && (
+                <Badge variant="outline" className={plato.apto_sin_lactosa ? "border-emerald-600/30 bg-emerald-50 text-emerald-800 whitespace-normal" : "whitespace-normal text-muted-foreground"}>
+                  {plato.apto_sin_lactosa ? "Apto sin lactosa" : "No apto sin lactosa"}
                 </Badge>
               )}
 

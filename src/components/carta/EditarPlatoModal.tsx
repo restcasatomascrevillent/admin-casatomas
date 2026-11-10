@@ -4,7 +4,13 @@ import {
   opcionesUnidadPlato,
 } from "@/lib/unidades-platos";
 import { AptoParaPlato } from "./AptoParaPlato";
-import { cambioVegetariano, esVegetariano } from "@/lib/dietas-plato";
+import {
+  aptitudesManualesDisponibles,
+  cambiosAptitudesManuales,
+  cambioVegetariano,
+  esVegetariano,
+  leerAptitudManual,
+} from "@/lib/dietas-plato";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -78,6 +84,9 @@ const formSchema = z
     descripcion: descripcionCarta,
     sin_gluten_disponible: z.boolean().default(false),
     vegetariano: z.boolean().default(false),
+    // «Apto para celíacos» / «Apto sin lactosa» a mano; null = según alérgenos (20261122093000).
+    apto_celiacos: z.boolean().nullable().default(null),
+    apto_sin_lactosa: z.boolean().nullable().default(null),
     ingredientes: z.string().optional(),
     unidad: z.string().default("Unidad"),
     gramos: z.coerce.number().optional(),
@@ -145,7 +154,6 @@ export function EditarPlatoModal({
   const [nuevoAlergeno, setNuevoAlergeno] = useState("");
   const [sinAlergenos, setSinAlergenos] = useState(false);
   const [errorAlergenos, setErrorAlergenos] = useState(false);
-  const tieneGluten = alergenosSeleccionados.includes("gluten");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -156,6 +164,8 @@ export function EditarPlatoModal({
       descripcion: "",
       sin_gluten_disponible: false,
       vegetariano: false,
+      apto_celiacos: null,
+      apto_sin_lactosa: null,
       ingredientes: "",
       unidad: "Unidad",
       gramos: 100,
@@ -182,9 +192,10 @@ export function EditarPlatoModal({
       categoria: plato.categoria ?? "",
       precio_eur: plato.precio_eur ?? 0,
       descripcion: plato.descripcion ?? "",
-      sin_gluten_disponible:
-        oficiales.includes("gluten") && plato.sin_gluten_disponible === true,
+      sin_gluten_disponible: plato.sin_gluten_disponible === true,
       vegetariano: esVegetariano(plato.etiquetas_dieteticas),
+      apto_celiacos: leerAptitudManual(plato.apto_celiacos),
+      apto_sin_lactosa: leerAptitudManual(plato.apto_sin_lactosa),
       ingredientes: plato.ingredientes ?? "",
       ...descomponerUnidad(plato.unidad),
     });
@@ -213,9 +224,6 @@ export function EditarPlatoModal({
   const toggleAlergeno = (id: string) => {
     setSinAlergenos(false);
     setErrorAlergenos(false);
-    if (id === "gluten" && tieneGluten) {
-      form.setValue("sin_gluten_disponible", false, { shouldDirty: true });
-    }
     setAlergenosSeleccionados((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
@@ -317,10 +325,15 @@ export function EditarPlatoModal({
         categoria: values.categoria,
         precio_eur: values.precio_eur,
         descripcion: values.descripcion?.trim() || null,
-        sin_gluten_disponible:
-          alergenos.includes("gluten") && values.sin_gluten_disponible,
+        // «Se puede hacer para celíacos»: interruptor siempre editable (10/11/2026).
+        sin_gluten_disponible: values.sin_gluten_disponible,
         // Solo si cambia (ver `cambioVegetariano`).
         ...cambioVegetariano(plato.etiquetas_dieteticas, values.vegetariano),
+        // Solo las que cambian: sin la migración 20261122093000 se sigue guardando.
+        ...cambiosAptitudesManuales(plato, {
+          apto_celiacos: values.apto_celiacos ?? null,
+          apto_sin_lactosa: values.apto_sin_lactosa ?? null,
+        }),
         ingredientes: values.ingredientes?.trim() || null,
         unidad: guardarUnidadPlato(values.unidad, values.gramos),
         alergenos_oficiales: alergenos.length > 0 ? alergenos : null,
@@ -500,7 +513,6 @@ export function EditarPlatoModal({
                   setSinAlergenos((v) => !v);
                   setAlergenosSeleccionados([]);
                   setAlergenosPersonalizados([]);
-                  form.setValue("sin_gluten_disponible", false);
                   setErrorAlergenos(false);
                 }}
               >
@@ -585,10 +597,12 @@ export function EditarPlatoModal({
               )}
             </div>
 
-            {/* «Apto para» (04/11/2026, dueño): celíacos, vegetarianos y sin lactosa, con su motivo y las
-                casillas «Se puede hacer sin gluten» y «Vegetariano». Mismas reglas que los filtros de la web. */}
+            {/* «Apto para» (04/11/2026, dueño): celíacos, vegetarianos y sin lactosa, con su motivo y los
+                interruptores editables (10/11/2026). Mismas reglas que los filtros de la web. */}
             <AptoParaPlato
               control={form.control}
+              setValue={form.setValue}
+              aptitudesManuales={aptitudesManualesDisponibles(plato)}
               alergenos={sinAlergenos ? [SIN_ALERGENOS_DECLARADOS] : combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados)}
               inferidos={plato?.alergenos_inferidos}
               notas={plato?.alergenos_notas}
