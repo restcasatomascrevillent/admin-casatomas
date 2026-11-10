@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { AvisoInstalarApp, InstalarApp, TEXTO_AYUDA_IOS } from "../InstalarApp";
+import { AvisoInstalarApp, TEXTO_AYUDA_IOS } from "../InstalarApp";
 import { escucharInstalacion, reiniciarInstalacion } from "@/lib/instalarApp";
 
 const uaOriginal = navigator.userAgent;
@@ -51,35 +51,15 @@ afterEach(() => {
   ponerUA(uaOriginal);
 });
 
-describe("InstalarApp (menú lateral)", () => {
+describe("AvisoInstalarApp: cuándo no sale", () => {
   it("sin el evento del navegador y fuera de iPhone no pinta nada", () => {
-    const { container } = render(<InstalarApp />);
+    const { container } = render(<AvisoInstalarApp />);
     expect(container).toBeEmptyDOMElement();
-  });
-
-  it("en Android, al llegar beforeinstallprompt sale el botón y llama a prompt()", async () => {
-    render(<InstalarApp />);
-    const evento = lanzarBeforeInstallPrompt();
-    expect(evento.defaultPrevented).toBe(true);
-    const boton = screen.getByRole("button", { name: "Instalar app" });
-    await act(async () => {
-      fireEvent.click(boton);
-    });
-    expect(evento.prompt).toHaveBeenCalledTimes(1);
-    // Aceptada: ya no se ofrece otra vez.
-    expect(screen.queryByRole("button", { name: "Instalar app" })).toBeNull();
-  });
-
-  it("en iPhone (sin evento) explica el gesto de Compartir", async () => {
-    ponerUA("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari/604.1");
-    render(<InstalarApp />);
-    fireEvent.click(screen.getByRole("button", { name: "Instalar app" }));
-    expect(await screen.findByText(TEXTO_AYUDA_IOS)).toBeInTheDocument();
   });
 
   it("ya instalada (display-mode: standalone) no pinta nada", () => {
     ponerMedia({ standalone: true });
-    const { container } = render(<InstalarApp />);
+    const { container } = render(<AvisoInstalarApp />);
     lanzarBeforeInstallPrompt();
     expect(container).toBeEmptyDOMElement();
   });
@@ -87,7 +67,7 @@ describe("InstalarApp (menú lateral)", () => {
   it("ya instalada en iPhone (navigator.standalone) no pinta nada", () => {
     ponerUA("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari/604.1");
     Object.defineProperty(window.navigator, "standalone", { value: true, configurable: true });
-    const { container } = render(<InstalarApp />);
+    const { container } = render(<AvisoInstalarApp />);
     expect(container).toBeEmptyDOMElement();
     Object.defineProperty(window.navigator, "standalone", { value: undefined, configurable: true });
   });

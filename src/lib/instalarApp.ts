@@ -2,7 +2,7 @@
  * «Instalar app» en el móvil (07/11/2026). El panel ya es instalable (manifest, iconos, service
  * worker); falta que el personal sepa hacerlo.
  *  · Android / Chrome / Edge: el navegador lanza `beforeinstallprompt` UNA vez, al cargar la página
- *    (antes de que exista el menú lateral, que va en un chunk perezoso). Por eso se escucha desde
+ *    (antes de que exista el aviso flotante, que va en un chunk perezoso). Por eso se escucha desde
  *    main.tsx con `escucharInstalacion()` y aquí se guarda el evento hasta que alguien pulse.
  *  · iPhone / iPad: Safari no tiene ese evento; solo se puede explicar el gesto (Compartir →
  *    «Añadir a pantalla de inicio»).

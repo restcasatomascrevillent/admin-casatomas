@@ -179,12 +179,12 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
     ruta: "/gestion-web",
     videoUrl: "/ayuda/videos/gestor-web.mp4",
     queEs:
-      "Desde aquí cambias lo que ven los clientes en las webs de Casa Tomás y Touza: la carta (platos, bebidas, vinos y cócteles), las novedades, el menú del día y las tapas. Escribes en español y se traduce solo al inglés y al francés.",
+      "Desde aquí cambias lo que ven los clientes en las webs de Casa Tomás y Touza: la carta (platos, bebidas, vinos y cócteles), las novedades, el menú del día, las tapas y si se ve la tienda de vinos. Escribes en español y se traduce solo al inglés y al francés.",
     grupos: [
       {
         titulo: "Moverte por el Gestor Web",
         pasos: [
-          "Elige arriba la pestaña de lo que quieres cambiar: «Carta», «Novedades», «Menús diarios» o «Tapas». Solo ves las que tienes permitidas.",
+          "Elige arriba la pestaña de lo que quieres cambiar: «Carta», «Novedades», «Menús diarios», «Tapas» o «Tienda». Solo ves las que tienes permitidas.",
           "Escribe siempre en español: al guardar se traduce solo al inglés y al francés.",
         ],
       },
@@ -232,6 +232,14 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
           "Elige la fecha y añade los platos por secciones: «De la carta» los busca entre tus platos y copia solos sus alérgenos, su foto y su traducción; «A mano» sirve para los que no están en la carta (también les puedes poner alérgenos y foto). Pulsa «Guardar y publicar».",
           "Los días ya guardados salen en la lista de arriba: toca uno para cambiarlo, o «Eliminar» para quitarlo en los tres idiomas. A la derecha ves cómo se leerá en la web.",
           "«Tapas» funciona igual: su propio interruptor, la fecha y una tapa por línea.",
+        ],
+      },
+      {
+        titulo: "Tienda en la web",
+        pasos: [
+          "En «Tienda», el interruptor «Mostrar «Tienda» en la web de Casa Tomás» enciende o apaga la tienda de vinos de la web. Es el mismo que «Tienda visible en la web» de la sección Tienda: si lo cambias en un sitio, cambia en el otro.",
+          "Apagada, «Tienda» desaparece del menú, del pie de la web y de la tarjeta de cheques regalo, y quien entre con un enlace guardado ve que la tienda no está disponible. No se borra nada: los vinos a la venta, el descuento y los textos siguen ahí.",
+          "Para elegir qué vinos se venden, el descuento o los textos, pulsa «Vinos a la venta, descuento y textos de la tienda». Esta pestaña solo sale si tienes permiso de Tienda, y para cambiar el interruptor hace falta «Puede editar».",
         ],
       },
     ],

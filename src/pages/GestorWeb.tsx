@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ComponentType } from "react";
 import { useSearchParams } from "react-router-dom";
-import { BookOpen, CalendarDays, Loader2, Newspaper, UtensilsCrossed } from "lucide-react";
+import { BookOpen, CalendarDays, Loader2, Newspaper, ShoppingBag, UtensilsCrossed } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
@@ -21,14 +21,15 @@ import {
 //
 // Antes eran tres entradas del menú (Gestor Carta, Gestor Web y Gestor Bot
 // Web). Ahora es una página con pestañas; la pestaña va en la URL
-// (?tab=carta|novedades|menus|tapas) para que recargar o compartir el
+// (?tab=carta|novedades|menus|tapas|tienda) para que recargar o compartir el
 // enlace abra la misma pestaña. /gestor-carta redirige aquí. El Bot Web se
 // retiró de aquí el 2026-09-26 y pasó a /super-admin/bot-web (exclusivo de
 // Super Admin); /gestion-bot ya no redirige a esta página.
 //
 // Permisos: cada pestaña conserva la sección de permisos que tenía su página
 // (gestor_carta, gestion_web). Solo se muestran las pestañas que el usuario
-// puede ver; no se amplía el acceso de nadie.
+// puede ver; no se amplía el acceso de nadie. «Tienda» (10/11/2026) pide el
+// permiso de Tienda, que por sí solo no abre esta página.
 //
 // Las pestañas se cargan bajo demanda (lazy) y, una vez abiertas, se quedan
 // montadas aunque cambies a otra: así no se pierde lo que estuvieras
@@ -39,12 +40,14 @@ const TabCarta = lazy(() => import("@/components/gestion-web/tabs/TabCarta"));
 const TabNovedades = lazy(() => import("@/components/gestion-web/tabs/TabNovedades"));
 const TabMenus = lazy(() => import("@/components/gestion-web/tabs/TabMenusTapas").then((m) => ({ default: m.TabMenus })));
 const TabTapas = lazy(() => import("@/components/gestion-web/tabs/TabMenusTapas").then((m) => ({ default: m.TabTapas })));
+const TabTienda = lazy(() => import("@/components/gestion-web/tabs/TabTienda"));
 
 const COMPONENTES: Record<PestanaGestorWeb, ComponentType> = {
   carta: TabCarta,
   novedades: TabNovedades,
   menus: TabMenus,
   tapas: TabTapas,
+  tienda: TabTienda,
 };
 
 const ICONOS: Record<PestanaGestorWeb, ComponentType<{ className?: string }>> = {
@@ -52,6 +55,7 @@ const ICONOS: Record<PestanaGestorWeb, ComponentType<{ className?: string }>> = 
   novedades: Newspaper,
   menus: UtensilsCrossed,
   tapas: CalendarDays,
+  tienda: ShoppingBag,
 };
 
 /** Etiqueta del móvil cuando la normal no cabe en la barra a 390 px. */

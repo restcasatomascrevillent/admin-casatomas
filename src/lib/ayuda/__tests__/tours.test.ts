@@ -39,7 +39,7 @@ describe("tours de ayuda", () => {
     for (const t of textos) expect(t).not.toMatch(/\busted\b/i);
   });
 
-  it("recorre las pestañas en orden: Facturas Cargar → Compras → IA; Gestor Web Carta (› Vinos) → Novedades → Menús → Tapas", () => {
+  it("recorre las pestañas en orden: Facturas Cargar → Compras → IA; Gestor Web Carta (› Vinos) → Novedades → Menús → Tapas → Tienda", () => {
     expect(pestanasDelTour(TOURS.facturas)).toEqual([
       "facturas-pestana-cargar",
       "facturas-pestana-compras",
@@ -50,6 +50,7 @@ describe("tours de ayuda", () => {
       "gw-pestana-novedades",
       "gw-pestana-menus",
       "gw-pestana-tapas",
+      "gw-pestana-tienda",
     ]);
   });
 
