@@ -41,7 +41,6 @@ import { LienzoManuscrito, type LienzoManuscritoApi } from "./LienzoManuscrito";
 // por dentro: la página del panel no desplaza (regla del dueño).
 // ============================================================================
 
-const LETRA_MANUSCRITA = '"Segoe Print", "Bradley Hand", "Noteworthy", "Comic Sans MS", cursive';
 const PAPEL = "bg-[#fbf6e9] text-stone-800";
 
 interface Props {
@@ -86,7 +85,7 @@ function ReservasDeLaHoja({ fecha, resaltada }: { fecha: string; resaltada: stri
     <div className="space-y-4">
       {grupos.map((g) => (
         <section key={g.turno} aria-label={ETIQUETA_TURNO[g.turno]}>
-          <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-stone-500">
+          <h3 className="mb-1 text-base font-semibold uppercase tracking-wide text-stone-500">
             {ETIQUETA_TURNO[g.turno]} · {g.reservas.length} {g.reservas.length === 1 ? "reserva" : "reservas"} · {g.pax} pax
           </h3>
           <ul>
@@ -97,22 +96,22 @@ function ReservasDeLaHoja({ fecha, resaltada }: { fecha: string; resaltada: stri
                 <li
                   key={r.id}
                   className={cn(
-                    "flex min-h-11 items-center gap-3 border-b border-sky-300/60 px-1 py-1 text-lg",
+                    "flex min-h-14 items-center gap-4 border-b border-sky-300/60 px-1 py-2 text-xl",
                     r.estado === ESTADO_NO_SHOW && "opacity-60",
                     resaltada === r.id && "bg-amber-200/50",
                   )}
                 >
-                  <span className="w-14 shrink-0 font-semibold tabular-nums">{horaCorta(r.hora) ?? r.hora}</span>
-                  <span className="min-w-0 flex-1 truncate" style={{ fontFamily: LETRA_MANUSCRITA }}>
+                  <span className="w-16 shrink-0 font-semibold tabular-nums">{horaCorta(r.hora) ?? r.hora}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium">
                     {r.nombre || "Sin nombre"}
-                    {r.notas_cliente ? <span className="ml-2 text-base text-stone-500">· {r.notas_cliente}</span> : null}
+                    {r.notas_cliente ? <span className="ml-2 text-lg font-normal text-stone-500">· {r.notas_cliente}</span> : null}
                   </span>
-                  <span className="shrink-0 tabular-nums" style={{ fontFamily: LETRA_MANUSCRITA }}>
+                  <span className="shrink-0 font-semibold tabular-nums">
                     {r.numero_comensales} px
                   </span>
-                  <span className="hidden w-28 shrink-0 truncate text-base text-stone-600 sm:inline">{sala ?? "—"}</span>
+                  <span className="hidden w-32 shrink-0 truncate text-lg text-stone-600 sm:inline">{sala ?? "—"}</span>
                   {info && (
-                    <Badge className={cn("shrink-0 text-xs", info.insignia)} variant={info.varianteInsignia}>
+                    <Badge className={cn("shrink-0 text-sm", info.insignia)} variant={info.varianteInsignia}>
                       {info.etiqueta}
                     </Badge>
                   )}
@@ -229,8 +228,8 @@ export function LibroReservas({ soloCrear = false }: Props) {
           <ReservasDeLaHoja fecha={fecha} resaltada={resaltada} />
         </div>
         <div className="border-t-2 border-dashed border-stone-300 px-6 pb-3 pt-2">
-          <p className="mb-1 text-sm text-stone-500">
-            Escribe la reserva con el lápiz, p. ej. <span style={{ fontFamily: LETRA_MANUSCRITA }}>«Esther 2px salón 14:15»</span>. Sin fecha, se apunta el {fechaCorta(fecha)}.
+          <p className="mb-1 text-base text-stone-500">
+            Escribe la reserva con el lápiz, p. ej. <span className="font-medium">«Esther 2px salón 14:15»</span>. Sin fecha, se apunta el {fechaCorta(fecha)}.
           </p>
           <div className="h-72 overflow-hidden rounded-md border border-stone-300 bg-white/70 lg:h-96">
             <LienzoManuscrito ref={lienzo} onCambio={setTrazos} />
