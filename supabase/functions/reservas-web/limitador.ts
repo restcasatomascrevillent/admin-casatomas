@@ -64,6 +64,28 @@ export async function reservarCupoCrear(cliente: ClienteRpc, req: Request, sal: 
 }
 
 /**
+ * Pide cupo para una consulta /disponibilidad (CT-REM-FN-07b). Misma forma que
+ * `reservarCupoCrear`, pero quien llama (handleDisponibilidad) FALLA EN ABIERTO
+ * ante `no_disponible`: disponibilidad es de solo lectura y crítica para la UX,
+ * así que una caída del limitador no debe impedir consultar. Solo se bloquea en
+ * `denegado` (el límite se superó de verdad).
+ */
+export async function reservarCupoDisponibilidad(cliente: ClienteRpc, req: Request, sal: string): Promise<ResultadoCupo> {
+  try {
+    const ipHash = await hashIp(ipCliente(req) ?? IP_DESCONOCIDA, sal);
+    if (!ipHash) return { estado: "no_disponible" };
+    const { data, error } = await cliente.rpc("reservas_web_reservar_cupo_disponibilidad", { p_ip_hash: ipHash });
+    if (error || !data || typeof data !== "object") return { estado: "no_disponible" };
+    const r = data as { permitido?: unknown; motivo?: unknown };
+    if (r.permitido === true) return { estado: "permitido" };
+    if (r.permitido === false) return { estado: "denegado", motivo: typeof r.motivo === "string" ? r.motivo : "limite" };
+    return { estado: "no_disponible" };
+  } catch {
+    return { estado: "no_disponible" };
+  }
+}
+
+/**
  * ¿Se puede mandar el correo de rechazo a esta dirección? Como mucho 1 cada
  * 24 h. Ante cualquier error, NO (fail-closed: es mejor no avisar a un
  * cliente que convertir el restaurante en un emisor de correo masivo).
