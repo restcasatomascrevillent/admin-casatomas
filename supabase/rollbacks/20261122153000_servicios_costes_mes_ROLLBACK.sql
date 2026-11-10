@@ -2,7 +2,8 @@ set client_encoding = 'UTF8';
 -- ROLLBACK de 20261122153000_servicios_costes_mes.sql: borra los costes metidos
 -- a mano por mes (¡se pierden!), el resumen mensual y la lectura de las cargas
 -- del mapa de vinos, y devuelve a Drive y Mapbox la nota «Sin lectura
--- automática». No toca las lecturas guardadas ni los servicios.
+-- automática», y quita a Vercel los límites de almacenamiento de despliegues
+-- y de funciones. No toca las lecturas guardadas ni los servicios.
 begin;
 
 drop function if exists public.servicios_cargas_mapa_vinos(timestamptz);
@@ -21,5 +22,9 @@ update public.servicios_contratados
          'Compartido con Gmail y Google Fotos de esa cuenta. Sin lectura automática: míralo en Drive.'::text))
  where proveedor = 'google_drive'
    and limites -> 'almacenamiento' ->> 'nota' like '%Lectura automática%';
+
+update public.servicios_contratados
+   set limites = limites - 'almacenamiento_despliegues' - 'almacenamiento_funciones'
+ where proveedor = 'vercel';
 
 commit;

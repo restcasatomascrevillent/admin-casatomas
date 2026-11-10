@@ -23,6 +23,13 @@ set client_encoding = 'UTF8';
 --      análisis. Sin la tabla de logs (20261118100000) devuelve null. La usa
 --      servicios-uso para la tarjeta de Mapbox.
 --   4. Notas de Google Drive y Mapbox: ya tienen lectura automática.
+--   5. Vercel (dueño, 10/11/2026: «no está controlando el deployment storage
+--      ni las functions storage»): dos límites nuevos, editables,
+--      «Almacenamiento de los despliegues» y «Almacenamiento de las
+--      funciones». Vercel no da esas cifras por API en el plan Hobby (ni en
+--      /v2/usage ni en facturación, comprobado el 10/11/2026): nacen sin
+--      límite («sin dato») y con la nota de dónde mirarlo; servicios-uso los
+--      rellena solo si la API empieza a darlos. Solo si no existen.
 --
 -- APLICAR (una a una, nunca `db push`): demo primero (sfonaclosuafvlhutkon),
 -- producción (haqmmdfdzzatdnrrcgez) solo tras aceptar el PR de la release y
@@ -194,5 +201,32 @@ update public.servicios_contratados
          'Compartido con Gmail y Google Fotos de esa cuenta. Lectura automática con la misma cuenta de Google que guarda las copias de las facturas.'::text))
  where proveedor = 'google_drive'
    and limites -> 'almacenamiento' ->> 'nota' like '%Sin lectura automática%';
+
+-- ─── 5. Vercel: almacenamiento de despliegues y de funciones ───────────────
+update public.servicios_contratados
+   set limites = coalesce(limites, '{}'::jsonb) || jsonb_build_object('almacenamiento_despliegues', jsonb_build_object(
+         'orden', 11,
+         'etiqueta', 'Almacenamiento de los despliegues (Deployment Storage)',
+         'limite', null,
+         'unidad', 'GB',
+         'periodo', 'ahora',
+         'fuente', 'https://vercel.com/docs/limits',
+         'nota', 'Vercel no da esta cifra por API en el plan Hobby: míralo en Vercel → Usage. Pon aquí el límite del plan cuando lo confirmes.'
+       ))
+ where proveedor = 'vercel'
+   and not (coalesce(limites, '{}'::jsonb) ? 'almacenamiento_despliegues');
+
+update public.servicios_contratados
+   set limites = coalesce(limites, '{}'::jsonb) || jsonb_build_object('almacenamiento_funciones', jsonb_build_object(
+         'orden', 12,
+         'etiqueta', 'Almacenamiento de las funciones (Functions Storage)',
+         'limite', null,
+         'unidad', 'GB',
+         'periodo', 'ahora',
+         'fuente', 'https://vercel.com/docs/functions/limitations',
+         'nota', 'Vercel no da esta cifra por API en el plan Hobby: míralo en Vercel → Usage. Cada función puede ocupar como mucho 250 MB sin comprimir.'
+       ))
+ where proveedor = 'vercel'
+   and not (coalesce(limites, '{}'::jsonb) ? 'almacenamiento_funciones');
 
 commit;

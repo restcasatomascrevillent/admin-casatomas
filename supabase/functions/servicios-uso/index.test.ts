@@ -480,6 +480,15 @@ describe("lectores", () => {
     expect(await LECTORES.mapbox(ctx({}, {}))).toMatchObject({ error: "error_api", detalles: { avisos: [expect.stringMatching(/20261122153000/)] } });
   });
 
+  it("Vercel: si la API da el almacenamiento de despliegues y funciones, salen como métricas (Hobby hoy no lo da)", async () => {
+    const conAlmacen = { data: USO_VERCEL.data.map((d, i) => ({ ...d, deployment_storage_bytes: 1000 + i, function_storage_bytes: 50 + i })) };
+    const r = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ "api.vercel.com/v2/usage": () => resp(conAlmacen) })));
+    expect(r.metricas.almacenamiento_despliegues).toMatchObject({ valor: 1001, unidad: "bytes", periodo: "ahora" });
+    expect(r.metricas.almacenamiento_funciones).toMatchObject({ valor: 51, unidad: "bytes" });
+    const sin = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas()));
+    expect(sin.metricas.almacenamiento_despliegues).toBeUndefined();
+  });
+
   it("Vercel: formato de uso desconocido → aviso con las claves vistas, sin inventar cifras", async () => {
     const r = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ "api.vercel.com/v2/usage": () => resp({ data: [{ cosa_rara: 5 }] }) })));
     expect(r.error).toBeFalsy();
@@ -808,6 +817,14 @@ describe("utilidades", () => {
       .toMatchObject({ peticiones: 7, bytesServidos: 10, bytesOrigen: 3, invocaciones: 2, cpuHoras: 2 });
     expect(resumirUsoVercel({ data: { proyectos: [{ request_hit_count: 1 }, { request_hit_count: 2 }] } }).peticiones).toBe(3);
     expect(resumirUsoVercel(null).claves).toEqual([]);
+  });
+  it("resumirUsoVercel: almacenamiento de despliegues y funciones, el último día (no se suma); sin él, nada", () => {
+    const r = resumirUsoVercel({ data: [
+      { timestamp: "2026-11-01", deployment_storage_bytes: 100, function_storage_bytes: 10, request_hit_count: 1 },
+      { timestamp: "2026-11-02", deployment_storage_bytes: 120, function_storage_bytes: 12, request_hit_count: 1 },
+    ] });
+    expect(r).toMatchObject({ bytesDespliegues: 120, bytesFunciones: 12 });
+    expect(resumirUsoVercel(USO_VERCEL)).toMatchObject({ bytesDespliegues: undefined, bytesFunciones: undefined });
   });
   it("resumirUsoGithub ignora lo que no es Actions (salvo en lo facturado)", () => {
     expect(resumirUsoGithub(GITHUB_RESUMEN)).toEqual({ computoUsd: 7, minutos: 1100, almacenamientoGbHoras: 3.6, netoUsd: 1, minutosPublicos: 0, computoPublicoUsd: 0, conRepositorio: false });

@@ -284,6 +284,19 @@ export function sumarCampos(json: unknown): Record<string, number> {
   return sumas;
 }
 
+/** Último valor (de la última fila con él) de los campos que casan: para niveles como el almacenamiento, que no se suman. */
+export function ultimoDe(json: unknown, incluye: RegExp): number | undefined {
+  let ultimo: number | undefined;
+  for (const fila of filasDeUso(json)) {
+    let suma: number | undefined;
+    for (const [k, v] of Object.entries(fila)) {
+      if (typeof v === "number" && Number.isFinite(v) && incluye.test(k)) suma = (suma ?? 0) + v;
+    }
+    if (suma != null) ultimo = suma;
+  }
+  return ultimo;
+}
+
 function sumaDe(sumas: Record<string, number>, incluye: RegExp, excluye?: RegExp): number | undefined {
   let total = 0;
   let hay = false;
@@ -307,6 +320,9 @@ export interface UsoVercel {
   imagenes?: number;
   /** % de las peticiones servidas desde la caché del CDN (aciertos / total). */
   aciertosCache?: number;
+  /** Almacenamiento de los despliegues y de las funciones (bytes, último día). Hobby no los da hoy. */
+  bytesDespliegues?: number;
+  bytesFunciones?: number;
   /** Peticiones de cada proyecto (del reparto diario «breakdown.requests»), de más a menos. */
   porProyecto: Array<{ proyecto: string; peticiones: number }>;
   claves: string[];
@@ -356,6 +372,9 @@ export function resumirUsoVercel(json: unknown): UsoVercel {
       const fallos = sumaDe(s, /^request_miss_count$/i);
       return aciertos != null && fallos != null && aciertos + fallos > 0 ? (aciertos / (aciertos + fallos)) * 100 : undefined;
     })(),
+    // Hobby no los da por API (comprobado el 10/11/2026); si un día salen, se leen.
+    bytesDespliegues: ultimoDe(json, /deployment.*(storage|size).*bytes?$|^deployments?_storage(_bytes)?$/i),
+    bytesFunciones: ultimoDe(json, /(function|lambda).*(storage|size).*bytes?$|^functions?_storage(_bytes)?$/i),
     porProyecto: peticionesPorProyecto(json),
     claves: Object.keys(s).sort(),
   };
@@ -458,6 +477,9 @@ export const leerVercel: Lector = async (ctx) => {
         limite: 360, unidad_limite: "GB-hora",
       };
     }
+    // Almacenamiento (petición del dueño, 10/11/2026). Es «ahora», no del periodo: el último valor del día.
+    if (r.bytesDespliegues != null) metricas.almacenamiento_despliegues = { orden: 11, etiqueta: "Almacenamiento de los despliegues (Deployment Storage)", valor: Math.round(r.bytesDespliegues), unidad: "bytes", periodo: "ahora" };
+    if (r.bytesFunciones != null) metricas.almacenamiento_funciones = { orden: 12, etiqueta: "Almacenamiento de las funciones (Functions Storage)", valor: Math.round(r.bytesFunciones), unidad: "bytes", periodo: "ahora" };
     if (r.imagenes != null) metricas.transformaciones_imagen = { orden: 6, etiqueta: "Imágenes optimizadas", valor: Math.round(r.imagenes), unidad: "transformaciones", periodo };
     if (r.peticiones == null && r.bytesServidos == null && r.invocaciones == null) {
       avisos.push("Vercel ha cambiado el formato de su API de uso: no se reconocen las cifras.");

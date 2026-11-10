@@ -549,8 +549,17 @@ ok(!(await q("select has_function_privilege('anon', 'public.servicios_cargas_map
 // Notas: cambian las de la semilla y no las editadas.
 const nota6 = async (p, k) => (await q(`select limites->'${k}'->>'nota' n from public.servicios_contratados where proveedor = '${p}'`)).rows[0].n;
 ok(/Lectura automática/.test(await nota6("mapbox", "cargas_mapa_web")) && /Lectura automática/.test(await nota6("google_drive", "almacenamiento")), "las notas de Mapbox y Drive siguen diciendo que no hay lectura automática");
+// Vercel: almacenamiento de despliegues y de funciones, sin límite («sin dato») y editable; no pisa lo editado.
+const vercel6 = async () => (await q("select limites from public.servicios_contratados where proveedor = 'vercel'")).rows[0].limites;
+const v6 = await vercel6();
+ok("almacenamiento_despliegues" in v6 && v6.almacenamiento_despliegues.limite === null && v6.almacenamiento_despliegues.unidad === "GB", "Vercel sin el control del almacenamiento de despliegues");
+ok("almacenamiento_funciones" in v6 && v6.almacenamiento_funciones.limite === null && /250 MB/.test(v6.almacenamiento_funciones.nota), "Vercel sin el control del almacenamiento de funciones");
+await db.exec(`update public.servicios_contratados set limites = jsonb_set(limites, '{almacenamiento_despliegues,limite}', '1') where proveedor = 'vercel'`);
+await db.exec(MIGRACION_6);
+igual((await vercel6()).almacenamiento_despliegues.limite, 1, "la migración pisa el límite de almacenamiento de despliegues editado");
 // Rollback: se va todo y se puede volver a aplicar; una nota editada no se toca.
 await db.exec(ROLLBACK_6);
+ok(!("almacenamiento_despliegues" in (await vercel6())) && !("almacenamiento_funciones" in (await vercel6())), "el rollback deja los límites de almacenamiento de Vercel");
 igual((await q("select to_regclass('public.servicios_costes_mes') t, to_regprocedure('public.servicios_resumen_mes(date)') r, to_regprocedure('public.servicios_cargas_mapa_vinos(timestamptz)') m")).rows[0], { t: null, r: null, m: null }, "el rollback de costes por mes deja restos");
 ok(/Sin lectura automática/.test(await nota6("mapbox", "cargas_mapa_web")) && /Sin lectura automática/.test(await nota6("google_drive", "almacenamiento")), "el rollback no devuelve las notas de Mapbox y Drive");
 await db.exec(`update public.servicios_contratados set limites = jsonb_set(limites, '{cargas_mapa_web,nota}', '"Mi nota"') where proveedor = 'mapbox'`);
