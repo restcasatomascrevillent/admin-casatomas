@@ -1,4 +1,4 @@
--- ROLLBACK de 20261122100000_decision_comparar_subida: vuelve a facturas_decision tal como
+-- ROLLBACK de 20261122100100_decision_comparar_subida: vuelve a facturas_decision tal como
 -- quedó en 20261116100000_chatbot_margenes_alertas (doc_otro solo con datos.factura_otro_id).
 create or replace function public.facturas_decision(
   p_desde date default null, p_hasta date default null, p_local text default null)

@@ -1,11 +1,11 @@
--- 20261122100000_decision_comparar_subida
+-- 20261122100100_decision_comparar_subida
 -- Facturas › Análisis: «Comparar facturas» también en los avisos de precio que sube / baja.
 -- facturas_decision rellena doc_otro de facturas_precio_sube con la ÚLTIMA compra anterior
 -- MÁS BARATA del mismo proveedor, misma línea normalizada y misma unidad (si no hay ninguna
 -- más barata, la última anterior); en facturas_precio_baja, la última anterior MÁS CARA.
 -- Solo cambian la CTE «ant» y el join de d2 en «2. Cambios de precio»; el resto es copia
 -- exacta de 20261116100000_chatbot_margenes_alertas.
--- Vuelta atrás: supabase/rollbacks/20261122100000_decision_comparar_subida_ROLLBACK.sql
+-- Vuelta atrás: supabase/rollbacks/20261122100100_decision_comparar_subida_ROLLBACK.sql
 create or replace function public.facturas_decision(
   p_desde date default null, p_hasta date default null, p_local text default null)
 returns jsonb

@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- Test de 20261122100000_decision_comparar_subida. BEGIN … ROLLBACK: no deja nada escrito.
+-- Test de 20261122100100_decision_comparar_subida. BEGIN … ROLLBACK: no deja nada escrito.
 -- Acaba en «decision_comparar_subida_test: OK».
 --   supabase db query --linked -f supabase/tests/decision_comparar_subida_test.sql
 --
