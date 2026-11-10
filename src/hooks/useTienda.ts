@@ -61,12 +61,13 @@ export function useGuardarAjustesTienda() {
 }
 
 /**
- * Interruptor «Mostrar Tienda en la web» de Gestor Web › Tienda (10/11/2026,
- * petición del dueño). Es la MISMA columna que «Tienda visible en la web» de
- * Tienda › Ajustes (`activa`), pero solo cambia esa: no pisa el descuento ni
- * los textos que otra persona pueda estar editando. Misma RLS que Ajustes
- * (`can_write_section('tienda')`). Se ve al momento (optimista) y se deshace
- * si falla. La web lo lee en vivo al cargar cada página: sin republicar.
+ * Interruptor «Visible en la web» de arriba de Panel › Tienda (10/11/2026,
+ * petición del dueño: un botón para encender o apagar la tienda de la web).
+ * Solo cambia `activa`: no pisa el descuento ni los textos que alguien esté
+ * editando en Ajustes. Misma RLS que Ajustes (`can_write_section('tienda')`).
+ * Se ve al momento (optimista) y se deshace si falla. La web lo lee en vivo
+ * al cargar cada página (quita «Tienda» del menú, del pie y de los cheques
+ * regalo): sin republicar.
  */
 export function useCambiarTiendaVisible() {
   const qc = useQueryClient();
