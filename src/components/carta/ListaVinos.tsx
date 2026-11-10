@@ -187,7 +187,7 @@ export function ListaVinos({ vinos, soloLectura = false }: ListaVinosProps) {
                   </div>
                 )
               }
-              titulo={<h3 className="font-semibold text-base leading-tight [overflow-wrap:anywhere]">{vino.nombre}</h3>}
+              titulo={<h3 className="font-semibold text-lg leading-tight [overflow-wrap:anywhere]">{vino.nombre}</h3>}
               controlesFoto={
                 <>
                   {tieneFoto && !soloLectura && (
