@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format, addDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, Armchair, CalendarIcon, CheckCircle, ChevronDown, Info, MapPin, Minus, Plus, ShieldBan } from "lucide-react";
+import { AlertTriangle, Armchair, CalendarIcon, CheckCircle, ChevronDown, Info, MapPin, Minus, Plus, ShieldBan, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -128,7 +128,7 @@ const formSchema = z.object({
   // 2026-10-01). El alta escribe siempre `marca: MARCA_POR_DEFECTO` (ver `onSubmit`).
   /** Sala asignada (null = sin asignar). Interna y opcional. */
   espacio_id: z.string().nullable().optional(),
-  /** Solo al EDITAR: marca de «importante» (en el alta no existe). */
+  /** Marca de «importante» (reserva del jefe): en el alta y al editar. */
   importante: z.boolean().optional(),
 });
 
@@ -983,6 +983,7 @@ export const FormularioReserva = ({
         canal: isPublic ? "web" : datosPreseleccionados?.canal ?? "manual",
         en_blacklist: !!blacklisted,
       };
+      if (values.importante) fila.importante = true;
       if (puedeMenuDelDia && menuDelDia) fila.menu_del_dia = true;
       if (datosPreseleccionados?.solicitud_id) fila.solicitud_id = datosPreseleccionados.solicitud_id;
 
@@ -1473,22 +1474,31 @@ export const FormularioReserva = ({
           )}
         />
 
-        {/* Solo al EDITAR: en el alta la estrella no existe (se marca después,
-            desde la lista o el Kanban); aquí se puede hacer en el mismo paso. */}
-        {editando && (
-          <FormField
-            control={form.control}
-            name="importante"
-            render={({ field }) => (
-              <FormItem className="flex min-h-11 flex-row items-center gap-2 space-y-0">
-                <FormControl>
-                  <Checkbox checked={!!field.value} onCheckedChange={(valor) => field.onChange(valor === true)} />
-                </FormControl>
-                <FormLabel className="font-normal">Marcar como importante</FormLabel>
-              </FormItem>
-            )}
-          />
-        )}
+        {/* Interruptor de «importante» (las reservas del jefe), en el alta y al editar.
+            Mismo icono y color que la estrella de la Lista. */}
+        <FormField
+          control={form.control}
+          name="importante"
+          render={({ field }) => (
+            <FormItem className="space-y-0">
+              <FormControl>
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-pressed={!!field.value}
+                  onClick={() => field.onChange(!field.value)}
+                  className={cn(
+                    "h-12 w-full justify-start gap-2 text-base",
+                    field.value && "border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-200",
+                  )}
+                >
+                  <Star className={cn("h-5 w-5", field.value ? "fill-amber-400 text-amber-500" : "text-muted-foreground")} aria-hidden="true" />
+                  {field.value ? "Importante" : "Marcar como importante (reserva del jefe)"}
+                </Button>
+              </FormControl>
+            </FormItem>
+          )}
+        />
 
         {puedeMenuDelDia && (
           <div className="flex min-h-11 flex-row items-center gap-2">
