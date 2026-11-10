@@ -70,7 +70,7 @@ export function ListaHoyEscritorio({
         <Button
           type="button"
           size="sm"
-          className="pointer-events-auto h-11 w-16 shrink-0 px-2"
+          className="pointer-events-auto h-11 w-20 shrink-0 px-2 text-base"
           disabled={ocupadaId === r.id}
           onClick={() => onSentar(r)}
           aria-label={elegir ? `Sentar a ${r.nombre || "la reserva"}: elegir mesa` : `Sentar a ${r.nombre || "la reserva"} en ${textoMesas(f.mesas).toLowerCase()}`}
@@ -84,7 +84,7 @@ export function ListaHoyEscritorio({
           type="button"
           size="sm"
           variant="outline"
-          className="pointer-events-auto h-11 w-16 shrink-0 px-2"
+          className="pointer-events-auto h-11 w-20 shrink-0 px-2 text-base"
           disabled={ocupadaId === r.id}
           onClick={() => onLiberar(r)}
           aria-label={`Liberar ${textoMesas(f.mesas).toLowerCase()} de ${r.nombre || "la reserva"}`}
@@ -112,19 +112,19 @@ export function ListaHoyEscritorio({
   const cabecera = (titulo: string, filas: Array<{ reserva: Reserva }>) => (
     <>
       <span>{titulo}</span>
-      <span className="text-xs font-normal tabular-nums text-muted-foreground">
+      <span className="text-sm font-normal tabular-nums text-muted-foreground">
         {filas.length} · {pax(filas)} pax
       </span>
     </>
   );
-  const claseCabecera = "sticky top-0 z-10 flex min-h-11 w-full items-center justify-between gap-2 border-b bg-muted/95 px-3 py-1.5 text-sm font-semibold backdrop-blur";
+  const claseCabecera = "sticky top-0 z-10 flex min-h-11 w-full items-center justify-between gap-2 border-b bg-muted/95 px-3 py-1.5 text-base font-semibold backdrop-blur";
 
   return (
     <div data-testid="lista-hoy-escritorio">
       <section aria-label="Por llegar">
         <h3 className={claseCabecera}>{cabecera("Por llegar", lista.porLlegar)}</h3>
         {lista.porLlegar.length === 0 ? (
-          <p className="px-3 py-2 text-sm text-muted-foreground">Nadie por llegar.</p>
+          <p className="px-3 py-2 text-base text-muted-foreground">Nadie por llegar.</p>
         ) : (
           <ul className="divide-y">{lista.porLlegar.map((f) => fila(f, "porLlegar"))}</ul>
         )}
@@ -132,7 +132,7 @@ export function ListaHoyEscritorio({
       <section aria-label="Sentadas">
         <h3 className={claseCabecera}>{cabecera("Sentadas", lista.sentadas)}</h3>
         {lista.sentadas.length === 0 ? (
-          <p className="px-3 py-2 text-sm text-muted-foreground">Nadie sentado.</p>
+          <p className="px-3 py-2 text-base text-muted-foreground">Nadie sentado.</p>
         ) : (
           <ul className="divide-y">{lista.sentadas.map((f) => fila(f, "sentadas"))}</ul>
         )}
@@ -144,12 +144,12 @@ export function ListaHoyEscritorio({
               <ChevronDown className={cn("h-4 w-4 transition-transform", verTerminadas && "rotate-180")} aria-hidden="true" />
               Terminadas / No vino / Canceladas
             </span>
-            <span className="text-xs font-normal tabular-nums text-muted-foreground">{lista.terminadas.length}</span>
+            <span className="text-sm font-normal tabular-nums text-muted-foreground">{lista.terminadas.length}</span>
           </button>
         </h3>
         {verTerminadas &&
           (lista.terminadas.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-muted-foreground">Ninguna todavía.</p>
+            <p className="px-3 py-2 text-base text-muted-foreground">Ninguna todavía.</p>
           ) : (
             <ul className="divide-y opacity-75">{lista.terminadas.map((f) => fila(f, "terminadas"))}</ul>
           ))}
@@ -216,18 +216,18 @@ function FilaEscritorio({
         aria-label={`${horaCorta(reserva.hora)} ${nombre}, ${reserva.numero_comensales} personas, ${sinMesa ? "sin mesa" : `${sala ? `${sala}, ` : ""}${textoMesas(mesas).toLowerCase()}`}${estado ? `, ${estado.texto}` : ""}`}
         className="absolute inset-0 h-full w-full touch-manipulation select-none hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted/70"
       />
-      <div className="pointer-events-none relative flex min-h-[3.25rem] items-center gap-1.5 px-3 py-1">
+      <div className="pointer-events-none relative flex min-h-14 items-center gap-1.5 px-3 py-1">
         {/* Por debajo de 1536 px no cabe la etiqueta: el estado va en un punto de color junto a la hora. */}
         {estado && <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full 2xl:hidden", estado.clase)} title={estado.texto} aria-hidden="true" />}
-        <span className="w-10 shrink-0 text-sm font-semibold tabular-nums">{horaCorta(reserva.hora)}</span>
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold" title={nombre}>
+        <span className="w-12 shrink-0 text-base font-semibold tabular-nums">{horaCorta(reserva.hora)}</span>
+        <span className="min-w-0 flex-1 truncate text-base font-semibold" title={nombre}>
           {nombre}
         </span>
         {/* Tocar el número cambia las personas (10/11/2026). */}
-        <BotonPersonas reserva={reserva} className="gap-0.5 text-sm font-bold" icono="hidden h-3.5 w-3.5 xl:inline" />
+        <BotonPersonas reserva={reserva} className="gap-0.5 text-base font-bold" icono="hidden h-4 w-4 xl:inline" />
         <span
           className={cn(
-            "inline-flex max-w-[5rem] shrink-0 items-center gap-0.5 truncate rounded-md px-1.5 py-0.5 text-xs font-semibold",
+            "inline-flex max-w-[6rem] shrink-0 items-center gap-0.5 truncate rounded-md px-1.5 py-0.5 text-sm font-semibold",
             sinMesa
               ? "bg-amber-100 text-amber-900 ring-1 ring-amber-400 dark:bg-amber-950/60 dark:text-amber-200"
               : "bg-muted text-foreground",
@@ -240,26 +240,26 @@ function FilaEscritorio({
         </span>
         <span className="flex shrink-0 items-center gap-0.5">
           {reserva.menu_del_dia && (
-            <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-900 dark:bg-violet-950/60 dark:text-violet-200" title="Menú del día">
+            <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-900 dark:bg-violet-950/60 dark:text-violet-200" title="Menú del día">
               Menú
             </span>
           )}
-          {alergia && <AlertTriangle className="h-4 w-4 text-red-600" aria-label="Alergia" />}
-          {notas && !alergia && <StickyNote className="h-4 w-4 text-amber-700 dark:text-amber-300" aria-label="Notas del cliente" />}
+          {alergia && <AlertTriangle className="h-5 w-5 text-red-600" aria-label="Alergia" />}
+          {notas && !alergia && <StickyNote className="h-5 w-5 text-amber-700 dark:text-amber-300" aria-label="Notas del cliente" />}
           {notas && <span className="sr-only">{notas}</span>}
           {tel && (
             <a
               href={tel}
               aria-label={`Llamar a ${nombre}`}
               title={telefonoLegible(reserva.telefono) ?? undefined}
-              className="pointer-events-auto -mx-2 -my-2 hidden h-11 w-11 items-center justify-center rounded-md text-primary hover:bg-muted active:bg-muted xl:inline-flex"
+              className="pointer-events-auto -mx-2 -my-2 hidden h-11 w-11 items-center justify-center rounded-md text-primary hover:bg-muted active:bg-muted 2xl:inline-flex"
             >
-              <Phone className="h-4 w-4" aria-hidden="true" />
+              <Phone className="h-5 w-5" aria-hidden="true" />
             </a>
           )}
         </span>
         {estado && (
-          <span className={cn("hidden w-[4.25rem] shrink-0 truncate rounded-full px-1 py-0.5 text-center text-[11px] font-medium 2xl:inline-block", estado.clase)}>
+          <span className={cn("hidden w-[5rem] shrink-0 truncate rounded-full px-1 py-0.5 text-center text-xs font-medium 2xl:inline-block", estado.clase)}>
             {estado.texto}
           </span>
         )}

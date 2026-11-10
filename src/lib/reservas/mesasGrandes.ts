@@ -24,8 +24,8 @@ export interface UnidadMesas {
 /** Relleno alrededor de las tarjetas (px). */
 export const RELLENO_MESAS_GRANDES = 8;
 /** Tamaño máximo de una tarjeta (px), para que con 3 mesas en una sala no salgan de medio metro. */
-const MAX_ANCHO_TARJETA = 260;
-const MAX_ALTO_TARJETA = 180;
+const MAX_ANCHO_TARJETA = 188;
+const MAX_ALTO_TARJETA = 130;
 
 /** Las tarjetas de una sala: una por mesa suelta y una por unión. */
 export function unidadesMesas(mesas: readonly MesaPosicion[], uniones: readonly UnionPosicion[] = []): UnidadMesas[] {
@@ -53,7 +53,7 @@ export function compararNombreMesa(a: string, b: string): number {
 
 /**
  * Medidas de cada tarjeta para un hueco de `ancho` × `alto` px con `filas` × `columnas`: entran SIEMPRE
- * enteras (sin scroll), cuadradas o más anchas que altas y como mucho 260 × 180.
+ * enteras (sin scroll), cuadradas o más anchas que altas y como mucho 188 × 130 (72 % de los 260 × 180 de antes: más mesas sin scroll).
  */
 export function medidasTarjetas(ancho: number, alto: number, filas: number, columnas: number) {
   const hueco = Math.min(ancho, alto) < 500 ? 6 : 10;
