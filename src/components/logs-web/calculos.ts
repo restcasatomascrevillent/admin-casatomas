@@ -6,7 +6,8 @@
  */
 import { format, formatDistanceStrict, parseISO, subDays } from "date-fns";
 import { es } from "date-fns/locale";
-import type { EstadoRecogidaDatos, EventoWeb } from "@/hooks/useLogsWeb";
+import type { EstadoRecogidaDatos, EventoWeb, IncidenciaWeb } from "@/hooks/useLogsWeb";
+import { causaConocida, type CausaConocida } from "../../../supabase/functions/_shared/logs-web/causas";
 
 export type NivelRecogida = "ok" | "sin_actividad" | "parada" | "sin_datos_aun" | "aviso";
 
@@ -221,3 +222,39 @@ export function rangoEstadisticas(valor: string, hoy: Date): { desde: string; ha
   return { desde: format(subDays(hoy, dias), ISO_DIA), hasta: format(subDays(hoy, 1), ISO_DIA) };
 }
 
+
+/** Causa conocida de una incidencia del panel (el objetivo va en el título: «mensaje · objetivo»). */
+export function causaDeFila(i: Pick<IncidenciaWeb, "tipo" | "fuente" | "mensaje" | "pila" | "titulo">): CausaConocida | null {
+  const objetivo = i.titulo.split(" · ").slice(1).join(" · ") || null;
+  return causaConocida({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo });
+}
+
+/** Reparto «valor n %» de una lista (los 4 más frecuentes). */
+export function repartoTexto<T>(filas: T[], clave: (f: T) => string | null | undefined): string {
+  if (!filas.length) return "—";
+  const n = new Map<string, number>();
+  for (const f of filas) {
+    const k = clave(f) || "desconocido";
+    n.set(k, (n.get(k) ?? 0) + 1);
+  }
+  return [...n.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k} ${Math.round((100 * v) / filas.length)} %`).join(" · ");
+}
+
+/** Texto para copiar y pegar a quien lo vaya a arreglar: error completo y contexto técnico (sin datos personales). */
+export function textoParaCopiar(i: IncidenciaWeb, e?: EventoWeb | null): string {
+  const l = [
+    `Incidencia #${i.id} · ${i.titulo}`,
+    `Tipo: ${NOMBRE_TIPO[i.tipo] ?? i.tipo} · fuente ${i.fuente} · entorno ${i.entorno} · gravedad ${i.gravedad}`,
+    `Ocurrencias: ${i.ocurrencias} (${i.ocurrencias_24h} en 24 h) · sesiones ${i.sesiones_afectadas} · de ${i.primera_vez} a ${i.ultima_vez}`,
+    `Versión: ${i.version_primera ?? "?"} → ${i.version_ultima ?? "?"}${i.despliegue_ultimo ? ` · despliegue ${i.despliegue_ultimo}` : ""}`,
+  ];
+  if (i.rutas.length) l.push(`Páginas: ${i.rutas.map((r) => `${r.ruta} (${r.n})`).join(", ")}`);
+  if (e) {
+    l.push(`Ocurrencia ${e.ocurrido_en}: ${[e.ruta, e.objetivo, e.navegador, e.so, e.dispositivo, e.version && `v${e.version}`].filter(Boolean).join(" · ")}`);
+    if (Object.keys(e.propiedades ?? {}).length) l.push(`Datos: ${JSON.stringify(e.propiedades)}`);
+  }
+  l.push("", e?.mensaje ?? i.mensaje ?? "(sin mensaje)");
+  const pila = e?.pila ?? i.pila;
+  if (pila) l.push("", pila);
+  return l.join("\n");
+}

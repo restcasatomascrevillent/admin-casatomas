@@ -63,13 +63,16 @@ function useQueryExplorar(claveRetrasada: string, activo: boolean) {
     staleTime: 5 * 60_000,
     placeholderData: keepPreviousData,
     retry: (n, e) => !(e instanceof Error && e.message === TEXTO_EXPLORADOR_SIN_MIGRACION) && n < 1,
-    queryFn: async (): Promise<Exploracion> => {
-      const { data, error } = await rpc("explorar_compras", JSON.parse(claveRetrasada) as Record<string, unknown>);
-      if (esErrorRpcInexistente(error)) throw new Error(TEXTO_EXPLORADOR_SIN_MIGRACION);
-      if (error) throw new Error(error.message || "No se ha podido calcular la gráfica");
-      return normalizarExploracion(data);
-    },
+    queryFn: () => consultarExplorarCompras(JSON.parse(claveRetrasada) as ParametrosExplorar),
   });
+}
+
+/** Una llamada a `explorar_compras` (también la usan los informes de Super Admin › Informes). */
+export async function consultarExplorarCompras(params: ParametrosExplorar): Promise<Exploracion> {
+  const { data, error } = await rpc("explorar_compras", params as unknown as Record<string, unknown>);
+  if (esErrorRpcInexistente(error)) throw new Error(TEXTO_EXPLORADOR_SIN_MIGRACION);
+  if (error) throw new Error(error.message || "No se ha podido calcular la gráfica");
+  return normalizarExploracion(data);
 }
 
 export const DOCUMENTOS_POR_PAGINA = 50;

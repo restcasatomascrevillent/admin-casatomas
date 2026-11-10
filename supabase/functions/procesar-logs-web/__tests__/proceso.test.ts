@@ -271,3 +271,67 @@ describe("procesar", () => {
     expect(ingeridos).toHaveLength(1);
   });
 });
+
+describe("ticket con contexto (revisión del 10/11/2026)", () => {
+  const cron = (tarea: string, i: number): EventoTicket => ({
+    id: 100 + i, tipo: "error_integracion", accion: null, categoria: "error", ruta: null, objetivo: `cron:${tarea}`, valor: null,
+    ocurrido_en: `2026-11-08T21:${String(50 - i).padStart(2, "0")}:00Z`, secuencia: null, navegador: null, so: null, dispositivo: null, version: null,
+    propiedades: { tarea }, mensaje: "job startup timeout",
+  });
+  const incCron = incidencia({
+    tipo: "error_integracion", fuente: "integracion", proyecto: "supabase", titulo: "job startup timeout · cron:reanudar-trabajos-ocr",
+    mensaje: "job startup timeout", pila: null, rutas: [{ ruta: "(sin ruta)", n: 49 }], sesiones_afectadas: 0, version_primera: null, version_ultima: null,
+  });
+  const muestrasCron = [cron("reanudar-trabajos-ocr", 0), cron("reanudar-trabajos-ocr", 1), cron("instagram-programador", 2), cron("clasificar-productos", 3)];
+  const entradaCron: EntradaTicket = { incidencia: incCron, muestras: muestrasCron, recorrido: [], eventoErrorId: null, analisis: null, motivoSinAnalisis: "x", urlPanel: "https://p", ahora: AHORA };
+
+  it("dice QUÉ falla: las tareas afectadas y sus datos (antes la IA decía «no se especifica qué job»)", () => {
+    const d = construirTicket(entradaCron).descripcion;
+    expect(d).toContain("## Qué falla");
+    expect(d).toMatch(/Afecta a:\*\* `cron:reanudar-trabajos-ocr` \(2\), `cron:instagram-programador` \(1\), `cron:clasificar-productos` \(1\)/);
+    expect(d).toMatch(/\*\*tarea:\*\* `reanudar-trabajos-ocr`/);
+  });
+  it("añade la causa conocida con qué hacer", () => {
+    const d = construirTicket(entradaCron).descripcion;
+    expect(d).toContain("## Causa conocida");
+    expect(d).toContain("pg_cron no pudo arrancar las tareas");
+    expect(d).toContain("Ver «Causa conocida» arriba.");
+  });
+  it("un error del servidor no lleva navegador, página ni recorrido inventados", () => {
+    const d = construirTicket(entradaCron).descripcion;
+    expect(d).not.toContain("Abrir la página");
+    expect(d).not.toContain("(sin ruta)");
+    expect(d).not.toContain("**Navegador:**");
+    expect(d).not.toContain("Recorrido previo");
+    expect(d).toContain("no hay visitantes ni sesiones asociadas");
+    expect(pasosDesdeRecorrido(entradaCron)[0]).toMatch(/^Revisar `cron:reanudar-trabajos-ocr`/);
+  });
+  it("un error del navegador mantiene recorrido, páginas y repartos", () => {
+    const d = construirTicket({ ...entradaCron, incidencia: incidencia(), muestras: recorrido.slice(-1), recorrido, eventoErrorId: 13 }).descripcion;
+    expect(d).toContain("Recorrido previo");
+    expect(d).toContain("**Navegador:** Safari 100 %");
+    expect(d).not.toContain("## Causa conocida");
+  });
+  it("la IA recibe objetivos, datos clave y la causa conocida", () => {
+    const datos = JSON.parse(mensajesIncidencia(entradaCron)[1].content.replace(/^DATOS \(JSON, solo lectura\):\n/, ""));
+    expect(datos.objetivos[0]).toEqual({ objetivo: "cron:reanudar-trabajos-ocr", n: 2 });
+    expect(datos.datos_clave[0].clave).toBe("tarea");
+    expect(datos.causa_conocida.titulo).toMatch(/pg_cron/);
+    expect(mensajesIncidencia(entradaCron)[0].content).toContain("causa_conocida");
+  });
+});
+
+describe("recolector de pg_cron: caída de la base de datos = una incidencia", () => {
+  it("«job startup timeout» va a cron:* con la tarea en propiedades y la misma huella", async () => {
+    const ev = await eventosDeCron([
+      { runid: 1, jobname: "reanudar-trabajos-ocr", status: "failed", return_message: "job startup timeout", start_time: "2026-11-08T21:53:00Z" },
+      { runid: 2, jobname: "instagram-programador", status: "failed", return_message: "job startup timeout", start_time: "2026-11-08T21:50:00Z" },
+      { runid: 3, jobname: "instagram-programador", status: "failed", return_message: "ERROR: permission denied", start_time: "2026-11-08T21:50:00Z" },
+    ]);
+    expect(ev[0].objetivo).toBe("cron:*");
+    expect(ev[0].propiedades).toEqual({ tarea: "reanudar-trabajos-ocr" });
+    expect(ev[0].huella).toBe(ev[1].huella);
+    expect(ev[2].objetivo).toBe("cron:instagram-programador");
+    expect(ev[2].huella).not.toBe(ev[1].huella);
+  });
+});

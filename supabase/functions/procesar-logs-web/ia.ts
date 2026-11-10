@@ -16,8 +16,9 @@
 // ============================================================================
 
 import type { AnalisisIa, EntradaTicket } from "./ticket.ts";
-import { describirEvento } from "./ticket.ts";
+import { causaDeIncidencia, datosClave, describirEvento, objetivosAfectados } from "./ticket.ts";
 import { sanearPila, sanearTexto } from "../_shared/logs-web/saneado.ts";
+import { quitarHashVite } from "../_shared/logs-web/huella.ts";
 
 export interface MensajeChat {
   role: "system" | "user";
@@ -31,6 +32,8 @@ Reglas obligatorias:
 - No inventes causas, archivos, funciones, versiones ni cifras. Nombra un archivo solo si aparece literalmente en la pila o el mensaje.
 - No afirmes que una solución está verificada. Las propuestas son cambios concretos a probar.
 - Si los datos no bastan, dilo en "falta_contexto".
+- Si DATOS trae "causa_conocida", es un diagnóstico ya confirmado para ese patrón: úsalo como hecho y no propongas causas que lo contradigan sin pruebas.
+- "objetivos" es lo que falla (tarea programada, función, recurso o componente) y "datos_clave", valores técnicos de las ocurrencias: cítalos en vez de decir que no se sabe qué falla.
 - Escribe en español, frases cortas.
 Responde SOLO con un objeto JSON con estas claves:
 {"impacto": string, "hechos_observados": string[], "hipotesis": [{"texto": string, "confianza": "baja"|"media"|"alta"}], "pasos_reproduccion": string[], "propuesta": string[], "validacion": string[], "falta_contexto": string[]}`;
@@ -64,6 +67,12 @@ export function datosParaIa(entrada: EntradaTicket): Record<string, unknown> {
       paginas: i.rutas,
       reabierta_veces: i.reabierta_veces,
     },
+    objetivos: objetivosAfectados(entrada.muestras).slice(0, 10),
+    datos_clave: datosClave(entrada.muestras),
+    causa_conocida: (() => {
+      const c = causaDeIncidencia(i, entrada.muestras);
+      return c ? { titulo: c.titulo, explicacion: c.explicacion, acciones: c.acciones } : null;
+    })(),
     muestras: {
       n: entrada.muestras.length,
       navegador: contar((e) => e.navegador),
@@ -87,10 +96,10 @@ const RE_ARCHIVO = /\b[\w@./-]+\.(?:tsx?|jsx?|mjs|cjs|sql|css|html|json|vue|py)\
 /** Sustituye los archivos que la IA nombre y no estén en las evidencias. */
 export function quitarArchivosInventados(texto: string, evidencias: string): string {
   // También vale el nombre sin el hash de Vite (index-AbCd12.js ↔ index.js).
-  const ev = `${evidencias}\n${evidencias.replace(/-[A-Za-z0-9_]{6,12}(\.(m?js|css))/g, "$1")}`;
+  const ev = `${evidencias}\n${quitarHashVite(evidencias)}`;
   return texto.replace(RE_ARCHIVO, (archivo) => {
     const base = archivo.split("/").pop() ?? archivo;
-    const sinHash = base.replace(/-[A-Za-z0-9_]{6,12}(\.(m?js|css))$/, "$1");
+    const sinHash = quitarHashVite(base);
     return ev.includes(base) || ev.includes(sinHash) || ev.includes(archivo) ? archivo : "(archivo no presente en las evidencias)";
   });
 }

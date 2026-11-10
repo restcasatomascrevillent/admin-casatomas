@@ -8,10 +8,14 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TIPOS_USUARIO, tipoDeValor, tipoQueCoincide, valorTipo } from "@/components/usuarios/tiposUsuario";
 import {
   Dialog,
   DialogContent,
@@ -153,7 +157,9 @@ export function ListaUsuarios({
     const perms = permisosParaEditar(user.permissions);
     setEditingPermissions(perms);
     const matchingPreset = findMatchingPreset(user.role, perms);
-    setSelectedPresetId(matchingPreset?.id ?? "manual");
+    // Si no es un preconfigurado, quizá sea uno de los tipos fijos («Reservas», «Albaranes»).
+    const tipo = matchingPreset ? null : tipoQueCoincide(perms);
+    setSelectedPresetId(matchingPreset?.id ?? (tipo ? valorTipo(tipo) : "manual"));
   };
 
   const closePermissionsDialog = () => {
@@ -295,6 +301,12 @@ export function ListaUsuarios({
   const handlePresetChange = (presetId: string) => {
     setSelectedPresetId(presetId);
     if (presetId === "manual") return;
+    // Tipo de usuario fijo (10/11/2026): copia sus permisos; el rol sale de ellos (Staff).
+    const tipo = tipoDeValor(presetId);
+    if (tipo) {
+      setEditingPermissions(permisosParaEditar(tipo.permisos));
+      return;
+    }
 
     const selectedPreset = presets.find((preset) => preset.id === presetId);
     if (!selectedPreset) return;
@@ -440,7 +452,7 @@ export function ListaUsuarios({
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Label className="text-sm font-medium">
-                Rol preconfigurado
+                Tipo de usuario o rol preconfigurado
               </Label>
               <ConfigurarRolesModal
                 currentPermissions={editingPermissions}
@@ -470,16 +482,38 @@ export function ListaUsuarios({
                 <SelectItem value="manual">
                   Sin rol preconfigurado
                 </SelectItem>
-                {presets.map((preset) => (
-                  <SelectItem
-                    key={preset.id}
-                    value={preset.id}
-                  >
-                    {preset.name}
-                  </SelectItem>
-                ))}
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel>Tipos de usuario</SelectLabel>
+                  {TIPOS_USUARIO.map((tipo) => (
+                    <SelectItem key={tipo.id} value={valorTipo(tipo)}>
+                      {tipo.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                {presets.length > 0 && (
+                  <>
+                    <SelectSeparator />
+                    <SelectGroup>
+                      <SelectLabel>Roles preconfigurados</SelectLabel>
+                      {presets.map((preset) => (
+                        <SelectItem
+                          key={preset.id}
+                          value={preset.id}
+                        >
+                          {preset.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </>
+                )}
               </SelectContent>
             </Select>
+            {tipoDeValor(selectedPresetId) && (
+              <p className="text-xs text-muted-foreground" data-testid="ayuda-tipo-usuario">
+                {tipoDeValor(selectedPresetId)?.descripcion}
+              </p>
+            )}
           </div>
           {selectedUser && !selectedUser.is_super_admin && (
             <p className="text-xs text-muted-foreground" data-testid="rol-al-guardar">

@@ -1,7 +1,7 @@
 // Gráficas de decisión (RPC facturas_decision, 20261115100000): validación de
 // la respuesta, cifras del resumen, minigráficas y textos cortos de las alertas.
 import { describe, expect, it } from "vitest";
-import { geometriaMini, normalizarDecision, resumenDecision, textoMesesReferencia, textoPctCorto, tonoVariacion } from "../decision";
+import { detalleAhorro, geometriaMini, normalizarDecision, resumenDecision, textoMesesReferencia, textoPctCorto, tonoVariacion } from "../decision";
 import { normalizarAlertas, resumenCortoAlerta, tituloCortoAlerta } from "../alertas";
 import { RESPUESTA } from "./decisionRespuesta";
 
@@ -39,6 +39,27 @@ describe("resumenDecision (las cifras de arriba)", () => {
     expect(r.ahorro90).toBe(219);
     expect(r.familiasFuera.map((f) => f.familia)).toEqual(["Congelados"]);
     expect(r.variacionBasePct).toBeCloseTo(-12.8, 1);
+  });
+});
+
+describe("«Puedes ahorrar» (10/11/2026: el dueño veía 0 €)", () => {
+  it("suma el ahorro de las alertas «más barato en otro proveedor» de la RPC (las de la demo: 101,51 + 117 + 65,56)", () => {
+    const mejor = [
+      { id: "m1", tipo: "facturas_precio_mejor", titulo: "Pluma de cerdo ibérico: 19 % más barato", datos: { ahorro: "101.51", local: "casa_tomas" } },
+      { id: "m2", tipo: "facturas_precio_mejor", titulo: "Berberecho: 18 % más barato", datos: { ahorro: 117, local: "casa_tomas" } },
+      { id: "m3", tipo: "facturas_precio_mejor", titulo: "Pimiento del piquillo: 27 % más barato", datos: { ahorro: "65.56", local: "casa_tomas" } },
+    ];
+    const r = resumenDecision(normalizarDecision({ ...RESPUESTA, cambios: { ...RESPUESTA.cambios, mejor } }));
+    expect(r.masBarato).toBe(3);
+    expect(r.ahorro90).toBe(284.07);
+    expect(detalleAhorro(r)).toBe("cada 90 días · 3 productos");
+  });
+
+  it("sin alertas vigentes la cifra es 0 € y el texto dice por qué (antes, «0 productos»)", () => {
+    const r = resumenDecision(normalizarDecision({ ...RESPUESTA, cambios: { ...RESPUESTA.cambios, mejor: [] } }));
+    expect(r.ahorro90).toBe(0);
+    expect(detalleAhorro(r)).toBe("ningún producto más barato en otro proveedor que ya usas");
+    expect(detalleAhorro({ masBarato: 1 })).toBe("cada 90 días · 1 producto");
   });
 });
 

@@ -26,6 +26,9 @@ export interface Plato {
   sin_gluten_disponible?: boolean | null;
   /** 'vegetariano' y/o 'vegano' confirmados (20261104151000). Ausente antes de esa migración. */
   etiquetas_dieteticas?: string[] | null;
+  /** «Apto para celíacos» / «Apto sin lactosa» a mano; NULL = según alérgenos (20261122093000). Ausentes antes. */
+  apto_celiacos?: boolean | null;
+  apto_sin_lactosa?: boolean | null;
   ingredientes: string | null;
   unidad: string | null;
   alergenos_oficiales: any;
@@ -57,6 +60,8 @@ export interface NuevoPlato {
   descripcion?: string;
   sin_gluten_disponible?: boolean;
   etiquetas_dieteticas?: string[] | null;
+  apto_celiacos?: boolean | null;
+  apto_sin_lactosa?: boolean | null;
   ingredientes?: string;
   unidad?: string;
   alergenos_oficiales?: any;
@@ -203,6 +208,9 @@ export function usePlatos() {
               : {}),
             // Solo si viene marcado: sin la migración 20261104151000 el alta sigue funcionando.
             ...(nuevoPlato.etiquetas_dieteticas ? { etiquetas_dieteticas: nuevoPlato.etiquetas_dieteticas } : {}),
+            // Igual con «Apto para celíacos/sin lactosa» a mano (migración 20261122093000).
+            ...(typeof nuevoPlato.apto_celiacos === "boolean" ? { apto_celiacos: nuevoPlato.apto_celiacos } : {}),
+            ...(typeof nuevoPlato.apto_sin_lactosa === "boolean" ? { apto_sin_lactosa: nuevoPlato.apto_sin_lactosa } : {}),
             ingredientes: nuevoPlato.ingredientes || null,
             unidad: normalizarUnidadPlato(nuevoPlato.unidad),
             alergenos_oficiales:

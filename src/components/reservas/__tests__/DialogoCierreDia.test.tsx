@@ -29,7 +29,8 @@ import { DialogoCierreDia } from "@/components/reservas/DialogoCierreDia";
 import type { ServicioCerrado } from "../../../../supabase/functions/_shared/cierres";
 
 const MARTES = "2026-10-20";
-const JUEVES = "2026-10-22"; // cierra por defecto (cierre semanal)
+const LUNES = "2026-10-19"; // cierra por defecto (cierre semanal)
+const JUEVES = "2026-10-22"; // sin reservas web por defecto, pero el restaurante abre (tapas)
 
 function abrir(fecha: string | null, cierres: ServicioCerrado[] = [], extra: { esPasado?: boolean } = {}) {
   const onClose = vi.fn();
@@ -82,14 +83,39 @@ describe("DialogoCierreDia", () => {
     expect(mutate).toHaveBeenCalledWith({ fecha: MARTES, turnos: ["cena"], cerrar: false }, expect.anything());
   });
 
-  it("un día cerrado por la regla semanal se puede abrir entero (jueves especial)", () => {
+  it("un día cerrado por la regla semanal se puede abrir entero (lunes especial)", () => {
+    abrir(LUNES, [
+      { fecha: LUNES, turno: "comida", origen: "semanal", motivo: null },
+      { fecha: LUNES, turno: "cena", origen: "semanal", motivo: null },
+    ]);
+    expect(screen.getByTestId("estado-comida")).toHaveTextContent("Cerrada (cierre semanal)");
+    fireEvent.click(boton(/Abrir las dos/));
+    expect(mutate).toHaveBeenCalledWith({ fecha: LUNES, turnos: ["comida", "cena"], cerrar: false }, expect.anything());
+  });
+
+  it("un jueves de tapas se puede abrir a la web (excepción)", () => {
     abrir(JUEVES, [
       { fecha: JUEVES, turno: "comida", origen: "semanal", motivo: null },
       { fecha: JUEVES, turno: "cena", origen: "semanal", motivo: null },
     ]);
-    expect(screen.getByTestId("estado-comida")).toHaveTextContent("Cerrada (cierre semanal)");
     fireEvent.click(boton(/Abrir las dos/));
     expect(mutate).toHaveBeenCalledWith({ fecha: JUEVES, turnos: ["comida", "cena"], cerrar: false }, expect.anything());
+  });
+
+  it("jueves de tapas: la regla semanal lo deja sin reservas web, pero se dice que el restaurante abre (sin rojo)", () => {
+    abrir(JUEVES, [
+      { fecha: JUEVES, turno: "comida", origen: "semanal", motivo: null },
+      { fecha: JUEVES, turno: "cena", origen: "semanal", motivo: null },
+    ]);
+    const comida = screen.getByTestId("estado-comida");
+    expect(comida).toHaveTextContent("Sin reservas web (el restaurante abre)");
+    expect(comida).not.toHaveTextContent("Cerrada");
+    expect(comida.className).not.toMatch(/destructive/);
+  });
+
+  it("un jueves cerrado a mano sí es un cierre", () => {
+    abrir(JUEVES, [{ fecha: JUEVES, turno: "cena", origen: "manual", motivo: null }]);
+    expect(screen.getByTestId("estado-cena")).toHaveTextContent("Cerrada a mano");
   });
 
   it("un jueves abierto a mano lo dice: es una excepción", () => {

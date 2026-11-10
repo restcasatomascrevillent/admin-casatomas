@@ -122,3 +122,18 @@ La pestaña **Stripe** separa lo cobrado en valor de los cheques y gastos de ges
 El cálculo vive en `casa-tomas-story/supabase/functions/_shared/cheques-regalo/gastos-gestion.ts`; lo usan la web para enseñarlo y `cheques-regalo-web` para cobrarlo. El panel lleva una copia en `src/lib/cheques/gastosGestion.ts` solo para los ejemplos. La web solo enseña gastos si se los anuncia la función que los cobra (`/plantilla-vista`), así que activar el interruptor antes de desplegar la función no cobra nada.
 
 Activación: aplicar `supabase/migrations/20261027090000_gastos_gestion_cheques.sql` y desplegar `cheques-regalo-web` y `stripe-webhook-cheques-regalo` (este último, para la línea de gastos en la factura). Estado: aplicada en prod y demo; funciones desplegadas en demo.
+
+## Pestaña Stripe e informe de cheques (10 de noviembre de 2026)
+
+Los cheques ya cobran de verdad en producción. La pestaña **Stripe** se ha revisado:
+
+- El rango de fechas se calcula en hora local (antes en UTC: de madrugada dejaba fuera el día de hoy), con rangos rápidos (este mes, mes pasado, 30/90 días, este año) y las fechas ya no se salen de la tarjeta en el móvil.
+- Cada cifra se compara con el periodo anterior de la misma duración; se añade el cheque medio.
+- La gráfica de ingresos enseña todos los días del rango (también los que no hubo ventas) y agrupa por semana o mes en rangos largos.
+- Con la cuenta en modo producción y todo activo, los «Pasos para pasar a producción» se recogen en un desplegable. En la demo (sin Stripe, a propósito) se dice así en vez de pedir la clave.
+
+**Generar informe** (mismo estilo y PDF que el de Tráfico web): eligiendo mes o año, ventas, importes, cheque medio, canal (web, restaurante, cortesía), lo que se lleva Stripe y los gastos de gestión, canjes, pendiente de canjear al cierre, cheques a punto de caducar o caducados, importes más vendidos, días de la semana y conclusiones, siempre frente al periodo anterior.
+
+- Datos: RPC `informe_cheques_regalo(p_desde, p_hasta)` (migración `20261122093700`, vuelta atrás en `supabase/rollbacks/`), permiso «Ver» en Cheques y **sin datos personales** (ni código, ni nombres, ni correos).
+- Cálculo: `src/lib/informes/cheques` (`generarInformeCheques("2026-10")`), separado de la pantalla para el módulo «Informes» del Super Admin; las diapositivas en `src/components/cheques/informe/Diapositivas.tsx`.
+- Capturas con datos sintéticos: `node tests/e2e-movil/cheques-stripe.capturas.mjs` (ver la cabecera del script); las del cambio están en `docs/capturas/cheques-stripe/`.
