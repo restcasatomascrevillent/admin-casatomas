@@ -2,6 +2,22 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.22.0] - 2026-11-10
+
+Objetivo: Reservas más claras en todas las pestañas: tabla con botones a la vista y «Verificar», añadir reserva desde la hoja, pasar hojas arrastrando, Nueva reserva en dos columnas, Calendario/Próximas/Blacklist/Configuración legibles y Hoy en el móvil sin solapes
+
+### Añadido
+- Reservas: «+ Añadir reserva a este día» desde la hoja del libro, pasar hojas arrastrando y Nueva reserva en dos columnas en horizontal ([#118](https://github.com/restcasatomascrevillent/admin-casatomas/pull/118))
+- Reservas: Nueva reserva solo para apuntar desde la hoja, pie que no tapa y lienzo a toda la altura ([#122](https://github.com/restcasatomascrevillent/admin-casatomas/pull/122))
+
+### Cambiado
+- Reservas: en la Tabla, botones a la vista con texto en vez de «Más»; «Aceptar» pasa a «Verificar» ([#120](https://github.com/restcasatomascrevillent/admin-casatomas/pull/120))
+- Reservas: Calendario, Próximas reservas, Blacklist y Configuración más legibles; enlaces ?tab= abren su pestaña ([#119](https://github.com/restcasatomascrevillent/admin-casatomas/pull/119))
+- Reservas: Hoy en el móvil sin solapes y con más sitio ([#121](https://github.com/restcasatomascrevillent/admin-casatomas/pull/121))
+- Reservas: en el móvil «Comida cerrada» y «Noche cerrada» caben enteros ([#123](https://github.com/restcasatomascrevillent/admin-casatomas/pull/123))
+
+Nota: montada igualando producción con staging; entradas escritas a mano, no por scripts/release.mjs. Sin migraciones. Revisado en la demo a 1366×1024 y 375×812.
+
 ## [1.21.0] - 2026-11-10
 
 Objetivo: Aceptar, confirmar y verificar viendo el día y los datos; tabla más grande y con aire; libro de una sola hoja con nombres enteros
