@@ -78,6 +78,7 @@ import { useAsignacionesMesa, useAsignarMesasReserva } from "@/hooks/useAsignaci
 import { useReservasServicioDia } from "@/hooks/useReservasServicioDia";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { useHorasFijasDelDia } from "@/hooks/useConfiguracionTurnos";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAccionesModoServicio } from "@/hooks/useAccionesModoServicio";
 import { useCanAccessSection } from "@/hooks/useUserRole";
@@ -155,7 +156,8 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
 
-  const config = useMemo(() => configServicioSalaDesde(configQuery.data), [configQuery.data]);
+  const horasFijas = useHorasFijasDelDia(fechaSel);
+  const config = useMemo(() => configServicioSalaDesde(configQuery.data, horasFijas), [configQuery.data, horasFijas]);
 
   const asignaciones = useMemo(
     () => (asignacionesQuery.data ?? []).map((a) => ({ mesa_id: a.mesa_id, reserva_id: a.reserva_id })),

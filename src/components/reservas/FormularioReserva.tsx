@@ -62,6 +62,8 @@ import { useRejillaCuartos } from "./DisponibilidadCuartos";
 import { ReservasDelDia } from "./ReservasDelDia";
 import { eligeMenuOCarta, salaAdmiteServicio, textoSalasDeServicio } from "@/lib/reservas/menuDelDia";
 import { errorPrecioMenu, formatearPrecioMenu, leerPrecioMenu } from "@/lib/reservas/menuCerrado";
+import { avisoZonaSala, ordenarSalasPorZona, salaCasaConZona, textoZona } from "@/lib/reservas/zonaPreferida";
+import { SelectorZona } from "./SelectorZona";
 import { formatearTelefonoReserva, variantesTelefono } from "@/lib/reservas/telefono";
 import {
   debeNotificarAltaPanel,
@@ -145,6 +147,8 @@ const formSchema = z.object({
   menu_cerrado: z.boolean().optional(),
   /** Martes a jueves comida: «Menú del día» o «Carta» (obligatorio al crear esos días). */
   servicio_comida: z.enum(["menu_del_dia", "carta"]).optional(),
+  /** «¿Dentro o fuera?» (opcional): null = no se dice nada. Va a `reservas.zona_preferida`. */
+  zona_preferida: z.enum(["dentro", "fuera"]).nullable().optional(),
   /** «Precio del menú (€)», escrito a mano ("18" o "18,50"); vacío = sin precio. */
   menu_precio: z
     .string()
@@ -393,6 +397,7 @@ export const FormularioReserva = ({
           espacio_id: datosPreseleccionados?.espacio_id ?? null,
           menu_cerrado: false,
           menu_precio: "",
+          zona_preferida: null,
         },
   });
 
@@ -438,6 +443,7 @@ export const FormularioReserva = ({
   // (`menu_del_dia` true/false), en el alta y al editar. Aparte del menú cerrado.
   const eligeServicio = eligeMenuOCarta(watchedFecha, watchedHora);
   const watchedServicio = form.watch("servicio_comida");
+  const watchedZona = form.watch("zona_preferida") ?? null;
   const ocupaSalaGuardado = !!eventoGuardado.data;
   const ocupaSala = !!watchedEspacio && (ocupaSalaElegido ?? ocupaSalaGuardado);
 
@@ -464,7 +470,10 @@ export const FormularioReserva = ({
   // Menú del día → Comedor o Terraza; Carta → Salón, Comedor o Terraza. Aviso (no bloquea).
   const servicioElegido = eligeServicio ? watchedServicio ?? null : null;
   const salaNoValeServicio = !!servicioElegido && !!nombreSalaMenu && !salaAdmiteServicio(nombreSalaMenu, servicioElegido);
-  const salasQueValen = servicioElegido ? salas.filter((e) => salaAdmiteServicio(e.nombre, servicioElegido)) : [];
+  // Con «Dentro»/«Fuera» elegido, solo se proponen las de esa zona (menú + fuera → Terraza).
+  const salasQueValen = servicioElegido
+    ? salas.filter((e) => salaAdmiteServicio(e.nombre, servicioElegido) && salaCasaConZona(e, watchedZona))
+    : [];
   const { rejilla } = useRejillaCuartos({
     fecha: fechaStr,
     comensales: Number(watchedComensales) || 0,
@@ -734,6 +743,7 @@ export const FormularioReserva = ({
           menu_cerrado: valoresActuales.menu_cerrado,
           servicio_comida: valoresActuales.servicio_comida ?? null,
           menu_precio: valoresActuales.menu_precio,
+          zona_preferida: valoresActuales.zona_preferida ?? null,
         })
       : null;
   const efectoMesas =
@@ -797,6 +807,7 @@ export const FormularioReserva = ({
         menu_cerrado: values.menu_cerrado,
         servicio_comida: values.servicio_comida ?? null,
         menu_precio: values.menu_precio,
+        zona_preferida: values.zona_preferida ?? null,
       };
       let cambios = calcularCambiosEdicion(original, editado);
       const cambiaEvento = ocupaSala !== ocupaSalaGuardado;
@@ -1050,6 +1061,7 @@ export const FormularioReserva = ({
         const precioMenu = leerPrecioMenu(values.menu_precio);
         if (precioMenu != null) fila.menu_precio = precioMenu;
       }
+      if (values.zona_preferida) fila.zona_preferida = values.zona_preferida;
       if (datosPreseleccionados?.solicitud_id) fila.solicitud_id = datosPreseleccionados.solicitud_id;
 
       const insertar = (valores: Record<string, unknown>) =>
@@ -1059,6 +1071,12 @@ export const FormularioReserva = ({
       if (error && "solicitud_id" in fila && esErrorEsquemaPendiente(error)) {
         const { solicitud_id: _omitida, ...sinSolicitud } = fila;
         ({ data: insertada, error } = await insertar(sinSolicitud));
+      }
+      // Sin la migración 20261122200000 no existe reservas.zona_preferida: se guarda sin ella y se avisa.
+      if (error && "zona_preferida" in fila && esErrorEsquemaPendiente(error) && /zona_preferida/.test(error.message ?? "")) {
+        const { zona_preferida: _sinZona, ...sinZona } = fila;
+        ({ data: insertada, error } = await insertar(sinZona));
+        if (!error) toast.warning("Reserva guardada sin «dentro o fuera»: falta aplicar la migración en la base de datos.");
       }
 
       if (error) throw error;
@@ -1109,7 +1127,7 @@ export const FormularioReserva = ({
         numero_comensales: values.numero_comensales,
         espacio_id: values.espacio_id || null,
       };
-      form.reset({ numero_comensales: 2, hora: "", espacio_id: null });
+      form.reset({ numero_comensales: 2, hora: "", espacio_id: null, zona_preferida: null });
       setOcupaSalaElegido(null);
       setModoOtraHora(false);
       setLimiteAlcanzado(null);
@@ -1446,7 +1464,7 @@ export const FormularioReserva = ({
         )}
 
         {!isPublic && !ocultarReservasDelDia && (
-          <div className="rounded-lg border p-3">
+          <div className="rounded-lg border p-4">
             <ReservasDelDia
               fecha={fechaStr}
               hora={watchedHora || null}
@@ -1459,11 +1477,29 @@ export const FormularioReserva = ({
           </div>
         )}
 
+        {/* «¿Dentro o fuera?» (dueño, 10/11/2026), justo ANTES de la asignación de sala: Dentro → Comedor | Salón,
+            Fuera → Terraza; nada marcado = no se dice nada. Ver `SelectorZona` y `zonaPreferida.ts`. */}
+        {!isPublic && (
+          <div className="rounded-lg border p-4">
+            <SelectorZona
+              zona={watchedZona}
+              espacioId={watchedEspacio}
+              salas={salas}
+              servicio={servicioElegido}
+              grande={grande}
+              onCambiar={(zona, espacioId) => {
+                form.setValue("zona_preferida", zona, { shouldDirty: true });
+                if (espacioId !== watchedEspacio) form.setValue("espacio_id", espacioId, { shouldDirty: true });
+              }}
+            />
+          </div>
+        )}
+
         {/* La sala es asignación INTERNA y opcional (reservas-sin-salas):
             plegada, con la rejilla de salas para decidir. Solo las salas
             activas de Casa Tomás. */}
         {!isPublic && (
-          <Collapsible className="space-y-3 rounded-lg border p-3">
+          <Collapsible className="space-y-4 rounded-lg border p-4">
             <CollapsibleTrigger asChild>
               <Button type="button" variant="ghost" size="sm" className="group h-8 w-full justify-between px-2 text-sm">
                 <span className="flex min-w-0 items-center gap-1.5">
@@ -1477,7 +1513,7 @@ export const FormularioReserva = ({
                 <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-3">
+            <CollapsibleContent className="space-y-4">
               <FormField
                 control={form.control}
                 name="espacio_id"
@@ -1495,11 +1531,14 @@ export const FormularioReserva = ({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value={SIN_ASIGNAR}>Sin asignar</SelectItem>
-                        {salas.map((e) => (
+                        {ordenarSalasPorZona(salas, watchedZona).map((e) => (
                           <SelectItem key={e.id} value={e.id}>
                             {e.nombre} ({e.capacidad_maxima} plazas)
                             {servicioElegido && !salaAdmiteServicio(e.nombre, servicioElegido)
                               ? ` · no vale para ${servicioElegido === "menu_del_dia" ? "menú del día" : "carta"}`
+                              : ""}
+                            {watchedZona && !salaCasaConZona(e, watchedZona)
+                              ? ` · es de ${watchedZona === "fuera" ? "dentro" : "fuera"}`
                               : ""}
                           </SelectItem>
                         ))}
@@ -1511,6 +1550,11 @@ export const FormularioReserva = ({
                         )}
                       </SelectContent>
                     </Select>
+                    {avisoZonaSala(salas.find((e) => e.id === field.value), watchedZona) && (
+                      <p className="text-xs font-medium text-amber-700 dark:text-amber-300" data-testid="aviso-zona-select">
+                        {avisoZonaSala(salas.find((e) => e.id === field.value), watchedZona)}
+                      </p>
+                    )}
                     <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground">
                       No se le dice al cliente ni limita la hora. Se puede dejar sin asignar y ponerla más tarde.
                     </p>
@@ -1569,9 +1613,9 @@ export const FormularioReserva = ({
             control={form.control}
             name="servicio_comida"
             render={({ field }) => (
-              <FormItem className="space-y-2">
+              <FormItem className="space-y-3">
                 <FormLabel id="etiqueta-servicio-comida">¿Menú del día o carta?</FormLabel>
-                <div role="radiogroup" aria-labelledby="etiqueta-servicio-comida" className="grid grid-cols-2 gap-2">
+                <div role="radiogroup" aria-labelledby="etiqueta-servicio-comida" className="grid grid-cols-2 gap-3">
                   {(
                     [
                       { valor: "menu_del_dia", texto: "Menú del día" },
@@ -1978,6 +2022,12 @@ export const FormularioReserva = ({
               <dd className="font-semibold">{resumen.numero_comensales}</dd>
               <dt className="text-muted-foreground">Sala</dt>
               <dd>{salas.find((s) => s.id === resumen.espacio_id)?.nombre ?? "Sin asignar"}</dd>
+              {textoZona(resumen.zona_preferida) ? (
+                <>
+                  <dt className="text-muted-foreground">Dentro o fuera</dt>
+                  <dd data-testid="resumen-zona">{textoZona(resumen.zona_preferida)}</dd>
+                </>
+              ) : null}
               <dt className="text-muted-foreground">Teléfono</dt>
               <dd>{resumen.telefono?.trim() || "—"}</dd>
               {resumen.email?.trim() ? (

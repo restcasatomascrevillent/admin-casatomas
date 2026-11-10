@@ -1,6 +1,6 @@
 import { EtiquetaFuera } from "./SentarFuera";
 import { useState, useMemo, useRef, useEffect, type MouseEvent, type ReactNode } from "react";
-import { InsigniaMenuCerrado, InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
+import { InsigniaMenuCerrado, InsigniaMenuDelDia, InsigniaZona } from "@/components/reservas/InterruptoresServiciosOnline";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1210,6 +1210,7 @@ export function ListaReservasAvanzada({
                     <EtiquetaFuera reserva={reservation as never} compacta />
                     <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} />
                     <InsigniaMenuCerrado reserva={reservation as { menu_cerrado?: boolean | null; menu_precio?: number | string | null }} />
+                    <InsigniaZona reserva={reservation as { zona_preferida?: string | null }} />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-base text-muted-foreground">
                     <span>{new Date(reservation.fecha).toLocaleDateString("es-ES")}</span>
@@ -1357,6 +1358,7 @@ export function ListaReservasAvanzada({
                               <p className="truncate text-xl font-semibold leading-tight" title={nombre}>{nombre}</p>
                               <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} className="hidden px-2 py-0.5 text-sm xl:inline-flex" />
                               <InsigniaMenuCerrado reserva={reservation as { menu_cerrado?: boolean | null; menu_precio?: number | string | null }} className="hidden px-2 py-0.5 text-sm xl:inline-flex" />
+                              <InsigniaZona reserva={reservation as { zona_preferida?: string | null }} className="hidden px-2 py-0.5 text-sm xl:inline-flex" />
                             </div>
                             {reservation.telefono && (
                               <p className="truncate text-base leading-tight text-muted-foreground" title={reservation.telefono}>

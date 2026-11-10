@@ -13,7 +13,7 @@
 // simplemente no se recuerdan.
 // ============================================================================
 
-import { turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
+import { horaAMinutos, turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
 import { COLUMNAS_FUERA } from "./sentarFuera";
 
 /**
@@ -31,9 +31,10 @@ export const COLUMNAS_RESERVAS_HOY =
  * Las de arriba MÁS las de «Sentar fuera» (`fuera_lugar`, `fuera_mesa`, `fuera_espacio_previo_id`; migración
  * 20261122171500). Solo las pide la consulta principal de Hoy (`consultaReservasHoy`), que si aún no existen
  * relee con `COLUMNAS_RESERVAS_HOY` (así publicar el panel antes que la migración no tumba Hoy). Va también
- * `menu_cerrado` y `menu_precio` (menú cerrado y su precio, 20261122190000), con la misma vuelta atrás si aún no existe.
+ * `menu_cerrado` y `menu_precio` (menú cerrado y su precio, 20261122190000) y `zona_preferida` («¿Dentro o fuera?»,
+ * 20261122200000), con la misma vuelta atrás si aún no existen.
  */
-export const COLUMNAS_RESERVAS_HOY_CON_FUERA = `${COLUMNAS_RESERVAS_HOY}, menu_cerrado, menu_precio, ${COLUMNAS_FUERA}`;
+export const COLUMNAS_RESERVAS_HOY_CON_FUERA = `${COLUMNAS_RESERVAS_HOY}, menu_cerrado, menu_precio, zona_preferida, ${COLUMNAS_FUERA}`;
 
 /** Las dos vistas de «Hoy». Por defecto, el kanban (la de siempre). */
 export type ModoVistaHoy = "kanban" | "plano";
@@ -137,6 +138,34 @@ export function coincideFiltroHoy(
 export function turnoDelPlano(filtroTurno: FiltroTurnoHoy, ahora: Date): "comida" | "cena" {
   if (filtroTurno === "comida" || filtroTurno === "cena") return filtroTurno;
   return turnoDeHora(ahora.getHours() * 60 + ahora.getMinutes());
+}
+
+/**
+ * Turno de hora fija EN CURSO (jueves de tapas por la noche: 20:30 y 22:00,
+ * `configuracion_turnos.horas_fijas`): el último que ya empezó o, antes del
+ * primero, el primero. Solo los de ese servicio. `null` en un día normal.
+ */
+export function turnoFijoEnCurso(
+  horasFijas: readonly string[] | null | undefined,
+  turno: "comida" | "cena",
+  ahora: Date,
+): { numero: number; hora: string; total: number } | null {
+  const delServicio = (horasFijas ?? [])
+    .map((h) => ({ h: String(h).slice(0, 5), m: horaAMinutos(h) }))
+    .filter((x): x is { h: string; m: number } => x.m !== null && turnoDeHora(x.m) === turno)
+    .sort((a, b) => a.m - b.m);
+  if (delServicio.length === 0) return null;
+  const minutos = ahora.getHours() * 60 + ahora.getMinutes();
+  let indice = 0;
+  delServicio.forEach((x, i) => {
+    if (x.m <= minutos) indice = i;
+  });
+  return { numero: indice + 1, hora: delServicio[indice].h, total: delServicio.length };
+}
+
+/** «2.º turno (22:00)»: el turno fijo en curso, para la etiqueta del plano. */
+export function textoTurnoFijo(t: { numero: number; hora: string }): string {
+  return `${t.numero}.${t.numero === 1 ? "er" : "º"} turno (${t.hora})`;
 }
 
 /**
