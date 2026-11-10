@@ -248,6 +248,10 @@ export interface ReservaServicio {
   mesa_fijada?: boolean | null;
   /** «Menú del día» (martes a jueves, comida). */
   menu_del_dia?: boolean | null;
+  /** «Menú cerrado» (de grupo; 20261122190000). Aparte del «Menú del día». */
+  menu_cerrado?: boolean | null;
+  /** Precio del menú cerrado en euros (20261122190000); NULL = sin precio. */
+  menu_precio?: number | string | null;
   /** «Sentar fuera» (20261122171500): dónde se sentó fuera de las salas («Touza»…); NULL = dentro. */
   fuera_lugar?: string | null;
   /** «Sentar fuera»: mesa o nota del sitio de fuera. */

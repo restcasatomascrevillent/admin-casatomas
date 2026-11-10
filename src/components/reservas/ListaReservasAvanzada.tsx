@@ -1,6 +1,6 @@
 import { EtiquetaFuera } from "./SentarFuera";
 import { useState, useMemo, useRef, useEffect, type ReactNode } from "react";
-import { InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
+import { InsigniaMenuCerrado, InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1154,6 +1154,7 @@ export function ListaReservasAvanzada({
                     <InsigniaEstado estado={reservation.estado} />
                     <EtiquetaFuera reserva={reservation as never} compacta />
                     <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} />
+                    <InsigniaMenuCerrado reserva={reservation as { menu_cerrado?: boolean | null; menu_precio?: number | string | null }} />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span>{new Date(reservation.fecha).toLocaleDateString("es-ES")}</span>
@@ -1297,6 +1298,7 @@ export function ListaReservasAvanzada({
                             <div className="flex min-w-0 items-center gap-1.5">
                               <p className="truncate font-medium leading-tight" title={nombre}>{nombre}</p>
                               <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} className="px-1.5 py-0 text-[10px]" />
+                              <InsigniaMenuCerrado reserva={reservation as { menu_cerrado?: boolean | null; menu_precio?: number | string | null }} className="px-1.5 py-0 text-[10px]" />
                             </div>
                             {reservation.telefono && (
                               <p className="truncate text-[11px] pointer-coarse:text-xs leading-tight text-muted-foreground xl:text-xs" title={reservation.telefono}>

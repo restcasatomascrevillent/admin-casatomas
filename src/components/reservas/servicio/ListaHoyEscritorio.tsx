@@ -15,6 +15,7 @@
 // el ratón (o el foco) por una fila la señala en el plano (`onSeñalar`).
 // ============================================================================
 
+import { formatearPrecioMenu, textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, Lock, Phone, StickyNote, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -256,6 +257,11 @@ function FilaEscritorio({
           {reserva.menu_del_dia && (
             <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-900 dark:bg-violet-950/60 dark:text-violet-200" title="Menú del día">
               Menú
+            </span>
+          )}
+          {reserva.menu_cerrado && (
+            <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-xs font-medium text-teal-900 dark:bg-teal-950/60 dark:text-teal-200" title={`Menú cerrado${formatearPrecioMenu(reserva.menu_precio) ? ` · ${formatearPrecioMenu(reserva.menu_precio)}` : ""}`}>
+              {textoInsigniaMenu(reserva.menu_precio)}
             </span>
           )}
           {alergia && <AlertTriangle className="h-5 w-5 text-red-600" aria-label="Alergia" />}

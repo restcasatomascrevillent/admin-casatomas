@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Info, Lock, LockOpen } from "lucide-react";
@@ -171,6 +172,31 @@ export function InsigniaMenuDelDia({
       )}
     >
       Menú del día
+    </span>
+  );
+}
+
+/**
+ * Insignia del «Menú cerrado» (de grupo) de una reserva: «Menú 55 €», o «Menú cerrado» sin
+ * precio. Nada si no lleva. Aparte (y de otro color) que la del «Menú del día».
+ */
+export function InsigniaMenuCerrado({
+  reserva,
+  className,
+}: {
+  reserva: { menu_cerrado?: boolean | null; menu_precio?: number | string | null };
+  className?: string;
+}) {
+  if (!reserva.menu_cerrado) return null;
+  return (
+    <span
+      data-testid="insignia-menu-cerrado"
+      className={cn(
+        "inline-flex shrink-0 items-center rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-900 dark:bg-teal-950/60 dark:text-teal-200",
+        className,
+      )}
+    >
+      {textoInsigniaMenu(reserva.menu_precio)}
     </span>
   );
 }

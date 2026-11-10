@@ -30,9 +30,10 @@ export const COLUMNAS_RESERVAS_HOY =
 /**
  * Las de arriba MÁS las de «Sentar fuera» (`fuera_lugar`, `fuera_mesa`, `fuera_espacio_previo_id`; migración
  * 20261122171500). Solo las pide la consulta principal de Hoy (`consultaReservasHoy`), que si aún no existen
- * relee con `COLUMNAS_RESERVAS_HOY` (así publicar el panel antes que la migración no tumba Hoy).
+ * relee con `COLUMNAS_RESERVAS_HOY` (así publicar el panel antes que la migración no tumba Hoy). Va también
+ * `menu_cerrado` y `menu_precio` (menú cerrado y su precio, 20261122190000), con la misma vuelta atrás si aún no existe.
  */
-export const COLUMNAS_RESERVAS_HOY_CON_FUERA = `${COLUMNAS_RESERVAS_HOY}, ${COLUMNAS_FUERA}`;
+export const COLUMNAS_RESERVAS_HOY_CON_FUERA = `${COLUMNAS_RESERVAS_HOY}, menu_cerrado, menu_precio, ${COLUMNAS_FUERA}`;
 
 /** Las dos vistas de «Hoy». Por defecto, el kanban (la de siempre). */
 export type ModoVistaHoy = "kanban" | "plano";
