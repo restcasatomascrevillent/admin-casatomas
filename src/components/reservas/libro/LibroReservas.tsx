@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CalendarIcon, ChevronLeft, ChevronRight, Eraser, Loader2, PenLine, Save, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { AlertTriangle, CalendarIcon, ChevronLeft, ChevronRight, ClipboardList, Eraser, Loader2, PenLine, Save, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +40,25 @@ import { LienzoManuscrito, type LienzoManuscritoApi } from "./LienzoManuscrito";
 // Al guardar, la reserva sale apuntada en su hoja (si lo escrito traía otra
 // fecha, el libro salta a ella). Ocupa el diálogo entero y hace scroll solo
 // por dentro: la página del panel no desplaza (regla del dueño).
+//
+// «Nueva reserva» única (10/11/2026, petición del dueño: «unifica las dos
+// listas, que salga como la segunda y después ya el formulario o para
+// escribir»): este componente ES el diálogo entero. Arriba siempre la hoja del
+// día en grande; debajo se elige «Escribir con lápiz» o «Formulario» (se
+// recuerda en el dispositivo). El formulario no repite su lista del día y, si
+// se le cambia la fecha, la hoja de arriba pasa a ese día.
 // ============================================================================
+
+type ModoApunte = "lapiz" | "formulario";
+const CLAVE_MODO = "reservas.modoAlta";
+
+function leerModo(): ModoApunte {
+  try {
+    return localStorage.getItem(CLAVE_MODO) === "formulario" ? "formulario" : "lapiz";
+  } catch {
+    return "lapiz";
+  }
+}
 
 const PAPEL = "bg-[#fbf6e9] text-stone-800";
 
@@ -179,6 +197,18 @@ export function LibroReservas({ soloCrear = false }: Props) {
   const [interpretada, setInterpretada] = useState<ReservaInterpretada | null>(null);
   const [resaltada, setResaltada] = useState<string | null>(null);
   const lienzo = useRef<LienzoManuscritoApi | null>(null);
+  const [modo, setModo] = useState<ModoApunte>(leerModo);
+  // Cambia tras cada alta por formulario: lo vacía para la siguiente.
+  const [altaFormulario, setAltaFormulario] = useState(0);
+  const datosFormulario = useMemo(() => ({ fecha: diaDeClave(fecha) }), [fecha]);
+  const elegirModo = (m: ModoApunte) => {
+    setModo(m);
+    try {
+      localStorage.setItem(CLAVE_MODO, m);
+    } catch {
+      /* sin almacenamiento: no se recuerda */
+    }
+  };
   // Borrador que se está pasando a limpio (guardado antes sin interpretar).
   const [borradorActivo, setBorradorActivo] = useState<string | null>(null);
   const { data: pendientes = [] } = useBorradoresPendientes();
@@ -310,7 +340,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
 
       {/* Hoja: lo apuntado + renglón para escribir */}
       <div className={cn("flex min-h-0 flex-1 flex-col", PAPEL, revisando && "hidden")}>
-        <div className="min-h-[28dvh] flex-1 overflow-y-auto overscroll-contain border-l-4 border-rose-300/70 px-6 py-4">
+        <div className="min-h-[22dvh] flex-1 overflow-y-auto overscroll-contain border-l-4 border-rose-300/70 px-6 py-4">
           <PorPasarALimpio
             borradores={pendientesHoja}
             ocupado={interpretando || resolverBorrador.isPending}
@@ -319,7 +349,53 @@ export function LibroReservas({ soloCrear = false }: Props) {
           />
           <ReservasDeLaHoja fecha={fecha} resaltada={resaltada} />
         </div>
-        <div className="border-t-2 border-dashed border-stone-300 px-6 pb-3 pt-2">
+        <div className="flex flex-wrap items-center gap-3 border-t-2 border-dashed border-stone-300 px-6 pt-2">
+          <span className="text-base font-semibold text-stone-600">Apuntar nueva:</span>
+          <div role="group" aria-label="Cómo apuntarla" className="inline-flex rounded-lg border-2 border-stone-700/70 bg-white p-0.5">
+            <Button
+              type="button"
+              variant={modo === "lapiz" ? "default" : "ghost"}
+              className="h-11 px-4 text-base font-semibold"
+              aria-pressed={modo === "lapiz"}
+              onClick={() => elegirModo("lapiz")}
+            >
+              <PenLine className="mr-2 h-4 w-4" />
+              Escribir con lápiz
+            </Button>
+            <Button
+              type="button"
+              variant={modo === "formulario" ? "default" : "ghost"}
+              className="h-11 px-4 text-base font-semibold"
+              aria-pressed={modo === "formulario"}
+              onClick={() => elegirModo("formulario")}
+            >
+              <ClipboardList className="mr-2 h-4 w-4" />
+              Formulario
+            </Button>
+          </div>
+        </div>
+        {modo === "formulario" ? (
+          <div className="max-h-[58dvh] overflow-y-auto overscroll-contain bg-background px-4 pb-4 pt-3 text-foreground sm:px-6">
+            <div className="mx-auto max-w-4xl">
+              <FormularioReserva
+                key={altaFormulario}
+                datosPreseleccionados={datosFormulario}
+                soloCrear={soloCrear}
+                ocultarReservasDelDia
+                onCambioFecha={(f) => {
+                  if (f !== fecha) irA(f);
+                }}
+                onSuccess={(creada) => {
+                  void queryClient.invalidateQueries({ queryKey: [CLAVE_RESERVAS_SERVICIO_DIA] });
+                  if (creada?.fecha) setFecha(creada.fecha);
+                  setResaltada(creada?.id ?? null);
+                  setAltaFormulario((n) => n + 1);
+                }}
+              />
+            </div>
+          </div>
+        ) : (
+        <div className="px-6 pb-3 pt-2">
           <p className="mb-1 text-base text-stone-500">
             Escribe la reserva con el lápiz, p. ej. <span className="font-medium">«Esther 2px salón 14:15»</span>. Sin fecha, se apunta el {fechaCorta(fecha)}.
           </p>
@@ -356,6 +432,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
             </Button>
           </div>
         </div>
+        )}
       </div>
 
       {/* Vista previa: el trazo al lado del alta manual prellenada */}

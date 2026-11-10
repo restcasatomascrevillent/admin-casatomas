@@ -33,6 +33,10 @@ vi.mock("@/components/reservas/VistaHoy", () => ({ VistaHoy: () => <div data-tes
 vi.mock("@/components/reservas/FormularioReserva", () => ({
   FormularioReserva: ({ soloCrear }: { soloCrear?: boolean }) => <div data-testid="formulario-alta" data-solo-crear={String(!!soloCrear)} />,
 }));
+// «Nueva reserva» única (10/11/2026): el diálogo monta LibroReservas (lista del día + lápiz o formulario).
+vi.mock("@/components/reservas/libro/LibroReservas", () => ({
+  LibroReservas: ({ soloCrear }: { soloCrear?: boolean }) => <div data-testid="formulario-alta" data-solo-crear={String(!!soloCrear)} />,
+}));
 vi.mock("@/components/reservas/ListaReservasAvanzada", () => ({ ListaReservasAvanzada: () => null }));
 vi.mock("@/components/reservas/CalendarioOcupacion", () => ({ CalendarioOcupacion: () => null }));
 vi.mock("@/components/reservas/PlanoEspacio2D", () => ({ PlanoEspacio2D: () => null }));

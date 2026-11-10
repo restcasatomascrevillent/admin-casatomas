@@ -322,6 +322,13 @@ interface FormularioReservaProps {
    * un resumen con «Confirmar» / «Corregir». El libro de reservas lo apaga: ya enseña lo leído al lado.
    */
   confirmarAntesDeGuardar?: boolean;
+  /**
+   * «Nueva reserva» única (10/11/2026, petición del dueño): el diálogo ya enseña arriba la lista del día en
+   * grande, así que el formulario no repite su «Reservas del día» y avisa del día elegido para que la lista
+   * de arriba lo siga.
+   */
+  ocultarReservasDelDia?: boolean;
+  onCambioFecha?: (fecha: string) => void;
 }
 
 export const FormularioReserva = ({
@@ -333,6 +340,8 @@ export const FormularioReserva = ({
   onCambiosSinGuardar,
   soloCrear: soloCrearReservas = false,
   confirmarAntesDeGuardar = true,
+  ocultarReservasDelDia = false,
+  onCambioFecha,
 }: FormularioReservaProps) => {
   const [resumen, setResumen] = useState<FormValues | null>(null);
   const editando = !!reservaAEditar;
@@ -405,6 +414,11 @@ export const FormularioReserva = ({
   const watchedTelefono = form.watch("telefono");
   const watchedEspacio = form.watch("espacio_id") ?? null;
   const fechaStr = watchedFecha ? format(watchedFecha, "yyyy-MM-dd") : null;
+  const onCambioFechaRef = useRef(onCambioFecha);
+  onCambioFechaRef.current = onCambioFecha;
+  useEffect(() => {
+    if (fechaStr) onCambioFechaRef.current?.(fechaStr);
+  }, [fechaStr]);
   // Sin sala no hay evento: la casilla se desactiva y no cuenta.
   const puedeMenuDelDia = !reservaAEditar && admiteMenuDelDia(watchedFecha, watchedHora);
   const ocupaSalaGuardado = !!eventoGuardado.data;
@@ -1372,7 +1386,7 @@ export const FormularioReserva = ({
           </Alert>
         )}
 
-        {!isPublic && (
+        {!isPublic && !ocultarReservasDelDia && (
           <div className="rounded-lg border p-3">
             <ReservasDelDia
               fecha={fechaStr}
