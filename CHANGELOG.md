@@ -2,6 +2,38 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.21.0] - 2026-11-10
+
+Objetivo: Aceptar, confirmar y verificar viendo el día y los datos; tabla más grande y con aire; libro de una sola hoja con nombres enteros
+
+### Añadido
+- Reservas: aceptar, confirmar y verificar abren una ventana con los datos completos y el día (aforo, cierres, reservas del día) ([#113](https://github.com/restcasatomascrevillent/admin-casatomas/pull/113))
+
+### Cambiado
+- Reservas: tabla más grande (filas de 76 px, texto 18 px, botones 52 px) y sin la columna Canal ([#113](https://github.com/restcasatomascrevillent/admin-casatomas/pull/113))
+- Reservas: la Lista como libro con una sola hoja y el nombre entero, notas debajo ([#116](https://github.com/restcasatomascrevillent/admin-casatomas/pull/116))
+
+Nota: montada igualando producción con staging; entradas escritas a mano, no por scripts/release.mjs. Sin migraciones.
+
+## [1.20.0] - 2026-11-10
+
+Objetivo: Todo lo de Reservas y Carta pendiente: lista como libro, tabla clara, Hoy con nombres visibles, menú cerrado y menú del día o carta, dentro o fuera, jueves de tapas en dos turnos, formulario y Carta con letra grande, gasto de leer reservas escritas a mano (incluye lo de la 1.19.0, que no llegó a publicarse)
+
+### Añadido
+- Reservas: gasto de leer las reservas escritas a mano (Super Admin › Costes y libro) ([#104](https://github.com/restcasatomascrevillent/admin-casatomas/pull/104))
+- Reservas: la Lista como un libro de hojas por día («Libro | Tabla») ([#106](https://github.com/restcasatomascrevillent/admin-casatomas/pull/106))
+- Reservas: menú cerrado sí/no con precio; menú del día o carta de martes a jueves y su sala; formulario más grande ([#109](https://github.com/restcasatomascrevillent/admin-casatomas/pull/109))
+- Reservas: «Dentro | Fuera» antes de la sala; dentro, Comedor o Salón ([#111](https://github.com/restcasatomascrevillent/admin-casatomas/pull/111))
+- Reservas: jueves de tapas por la noche en dos turnos fijos (20:30 y 22:00), configurable en Turnos ([#112](https://github.com/restcasatomascrevillent/admin-casatomas/pull/112))
+
+### Cambiado
+- Reservas: tabla con una acción clara por reserva, botones más grandes y comida de martes a jueves por menú/carta ([#107](https://github.com/restcasatomascrevillent/admin-casatomas/pull/107))
+- Reservas: Hoy con mesas más pequeñas y nombres visibles; comida de martes a jueves por menú/carta ([#108](https://github.com/restcasatomascrevillent/admin-casatomas/pull/108))
+- Carta: letra más grande y más contraste en la Carta del panel ([#110](https://github.com/restcasatomascrevillent/admin-casatomas/pull/110))
+- Reservas: «Nueva reserva» con la lista del día arriba y lápiz o formulario debajo; «Elegir mesa» con el código de colores común (otras sesiones)
+
+Nota: montada igualando producción con staging; entradas escritas a mano, no por scripts/release.mjs. Migraciones para producción: 20261122190000_reservas_menu_cerrado, 20261122200000_reservas_zona_preferida, 20261122200100_turnos_horas_fijas_jueves_tapas.
+
 ## [1.18.0] - 2026-11-10
 
 Objetivo: Un solo «Nueva Reserva» con formulario o libro, más contraste en Reservas, libro proporcionado en el ordenador y «Sentar sin reserva» eligiendo entre todas las mesas
