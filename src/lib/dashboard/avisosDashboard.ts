@@ -6,7 +6,7 @@
 // quien puede ver su sección: la tabla la lee cualquiera con «Dashboard», así
 // que el filtro por sección se hace aquí. Sin React: se prueba suelto.
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
-import { avisoCaducado, tiposDeSeccion } from "@/lib/avisos";
+import { avisoCaducado, TIPOS_POR_FILTRO, tiposDeSeccion } from "@/lib/avisos";
 
 export type SeccionAviso = "reservas" | "facturas" | "rrss" | "super_admin" | "general";
 
@@ -26,7 +26,9 @@ export const ETIQUETA_SECCION_AVISO: Record<SeccionAviso, string> = {
   general: "Panel",
 };
 
-const RESERVAS = new Set(tiposDeSeccion("reservas"));
+// TIPOS_POR_FILTRO y no tiposDeSeccion: el botón «Avisos» de Reservas solo enseña nuevas y canceladas (10/11/2026),
+// pero solicitudes y «sin sala» siguen siendo avisos de Reservas (solo para quien ve Reservas).
+const RESERVAS = new Set(TIPOS_POR_FILTRO.reservas);
 const FACTURAS = new Set(tiposDeSeccion("facturas"));
 
 /** De qué sección es un aviso (decide quién lo ve). */
