@@ -120,7 +120,7 @@ export function ListaComoLibro({ extra, onAnadirReserva, resaltar = null }: Prop
   const hoy = claveDia(new Date());
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-3">
       {/* Barra: pasar hojas */}
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label="Hoja anterior" onClick={() => pasar(-1)}>
@@ -157,20 +157,21 @@ export function ListaComoLibro({ extra, onAnadirReserva, resaltar = null }: Prop
       {/* El libro */}
       <div
         ref={setBloque}
-        className={cn("mx-auto flex w-full touch-pan-y flex-col", dosHojas ? "max-w-[96rem]" : "max-w-4xl", !alto && "min-h-[60dvh]")}
+        className={cn("mx-auto flex w-full min-w-0 touch-pan-y flex-col overflow-hidden", dosHojas ? "max-w-[96rem]" : "max-w-4xl", !alto && "min-h-[60dvh]")}
         style={alto ? { height: alto } : undefined}
         {...manejadores}
         data-testid="libro-lista"
       >
         <div
           style={desplazamiento ? { transform: `translateX(${desplazamiento}px)` } : undefined}
-          className={cn("flex min-h-0 flex-1", !desplazamiento && "transition-transform duration-200")}
+          className={cn("flex min-h-0 min-w-0 w-full flex-1", !desplazamiento && "transition-transform duration-200")}
           data-testid="hoja-que-sigue-al-dedo"
         >
         <div
           key={fecha}
           className={cn(
-            "flex min-h-0 flex-1 motion-safe:duration-300 motion-safe:animate-in motion-safe:fade-in-0",
+            // min-w-0 en cada caja flex (10/11/2026): sin él, una nota larga ensanchaba la hoja y la página hacía scroll horizontal.
+            "flex min-h-0 min-w-0 w-full flex-1 motion-safe:duration-300 motion-safe:animate-in motion-safe:fade-in-0",
             sentido === 1 ? "motion-safe:slide-in-from-right-8" : "motion-safe:slide-in-from-left-8",
           )}
           data-sentido={sentido === 1 ? "siguiente" : "anterior"}

@@ -2,6 +2,15 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.23.0] - 2026-11-10
+
+Objetivo: Arreglar el scroll horizontal de la Lista como libro
+
+### Arreglado
+- Reservas: la hoja del libro ya no se sale ni hace scroll horizontal cuando una reserva tiene una nota larga ([#125](https://github.com/restcasatomascrevillent/admin-casatomas/pull/125))
+
+Nota: montada igualando producción con staging; entrada escrita a mano. Sin migraciones.
+
 ## [1.22.0] - 2026-11-10
 
 Objetivo: Reservas más claras en todas las pestañas: tabla con botones a la vista y «Verificar», añadir reserva desde la hoja, pasar hojas arrastrando, Nueva reserva en dos columnas, Calendario/Próximas/Blacklist/Configuración legibles y Hoy en el móvil sin solapes
