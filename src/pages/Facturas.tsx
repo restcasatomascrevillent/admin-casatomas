@@ -197,10 +197,12 @@ const Facturas = () => {
             // En el móvil, solo iconos: a 390 px el gasto de IA tapaba «Cargar» (QA 05/11/2026).
             soloIconosEnMovil
             className={pantallaIa ? "hidden" : undefined}
-            // En Análisis la barra de filtros va en esta fila; por debajo de lg (tablet vertical, móvil), en la de abajo.
+            // En Análisis la barra de filtros va en una fila propia, bajo las pestañas, salvo en pantallas muy
+            // anchas (≥ 1800 px), donde cabe todo junto: en la tablet y el portátil se partía en dos líneas y las
+            // pestañas quedaban descolgadas (09/11/2026).
             accionesAnchas={barraUnica}
             iconosSoloMuyAncho={barraUnica}
-            accionesDebajoEnMovil={barraUnica ? "lg" : undefined}
+            accionesDebajoEnMovil={barraUnica ? "muyAncho" : undefined}
             pestanas={[
               { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, tour: "facturas-pestana-ia" },
               { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
