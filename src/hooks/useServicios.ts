@@ -1,7 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { CAMBIO_POR_DEFECTO, type LecturaServicio, type ServicioContratado } from "@/lib/servicios";
+import { type FilaResumenMes, normalizarResumenMes } from "@/lib/informeServicios";
 
 // Las consultas van sin tipar: estas tablas cambian de forma con
 // 20261103160000 y la pantalla tiene que funcionar antes y después.
@@ -10,6 +11,7 @@ const sb = supabase as unknown as SupabaseClient;
 export const CLAVE_SERVICIOS = ["super-admin", "servicios"] as const;
 export const CLAVE_LECTURAS = ["super-admin", "servicios-uso"] as const;
 export const CLAVE_CONFIG = ["super-admin", "servicios-config"] as const;
+export const CLAVE_RESUMEN_MES = ["super-admin", "servicios-resumen-mes"] as const;
 
 // `string` a secas: sin tipos generados, el analizador de supabase-js no infiere filas.
 const COLUMNAS_BASE: string = "proveedor, nombre, plan, precio_mensual, moneda, ciclo, renovacion, cuenta, panel_url, limites, notas, actualizado_en";
@@ -238,5 +240,83 @@ export function useBorrarServicio() {
       return proveedor;
     },
     onSuccess: () => cliente.invalidateQueries({ queryKey: CLAVE_SERVICIOS }),
+  });
+}
+
+// ─── Costes de cada mes e informe mensual (20261122153000) ──────────────────
+
+/** `disponible: false` si falta la migración 20261122153000 (sin costes por mes). */
+export type ResultadoResumenMes = { disponible: true; filas: FilaResumenMes[] } | { disponible: false };
+
+const esSinMigracionCostesMes = (e: { code?: string; message?: string } | null) =>
+  !!e && (e.code === "42P01" || e.code === "PGRST202" || e.code === "PGRST205" || e.code === "42883" ||
+    /servicios_(resumen_mes|costes_mes)/.test(e.message ?? ""));
+
+/** Lo metido a mano y el coste por uso de cada servicio en un mes («AAAA-MM-01»). */
+export async function cargarResumenMes(mes: string): Promise<ResultadoResumenMes> {
+  const { data, error } = await sb.rpc("servicios_resumen_mes", { p_mes: mes });
+  if (error) {
+    if (esSinMigracionCostesMes(error)) return { disponible: false };
+    throw new Error(error.message || "No se pudo cargar el resumen del mes.");
+  }
+  return { disponible: true, filas: normalizarResumenMes(data) };
+}
+
+/** Un resumen por mes (en el mismo orden que `meses`). */
+export function useResumenesMes(meses: string[], habilitado = true) {
+  return useQueries({
+    queries: meses.map((mes) => ({
+      queryKey: [...CLAVE_RESUMEN_MES, mes],
+      queryFn: () => cargarResumenMes(mes),
+      enabled: habilitado,
+      staleTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+    })),
+  });
+}
+
+export interface CosteMesNuevo {
+  proveedor: string;
+  mes: string;
+  importe: number;
+  moneda: string;
+  nota: string | null;
+}
+
+function mensajeCosteMes(error: { code?: string; message?: string }): string {
+  const texto = error.message ?? "";
+  if (esSinMigracionCostesMes(error)) return "Falta aplicar en Supabase la migración 20261122153000_servicios_costes_mes.";
+  if (/row-level security/i.test(texto) || error.code === "42501") return "Solo un super admin puede meter costes.";
+  if (/check constraint/i.test(texto)) return "El importe no es válido (tiene que ser 0 o más) o la nota es demasiado larga.";
+  return texto || "No se ha podido guardar el coste.";
+}
+
+/** Mete (o cambia) el coste de un servicio en un mes. */
+export function useGuardarCosteMes() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (c: CosteMesNuevo) => {
+      const { data, error } = await sb
+        .from("servicios_costes_mes")
+        .upsert({ proveedor: c.proveedor, mes: c.mes, importe: c.importe, moneda: c.moneda, nota: c.nota }, { onConflict: "proveedor,mes" })
+        .select("proveedor");
+      if (error) throw new Error(mensajeCosteMes(error));
+      if (!data || data.length === 0) throw new Error("No se ha guardado: solo un super admin puede meter costes.");
+      return c;
+    },
+    onSuccess: (c) => cliente.invalidateQueries({ queryKey: [...CLAVE_RESUMEN_MES, c.mes] }),
+  });
+}
+
+/** Quita el coste metido a mano de un servicio en un mes (vuelve a la estimación). */
+export function useBorrarCosteMes() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ proveedor, mes }: { proveedor: string; mes: string }) => {
+      const { error } = await sb.from("servicios_costes_mes").delete().eq("proveedor", proveedor).eq("mes", mes);
+      if (error) throw new Error(mensajeCosteMes(error));
+      return { proveedor, mes };
+    },
+    onSuccess: (c) => cliente.invalidateQueries({ queryKey: [...CLAVE_RESUMEN_MES, c.mes] }),
   });
 }

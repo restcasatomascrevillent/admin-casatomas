@@ -279,12 +279,13 @@ export function PestanaEstado({ estado, resumen, pendientes, ultima, cargandoLec
               {conDatos.map((f) => <Ficha key={f.proveedor} ficha={f} onAbrir={onAbrir} />)}
             </ul>
           )}
-          {/* Sin datos (no hay lectura automática o aún no se ha leído): no es un estado que vigilar,
-              así que van en pequeño, sin ocupar una fila de fichas. */}
-          {sinDatos.length > 0 && (
+          {/* Sin datos todavía (aún no se ha leído): no es un estado que vigilar, así que van en
+              pequeño, sin ocupar una fila de fichas. Los que no tienen lectura automática ya no llegan
+              aquí (10/11/2026); mientras se lee, tampoco se sabe cuáles son, así que no se enseña. */}
+          {sinDatos.length > 0 && !cargandoLecturas && (
             <div className="flex min-w-0 flex-wrap items-center gap-2" data-testid="estado-sin-datos">
-              <span className="text-xs font-medium text-muted-foreground">Sin datos automáticos:</span>
-              <ul className="flex min-w-0 flex-wrap gap-2" aria-label="Servicios sin datos automáticos">
+              <span className="text-xs font-medium text-muted-foreground">Sin datos todavía:</span>
+              <ul className="flex min-w-0 flex-wrap gap-2" aria-label="Servicios sin datos todavía">
                 {sinDatos.map((f) => {
                   const IconoCat = iconoCategoria(f.categoria);
                   return (
