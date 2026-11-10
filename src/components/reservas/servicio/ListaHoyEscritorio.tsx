@@ -240,6 +240,11 @@ function FilaEscritorio({
           {sinMesa ? textoMesa : `M ${textoMesa}`}
         </span>
         <span className="flex shrink-0 items-center gap-0.5">
+          {reserva.menu_del_dia && (
+            <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-900 dark:bg-violet-950/60 dark:text-violet-200" title="Menú del día">
+              Menú
+            </span>
+          )}
           {alergia && <AlertTriangle className="h-4 w-4 text-red-600" aria-label="Alergia" />}
           {notas && !alergia && <StickyNote className="h-4 w-4 text-amber-700 dark:text-amber-300" aria-label="Notas del cliente" />}
           {notas && <span className="sr-only">{notas}</span>}

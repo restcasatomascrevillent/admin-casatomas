@@ -43,12 +43,13 @@ import {
 } from "@/lib/reservas/ocupacionSalas";
 import { OcupacionSalas } from "./OcupacionSalas";
 import { DisponibilidadCuartos, useRejillaCuartos } from "./DisponibilidadCuartos";
+import { admiteMenuDelDia } from "@/lib/reservas/menuDelDia";
 import { formatearTelefonoReserva, variantesTelefono } from "@/lib/reservas/telefono";
 import {
   debeNotificarAltaPanel,
   emailParaGuardar,
   errorEmailOpcional,
-  errorTelefono,
+  errorTelefonoOpcional,
   esErrorSinPermiso,
   estadoInicialAltaPanel,
   MENSAJE_SIN_PERMISO_ALTA,
@@ -86,16 +87,18 @@ import {
   type ReservaEditable,
 } from "@/lib/reservas/edicionReserva";
 
-// Teléfono obligatorio. El email es OPCIONAL (cambio 2026-09-30; antes era
+// Teléfono y email OPCIONALES. El email es OPCIONAL (cambio 2026-09-30; antes era
 // obligatorio por decisión del dueño de 2026-09-23): con email, el cliente recibe
 // un correo para confirmar la reserva; sin él no se manda nada y se guarda
 // `null`. Reglas en src/lib/reservas/altaPanel.ts.
 const formSchema = z.object({
   nombre: z.string({ required_error: "El nombre es obligatorio" }).trim().min(2, "El nombre es obligatorio"),
+  // Teléfono OPCIONAL (2026-11-10): si se rellena, se valida.
   telefono: z
-    .string({ required_error: "El teléfono es obligatorio" })
+    .string()
+    .optional()
     .superRefine((v, ctx) => {
-      const mensaje = errorTelefono(v);
+      const mensaje = errorTelefonoOpcional(v);
       if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
     }),
   // No se usa `.email()` de zod: rechaza la cadena vacía, que es justo lo que
@@ -137,7 +140,7 @@ function esquemaEdicion(original: ReservaEditable) {
       const mensaje = errorNombreEdicion(v, original.nombre);
       if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
     }),
-    telefono: z.string().superRefine((v, ctx) => {
+    telefono: z.string().optional().superRefine((v, ctx) => {
       const mensaje = errorTelefonoEdicion(v, original.telefono);
       if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
     }),
@@ -323,6 +326,8 @@ export const FormularioReserva = ({
   // guardado (al editar) o «no» (en el alta).
   const eventoGuardado = useSalaEventoDeReserva(reservaAEditar?.id);
   const [ocupaSalaElegido, setOcupaSalaElegido] = useState<boolean | null>(null);
+  // «Menú del día» (solo en el alta, martes a jueves antes de las 17:00).
+  const [menuDelDia, setMenuDelDia] = useState(false);
 
   const esquema = useMemo(() => (reservaAEditar ? esquemaEdicion(reservaAEditar) : formSchema), [reservaAEditar]);
   const form = useForm<FormValues>({
@@ -369,6 +374,7 @@ export const FormularioReserva = ({
   const watchedEspacio = form.watch("espacio_id") ?? null;
   const fechaStr = watchedFecha ? format(watchedFecha, "yyyy-MM-dd") : null;
   // Sin sala no hay evento: la casilla se desactiva y no cuenta.
+  const puedeMenuDelDia = !reservaAEditar && admiteMenuDelDia(watchedFecha, watchedHora);
   const ocupaSalaGuardado = !!eventoGuardado.data;
   const ocupaSala = !!watchedEspacio && (ocupaSalaElegido ?? ocupaSalaGuardado);
 
@@ -955,6 +961,7 @@ export const FormularioReserva = ({
         canal: isPublic ? "web" : datosPreseleccionados?.canal ?? "manual",
         en_blacklist: !!blacklisted,
       };
+      if (puedeMenuDelDia && menuDelDia) fila.menu_del_dia = true;
       if (datosPreseleccionados?.solicitud_id) fila.solicitud_id = datosPreseleccionados.solicitud_id;
 
       const insertar = (valores: Record<string, unknown>) =>
@@ -1086,7 +1093,7 @@ export const FormularioReserva = ({
             name="telefono"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Teléfono</FormLabel>
+                <FormLabel>Teléfono (opcional)</FormLabel>
                 <FormControl>
                   <Input type="tel" inputMode="tel" autoComplete="tel" placeholder="612345678" {...field} />
                 </FormControl>
@@ -1456,6 +1463,15 @@ export const FormularioReserva = ({
               </FormItem>
             )}
           />
+        )}
+
+        {puedeMenuDelDia && (
+          <div className="flex min-h-11 flex-row items-center gap-2">
+            <Checkbox id="menu-del-dia" checked={menuDelDia} onCheckedChange={(v) => setMenuDelDia(v === true)} />
+            <Label htmlFor="menu-del-dia" className="font-normal">
+              Menú del día
+            </Label>
+          </div>
         )}
 
         {erroresValidacion.length > 0 && (
