@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Download,
   LayoutGrid,
+  ListChecks,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,11 +39,13 @@ import {
 } from "@/lib/carta-pdf/datos";
 import {
   ALINEACION_POR_DEFECTO,
+  INTERLINEADO_POR_DEFECTO,
   maquetarCarta,
   seccionesQueNoCaben,
   TAMANOS_CARTA,
   type AlineacionHorizontal,
   type AlineacionVertical,
+  type Interlineado,
   type MaquetaCarta,
   type PaginaCarta,
   type TamanoCarta,
@@ -50,7 +53,7 @@ import {
 import { cargarMotorCarta, descargarPdf, type MotorCarta } from "@/lib/carta-pdf/navegador";
 import { crearPdfCarta } from "@/lib/carta-pdf/pdf";
 import { IDIOMAS_CARTA, NOMBRE_IDIOMA, TEXTOS, type IdiomaCarta } from "@/lib/carta-pdf/textos";
-import { RevisionSecciones } from "./RevisionSecciones";
+import { ListaElementos, RevisionSecciones } from "./RevisionSecciones";
 import { VistaPagina } from "./VistaPagina";
 
 /**
@@ -65,8 +68,11 @@ import { VistaPagina } from "./VistaPagina";
  * Nunca dos secciones en el mismo folio, un plato por línea (08/11 y
  * 10/11/2026): cada sección empieza en página nueva y, si no cabe en una,
  * sigue en las siguientes. Se elige dónde va el texto (izquierda, centro o
- * derecha; arriba, centro o abajo). RevisionSecciones dice qué secciones
- * ocupan varias páginas y deja quitar platos o vinos solo de la carta impresa.
+ * derecha; arriba, centro o abajo) y el interlineado (compacto, normal o
+ * amplio). Sin aviso de «varias páginas» (10/11/2026): que una sección larga
+ * siga en la siguiente es lo normal. Desde una página en grande se pueden
+ * quitar platos o vinos de su sección solo de la carta impresa, y
+ * RevisionSecciones recuerda lo quitado.
  */
 
 interface Props {
@@ -114,6 +120,24 @@ function ListaCasillas({
   );
 }
 
+const OPCIONES_INTERLINEADO: readonly (readonly [Interlineado, string, string, number])[] = [
+  ["compacto", "Compacto", "Interlineado compacto", 3],
+  ["normal", "Normal", "Interlineado normal", 4.5],
+  ["amplio", "Amplio", "Interlineado amplio", 6],
+];
+
+/** Tres rayas separadas según el interlineado (el icono de cada opción). */
+function IconoInterlineado({ paso }: { paso: number }) {
+  const inicio = 8 - paso;
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+      {[0, 1, 2].map((i) => (
+        <line key={i} x1={2} x2={14} y1={inicio + i * paso} y2={inicio + i * paso} />
+      ))}
+    </svg>
+  );
+}
+
 // Por defecto, una lista vacía estable: con `= []` cada render estrenaba lista y se volvía a maquetar todo.
 const SIN_FILAS = [] as const;
 const SIN_PAGINAS: PaginaCarta[] = [];
@@ -133,6 +157,9 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
   const [descargando, setDescargando] = useState(false);
   const [horizontal, setHorizontal] = useState<AlineacionHorizontal>(ALINEACION_POR_DEFECTO.horizontal);
   const [vertical, setVertical] = useState<AlineacionVertical>(ALINEACION_POR_DEFECTO.vertical);
+  const [interlineado, setInterlineado] = useState<Interlineado>(INTERLINEADO_POR_DEFECTO);
+  /** Sección de la página en grande con su lista de platos o vinos abierta. */
+  const [eligiendo, setEligiendo] = useState<string | null>(null);
   /** Platos o vinos (id) quitados a mano de la carta impresa. */
   const [excluidosElementos, setExcluidosElementos] = useState<Set<string>>(() => new Set());
 
@@ -175,8 +202,8 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
 
   const maqueta: MaquetaCarta | null = useMemo(() => {
     if (!motor || totalElementos === 0) return null;
-    return maquetarCarta(motor.medidor, contenido, tamano, { alineacion: { horizontal, vertical } });
-  }, [motor, contenido, totalElementos, tamano, horizontal, vertical]);
+    return maquetarCarta(motor.medidor, contenido, tamano, { alineacion: { horizontal, vertical }, interlineado });
+  }, [motor, contenido, totalElementos, tamano, horizontal, vertical, interlineado]);
   const paginas: PaginaCarta[] = maqueta?.paginas ?? SIN_PAGINAS;
   // Solo si un plato no cabe ni en una página entera (un texto desmesurado): entonces no se descarga.
   const problemas = useMemo(() => (maqueta ? seccionesQueNoCaben(maqueta) : []), [maqueta]);
@@ -231,6 +258,9 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
   };
 
   const etiquetaPagina = (i: number) => `Página ${i + 1} de ${paginas.length}`;
+  const sustantivo = tipo === "vinos" ? { singular: "vino", plural: "vinos" } : { singular: "plato", plural: "platos" };
+  const claveAmpliada = ampliada !== null ? paginas[ampliada]?.seccion : undefined;
+  const seccionAmpliada = claveAmpliada ? completo.secciones.find((s) => s.clave === claveAmpliada) : undefined;
 
   return (
     <Dialog open={abierto} onOpenChange={onCambiarAbierto}>
@@ -375,6 +405,31 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
               </ToggleGroup>
             </fieldset>
 
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Interlineado</legend>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={interlineado}
+                onValueChange={(valor) => valor && setInterlineado(valor as Interlineado)}
+                className="grid grid-cols-3 gap-1"
+                aria-label="Interlineado"
+              >
+                {OPCIONES_INTERLINEADO.map(([valor, etiqueta, nombre, paso]) => (
+                  <ToggleGroupItem
+                    key={valor}
+                    value={valor}
+                    aria-label={nombre}
+                    className="h-auto flex-col gap-0.5 px-1 py-1.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    <IconoInterlineado paso={paso} />
+                    {etiqueta}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+              <p className="text-xs text-muted-foreground">Separación entre líneas y entre {sustantivo.plural}.</p>
+            </fieldset>
+
             <fieldset className="space-y-1">
               <div className="flex items-center justify-between gap-2">
                 <legend className="text-sm font-medium">{tipo === "vinos" ? "Tipos y denominaciones" : "Categorías"}</legend>
@@ -508,6 +563,23 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
                     </Button>
                   </div>
                 </div>
+                {seccionAmpliada && (
+                  <div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      aria-expanded={eligiendo === seccionAmpliada.clave}
+                      onClick={() => setEligiendo(eligiendo === seccionAmpliada.clave ? null : seccionAmpliada.clave)}
+                    >
+                      <ListChecks className="mr-1.5 h-4 w-4" /> Elegir {sustantivo.plural} de esta sección
+                    </Button>
+                    {eligiendo === seccionAmpliada.clave && (
+                      <ListaElementos seccion={seccionAmpliada} excluidos={excluidosElementos} sustantivo={sustantivo} alCambiar={cambiarExcluidos} />
+                    )}
+                  </div>
+                )}
                 {paginas[ampliada].desborda && (
                   <p className="flex items-start gap-2 text-sm text-destructive">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
