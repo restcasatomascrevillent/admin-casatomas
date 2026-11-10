@@ -53,7 +53,7 @@ export function useReservasServicioDia(fecha: string | null | undefined, espacio
     queryFn: async (): Promise<ReservaMesaServicio[]> => {
       let q = (supabase.from("reservas" as any) as any)
         .select(
-          "id, nombre, hora, numero_comensales, estado, espacio_id, telefono, email, importante, llegada_at, salida_at",
+          "id, nombre, hora, numero_comensales, estado, espacio_id, telefono, email, importante, llegada_at, salida_at, notas_cliente",
         )
         .eq("fecha", fecha);
       if (espacioId) q = q.eq("espacio_id", espacioId);
@@ -72,6 +72,7 @@ export function useReservasServicioDia(fecha: string | null | undefined, espacio
         importante: (r.importante as boolean | null) ?? null,
         llegada_at: (r.llegada_at as string | null) ?? null,
         salida_at: (r.salida_at as string | null) ?? null,
+        notas_cliente: (r.notas_cliente as string | null) ?? null,
       }));
     },
   });

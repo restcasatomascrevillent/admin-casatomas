@@ -81,8 +81,8 @@ vi.mock("@/components/reservas/OcupacionSalas", () => ({
     );
   },
 }));
-vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
-  DisponibilidadCuartos: (props: { onSeleccionarHora?: (hora: string) => void }) => {
+vi.mock("@/components/reservas/ReservasDelDia", () => ({
+  ReservasDelDia: (props: { onSeleccionarHora?: (hora: string) => void }) => {
     mocks.cuartos(props);
     return (
       <button type="button" onClick={() => props.onSeleccionarHora?.("13:00")}>
@@ -90,6 +90,9 @@ vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
       </button>
     );
   },
+}));
+vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
+  DisponibilidadCuartos: () => null,
   useRejillaCuartos: (args: unknown) => {
     mocks.rejilla(args);
     return {
