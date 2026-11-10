@@ -233,7 +233,9 @@ describe("Sin reserva en una mesa prevista para otro (móvil)", () => {
         />,
       );
       expect(screen.getByText("Prevista para García (21:30) · 4 plazas")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Sentar sin reserva" }));
       fireEvent.click(screen.getByRole("button", { name: "2" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sentar 2 en mesa 7" }));
       expect(screen.getByRole("alert")).toHaveTextContent("García se quedará sin mesa prevista.");
       fireEvent.click(screen.getByRole("button", { name: "Sentar igualmente" }));
       await waitFor(() => expect(h.llamadas).toEqual(["asignar:g:[]", "sinReserva:2:m7"]));
@@ -334,7 +336,9 @@ describe("Mesa fijada y recolocar al sentar (07/11/2026)", () => {
           onCerrar={vi.fn()}
         />,
       );
+      fireEvent.click(screen.getByRole("button", { name: "Sentar sin reserva" }));
       fireEvent.click(screen.getByRole("button", { name: "2" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sentar 2 en mesa 7" }));
       expect(screen.getByRole("alert")).toHaveTextContent("García se queda sin mesa: no hay ninguna libre.");
       fireEvent.click(screen.getByRole("button", { name: "Sentar igualmente" }));
       await waitFor(() => expect(h.llamadas).toEqual(["asignar:g:[]", "sinReserva:2:m7"]));
