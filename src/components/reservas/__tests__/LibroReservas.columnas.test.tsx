@@ -135,6 +135,37 @@ describe("LibroReservas · dos columnas en horizontal, una en vertical", () => {
   });
 });
 
+describe("LibroReservas · solo apuntar (desde «Añadir reserva a este día»)", () => {
+  it("sin la hoja del día: la columna de apuntar a todo el ancho, aunque la pantalla sea ancha", () => {
+    pantalla(true);
+    montar({ fechaInicial: FECHA, soloApuntar: true });
+    expect(screen.getByTestId("lista-hoja-libro")).toHaveClass("hidden");
+    expect(screen.getByTestId("columna-apuntar")).toHaveClass("flex-1");
+    expect(screen.getByTestId("lista-hoja-libro").parentElement).toHaveAttribute("data-columnas", "1");
+    // El lienzo, a todo el alto; el día sigue a la vista y se puede cambiar.
+    expect(screen.getByTestId("caja-lienzo")).toHaveClass("flex-1", "min-h-[280px]");
+    expect(fechaVisible()).toHaveTextContent(tituloHoja(FECHA));
+    fireEvent.click(screen.getByRole("button", { name: "Día siguiente" }));
+    expect(fechaVisible()).toHaveTextContent(tituloHoja(pasarHoja(FECHA, 1)));
+  });
+
+  it("el formulario centrado en una columna cómoda (máx. 48rem)", () => {
+    montar({ fechaInicial: FECHA, soloApuntar: true });
+    fireEvent.click(screen.getByRole("button", { name: /Formulario/ }));
+    const centro = screen.getByTestId("formulario").parentElement!;
+    expect(centro).toHaveClass("mx-auto", "max-w-3xl");
+    expect(centro.parentElement).toHaveClass("formulario-una-columna", "flex-1");
+  });
+
+  it("avisa del día de la hoja (para el título del diálogo)", () => {
+    const onCambioFecha = vi.fn();
+    montar({ fechaInicial: FECHA, soloApuntar: true, onCambioFecha });
+    expect(onCambioFecha).toHaveBeenLastCalledWith(FECHA);
+    fireEvent.click(screen.getByRole("button", { name: "Día siguiente" }));
+    expect(onCambioFecha).toHaveBeenLastCalledWith(pasarHoja(FECHA, 1));
+  });
+});
+
 describe("LibroReservas · abrir en un día y pasar hojas arrastrando", () => {
   it("con `fechaInicial` abre en esa hoja y el formulario trae ese día", () => {
     montar({ fechaInicial: FECHA });

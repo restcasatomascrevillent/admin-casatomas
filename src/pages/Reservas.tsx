@@ -87,6 +87,12 @@ function CargandoPestana() {
   );
 }
 
+/** "2026-11-20" → «viernes 20 de noviembre». */
+function diaLargo(clave: string): string {
+  const [a, m, d] = clave.split("-").map(Number);
+  return new Date(a, m - 1, d).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+}
+
 const bajoDemanda = (contenido: ReactNode) => <Suspense fallback={<CargandoPestana />}>{contenido}</Suspense>;
 
 /**
@@ -212,6 +218,8 @@ export default function Reservas() {
   // ese día. `null` = abierto desde el botón de arriba (hoy).
   const [fechaNuevaReserva, setFechaNuevaReserva] = useState<string | null>(null);
   const [ultimaCreada, setUltimaCreada] = useState<{ id: string; fecha: string } | null>(null);
+  // El día de la hoja abierta en «Nueva Reserva», para el título cuando se abre desde la hoja («solo apuntar»).
+  const [fechaHojaNueva, setFechaHojaNueva] = useState<string | null>(null);
   const abrirNuevaReserva = (fecha: string | null = null) => {
     setFechaNuevaReserva(fecha);
     setOpenDialog(true);
@@ -488,10 +496,22 @@ export default function Reservas() {
                 </DialogTrigger>
                 <DialogContent className="reservas-contraste flex h-[94dvh] max-h-[94dvh] w-[98vw] max-w-[98vw] flex-col gap-0 overflow-hidden p-0">
                   <DialogHeader className="flex-row flex-wrap items-center gap-3 space-y-0 border-b px-4 py-2 pr-12">
-                    <DialogTitle className="text-lg">Nueva reserva</DialogTitle>
+                    <DialogTitle className="text-lg">
+                      Nueva reserva
+                      {fechaNuevaReserva && fechaHojaNueva ? ` · ${diaLargo(fechaHojaNueva)}` : ""}
+                    </DialogTitle>
                     <DialogDescription className="sr-only">Las reservas del día y, debajo, apuntar una nueva con el lápiz o con el formulario.</DialogDescription>
                   </DialogHeader>
-                  {bajoDemanda(<LibroReservas soloCrear={soloCrear} fechaInicial={fechaNuevaReserva} onReservaCreada={setUltimaCreada} />)}
+                  {bajoDemanda(
+                    <LibroReservas
+                      soloCrear={soloCrear}
+                      fechaInicial={fechaNuevaReserva}
+                      onReservaCreada={setUltimaCreada}
+                      // Desde «+ Añadir reserva a este día»: sin la hoja (ya se ve detrás), solo apuntar.
+                      soloApuntar={!!fechaNuevaReserva}
+                      onCambioFecha={setFechaHojaNueva}
+                    />,
+                  )}
                 </DialogContent>
               </Dialog>
             )}

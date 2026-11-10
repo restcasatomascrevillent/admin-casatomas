@@ -29,18 +29,28 @@ vi.mock("@/components/reservas/libro/ListaComoLibro", () => ({
     );
   },
 }));
-vi.mock("@/components/reservas/libro/LibroReservas", () => ({
-  LibroReservas: (props: { fechaInicial?: string | null; onReservaCreada?: (r: { id: string; fecha: string }) => void }) => {
+vi.mock("@/components/reservas/libro/LibroReservas", async () => {
+  const { useEffect } = await import("react");
+  return {
+  LibroReservas: (props: {
+    fechaInicial?: string | null;
+    soloApuntar?: boolean;
+    onCambioFecha?: (f: string) => void;
+    onReservaCreada?: (r: { id: string; fecha: string }) => void;
+  }) => {
     pag.libro(props);
+    const { onCambioFecha, fechaInicial } = props;
+    useEffect(() => onCambioFecha?.(fechaInicial ?? "2026-11-10"), [onCambioFecha, fechaInicial]);
     return (
-      <div data-testid="libro-nueva" data-fecha={props.fechaInicial ?? "hoy"}>
+      <div data-testid="libro-nueva" data-fecha={props.fechaInicial ?? "hoy"} data-solo-apuntar={String(!!props.soloApuntar)}>
         <button type="button" onClick={() => props.onReservaCreada?.({ id: "nueva-1", fecha: "2026-11-20" })}>
           Guardar (simulado)
         </button>
       </div>
     );
   },
-}));
+  };
+});
 vi.mock("@/components/reservas/CalendarioOcupacion", () => ({ CalendarioOcupacion: () => null }));
 vi.mock("@/components/reservas/PlanoEspacio2D", () => ({ PlanoEspacio2D: () => null }));
 vi.mock("@/components/reservas/servicio/ModoServicioPlano", () => ({ ModoServicioPlano: () => null }));
@@ -133,7 +143,7 @@ describe("Reservas › Lista · «Añadir reserva a este día» desde la hoja de
     const dialogo = await screen.findByRole("dialog");
     expect(await within(dialogo).findByTestId("libro-nueva")).toHaveAttribute("data-fecha", "2026-11-20");
     // Un solo diálogo: el de siempre.
-    expect(within(dialogo).getByRole("heading", { name: "Nueva reserva" })).toBeInTheDocument();
+    expect(within(dialogo).getByRole("heading", { name: /^Nueva reserva/ })).toBeInTheDocument();
 
     fireEvent.keyDown(dialogo, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -154,5 +164,25 @@ describe("Reservas › Lista · «Añadir reserva a este día» desde la hoja de
     await screen.findByTestId("libro-lista");
     expect(screen.queryByRole("button", { name: "Añadir reserva a este día" })).toBeNull();
     expect(pag.lista.mock.calls.at(-1)![0].onAnadirReserva).toBeUndefined();
+  });
+});
+
+// 10/11/2026 (dueño): desde la hoja, el diálogo es «solo apuntar» (sin la hoja, que ya se ve detrás) y el título
+// dice el día; desde «Nueva Reserva» de la barra, el de siempre con la hoja del día.
+describe("Reservas › «Nueva Reserva»: solo apuntar desde la hoja, completo desde la barra", () => {
+  it("desde la hoja: solo apuntar y «Nueva reserva · viernes 20 de noviembre»", async () => {
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: "Añadir reserva a este día" }));
+    const dialogo = await screen.findByRole("dialog");
+    expect(await within(dialogo).findByTestId("libro-nueva")).toHaveAttribute("data-solo-apuntar", "true");
+    await waitFor(() => expect(within(dialogo).getByRole("heading")).toHaveTextContent("Nueva reserva · viernes, 20 de noviembre"));
+  });
+
+  it("desde la barra: con la hoja del día y el título de siempre", async () => {
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: /Nueva Reserva/ }));
+    const dialogo = await screen.findByRole("dialog");
+    expect(await within(dialogo).findByTestId("libro-nueva")).toHaveAttribute("data-solo-apuntar", "false");
+    expect(within(dialogo).getByRole("heading")).toHaveTextContent(/^Nueva reserva$/);
   });
 });
