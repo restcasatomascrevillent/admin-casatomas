@@ -14,6 +14,7 @@ import {
   ScrollText,
   Server,
   FileSearch,
+  FileBarChart2,
 } from "lucide-react";
 import { useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -41,7 +42,7 @@ import { MenuMasModulos, type ItemMenu } from "@/components/superadmin/MenuMasMo
 /**
  * Menú del Super Admin (orden del 2026-11-03, petición del dueño; Costes dentro de Servicios el 2026-11-04): arriba lo de
  * uso diario agrupado por tema; abajo del todo, en el desplegable «Más módulos»,
- * Ecommerce, Asistente Tel., Espacios y Bot Web.
+ * Gestor Gasto (desde el 2026-11-10: «Mover gestor gasto a más módulos»), Ecommerce, Asistente Tel., Espacios y Bot Web.
  */
 const gruposMenuSuperAdmin: { etiqueta: string; items: ItemMenu[] }[] = [
   {
@@ -50,12 +51,13 @@ const gruposMenuSuperAdmin: { etiqueta: string; items: ItemMenu[] }[] = [
       { title: "Control del Panel", url: "/super-admin", icon: LayoutDashboard },
       { title: "Usuarios", url: "/super-admin/usuarios", icon: Users },
       { title: "Auditoría", url: "/super-admin/auditoria", icon: ScrollText },
+      // Informes (10/11/2026): todos los informes del panel en un sitio (src/lib/informes/registro.ts).
+      { title: "Informes", url: "/super-admin/informes", icon: FileBarChart2 },
     ],
   },
   {
     etiqueta: "Costes",
     items: [
-      { title: "Gestor Gasto", url: "/super-admin/gestor-gasto", icon: Wallet },
       // «Costes» es una pestaña de Servicios desde el 04/11/2026 (petición del dueño: «que sean una»).
       { title: "Servicios", url: "/super-admin/servicios", icon: Server },
     ],
@@ -73,6 +75,7 @@ const gruposMenuSuperAdmin: { etiqueta: string; items: ItemMenu[] }[] = [
 ];
 
 const masModulosSuperAdmin: ItemMenu[] = [
+  { title: "Gestor Gasto", url: "/super-admin/gestor-gasto", icon: Wallet },
   { title: "Ecommerce", url: "/super-admin/ecommerce", icon: ShoppingCart },
   { title: "Asistente Tel.", url: "/super-admin/asistente-telefonico", icon: Phone },
   { title: "Espacios", url: "/super-admin/espacios", icon: MapPin },

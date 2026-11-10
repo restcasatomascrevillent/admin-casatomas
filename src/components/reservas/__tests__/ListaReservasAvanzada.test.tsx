@@ -56,6 +56,7 @@ import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 import { ESTADOS_RESERVA, type EstadoReserva } from "@/lib/reservas/estadosReserva";
 import { ErrorLecturaInconsistente } from "@/lib/reservas/paginarConsulta";
 import type { DobleSupabase } from "@/lib/reservas/__tests__/dobleSupabaseLotes";
+import type { DobleCanales } from "@/hooks/__tests__/dobleCanalRealtime";
 
 const supa = vi.hoisted(() => ({
   /** Las salas que devuelve `useEspaciosReserva` (por defecto, ninguna). */
@@ -80,6 +81,8 @@ const supa = vi.hoisted(() => ({
    * `opciones` (fallos, esperas, lotes cortos, abortos). Se reinicia en cada test.
    */
   lecturas: undefined as unknown as DobleSupabase,
+  /** Los canales realtime que abre la Lista (`useListaReservasEnVivo`): aquí se disparan sus eventos. */
+  canales: undefined as unknown as DobleCanales,
   // Props con las que se monta el alta al convertir una solicitud.
   formulario: vi.fn(),
   // Props de la tarjeta de solicitud (móvil) y del panel «Gestionar»: ¿llevan «Convertir»?
@@ -104,9 +107,13 @@ vi.mock("@/integrations/supabase/client", async () => {
     get: (_destino, tabla) => (tabla === "reservas" ? supa.filas : undefined),
   });
   supa.lecturas = lecturas;
+  const { crearDobleCanales } = await import("@/hooks/__tests__/dobleCanalRealtime");
+  supa.canales = crearDobleCanales();
 
   return {
     supabase: {
+      channel: supa.canales.channel,
+      removeChannel: supa.canales.removeChannel,
       from: () => ({
         select: (columnas?: string, opciones?: { count?: string }) => {
           supa.cargas();
@@ -281,6 +288,7 @@ const filaDe = (tabla: HTMLElement, texto: string) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  supa.canales.reiniciar();
   supa.lecturas.reiniciar(); // sin opciones, sin peticiones anotadas y la numeración de peticiones desde 1
   // Los fixtures de estos tests ya vienen en el orden en que se espera verlos (varias reservas empatan en día y
   // hora): el doble no las reordena por `id`, como haría el servidor. Lo que pide la consulta (`fecha` desc,
@@ -297,6 +305,52 @@ beforeEach(() => {
     // Única con sala repartida: es la que puede saltar al plano.
     reserva("res-con-sala", "confirmada", "Elena ConSala", "esp-comedor"),
   ];
+});
+
+describe("ListaReservasAvanzada · se pone al día sola (realtime)", () => {
+  /** El canal de la Lista a `reservas` (`useListaReservasEnVivo`). */
+  const canalLista = () => {
+    const canal = supa.canales.canales.find((c) => c.nombre.startsWith("reservas-lista-en-vivo-"));
+    if (!canal) throw new Error("La Lista no ha abierto su canal a `reservas`");
+    return canal;
+  };
+  const textoTabla = (container: HTMLElement) => container.querySelector("table")?.textContent ?? "";
+
+  it("escucha `reservas` en su propio canal", async () => {
+    await montar();
+    expect(canalLista().tablas()).toEqual(["reservas"]);
+  });
+
+  it("una reserva nueva (de la web, del bot, de otro dispositivo) aparece sola, sin recargar", async () => {
+    const { container } = await montar();
+    const cargasAlMontar = supa.cargas.mock.calls.length;
+    expect(textoTabla(container)).not.toContain("Fede Nueva");
+
+    supa.filas = [reserva("res-nueva", "pendiente", "Fede Nueva"), ...supa.filas];
+    act(() => canalLista().cambio({ eventType: "INSERT", new: { id: "res-nueva" } }));
+
+    await waitFor(() => expect(textoTabla(container)).toContain("Fede Nueva"), { timeout: 3_000 });
+    expect(supa.cargas.mock.calls.length).toBe(cargasAlMontar + 1); // una sola relectura
+    expect(textoTabla(container)).toContain("Ana Pendiente"); // las de antes siguen ahí
+  });
+
+  it("una reserva cambiada en otro dispositivo se ve cambiada", async () => {
+    const { container } = await montar();
+
+    supa.filas = supa.filas.map((f) => (f.id === "res-pendiente" ? { ...f, nombre: "Ana Cambiada" } : f));
+    act(() => canalLista().cambio({ eventType: "UPDATE", new: { id: "res-pendiente" } }));
+
+    await waitFor(() => expect(textoTabla(container)).toContain("Ana Cambiada"), { timeout: 3_000 });
+    expect(textoTabla(container)).not.toContain("Ana Pendiente");
+  });
+
+  it("al salir de la Lista cierra su canal", async () => {
+    const { unmount } = await montar();
+    const canal = canalLista();
+
+    unmount();
+    expect(supa.canales.removeChannel).toHaveBeenCalledWith(canal);
+  });
 });
 
 describe("ListaReservasAvanzada · columna de acciones", () => {

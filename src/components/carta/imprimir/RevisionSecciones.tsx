@@ -7,12 +7,14 @@ import { nombreSeccion, type ContenidoCarta, type SeccionCarta, type TipoCartaIm
 import type { InformeSeccion, TamanoCarta } from "@/lib/carta-pdf/maquetacion";
 
 /**
- * Lo que conviene saber antes de descargar la carta impresa. Cada sección va
- * en sus propias páginas (nunca dos en el mismo folio) y una larga sigue en las
- * siguientes: aquí se dice cuáles ocupan varias páginas, con la opción de ver
- * su primera página o de quitar platos o vinos solo de la carta impresa. También
- * recuerda lo quitado, con la forma de recuperarlo, y avisa en el caso raro de
- * un elemento que no cabe ni en una página entera (entonces no se descarga).
+ * Lo que conviene saber antes de descargar la carta impresa: recuerda los
+ * platos o vinos quitados solo de la carta impresa, con la forma de
+ * recuperarlos, y avisa en el caso raro de un elemento que no cabe ni en una
+ * página entera (entonces no se descarga).
+ *
+ * Sin aviso de «varias páginas» (10/11/2026, dueño: «quitar el aviso de varias
+ * páginas»): que una sección larga siga en la página siguiente es lo normal.
+ * Los platos se eligen desde la página en grande (`ListaElementos`).
  */
 
 interface Props {
@@ -28,7 +30,7 @@ interface Props {
 
 const contar = (n: number, singular: string, plural: string) => `${n} ${n === 1 ? singular : plural}`;
 
-function ListaElementos({
+export function ListaElementos({
   seccion,
   excluidos,
   sustantivo,
@@ -88,14 +90,13 @@ export function RevisionSecciones({ tipo, tamano, secciones, completo, excluidos
   const [abierta, setAbierta] = useState<string | null>(null);
   const sustantivo = tipo === "vinos" ? { singular: "vino", plural: "vinos" } : { singular: "plato", plural: "platos" };
   const problemas = secciones.filter((s) => !s.cabe);
-  const largas = secciones.filter((s) => s.cabe && s.caras > 1);
   const quitados = completo.secciones
     .map((seccion) => ({
       seccion,
       quitados: seccion.grupos.reduce((t, g) => t + g.elementos.filter((e) => excluidos.has(e.id)).length, 0),
     }))
-    .filter((q) => q.quitados > 0 && !secciones.some((s) => s.clave === q.seccion.clave && (!s.cabe || s.caras > 1)));
-  if (!problemas.length && !largas.length && !quitados.length) return null;
+    .filter((q) => q.quitados > 0 && !secciones.some((s) => s.clave === q.seccion.clave && !s.cabe));
+  if (!problemas.length && !quitados.length) return null;
 
   const seccionCompleta = (clave: string) => completo.secciones.find((s) => s.clave === clave);
   const quitadosDe = (clave: string) =>
@@ -143,10 +144,6 @@ export function RevisionSecciones({ tipo, tamano, secciones, completo, excluidos
       </>
     );
   };
-  const quitadosTexto = (clave: string) => {
-    const n = quitadosDe(clave);
-    return n ? ` ${contar(n, `${sustantivo.singular} quitado`, `${sustantivo.plural} quitados`)}.` : "";
-  };
 
   return (
     <div className="mb-3 space-y-2">
@@ -168,21 +165,9 @@ export function RevisionSecciones({ tipo, tamano, secciones, completo, excluidos
           </ul>
         </div>
       )}
-      {(largas.length > 0 || quitados.length > 0) && (
+      {quitados.length > 0 && (
         <div className="rounded-md border bg-background p-3 text-sm">
           <ul className="space-y-2">
-            {largas.map((s) => (
-              <li key={`l-${s.clave}`}>
-                <p className="flex items-start gap-2">
-                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span>
-                    <strong>{nombreSeccion(tipo, s.clave)}</strong> ocupa {s.caras} páginas {tamano} ({contar(s.elementos, sustantivo.singular, sustantivo.plural)}),
-                    sin compartir página con otra sección.{quitadosTexto(s.clave)}
-                  </span>
-                </p>
-                {acciones(s.clave, s.pagina)}
-              </li>
-            ))}
             {quitados.map(({ seccion, quitados: n }) => (
               <li key={`q-${seccion.clave}`}>
                 <p className="flex items-start gap-2">

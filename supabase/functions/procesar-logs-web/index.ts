@@ -94,10 +94,19 @@ function crearRepo(sb: any): RepoProceso {
       return comprobar(await sb.rpc("web_logs_agrupar_errores", { p_limite: 5000 }), "agrupar errores");
     },
     async incidenciasConTicket(limite) {
-      return comprobar(await sb.from("web_incidencias").select("*")
-        .in("linear_estado", ["pendiente", "error", "creado"])
-        .neq("estado", "ignorada")
-        .order("ultima_vez", { ascending: false }).limit(limite), "leer incidencias") ?? [];
+      // Dos colas para que ninguna se coma a la otra: antes era una sola lista de 200 por
+      // «última vez», y con muchos tickets ya creados una pendiente antigua no entraba nunca.
+      //   · por crear (pendiente/error): las que antes toca reintentar;
+      //   · con ticket: las que llevan más tiempo sin sincronizar.
+      const mitad = Math.max(1, Math.floor(limite / 2));
+      const porCrear = comprobar(await sb.from("web_incidencias").select("*")
+        .in("linear_estado", ["pendiente", "error"]).neq("estado", "ignorada")
+        .order("linear_proximo_intento", { ascending: true, nullsFirst: true }).order("id").limit(mitad), "leer incidencias por crear") ?? [];
+      const conTicket = comprobar(await sb.from("web_incidencias").select("*")
+        .eq("linear_estado", "creado").neq("estado", "ignorada")
+        .order("linear_pendiente_reapertura", { ascending: false })
+        .order("linear_ultima_sync", { ascending: true, nullsFirst: true }).order("id").limit(limite - mitad), "leer incidencias con ticket") ?? [];
+      return [...porCrear, ...conTicket];
     },
     async reclamar(id, ahora, hasta) {
       const r = await sb.from("web_incidencias").update({ linear_bloqueo_hasta: hasta.toISOString() })
@@ -110,7 +119,8 @@ function crearRepo(sb: any): RepoProceso {
     async muestras(id) {
       return comprobar(await sb.from("web_eventos")
         .select("id, tipo, accion, categoria, ruta, objetivo, valor, ocurrido_en, secuencia, navegador, so, dispositivo, version, propiedades, mensaje")
-        .eq("incidencia_id", id).order("ocurrido_en", { ascending: false }).limit(50), "leer muestras") ?? [];
+        // Sin bots: los repartos (navegador, versión…) son de visitantes reales, como las cifras.
+        .eq("incidencia_id", id).eq("es_bot", false).order("ocurrido_en", { ascending: false }).limit(50), "leer muestras") ?? [];
     },
     async ultimoErrorConSesion(id) {
       // Con consentimiento: solo esas tienen recorrido (sin él, el id de sesión es efímero y solo trae el error).

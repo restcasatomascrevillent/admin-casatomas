@@ -259,7 +259,7 @@ describe("useUsersManagement · setAllPermissions guarda sin dejar al usuario co
     expect(escrituras[0].payload!.map((f) => f.section_key).sort()).toEqual(["dashboard", "gestor_carta", "reservas", "usuarios"]);
     expect(escrituras[1].filtros).toEqual([
       ["eq", "user_id", USUARIO],
-      ["in", "section_key", ["reservas_configuracion", "gestion_web", "marketing", "instagram_agencia", "instagram_render", "cheques", "tienda", "facturas", "facturas_subida"]],
+      ["in", "section_key", ["reservas_configuracion", "reservas_crear", "gestion_web", "marketing", "instagram_agencia", "instagram_render", "cheques", "tienda", "facturas", "facturas_subida", "facturas_albaranes"]],
     ]);
     // Resultado: lo marcado está, lo desmarcado ya no, y la edición de Reservas sigue.
     expect(enBd("reservas")).toMatchObject({ can_view: true, can_edit: true });

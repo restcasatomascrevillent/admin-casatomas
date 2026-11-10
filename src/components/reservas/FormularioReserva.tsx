@@ -26,7 +26,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { verificarAforoTurno } from "@/hooks/useDisponibilidad";
 import { useCierresReserva } from "@/hooks/useCierresReserva";
-import { textoTurnosCerrados, turnoDeHoraServicio, turnosCerradosEn } from "../../../supabase/functions/_shared/cierres";
+import {
+  diasAbiertosSinReservaOnlineDesde,
+  separarCierres,
+  textoTurnosCerrados,
+  turnoDeHoraServicio,
+  turnosCerradosEn,
+} from "../../../supabase/functions/_shared/cierres";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -294,6 +300,12 @@ interface FormularioReservaProps {
    * lo que se cambia con `setValue` desde el calendario o las rejillas).
    */
   onCambiosSinGuardar?: (hayCambios: boolean) => void;
+  /**
+   * Tipo de usuario «Reservas» (10/11/2026): quien solo tiene «Reservas · Crear» (sin «Editar») solo
+   * crea la reserva; no se le ofrece «Ocupa la sala entera (evento)», que cierra la sala y exige «Editar»
+   * (la BD tampoco le deja escribir en salas_cerradas_servicio). Lo decide Reservas con usePuedeCrearReservas.
+   */
+  soloCrear?: boolean;
 }
 
 export const FormularioReserva = ({
@@ -303,6 +315,7 @@ export const FormularioReserva = ({
   reservaAEditar,
   mesasAsignadas = [],
   onCambiosSinGuardar,
+  soloCrear: soloCrearReservas = false,
 }: FormularioReservaProps) => {
   const editando = !!reservaAEditar;
   const navigate = useNavigate();
@@ -328,6 +341,7 @@ export const FormularioReserva = ({
   const [ocupaSalaElegido, setOcupaSalaElegido] = useState<boolean | null>(null);
   // «Menú del día» (solo en el alta, martes a jueves antes de las 17:00).
   const [menuDelDia, setMenuDelDia] = useState(false);
+
 
   const esquema = useMemo(() => (reservaAEditar ? esquemaEdicion(reservaAEditar) : formSchema), [reservaAEditar]);
   const form = useForm<FormValues>({
@@ -384,7 +398,14 @@ export const FormularioReserva = ({
   // Cierres de reservas (lunes, jueves, domingo noche, calendario): el panel
   // NO bloquea, solo avisa — el personal puede hacer una excepción.
   const { data: cierresFecha } = useCierresReserva(isPublic ? null : fechaStr, isPublic ? null : fechaStr);
-  const turnosCerradosFecha = fechaStr ? turnosCerradosEn(cierresFecha?.cierres ?? [], fechaStr) : [];
+  // Jueves de tapas (dueño, 2026-11-10: «Abierto, sin reservas web»): el local abre y el personal
+  // apunta reservas sin aviso de día cerrado; solo una nota de que la web y el teléfono no las cogen.
+  const { cerrados: cierresDeVerdad, sinReservaOnline: sinOnlineFecha } = separarCierres(
+    cierresFecha?.cierres ?? [],
+    diasAbiertosSinReservaOnlineDesde(configReservas),
+  );
+  const turnosCerradosFecha = fechaStr ? turnosCerradosEn(cierresDeVerdad, fechaStr) : [];
+  const soloSinReservaWeb = !!fechaStr && turnosCerradosFecha.length === 0 && sinOnlineFecha.length > 0;
   const cierreAfectaHora =
     turnosCerradosFecha.length === 2 ||
     (!!watchedHora && turnosCerradosFecha.includes(turnoDeHoraServicio(watchedHora)));
@@ -1392,7 +1413,10 @@ export const FormularioReserva = ({
                 )}
               />
               {/* «Evento: sala entera» (20261119100000): la reserva se queda la sala ese día y
-                  turno. Resta la sala del aforo, nadie más puede entrar y Organizar no la toca. */}
+                  turno. Resta la sala del aforo, nadie más puede entrar y Organizar no la toca.
+                  Cerrar la sala exige «Editar» en Reservas: con solo «Reservas · Crear» no sale
+                  (10/11/2026; la BD tampoco le deja escribir en salas_cerradas_servicio). */}
+              {!soloCrearReservas && (
               <label
                 className={cn(
                   "flex min-h-11 items-center gap-3 rounded-md border px-3 py-2 text-sm",
@@ -1415,6 +1439,7 @@ export const FormularioReserva = ({
                   </span>
                 </span>
               </label>
+              )}
               <OcupacionSalas
                 fecha={fechaStr}
                 comensales={Number(watchedComensales) || 0}
@@ -1504,6 +1529,12 @@ export const FormularioReserva = ({
               {cierreAfectaHora ? " Puedes guardarla igualmente si es una excepción." : ""}
             </AlertDescription>
           </Alert>
+        )}
+
+        {!isPublic && soloSinReservaWeb && (
+          <p data-testid="nota-sin-reservas-web" className="text-sm text-muted-foreground">
+            Ese día la web y el teléfono no cogen reservas, pero el restaurante abre: puedes apuntarla aquí.
+          </p>
         )}
 
         {!isPublic && datosDia?.cerrado && (

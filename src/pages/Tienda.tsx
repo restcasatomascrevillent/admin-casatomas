@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, Loader2, Settings2, Wine } from "lucide-react";
+import { AlertTriangle, Settings2, Wine, WifiOff } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { VinosTienda } from "@/components/tienda/VinosTienda";
 import { AjustesTienda } from "@/components/tienda/AjustesTienda";
@@ -40,6 +41,8 @@ const pestanaDeUrl = (v: string | null): Pestana => (PESTANAS as readonly string
  * can_write_section('tienda')). Con solo «Ver» (06/11/2026, decisión del dueño)
  * no sale la pestaña Ajustes ni los interruptores «A la venta» (se ocultan, no
  * se desactivan) y junto a las pestañas aparece la etiqueta «Solo lectura».
+ * En el móvil el interruptor baja a su fila, a todo el ancho, para no tapar las
+ * pestañas (10/11/2026, repaso de estética; sin botón «Ver la tienda en la web»).
  */
 export default function Tienda() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -63,16 +66,26 @@ export default function Tienda() {
 
   let contenido;
   if (configuracion.isLoading) {
+    // La silueta de la barra de pestañas y de la tabla: sin saltos cuando llega la configuración.
     contenido = (
-      <p role="status" className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Cargando la tienda…
-      </p>
+      <div role="status" aria-label="Cargando la tienda" className="flex flex-col gap-3">
+        <span className="sr-only">Cargando la tienda…</span>
+        <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2">
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="hidden h-9 w-48 rounded-full sm:block" />
+        </div>
+        <Skeleton className="h-11 w-full max-w-lg" />
+        <Skeleton className="h-11 w-full" />
+        <Skeleton className="h-64 w-full rounded-xl" />
+      </div>
     );
   } else if (configuracion.isError) {
     contenido = (
-      <div role="alert" className="flex max-w-xl flex-col items-start gap-3 rounded-xl border border-destructive/40 p-4 text-sm">
-        <p>No se pudo cargar la tienda. Comprueba la conexión y vuelve a intentarlo.</p>
-        <Button variant="outline" onClick={() => void configuracion.refetch()}>Reintentar</Button>
+      <div role="alert" className="mx-auto mt-6 flex w-full max-w-md flex-col items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-10 text-center">
+        <WifiOff className="mb-1 h-8 w-8 text-destructive/60" aria-hidden="true" />
+        <p className="text-sm font-medium">No se pudo cargar la tienda</p>
+        <p className="text-xs text-muted-foreground">Comprueba la conexión y vuelve a intentarlo.</p>
+        <Button variant="outline" className="mt-2 h-11" onClick={() => void configuracion.refetch()}>Reintentar</Button>
       </div>
     );
   } else if (!config) {
@@ -90,10 +103,11 @@ export default function Tienda() {
             { valor: "vinos", etiqueta: "Vinos", icono: <Wine /> },
             ...(puedeEditar ? [{ valor: "ajustes", etiqueta: "Ajustes", icono: <Settings2 /> }] : []),
           ]}
+          accionesDebajoEnMovil
           acciones={
-            <span className="flex items-center gap-2">
+            <span className="flex w-full items-center gap-2 sm:w-auto">
               {soloLectura && <EtiquetaSoloLectura />}
-              {!cargandoPermisos && <InterruptorTiendaWeb config={config} puedeEditar={puedeEditar} />}
+              {!cargandoPermisos && <InterruptorTiendaWeb config={config} puedeEditar={puedeEditar} className="flex-1 sm:flex-none" />}
             </span>
           }
         />

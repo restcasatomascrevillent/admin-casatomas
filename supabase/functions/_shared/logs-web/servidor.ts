@@ -6,14 +6,15 @@
 //  en web_eventos (vía la RPC web_logs_ingerir por REST, sin supabase-js).
 //    · REGISTRAR NUNCA ROMPE LA FUNCIÓN: nunca lanza, tope de 2 s, y si hay
 //      EdgeRuntime.waitUntil la respuesta sale sin esperarlo.
-//    · Ni cuerpo de la petición ni datos del usuario: función, ruta, código
-//      HTTP y el campo `error` de la respuesta, saneado.
+//    · Ni cuerpo de la petición ni datos del usuario: función, ruta, método,
+//      código HTTP, el campo `error` de la respuesta y, si la función lanzó,
+//      la pila (todo saneado). Sin pila no se sabía en qué línea fallaba.
 //    · Solo en proyectos reales de Supabase (https://<ref de 20 letras>.supabase.co):
 //      en pruebas y en local no sale ninguna petición.
 // ============================================================================
 
 import { calcularHuella } from "./huella.ts";
-import { sanearTexto } from "./saneado.ts";
+import { sanearPila, sanearTexto } from "./saneado.ts";
 import { entornoDeSupabase } from "./clasificacion.ts";
 
 type LectorEnv = (n: string) => string | undefined;
@@ -30,6 +31,12 @@ export interface ErrorServidor {
   status: number;
   mensaje: string | null;
   duracionMs: number;
+  /** GET, POST… */
+  metodo?: string | null;
+  /** Pila de la excepción, si la función lanzó (se sanea antes de guardarla). */
+  pila?: string | null;
+  /** true si la función lanzó (frente a responder 5xx ella misma). */
+  excepcion?: boolean;
 }
 
 export async function eventoErrorServidor(e: ErrorServidor, ahora = new Date()) {
@@ -44,9 +51,14 @@ export async function eventoErrorServidor(e: ErrorServidor, ahora = new Date()) 
     tipo: "error_servidor",
     objetivo,
     valor: Math.round(e.duracionMs),
-    propiedades: { status: e.status },
+    propiedades: {
+      status: e.status,
+      ...(e.metodo && /^[A-Z]{3,7}$/.test(e.metodo) ? { metodo: e.metodo } : {}),
+      ...(e.excepcion ? { excepcion: true } : {}),
+    },
     gravedad: CRITICAS.test(objetivo) ? "critico" : "error",
     mensaje: `${objetivo}: ${mensaje}`.slice(0, 500),
+    pila: sanearPila(e.pila) ?? null,
     huella: await calcularHuella({ tipo: "error_servidor", fuente: "servidor", objetivo, codigo: e.status, mensaje }),
     consentimiento: false,
   };

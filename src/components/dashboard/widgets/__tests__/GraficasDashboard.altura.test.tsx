@@ -1,5 +1,5 @@
 /**
- * Gráficas del Dashboard («Reservas por Día» y «Curva de Reservas por Hora») a la ALTURA QUE LES DEJA EL DASHBOARD
+ * Gráfica del Dashboard («Curva de Reservas por Hora») a la ALTURA QUE LE DEJA EL DASHBOARD
  * (06/10/2026: el Dashboard ocupa el alto de la pantalla sin scroll). Antes cada una dibujaba 250 px fijos y, con
  * «Reservas de Hoy» encima, se salían por abajo (147 px a 1280×711, la ventana del dueño). Ahora:
  *   · la tarjeta llena su hueco (`h-full`, columna flex) y la gráfica se queda con lo que hay bajo el título
@@ -7,6 +7,8 @@
  *     100 % × 100 % y no su propio contenido;
  *   · el título es pequeño y comparte fila con la leyenda (la curva no tenía leyenda: dos líneas sin nombre);
  *   · si la consulta falla, el aviso de error también ocupa el hueco.
+ * «Reservas por Día» se quitó del Dashboard el 10/11/2026 (decisión del dueño: se queda la curva por hora y
+ * entran «Márgenes de precio» y «Avisos»).
  * jsdom no calcula layout: se comprueba la estructura; los píxeles, con el arnés de capturas.
  */
 import type { ComponentType } from "react";
@@ -32,7 +34,6 @@ vi.mock("@/hooks/useDashboardStats", () => ({
 }));
 vi.mock("@/hooks/useSalasPrivadas", () => ({ useIdsSalasPrivadas: () => [] }));
 
-import { GraficoReservasPorDia } from "@/components/dashboard/widgets/GraficoReservasPorDia";
 import { CurvaReservasPorHora } from "@/components/dashboard/widgets/CurvaReservasPorHora";
 
 const reserva = (fecha: string, hora: string, pax: number) => ({
@@ -53,7 +54,6 @@ beforeEach(() => {
 });
 
 const GRAFICAS: Array<[string, ComponentType]> = [
-  ["Reservas por Día", GraficoReservasPorDia],
   ["Curva de Reservas por Hora", CurvaReservasPorHora],
 ];
 
@@ -88,7 +88,7 @@ describe("Gráficas del Dashboard · llenan el hueco que les toca", () => {
   });
 
   it("la curva lleva su leyenda (Reservas y Comensales) en la misma fila que el título, no debajo", () => {
-    montar(GRAFICAS[1][1]);
+    montar(GRAFICAS[0][1]);
     const titulo = screen.getByText("Curva de Reservas por Hora");
     const cabecera = titulo.parentElement as HTMLElement;
 

@@ -184,9 +184,10 @@ interface EtiquetaValorProps {
   items: ItemBarra[];
   color: string;
   colorSecundario: string;
+  formato: (v: number) => string;
 }
 
-function EtiquetaValor({ x = 0, y = 0, width = 0, height = 0, index = 0, items, color, colorSecundario }: EtiquetaValorProps) {
+function EtiquetaValor({ x = 0, y = 0, width = 0, height = 0, index = 0, items, color, colorSecundario, formato }: EtiquetaValorProps) {
   const item = items[index];
   if (!item) return null;
   return (
@@ -198,7 +199,7 @@ function EtiquetaValor({ x = 0, y = 0, width = 0, height = 0, index = 0, items, 
       fontFamily={PILA_FUENTES}
       fill={color}
     >
-      <tspan fontWeight={700}>{fmtEntero(item.visitas)}</tspan>
+      <tspan fontWeight={700}>{formato(item.visitas)}</tspan>
       <tspan fill={colorSecundario} fontWeight={400}>{`  ${fmtCuota(item.pct)}`}</tspan>
     </text>
   );
@@ -211,9 +212,11 @@ interface GraficoBarrasProps {
   /** En la tarjeta pizarra (oro claro + piedra media) o sobre el papel (oro + piedra). */
   sobrePizarra?: boolean;
   anchoNombres?: number;
+  /** Cómo se escribe el valor de cada barra (por defecto, entero: «1.234»). El informe de cheques lo pone en euros. */
+  formatoValor?: (v: number) => string;
 }
 
-export function GraficoBarras({ items, ancho, alto, sobrePizarra = false, anchoNombres = 250 }: GraficoBarrasProps) {
+export function GraficoBarras({ items, ancho, alto, sobrePizarra = false, anchoNombres = 250, formatoValor = fmtEntero }: GraficoBarrasProps) {
   const max = Math.max(0, ...items.map((i) => i.visitas));
   const texto = sobrePizarra ? COLOR.blanco : COLOR.pizarra;
   const textoSecundario = sobrePizarra ? COLOR.tenueSobrePizarra : COLOR.tenue;
@@ -228,7 +231,7 @@ export function GraficoBarras({ items, ancho, alto, sobrePizarra = false, anchoN
       height={alto}
       data={items}
       layout="vertical"
-      margin={{ top: 4, right: 120, bottom: 4, left: 0 }}
+      margin={{ top: 4, right: formatoValor === fmtEntero ? 120 : 170, bottom: 4, left: 0 }}
       barCategoryGap="30%"
     >
       <XAxis type="number" hide domain={[0, Math.max(1, max)]} />
@@ -247,7 +250,7 @@ export function GraficoBarras({ items, ancho, alto, sobrePizarra = false, anchoN
         ))}
         <LabelList
           dataKey="visitas"
-          content={<EtiquetaValor items={items} color={texto} colorSecundario={textoSecundario} />}
+          content={<EtiquetaValor items={items} color={texto} colorSecundario={textoSecundario} formato={formatoValor} />}
         />
       </Bar>
     </BarChart>

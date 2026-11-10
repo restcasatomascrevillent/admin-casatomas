@@ -4,6 +4,7 @@
 // proveedores sin lector o que no se usan, y que ningún secreto llegue nunca
 // al navegador.
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { olvidarTokenDrive } from "../_shared/google-drive.ts";
 import {
   CACHE_MS,
   LECTORES,
@@ -81,6 +82,8 @@ type Estado = {
   errorMetricas: boolean;
   metricasExtra: Record<string, unknown>;
   usoRecortes?: Record<string, number> | null;
+  /** servicios_cargas_mapa_vinos: número, null (sin logs de la web) o «error» (sin la migración). */
+  cargasMapa?: number | null | "error";
 };
 let estado: Estado;
 
@@ -99,6 +102,9 @@ function crearCliente(_url: string, _key: string) {
       if (fn === "is_admin") return { data: !!u?.admin, error: null };
       if (fn === "servicios_uso_ultimas") return { data: estado.previas, error: null };
       if (fn === "servicios_metricas_supabase") return estado.errorMetricas ? { data: null, error: { message: "no existe" } } : { data: { ...METRICAS_BD, ...estado.metricasExtra }, error: null };
+      if (fn === "servicios_cargas_mapa_vinos") {
+        return estado.cargasMapa === "error" ? { data: null, error: { message: "no existe" } } : { data: estado.cargasMapa ?? null, error: null };
+      }
       if (fn === "recorte_servidor_uso") return estado.usoRecortes ? { data: estado.usoRecortes, error: null } : { data: null, error: { message: "no existe" } };
       if (fn === "servicios_metricas_supabase") return estado.errorMetricas ? { data: null, error: { message: "no existe" } } : { data: METRICAS_BD, error: null };
       return { data: null, error: { message: `rpc ${fn} no simulada` } };
@@ -431,6 +437,58 @@ describe("lectores", () => {
     admin: crearCliente("", "") as never, refProyecto: "sfonaclosuafvlhutkon",
   });
 
+  it("Google Drive: espacio de la cuenta con los secretos de las facturas; sin ellos, qué falta; token rechazado", async () => {
+    olvidarTokenDrive();
+    const GOOGLE = { GOOGLE_CLIENT_ID: "cliente.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "secreto-google-444", GOOGLE_REFRESH_TOKEN: "1//refresco-555" };
+    const rutas = {
+      "oauth2.googleapis.com/token": () => resp({ access_token: "ya29.token-666", expires_in: 3600, scope: "https://www.googleapis.com/auth/drive.file" }),
+      "www.googleapis.com/drive/v3/about": (url: URL) => {
+        expect(url.searchParams.get("fields")).toBe("storageQuota");
+        return resp({ storageQuota: { limit: String(15 * 1024 ** 3), usage: String(3 * 1024 ** 3), usageInDrive: String(1024 ** 3), usageInDriveTrash: "1024" } });
+      },
+    };
+    const r = await LECTORES.google_drive(ctx(GOOGLE, rutas));
+    expect(r.error).toBeUndefined();
+    expect(r.metricas.almacenamiento).toMatchObject({ valor: 3 * 1024 ** 3, unidad: "bytes", limite: 15, unidad_limite: "GB" });
+    expect(r.metricas.en_drive).toMatchObject({ valor: 1024 ** 3 });
+    expect(r.metricas.papelera).toMatchObject({ valor: 1024 });
+    expect(r.detalles?.plan_detectado).toBe("15 GB de espacio");
+    expect(JSON.stringify(r)).not.toContain("ya29");
+
+    expect(await LECTORES.google_drive(ctx({}, {}))).toMatchObject({ error: "falta_secreto", detalles: { secreto: "GOOGLE_REFRESH_TOKEN" } });
+    expect(await LECTORES.google_drive(ctx({ ...GOOGLE, GOOGLE_CLIENT_SECRET: "  " }, {}))).toMatchObject({ error: "falta_secreto", detalles: { secreto: "GOOGLE_CLIENT_SECRET" } });
+
+    olvidarTokenDrive();
+    const rechazo = await LECTORES.google_drive(ctx(GOOGLE, { "oauth2.googleapis.com/token": () => resp({ error: "invalid_grant" }, 400) }));
+    expect(rechazo).toMatchObject({ error: "credencial_rechazada", metricas: {} });
+    olvidarTokenDrive();
+    const sinLimite = await LECTORES.google_drive(ctx(GOOGLE, { ...rutas, "www.googleapis.com/drive/v3/about": () => resp({ storageQuota: { usage: "10" } }) }));
+    expect(sinLimite.metricas.almacenamiento.limite).toBeUndefined();
+    expect(sinLimite.detalles?.avisos).toEqual([expect.stringMatching(/no tiene límite/)]);
+  });
+
+  it("Mapbox: cargas del mapa de vinos (logs de la web), coste a partir de 50.000; sin logs o sin migración, lo dice", async () => {
+    estado.cargasMapa = 1234;
+    const r = await LECTORES.mapbox(ctx({}, {}));
+    expect(r.metricas.cargas_mapa_web).toMatchObject({ valor: 1234, unidad: "cargas", limite: 50000, periodo: "mes en curso" });
+    expect(r.coste_variable).toMatchObject({ importe: 0, moneda: "USD", origen: "estimado" });
+    estado.cargasMapa = 52_500;
+    expect((await LECTORES.mapbox(ctx({}, {}))).coste_variable?.importe).toBe(12.5);
+    estado.cargasMapa = null;
+    expect(await LECTORES.mapbox(ctx({}, {}))).toMatchObject({ error: "error_api", detalles: { avisos: [expect.stringMatching(/logs de la web/)] } });
+    estado.cargasMapa = "error";
+    expect(await LECTORES.mapbox(ctx({}, {}))).toMatchObject({ error: "error_api", detalles: { avisos: [expect.stringMatching(/20261122153000/)] } });
+  });
+
+  it("Vercel: si la API da el almacenamiento de despliegues y funciones, salen como métricas (Hobby hoy no lo da)", async () => {
+    const conAlmacen = { data: USO_VERCEL.data.map((d, i) => ({ ...d, deployment_storage_bytes: 1000 + i, function_storage_bytes: 50 + i })) };
+    const r = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ "api.vercel.com/v2/usage": () => resp(conAlmacen) })));
+    expect(r.metricas.almacenamiento_despliegues).toMatchObject({ valor: 1001, unidad: "bytes", periodo: "ahora" });
+    expect(r.metricas.almacenamiento_funciones).toMatchObject({ valor: 51, unidad: "bytes" });
+    const sin = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas()));
+    expect(sin.metricas.almacenamiento_despliegues).toBeUndefined();
+  });
+
   it("Vercel: formato de uso desconocido → aviso con las claves vistas, sin inventar cifras", async () => {
     const r = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ "api.vercel.com/v2/usage": () => resp({ data: [{ cosa_rara: 5 }] }) })));
     expect(r.error).toBeFalsy();
@@ -759,6 +817,14 @@ describe("utilidades", () => {
       .toMatchObject({ peticiones: 7, bytesServidos: 10, bytesOrigen: 3, invocaciones: 2, cpuHoras: 2 });
     expect(resumirUsoVercel({ data: { proyectos: [{ request_hit_count: 1 }, { request_hit_count: 2 }] } }).peticiones).toBe(3);
     expect(resumirUsoVercel(null).claves).toEqual([]);
+  });
+  it("resumirUsoVercel: almacenamiento de despliegues y funciones, el último día (no se suma); sin él, nada", () => {
+    const r = resumirUsoVercel({ data: [
+      { timestamp: "2026-11-01", deployment_storage_bytes: 100, function_storage_bytes: 10, request_hit_count: 1 },
+      { timestamp: "2026-11-02", deployment_storage_bytes: 120, function_storage_bytes: 12, request_hit_count: 1 },
+    ] });
+    expect(r).toMatchObject({ bytesDespliegues: 120, bytesFunciones: 12 });
+    expect(resumirUsoVercel(USO_VERCEL)).toMatchObject({ bytesDespliegues: undefined, bytesFunciones: undefined });
   });
   it("resumirUsoGithub ignora lo que no es Actions (salvo en lo facturado)", () => {
     expect(resumirUsoGithub(GITHUB_RESUMEN)).toEqual({ computoUsd: 7, minutos: 1100, almacenamientoGbHoras: 3.6, netoUsd: 1, minutosPublicos: 0, computoPublicoUsd: 0, conRepositorio: false });

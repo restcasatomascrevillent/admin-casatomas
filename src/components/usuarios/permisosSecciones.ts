@@ -46,6 +46,8 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   reservas: "crear y modificar reservas, aceptarlas o cancelarlas, marcar llegadas, dar mesa y mover de sala, cerrar días y la lista negra. Con solo «Ver» se consulta todo, sin ningún botón para cambiarlo.",
   reservas_configuracion:
     "entrar y cambiar las reglas, los turnos, las mesas y las plantillas de correo de las reservas. «Ver» aquí no sirve por sí solo: sin «Editar» no se ve la pestaña. Hace falta también «Ver» en Reservas.",
+  reservas_crear:
+    "«Nueva reserva»: crear reservas (nacen verificadas o pendientes y el cliente las confirma por correo), sin modificarlas, cambiar su estado (ni «Ha llegado»), dar mesa, cancelar ni configurar. Necesita «Ver» en Reservas. Es el tipo de usuario «Reservas».",
   gestor_carta:
     "añadir, cambiar y borrar platos, vinos, bebidas y cócteles: ajustar y restaurar precios, ordenar, visibilidad, fotos (quitar el fondo y vídeos), «Añadir vino» y «Varias botellas» con IA, traducciones y la votación del vino favorito. Con solo «Ver» se consulta la carta y se descarga el «PDF Carta».",
   gestion_web:
@@ -61,6 +63,8 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
     "modificar, verificar y borrar documentos, clasificar productos, cambiar los ajustes de Facturas y usar la IA; también subir (pestaña Cargar). Con solo «Ver» se consultan Análisis y Compras.",
   facturas_subida:
     "pestaña Cargar: subir facturas y albaranes, decidir sobre los repetidos y corregir los datos leídos de lo que sube él mismo (no lo de otros). No necesita «Ver» en Facturas: sin él, solo ve Cargar.",
+  facturas_albaranes:
+    "pantalla «Subir albaranes» (pensada para el móvil): hacer o elegir fotos de albaranes y facturas para que se lean solas, y ver si llegaron. No ve lo leído, ni importes, ni el resto de Facturas. Es el tipo de usuario «Albaranes».",
   usuarios:
     "consultar en el admin panel la lista de usuarios y sus permisos. Crear, borrar, bloquear y cambiar permisos es solo del super admin.",
 };
@@ -74,6 +78,9 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
  */
 export const SECCIONES_UN_INTERRUPTOR: Partial<Record<SeccionConfigurable["key"], { etiqueta: string }>> = {
   facturas_subida: { etiqueta: "Puede subir" },
+  // Tipos de usuario «Reservas» y «Albaranes» (10/11/2026).
+  reservas_crear: { etiqueta: "Puede crear" },
+  facturas_albaranes: { etiqueta: "Puede subir fotos" },
   usuarios: { etiqueta: "Puede ver" },
 };
 
@@ -105,11 +112,23 @@ export function permisosParaEditar(origen: ReadonlyArray<PermisoGuardado>): Perm
   });
 }
 
+/**
+ * Secciones que no sirven sin «Ver» en otra (10/11/2026): «Reservas · Crear» necesita ver las
+ * reservas (en la BD, reservas_puede_crear() exige los dos). Al activarla se activa también «Ver»
+ * en Reservas, y al quitar «Ver» en Reservas se quita también ella.
+ */
+export const NECESITA_VER: Readonly<Record<string, string>> = { reservas_crear: "reservas" };
+
 /** Cambia «Ver» de una sección; al quitarlo se quita también «Puede editar». */
 export function cambiarVer(permisos: PermisoSeccion[], sectionKey: string, ver: boolean): PermisoSeccion[] {
-  return permisos.map((p) =>
-    p.section_key === sectionKey ? { ...p, can_view: ver, can_edit: ver && p.can_edit } : p,
-  );
+  const base = NECESITA_VER[sectionKey];
+  const dependientes = Object.keys(NECESITA_VER).filter((k) => NECESITA_VER[k] === sectionKey);
+  return permisos.map((p) => {
+    if (p.section_key === sectionKey) return { ...p, can_view: ver, can_edit: ver && p.can_edit };
+    if (ver && base && p.section_key === base) return { ...p, can_view: true };
+    if (!ver && dependientes.includes(p.section_key)) return { ...p, can_view: false, can_edit: false };
+    return p;
+  });
 }
 
 /** Cambia «Puede editar» de una sección; sin «Ver» no se puede activar. */
@@ -125,10 +144,14 @@ export function sinEdicion(permisos: PermisoSeccion[]): PermisoSeccion[] {
 
 /**
  * Secciones que NO cuentan para decidir el rol por los permisos: el Dashboard («Editar»
- * no hace nada), los dos perfiles especiales de Instagram, «Facturas · Subida» y
- * «Usuarios» (un solo interruptor cada una).
+ * no hace nada), los dos perfiles especiales de Instagram, «Facturas · Subida»,
+ * «Usuarios», «Reservas · Crear» y «Facturas · Solo fotos» (un solo interruptor cada una).
  */
-const SECCIONES_FUERA_DEL_ROL = new Set(["dashboard", "instagram_agencia", "instagram_render", "facturas_subida", "usuarios"]);
+const SECCIONES_FUERA_DEL_ROL = new Set([
+  "dashboard", "instagram_agencia", "instagram_render", "facturas_subida", "usuarios",
+  // Tipos de usuario «Reservas» y «Albaranes» (10/11/2026): un solo interruptor cada una.
+  "reservas_crear", "facturas_albaranes",
+]);
 
 /**
  * Rol base que corresponde a unos permisos (06/11/2026, dueño: «cuando cambias los
