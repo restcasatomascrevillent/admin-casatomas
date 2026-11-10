@@ -74,6 +74,7 @@ import { SolicitudCard, MOTIVO_LABELS, ESTADO_LABELS } from "./GestionSolicitude
 import { FormularioReserva, type ReservaCreadaDesdeFormulario } from "./FormularioReserva";
 import { SolicitudGestionPanel } from "./SolicitudGestionPanel";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { useListaReservasEnVivo } from "@/hooks/useListaReservasEnVivo";
 import { EstadoPropuestaBadge } from "./EstadoPropuestaBadge";
 import {
   estadoPropuestaVista,
@@ -546,10 +547,11 @@ export function ListaReservasAvanzada({
         // un lote falla, falla la consulta entera. La caché sigue siendo un ARRAY de reservas (`.filas`): los
         // parches optimistas de `useAccionesServicioReserva` (`Array.isArray(old)`) dependen de ello.
         //
-        // Sin realtime ni `staleTime` a propósito: cada recarga (una acción, el foco de la ventana) relee el
-        // histórico entero, hoy ~1.241 reservas = 2 peticiones. Si crece mucho habrá que filtrar por fecha en el
-        // servidor en vez de leerlo todo: por encima de `LIMITE_FILAS` (10.000) `leerReservasLista` corta y
-        // devuelve `truncado: true`, que esta pantalla todavía no enseña.
+        // Cada recarga (una acción, el foco de la ventana, un cambio llegado por realtime: ver
+        // `useListaReservasEnVivo`, justo debajo) relee el histórico entero, hoy ~1.241 reservas = 2 peticiones.
+        // Si crece mucho habrá que filtrar por fecha en el servidor en vez de leerlo todo: por encima de
+        // `LIMITE_FILAS` (10.000) `leerReservasLista` corta y devuelve `truncado: true`, que esta pantalla todavía
+        // no enseña.
         const { filas } = await leerReservasLista(supabase, { signal });
         return filas as unknown as Reservation[];
       } catch (error) {
@@ -566,6 +568,9 @@ export function ListaReservasAvanzada({
       }
     },
   });
+  // Lo que cambie en `reservas` desde otro dispositivo, la web o el bot vuelve a pedir esta lista (1-5 s después;
+  // con la pestaña del navegador oculta, al volver a ella).
+  useListaReservasEnVivo();
   const reservations = useMemo(() => reservasData ?? [], [reservasData]);
   const fetchReservations = () => {
     void refetch();

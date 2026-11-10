@@ -15,10 +15,10 @@ import { crearInvalidacionDiferida, nombreCanalUnico, vigilarCanal } from "@/lib
 //
 // QUÉ REFRESCA: lo mismo que un cambio de ocupación hecho desde el panel
 // (`CLAVES_POR_CAMBIO.ocupacion`, clavesCache.ts; incluye `asignaciones_mesa` y
-// `resumen-asignacion-dia`) MENOS la Lista (`reservas-lista`): la Lista renuncia
-// a realtime a propósito (relee todo el histórico por lotes; ver
-// ListaReservasAvanzada). `invalidateQueries` solo vuelve a pedir las consultas
-// montadas: el resto quedan caducadas sin coste.
+// `resumen-asignacion-dia`) MENOS la Lista (`reservas-lista`): la Lista tiene su
+// propio canal (`useListaReservasEnVivo`), porque relee todo el histórico por
+// lotes y con la pestaña oculta no lo relee. `invalidateQueries` solo vuelve a
+// pedir las consultas montadas: el resto quedan caducadas sin coste.
 //
 // INVALIDACIÓN DIFERIDA (`crearInvalidacionDiferida`, realtimeCanal.ts): 1 s tras
 // el último evento y como mucho 5 s tras el primero pendiente. Una ráfaga corta
@@ -36,8 +36,8 @@ import { crearInvalidacionDiferida, nombreCanalUnico, vigilarCanal } from "@/lib
 // Dónde se monta: `VistaHoy` (pestaña Hoy) y `CalendarioOcupacion`, que además
 // envuelven su contenido en `ReservasEnVivoContexto`: las rejillas de salas de
 // dentro («Disponibilidad por cuartos») no abren otro canal a `reservas`. La
-// pestaña Asignación ya tiene la suya (`useReservasPorAsignar`) y la Lista no lo
-// quiere.
+// pestaña Asignación ya tiene la suya (`useReservasPorAsignar`) y la Lista, la
+// suya (`useListaReservasEnVivo`).
 // ============================================================================
 
 /** Prefijo de los canales; el nombre lleva además la tabla y un número propio de cada suscripción. */
