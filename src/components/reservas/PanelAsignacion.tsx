@@ -325,7 +325,7 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
       {!isError && !isLoading && truncado && (
         <div
           role="status"
-          className="flex shrink-0 items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          className="flex shrink-0 items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-base text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>
@@ -338,7 +338,7 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
 
       {isError ? (
         <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
+          <CardContent className="flex flex-col items-center gap-3 py-10 text-center text-base text-muted-foreground">
             No se pudieron cargar las reservas.
             <Button variant="outline" size="sm" onClick={() => void refetch()}>
               Reintentar
@@ -464,20 +464,20 @@ function FilaReserva({
   const guardando = salaEnCurso === fila.reserva_id;
 
   return (
-    <li className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="w-12 font-semibold tabular-nums">{horaCorta(fila.hora)}</span>
-        <span className="min-w-0 truncate font-medium">{fila.nombre || "Sin nombre"}</span>
-        <span className="flex items-center gap-1 text-sm text-muted-foreground tabular-nums">
-          <Users className="h-3.5 w-3.5" aria-hidden="true" />
+    <li className="flex min-h-16 flex-col gap-2 px-3 py-2.5 text-[17px] sm:flex-row sm:items-center sm:justify-between sm:px-4">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="w-14 text-lg font-bold tabular-nums">{horaCorta(fila.hora)}</span>
+        <span className="min-w-0 truncate text-lg font-semibold">{fila.nombre || "Sin nombre"}</span>
+        <span className="flex items-center gap-1 text-[17px] font-medium tabular-nums">
+          <Users className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           {fila.numero_comensales}
         </span>
         {fila.estado !== "confirmada" && (
-          <span className="text-xs capitalize text-muted-foreground">{fila.estado}</span>
+          <span className="text-[15px] capitalize text-muted-foreground">{fila.estado}</span>
         )}
         {fila.espacio_nombre && (
-          <span className="flex items-center gap-1 text-sm">
-            <MapPin className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+          <span className="flex items-center gap-1 text-[17px]">
+            <MapPin className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             {fila.espacio_nombre}
             {fila.mesas_nombres.length > 0 && (
               <span className="text-muted-foreground"> · {fila.mesas_nombres.join(", ")}</span>
@@ -487,10 +487,10 @@ function FilaReserva({
         {salaNoUsable && (
           <Badge
             variant="outline"
-            className="gap-1 border-amber-400 text-[11px] pointer-coarse:text-xs text-amber-800 dark:text-amber-200"
+            className="gap-1 border-amber-400 text-sm text-amber-800 dark:text-amber-200"
             title="Esta sala está marcada como no usable en Configuración. La reserva sigue en ella hasta que la cambies."
           >
-            <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+            <AlertTriangle className="h-4 w-4" aria-hidden="true" />
             Sala no usable
           </Badge>
         )}
@@ -504,9 +504,8 @@ function FilaReserva({
           {/* Editar datos, día, hora, comensales, sala o notas (2026-09-30). Sin
               mirar el estado: solo el permiso lo quita. */}
           <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5"
+            variant="outline"
+            className="h-11 gap-1.5 px-4 text-base"
             title="Editar datos, día, hora, comensales, sala y notas"
             aria-label={`Editar la reserva de ${fila.nombre || "este cliente"}`}
             onClick={() => onEditar(fila.reserva_id)}
@@ -517,8 +516,7 @@ function FilaReserva({
           <SelectorSala fila={fila} salas={salas} guardando={guardando} onElegir={onElegirSala} />
           <Button
             variant="outline"
-            size="sm"
-            className="gap-1.5"
+            className="h-11 gap-1.5 px-4 text-base"
             disabled={!salto.destino}
             title={tituloMesas}
             aria-label={tituloMesas}
@@ -548,13 +546,13 @@ function SelectorSala({
   return (
     <Popover open={abierto} onOpenChange={setAbierto}>
       <PopoverTrigger asChild>
-        <Button variant={fila.espacio_id ? "outline" : "default"} size="sm" className="gap-1.5" disabled={guardando}>
+        <Button variant={fila.espacio_id ? "outline" : "default"} className="h-11 gap-1.5 px-4 text-base" disabled={guardando}>
           {guardando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <MapPin className="h-4 w-4" aria-hidden="true" />}
           {fila.espacio_id ? "Sala" : "Dar sala"}
           <ChevronDown className="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 p-0">
+      <PopoverContent align="end" className="w-80 p-0">
         {/* Montado solo con el popover abierto: la ocupación del día se pide
             al abrirlo, no por cada fila de la lista. */}
         {abierto && (
@@ -613,7 +611,7 @@ function OpcionesSala({
 
   return (
     <div className="py-1">
-      <p className="px-3 pb-1 pt-2 text-xs text-muted-foreground">
+      <p className="px-3 pb-1 pt-2 text-sm text-muted-foreground">
         {fila.numero_comensales} comensales · {ETIQUETA_TURNO[fila.turno]} del {fila.fecha.split("-").reverse().join("/")}
       </p>
       <ul aria-label="Salas" className="max-h-72 overflow-y-auto">
@@ -627,20 +625,20 @@ function OpcionesSala({
                 disabled={actual}
                 aria-current={actual ? "true" : undefined}
                 onClick={() => onElegir(sala.id)}
-                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted pointer-coarse:min-h-11 disabled:cursor-default disabled:hover:bg-transparent"
+                className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-base hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"
               >
                 <span className="flex min-w-0 items-center gap-1.5">
                   {actual ? <Check className="h-4 w-4 text-primary" aria-hidden="true" /> : <span className="w-4" />}
                   <span className="truncate">{sala.nombre}</span>
                   {sala.id === sugerida && !actual && (
-                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px] pointer-coarse:text-xs">
+                    <Badge variant="secondary" className="h-6 px-2 text-sm">
                       Sugerida
                     </Badge>
                   )}
                 </span>
                 <span
                   className={cn(
-                    "shrink-0 text-xs tabular-nums",
+                    "shrink-0 text-sm tabular-nums",
                     celda && !celda.cabe ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground",
                   )}
                   title={celda && !celda.cabe ? "Con este grupo la sala pasaría de su capacidad" : undefined}
@@ -652,7 +650,7 @@ function OpcionesSala({
           );
         })}
       </ul>
-      {texto && <p className="border-t px-3 py-2 text-xs text-muted-foreground">{texto}</p>}
+      {texto && <p className="border-t px-3 py-2 text-sm text-muted-foreground">{texto}</p>}
     </div>
   );
 }

@@ -88,7 +88,7 @@ describe("DialogoAccionReserva · los datos completos, grandes", () => {
   it("nombre, teléfono con enlace, email, día y hora, personas, sala, servicio, menú cerrado, notas, canal, importante y lista negra", () => {
     const { dialogo } = montar();
     const datos = within(dialogo).getByRole("region", { name: "Datos de la reserva" });
-    expect(within(dialogo).getByRole("heading", { name: /Aceptar reserva · Ana López/ })).toBeInTheDocument();
+    expect(within(dialogo).getByRole("heading", { name: /Verificar reserva · Ana López/ })).toBeInTheDocument();
     expect(within(datos).getByRole("link", { name: "+34 600 111 222" })).toHaveAttribute("href", "tel:+34600111222");
     for (const texto of [
       "ana@ejemplo.com",
@@ -141,7 +141,7 @@ describe("DialogoAccionReserva · el día", () => {
 describe("DialogoAccionReserva · los botones", () => {
   it("el botón verde hace lo de siempre y cierra", async () => {
     const { onAccion, onCerrar } = montar();
-    const boton = screen.getByRole("button", { name: "Aceptar reserva" });
+    const boton = screen.getByRole("button", { name: "Verificar reserva" });
     expect(boton).toHaveClass("bg-emerald-600", "h-14", "text-lg");
     fireEvent.click(boton);
     expect(onAccion).toHaveBeenCalledTimes(1);
@@ -166,7 +166,7 @@ describe("DialogoAccionReserva · los botones", () => {
 
   it("sin permiso (sin manejadores) no hay acción ni «Editar»: solo mirar y cerrar", () => {
     montar({ onAccion: undefined, onEditar: undefined });
-    expect(screen.queryByRole("button", { name: "Aceptar reserva" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Verificar reserva" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Editar" })).toBeNull();
     expect(screen.getByRole("button", { name: "Cerrar" })).toBeInTheDocument();
   });

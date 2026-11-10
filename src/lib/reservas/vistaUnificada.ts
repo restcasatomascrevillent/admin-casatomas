@@ -242,7 +242,18 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
 // ----------------------------------------------------------------------------
 // "asignacion": panel de salas y mesas (reservas-sin-salas, Fase B); la
 // campana enlaza ahí las notificaciones `reserva_sin_asignar`.
-export const TABS_RESERVAS = ["reservas", "calendario", "asignacion", "blacklist", "configuracion"] as const;
+// "hoy" (10/11/2026): el kanban del día. Antes `?tab=hoy` caía en la Lista
+// (era el nombre de la pestaña de ANTES de la unificación del 2026-09-23) y un
+// enlace a «Hoy» acababa en otra pantalla; ahora abre «Hoy». Solo si el enlace
+// trae filtro (`status`/`date`, que «Hoy» no tiene) sigue yendo a la Lista.
+export const TABS_RESERVAS = ["hoy", "reservas", "calendario", "asignacion", "blacklist", "configuracion"] as const;
+
+/** Nombres de pestaña que se escriben a mano o en notas: `?tab=proximas` abre «Próximas reservas». */
+const ALIAS_TAB_RESERVAS = new Map<string, TabReservas>([
+  ["proximas", "asignacion"],
+  ["proximas-reservas", "asignacion"],
+  ["calendario-ocupacion", "calendario"],
+]);
 export type TabReservas = (typeof TABS_RESERVAS)[number];
 
 export interface DestinoDeepLink {
@@ -269,13 +280,17 @@ export function resolverDeepLinkReservas(params: {
     case "solicitudes":
       return { tab: "reservas", status: status ?? FILTRO_SOLICITUDES, date };
     case "hoy":
+      return status || date ? { tab: "reservas", status, date } : { tab: "hoy", status, date };
     case "lista":
     case null:
       return { tab: "reservas", status, date };
-    default:
+    default: {
+      const alias = ALIAS_TAB_RESERVAS.get(tab);
+      if (alias) return { tab: alias, status, date };
       return (TABS_RESERVAS as readonly string[]).includes(tab)
         ? { tab: tab as TabReservas, status, date }
         : { tab: "reservas", status, date };
+    }
   }
 }
 

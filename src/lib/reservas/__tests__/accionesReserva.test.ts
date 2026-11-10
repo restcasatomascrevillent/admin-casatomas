@@ -320,7 +320,7 @@ describe("Lista — textos (los de hoy: el paso que migre la Lista no cambia lo 
   it("aceptar", () => {
     // Cambio acordado (2026-10-01): «Aceptar» acepta la reserva tal como está; antes decía «tal y como la pidió el cliente».
     expect(titulo("pendiente", "lista", true, "aceptar")).toBe(
-      "Aceptar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email",
+      "Verificar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email",
     );
     expect(TITULO_ACEPTAR).toBe(titulo("pendiente", "lista", true, "aceptar"));
   });

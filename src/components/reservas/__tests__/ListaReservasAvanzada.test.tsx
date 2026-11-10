@@ -59,6 +59,8 @@ import type { DobleSupabase } from "@/lib/reservas/__tests__/dobleSupabaseLotes"
 import type { DobleCanales } from "@/hooks/__tests__/dobleCanalRealtime";
 
 const supa = vi.hoisted(() => ({
+  /** Props del diálogo de verificar (elegir la hora). */
+  verificacion: vi.fn(),
   /** Las salas que devuelve `useEspaciosReserva` (por defecto, ninguna). */
   espacios: [] as unknown[],
   // La escritura del ejecutor de acciones es `update(…).eq("id", …)[.in("estado", …)].select("id")`.
@@ -159,7 +161,12 @@ vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data
 vi.mock("@/hooks/useEdicionReserva", () => ({
   useEdicionReserva: () => ({ editarReserva: supa.editarReserva, dialogoEdicion: null }),
 }));
-vi.mock("@/components/reservas/ModalVerificacionReserva", () => ({ ModalVerificacionReserva: () => null }));
+vi.mock("@/components/reservas/ModalVerificacionReserva", () => ({
+  ModalVerificacionReserva: (props: unknown) => {
+    supa.verificacion(props);
+    return null;
+  },
+}));
 // El día de la reserva del diálogo de aceptar/confirmar/verificar tiene sus propios tests (DialogoAccionReserva).
 vi.mock("@/components/reservas/ElDiaDeLaReserva", () => ({ ElDiaDeLaReserva: () => <div data-testid="el-dia" /> }));
 vi.mock("@/components/reservas/BlacklistModal", () => ({ BlacklistModal: () => null }));
@@ -273,9 +280,13 @@ async function montar(props: Partial<Parameters<typeof ListaReservasAvanzada>[0]
   return { ...montada, tabla };
 }
 
-/** Botones de la celda de acciones de una fila, en orden de pantalla. */
-const botonesDeFila = (fila: HTMLElement) =>
-  [...fila.querySelector("td")!.querySelectorAll("button")].filter((b) => b.getAttribute("role") !== "checkbox");
+/**
+ * Botones de acción de una fila, en orden de pantalla. Desde el 10/11/2026 («no pongas el Más, que se vean los
+ * botones») van todos a la vista, debajo del nombre y el teléfono (`[data-testid="acciones-fila"]`).
+ */
+const botonesDeFila = (fila: HTMLElement) => [
+  ...(fila.querySelector('[data-testid="acciones-fila"]')?.querySelectorAll("button") ?? []),
+] as HTMLButtonElement[];
 
 /** Etiquetas de los botones de la celda de acciones de una fila. */
 const accionesDeFila = (fila: HTMLElement) =>
@@ -291,38 +302,28 @@ const accionesDeFila = (fila: HTMLElement) =>
 async function pulsarConDialogo(boton: HTMLElement) {
   fireEvent.click(boton);
   const dialogo = await screen.findByRole("dialog");
-  fireEvent.click(within(dialogo).getByRole("button", { name: /^(Aceptar reserva|Confirmar reserva|Verificar)$/ }));
+  fireEvent.click(within(dialogo).getByRole("button", { name: /^(Verificar reserva|Confirmar reserva|Verificar)$/ }));
 }
 
 /** Fila de la tabla que habla de ese cliente. */
 const filaDe = (tabla: HTMLElement, texto: string) =>
   ([...tabla.querySelectorAll("tbody tr")] as HTMLElement[]).find((f) => f.textContent?.includes(texto))!;
 
-// 10/11/2026 (petición del dueño: «hay que limpiarlo de botones»): en cada fila, UNA acción principal grande
-// con texto (solo si toca algo) y «⋯ Más» con el resto, con texto y solo lo que se puede usar.
-/** La acción principal de una fila (el botón con texto que no es «Más»), o `undefined` si no toca ninguna. */
-const principalDe = (fila: HTMLElement) =>
-  botonesDeFila(fila).find((b) => !/^Más acciones/.test(b.getAttribute("aria-label") ?? ""));
-/** El botón «⋯ Más» de una fila. */
-const botonMas = (fila: HTMLElement) => within(fila.querySelector("td")!).getByRole("button", { name: /^Más acciones/ });
-/** Abre «Más» de una fila y devuelve sus opciones, en orden. */
-function opcionesMas(fila: HTMLElement) {
-  fireEvent.pointerDown(botonMas(fila), { button: 0, ctrlKey: false });
-  return screen.getAllByRole("menuitem");
-}
-/** Los textos de las opciones de «Más» de una fila (y lo cierra). */
-function textosMas(fila: HTMLElement) {
-  const items = opcionesMas(fila);
-  const textos = items.map((i) => i.textContent?.trim());
-  fireEvent.keyDown(items[0], { key: "Escape" });
-  return textos;
-}
-/** Una opción de «Más» por su texto (con el menú abierto). */
+/** La acción principal (en verde) de una fila, o `undefined` si no toca ninguna. */
+const principalDe = (fila: HTMLElement) => botonesDeFila(fila).find((b) => b.hasAttribute("data-principal"));
+/** Los textos de los botones de una fila que no son la principal, en orden. */
+const textosMas = (fila: HTMLElement) =>
+  botonesDeFila(fila)
+    .filter((b) => !b.hasAttribute("data-principal"))
+    .map((b) => b.textContent?.trim());
+/** Un botón de la fila por su texto. */
 const opcionMas = (fila: HTMLElement, texto: string) => {
-  const item = opcionesMas(fila).find((i) => i.textContent?.trim() === texto);
-  if (!item) throw new Error(`«Más» no tiene «${texto}»`);
-  return item;
+  const b = botonesDeFila(fila).find((x) => x.textContent?.trim() === texto);
+  if (!b) throw new Error(`La fila no tiene «${texto}»`);
+  return b;
 };
+/** Los botones de una fila (para mirar sus `title`). */
+const opcionesMas = (fila: HTMLElement) => botonesDeFila(fila).filter((b) => !b.hasAttribute("data-principal"));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -401,39 +402,44 @@ describe("ListaReservasAvanzada · columna de acciones", () => {
     expect(cabeceras.some((th) => th.textContent?.includes("Acciones"))).toBe(false);
   });
 
-  it("cada fila: como mucho UNA acción principal y «Más»; nunca un botón deshabilitado", async () => {
+  it("cada fila: los botones a la vista (sin «Más»), la principal la primera y nunca un botón deshabilitado", async () => {
     const { tabla } = await montar();
     const filas = [...tabla.querySelectorAll("tbody tr")] as HTMLElement[];
     expect(filas.length).toBe(6); // 5 reservas + 1 solicitud
+    expect(screen.queryByRole("button", { name: /^Más acciones/ })).toBeNull();
 
     for (const fila of filas) {
       const botones = botonesDeFila(fila);
-      expect(botones.length).toBeLessThanOrEqual(2);
-      expect(botonMas(fila)).toHaveTextContent("Más");
+      expect(botones.length).toBeGreaterThan(0);
+      const principal = principalDe(fila);
+      if (principal) expect(botones[0]).toBe(principal);
       for (const b of botones) expect(b).not.toBeDisabled();
+      // Se ven con su texto, 48 px de alto y a 16 px.
+      for (const b of botones) expect(b).toHaveClass("h-12", "text-base");
     }
   });
-  it("lo que no aplica a una fila no sale: la principal solo si toca algo y en «Más» solo lo que se puede usar", async () => {
+  it("lo que no aplica a una fila no sale: la principal solo si toca algo y los demás botones solo si se pueden usar", async () => {
     const { tabla } = await montar({ onAsignarMesa: vi.fn() });
     const fila = (texto: string) => filaDe(tabla, texto);
 
     // Pendiente sin sala: «Aceptar»; se verifica, se edita, se cancela; sin sala no hay «Dar mesa».
-    expect(principalDe(fila("Ana Pendiente"))).toHaveTextContent("Aceptar");
-    expect(textosMas(fila("Ana Pendiente"))).toEqual(["Verificar", "Editar", "Cancelar reserva", "Lista negra"]);
+    expect(principalDe(fila("Ana Pendiente"))).toHaveTextContent("Verificar");
+    // Una sola «Verificar» (10/11/2026): la principal; no se repite.
+    expect(textosMas(fila("Ana Pendiente"))).toEqual(["Editar", "Cancelar", "Lista negra"]);
 
     // Verificada: la principal pasa a «Confirmar» y ya no se verifica.
     expect(principalDe(fila("Berta Verificada"))).toHaveTextContent("Confirmar");
-    expect(textosMas(fila("Berta Verificada"))).toEqual(["Editar", "Cancelar reserva", "Lista negra"]);
+    expect(textosMas(fila("Berta Verificada"))).toEqual(["Editar", "Cancelar", "Lista negra"]);
 
     // Confirmada: nada que aceptar ni confirmar, así que NO hay principal (ni deshabilitada).
     expect(principalDe(fila("Carlos Confirmado"))).toBeUndefined();
-    expect(textosMas(fila("Carlos Confirmado"))).toEqual(["Editar", "Cancelar reserva", "Lista negra"]);
+    expect(textosMas(fila("Carlos Confirmado"))).toEqual(["Editar", "Cancelar", "Lista negra"]);
 
     // Cancelada: tampoco se vuelve a cancelar.
     expect(textosMas(fila("Diana Cancelada"))).toEqual(["Editar", "Lista negra"]);
 
     // Con sala: la única que puede saltar al plano a por su mesa.
-    expect(textosMas(fila("Elena ConSala"))).toEqual(["Dar mesa", "Editar", "Cancelar reserva", "Lista negra"]);
+    expect(textosMas(fila("Elena ConSala"))).toEqual(["Dar mesa", "Editar", "Cancelar", "Lista negra"]);
 
     // Solicitud del bot: «Convertir» y «Gestionar»; nada de mesa, verificar, cancelar ni lista negra.
     expect(principalDe(fila("Familia Ballester"))).toHaveTextContent("Convertir");
@@ -477,21 +483,27 @@ describe("ListaReservasAvanzada · «Dar mesa» salta al plano de su sala", () =
     expect(textosMas(filaDe(tabla, "Familia Ballester"))).not.toContain("Dar mesa");
     expect(onAsignarMesa).not.toHaveBeenCalled();
   });
-  it("una fila de solicitud usa el mismo molde que una de reserva: principal y «Más»", async () => {
+  it("una fila de solicitud usa el mismo molde que una de reserva: principal en verde y el resto a la vista", async () => {
     const { tabla } = await montar({ onAsignarMesa: vi.fn() });
-    for (const cliente of ["Ana Pendiente", "Familia Ballester"]) {
-      const botones = botonesDeFila(filaDe(tabla, cliente));
-      expect(botones).toHaveLength(2);
-      expect(botones[1]).toBe(botonMas(filaDe(tabla, cliente)));
-    }
+    expect(principalDe(filaDe(tabla, "Familia Ballester"))).toHaveClass("bg-emerald-600");
+    expect(principalDe(filaDe(tabla, "Ana Pendiente"))).toHaveClass("bg-emerald-600");
+  });
+
+  it("Cancelar y Lista negra van al final, separadas y en rojo contorneado", async () => {
+    const { tabla } = await montar();
+    const fila = filaDe(tabla, "Carlos Confirmado");
+    const separadas = fila.querySelector('[data-testid="acciones-destructivas"]')!;
+    expect([...separadas.querySelectorAll("button")].map((b) => b.textContent?.trim())).toEqual(["Cancelar", "Lista negra"]);
+    for (const b of separadas.querySelectorAll("button")) expect(b).toHaveClass("border-destructive/60", "text-destructive");
+    expect(opcionMas(fila, "Editar").className).not.toMatch(/destructive/);
   });
 });
 
 describe("ListaReservasAvanzada · cancelar pide confirmación", () => {
   const abrirCancelacion = async () => {
     const { tabla } = await montar();
-    // «Cancelar reserva» está en «Más», al final y en rojo.
-    const opcion = opcionMas(filaDe(tabla, "Ana Pendiente"), "Cancelar reserva");
+    // «Cancelar» va al final, en rojo.
+    const opcion = opcionMas(filaDe(tabla, "Ana Pendiente"), "Cancelar");
     expect(opcion.className).toMatch(/text-destructive/);
     fireEvent.click(opcion);
     return await screen.findByRole("alertdialog");
@@ -746,15 +758,12 @@ describe("ListaReservasAvanzada · editar una reserva, siempre", () => {
     fireEvent.click(gestionar);
     expect(supa.editarReserva).not.toHaveBeenCalled();
   });
-  it("en las tarjetas de móvil también está: mismo «Más», mismo editor, y tocar la tarjeta también lo abre", async () => {
+  it("en las tarjetas de móvil también está: mismo «Editar», mismo editor, y tocar la tarjeta también lo abre", async () => {
     await montar();
 
-    // jsdom monta a la vez la tabla y las tarjetas: el mismo «Más» sale dos veces.
-    const botones = screen.getAllByRole("button", { name: "Más acciones de Diana Cancelada" });
-    expect(botones).toHaveLength(2);
-    const enTarjeta = botones.find((b) => !b.closest("table"))!;
-    fireEvent.pointerDown(enTarjeta, { button: 0, ctrlKey: false });
-    fireEvent.click(screen.getByRole("menuitem", { name: "Editar" }));
+    // jsdom monta a la vez la tabla y las tarjetas: el mismo botón sale dos veces.
+    const tarjeta = screen.getAllByText("Diana Cancelada").find((n) => !n.closest("table"))!.closest("[class*='p-5']") as HTMLElement;
+    fireEvent.click(within(tarjeta).getByRole("button", { name: "Editar" }));
     expect(supa.editarReserva).toHaveBeenCalledWith("res-cancelada");
 
     supa.editarReserva.mockClear();
@@ -868,7 +877,7 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
   it("cancelar solo parte de un estado VIVO (la escritura va condicionada) y avisa al cliente con `{ id, estado }`", async () => {
     const { tabla } = await montar();
 
-    fireEvent.click(opcionMas(filaDe(tabla, "Carlos Confirmado"), "Cancelar reserva"));
+    fireEvent.click(opcionMas(filaDe(tabla, "Carlos Confirmado"), "Cancelar"));
     const dialogo = await screen.findByRole("alertdialog");
     fireEvent.click(within(dialogo).getByRole("button", { name: /^Sí, cancelar/ }));
 
@@ -888,10 +897,10 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
     const { tabla } = await montar();
 
     for (const cliente of ["Elena Llegó", "Fede NoVino", "Diana Cancelada"]) {
-      expect(textosMas(filaDe(tabla, cliente)), cliente).not.toContain("Cancelar reserva");
+      expect(textosMas(filaDe(tabla, cliente)), cliente).not.toContain("Cancelar");
     }
     // Y una viva sigue pudiéndose cancelar.
-    const cancelar = opcionMas(filaDe(tabla, "Carlos Confirmado"), "Cancelar reserva");
+    const cancelar = opcionMas(filaDe(tabla, "Carlos Confirmado"), "Cancelar");
     expect(cancelar.getAttribute("title")).toMatch(/^Cancelar la reserva de Carlos Confirmado/);
   });
   it("la estrella: escribe `{ importante: true }` pidiendo la fila de vuelta y sin condición de estado, y avisa", async () => {
@@ -1021,8 +1030,8 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
     const { tabla } = await montarSeis();
 
     const [aceptar] = botonesDeFila(filaDe(tabla, "Ana Pendiente"));
-    expect(aceptar.textContent?.trim()).toBe("Aceptar");
-    expect(aceptar.getAttribute("title")).toMatch(/^Aceptar la reserva tal como está/);
+    expect(aceptar.textContent?.trim()).toBe("Verificar");
+    expect(aceptar.getAttribute("title")).toMatch(/^Verificar la reserva tal como está/);
     expect(aceptar.getAttribute("title")).not.toMatch(/pidió/);
   });
 
@@ -1072,7 +1081,6 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
 
     expect(titulos).toContain("Cancelar la reserva de este cliente — pedirá confirmación");
     expect(titulos).toContain("Añadir a este cliente a la lista negra");
-    fireEvent.keyDown(screen.getAllByRole("menuitem")[0], { key: "Escape" });
     expect(within(fila).getByRole("button", { name: "Marcar este cliente como importante" })).toBeInTheDocument();
   });
 
@@ -2074,27 +2082,40 @@ describe("ListaReservasAvanzada · más alto para las filas: sin recuento, sin s
     expect(within(tabla).queryByRole("columnheader", { name: "Canal" })).toBeNull();
     // Lo largo de Cliente se recorta con «…» y va entero en el `title`.
     const fila = filaDe(tabla, "Ana Pendiente");
-    expect(within(fila).getByText("Ana Pendiente")).toHaveClass("truncate");
+    // 10/11/2026 (dueño: el teléfono salía cortado): nombre y teléfono COMPLETOS, el teléfono en grupos de tres.
+    expect(within(fila).getByText("Ana Pendiente")).not.toHaveClass("truncate");
     expect(within(fila).getByText("Ana Pendiente")).toHaveAttribute("title", "Ana Pendiente");
-    expect(within(fila).getByText("+34 600 111 222")).toHaveClass("truncate");
+    expect(within(fila).getByText("600 111 222")).toHaveClass("whitespace-nowrap");
+    expect(within(fila).getByText("600 111 222")).not.toHaveClass("truncate");
+    // «Fecha y hora» en una línea.
+    expect(within(tabla).getByText("Fecha y hora")).toHaveClass("whitespace-nowrap");
     // Con nombre accesible: el título que había encima de la lista se quitó.
     expect(tabla).toHaveAccessibleName("Reservas y solicitudes");
   });
 
-  it("la acción principal (o su hueco) mide lo mismo en todas las filas y es grande: 52 px de alto y texto a 17 px", async () => {
+  it("botones grandes (48 px, 16 px, gap-3), la principal en verde y debajo del nombre; la primera columna solo con la casilla", async () => {
     const { tabla } = await montar();
     const filas = [...tabla.querySelectorAll("tbody tr")] as HTMLElement[];
 
     const principales = filas.map(principalDe).filter((b): b is HTMLButtonElement => !!b);
-    expect(principales.map((b) => b.textContent?.trim())).toEqual(expect.arrayContaining(["Aceptar", "Confirmar", "Convertir"]));
-    for (const b of principales) expect(b).toHaveClass("w-[9.5rem]", "h-[52px]", "text-[17px]");
-    // Las filas sin nada que hacer dejan el hueco del mismo ancho: «Más» cae en la misma X.
-    const huecos = filas.flatMap((f) => [...f.querySelectorAll('[data-testid="sin-accion-principal"]')]);
-    expect(huecos.length).toBe(filas.length - principales.length);
-    for (const h of huecos) expect(h).toHaveClass("w-[9.5rem]");
-    // Filas altas y con aire (dueño: «ojo con los padding y los márgenes»).
-    for (const f of filas) expect(f).toHaveClass("h-[76px]");
+    expect(principales.map((b) => b.textContent?.trim())).toEqual(expect.arrayContaining(["Verificar", "Confirmar", "Convertir"]));
+    for (const b of principales) expect(b).toHaveClass("h-12", "text-base", "bg-emerald-600");
+    // Las acciones van en la celda Cliente, bajo el nombre, y pasan de línea si no caben.
+    const acciones = filaDe(tabla, "Ana Pendiente").querySelector('[data-testid="acciones-fila"]')!;
+    expect(acciones).toHaveClass("flex-wrap", "gap-3");
+    expect(acciones.closest("td")!.textContent).toContain("Ana Pendiente");
+    // La primera columna, estrecha y solo con la casilla.
+    expect(tabla.querySelector("thead th")).toHaveClass("w-[64px]");
+    expect(filas[0].querySelector("td")!.querySelectorAll("button:not([role=checkbox])")).toHaveLength(0);
+    // Filas con aire (dueño: «ojo con los padding y los márgenes»).
     for (const td of filas[0].querySelectorAll("td")) expect(td).toHaveClass("px-4", "py-3");
+  });
+  it("una reserva sin acción principal enseña solo lo que puede usar, sin hueco", async () => {
+    supa.filas = [reserva("res-c1", "confirmada", "Carlos Confirmado")];
+    const { tabla } = await montar({ solicitudesState: { ...estadoSolicitudes, solicitudes: [] } as typeof estadoSolicitudes });
+    const fila = filaDe(tabla, "Carlos Confirmado");
+    expect(principalDe(fila)).toBeUndefined();
+    expect(textosMas(fila)).toEqual(["Editar", "Cancelar", "Lista negra"]);
   });
   // ── La posición de las filas ────────────────────────────────────────────────
 
@@ -2227,12 +2248,12 @@ describe("ListaReservasAvanzada · aceptar, confirmar y verificar abren el diál
     fireEvent.click(principalDe(filaDe(tabla, "Ana Pendiente"))!);
 
     const dialogo = await screen.findByRole("dialog");
-    expect(within(dialogo).getByRole("heading", { name: /Aceptar reserva · Ana Pendiente/ })).toBeInTheDocument();
+    expect(within(dialogo).getByRole("heading", { name: /Verificar reserva · Ana Pendiente/ })).toBeInTheDocument();
     expect(within(dialogo).getByRole("link", { name: "+34 600 111 222" })).toBeInTheDocument();
     expect(within(dialogo).getByTestId("el-dia")).toBeInTheDocument();
     expect(supa.update).not.toHaveBeenCalled();
 
-    fireEvent.click(within(dialogo).getByRole("button", { name: "Aceptar reserva" }));
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Verificar reserva" }));
     await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
@@ -2252,11 +2273,15 @@ describe("ListaReservasAvanzada · aceptar, confirmar y verificar abren el diál
     expect(supa.update).not.toHaveBeenCalled();
   });
 
-  it("«Verificar» de «Más» también pasa por el diálogo antes de abrir el de verificar", async () => {
+  it("una sola «Verificar»: no está en «Más» y su diálogo ofrece «Verificar con otra hora» (elegir la hora)", async () => {
     const { tabla } = await montar();
-    fireEvent.click(opcionMas(filaDe(tabla, "Ana Pendiente"), "Verificar"));
+    expect(textosMas(filaDe(tabla, "Ana Pendiente"))).not.toContain("Verificar");
+    fireEvent.click(principalDe(filaDe(tabla, "Ana Pendiente"))!);
     const dialogo = await screen.findByRole("dialog");
     expect(within(dialogo).getByRole("heading", { name: /Verificar reserva · Ana Pendiente/ })).toBeInTheDocument();
-    expect(within(dialogo).getByRole("button", { name: "Verificar" })).toBeInTheDocument();
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Verificar con otra hora" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(supa.verificacion.mock.calls.at(-1)?.[0]).toMatchObject({ open: true, reserva: expect.objectContaining({ id: "res-pendiente" }) }));
+    expect(supa.update).not.toHaveBeenCalled();
   });
 });

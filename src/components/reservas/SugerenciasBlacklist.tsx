@@ -79,31 +79,33 @@ const DIAS_CADUCIDAD_POR_DEFECTO = 90;
  * golpe es justo el problema que se viene a arreglar. */
 const TAMANO_PAGINA = 50;
 
-/** 56 px por fila. Se sostiene porque ninguna celda pasa de dos líneas
- * `leading-tight` y todas las insignias tienen alto fijo. */
-const ALTO_FILA = "h-14";
+// 10/11/2026 (dueño: «letra más grande, más contraste y botones claros, sin cerrar márgenes»): la
+// tabla pasa a la escala de la Lista: texto de 17 px, nombre de 18 px seminegrita, filas de 72 px,
+// insignias de 14 px y botones de 48 px con texto. La fecha de detección baja debajo del motivo
+// (una columna menos) para que quepa sin apretar.
+
+/** 72 px por fila: nombre + contacto, o insignia + fecha, en dos líneas. */
+const ALTO_FILA = "h-[72px]";
 /** Sustituye el `p-4` que trae el primitivo `TableCell`. */
-const CELDA = "px-1.5 py-2 align-middle xl:px-3";
+const CELDA = "px-3 py-2.5 align-middle";
 
 /** El primitivo `Badge` no trae `whitespace-nowrap` ni alto fijo y es de uso
  * global, así que no se parchea allí: se aplica en cada sitio de llamada. */
-const INSIGNIA =
-  "h-5 shrink-0 gap-1 whitespace-nowrap px-1.5 py-0 text-[11px] pointer-coarse:text-xs font-medium lg:px-1 lg:text-[10px] xl:px-1.5 xl:text-[11px]";
-const INSIGNIA_SECUNDARIA = "h-4 shrink-0 gap-1 whitespace-nowrap px-1 py-0 text-[10px] pointer-coarse:text-xs font-medium";
+const INSIGNIA = "h-7 shrink-0 gap-1 whitespace-nowrap px-2 py-0 text-sm font-medium";
+const INSIGNIA_SECUNDARIA = "h-6 shrink-0 gap-1 whitespace-nowrap px-1.5 py-0 text-sm font-medium";
 
-const ANCHO_ACCIONES = "w-[176px] xl:w-[188px] pointer-coarse:w-[240px] pointer-coarse:xl:w-[240px]";
-const ANCHO_MOTIVO = "w-[128px] xl:w-[152px]";
+const ANCHO_ACCIONES = "w-[276px]";
+const ANCHO_MOTIVO = "w-[210px]";
 /** El `max-w` es imprescindible: con `truncate` (que implica `nowrap`) una
  * tabla de layout automático reclamaría el ancho del nombre más largo de la
  * página. `min-width: 0` por dentro no basta. */
-const ANCHO_CLIENTE = "min-w-[130px] max-w-[200px] xl:max-w-[330px] 2xl:max-w-[560px]";
-const ANCHO_HISTORIAL = "w-[124px] xl:w-[158px]";
-const ANCHO_FECHA = "w-[74px] xl:w-[116px]";
+const ANCHO_CLIENTE = "min-w-[200px] max-w-[300px] xl:max-w-[420px] 2xl:max-w-[560px]";
+const ANCHO_HISTORIAL = "w-[200px]";
 
 /** Ancho FIJO de cada botón de acción. "Rechazar" y "Aprobar" miden distinto,
  * así que sin fijarlo el segundo botón caería en una X diferente en cada fila. */
 // Con dedo el botón sube a 44 px y a `px-4`: el ancho fijo de ratón se queda corto para «Rechazar».
-const ANCHO_BOTON = "w-[82px] xl:w-[88px] pointer-coarse:w-auto pointer-coarse:min-w-[6rem] pointer-coarse:xl:w-auto";
+const ANCHO_BOTON = "w-[124px]";
 
 /** Franja ámbar de "pendiente de revisar". Va como sombra interior y NO como
  * `border-l-4`: con `border-collapse`, un borde de verdad empuja el contenido
@@ -187,46 +189,46 @@ function CeldaHistorial({ resumen }: { resumen: HistorialResumen }) {
 
   if (!resumen.presente) {
     return (
-      <span className="text-[11px] pointer-coarse:text-xs italic leading-tight text-muted-foreground" title={titulo}>
+      <span className="text-[15px] italic leading-tight text-muted-foreground" title={titulo}>
         Sin historial
       </span>
     );
   }
   if (resumen.total === 0) {
     return (
-      <span className="text-[11px] pointer-coarse:text-xs leading-tight text-muted-foreground" title={titulo}>
+      <span className="text-[15px] leading-tight text-muted-foreground" title={titulo}>
         Sin antecedentes
       </span>
     );
   }
   return (
     <span
-      className="flex items-center gap-1.5 whitespace-nowrap text-[11px] pointer-coarse:text-xs leading-tight xl:gap-2 xl:text-xs"
+      className="flex items-center gap-2.5 whitespace-nowrap text-base font-medium leading-tight"
       title={titulo}
     >
       {resumen.noShows > 0 && (
         <ChipHistorial
-          icono={<ShieldAlert className="h-3 w-3 shrink-0 text-red-600 dark:text-red-400" />}
+          icono={<ShieldAlert className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />}
           valor={resumen.noShows}
           etiqueta="ausencias previas"
         />
       )}
       {resumen.completadas > 0 && (
         <ChipHistorial
-          icono={<CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />}
+          icono={<CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />}
           valor={resumen.completadas}
           etiqueta="reservas completadas"
         />
       )}
       {resumen.canceladas > 0 && (
         <ChipHistorial
-          icono={<CalendarOff className="h-3 w-3 shrink-0 text-muted-foreground" />}
+          icono={<CalendarOff className="h-4 w-4 shrink-0 text-muted-foreground" />}
           valor={resumen.canceladas}
           etiqueta="reservas canceladas"
         />
       )}
       <ChipHistorial
-        icono={<History className="h-3 w-3 shrink-0 text-muted-foreground" />}
+        icono={<History className="h-4 w-4 shrink-0 text-muted-foreground" />}
         valor={resumen.total}
         etiqueta="reservas previas en total"
       />
@@ -237,8 +239,8 @@ function CeldaHistorial({ resumen }: { resumen: HistorialResumen }) {
 function Stat({ label, value }: { label: string; value: number | undefined }) {
   return (
     <div className="rounded-md bg-muted/50 py-1.5 px-1 text-center">
-      <p className="text-sm font-semibold leading-none tabular-nums">{value ?? "—"}</p>
-      <p className="text-[10px] pointer-coarse:text-xs text-muted-foreground mt-1">{label}</p>
+      <p className="text-lg font-semibold leading-none tabular-nums">{value ?? "—"}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -281,7 +283,7 @@ function AccionesSugerencia({
           aria-label={tituloRechazar}
           disabled={pendiente}
           onClick={onRechazar}
-          className={cn("h-7 shrink-0 justify-center gap-1 px-1 text-[11px] pointer-coarse:text-xs [&_svg]:size-3.5", ANCHO_BOTON)}
+          className={cn("h-12 shrink-0 justify-center gap-1.5 px-3 text-base font-semibold [&_svg]:size-5", ANCHO_BOTON)}
         >
           <XCircle />
           Rechazar
@@ -296,7 +298,7 @@ function AccionesSugerencia({
           disabled={pendiente}
           onClick={onAprobar}
           className={cn(
-            "h-7 shrink-0 justify-center gap-1 px-1 text-[11px] pointer-coarse:text-xs [&_svg]:size-3.5",
+            "h-12 shrink-0 justify-center gap-1.5 px-3 text-base font-semibold [&_svg]:size-5",
             "bg-amber-700 text-white hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500",
             ANCHO_BOTON,
           )}
@@ -321,7 +323,7 @@ function InsigniaMotivo({ motivo }: { motivo: string }) {
       className={cn(INSIGNIA, "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300")}
       title={titulo}
     >
-      <ShieldAlert className="h-3 w-3 shrink-0" />
+      <ShieldAlert className="h-4 w-4 shrink-0" />
       {etiqueta}
     </Badge>
   );
@@ -333,7 +335,7 @@ function BloqueCliente({ sugerencia, reincidente }: { sugerencia: SugerenciaBlac
   return (
     <div className="min-w-0">
       <div className="flex min-w-0 items-center gap-1.5">
-        <p className="truncate font-medium leading-tight" title={nombre}>
+        <p className="truncate text-lg font-semibold leading-tight" title={nombre}>
           {nombre}
         </p>
         {reincidente && (
@@ -346,16 +348,16 @@ function BloqueCliente({ sugerencia, reincidente }: { sugerencia: SugerenciaBlac
           </Badge>
         )}
       </div>
-      <div className="flex min-w-0 items-center gap-1.5 text-[11px] pointer-coarse:text-xs leading-tight text-muted-foreground xl:text-xs">
+      <div className="mt-1 flex min-w-0 items-center gap-3 text-[15px] leading-tight text-muted-foreground">
         {sugerencia.telefono && (
           <span className="flex shrink-0 items-center gap-0.5 tabular-nums" title={sugerencia.telefono}>
-            <Phone className="h-3 w-3 shrink-0" />
+            <Phone className="h-4 w-4 shrink-0" />
             {sugerencia.telefono}
           </span>
         )}
         {sugerencia.email && (
           <span className="flex min-w-0 items-center gap-0.5" title={sugerencia.email}>
-            <Mail className="h-3 w-3 shrink-0" />
+            <Mail className="h-4 w-4 shrink-0" />
             <span className="truncate">{sugerencia.email}</span>
           </span>
         )}
@@ -370,18 +372,14 @@ function BloqueCliente({ sugerencia, reincidente }: { sugerencia: SugerenciaBlac
 function BloqueFecha({ creadaAt }: { creadaAt: string | null }) {
   if (!creadaAt) return <span className="text-muted-foreground">—</span>;
   const d = new Date(creadaAt);
-  const corta = format(d, "dd/MM", { locale: es });
   const larga = format(d, "d MMM yyyy", { locale: es });
   const hhmm = format(d, "HH:mm", { locale: es });
   return (
     <span
-      className="flex flex-col text-xs leading-tight xl:flex-row xl:items-baseline xl:gap-2 xl:text-sm"
+      className="flex items-baseline gap-1.5 whitespace-nowrap text-[15px] leading-tight text-muted-foreground tabular-nums"
       title={`Detectada el ${larga} a las ${hhmm}`}
     >
-      <span>
-        <span className="xl:hidden">{corta}</span>
-        <span className="hidden xl:inline">{larga}</span>
-      </span>
+      <span>Detectada {larga}</span>
       <span className="font-medium">{hhmm}</span>
     </span>
   );
@@ -447,8 +445,8 @@ export function SugerenciasBlacklist() {
 
   if (migracionPendiente) {
     return (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground border rounded-md p-2.5 bg-muted/30">
-        <Lock className="h-3.5 w-3.5 shrink-0" />
+      <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-base text-muted-foreground">
+        <Lock className="h-4 w-4 shrink-0" />
         {MENSAJE_MIGRACION_SUGERENCIAS_PENDIENTE}
       </div>
     );
@@ -460,8 +458,8 @@ export function SugerenciasBlacklist() {
 
   if (!sugerencias || sugerencias.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground flex items-center gap-1.5 px-1">
-        <ShieldAlert className="h-3.5 w-3.5" />
+      <p className="flex items-center gap-2 px-1 text-base text-muted-foreground">
+        <ShieldAlert className="h-5 w-5" />
         Sin sugerencias de lista negra pendientes.
       </p>
     );
@@ -493,12 +491,12 @@ export function SugerenciasBlacklist() {
   return (
     <div ref={raizRef} className="space-y-3">
       <div>
-        <h3 className="text-sm font-medium flex items-center gap-1.5">
-          <ShieldAlert className="h-4 w-4 text-amber-600" />
+        <h3 className="flex items-center gap-2 text-xl font-semibold">
+          <ShieldAlert className="h-6 w-6 text-amber-600" />
           Sugerencias pendientes
-          <Badge variant="secondary">{sugerencias.length}</Badge>
+          <Badge variant="secondary" className="px-2 text-sm">{sugerencias.length}</Badge>
         </h3>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           {canEdit
             ? "Ausencias detectadas automáticamente. Revísalas antes de que caduquen de interés."
             : "Ausencias detectadas automáticamente, pendientes de que alguien con permiso de edición las revise."}
@@ -506,24 +504,22 @@ export function SugerenciasBlacklist() {
       </div>
 
       {/* Tarjetas compactas por debajo de lg (la tabla no cabe sin recortar) */}
-      <div className="space-y-2 lg:hidden">
+      <div className="space-y-3 lg:hidden">
         {filasPagina.map((s) => {
           const resumen = resumirHistorial(s.historial);
           return (
-            <div key={s.id} className={cn("rounded-md border bg-card p-2.5 space-y-1.5", FRANJA_PENDIENTE)}>
-              <div className="flex items-start justify-between gap-2">
+            <div key={s.id} className={cn("space-y-2.5 rounded-md border bg-card p-4 text-[17px]", FRANJA_PENDIENTE)}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <InsigniaMotivo motivo={s.motivo} />
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  <BloqueFecha creadaAt={s.creada_at} />
-                </span>
+                <BloqueFecha creadaAt={s.creada_at} />
               </div>
               <BloqueCliente sugerencia={s} reincidente={resumen.reincidente} />
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <CeldaHistorial resumen={resumen} />
                 {/* Solo «Ver» (06/11/2026): sin Aprobar ni Rechazar, ni un aviso por fila; la etiqueta
                     «Solo lectura» la pone la página, arriba. */}
                 {canEdit && (
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <AccionesSugerencia
                       nombre={nombreDe(s)}
                       pendiente={mutando}
@@ -541,19 +537,18 @@ export function SugerenciasBlacklist() {
       {/* Tabla a partir de lg */}
       <Card className="hidden overflow-hidden lg:block">
         <CardContent className="p-0">
-          <Table className="text-xs xl:text-sm">
+          <Table className="text-[17px]">
             <TableHeader>
               <TableRow>
                 {canEdit && (
                   <TableHead
                     aria-label="Acciones"
-                    className={cn("sticky left-0 z-30 h-10 border-r border-border/60 bg-card", ANCHO_ACCIONES, CELDA)}
+                    className={cn("sticky left-0 z-30 h-12 border-r border-border/60 bg-card", ANCHO_ACCIONES, CELDA)}
                   />
                 )}
-                <TableHead className={cn("h-10 bg-card", ANCHO_MOTIVO, CELDA)}>Motivo</TableHead>
-                <TableHead className={cn("h-10 bg-card", ANCHO_CLIENTE, CELDA)}>Cliente</TableHead>
-                <TableHead className={cn("h-10 bg-card", ANCHO_HISTORIAL, CELDA)}>Historial</TableHead>
-                <TableHead className={cn("h-10 bg-card whitespace-nowrap", ANCHO_FECHA, CELDA)}>Detectada</TableHead>
+                <TableHead className={cn("h-12 bg-card text-base font-semibold text-foreground", ANCHO_CLIENTE, CELDA)}>Cliente</TableHead>
+                <TableHead className={cn("h-12 bg-card text-base font-semibold text-foreground", ANCHO_MOTIVO, CELDA)}>Motivo</TableHead>
+                <TableHead className={cn("h-12 bg-card text-base font-semibold text-foreground", ANCHO_HISTORIAL, CELDA)}>Historial</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -565,14 +560,14 @@ export function SugerenciasBlacklist() {
                     {canEdit && (
                       <TableCell
                         className={cn(
-                          "px-1.5 py-2 align-middle xl:px-2",
+                          "px-3 py-2.5 align-middle",
                           ANCHO_ACCIONES,
                           "sticky left-0 z-10 border-r border-border/60",
                           FRANJA_PENDIENTE,
                           "bg-card group-hover:bg-muted",
                         )}
                       >
-                        <div className="flex items-center justify-start gap-1">
+                        <div className="flex items-center justify-start gap-2">
                           <AccionesSugerencia
                             nombre={nombreDe(s)}
                             pendiente={mutando}
@@ -582,17 +577,17 @@ export function SugerenciasBlacklist() {
                         </div>
                       </TableCell>
                     )}
-                    <TableCell className={cn(CELDA, ANCHO_MOTIVO)}>
-                      <InsigniaMotivo motivo={s.motivo} />
-                    </TableCell>
                     <TableCell className={cn(CELDA, ANCHO_CLIENTE)}>
                       <BloqueCliente sugerencia={s} reincidente={resumen.reincidente} />
                     </TableCell>
+                    <TableCell className={cn(CELDA, ANCHO_MOTIVO)}>
+                      <div className="flex flex-col items-start gap-1">
+                        <InsigniaMotivo motivo={s.motivo} />
+                        <BloqueFecha creadaAt={s.creada_at} />
+                      </div>
+                    </TableCell>
                     <TableCell className={cn(CELDA, ANCHO_HISTORIAL)}>
                       <CeldaHistorial resumen={resumen} />
-                    </TableCell>
-                    <TableCell className={cn(CELDA, ANCHO_FECHA, "whitespace-nowrap tabular-nums")}>
-                      <BloqueFecha creadaAt={s.creada_at} />
                     </TableCell>
                   </TableRow>
                 );
@@ -606,7 +601,7 @@ export function SugerenciasBlacklist() {
           lo más viejo sin resolver sigue cayendo en la página 1. */}
       {hayPaginacion && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             Mostrando{" "}
             <span className="font-medium text-foreground tabular-nums">
               {primeraDeLaPagina + 1}–{primeraDeLaPagina + filasPagina.length}
@@ -614,15 +609,15 @@ export function SugerenciasBlacklist() {
             de <span className="tabular-nums">{sugerencias.length}</span>
           </p>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={paginaActual === 1} onClick={() => irAPagina(paginaActual - 1)}>
+            <Button variant="outline" className="h-12 px-4 text-base" disabled={paginaActual === 1} onClick={() => irAPagina(paginaActual - 1)}>
               Anterior
             </Button>
-            <span className="text-sm tabular-nums text-muted-foreground">
+            <span className="text-base tabular-nums text-muted-foreground">
               Página {paginaActual} de {totalPaginas}
             </span>
             <Button
               variant="outline"
-              size="sm"
+              className="h-12 px-4 text-base"
               disabled={paginaActual === totalPaginas}
               onClick={() => irAPagina(paginaActual + 1)}
             >
@@ -654,7 +649,7 @@ export function SugerenciasBlacklist() {
 
       {/* --- Aprobar: un solo Dialog para toda la bandeja ------------------ */}
       <Dialog open={!!aAprobar} onOpenChange={(abierto) => !abierto && setAAprobar(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="reservas-contraste reservas-legible sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Aprobar y añadir a lista negra</DialogTitle>
             <DialogDescription>

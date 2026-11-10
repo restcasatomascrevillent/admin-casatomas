@@ -164,7 +164,7 @@ export function CasillaOcupacion({
   // sale de la casilla medida (px); sin ella, del ancho (`cqw`).
   // Una cifra de 2-3 dígitos nunca puede ser más ancha que la casilla: el tamaño en px es el techo y `cqw` lo recorta por nº de dígitos (P-01).
   const digitos = String(resumen?.comensales ?? 0).length;
-  const fuenteCifra = fuenteComensales ? Math.max(14, fuenteComensales - lineasExtra * (compacta ? 8 : 10)) : 0;
+  const fuenteCifra = fuenteComensales ? Math.max(20, fuenteComensales - lineasExtra * (compacta ? 6 : 8)) : 0;
   const cifra = conReservas ? (
     <span
       data-testid="comensales-casilla"
@@ -173,7 +173,7 @@ export function CasillaOcupacion({
       className={cn(
         "font-bold leading-none",
         "text-center",
-        !fija && "[font-size:clamp(1.125rem,30cqw,2rem)]",
+        !fija && "[font-size:clamp(1.25rem,32cqw,2.25rem)]",
       )}
       style={fija && fuenteComensales ? { fontSize: `min(${fuenteCifra}px, calc(100cqw / ${(digitos * 0.62 + 0.3).toFixed(2)}))` } : undefined}
     >
@@ -197,8 +197,8 @@ export function CasillaOcupacion({
         "relative flex w-full cursor-pointer flex-col overflow-hidden rounded-lg border text-left",
         "transition-shadow hover:shadow-md motion-reduce:transition-none",
         fija
-          ? cn("h-full min-h-0", compacta ? "gap-0.5 p-1" : "gap-1 p-1.5")
-          : "min-h-[3.75rem] gap-0.5 p-1 sm:min-h-[4.75rem] sm:gap-1 sm:p-1.5",
+          ? cn("h-full min-h-0", compacta ? "gap-0.5 p-1.5" : "gap-1 p-2")
+          : "min-h-[4.5rem] gap-1 p-1.5 sm:min-h-[6rem] sm:p-2",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         // Cada casilla mide su propio ancho: el número grande se escala con él (cqw).
         "[container-type:inline-size]",
@@ -216,8 +216,8 @@ export function CasillaOcupacion({
           <span
             className={cn(
               "flex items-center justify-center rounded-full px-1 font-medium leading-none tabular-nums",
-              !fija && "h-5 min-w-5 text-[11px] pointer-coarse:text-xs sm:h-6 sm:min-w-6 sm:text-sm",
-              fija && (compacta ? "h-5 min-w-5 text-xs" : "h-6 min-w-6 text-sm"),
+              !fija && "h-6 min-w-6 text-base sm:h-7 sm:min-w-7 sm:text-lg",
+              fija && (densidad === "completa" ? "h-7 min-w-7 text-lg" : "h-6 min-w-6 text-lg"),
               esHoy && cn(estilo.hoy, "font-semibold"),
             )}
           >
@@ -236,7 +236,7 @@ export function CasillaOcupacion({
         <span
           data-testid="cierre-casilla"
           className={cn(
-            "block shrink-0 break-words text-[10px] pointer-coarse:text-xs leading-none",
+            "block shrink-0 break-words text-sm leading-tight",
             textoCierre ? "font-semibold uppercase" : "font-medium",
             cierraComida && cierraCena ? "text-destructive" : "text-muted-foreground",
           )}
@@ -245,8 +245,8 @@ export function CasillaOcupacion({
             // «Sin reservas web» parte en dos líneas en una casilla estrecha (iPad vertical) y empuja
             // el % fuera: ahí basta «Sin web» (el aria-label lo dice entero). La casilla es contenedor.
             <>
-              <span className="[@container(min-width:6.5rem)]:hidden">Sin web</span>
-              <span className="hidden [@container(min-width:6.5rem)]:inline">{textoSinWeb}</span>
+              <span className="[@container(min-width:7.5rem)]:hidden">Sin web</span>
+              <span className="hidden [@container(min-width:7.5rem)]:inline">{textoSinWeb}</span>
             </>
           )}
         </span>
@@ -256,7 +256,7 @@ export function CasillaOcupacion({
           data-testid="evento-casilla"
           aria-hidden="true"
           className={cn(
-            "shrink-0 truncate rounded bg-violet-100 px-1 text-[10px] pointer-coarse:text-xs font-semibold leading-tight text-violet-900 dark:bg-violet-900/40 dark:text-violet-100",
+            "shrink-0 truncate rounded bg-violet-100 px-1 text-sm font-semibold leading-tight text-violet-900 dark:bg-violet-900/40 dark:text-violet-100",
             compacta && "hidden",
           )}
         >
@@ -270,7 +270,7 @@ export function CasillaOcupacion({
             <span
               data-testid="reservas-casilla"
               aria-hidden="true"
-              className={cn("text-center text-[10px] pointer-coarse:text-xs leading-none opacity-80", !fija && "hidden sm:block")}
+              className={cn("text-center text-sm font-medium leading-none", !fija && "hidden sm:block")}
             >
               {resumen.reservas} res.
             </span>
@@ -285,7 +285,7 @@ export function CasillaOcupacion({
               {textoPorcentaje && (!fija || verPorcentaje) && (
                 <span
                   data-testid="porcentaje-casilla"
-                  className={cn("text-center text-[10px] pointer-coarse:text-xs font-semibold leading-none", !fija && "hidden sm:block")}
+                  className={cn("text-center text-sm font-semibold leading-none", !fija && "hidden sm:block")}
                 >
                   {textoPorcentaje}
                 </span>
@@ -303,7 +303,7 @@ export function CasillaOcupacion({
   return (
     <Tooltip>
       <TooltipTrigger asChild>{boton}</TooltipTrigger>
-      <TooltipContent side="top" className="max-w-[18rem] space-y-0.5 text-xs">
+      <TooltipContent side="top" className="max-w-[20rem] space-y-0.5 text-sm">
         <p className="font-semibold">{conMayuscula(format(dia, "EEEE, d 'de' MMMM", { locale: es }))}</p>
         {descripcion.lineas.map((linea, i) => (
           <p key={i}>{linea}</p>

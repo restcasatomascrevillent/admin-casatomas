@@ -397,7 +397,7 @@ export function VistaHoyMovil({
         <BotonSentarSinReserva soloIcono className="shrink-0" />
       </div>
       )}
-      {!columna && <InterruptoresServiciosOnline fecha={fecha} className="shrink-0 px-1" />}
+      {!columna && <InterruptoresServiciosOnline fecha={fecha} compacta className="shrink-0" />}
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border bg-card" data-testid="hoy-movil-lista">
         {reservas === undefined ? (
@@ -644,14 +644,6 @@ export function FilaReservaMovil({
                 </span>
               </span>
             )}
-            {tarde ? (
-              <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">Tarde</span>
-            ) : (
-              info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
-            )}
-            <InsigniaMenuDelDia reserva={reserva} />
-            <InsigniaMenuCerrado reserva={reserva} />
-            <InsigniaZona reserva={reserva} />
           </span>
           {/* La protagonista es la MESA (07/11/2026, petición del dueño): «Sentar» pequeño encima y debajo, en
               grande, sala y mesa. Un toque = sentar en ella (con `decidirSentarPrevista`). Sin mesa (o con la
@@ -678,6 +670,18 @@ export function FilaReservaMovil({
             </Button>
           )}
           {sentarFuera}
+        </div>
+        {/* Estado y menús en su propia línea, a todo lo ancho (10/11/2026): al lado de «Sentar» y «Fuera» cada
+            insignia se iba a una línea y la fila crecía mucho a 375 px. */}
+        <div className="flex flex-wrap items-center gap-1.5 empty:hidden" data-testid="insignias-fila">
+          {tarde ? (
+            <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">Tarde</span>
+          ) : (
+            info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
+          )}
+          <InsigniaMenuDelDia reserva={reserva} />
+          <InsigniaMenuCerrado reserva={reserva} />
+          <InsigniaZona reserva={reserva} />
         </div>
         {notas && (
           <p className="flex min-w-0 items-center gap-1.5 text-sm text-amber-800 dark:text-amber-300">
@@ -780,7 +784,7 @@ function CuadriculaMesas({
                     {textoEvento(evento)}
                   </span>
                 ) : (
-                  <span className="text-xs font-normal text-muted-foreground">
+                  <span className="shrink-0 whitespace-nowrap text-xs font-normal text-muted-foreground">
                     {cerrada ? "Cerrada en este servicio" : `${libres} libres de ${casillas.length}`}
                   </span>
                 )}
@@ -834,19 +838,26 @@ function CasillaMesa({
       type="button"
       onClick={pulsar}
       className={cn(
-        "flex min-h-20 flex-col items-start justify-between rounded-lg p-2 text-left active:scale-[0.98]",
+        "flex min-h-20 min-w-0 flex-col items-start justify-between gap-0.5 rounded-lg p-2 text-left active:scale-[0.98]",
         // Mismos colores que el plano de escritorio (`coloresMesa.ts`, 10/11/2026).
         COLORES_MESA[estadoColorMovil(estado.tipo)].mesa,
       )}
       data-estado={estadoColorMovil(estado.tipo)}
       aria-label={`Mesa ${opcion.nombre}, ${opcion.plazas} plazas, ${estado.tipo === "libre" ? "libre" : estado.tipo === "sentada" ? `sentada: ${estado.nombre}` : `${fijada ? "fijada" : "prevista"} a las ${horaCorta(estado.hora)} para ${estado.nombre || "una reserva"}`}`}
     >
-      <span className="flex w-full items-baseline justify-between gap-1">
-        <span className="flex items-center gap-1 text-lg font-bold leading-none">
-          {opcion.nombre}
-          {fijada && <Lock className="h-3.5 w-3.5" aria-hidden="true" data-testid="candado-mesa" />}
+      {/* Nombre y plazas (10/11/2026): un nombre largo («Reservado», «Mesa 10», «Barra») va a 16 px y, si no deja
+          sitio, las plazas bajan a la línea de abajo en vez de montarse encima; si ni así cabe, se corta con «…». */}
+      <span className="flex w-full min-w-0 flex-wrap items-baseline justify-between gap-x-1 gap-y-0.5">
+        <span
+          className={cn("flex min-w-0 max-w-full items-center gap-1 font-bold leading-tight", opcion.nombre.length > 3 ? "text-base" : "text-lg")}
+          data-testid="nombre-mesa-movil"
+        >
+          <span className="truncate" title={opcion.nombre}>
+            {opcion.nombre}
+          </span>
+          {fijada && <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" data-testid="candado-mesa" />}
         </span>
-        <span className="flex items-center gap-0.5 text-xs text-muted-foreground tabular-nums">
+        <span className="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground tabular-nums">
           <Users className="h-3 w-3" aria-hidden />
           {opcion.plazas}
         </span>

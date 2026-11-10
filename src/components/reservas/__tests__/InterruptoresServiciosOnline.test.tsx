@@ -39,6 +39,19 @@ describe("Cerrar comida / Cerrar noche", () => {
     expect(cambiar).toHaveBeenCalledWith("cena", true);
   });
 
+  it("compacta (móvil): botones y ayuda (i) en una sola fila, sin saltar de línea", () => {
+    render(
+      <TooltipProvider>
+        <InterruptoresServiciosOnline fecha="2026-11-10" compacta />
+      </TooltipProvider>,
+    );
+    const fila = screen.getByTestId("interruptores-servicios-online");
+    expect(fila).toHaveClass("flex-nowrap");
+    expect(fila).not.toHaveClass("flex-wrap");
+    expect(screen.getByRole("button", { name: /Cerrar comida/ })).toHaveClass("min-h-11", "min-w-0");
+    expect(screen.getByRole("button", { name: "Qué hace cerrar un servicio" })).toHaveClass("h-11", "shrink-0");
+  });
+
   it("cancelar no cambia nada", () => {
     pintar();
     fireEvent.click(screen.getByRole("button", { name: /Cerrar comida/ }));
