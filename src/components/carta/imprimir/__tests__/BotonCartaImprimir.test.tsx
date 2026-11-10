@@ -1,8 +1,10 @@
 /**
  * «Carta para imprimir»: el diálogo ofrece tamaño, carta (si hay Touza),
  * idioma, categorías y sangrado; la vista previa cuenta las páginas y
- * «Descargar PDF» genera el fichero con su nombre. Cada sección va en su cara:
- * si una no cabe, avisa (sección y tamaño) y no descarga hasta revisarla.
+ * «Descargar PDF» genera el fichero con su nombre. Cada sección empieza en
+ * página nueva y, si no cabe, sigue en las siguientes (el diálogo lo dice); el
+ * texto se alinea a la izquierda, al centro o a la derecha, y arriba, en el
+ * centro o abajo.
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -63,7 +65,7 @@ async function abrir(props: Parameters<typeof BotonCartaImprimir>[0]) {
   render(<BotonCartaImprimir {...props} />);
   fireEvent.click(screen.getByRole("button", { name: /PDF Carta/ }));
   const dialogo = await screen.findByRole("dialog");
-  await within(dialogo).findByText(/páginas A5/);
+  await within(dialogo).findByText(/^\d+ páginas A5/);
   return dialogo;
 }
 
@@ -101,7 +103,7 @@ describe("BotonCartaImprimir", () => {
     expect(m.descargar.mock.calls[0][1]).toMatch(/^Carta-Casa-Tomas-platos-es-A4-\d{4}-\d{2}-\d{2}\.pdf$/);
   });
 
-  it("una sección por cara: tres categorías, tres páginas entre portada y contraportada", async () => {
+  it("una sección por página: tres categorías, tres páginas entre portada y contraportada", async () => {
     const dialogo = await abrir({ tipo: "platos", platos: PLATOS });
     expect(within(dialogo).getByText(/^5 páginas A5/)).toBeInTheDocument();
     expect(within(dialogo).queryByRole("alert")).toBeNull();
@@ -111,8 +113,29 @@ describe("BotonCartaImprimir", () => {
     expect(paginas.filter((p) => p.tipo === "interior").map((p) => p.seccion)).toEqual(["NOVEDADES DEL DÍA", "CARNES", "POSTRES"]);
   });
 
-  describe("si una sección no cabe en una cara", () => {
-    // 24 mariscos con descripción de dos líneas: en A5 no caben en una cara; en A4, a dos columnas, sí.
+  it("se elige la alineación del texto: a la izquierda y en el centro, por defecto; a la derecha y abajo cambia el PDF", async () => {
+    type Pagina = { tipo: string; trazos: { tipo: string; texto?: string; x?: number; y?: number }[] };
+    const tituloCarnes = (paginas: Pagina[]) =>
+      paginas.flatMap((p) => p.trazos).find((t) => t.tipo === "texto" && t.texto === "CARNES") as { x: number; y: number };
+    const dialogo = await abrir({ tipo: "platos", platos: PLATOS });
+    expect(within(dialogo).getByRole("radio", { name: "Texto a la izquierda" })).toHaveAttribute("data-state", "on");
+    expect(within(dialogo).getByRole("radio", { name: "En el centro de la página" })).toHaveAttribute("data-state", "on");
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Descargar PDF" }));
+    await waitFor(() => expect(m.crearPdf).toHaveBeenCalledTimes(1));
+    const antes = tituloCarnes((m.crearPdf.mock.calls[0] as unknown as [Pagina[]])[0]);
+
+    fireEvent.click(within(dialogo).getByRole("radio", { name: "Texto a la derecha" }));
+    fireEvent.click(within(dialogo).getByRole("radio", { name: "Abajo de la página" }));
+    expect(within(dialogo).getByRole("radio", { name: "Texto a la derecha" })).toHaveAttribute("data-state", "on");
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Descargar PDF" }));
+    await waitFor(() => expect(m.crearPdf).toHaveBeenCalledTimes(2));
+    const despues = tituloCarnes((m.crearPdf.mock.calls[1] as unknown as [Pagina[]])[0]);
+    expect(despues.x).toBeGreaterThan(antes.x + 50);
+    expect(despues.y).toBeGreaterThan(antes.y + 20);
+  });
+
+  describe("una sección que no cabe en una página", () => {
+    // 24 mariscos con descripción de dos líneas: en A5 no caben en una página.
     const MARISCOS = [
       ...Array.from({ length: 24 }, (_, i) =>
         plato(String(100 + i), "MARISCOS", {
@@ -123,60 +146,38 @@ describe("BotonCartaImprimir", () => {
       plato("1", "CARNES"),
     ];
 
-    it("avisa con la sección y el tamaño, y no deja descargar", async () => {
+    it("sigue en páginas nuevas, sin compartirlas con otra sección, lo dice y se descarga", async () => {
       const dialogo = await abrir({ tipo: "platos", platos: MARISCOS });
-      const aviso = await within(dialogo).findByRole("alert");
-      expect(aviso).toHaveTextContent("Una sección no cabe en una cara A5");
-      expect(aviso).toHaveTextContent(/Mariscos · A5: 24 platos/);
-      expect(within(dialogo).getByText(/Mariscos no cabe en una cara A5: revísalo antes de descargar/)).toBeInTheDocument();
-      expect(within(dialogo).getByRole("button", { name: "Descargar PDF" })).toBeDisabled();
-      expect(within(dialogo).getByRole("button", { name: /Ver en grande: Página 2 de 4 \(no cabe\)/ })).toBeInTheDocument();
-      // «Ver página» abre esa página en grande.
-      fireEvent.click(within(aviso).getByRole("button", { name: /Ver página/ }));
-      expect(await within(dialogo).findByText(/No cabe en una cara A5: lo que se ve es lo que entra/)).toBeInTheDocument();
-    });
-
-    it("se puede repartir a propósito en las caras que necesita, y deshacerlo", async () => {
-      const dialogo = await abrir({ tipo: "platos", platos: MARISCOS });
-      const aviso = await within(dialogo).findByRole("alert");
-      const repartir = within(aviso).getByRole("button", { name: /Repartir en \d+ caras/ });
-      const caras = Number(repartir.textContent!.match(/(\d+) caras/)![1]);
-      expect(caras).toBeGreaterThan(1);
-      fireEvent.click(repartir);
-      await waitFor(() => expect(within(dialogo).queryByRole("alert")).toBeNull());
-      expect(within(dialogo).getByText(new RegExp(`ocupa ${caras} caras A5, repartida a petición tuya`))).toBeInTheDocument();
-      expect(within(dialogo).getByText(new RegExp(`^${caras + 3} páginas A5`))).toBeInTheDocument();
-      fireEvent.click(within(dialogo).getByRole("button", { name: "Descargar PDF" }));
+      expect(within(dialogo).queryByRole("alert")).toBeNull();
+      expect(within(dialogo).getByText(/ocupa \d+ páginas A5 \(24 platos\), sin compartir página con otra sección/)).toBeInTheDocument();
+      const boton = within(dialogo).getByRole("button", { name: "Descargar PDF" });
+      expect(boton).toBeEnabled();
+      fireEvent.click(boton);
       await waitFor(() => expect(m.descargar).toHaveBeenCalledTimes(1));
-      fireEvent.click(within(dialogo).getByRole("button", { name: /Volver a una cara/ }));
-      expect(await within(dialogo).findByRole("alert")).toHaveTextContent("Mariscos");
+      const [paginas] = m.crearPdf.mock.calls[0] as unknown as [{ tipo: string; seccion?: string }[]];
+      const secciones = paginas.filter((p) => p.tipo === "interior").map((p) => p.seccion);
+      expect(secciones.filter((s) => s === "MARISCOS").length).toBeGreaterThan(1);
+      expect(secciones[secciones.length - 1]).toBe("CARNES");
+      expect(secciones.indexOf("CARNES")).toBe(secciones.lastIndexOf("MARISCOS") + 1);
     });
 
-    it("se pueden quitar platos de esa sección o pasar al tamaño en el que sí cabe", async () => {
+    it("se pueden quitar platos solo de la carta impresa y recuperarlos", async () => {
       const dialogo = await abrir({ tipo: "platos", platos: MARISCOS });
-      const aviso = await within(dialogo).findByRole("alert");
-      fireEvent.click(within(aviso).getByRole("button", { name: /Elegir platos/ }));
-      expect(within(aviso).getByText(/Marcados 24 de 24 · en una cara caben unos \d+/)).toBeInTheDocument();
-      fireEvent.click(within(aviso).getByRole("checkbox", { name: /^Marisco 24\s*·/ }));
-      expect(await within(aviso).findByText(/Marcados 23 de 24/)).toBeInTheDocument();
+      fireEvent.click(within(dialogo).getByRole("button", { name: /Elegir platos/ }));
+      expect(within(dialogo).getByText("Marcados 24 de 24")).toBeInTheDocument();
+      fireEvent.click(within(dialogo).getByRole("checkbox", { name: /^Marisco 24\s*·/ }));
+      expect(await within(dialogo).findByText("Marcados 23 de 24")).toBeInTheDocument();
       expect(within(dialogo).getByText(/· 24 platos/)).toBeInTheDocument();
-
-      fireEvent.click(within(aviso).getByRole("button", { name: "En A4 sí cabe: pasar a A4" }));
-      await waitFor(() => expect(within(dialogo).queryByRole("alert")).toBeNull());
-      expect(within(dialogo).getByText(/páginas A4/)).toBeInTheDocument();
-      // Lo quitado se recuerda y se puede recuperar.
-      expect(within(dialogo).getByText(/1 plato quitado de la carta impresa/)).toBeInTheDocument();
+      expect(within(dialogo).getByText(/1 plato quitado\./)).toBeInTheDocument();
       fireEvent.click(within(dialogo).getByRole("button", { name: /Recuperarlos/ }));
       expect(await within(dialogo).findByText(/· 25 platos/)).toBeInTheDocument();
-      expect(within(dialogo).getByRole("button", { name: "Descargar PDF" })).toBeEnabled();
     });
 
     it("si se quitan todos, lo dice y deja recuperarlos", async () => {
       const dialogo = await abrir({ tipo: "platos", platos: MARISCOS });
       fireEvent.click(within(dialogo).getByRole("checkbox", { name: /^Carnes/ }));
-      const aviso = await within(dialogo).findByRole("alert");
-      fireEvent.click(within(aviso).getByRole("button", { name: /Elegir platos/ }));
-      // Al quitar unos, la sección pasa a caber y la lista sigue abierta en el recuadro de lo decidido.
+      fireEvent.click(await within(dialogo).findByRole("button", { name: /Elegir platos/ }));
+      // Al quitar unos, la sección pasa a caber en una página y la lista sigue abierta en lo quitado.
       for (let i = 0; i < 24; i++) {
         const [marcada] = within(dialogo).queryAllByRole("checkbox", { name: /^Marisco \d+/, checked: true });
         if (!marcada) break;

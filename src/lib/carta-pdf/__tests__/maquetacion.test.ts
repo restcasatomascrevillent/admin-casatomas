@@ -1,20 +1,24 @@
 /**
- * Una sección por cara: cada categoría o tipo de vino empieza en página nueva
- * y lleva en ella todos sus elementos; nada se sale de los márgenes, ningún
- * plato se parte, se pierde ni se repite; las secciones vacías no tienen
- * página; las cortas no se estiran; las largas se compactan sin bajar del
- * cuerpo mínimo y, si ni así caben, se avisa (y solo se reparten si se pide).
- * El A4 es A4 y no un A5 ampliado.
+ * Nunca dos secciones en el mismo folio y un plato por línea: cada categoría o
+ * tipo de vino empieza en página nueva, a una columna; si no cabe en una
+ * página, sigue en las siguientes (con «(continuación)») y la siguiente
+ * sección vuelve a empezar en página nueva. Nada se sale de los márgenes,
+ * ningún plato se parte, se pierde ni se repite; las secciones vacías no
+ * tienen página; las cortas no se estiran; el texto se alinea a la izquierda,
+ * al centro o a la derecha, y arriba, en el centro o abajo. El A4 es A4 y no
+ * un A5 ampliado.
  */
 import { describe, expect, it } from "vitest";
 import type { ContenidoCarta, ElementoCarta, SeccionCarta } from "../datos";
 import {
+  ALINEACIONES_HORIZONTALES,
   COLORES,
   CUERPO_MINIMO,
   FORMATOS,
   maquetarCarta,
   mm,
   seccionesQueNoCaben,
+  type Alineacion,
   type Medidor,
   type PaginaCarta,
   type TamanoCarta,
@@ -62,18 +66,22 @@ const contenido = (secciones: SeccionCarta[], tipo: ContenidoCarta["tipo"] = "pl
   notaComun: null,
 });
 
-const textos = (pagina: PaginaCarta) => pagina.trazos.filter((t): t is Extract<Trazo, { tipo: "texto" }> => t.tipo === "texto");
+type Texto = Extract<Trazo, { tipo: "texto" }>;
+const textos = (pagina: PaginaCarta) => pagina.trazos.filter((t): t is Texto => t.tipo === "texto");
 const mismoColor = (a: { r: number }, b: { r: number }) => Math.abs(a.r - b.r) < 1e-9;
-/** Nombres de plato: seminegrita en pizarra. */
-const nombresEn = (pagina: PaginaCarta) =>
-  textos(pagina).filter((t) => t.fuente === "seminegrita" && mismoColor(t.color, COLORES.pizarra)).map((t) => t.texto);
+/** Líneas de nombre de plato: seminegrita en pizarra. */
+const lineasNombre = (pagina: PaginaCarta) => textos(pagina).filter((t) => t.fuente === "seminegrita" && mismoColor(t.color, COLORES.pizarra));
+const nombresEn = (pagina: PaginaCarta) => lineasNombre(pagina).map((t) => t.texto);
+/** Precios: seminegrita en oro, del cuerpo del nombre (los números de alérgenos son más pequeños). */
+const preciosEn = (pagina: PaginaCarta) => textos(pagina).filter((t) => t.fuente === "seminegrita" && mismoColor(t.color, COLORES.oro) && t.texto.includes("€"));
 /** Títulos de sección: regular, oro y con espaciado (no la cabecera de página, que va en piedra). */
 const titulosEn = (pagina: PaginaCarta) =>
-  textos(pagina).filter((t) => t.fuente === "regular" && mismoColor(t.color, COLORES.oro) && (t.espaciado ?? 0) > 0).map((t) => t.texto);
+  textos(pagina).filter((t) => t.fuente === "regular" && mismoColor(t.color, COLORES.oro) && (t.espaciado ?? 0) > 0);
 const interiores = (paginas: PaginaCarta[]) => paginas.filter((p) => p.tipo === "interior");
+const anchoDe = (t: Texto) => medidor.ancho(t.texto, t.fuente, t.tamano, t.espaciado);
 const TAMANOS: TamanoCarta[] = ["A5", "A4"];
 
-describe("maquetarCarta: una sección por cara", () => {
+describe("maquetarCarta: nunca dos secciones en la misma página", () => {
   it("portada, interiores y contraportada en A5 (419,53 × 595,28 pt)", () => {
     const { paginas } = maquetarCarta(medidor, contenido([seccion("CARNES", 6)]));
     expect(paginas[0].tipo).toBe("portada");
@@ -85,53 +93,153 @@ describe("maquetarCarta: una sección por cara", () => {
     }
   });
 
-  it.each(TAMANOS)("en %s, seis secciones dan seis caras, cada una con un solo título y todos sus platos, una vez y en orden", (tamano) => {
+  it.each(TAMANOS)("en %s, seis secciones que caben dan seis páginas, cada una con un solo título y todos sus platos, una vez y en orden", (tamano) => {
     const secciones = [seccion("NOVEDADES", 9), seccion("ENTRANTES", 14), seccion("CARNES", 3), seccion("POSTRES", 11), seccion("ARROCES", 1), seccion("SNACK", 6)];
     const { paginas, secciones: informe } = maquetarCarta(medidor, contenido(secciones), tamano);
     const caras = interiores(paginas);
     expect(caras).toHaveLength(6);
     caras.forEach((cara, i) => {
-      expect(titulosEn(cara)).toEqual([secciones[i].titulo]);
+      expect(titulosEn(cara).map((t) => t.texto)).toEqual([secciones[i].titulo]);
       expect(cara.seccion).toBe(secciones[i].clave);
       expect(nombresEn(cara)).toEqual(secciones[i].grupos[0].elementos.map((e) => e.nombre));
-      expect(cara.desborda).toBeUndefined();
     });
     expect(informe.map((s) => [s.clave, s.caras, s.cabe])).toEqual(secciones.map((s) => [s.clave, 1, true]));
-    // Portada, seis caras y contraportada: sin páginas en blanco entre secciones.
+    // Portada, seis páginas y contraportada: sin páginas en blanco entre secciones.
     expect(paginas).toHaveLength(8);
   });
 
-  it.each(TAMANOS)("en %s todo cabe dentro de los márgenes de la hoja (≥ 12 mm) y no se pisa nada, también con nombres y descripciones largos", (tamano) => {
-    const entrantes = seccion("ENTRANTES", 18);
-    entrantes.grupos[0].elementos.splice(3, 0, {
-      ...elemento(
-        "Tataki de chuleta de vaca madurada sesenta días con pimiento caramelizado, salsa de sésamo tostado y brotes",
-        "Chuleta de vaca marcada por fuera y roja por dentro, con pimiento caramelizado a fuego lento, salsa de sésamo tostado, brotes tiernos y un toque de lima, como la servimos en la barra desde hace años.",
-      ),
-      unidad: "100 g",
-    });
-    const secciones = [seccion("NOVEDADES", 9), entrantes, seccion("CARNES", 2)];
-    const { paginas } = maquetarCarta(medidor, contenido(secciones), tamano);
-    const formato = FORMATOS[tamano];
-    for (const pagina of interiores(paginas)) {
-      // La cabecera y el número de página van, a propósito, en el margen.
-      const contenidoPagina = textos(pagina).filter((t) => t.texto !== String(pagina.numero) && !t.texto.startsWith("CASA TOMÁS ·"));
-      const cajas = contenidoPagina.map((t) => ({ t, x0: t.x, x1: t.x + medidor.ancho(t.texto, t.fuente, t.tamano, t.espaciado), y0: t.y - 0.7 * t.tamano, y1: t.y + 0.2 * t.tamano }));
-      for (const caja of cajas) {
-        expect(caja.x0).toBeGreaterThanOrEqual(mm(12) - 0.01);
-        expect(caja.x1).toBeLessThanOrEqual(formato.ancho - mm(12) + 0.01);
-        expect(caja.y0).toBeGreaterThanOrEqual(mm(12) - 0.01);
-        expect(caja.y1).toBeLessThanOrEqual(formato.alto - mm(12) + 0.01);
-      }
-      // Solo cuenta lo que no son números de alérgenos (que van pegados, voladitos, al nombre).
-      const cuerpo = cajas.filter((c) => c.t.tamano >= 8);
-      for (let i = 0; i < cuerpo.length; i++)
-        for (let j = i + 1; j < cuerpo.length; j++) {
-          const [a, b] = [cuerpo[i], cuerpo[j]];
-          const pisan = a.x0 < b.x1 - 0.3 && b.x0 < a.x1 - 0.3 && a.y0 < b.y1 - 0.3 && b.y0 < a.y1 - 0.3;
-          expect(pisan, `«${a.t.texto}» y «${b.t.texto}» en la página ${pagina.numero}`).toBe(false);
+  it("una sección que no cabe en una página sigue en las siguientes, con su título y «(continuación)», y la siguiente empieza en página nueva", () => {
+    const larga = seccion("PESCADOS", 45);
+    const { paginas, secciones } = maquetarCarta(medidor, contenido([seccion("CARNES", 3), larga, seccion("POSTRES", 2)]));
+    const caras = interiores(paginas);
+    const deLarga = caras.filter((p) => p.seccion === "PESCADOS");
+    expect(deLarga.length).toBeGreaterThan(1);
+    // En orden y sin mezclarse: CARNES, todas las de PESCADOS, POSTRES.
+    expect(caras.map((p) => p.seccion)).toEqual(["CARNES", ...deLarga.map(() => "PESCADOS"), "POSTRES"]);
+    for (const cara of caras) expect(new Set(titulosEn(cara).map((t) => t.texto)).size).toBe(1);
+    expect(deLarga.slice(1).every((p) => textos(p).some((t) => t.texto === "(continuación)"))).toBe(true);
+    expect(textos(deLarga[0]).some((t) => t.texto === "(continuación)")).toBe(false);
+    // Cada plato una vez, en orden, y nada marcado como que no cabe.
+    expect(deLarga.flatMap(nombresEn)).toEqual(larga.grupos[0].elementos.map((e) => e.nombre));
+    expect(caras.every((p) => !p.desborda)).toBe(true);
+    expect(secciones.find((s) => s.clave === "PESCADOS")).toMatchObject({ cabe: true, caras: deLarga.length, pagina: 2 });
+    expect(seccionesQueNoCaben({ paginas, secciones })).toEqual([]);
+  });
+
+  it("si no cabe en una página no se aprieta: letra de diseño y páginas equilibradas", () => {
+    const { paginas, secciones } = maquetarCarta(medidor, contenido([seccion("PESCADOS", 45)]));
+    expect(secciones[0].cuerpo).toBe(10.5);
+    const caras = interiores(paginas);
+    const platos = caras.map((p) => nombresEn(p).length);
+    // Ninguna página con menos de la mitad de platos que la más llena.
+    expect(Math.min(...platos)).toBeGreaterThanOrEqual(Math.max(...platos) / 2);
+  });
+
+  it("siempre a una columna: un plato debajo de otro", () => {
+    for (const tamano of TAMANOS) {
+      for (const tipo of ["platos", "vinos"] as const) {
+        const datos = tipo === "vinos" ? [tipoVino("TINTOS", 12, 6)] : [seccion("MARISCOS", 40)];
+        for (const pagina of interiores(maquetarCarta(medidor, contenido(datos, tipo), tamano).paginas)) {
+          expect(new Set(lineasNombre(pagina).map((t) => Math.round(t.x))).size, `${tamano} ${tipo}`).toBe(1);
+          // Cada plato, más abajo que el anterior.
+          const ys = preciosEn(pagina).map((t) => t.y);
+          expect(ys).toEqual([...ys].sort((a, b) => a - b));
         }
+      }
     }
+  });
+
+  for (const horizontal of ALINEACIONES_HORIZONTALES) {
+    it.each(TAMANOS)(`alineado a la ${horizontal}, en %s todo cabe dentro de los márgenes (≥ 12 mm) y no se pisa nada, también con nombres y descripciones largos`, (tamano) => {
+      const entrantes = seccion("ENTRANTES", 30);
+      entrantes.grupos[0].elementos.splice(3, 0, {
+        ...elemento(
+          "Tataki de chuleta de vaca madurada sesenta días con pimiento caramelizado, salsa de sésamo tostado y brotes",
+          "Chuleta de vaca marcada por fuera y roja por dentro, con pimiento caramelizado a fuego lento, salsa de sésamo tostado, brotes tiernos y un toque de lima, como la servimos en la barra desde hace años.",
+        ),
+        unidad: "100 g",
+      });
+      const vinos = tipoVino("TINTOS", 10, 6);
+      vinos.grupos[0].elementos[0] = { ...vinos.grupos[0].elementos[0], copa: "Copa 6,50 €", precio: "Consultar precio" };
+      for (const datos of [contenido([seccion("NOVEDADES", 9), entrantes, seccion("CARNES", 2)]), contenido([vinos], "vinos")]) {
+        const { paginas } = maquetarCarta(medidor, datos, tamano, { alineacion: { horizontal } });
+        const formato = FORMATOS[tamano];
+        for (const pagina of interiores(paginas)) {
+          // La cabecera y el número de página van, a propósito, en el margen.
+          const cuerpo = textos(pagina).filter((t) => t.texto !== String(pagina.numero) && !t.texto.startsWith("CASA TOMÁS ·"));
+          const cajas = cuerpo.map((t) => ({ t, x0: t.x, x1: t.x + anchoDe(t), y0: t.y - 0.7 * t.tamano, y1: t.y + 0.2 * t.tamano }));
+          for (const caja of cajas) {
+            expect(caja.x0).toBeGreaterThanOrEqual(mm(12) - 0.01);
+            expect(caja.x1).toBeLessThanOrEqual(formato.ancho - mm(12) + 0.01);
+            expect(caja.y0).toBeGreaterThanOrEqual(mm(12) - 0.01);
+            expect(caja.y1).toBeLessThanOrEqual(formato.alto - mm(12) + 0.01);
+          }
+          // Los números de alérgenos van pegados, voladitos, al nombre: no cuentan.
+          const grandes = cajas.filter((c) => c.t.tamano >= 8);
+          for (let i = 0; i < grandes.length; i++)
+            for (let j = i + 1; j < grandes.length; j++) {
+              const [a, b] = [grandes[i], grandes[j]];
+              const pisan = a.x0 < b.x1 - 0.3 && b.x0 < a.x1 - 0.3 && a.y0 < b.y1 - 0.3 && b.y0 < a.y1 - 0.3;
+              expect(pisan, `«${a.t.texto}» y «${b.t.texto}» en la página ${pagina.numero}`).toBe(false);
+            }
+        }
+      }
+    });
+  }
+
+  it("a la izquierda, nombres al margen izquierdo y precios al derecho; a la derecha, todo al margen derecho; al centro, centrado", () => {
+    const datos = contenido([seccion("CARNES", 4)]);
+    const formato = FORMATOS.A5;
+    const pagina = (alineacion: Partial<Alineacion>) => interiores(maquetarCarta(medidor, datos, "A5", { alineacion }).paginas)[0];
+    const margen = formato.variantes.platos[0].lateral;
+    const derecho = formato.ancho - margen;
+    const centro = formato.ancho / 2;
+
+    const izquierda = pagina({ horizontal: "izquierda" });
+    expect(lineasNombre(izquierda).every((t) => Math.abs(t.x - margen) < 0.01)).toBe(true);
+    expect(preciosEn(izquierda).every((t) => Math.abs(t.x + anchoDe(t) - derecho) < 0.01)).toBe(true);
+    expect(titulosEn(izquierda)[0].x).toBeCloseTo(margen, 2);
+
+    const derecha = pagina({ horizontal: "derecha" });
+    expect(preciosEn(derecha).every((t) => Math.abs(t.x + anchoDe(t) - derecho) < 0.01)).toBe(true);
+    // El nombre (con sus alérgenos) termina justo antes del precio, no al margen izquierdo.
+    expect(lineasNombre(derecha).every((t) => t.x > margen + 20)).toBe(true);
+    const titulo = titulosEn(derecha)[0];
+    expect(titulo.x + anchoDe(titulo)).toBeCloseTo(derecho, 2);
+    const detalles = textos(derecha).filter((t) => t.fuente === "italica");
+    expect(detalles.every((t) => Math.abs(t.x + anchoDe(t) - derecho) < 0.01)).toBe(true);
+
+    const centrada = pagina({ horizontal: "centro" });
+    const tituloCentro = titulosEn(centrada)[0];
+    expect(tituloCentro.x + anchoDe(tituloCentro) / 2).toBeCloseTo(centro, 2);
+    expect(textos(centrada).filter((t) => t.fuente === "italica").every((t) => Math.abs(t.x + anchoDe(t) / 2 - centro) < 0.01)).toBe(true);
+    // Nombre, alérgenos y precio forman una línea centrada.
+    const nombre = lineasNombre(centrada)[0];
+    const precio = preciosEn(centrada)[0];
+    expect((nombre.x + precio.x + anchoDe(precio)) / 2).toBeCloseTo(centro, 1);
+    // Sin puntos guía fuera de la alineación a la izquierda.
+    expect(centrada.trazos.some((t) => t.tipo === "linea" && t.puntos)).toBe(false);
+    expect(izquierda.trazos.some((t) => t.tipo === "linea" && t.puntos)).toBe(true);
+  });
+
+  it.each(TAMANOS)("en %s una sección corta guarda la letra y el aire de diseño y va arriba, en el centro o abajo, sin estirarse", (tamano) => {
+    const corta = (vertical: Alineacion["vertical"]) => interiores(maquetarCarta(medidor, contenido([seccion("ARROCES", 3)]), tamano, { alineacion: { vertical } }).paginas)[0];
+    const larga = interiores(maquetarCarta(medidor, contenido([seccion("ARROCES", 8)]), tamano).paginas)[0];
+    const [arriba, centro, abajo] = [corta("arriba"), corta("centro"), corta("abajo")];
+    // Mismo cuerpo y misma distancia entre platos que en una sección más larga: no se reparte el blanco.
+    for (const pagina of [arriba, centro, abajo]) {
+      expect(lineasNombre(pagina)[0].tamano).toBe(lineasNombre(larga)[0].tamano);
+      expect(lineasNombre(pagina)[1].y - lineasNombre(pagina)[0].y).toBeCloseTo(lineasNombre(larga)[1].y - lineasNombre(larga)[0].y, 5);
+    }
+    const formato = FORMATOS[tamano];
+    const y0 = formato.variantes.platos[0].superior;
+    const y1 = formato.alto - formato.variantes.platos[0].inferior;
+    const tituloY = (p: PaginaCarta) => titulosEn(p)[0].y;
+    const ultimaY = (p: PaginaCarta) => Math.max(...textos(p).filter((t) => t.fuente === "italica").map((t) => t.y));
+    expect(tituloY(arriba) - y0).toBeLessThan(20);
+    expect(y1 - ultimaY(abajo)).toBeLessThan(10);
+    expect(tituloY(centro)).toBeGreaterThan(tituloY(arriba) + 20);
+    expect(tituloY(abajo)).toBeGreaterThan(tituloY(centro) + 20);
   });
 
   it("una sección vacía no tiene página", () => {
@@ -141,116 +249,59 @@ describe("maquetarCarta: una sección por cara", () => {
     expect(secciones.map((s) => s.clave)).toEqual(["CARNES", "POSTRES"]);
   });
 
-  it.each(TAMANOS)("en %s una sección corta guarda la letra y el aire de diseño y se centra, sin estirarse", (tamano) => {
-    const corta = interiores(maquetarCarta(medidor, contenido([seccion("ARROCES", 3)]), tamano).paginas)[0];
-    const larga = interiores(maquetarCarta(medidor, contenido([seccion("ARROCES", 8)]), tamano).paginas)[0];
-    const filas = (pagina: PaginaCarta) => textos(pagina).filter((t) => t.fuente === "seminegrita" && mismoColor(t.color, COLORES.pizarra));
-    // Mismo cuerpo y misma distancia entre platos que en una sección más larga: no se reparte el blanco.
-    expect(filas(corta)[0].tamano).toBe(filas(larga)[0].tamano);
-    expect(filas(corta)[1].y - filas(corta)[0].y).toBeCloseTo(filas(larga)[1].y - filas(larga)[0].y, 5);
-    // Centrada: el título, más abajo que el de una larga, y el bloque, alrededor del centro de la hoja.
-    const titulo = (pagina: PaginaCarta) => textos(pagina).find((t) => t.texto === "ARROCES")!.y;
-    expect(titulo(corta)).toBeGreaterThan(titulo(larga) + 20);
-    const ultimo = filas(corta)[filas(corta).length - 1].y;
-    expect((titulo(corta) + ultimo) / 2).toBeLessThan(FORMATOS[tamano].alto / 2);
-    expect((titulo(corta) + ultimo) / 2).toBeGreaterThan(FORMATOS[tamano].alto * 0.35);
-  });
-
-  it.each(TAMANOS)("en %s una sección larga se compacta para caber en su cara sin bajar del cuerpo mínimo", (tamano) => {
+  it.each(TAMANOS)("en %s una sección algo larga se compacta para caber en una página sin bajar del cuerpo mínimo", (tamano) => {
     const larga = seccion("MARISCOS", tamano === "A5" ? 18 : 22);
     const { paginas, secciones } = maquetarCarta(medidor, contenido([larga]), tamano);
     expect(interiores(paginas)).toHaveLength(1);
     expect(secciones[0]).toMatchObject({ cabe: true, caras: 1 });
-    const disenoPlato = 10.5 * FORMATOS[tamano].escala.platos;
-    expect(secciones[0].cuerpo).toBeLessThan(disenoPlato);
+    expect(secciones[0].cuerpo).toBeLessThan(10.5 * FORMATOS[tamano].escala.platos);
     expect(secciones[0].cuerpo).toBeGreaterThanOrEqual(CUERPO_MINIMO.nombre);
     expect(nombresEn(interiores(paginas)[0])).toHaveLength(larga.grupos[0].elementos.length);
   });
 
-  it("si no cabe ni compactada, avisa con la sección y no la reparte sola: una cara marcada", () => {
-    const enorme = seccion("PESCADOS", 60);
-    const { paginas, secciones } = maquetarCarta(medidor, contenido([seccion("CARNES", 3), enorme]));
-    const caras = interiores(paginas);
-    expect(caras.map((p) => p.seccion)).toEqual(["CARNES", "PESCADOS"]);
-    expect(caras[1].desborda).toBe(true);
-    expect(caras[0].desborda).toBeUndefined();
-    const informe = seccionesQueNoCaben({ paginas, secciones });
-    expect(informe).toHaveLength(1);
-    expect(informe[0]).toMatchObject({ clave: "PESCADOS", cabe: false, caras: 1, elementos: 60, pagina: 2 });
-    expect(informe[0].carasNecesarias).toBeGreaterThan(1);
-    expect(informe[0].caben).toBeGreaterThan(0);
-    expect(informe[0].caben).toBeLessThan(60);
-    // Nada de «(continuación)» si no se ha pedido.
-    expect(caras.some((p) => textos(p).some((t) => t.texto === "(continuación)"))).toBe(false);
-  });
-
-  it("repartida a petición: las caras necesarias, con «(continuación)», y cada plato una vez", () => {
-    const enorme = seccion("PESCADOS", 60);
-    const sin = maquetarCarta(medidor, contenido([enorme]));
-    const con = maquetarCarta(medidor, contenido([enorme]), "A5", { repartir: ["PESCADOS"] });
-    const caras = interiores(con.paginas);
-    expect(caras).toHaveLength(sin.secciones[0].carasNecesarias);
-    expect(con.secciones[0]).toMatchObject({ cabe: true, repartida: true, caras: caras.length });
-    expect(caras.every((p) => !p.desborda && titulosEn(p).join() === "PESCADOS")).toBe(true);
-    expect(caras.slice(1).every((p) => textos(p).some((t) => t.texto === "(continuación)"))).toBe(true);
-    expect(caras.flatMap(nombresEn)).toEqual(enorme.grupos[0].elementos.map((e) => e.nombre));
-  });
-
-  it("los vinos: cada tipo en su cara en A5 y en A4, y en A4 a varias columnas con letra mayor", () => {
+  it("los vinos: cada tipo en sus páginas en A5 y en A4, y el A4 con más letra", () => {
     const vinos = contenido([tipoVino("TINTOS", 3, 4), tipoVino("BLANCOS", 2, 3), tipoVino("ROSADOS", 1, 2)], "vinos");
     for (const tamano of TAMANOS) {
-      expect(interiores(maquetarCarta(medidor, vinos, tamano).paginas).map(titulosEn)).toEqual([["TINTOS"], ["BLANCOS"], ["ROSADOS"]]);
+      expect(interiores(maquetarCarta(medidor, vinos, tamano).paginas).map((p) => titulosEn(p).map((t) => t.texto))).toEqual([["TINTOS"], ["BLANCOS"], ["ROSADOS"]]);
     }
-    const largos = contenido([tipoVino("TINTOS", 6, 5)], "vinos");
-    const a5 = maquetarCarta(medidor, largos, "A5");
-    const a4 = maquetarCarta(medidor, largos, "A4");
+    const a5 = maquetarCarta(medidor, vinos, "A5");
+    const a4 = maquetarCarta(medidor, vinos, "A4");
     expect(a4.paginas[0].ancho).toBeCloseTo(595.28, 2);
     expect(a4.paginas[0].alto).toBeCloseTo(841.89, 2);
-    expect(a4.secciones[0].cabe).toBe(true);
-    expect(a4.secciones[0].columnas).toBeGreaterThanOrEqual(2);
-    const columnas = new Set(nombresEn(a4.paginas[1]).length ? textos(a4.paginas[1]).filter((t) => t.fuente === "seminegrita" && mismoColor(t.color, COLORES.pizarra)).map((t) => Math.round(t.x)) : []);
-    expect(columnas.size).toBe(a4.secciones[0].columnas);
-    // El A4 no es el A5 a escala: con el mismo contenido, más letra.
     expect(a4.secciones[0].cuerpo).toBeGreaterThan(a5.secciones[0].cuerpo);
   });
 
-  it("una denominación nunca se queda sola al pie de una columna, y si sigue en la siguiente lo dice", () => {
-    const vinos = contenido([tipoVino("TINTOS", 6, 5)], "vinos");
+  it("una denominación nunca se queda sola al pie, y si sigue en la página siguiente lo dice", () => {
+    const vinos = contenido([tipoVino("TINTOS", 14, 5)], "vinos");
     for (const tamano of TAMANOS) {
-      const { paginas, secciones } = maquetarCarta(medidor, vinos, tamano);
-      expect(secciones[0].cabe).toBe(true);
-      const cara = interiores(paginas)[0];
-      const cabeceras = textos(cara).filter((t) => t.fuente === "italica" && mismoColor(t.color, COLORES.oro));
-      for (const cabecera of cabeceras) {
-        // Debajo, en la misma columna, al menos dos vinos (todas las denominaciones tienen cinco).
-        const debajo = nombresEn({ ...cara, trazos: textos(cara).filter((t) => Math.abs(t.x - cabecera.x) < 1 && t.y > cabecera.y) });
-        expect(debajo.length, `${tamano} «${cabecera.texto}»`).toBeGreaterThanOrEqual(2);
-      }
-      const nombres = textos(cara).filter((t) => t.fuente === "seminegrita" && mismoColor(t.color, COLORES.pizarra));
-      const columnasConVinos = new Set(nombres.map((t) => Math.round(t.x)));
-      if (columnasConVinos.size > 1) {
-        // Cada columna empieza con su denominación (nueva o «(continuación)»).
-        for (const x of columnasConVinos) {
-          const primeroColumna = Math.min(...nombres.filter((t) => Math.round(t.x) === x).map((t) => t.y));
-          expect(cabeceras.some((c) => Math.round(c.x) === x && c.y < primeroColumna)).toBe(true);
+      const caras = interiores(maquetarCarta(medidor, vinos, tamano).paginas);
+      expect(caras.length).toBeGreaterThan(1);
+      for (const cara of caras) {
+        const cabeceras = textos(cara).filter((t) => t.fuente === "italica" && mismoColor(t.color, COLORES.oro));
+        const nombres = lineasNombre(cara);
+        for (const cabecera of cabeceras) {
+          // Debajo, al menos dos vinos (o los que queden de una denominación que sigue).
+          const debajo = nombres.filter((t) => t.y > cabecera.y);
+          expect(debajo.length, `${tamano} «${cabecera.texto}»`).toBeGreaterThanOrEqual(cabecera.texto.includes("(continuación)") ? 1 : 2);
         }
+        // Cada página empieza con su denominación (nueva o «(continuación)»).
+        const primero = Math.min(...nombres.map((t) => t.y));
+        expect(cabeceras.some((c) => c.y < primero), `${tamano} página ${cara.numero}`).toBe(true);
       }
     }
   });
 
-  it("no parte palabras por letras: si en columnas estrechas no caben, usa otra composición", () => {
-    // 40 letras: más ancha que una columna de las tres del A4, cabe en una de dos.
-    const largo: ElementoCarta = { ...elemento("Supercalifragilisticoespialidosisimament Reserva", "Zona"), precio: "Consultar precio" };
-    const seccionLarga: SeccionCarta = {
+  it("no parte palabras por letras: si una no cabe ni en una página entera, la sección sale marcada y no se descarga", () => {
+    const imposible: SeccionCarta = {
       clave: "TINTOS",
       titulo: "TINTOS",
-      grupos: [{ titulo: "D.O. Larga", elementos: [largo, ...Array.from({ length: 50 }, (_, i) => elemento(`Vino ${i + 1}`, "Zona"))] }],
+      grupos: [{ titulo: null, elementos: [elemento(`Vino${"x".repeat(90)}`, "Zona"), elemento("Vino normal", "Zona")] }],
     };
-    const { paginas } = maquetarCarta(medidor, contenido([seccionLarga], "vinos"), "A4", { repartir: ["TINTOS"] });
-    const palabras = new Set(seccionLarga.grupos[0].elementos.flatMap((e) => e.nombre.split(" ")));
-    const lineas = interiores(paginas).flatMap(nombresEn);
-    expect(lineas).toContain("Supercalifragilisticoespialidosisimament");
-    for (const linea of lineas) for (const palabra of linea.split(" ")) expect(palabras.has(palabra), `«${palabra}»`).toBe(true);
+    const maqueta = maquetarCarta(medidor, contenido([seccion("BLANCOS", 2), imposible], "vinos"));
+    const caras = interiores(maqueta.paginas);
+    expect(caras.find((p) => p.seccion === "BLANCOS")?.desborda).toBeUndefined();
+    expect(caras.filter((p) => p.seccion === "TINTOS").every((p) => p.desborda)).toBe(true);
+    expect(seccionesQueNoCaben(maqueta).map((s) => s.clave)).toEqual(["TINTOS"]);
   });
 
   it("el cuerpo mínimo: nombres y precios de 9 pt o más, descripciones de 8 pt o más, y márgenes de 12 mm o más", () => {
@@ -263,13 +314,11 @@ describe("maquetarCarta: una sección por cara", () => {
           expect(Math.min(variante.lateral, variante.superior, variante.inferior)).toBeGreaterThanOrEqual(mm(12) - 1e-9);
         }
       }
-      // Con la sección más apretada que aún cabe, la letra sigue por encima del mínimo.
-      const { paginas } = maquetarCarta(medidor, contenido([seccion("CARNES", tamano === "A5" ? 24 : 34)]), tamano);
+      // Con la sección más apretada que aún cabe en una página, la letra sigue por encima del mínimo.
+      const { paginas } = maquetarCarta(medidor, contenido([seccion("CARNES", tamano === "A5" ? 18 : 22)]), tamano);
       const cuerpo = interiores(paginas).flatMap(textos);
-      const nombres = cuerpo.filter((t) => t.fuente === "seminegrita" && t.texto.length > 3);
-      const descripciones = cuerpo.filter((t) => t.fuente === "italica" && t.texto.length > 3);
-      expect(Math.min(...nombres.map((t) => t.tamano))).toBeGreaterThanOrEqual(CUERPO_MINIMO.nombre - 1e-9);
-      expect(Math.min(...descripciones.map((t) => t.tamano))).toBeGreaterThanOrEqual(CUERPO_MINIMO.detalle - 1e-9);
+      expect(Math.min(...cuerpo.filter((t) => t.fuente === "seminegrita" && t.texto.length > 3).map((t) => t.tamano))).toBeGreaterThanOrEqual(CUERPO_MINIMO.nombre - 1e-9);
+      expect(Math.min(...cuerpo.filter((t) => t.fuente === "italica" && t.texto.length > 3).map((t) => t.tamano))).toBeGreaterThanOrEqual(CUERPO_MINIMO.detalle - 1e-9);
     }
   });
 });
