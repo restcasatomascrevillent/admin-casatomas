@@ -999,6 +999,14 @@ function pageTokenInvalido(): string {
 //
 // En error (4xx/5xx) el cuerpo sigue siendo `{ ok:false, error }`: hay
 // que comprobar `response.ok` ANTES de mapear.
+// GET /salud — sonda de keep-warm (CT-REM-FN-07c). Sin BD y sin secretos: solo
+// mantiene caliente el isolate de la función para evitar el arranque en frío
+// (~22 s en la 1.ª petición tras un rato de inactividad). La llama el cron
+// `reservas-web-keep-warm` (migración 20261119120000). No revela nada.
+function handleSalud(): Response {
+  return json({ ok: true, servicio: "reservas-web" });
+}
+
 async function handleDisponibilidad(req: Request): Promise<Response> {
   if (!checkSharedSecret(req)) return json({ ok: false, error: "unauthorized" }, 401);
   let body: Record<string, unknown>;
@@ -1845,6 +1853,7 @@ serve(conAuditoriaDePeticion("reservas-web", createClientBase, async (req: Reque
       case "confirmar": return await handleConfirmar(req);
       case "cancelar": return await handleCancelarPreview(req);
       case "cancelar/ejecutar": return await handleCancelarEjecutar(req);
+      case "salud": return handleSalud();
       default: return json({ ok: false, error: "not_found", route: rutaDelPath(pathname) }, 404);
     }
   } catch (err) {
