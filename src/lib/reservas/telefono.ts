@@ -71,3 +71,14 @@ export function enlaceTelefono(telefono: string | null | undefined): string | nu
   const f = formatearTelefonoReserva(telefono);
   return f ? `tel:${f.replace(/\s/g, "")}` : null;
 }
+
+/** Para la Lista (10/11/2026, petición del dueño): un español de 9 cifras en grupos de tres, "606 838 152";
+ * otro -> "+<cifras>"; si no son cifras, tal cual. Vacío -> null. */
+export function telefonoEnGrupos(telefono: string | null | undefined): string | null {
+  const bruto = (telefono ?? "").trim();
+  if (!bruto) return null;
+  const n = normalizarTelefono(bruto);
+  if (!/^\d+$/.test(n)) return bruto;
+  if (n.length === 9) return `${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}`;
+  return n.length > 9 ? `+${n}` : n;
+}

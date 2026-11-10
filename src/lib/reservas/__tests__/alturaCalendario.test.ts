@@ -78,7 +78,7 @@ describe("medirCasilla", () => {
   it("la cifra crece con la fila pero tiene tope y suelo", () => {
     const f = (alto: number) => medirCasilla({ ancho: 400, alto }).fuenteComensales;
     expect(f(110)).toBeLessThanOrEqual(f(400));
-    expect(f(400)).toBeLessThanOrEqual(40);
+    expect(f(400)).toBeLessThanOrEqual(44);
     expect(medirCasilla({ ancho: 100, alto: 44 }).fuenteComensales).toBeGreaterThanOrEqual(16);
   });
 

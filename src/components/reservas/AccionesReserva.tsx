@@ -15,20 +15,17 @@
 // «Mover») tiene sus propios botones (kanban + `ControlLlegada`): las dos leen la
 // misma fuente de verdad pero NO comparten botonera (decisión del dueño).
 //
-// UNA ACCIÓN CLARA + «MÁS» (10/11/2026, petición del dueño: «hay que limpiarlo
-// de botones para que quede claro lo que se tiene que hacer, y los botones de
-// acción y las cosas más grandes»)
+// LOS BOTONES A LA VISTA (10/11/2026, peticiones del dueño: «hay que limpiarlo
+// de botones para que quede claro lo que se tiene que hacer» y después «no
+// pongas el Más, que se vean los botones»)
 // ----------------------------------------------------------------------------
-//   [casilla] · principal (grande, con texto) · «⋯ Más»
-// Antes eran seis ranuras fijas de icono, con lo que no aplicaba deshabilitado.
-// Ahora solo se ve la acción que toca; si no hay ninguna, un hueco del mismo
-// ancho (nunca un botón deshabilitado de algo ya hecho), así «Más» cae en la
-// misma X. En «Más», con texto, solo lo que se puede usar: dar mesa, verificar,
-// editar/gestionar y, al final y en rojo, cancelar y lista negra. Las filas de
-// SOLICITUD del bot usan el mismo molde (`RanurasDeAcciones`).
+//   principal (verde) · dar mesa · editar  |  cancelar · lista negra (rojo)
+// Solo los que se pueden usar en esa fila (nada deshabilitado ni hueco), con
+// texto, 48 px y `flex-wrap`. En la Lista van debajo del nombre y el teléfono.
+// Las filas de SOLICITUD del bot usan el mismo molde (`RanurasDeAcciones`).
 //
-//   · principal   «Aceptar» si está pendiente y «Confirmar» si está verificada;
-//                 en el resto no hay.
+//   · principal   «Verificar» si está pendiente (abre el diálogo con el día) y
+//                 «Confirmar» si está verificada; en el resto no hay.
 //   · dar mesa    lo decide `resolverSaltoAsignacion` (compartido con Hoy), no
 //                 `accionesDisponibles`.
 //   · editar      el lápiz. Su texto empieza por «Gestionar» porque «Dar mesa» sin
@@ -51,7 +48,6 @@ import {
   CheckCircle,
   ClipboardCheck,
   Loader2,
-  MoreHorizontal,
   Settings2,
   ShieldBan,
   SquarePen,
@@ -60,13 +56,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { accionesDisponibles, type AccionReserva, type EstadoAccion } from "@/lib/reservas/accionesReserva";
 import { resolverSaltoAsignacion, type DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
@@ -98,59 +87,19 @@ export type AlPulsar = Partial<Record<AccionReserva, () => void>>;
 /** Texto de «Dar mesa» cuando la pantalla que monta la lista no lleva a ningún plano de sala. */
 export const TITULO_DAR_MESA_SIN_PLANO = "Dar mesa: esta pantalla no lleva al plano de sala";
 
-/**
- * Ancho FIJO de la acción principal (o de su hueco cuando no hay): así el botón «Más» cae en la misma X en
- * todas las filas. Cabe «Confirmar» / «Convertir» con su icono a 16 px. La columna de acciones de la Lista
- * cuenta con él (`ANCHO_ACCIONES` en ListaReservasAvanzada.tsx).
- */
-const ANCHO_PRINCIPAL = "w-[9.5rem]";
+/** Los botones de acción: 48 px de alto, texto a 16 px (10/11/2026, petición del dueño). */
+const BOTON = "h-12 shrink-0 gap-2 px-4 text-base [&_svg]:size-5";
 
 /**
- * Acción PRINCIPAL de la fila: la única a la vista, grande y con texto, para que se vea de un vistazo qué
- * toca hacer. Si no hay nada que hacer (reserva ya confirmada, solicitud cerrada) NO se pinta ningún botón
- * deshabilitado (10/11/2026, petición del dueño): queda un hueco del mismo ancho. Sin `aria-label`: su
- * nombre accesible es su texto.
- */
-function AccionPrincipal({
-  etiqueta,
-  titulo,
-  onClick,
-  cargando,
-  children,
-}: {
-  etiqueta: string;
-  titulo: string;
-  onClick?: () => void;
-  cargando?: boolean;
-  children: ReactNode;
-}) {
-  if (!onClick && !cargando) return <span aria-hidden className={cn("shrink-0", ANCHO_PRINCIPAL)} data-testid="sin-accion-principal" />;
-  return (
-    <Button
-      type="button"
-      title={titulo}
-      disabled={!onClick}
-      onClick={onClick}
-      className={cn("h-[52px] shrink-0 justify-center gap-2 px-4 text-[17px] font-semibold [&_svg]:size-5", ANCHO_PRINCIPAL)}
-    >
-      {cargando ? <Loader2 className="animate-spin" /> : children}
-      {etiqueta}
-    </Button>
-  );
-}
-
-/**
- * Hueco de ancho fijo para la casilla de selección, dentro de la celda de
- * acciones (y en su cabecera, con la de «seleccionar todas»). Se pinta siempre
- * que haya permiso —vacío cuando la fila no es seleccionable— para que los
- * botones de todas las filas empiecen en la misma X.
+ * Hueco de ancho fijo para la casilla de «aceptar en bloque» (primera columna de la tabla y su cabecera, con
+ * «seleccionar todas»).
  */
 export function RanuraSeleccion({ children }: { children?: ReactNode }) {
   return <span className="inline-flex w-6 shrink-0 items-center justify-center">{children}</span>;
 }
 
-/** Una opción del menú «Más»: solo las que se pueden usar en esa fila. */
-interface OpcionMas {
+/** Un botón de la fila: solo los que se pueden usar en esa fila. */
+interface BotonAccion {
   clave: string;
   texto: string;
   titulo: string;
@@ -161,24 +110,23 @@ interface OpcionMas {
 }
 
 /**
- * El MOLDE de la celda de acciones, el mismo para reservas y solicitudes (10/11/2026, petición del dueño:
- * «hay que limpiarlo de botones para que quede claro lo que se tiene que hacer, y los botones de acción y
- * las cosas más grandes»): casilla (si hay) · la acción principal grande con texto · «⋯ Más». En «Más», con
- * texto, solo lo que se puede usar en esa fila: dar mesa, verificar, gestionar/editar y, al final y en
- * rojo, cancelar y lista negra (cada una con la confirmación que ya tenía). Lo que no aplica no sale.
+ * El MOLDE de las acciones de una fila, el mismo para reservas y solicitudes.
+ *
+ * 10/11/2026, petición del dueño: «no pongas el Más, que se vean los botones». Todas las acciones que se pueden
+ * usar en esa fila van a la vista, con texto y en este orden: la principal en verde («Verificar», «Confirmar»,
+ * «Convertir»), «Dar mesa», «Editar» / «Gestionar» y, al final y separadas, en rojo contorneado, «Cancelar» y
+ * «Lista negra» (cada una con la confirmación que ya tenía). Lo que no aplica NO sale (nada deshabilitado). Si no
+ * caben en una línea, pasan a la siguiente (`flex-wrap`) antes que esconderse.
  */
 export function RanurasDeAcciones({
-  seleccion,
   principal,
   darMesa,
   verificar,
   gestionar,
   cancelar,
   listaNegra,
-  nombre,
+  className,
 }: {
-  /** `undefined` = no hay ranura de selección en toda la lista (sin permiso de edición). */
-  seleccion?: ReactNode;
   principal: RanuraAccion & { etiqueta: string; icono: ReactNode };
   /** Salto al plano de SU sala, en SU día, con la reserva señalada. */
   darMesa: RanuraAccion;
@@ -187,10 +135,9 @@ export function RanurasDeAcciones({
   gestionar: RanuraAccion & { icono?: ReactNode; etiqueta?: string };
   cancelar: RanuraAccion;
   listaNegra: RanuraAccion;
-  /** Para el nombre accesible de «Más» («Más acciones de Ana»). */
-  nombre?: string | null;
+  className?: string;
 }) {
-  const todas: OpcionMas[] = [
+  const todas: BotonAccion[] = [
     { clave: "darMesa", texto: "Dar mesa", titulo: darMesa.titulo, icono: <Armchair />, onClick: darMesa.onClick },
     { clave: "verificar", texto: "Verificar", titulo: verificar.titulo, icono: <ClipboardCheck />, onClick: verificar.onClick },
     {
@@ -202,7 +149,7 @@ export function RanurasDeAcciones({
     },
     {
       clave: "cancelar",
-      texto: cancelar.cargando ? "Cancelando…" : "Cancelar reserva",
+      texto: cancelar.cargando ? "Cancelando…" : "Cancelar",
       titulo: cancelar.titulo,
       icono: cancelar.cargando ? <Loader2 className="animate-spin" /> : <XCircle />,
       onClick: cancelar.onClick,
@@ -211,53 +158,52 @@ export function RanurasDeAcciones({
     },
     { clave: "listaNegra", texto: "Lista negra", titulo: listaNegra.titulo, icono: <ShieldBan />, onClick: listaNegra.onClick, destructiva: true },
   ];
-  const opciones = todas.filter((o) => o.onClick || o.cargando);
-  const normales = opciones.filter((o) => !o.destructiva);
-  const destructivas = opciones.filter((o) => o.destructiva);
+  const visibles = todas.filter((o) => o.onClick || o.cargando);
+  const normales = visibles.filter((o) => !o.destructiva);
+  const destructivas = visibles.filter((o) => o.destructiva);
+  const hayPrincipal = !!principal.onClick || !!principal.cargando;
+  if (!hayPrincipal && !visibles.length) return null;
 
-  const item = (o: OpcionMas) => (
-    <DropdownMenuItem
+  const boton = (o: BotonAccion) => (
+    <Button
       key={o.clave}
+      type="button"
+      variant="outline"
       title={o.titulo}
       disabled={!o.onClick}
-      onSelect={() => o.onClick?.()}
+      onClick={o.onClick}
       className={cn(
-        "min-h-12 gap-3 px-4 py-3 text-lg [&_svg]:size-5",
-        o.destructiva && "text-destructive focus:bg-destructive focus:text-destructive-foreground",
+        BOTON,
+        o.destructiva && "border-2 border-destructive/60 text-destructive hover:bg-destructive hover:text-destructive-foreground",
       )}
     >
       {o.icono}
       {o.texto}
-    </DropdownMenuItem>
+    </Button>
   );
 
   return (
-    <>
-      {seleccion !== undefined && <RanuraSeleccion>{seleccion}</RanuraSeleccion>}
-      <AccionPrincipal etiqueta={principal.etiqueta} titulo={principal.titulo} onClick={principal.onClick} cargando={principal.cargando}>
-        {principal.icono}
-      </AccionPrincipal>
-      {opciones.length > 0 && (
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-[52px] shrink-0 gap-2 px-4 text-[17px] [&_svg]:size-5"
-              aria-label={nombre ? `Más acciones de ${nombre}` : "Más acciones"}
-            >
-              <MoreHorizontal />
-              Más
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-[16rem] p-2">
-            {normales.map(item)}
-            {normales.length > 0 && destructivas.length > 0 && <DropdownMenuSeparator />}
-            {destructivas.map(item)}
-          </DropdownMenuContent>
-        </DropdownMenu>
+    <div className={cn("flex flex-wrap items-center gap-3", className)} data-testid="acciones-fila">
+      {hayPrincipal && (
+        <Button
+          type="button"
+          title={principal.titulo}
+          disabled={!principal.onClick}
+          onClick={principal.onClick}
+          className={cn(BOTON, "bg-emerald-600 font-semibold text-white hover:bg-emerald-700")}
+          data-principal=""
+        >
+          {principal.cargando ? <Loader2 className="animate-spin" /> : principal.icono}
+          {principal.etiqueta}
+        </Button>
       )}
-    </>
+      {normales.map(boton)}
+      {destructivas.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 border-l-2 border-border pl-3" data-testid="acciones-destructivas">
+          {destructivas.map(boton)}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -368,7 +314,6 @@ export function AccionesReserva({
   al,
   ocupada = false,
   bloqueEnCurso = false,
-  seleccionada = false,
   nombreSala = null,
   onAsignarMesa,
 }: {
@@ -381,8 +326,6 @@ export function AccionesReserva({
   ocupada?: boolean;
   /** Hay un «aceptar en bloque» en curso: la principal también espera. */
   bloqueEnCurso?: boolean;
-  /** La casilla de aceptar en bloque está marcada (solo `fila`). */
-  seleccionada?: boolean;
   /** Nombre de su sala, para que «Dar mesa» diga a DÓNDE lleva. */
   nombreSala?: string | null;
   /** A dónde salta «Dar mesa». Sin él, el botón sigue en su sitio pero deshabilitado. */
@@ -406,13 +349,10 @@ export function AccionesReserva({
 
   const ranuras = (
     <RanurasDeAcciones
-      seleccion={
-        variante === "fila" ? (
-          <CasillaAceptarEnBloque reserva={reserva} canEdit={canEdit} marcada={seleccionada} onCambiar={al.seleccionar} />
-        ) : undefined
-      }
+      className={variante === "tarjeta" ? "pt-2" : "mt-3"}
       principal={{
-        etiqueta: textoAceptar ? "Aceptar" : "Confirmar",
+        // «Verificar» (10/11/2026, dueño: «lo que hace es verificarla»; antes decía «Aceptar»).
+        etiqueta: textoAceptar ? "Verificar" : "Confirmar",
         icono: textoAceptar ? <CheckCircle /> : <CheckCheck />,
         titulo: principal.titulo,
         onClick: principal.habilitada && !principalOcupada ? (pendiente ? al.aceptar : al.confirmar) : undefined,
@@ -422,13 +362,14 @@ export function AccionesReserva({
         titulo: onAsignarMesa ? tituloDarMesa : TITULO_DAR_MESA_SIN_PLANO,
         onClick: destino && onAsignarMesa ? () => onAsignarMesa(destino) : undefined,
       }}
-      verificar={ranura(acc.verificar, al.verificar)}
+      // Una sola «Verificar» (10/11/2026): la principal abre el diálogo con el día y, desde ahí, «Verificar con
+      // otra hora» lleva a elegir la hora. No se repite.
+      verificar={{ titulo: acc.verificar.titulo }}
       gestionar={{ ...ranura(acc.editar, al.editar), icono: <SquarePen />, etiqueta: "Editar" }}
-      nombre={reserva.nombre || "Sin nombre"}
       cancelar={{ ...ranura(acc.cancelar, ocupada ? undefined : al.cancelar), cargando: ocupada }}
       listaNegra={ranura(acc.listaNegra, al.listaNegra)}
     />
   );
 
-  return variante === "tarjeta" ? <div className="flex flex-wrap items-center gap-3 pt-2">{ranuras}</div> : ranuras;
+  return ranuras;
 }

@@ -34,6 +34,13 @@ import { ListaComoLibro } from "@/components/reservas/libro/ListaComoLibro";
 import { ReservasDeLaHoja } from "@/components/reservas/libro/ReservasDeLaHoja";
 
 const hoy = claveDia(new Date());
+/** Arrastra con el dedo (o lo que se diga) de `desdeX` a `hastaX`, bajando `dy` px. */
+function arrastrar(el: HTMLElement, desdeX: number, hastaX: number, dy = 0, pointerType = "touch") {
+  const base = { pointerId: 1, pointerType, clientY: 200 };
+  fireEvent.pointerDown(el, { ...base, clientX: desdeX });
+  fireEvent.pointerMove(el, { ...base, clientX: (desdeX + hastaX) / 2, clientY: 200 + dy / 2 });
+  fireEvent.pointerUp(el, { ...base, clientX: hastaX, clientY: 200 + dy });
+}
 const titulo = () => screen.getByRole("button", { name: "Elegir día" });
 const hojas = () => screen.getAllByRole("article");
 
@@ -56,38 +63,96 @@ describe("ListaComoLibro · pasar hojas", () => {
     render(<ListaComoLibro />);
     fireEvent.click(screen.getByRole("button", { name: "Hoja siguiente" }));
     expect(titulo()).toHaveTextContent(tituloHoja(pasarHoja(hoy, 1)));
-    expect(screen.getByTestId("libro-lista").firstElementChild).toHaveAttribute("data-sentido", "siguiente");
+    expect(screen.getByTestId("libro-lista").querySelector("[data-sentido]")).toHaveAttribute("data-sentido", "siguiente");
     expect(h.pedidas).toContain(pasarHoja(hoy, 1));
 
     fireEvent.click(screen.getByRole("button", { name: "Hoja anterior" }));
     fireEvent.click(screen.getByRole("button", { name: "Hoja anterior" }));
     expect(titulo()).toHaveTextContent(tituloHoja(pasarHoja(hoy, -1)));
-    expect(screen.getByTestId("libro-lista").firstElementChild).toHaveAttribute("data-sentido", "anterior");
+    expect(screen.getByTestId("libro-lista").querySelector("[data-sentido]")).toHaveAttribute("data-sentido", "anterior");
 
     fireEvent.click(screen.getByRole("button", { name: "Hoy" }));
     expect(titulo()).toHaveTextContent(tituloHoja(hoy));
   });
 
-  it("deslizar el dedo a la izquierda pasa a la hoja siguiente; a la derecha, a la anterior", () => {
+  it("arrastrar el dedo a la izquierda pasa a la hoja siguiente; a la derecha, a la anterior (eventos de puntero)", () => {
     render(<ListaComoLibro />);
     const libro = screen.getByTestId("libro-lista");
-    fireEvent.touchStart(libro, { touches: [{ clientX: 400, clientY: 200 }] });
-    fireEvent.touchEnd(libro, { changedTouches: [{ clientX: 250, clientY: 210 }] });
+    arrastrar(libro, 400, 250, 10);
     expect(titulo()).toHaveTextContent(tituloHoja(pasarHoja(hoy, 1)));
-
-    fireEvent.touchStart(libro, { touches: [{ clientX: 100, clientY: 200 }] });
-    fireEvent.touchEnd(libro, { changedTouches: [{ clientX: 300, clientY: 200 }] });
+    arrastrar(libro, 100, 300);
     expect(titulo()).toHaveTextContent(tituloHoja(hoy));
   });
 
-  it("un gesto corto o vertical (bajar por la hoja) no pasa hoja", () => {
+  it("mientras se arrastra, la hoja sigue al dedo un poco y vuelve al soltar", () => {
     render(<ListaComoLibro />);
     const libro = screen.getByTestId("libro-lista");
-    fireEvent.touchStart(libro, { touches: [{ clientX: 300, clientY: 100 }] });
-    fireEvent.touchEnd(libro, { changedTouches: [{ clientX: 270, clientY: 100 }] });
-    fireEvent.touchStart(libro, { touches: [{ clientX: 300, clientY: 100 }] });
-    fireEvent.touchEnd(libro, { changedTouches: [{ clientX: 220, clientY: 400 }] });
+    const hoja = screen.getByTestId("hoja-que-sigue-al-dedo");
+    fireEvent.pointerDown(libro, { pointerId: 1, pointerType: "touch", clientX: 400, clientY: 200 });
+    fireEvent.pointerMove(libro, { pointerId: 1, pointerType: "touch", clientX: 300, clientY: 200 });
+    expect(hoja.style.transform).toBe("translateX(-40px)");
+    fireEvent.pointerUp(libro, { pointerId: 1, pointerType: "touch", clientX: 300, clientY: 200 });
+    expect(hoja.style.transform).toBe("");
+  });
+
+  it("un gesto corto, vertical (bajar por la hoja), cancelado o con ratón no pasa hoja", () => {
+    render(<ListaComoLibro />);
+    const libro = screen.getByTestId("libro-lista");
+    arrastrar(libro, 300, 270);
+    arrastrar(libro, 300, 220, 300);
+    fireEvent.pointerDown(libro, { pointerId: 7, pointerType: "touch", clientX: 300, clientY: 100 });
+    fireEvent.pointerCancel(libro, { pointerId: 7, pointerType: "touch" });
+    fireEvent.pointerUp(libro, { pointerId: 7, pointerType: "touch", clientX: 100, clientY: 100 });
+    arrastrar(libro, 400, 200, 0, "mouse");
     expect(titulo()).toHaveTextContent(tituloHoja(hoy));
+  });
+
+  it("la hoja y su contenedor con scroll dejan el gesto lateral a la página (touch-pan-y, sin scroll horizontal)", () => {
+    render(<ListaComoLibro />);
+    expect(screen.getByTestId("libro-lista")).toHaveClass("touch-pan-y");
+    expect(screen.getByTestId("hoja-scroll")).toHaveClass("touch-pan-y", "overflow-x-hidden");
+  });
+});
+
+describe("ListaComoLibro · añadir y arrastrar sin abrir (10/11/2026)", () => {
+  it("«Añadir reserva a este día» pasa la fecha de la HOJA que se ve", () => {
+    const onAnadirReserva = vi.fn();
+    render(<ListaComoLibro onAnadirReserva={onAnadirReserva} />);
+    fireEvent.click(screen.getByRole("button", { name: "Hoja siguiente" }));
+    const boton = within(hojas()[0]).getByRole("button", { name: "Añadir reserva a este día" });
+    expect(boton).toHaveClass("bg-emerald-600", "h-12");
+    fireEvent.click(boton);
+    expect(onAnadirReserva).toHaveBeenCalledWith(pasarHoja(hoy, 1));
+  });
+
+  it("sin permiso de crear (sin `onAnadirReserva`) no sale el botón", () => {
+    render(<ListaComoLibro />);
+    expect(screen.queryByRole("button", { name: "Añadir reserva a este día" })).toBeNull();
+  });
+
+  it("arrastrar empezando sobre una reserva pasa la hoja y NO abre la reserva; un toque sí la abre", () => {
+    h.porDia[hoy] = [{ id: "r1", nombre: "Esther", hora: "14:15:00", numero_comensales: 2, estado: "confirmada", espacio_id: "s1" }];
+    render(<ListaComoLibro />);
+    const renglon = screen.getByRole("button", { name: /Abrir la reserva de Esther/ });
+    arrastrar(renglon, 400, 250);
+    // El navegador puede mandar un clic al soltar: no debe abrir nada.
+    fireEvent.click(renglon);
+    expect(h.editada).not.toHaveBeenCalled();
+    expect(titulo()).toHaveTextContent(tituloHoja(pasarHoja(hoy, 1)));
+
+    fireEvent.click(screen.getByRole("button", { name: "Hoy" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: /Abrir la reserva de Esther/ }), { pointerId: 2, pointerType: "touch", clientX: 10, clientY: 10 });
+    fireEvent.click(screen.getByRole("button", { name: /Abrir la reserva de Esther/ }));
+    expect(h.editada).toHaveBeenCalledWith("r1");
+  });
+
+  it("al llegar una reserva recién creada, el libro va a su día y la resalta", () => {
+    const dia = pasarHoja(hoy, 3);
+    h.porDia[dia] = [{ id: "nueva", nombre: "Recién Creada", hora: "21:00:00", numero_comensales: 4, estado: "confirmada", espacio_id: null }];
+    const { rerender } = render(<ListaComoLibro resaltar={null} />);
+    rerender(<ListaComoLibro resaltar={{ id: "nueva", fecha: dia }} />);
+    expect(titulo()).toHaveTextContent(tituloHoja(dia));
+    expect(screen.getByText("Recién Creada").closest("li")).toHaveClass("bg-amber-200/50");
   });
 });
 

@@ -349,7 +349,7 @@ export function ConfiguracionTurnos() {
   return (
     // Desde el 04/11/2026 esto es solo el chip «Turnos» de Reservas › Configuración (petición del dueño: «pon
     // subpestañas porque el scroll es eterno»). Las reglas y las mesas que iban encima tienen ya su chip.
-    <div className="space-y-8">
+    <div className="reservas-legible space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-medium">Configuración de Turnos</h3>

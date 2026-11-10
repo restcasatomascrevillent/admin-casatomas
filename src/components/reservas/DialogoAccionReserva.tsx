@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { CheckCircle, ClipboardCheck, Loader2, SquarePen, Star, ShieldBan } from "lucide-react";
+import { CheckCircle, ClipboardCheck, Clock, Loader2, SquarePen, Star, ShieldBan } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { tituloHoja } from "@/lib/reservas/libroReservas";
@@ -15,8 +15,8 @@ import { ComoSeHizoReserva, type ReservaConOrigen } from "./ComoSeHizoReserva";
 // para ver el día, lo que hay ese día y ver si se puede. Y se ven los datos de
 // la persona completos»).
 //
-// La acción principal de la fila de la Lista («Aceptar», «Confirmar») y
-// «Verificar» de «Más» ya no actúan directamente: abren este diálogo con
+// La acción principal de la fila de la Lista («Verificar», «Confirmar») ya no
+// actúa directamente: abre este diálogo con
 //   · arriba, los DATOS completos de la persona y la reserva, grandes;
 //   · debajo, EL DÍA (`ElDiaDeLaReserva`): aforo por servicio, avisos de
 //     cierre/bloqueo/aforo y las reservas del día con esta resaltada;
@@ -29,7 +29,8 @@ import { ComoSeHizoReserva, type ReservaConOrigen } from "./ComoSeHizoReserva";
 export type AccionDialogo = "aceptar" | "confirmar" | "verificar";
 
 const TEXTO: Record<AccionDialogo, { titulo: string; boton: string }> = {
-  aceptar: { titulo: "Aceptar reserva", boton: "Aceptar reserva" },
+  // «Verificar» (10/11/2026, dueño): la acción `aceptar` pasa la reserva a verificada tal como está.
+  aceptar: { titulo: "Verificar reserva", boton: "Verificar reserva" },
   confirmar: { titulo: "Confirmar reserva", boton: "Confirmar reserva" },
   verificar: { titulo: "Verificar reserva", boton: "Verificar" },
 };
@@ -74,6 +75,7 @@ export function DialogoAccionReserva({
   nombreSala,
   onAccion,
   onEditar,
+  onElegirHora,
   onCerrar,
 }: {
   reserva: ReservaDelDialogo | null;
@@ -82,6 +84,8 @@ export function DialogoAccionReserva({
   /** Lo mismo que hacía el botón de la fila. Sin él (sin permiso) no hay botón de acción. */
   onAccion?: () => unknown;
   onEditar?: () => void;
+  /** «Verificar con otra hora»: el diálogo de elegir la hora que se le da (el «Verificar» de antes). */
+  onElegirHora?: () => void;
   onCerrar: () => void;
 }) {
   const [enCurso, setEnCurso] = useState(false);
@@ -183,6 +187,20 @@ export function DialogoAccionReserva({
               disabled={enCurso}
             >
               <SquarePen /> Editar
+            </Button>
+          )}
+          {onElegirHora && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-14 gap-2 px-6 text-lg [&_svg]:size-5"
+              onClick={() => {
+                onCerrar();
+                onElegirHora();
+              }}
+              disabled={enCurso}
+            >
+              <Clock /> Verificar con otra hora
             </Button>
           )}
           {onAccion && (

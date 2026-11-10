@@ -78,7 +78,7 @@ describe("CasillaOcupacion — etiqueta de cierre", () => {
     unmount();
 
     pintar(sinCena, "completa");
-    expect(screen.getByTestId("comensales-casilla")).toHaveAttribute("data-fuente", "14");
+    expect(screen.getByTestId("comensales-casilla")).toHaveAttribute("data-fuente", "20");
     expect(screen.queryByTestId("reservas-casilla")).toBeNull();
     expect(screen.getByRole("button").getAttribute("aria-label")).toMatch(/Sin cena para reservas/);
   });

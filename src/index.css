@@ -402,6 +402,71 @@ html {
 .reservas-contraste [role="tab"][data-state="inactive"] {
   color: hsl(var(--foreground));
 }
+/* Subpestañas de Reservas › Configuración (Reglas, Servicio, Mesas, Turnos, Plantillas email) a 16 px y
+   44 px de alto (10/11/2026, petición del dueño: «letra más grande y botones claros»). */
+.reservas-contraste [data-testid="chips-subnivel"] [role="tab"] {
+  min-height: 2.75rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 500;
+}
+.reservas-contraste [data-testid="chips-subnivel"] [role="tab"] svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* Letra más grande en Reservas › Configuración, la lista negra y sus diálogos (10/11/2026, petición
+   del dueño): mismo criterio que .carta-contraste. Sube los tamaños pequeños de Tailwind (≤ 12 → 14 px,
+   12 → 15 px, 14 → 17 px, 16 → 18 px, 18 → 20 px), etiquetas a 16-17 px y campos a 48 px con 17 px de
+   letra. Sin tocar rellenos ni márgenes. Las variantes sm:/md:/lg: se repiten para que el tamaño
+   responsive siga ganando a la regla base. */
+.reservas-legible .text-\[10px\],
+.reservas-legible .text-\[11px\],
+.reservas-legible .text-\[12px\] {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+.reservas-legible .text-xs {
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
+}
+.reservas-legible .text-sm {
+  font-size: 1.0625rem;
+  line-height: 1.5rem;
+}
+.reservas-legible .text-base {
+  font-size: 1.125rem;
+  line-height: 1.625rem;
+}
+.reservas-legible .text-lg {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+@media (min-width: 640px) {
+  .reservas-legible .sm\:text-xs { font-size: 0.9375rem; line-height: 1.375rem; }
+  .reservas-legible .sm\:text-sm { font-size: 1.0625rem; line-height: 1.5rem; }
+  .reservas-legible .sm\:text-base { font-size: 1.125rem; line-height: 1.625rem; }
+  .reservas-legible .sm\:text-lg { font-size: 1.25rem; line-height: 1.75rem; }
+}
+@media (min-width: 768px) {
+  .reservas-legible .md\:text-sm { font-size: 1.0625rem; line-height: 1.5rem; }
+  .reservas-legible .md\:text-base { font-size: 1.125rem; line-height: 1.625rem; }
+}
+@media (min-width: 1024px) {
+  .reservas-legible .lg\:text-sm { font-size: 1.0625rem; line-height: 1.5rem; }
+  .reservas-legible .lg\:text-base { font-size: 1.125rem; line-height: 1.625rem; }
+}
+.reservas-legible input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
+.reservas-legible textarea,
+.reservas-legible button[role="combobox"] {
+  min-height: 3rem;
+  font-size: 1.0625rem;
+}
+.reservas-legible label {
+  font-size: 1.0625rem;
+}
 
 /* Carta con letra más grande y más contraste (10/11/2026, petición del dueño: «la carta también,
    hay que poner más grandes las letras»). Mismo criterio que .reservas-contraste: bordes y texto
@@ -461,4 +526,33 @@ html {
 }
 .carta-contraste label {
   font-size: 1.0625rem;
+}
+
+/* «Nueva reserva» en dos columnas (10/11/2026): en la columna derecha el formulario va en UNA columna (su rejilla
+   de dos, `lg:grid-cols-2`, se apretaba en el ~60 % del diálogo). Ver LibroReservas.tsx. */
+.formulario-una-columna form .lg\:grid-cols-2 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  column-gap: 0;
+}
+.formulario-una-columna form .lg\:space-y-0 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1.25rem;
+}
+/* Con «Nueva reserva» abierta, los avisos (toasts) salen a la IZQUIERDA para no tapar «Crear Reserva», que va
+   abajo a la derecha. */
+body:has([data-dialogo-nueva-reserva]) [data-sonner-toaster][data-x-position="right"] {
+  right: auto !important;
+  left: var(--offset-right, 24px) !important;
+}
+/* Pie fijo del formulario («Crear Reserva») en la columna derecha (10/11/2026, revisión del dueño: el selector
+   «Dentro | Fuera» asomaba por detrás del botón). Fondo opaco, borde superior marcado y por encima de los campos;
+   y un hueco antes del pie (≥ su alto + 16 px) para que el último campo se vea entero encima del botón. */
+.formulario-una-columna form > div.sticky:last-child {
+  z-index: 40;
+  background-color: hsl(var(--background));
+  border-top: 2px solid hsl(var(--border));
+  box-shadow: 0 -8px 16px -8px hsl(var(--foreground) / 0.15);
+  margin-bottom: 0;
+}
+.formulario-una-columna form > :nth-last-child(2) {
+  padding-bottom: 6.25rem;
 }

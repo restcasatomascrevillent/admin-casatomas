@@ -76,11 +76,11 @@ export function PanelDia<T extends ReservaVentana>({
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <h3 className="text-balance text-base font-semibold sm:text-lg">{etiquetas.titulo}</h3>
+          <h3 className="text-balance text-xl font-semibold">{etiquetas.titulo}</h3>
           {dia.hayReservas && (
             <p
               data-testid="resumen-dia"
-              className="text-xs text-muted-foreground tabular-nums"
+              className="text-base text-muted-foreground tabular-nums"
               title={etiquetas.esHoy ? TEXTO_SOLO_HOY : undefined}
             >
               {dia.reservas} {plural(dia.reservas, "reserva", "reservas")} · {dia.comensales} comensales ·{" "}
@@ -100,16 +100,16 @@ export function PanelDia<T extends ReservaVentana>({
         <div className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
           {enVentana && (
             <span
-              className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] pointer-coarse:text-xs text-muted-foreground"
+              className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2.5 py-1 text-sm text-muted-foreground"
               title={`Dentro de las próximas ${ventanaHoras} h`}
             >
-              <Clock className="h-3 w-3" aria-hidden="true" />
+              <Clock className="h-4 w-4" aria-hidden="true" />
               Próximas {ventanaHoras}&nbsp;h
             </span>
           )}
-          <div className="flex items-center gap-2 pointer-coarse:min-h-11">
+          <div className="flex min-h-11 items-center gap-2">
             <Switch id="asignacion-solo-pendientes" checked={soloPendientes} onCheckedChange={onSoloPendientes} />
-            <Label htmlFor="asignacion-solo-pendientes" className="cursor-pointer text-sm font-normal">
+            <Label htmlFor="asignacion-solo-pendientes" className="cursor-pointer text-base font-normal">
               Ocultar las que ya tienen mesa
             </Label>
           </div>
@@ -130,14 +130,14 @@ export function PanelDia<T extends ReservaVentana>({
         {!dia.hayReservas ? (
           <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-6 text-center text-muted-foreground">
             <CalendarX2 className="h-6 w-6" aria-hidden="true" />
-            <p className="text-sm">Sin reservas este día</p>
+            <p className="text-lg">Sin reservas este día</p>
           </div>
         ) : (
           <>
             {todoAsignado && (
               <div
                 role="status"
-                className="flex items-start gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                className="flex items-start gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-base text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
               >
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 <p>
@@ -157,7 +157,7 @@ export function PanelDia<T extends ReservaVentana>({
                     key={turno}
                     className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border px-3 py-2 sm:px-4"
                   >
-                    <span className="text-sm font-semibold sm:text-base">{ETIQUETA_TURNO[turno]}</span>
+                    <span className="text-lg font-semibold">{ETIQUETA_TURNO[turno]}</span>
                     <ResumenTurno resumen={resumen} />
                   </div>
                 ) : null;
@@ -166,14 +166,14 @@ export function PanelDia<T extends ReservaVentana>({
                 <Card key={grupo.turno}>
                   <CardHeader className="px-3 pb-2 pt-3 sm:px-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <CardTitle className="text-sm font-semibold sm:text-base">{ETIQUETA_TURNO[grupo.turno]}</CardTitle>
+                      <CardTitle className="text-lg font-semibold">{ETIQUETA_TURNO[grupo.turno]}</CardTitle>
                       <ResumenTurno resumen={resumen} />
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3 px-3 pb-3 sm:px-4">
                     {grupo.grados.map(({ grado, reservas }) => (
                       <div key={grado} className="space-y-1.5">
-                        <Badge variant="outline" className={cn("text-[11px] pointer-coarse:text-xs font-medium", CLASES_GRADO[grado])}>
+                        <Badge variant="outline" className={cn("text-sm font-medium", CLASES_GRADO[grado])}>
                           {ETIQUETA_GRADO[grado]} · {reservas.length}
                         </Badge>
                         <ul className="divide-y rounded-md border">{reservas.map(renderFila)}</ul>
@@ -203,7 +203,7 @@ function textoTodoAsignado(cantidad: number, ocultas: boolean): string {
 function ResumenTurno({ resumen }: { resumen: Pick<ResumenTurnoDia, "reservas" | "comensales" | "sinMesa" | "ocultas"> }) {
   const hayReservas = resumen.reservas > 0;
   return (
-    <span className="text-xs text-muted-foreground tabular-nums">
+    <span className="text-base text-muted-foreground tabular-nums">
       {resumen.reservas} {plural(resumen.reservas, "reserva", "reservas")} · {resumen.comensales} comensales
       {hayReservas && resumen.sinMesa > 0 && ` · ${resumen.sinMesa} sin mesa`}
       {(!hayReservas || resumen.sinMesa === 0) && (
