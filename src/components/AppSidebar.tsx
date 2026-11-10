@@ -10,7 +10,6 @@ import {
   Settings,
   HelpCircle,
   Share2,
-  ChartNoAxesCombined,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -120,15 +119,8 @@ const menuItems: {
     sectionKey: ["facturas", "facturas_subida"],
     toggleKey: "facturas",
   },
-  // «Análisis general» (07/11/2026, petición del dueño): sección propia, fuera de Facturas. Primera
-  // pantalla, Márgenes de carta. Usa el permiso y el interruptor de Facturas (no hay sección «analisis»).
-  {
-    title: "Análisis general",
-    url: "/analisis",
-    icon: ChartNoAxesCombined,
-    sectionKey: "facturas",
-    toggleKey: "facturas",
-  },
+  // «Análisis general» (07/11/2026) ya no va aquí: desde el 10/11/2026 es la pestaña «Márgenes» de Facturas
+  // (petición del dueño). /analisis lleva a ella.
   {
     title: "Usuarios",
     url: "/usuarios",

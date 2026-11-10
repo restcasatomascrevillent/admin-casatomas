@@ -27,8 +27,6 @@ const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   "/tienda": "tienda",
   // «Facturas · Subida» (06/11/2026) entra también, solo a la pestaña Cargar.
   "/facturas": ["facturas", "facturas_subida"],
-  // «Análisis general» (07/11/2026): permisos de Facturas (no hay sección propia).
-  "/analisis": "facturas",
   "/usuarios": "usuarios",
 };
 // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web y
