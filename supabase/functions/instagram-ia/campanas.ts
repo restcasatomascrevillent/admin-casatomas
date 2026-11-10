@@ -340,7 +340,7 @@ export async function manejarPlanificacion(valor: unknown, m: ContextoManejador)
     hasta: e.hasta,
     ...(esCampana ? { semanas: e.semanas, piezas_por_semana: e.piezasPorSemana, piezas_total: maxPiezas, peticion: e.objetivo } : {}),
     guia: { version: guia.version, texto: guia.guia, hashtags_base: guia.hashtags_base, ctas: guia.ctas },
-    plantillas: plantillas.map((p) => ({ id: p.id, formatos: p.formatos, con_foto: p.conFoto, ...(p.conFoto ? { encaje: p.encaje ?? "sangre" } : {}), campos: p.campos, limites: p.limites })),
+    plantillas: plantillas.map((p) => ({ id: p.id, ...(p.papel ? { papel: p.papel } : {}), formatos: p.formatos, con_foto: p.conFoto, ...(p.conFoto ? { encaje: p.encaje ?? "sangre" } : {}), campos: p.campos, limites: p.limites })),
     carta: cartaParaModelo(bd.carta),
     novedades: bd.novedades,
     fechas: bd.fechas,

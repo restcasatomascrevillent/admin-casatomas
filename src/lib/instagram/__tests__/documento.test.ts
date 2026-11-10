@@ -8,6 +8,7 @@ import {
   CODIGO_COMPROBAR_MAQUETACION,
   CODIGO_ESPERAR_RECURSOS,
   EJEMPLOS,
+  EJEMPLOS_V2,
   FORMATOS,
   FOTOS,
   FUENTES,
@@ -22,7 +23,11 @@ import {
   esAptaPara,
   generarCss,
   obtenerPlantilla,
+  plantillaEnmarcada,
+  plantillaPara,
   plantillasDe,
+  plantillasVisibles,
+  varianteConEncaje,
   problemasDePlantilla,
   rutasLogos,
   urlFoto,
@@ -44,15 +49,48 @@ function datosDe(id: string): DatosPieza {
 }
 
 describe("registro estático de plantillas", () => {
-  it("tiene las 4 plantillas del prototipo y las 2 enmarcadas, y todas cumplen el contrato", () => {
-    expect(PLANTILLAS.map((p) => p.id)).toEqual(["ct-foto-titular", "ct-marco", "ct-tipografica", "tz-foto-titular", "tz-marco", "tz-tipografica"]);
+  it("tiene las clásicas (4 del prototipo y 2 enmarcadas) y las 16 v2, y todas cumplen el contrato", () => {
+    const clasicas = ["ct-foto-titular", "ct-marco", "ct-tipografica", "tz-foto-titular", "tz-marco"];
+    const v2 = ["portada", "portada-marco", "plato", "plato-marco", "cierre", "cierre-marco", "cierre-marca", "frase"];
+    const esperadas = [...clasicas, "tz-tipografica", ...v2.flatMap((x) => [`ct-${x}`, `tz-${x}`])].sort();
+    expect(PLANTILLAS.map((p) => p.id)).toEqual(esperadas);
     for (const p of PLANTILLAS) expect(problemasDePlantilla(p), p.id).toEqual([]);
+    expect(PLANTILLAS.filter((p) => p.clasica).map((p) => p.id).sort()).toEqual(clasicas.sort());
+    for (const p of PLANTILLAS.filter((x) => !x.clasica)) expect(p.papel, p.id).toBeDefined();
   });
-  it("obtenerPlantilla y plantillasDe", () => {
+  it("obtenerPlantilla y plantillasDe (todas, también las clásicas)", () => {
     expect(obtenerPlantilla("ct-tipografica")?.titularOpcional).toBe(true);
     expect(obtenerPlantilla("no-existe")).toBeUndefined();
-    expect(plantillasDe("touza").map((p) => p.id)).toEqual(["tz-foto-titular", "tz-marco", "tz-tipografica"]);
-    expect(plantillasDe("casa-tomas", "story").map((p) => p.id)).toEqual(["ct-foto-titular", "ct-marco"]);
+    expect(plantillasDe("touza").map((p) => p.id)).toContain("tz-foto-titular");
+    expect(plantillasDe("casa-tomas", "story").map((p) => p.id)).toEqual(expect.arrayContaining(["ct-foto-titular", "ct-marco", "ct-portada"]));
+    expect(plantillasDe("casa-tomas", "story").map((p) => p.id)).not.toContain("ct-tipografica");
+  });
+  it("plantillasVisibles: sin clásicas, por papel; la clásica actual se añade al final", () => {
+    expect(plantillasVisibles("casa-tomas", "post").map((p) => p.id)).toEqual([
+      "ct-portada",
+      "ct-portada-marco",
+      "ct-plato",
+      "ct-plato-marco",
+      "ct-cierre",
+      "ct-cierre-marco",
+      "ct-cierre-marca",
+      "ct-frase",
+    ]);
+    expect(plantillasVisibles("touza", "post").map((p) => p.id).at(-1)).toBe("tz-tipografica");
+    expect(plantillasVisibles("casa-tomas", "post", "ct-foto-titular").map((p) => p.id).at(-1)).toBe("ct-foto-titular");
+    // Una clásica de otra marca o sin ese formato no se cuela.
+    expect(plantillasVisibles("touza", "post", "ct-foto-titular").map((p) => p.id)).not.toContain("ct-foto-titular");
+    expect(plantillasVisibles("casa-tomas", "story", "ct-tipografica").map((p) => p.id)).not.toContain("ct-tipografica");
+  });
+  it("plantillaPara, plantillaEnmarcada y varianteConEncaje", () => {
+    expect(plantillaPara("casa-tomas", "post", "plato", "marco")?.id).toBe("ct-plato-marco");
+    expect(plantillaPara("touza", "story", "cierre", "sangre")?.id).toBe("tz-cierre");
+    expect(plantillaPara("touza", "post", "tipografica")?.id).toBe("tz-frase");
+    expect(plantillaEnmarcada("casa-tomas", "post")?.id).toBe("ct-portada-marco");
+    expect(plantillaEnmarcada("touza", "story", "cierre")?.id).toBe("tz-cierre-marco");
+    expect(varianteConEncaje(obtenerPlantilla("ct-plato")!, "marco", "post")?.id).toBe("ct-plato-marco");
+    expect(varianteConEncaje(obtenerPlantilla("ct-foto-titular")!, "marco", "post")?.id).toBe("ct-marco");
+    expect(varianteConEncaje(obtenerPlantilla("tz-cierre-marco")!, "sangre", "story")?.id).toBe("tz-cierre");
   });
   it("ct-tipografica admite cita (≤ 70 caracteres) y deja el titular opcional", () => {
     const p = obtenerPlantilla("ct-tipografica")!;
@@ -156,7 +194,8 @@ describe("construirDocumento", () => {
   });
   it("todos los ejemplos validan y construyen", () => {
     expect(EJEMPLOS).toHaveLength(16);
-    for (const e of EJEMPLOS) {
+    expect(EJEMPLOS_V2).toHaveLength(32); // 16 plantillas v2 × post y story
+    for (const e of [...EJEMPLOS, ...EJEMPLOS_V2]) {
       const r = validarPieza(e.json);
       expect(r.ok ? [] : r.problemas, e.id).toEqual([]);
       if (r.ok) expect(construirDocumento(r.datos, BASES)).toContain(`data-plantilla="${e.json.plantilla}"`);

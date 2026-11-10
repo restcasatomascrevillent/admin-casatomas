@@ -191,6 +191,9 @@ export const MARCAS = {
       "gris-medio": "#67615f", // web-casatomas:src/index.css → --mid-gray (15 4% 39%)
       papel: "#fbf8f4", // web-casatomas:src/index.css → --ticket-paper (36 50% 97%)
       blanco: "#ffffff", // web-casatomas:src/index.css → --background (0 0% 100%)
+      // Plantillas v2 (08/11/2026): degradado de las fotos y fondo de sección, como redes-posts.html.
+      "pizarra-oscura": "#22272a", // marca-base → --ct-slate-900 (modo oscuro 206 11% 15%; redes-posts.html → rgba(34,39,42,.88))
+      arena: "#f4f2f1", // marca-base → --ct-sand-50 (25 13% 95%, fondo de sección)
       // Color real del logo: píxel dominante de casa-tomas-story:src/assets/logo-casa-tomas.png
       // (rgb 7,7,7). Solo para la variante «negro» del logo.
       "negro-logo": "#070707",

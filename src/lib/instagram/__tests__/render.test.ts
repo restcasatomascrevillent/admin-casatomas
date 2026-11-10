@@ -21,6 +21,7 @@ import {
   CODIGO_COMPROBAR_MAQUETACION,
   CODIGO_ESPERAR_RECURSOS,
   EJEMPLOS,
+  EJEMPLOS_V2,
   FORMATOS,
   FUENTES,
   PLANTILLAS,
@@ -179,7 +180,7 @@ describe.skipIf(!!motivo)("render real con Chromium", () => {
     expect(canal.max - canal.min).toBeGreaterThan(40);
   }
 
-  for (const e of EJEMPLOS) {
+  for (const e of [...EJEMPLOS, ...EJEMPLOS_V2]) {
     it(`ejemplo ${e.id}: ${e.json.formato} exacto, no en blanco, sin problemas de maquetación`, async () => {
       const v = validarPieza(e.json);
       expect(v.ok ? [] : v.problemas).toEqual([]);
@@ -196,7 +197,7 @@ describe.skipIf(!!motivo)("render real con Chromium", () => {
   for (const p of PLANTILLAS) {
     for (const formato of p.formatos) {
       it(`${p.id} ${formato}: titular de 6 palabras larguísimas → error que nombra «titular»`, async () => {
-        const e = EJEMPLOS.find((x) => x.json.plantilla === p.id && x.json.formato === formato);
+        const e = [...EJEMPLOS, ...EJEMPLOS_V2].find((x) => x.json.plantilla === p.id && x.json.formato === formato);
         expect(e, "falta un ejemplo para esta plantilla y formato").toBeDefined();
         // Sin pasar por el esquema (los límites de caracteres ya lo pararían).
         const datos = { ...(e!.json as DatosPieza), titular: TITULAR_LARGO };

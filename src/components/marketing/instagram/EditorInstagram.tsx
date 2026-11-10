@@ -60,9 +60,14 @@ function datosEjemplo(json: unknown): never {
   return { ...(json as Record<string, unknown>), foto: undefined } as never;
 }
 
+/** Editor antiguo (ya no se usa): arranca con la primera plantilla que tiene ejemplo (una clásica). */
+function plantillaInicial(marca: MarcaId) {
+  return plantillasDe(marca).find((p) => EJEMPLOS.some((e) => e.json.plantilla === p.id)) ?? plantillasDe(marca)[0];
+}
+
 function borradorInicial(): Borrador {
   const marca: MarcaId = "casa-tomas";
-  const plantilla = plantillasDe(marca)[0];
+  const plantilla = plantillaInicial(marca);
   const base = borradorVacio(marca, plantilla?.id ?? "", plantilla?.formatos[0] ?? "post");
   const ejemplo = plantilla ? ejemplosPara(plantilla.id, base.formato)[0] : undefined;
   return ejemplo ? borradorDesdeDatos(datosEjemplo(ejemplo.json), base) : base;
@@ -152,7 +157,7 @@ export function EditorInstagram({ abrir = null }: EditorInstagramProps = {}) {
 
   const cambiarMarca = (marca: MarcaId) => {
     if (marca === borrador.marca) return;
-    const p = plantillasDe(marca)[0];
+    const p = plantillaInicial(marca);
     setBorrador((b) => ({
       ...b,
       marca,

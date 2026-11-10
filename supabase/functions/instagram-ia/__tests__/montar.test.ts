@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("https://esm.sh/@supabase/supabase-js@2.57.4", () => ({ createClient: vi.fn() }));
 
 import { manejarIA, OPENAI } from "../ia.ts";
-import { formatoFinal, fotoCubre, horaValida, plantillasMontar } from "../montar.ts";
+import { formatoFinal, fotoCubre, horaValida, LEMA_CIERRE, papelDe, plantillasMontar } from "../montar.ts";
 import { olvidarSecretos } from "../../_shared/instagram/secretos.ts";
 import type { AcumuladorUso, OpcionesRegistro } from "../../_shared/registrar-uso-ia.ts";
 
@@ -110,7 +110,7 @@ describe("instagram-ia · montar_pieza", () => {
     expect(j).toMatchObject({
       ok: true,
       formato: "post",
-      diapositivas: [{ foto: "drive:FotoDeDrive0001", plantilla: "ct-foto-titular", datos: { antetitulo: "Del mar", titular: "Centolla recién llegada" }, altText: "Foto 1 de marisco sobre hielo." }],
+      diapositivas: [{ foto: "drive:FotoDeDrive0001", plantilla: "ct-portada", datos: { antetitulo: "Del mar", titular: "Centolla recién llegada" }, altText: "Foto 1 de marisco sobre hielo." }],
       hashtags: ["#Marisco", "#Crevillent", "#CasaTomás", "#Centolla"],
       horaSugerida: "2026-11-07T13:00",
       resumen: expect.stringMatching(/marisco/),
@@ -158,7 +158,8 @@ describe("instagram-ia · montar_pieza", () => {
     const { f } = falso([respuestaOpenAI(montaje([diapo(1, "Centolla recién llegada", { plantilla: "ct-no-existe" }), diapo(2, "Nécoras", { plantilla: "ct-tipografica" })]))]);
     const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [foto(1), foto(2)] }), deps(f));
     const j = await r.json();
-    expect(j.diapositivas.map((d: { plantilla: string }) => d.plantilla)).toEqual(["ct-foto-titular", "ct-foto-titular"]);
+    // 2 fotos: portada y cierre (la plantilla va por el papel, diga lo que diga la IA).
+    expect(j.diapositivas.map((d: { plantilla: string }) => d.plantilla)).toEqual(["ct-portada", "ct-cierre"]);
     expect(j.avisos.join(" ")).toMatch(/«ct-no-existe» no vale/);
     expect(j.avisos.join(" ")).toMatch(/«ct-tipografica» no vale/);
   });
@@ -221,16 +222,18 @@ describe("montar_pieza · fotos que no cubren (Foto enmarcada)", () => {
     (async (u: string | URL | Request, i?: RequestInit) =>
       String(u).startsWith(`${SB}/rest/v1/Platos?id=eq.`) ? resp(200, [{ id: "centolla", nombre: "Centolla cocida", activado: true, restaurante: true, touza: false }]) : f(u, i)) as typeof fetch;
 
-  it("foto de la carta + plantilla a sangre → se corrige a «ct-marco» y se avisa; la IA sabe que no cubre", async () => {
+  it("foto de la carta + plantilla a sangre → se corrige a la portada enmarcada y se avisa; la IA sabe que no cubre", async () => {
     const { f, openai } = falso([respuestaOpenAI(montaje([diapo(1, "Centolla recién llegada", { cita: "Centolla cocida" })]))]);
     const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [carta] }), { ...deps(f), fetch: conPlato(f) });
     expect(r.status).toBe(200);
     const j = await r.json();
-    expect(j.diapositivas[0]).toMatchObject({ foto: "carta:centolla", plantilla: "ct-marco", datos: { titular: "Centolla recién llegada", cita: "Centolla cocida" } });
-    expect(j.avisos.join(" ")).toMatch(/Foto 1 \(foto de la carta\): no cubre un post.*«ct-foto-titular».*se usa «ct-marco» \(Foto enmarcada\)/);
+    expect(j.diapositivas[0]).toMatchObject({ foto: "carta:centolla", plantilla: "ct-portada-marco", datos: { titular: "Centolla recién llegada", cita: "Centolla cocida" } });
+    expect(j.avisos.join(" ")).toMatch(/Foto 1 \(foto de la carta\): no cubre un post.*«ct-foto-titular».*se usa «ct-portada-marco» \(Foto enmarcada\)/);
     const [llamada] = openai();
-    expect(llamada.messages[0].content).toMatch(/«cubre»: false.*usa SOLO «ct-marco»/);
-    expect(llamada.messages[0].content).toMatch(/«ct-marco» \(Foto enmarcada/);
+    expect(llamada.messages[0].content).toMatch(/«cubre»: false.*usa SOLO plantillas «Foto enmarcada» \(como «ct-portada-marco»\)/);
+    expect(llamada.messages[0].content).toMatch(/«ct-portada-marco» \(portada, Foto enmarcada/);
+    // Las clásicas ya no se ofrecen.
+    expect(llamada.messages[0].content).not.toMatch(/«ct-foto-titular»|«ct-marco»/);
     const datos = JSON.parse(llamada.messages[1].content[0].text.split("<<<DATOS")[1].split("DATOS>>>")[0]);
     expect(datos.fotos).toEqual([{ numero: 1, origen: "carta", cubre: false }]);
   });
@@ -244,7 +247,7 @@ describe("montar_pieza · fotos que no cubren (Foto enmarcada)", () => {
     const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos }), deps(f));
     expect(r.status).toBe(200);
     const j = await r.json();
-    expect(j.diapositivas.map((d: { plantilla: string }) => d.plantilla)).toEqual(["ct-marco", "ct-foto-titular"]);
+    expect(j.diapositivas.map((d: { plantilla: string }) => d.plantilla)).toEqual(["ct-portada-marco", "ct-cierre"]);
     expect(j.avisos.join(" ")).toMatch(/Foto 1 \(1920×1080\): no cubre un post/);
     const datos = JSON.parse(openai()[0].messages[1].content[0].text.split("<<<DATOS")[1].split("DATOS>>>")[0]);
     expect(datos.fotos.map((x: { cubre: boolean; medidas?: string }) => [x.medidas, x.cubre])).toEqual([
@@ -253,7 +256,7 @@ describe("montar_pieza · fotos que no cubren (Foto enmarcada)", () => {
     ]);
   });
 
-  it("plantilla inexistente con una foto de la carta (Touza, story) → «tz-marco»", async () => {
+  it("plantilla inexistente con una foto de la carta (Touza, story) → «tz-portada-marco»", async () => {
     const { f } = falso([respuestaOpenAI(montaje([diapo(1, "Para empezar la noche", { plantilla: "tz-no-existe", antetitulo: "Touza" })]))]);
     const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "touza", formato: "story", fotos: [{ id: "carta:vermut", url: `${SB}/storage/v1/object/public/platos/vermut.webp` }] }), {
       ...deps(f),
@@ -261,7 +264,7 @@ describe("montar_pieza · fotos que no cubren (Foto enmarcada)", () => {
         String(u).startsWith(`${SB}/rest/v1/Platos?id=eq.`) ? resp(200, [{ id: "vermut", nombre: "Vermut", activado: true, restaurante: false, touza: true }]) : f(u, i)) as typeof fetch,
     });
     expect(r.status).toBe(200);
-    expect((await r.json()).diapositivas[0].plantilla).toBe("tz-marco");
+    expect((await r.json()).diapositivas[0].plantilla).toBe("tz-portada-marco");
   });
 
   it("fotoCubre: regla de esAptaPara con medidas; sin ellas, la carta y los vinos no cubren", () => {
@@ -275,13 +278,57 @@ describe("montar_pieza · fotos que no cubren (Foto enmarcada)", () => {
   });
 });
 
+describe("montar_pieza · papeles del carrusel (plantillas v2)", () => {
+  it("4 fotos: portada → platos → cierre; el botón solo en la última y el cierre sin texto lleva el lema", async () => {
+    const { f } = falso([
+      respuestaOpenAI(
+        montaje([
+          diapo(2, "Del mar a la mesa", { cta: "Reservar mesa", plantilla: "ct-cierre" }),
+          diapo(1, "Centolla", { cta: "Ver carta", antetitulo: "" }),
+          diapo(4, "Nécoras", { antetitulo: "" }),
+          diapo(3, "", { antetitulo: "", cta: "Reservar mesa" }),
+        ]),
+      ),
+    ]);
+    const fotos = [1, 2, 3, 4].map(foto);
+    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos }), deps(f));
+    expect(r.status).toBe(200);
+    const j = await r.json();
+    expect(j.diapositivas.map((d: { plantilla: string }) => d.plantilla)).toEqual(["ct-portada", "ct-plato", "ct-plato", "ct-cierre"]);
+    expect(j.diapositivas[0].datos.cta).toBeUndefined();
+    expect(j.diapositivas[1].datos.cta).toBeUndefined();
+    expect(j.diapositivas[3].datos).toEqual({ cita: LEMA_CIERRE["casa-tomas"], cta: "Reservar mesa" });
+    expect(j.avisos.join(" ")).toMatch(/Imagen 1: se quita el botón «Reservar mesa»: en un carrusel va solo en la última/);
+    expect(j.avisos.join(" ")).toMatch(/Imagen 2: se quita el botón «Ver carta»/);
+  });
+
+  it("Touza: el cierre nunca dice «Reservar» (se descarta y se reintenta)", async () => {
+    const mal = montaje([diapo(1, "La noche empieza aquí", { antetitulo: "" }), diapo(2, "", { antetitulo: "", cta: "Reservar mesa" })]);
+    const { f } = falso([respuestaOpenAI(mal), respuestaOpenAI(mal)]);
+    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "touza", fotos: [foto(1), foto(2)] }), deps(f));
+    expect(r.status).toBe(422);
+    expect(JSON.stringify(await r.json())).toMatch(/TOUZA no admite reservas/);
+  });
+
+  it("carrusel con fotos de la carta: todas enmarcadas, cada una con su papel", async () => {
+    const { f } = falso([respuestaOpenAI(montaje([diapo(1, "Lo que nunca falta"), diapo(2, "Centolla", { antetitulo: "" }), diapo(3, "", { antetitulo: "" })]))]);
+    const fotos = [1, 2, 3].map((n) => ({ ...foto(n), ancho: 1200, alto: 900 }));
+    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos }), deps(f));
+    expect(r.status).toBe(200);
+    expect((await r.json()).diapositivas.map((d: { plantilla: string }) => d.plantilla)).toEqual(["ct-portada-marco", "ct-plato-marco", "ct-cierre-marco"]);
+  });
+});
+
 describe("montar: piezas", () => {
   it("formato auto, plantillas con foto por formato y hora sugerida válida", () => {
     expect(formatoFinal("auto", 1)).toBe("post");
     expect(formatoFinal("auto", 6)).toBe("carrusel");
     expect(formatoFinal("story", 3)).toBe("story");
-    expect(plantillasMontar("casa-tomas", "carrusel").map((p) => p.id)).toEqual(["ct-foto-titular", "ct-marco"]);
-    expect(plantillasMontar("touza", "story").map((p) => p.id)).toEqual(["tz-foto-titular", "tz-marco"]);
+    // Solo las v2 con foto (sin clásicas ni las de sin foto).
+    expect(plantillasMontar("casa-tomas", "carrusel").map((p) => p.id)).toEqual(["ct-cierre", "ct-cierre-marco", "ct-plato", "ct-plato-marco", "ct-portada", "ct-portada-marco"]);
+    expect(plantillasMontar("touza", "story").map((p) => p.id)).toEqual(["tz-cierre", "tz-cierre-marco", "tz-plato", "tz-plato-marco", "tz-portada", "tz-portada-marco"]);
+    expect([0, 1, 2, 3].map((i) => papelDe(i, 4, "carrusel"))).toEqual(["portada", "plato", "plato", "cierre"]);
+    expect(papelDe(0, 1, "story")).toBe("portada");
     expect(horaValida("2026-11-07T13:00", AHORA)).toBe("2026-11-07T13:00");
     expect(horaValida("2026-10-01T13:00", AHORA)).toBeNull();
     expect(horaValida("mañana a las 2", AHORA)).toBeNull();

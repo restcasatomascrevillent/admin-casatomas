@@ -40,6 +40,8 @@ const plantilla: Plantilla = {
   },
   tiposFoto: ["plato", "sala", "ambiente", "bebida", "interior", "barra", "coctel"],
   encaje: "marco",
+  // Clásica (08/11/2026): sigue abriendo las piezas guardadas, pero ya no sale en los selectores.
+  clasica: true,
 
   html(datos, ctx) {
     const story = datos.formato === "story";

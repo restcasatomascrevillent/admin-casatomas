@@ -29,6 +29,8 @@ const EQUIVALENCIAS: Array<[keyof typeof MARCAS, string, string]> = [
   ["casa-tomas", "piedra", "ct-stone"],
   ["casa-tomas", "piedra-clara", "ct-sand-200"],
   ["casa-tomas", "blanco", "ct-white"],
+  ["casa-tomas", "pizarra-oscura", "ct-slate-900"],
+  ["casa-tomas", "arena", "ct-sand-50"],
   ["touza", "negro", "tz-black"],
   ["touza", "crema", "tz-cream"],
   ["touza", "oro", "tz-gold"],

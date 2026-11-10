@@ -7,7 +7,7 @@
  * La IA solo propone: nada de aquí publica ni programa.
  */
 import { ErrorIA, llamar, type OpcionesLlamada } from "@/components/instagram/ia/api";
-import { cubreFormato, obtenerPlantilla, plantillaEnmarcada, plantillasDe } from "@/lib/instagram";
+import { cubreFormato, obtenerPlantilla, plantillaPara } from "@/lib/instagram";
 import {
   MAX_FOTOS_CARRUSEL,
   type DiapositivaMontada,
@@ -117,13 +117,12 @@ export function crearMontadorSimulado(o: OpcionesMontadorSimulado = {}): Montado
     const fotos = o.invertirOrden ? [...p.fotos].reverse() : p.fotos;
     const formato: FormatoMontado = fotos.length > 1 ? "carrusel" : p.formato === "story" ? "story" : "post";
     const formatoImg = formato === "story" ? "story" : "post";
-    const plantilla = plantillasDe(p.marca, formatoImg).find((x) => x.admitidos.includes("foto"));
-    // Como el servidor: una foto que no cubre el lienzo (las de la carta, 1200×900) va enmarcada.
-    const enmarcada = plantillaEnmarcada(p.marca, formatoImg);
     const titulares = ["Recién llegado", "Del mar a la mesa", "Para compartir", "Hecho al momento", "Te esperamos"];
     const diapositivas: DiapositivaMontada[] = fotos.map((f, i) => {
+      // Como el servidor: portada → platos → cierre, y enmarcada si la foto no cubre el lienzo (las de la carta, 1200×900).
       const noCubre = !!f.ancho && !!f.alto && !cubreFormato({ ancho: f.ancho, alto: f.alto }, formatoImg);
-      const id = (noCubre && enmarcada ? enmarcada : plantilla)?.id ?? "";
+      const papel = formato !== "carrusel" || i === 0 ? "portada" : i === fotos.length - 1 ? "cierre" : "plato";
+      const id = plantillaPara(p.marca, formatoImg, papel, noCubre ? "marco" : "sangre")?.id ?? "";
       return {
         foto: f.id,
         plantilla: id,

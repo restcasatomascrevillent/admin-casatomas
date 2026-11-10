@@ -60,6 +60,8 @@ export interface PlantillaCampana extends PlantillaRotulos {
    * (entera, sin ampliar). Las fotos de la carta (1200×900) solo valen enmarcadas.
    */
   encaje?: "sangre" | "marco";
+  /** Papel de la plantilla v2 (portada, plato, cierre, tipografica); las clásicas no tienen. */
+  papel?: string;
 }
 
 export type FormatoCampana = "post" | "story";
@@ -262,7 +264,9 @@ export function revisarPiezaCampana(bruta: unknown, ctx: ContextoCampana): { ok:
     }
     // Las fotos de la carta (1200×900, apaisadas) no cubren un post ni una story: solo enmarcadas.
     if (foto && deCarta && plantilla.encaje !== "marco") {
-      const marco = ctx.plantillas.find((p) => p.conFoto && p.encaje === "marco" && (!FORMATOS_CAMPANA.includes(formato) || p.formatos.includes(formato)));
+      // La enmarcada del mismo papel (portada → portada enmarcada); si no hay, cualquiera enmarcada.
+      const enmarcadas = ctx.plantillas.filter((p) => p.conFoto && p.encaje === "marco" && (!FORMATOS_CAMPANA.includes(formato) || p.formatos.includes(formato)));
+      const marco = enmarcadas.find((p) => p.papel === plantilla!.papel) ?? enmarcadas[0];
       if (marco) {
         correcciones.push(`La foto de la carta no cubre la plantilla «${plantilla.id}» (se vería ampliada y borrosa): se usa «${marco.id}» (Foto enmarcada).`);
         plantilla = marco;
