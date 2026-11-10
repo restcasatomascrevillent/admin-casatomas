@@ -11,6 +11,10 @@ import { normalizarAlergeno, parseAlergenos } from "@/lib/alergenos";
  *  · Sin lactosa: alérgenos rellenos sin lácteos y sin nota de leche/lactosa ni «consultar».
  *  · Vegetariano: casilla marcada, sin carne, pescado ni marisco en los alérgenos y sin palabras
  *    de origen animal en el nombre, la descripción, los ingredientes o la nota.
+ *
+ * Desde el 10/11/2026 (dueño: «que sea modificable … apto para celíaco, … apto para sin lactosa»)
+ * «Celíacos» y «Sin lactosa» se pueden decidir a mano (Platos.apto_celiacos / apto_sin_lactosa,
+ * migración 20261122093000): true o false mandan sobre lo anterior; NULL = automático.
  */
 export type DietaPlato = "celiaquia" | "vegetariano" | "lactosa";
 
@@ -31,7 +35,13 @@ export interface DatosAptitud {
   ingredientes?: string | null;
   sinGluten?: boolean;
   vegetariano?: boolean;
+  /** Decidido a mano (true/false); null o ausente = automático, según alérgenos. */
+  aptoCeliacos?: boolean | null;
+  aptoSinLactosa?: boolean | null;
 }
+
+/** Motivo de una aptitud decidida a mano. */
+const aMano = (apto: boolean): EstadoDieta => ({ apto, motivo: apto ? "Marcado a mano" : "Desmarcado a mano" });
 
 const plegar = (texto: string) =>
   texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -67,10 +77,14 @@ export function aptitudesPlato(datos: DatosAptitud): Record<DietaPlato, EstadoDi
     return { apto: true, motivo: ok };
   };
 
-  const celiaquia = datos.sinGluten && claves.has("gluten")
-    ? { apto: true, motivo: "Se puede hacer sin gluten" }
-    : porAlergenos("gluten", NOTA_GLUTEN, "gluten", "Sin gluten declarado");
-  const lactosa = porAlergenos("lacteos", NOTA_LACTOSA, "lácteos", "Sin lácteos declarados");
+  const celiaquia = typeof datos.aptoCeliacos === "boolean"
+    ? aMano(datos.aptoCeliacos)
+    : datos.sinGluten && claves.has("gluten")
+      ? { apto: true, motivo: "Se puede hacer sin gluten" }
+      : porAlergenos("gluten", NOTA_GLUTEN, "gluten", "Sin gluten declarado");
+  const lactosa = typeof datos.aptoSinLactosa === "boolean"
+    ? aMano(datos.aptoSinLactosa)
+    : porAlergenos("lacteos", NOTA_LACTOSA, "lácteos", "Sin lácteos declarados");
 
   let vegetariano: EstadoDieta;
   const animal = NO_VEGETARIANO.find((a) => claves.has(a));

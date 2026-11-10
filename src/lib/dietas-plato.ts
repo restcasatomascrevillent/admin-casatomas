@@ -37,3 +37,42 @@ export function cambioVegetariano(etiquetas: unknown, vegetariano: boolean): { e
   const actuales = leer(etiquetas);
   return { etiquetas_dieteticas: actuales.includes("vegetariano") ? actuales : ["vegetariano", ...actuales] };
 }
+
+/**
+ * «Apto para celíacos» y «Apto sin lactosa» decididos a mano (10/11/2026; columnas
+ * Platos.apto_celiacos / apto_sin_lactosa, migración 20261122093000). NULL = automático: lo
+ * deciden los alérgenos.
+ */
+export type AptitudManual = boolean | null;
+
+/** Lee lo guardado: solo true/false cuentan como decidido a mano; lo demás es automático. */
+export function leerAptitudManual(valor: unknown): AptitudManual {
+  return typeof valor === "boolean" ? valor : null;
+}
+
+/**
+ * Valor que deja el interruptor al pulsarlo: si coincide con lo que dirían los alérgenos, vuelve
+ * a automático (NULL) para que siga a los alérgenos si cambian; si no, queda decidido a mano.
+ */
+export function aptitudTrasPulsar(nuevo: boolean, automatico: boolean): AptitudManual {
+  return nuevo === automatico ? null : nuevo;
+}
+
+/**
+ * Lo que hay que guardar de las dos aptitudes a mano. Solo manda la columna que cambia: sin la
+ * migración aplicada (columna ausente) el plato se sigue guardando mientras no se toque.
+ */
+export function cambiosAptitudesManuales(
+  anterior: { apto_celiacos?: unknown; apto_sin_lactosa?: unknown } | null | undefined,
+  nuevo: { apto_celiacos: AptitudManual; apto_sin_lactosa: AptitudManual },
+): { apto_celiacos?: AptitudManual; apto_sin_lactosa?: AptitudManual } {
+  const cambios: { apto_celiacos?: AptitudManual; apto_sin_lactosa?: AptitudManual } = {};
+  if (leerAptitudManual(anterior?.apto_celiacos) !== nuevo.apto_celiacos) cambios.apto_celiacos = nuevo.apto_celiacos;
+  if (leerAptitudManual(anterior?.apto_sin_lactosa) !== nuevo.apto_sin_lactosa) cambios.apto_sin_lactosa = nuevo.apto_sin_lactosa;
+  return cambios;
+}
+
+/** ¿La BD ya tiene las columnas? select('*') no las trae antes de aplicar la migración. */
+export function aptitudesManualesDisponibles(plato: object | null | undefined): boolean {
+  return !!plato && "apto_celiacos" in plato;
+}

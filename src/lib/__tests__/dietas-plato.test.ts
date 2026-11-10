@@ -19,3 +19,34 @@ describe("Casilla «Vegetariano» de los platos", () => {
     expect(cambioVegetariano(["vegetariano", "vegano"], false)).toEqual({ etiquetas_dieteticas: null });
   });
 });
+
+describe("«Apto para celíacos» y «Apto sin lactosa» a mano", () => {
+  it("solo true/false cuentan como decidido a mano", async () => {
+    const { leerAptitudManual } = await import("@/lib/dietas-plato");
+    expect(leerAptitudManual(true)).toBe(true);
+    expect(leerAptitudManual(false)).toBe(false);
+    expect(leerAptitudManual(null)).toBeNull();
+    expect(leerAptitudManual(undefined)).toBeNull();
+    expect(leerAptitudManual("true")).toBeNull();
+  });
+  it("al pulsar, si coincide con los alérgenos vuelve a automático", async () => {
+    const { aptitudTrasPulsar } = await import("@/lib/dietas-plato");
+    expect(aptitudTrasPulsar(true, true)).toBeNull();
+    expect(aptitudTrasPulsar(false, false)).toBeNull();
+    expect(aptitudTrasPulsar(false, true)).toBe(false);
+    expect(aptitudTrasPulsar(true, false)).toBe(true);
+  });
+  it("solo manda la columna que cambia", async () => {
+    const { cambiosAptitudesManuales } = await import("@/lib/dietas-plato");
+    expect(cambiosAptitudesManuales({}, { apto_celiacos: null, apto_sin_lactosa: null })).toEqual({});
+    expect(cambiosAptitudesManuales({ apto_celiacos: null }, { apto_celiacos: true, apto_sin_lactosa: null })).toEqual({ apto_celiacos: true });
+    expect(cambiosAptitudesManuales({ apto_celiacos: true, apto_sin_lactosa: false }, { apto_celiacos: true, apto_sin_lactosa: null }))
+      .toEqual({ apto_sin_lactosa: null });
+  });
+  it("detecta si la BD ya tiene las columnas", async () => {
+    const { aptitudesManualesDisponibles } = await import("@/lib/dietas-plato");
+    expect(aptitudesManualesDisponibles({ id: "p", apto_celiacos: null })).toBe(true);
+    expect(aptitudesManualesDisponibles({ id: "p" })).toBe(false);
+    expect(aptitudesManualesDisponibles(null)).toBe(false);
+  });
+});
