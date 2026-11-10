@@ -1,5 +1,7 @@
 # Vídeo del plato: «Mandar a un dispositivo potente»
 
+> **Retirado el 10/11/2026** (petición del dueño: «Quitar el botón de mandar a dispositivo potente»). El panel ya no muestra el botón en «Vídeo del plato» ni en «Cambiar fondo del vídeo», así que no se crean trabajos nuevos. El aviso del ordenador (`AvisoTrabajosVideo`) ya se había quitado el 06/11/2026. Se conservan la tabla `trabajos_video`, la Edge Function `notificar-video`, la etiqueta «Vídeo pendiente» de la lista (por si quedara algún trabajo vivo) y `pushVideo.ts`, que también usa el recorte de fotos en un ordenador. El resto del documento describe cómo funcionaba.
+
 Procesar el vídeo del plato (quitar el fondo fotograma a fotograma) en un móvil tarda varios minutos y gasta batería. Con esta función, el móvil **sube el vídeo tal cual** y un **ordenador potente** que tenga el panel abierto lo procesa, lo guarda en el plato y avisa al móvil con una notificación, aunque el panel del móvil esté cerrado.
 
 ## Cómo funciona
@@ -62,7 +64,7 @@ Lo mismo con `--project-ref haqmmdfdzzatdnrrcgez` y la variable de Vercel en el 
 | Cola, textos, extensiones | `src/components/carta/potente/colaPendientes.ts` |
 | Supabase (subir, reclamar, terminar…) | `src/components/carta/potente/trabajosVideo.ts` |
 | Procesar un trabajo | `src/components/carta/potente/procesarTrabajoRemoto.ts` |
-| Botón del móvil | `src/components/carta/potente/BotonMandarPotente.tsx` |
+| Botón del móvil | ~~`BotonMandarPotente.tsx`~~ (borrado el 10/11/2026) |
 | Aviso en el ordenador | `src/components/carta/potente/AvisoTrabajosVideo.tsx` (montado en `App.tsx` dentro de `ColaVideosProvider`) |
 | Puente con la cola de vídeo | `src/components/carta/potente/esperasCola.ts` (encola el bruto y espera listo/fallo/cancelado) |
 | Suscripción push | `src/components/carta/potente/pushVideo.ts` |
