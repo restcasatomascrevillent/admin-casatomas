@@ -145,18 +145,21 @@ export function urlTiendaWeb(entorno: VersionApp["entorno"], urlConfigurada?: st
 
 // ─── Ajustes ────────────────────────────────────────────────────────────────
 
+/**
+ * Formulario de Ajustes. Sin `activa` (10/11/2026): si la tienda sale en la web
+ * se cambia arriba de la página y se guarda al momento (`useCambiarTiendaVisible`);
+ * si el formulario lo enviara, guardarlo podría deshacer ese cambio.
+ */
 export interface FormularioAjustesTienda {
-  activa: boolean;
   /** Texto del campo (admite coma decimal). */
   descuento: string;
   aviso: string;
   recogida: string;
 }
 
-export type CambiosAjustesTienda = Pick<ConfiguracionTienda, "activa" | "descuento_pct" | "aviso" | "recogida">;
+export type CambiosAjustesTienda = Pick<ConfiguracionTienda, "descuento_pct" | "aviso" | "recogida">;
 
 export const formularioDesdeConfiguracion = (c: ConfiguracionTienda): FormularioAjustesTienda => ({
-  activa: c.activa,
   descuento: String(c.descuento_pct).replace(".", ","),
   aviso: c.aviso ?? "",
   recogida: c.recogida ?? "",
@@ -184,7 +187,6 @@ export function validarAjustes(f: FormularioAjustesTienda):
   return {
     ok: true,
     cambios: {
-      activa: f.activa,
       descuento_pct: Math.round((descuento as number) * 100) / 100,
       aviso: f.aviso.trim() || null,
       recogida: f.recogida.trim() || null,
