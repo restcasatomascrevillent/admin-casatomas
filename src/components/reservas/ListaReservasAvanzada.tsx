@@ -1458,6 +1458,11 @@ export function ListaReservasAvanzada({
         nombreSala={dialogoAccion ? nombreSalaDe(dialogoAccion.reserva) : null}
         onAccion={dialogoAccion && canEdit ? () => ejecutarAccion(dialogoAccion.reserva, dialogoAccion.accion) : undefined}
         onEditar={dialogoAccion && canEdit ? () => editarReserva(dialogoAccion.reserva.id) : undefined}
+        onElegirHora={
+          dialogoAccion && canEdit && dialogoAccion.accion === "aceptar"
+            ? () => ejecutarAccion(dialogoAccion.reserva, "verificar")
+            : undefined
+        }
         onCerrar={() => setDialogoAccion(null)}
       />
 

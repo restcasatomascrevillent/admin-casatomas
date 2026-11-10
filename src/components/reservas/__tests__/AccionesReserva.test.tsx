@@ -75,7 +75,8 @@ const textos = (items: HTMLElement[]) => items.map((i) => i.textContent?.trim())
 
 // Con permiso, sala y fecha, y una pantalla que lleva al plano.
 const CON_PERMISO: Record<Estado, { principal: string | null; mas: string[] }> = {
-  pendiente: { principal: "Aceptar", mas: ["Dar mesa", "Verificar", "Editar", "Cancelar reserva", "Lista negra"] },
+  // «Verificar» (antes «Aceptar», 10/11/2026) es la principal; «Más» ya no la repite.
+  pendiente: { principal: "Verificar", mas: ["Dar mesa", "Editar", "Cancelar reserva", "Lista negra"] },
   verificada: { principal: "Confirmar", mas: ["Dar mesa", "Editar", "Cancelar reserva", "Lista negra"] },
   confirmada: { principal: null, mas: ["Dar mesa", "Editar", "Cancelar reserva", "Lista negra"] },
   completada: { principal: null, mas: ["Dar mesa", "Editar", "Lista negra"] }, // «Llegó» no se cancela
@@ -131,7 +132,7 @@ describe("AccionesReserva · una acción clara y «Más», por estado y permiso"
   it("CAMBIO ACORDADO (2026-10-01): «Aceptar» acepta la reserva tal como está, no «como la pidió el cliente»", () => {
     const { celda } = montar({ reserva: reserva("pendiente") });
     expect(principal(celda)!.getAttribute("title")).toBe(
-      "Aceptar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email",
+      "Verificar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email",
     );
   });
 
@@ -163,11 +164,12 @@ describe("AccionesReserva · qué hace cada botón", () => {
     expect(al.aceptar).toHaveBeenCalledTimes(1);
     expect(al.confirmar).not.toHaveBeenCalled();
 
-    for (const texto of ["Dar mesa", "Verificar", "Editar", "Cancelar reserva", "Lista negra"]) {
+    for (const texto of ["Dar mesa", "Editar", "Cancelar reserva", "Lista negra"]) {
       const item = abrirMas(celda).find((i) => i.textContent?.trim() === texto)!;
       fireEvent.click(item);
     }
-    expect(al.verificar).toHaveBeenCalledTimes(1);
+    // Una sola «Verificar»: la de la fila (la de elegir hora va desde su diálogo).
+    expect(al.verificar).not.toHaveBeenCalled();
     expect(al.editar).toHaveBeenCalledTimes(1);
     expect(al.cancelar).toHaveBeenCalledTimes(1);
     expect(al.listaNegra).toHaveBeenCalledTimes(1);
@@ -293,7 +295,7 @@ describe("AccionesReserva · variantes", () => {
     expect(fila.tagName).toBe("DIV");
     expect(fila.className).toBe("flex flex-wrap items-center gap-3 pt-2");
     expect(within(celda).queryByRole("checkbox")).toBeNull();
-    expect(principal(celda)).toHaveTextContent("Aceptar");
+    expect(principal(celda)).toHaveTextContent("Verificar");
     expect(within(celda).getByRole("button", { name: "Más acciones de Ana" })).toBeInTheDocument();
   });
 });

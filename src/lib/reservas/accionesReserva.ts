@@ -157,7 +157,9 @@ export const TITULO_SIN_PERMISO_CANCELAR = "No tienes permiso para cancelar rese
  * «Aceptar» de la Lista: acepta la reserva TAL COMO ESTÁ, sin tocar hora ni sala
  * (cambio acordado con el dueño, 2026-10-01). Antes: «tal y como la pidió el cliente».
  */
-export const TITULO_ACEPTAR = "Aceptar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email";
+// 10/11/2026 (dueño): el botón se llama «Verificar», porque es lo que hace (pasa a `verificada`). La clave
+// interna sigue siendo `aceptar`.
+export const TITULO_ACEPTAR = "Verificar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email";
 
 const oculta = (): EstadoAccion => ({ visible: false, habilitada: false, titulo: "" });
 const accion = (habilitada: boolean, titulo: string): EstadoAccion => ({ visible: true, habilitada, titulo });

@@ -413,7 +413,8 @@ export function AccionesReserva({
         ) : undefined
       }
       principal={{
-        etiqueta: textoAceptar ? "Aceptar" : "Confirmar",
+        // «Verificar» (10/11/2026, dueño: «lo que hace es verificarla»; antes decía «Aceptar»).
+        etiqueta: textoAceptar ? "Verificar" : "Confirmar",
         icono: textoAceptar ? <CheckCircle /> : <CheckCheck />,
         titulo: principal.titulo,
         onClick: principal.habilitada && !principalOcupada ? (pendiente ? al.aceptar : al.confirmar) : undefined,
@@ -423,7 +424,9 @@ export function AccionesReserva({
         titulo: onAsignarMesa ? tituloDarMesa : TITULO_DAR_MESA_SIN_PLANO,
         onClick: destino && onAsignarMesa ? () => onAsignarMesa(destino) : undefined,
       }}
-      verificar={ranura(acc.verificar, al.verificar)}
+      // Una sola «Verificar» (10/11/2026): la de la fila abre el diálogo con el día y, desde ahí, «Verificar con
+      // otra hora» lleva a elegir la hora. En «Más» ya no se repite.
+      verificar={{ titulo: acc.verificar.titulo }}
       gestionar={{ ...ranura(acc.editar, al.editar), icono: <SquarePen />, etiqueta: "Editar" }}
       nombre={reserva.nombre || "Sin nombre"}
       cancelar={{ ...ranura(acc.cancelar, ocupada ? undefined : al.cancelar), cargando: ocupada }}

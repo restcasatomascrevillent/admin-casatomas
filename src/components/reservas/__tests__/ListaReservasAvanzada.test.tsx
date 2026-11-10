@@ -59,6 +59,8 @@ import type { DobleSupabase } from "@/lib/reservas/__tests__/dobleSupabaseLotes"
 import type { DobleCanales } from "@/hooks/__tests__/dobleCanalRealtime";
 
 const supa = vi.hoisted(() => ({
+  /** Props del diálogo de verificar (elegir la hora). */
+  verificacion: vi.fn(),
   /** Las salas que devuelve `useEspaciosReserva` (por defecto, ninguna). */
   espacios: [] as unknown[],
   // La escritura del ejecutor de acciones es `update(…).eq("id", …)[.in("estado", …)].select("id")`.
@@ -159,7 +161,12 @@ vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data
 vi.mock("@/hooks/useEdicionReserva", () => ({
   useEdicionReserva: () => ({ editarReserva: supa.editarReserva, dialogoEdicion: null }),
 }));
-vi.mock("@/components/reservas/ModalVerificacionReserva", () => ({ ModalVerificacionReserva: () => null }));
+vi.mock("@/components/reservas/ModalVerificacionReserva", () => ({
+  ModalVerificacionReserva: (props: unknown) => {
+    supa.verificacion(props);
+    return null;
+  },
+}));
 // El día de la reserva del diálogo de aceptar/confirmar/verificar tiene sus propios tests (DialogoAccionReserva).
 vi.mock("@/components/reservas/ElDiaDeLaReserva", () => ({ ElDiaDeLaReserva: () => <div data-testid="el-dia" /> }));
 vi.mock("@/components/reservas/BlacklistModal", () => ({ BlacklistModal: () => null }));
@@ -291,7 +298,7 @@ const accionesDeFila = (fila: HTMLElement) =>
 async function pulsarConDialogo(boton: HTMLElement) {
   fireEvent.click(boton);
   const dialogo = await screen.findByRole("dialog");
-  fireEvent.click(within(dialogo).getByRole("button", { name: /^(Aceptar reserva|Confirmar reserva|Verificar)$/ }));
+  fireEvent.click(within(dialogo).getByRole("button", { name: /^(Verificar reserva|Confirmar reserva|Verificar)$/ }));
 }
 
 /** Fila de la tabla que habla de ese cliente. */
@@ -418,8 +425,9 @@ describe("ListaReservasAvanzada · columna de acciones", () => {
     const fila = (texto: string) => filaDe(tabla, texto);
 
     // Pendiente sin sala: «Aceptar»; se verifica, se edita, se cancela; sin sala no hay «Dar mesa».
-    expect(principalDe(fila("Ana Pendiente"))).toHaveTextContent("Aceptar");
-    expect(textosMas(fila("Ana Pendiente"))).toEqual(["Verificar", "Editar", "Cancelar reserva", "Lista negra"]);
+    expect(principalDe(fila("Ana Pendiente"))).toHaveTextContent("Verificar");
+    // Una sola «Verificar» (10/11/2026): la de la fila; «Más» no la repite.
+    expect(textosMas(fila("Ana Pendiente"))).toEqual(["Editar", "Cancelar reserva", "Lista negra"]);
 
     // Verificada: la principal pasa a «Confirmar» y ya no se verifica.
     expect(principalDe(fila("Berta Verificada"))).toHaveTextContent("Confirmar");
@@ -1021,8 +1029,8 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
     const { tabla } = await montarSeis();
 
     const [aceptar] = botonesDeFila(filaDe(tabla, "Ana Pendiente"));
-    expect(aceptar.textContent?.trim()).toBe("Aceptar");
-    expect(aceptar.getAttribute("title")).toMatch(/^Aceptar la reserva tal como está/);
+    expect(aceptar.textContent?.trim()).toBe("Verificar");
+    expect(aceptar.getAttribute("title")).toMatch(/^Verificar la reserva tal como está/);
     expect(aceptar.getAttribute("title")).not.toMatch(/pidió/);
   });
 
@@ -2090,7 +2098,7 @@ describe("ListaReservasAvanzada · más alto para las filas: sin recuento, sin s
     const filas = [...tabla.querySelectorAll("tbody tr")] as HTMLElement[];
 
     const principales = filas.map(principalDe).filter((b): b is HTMLButtonElement => !!b);
-    expect(principales.map((b) => b.textContent?.trim())).toEqual(expect.arrayContaining(["Aceptar", "Confirmar", "Convertir"]));
+    expect(principales.map((b) => b.textContent?.trim())).toEqual(expect.arrayContaining(["Verificar", "Confirmar", "Convertir"]));
     for (const b of principales) expect(b).toHaveClass("w-[9.5rem]", "h-[52px]", "text-[17px]");
     // Fila sin acción principal (confirmada): casilla vacía y «Más» justo detrás, sin hueco.
     expect(botonesDeFila(filaDe(tabla, "Carlos Confirmado"))).toHaveLength(1);
@@ -2242,12 +2250,12 @@ describe("ListaReservasAvanzada · aceptar, confirmar y verificar abren el diál
     fireEvent.click(principalDe(filaDe(tabla, "Ana Pendiente"))!);
 
     const dialogo = await screen.findByRole("dialog");
-    expect(within(dialogo).getByRole("heading", { name: /Aceptar reserva · Ana Pendiente/ })).toBeInTheDocument();
+    expect(within(dialogo).getByRole("heading", { name: /Verificar reserva · Ana Pendiente/ })).toBeInTheDocument();
     expect(within(dialogo).getByRole("link", { name: "+34 600 111 222" })).toBeInTheDocument();
     expect(within(dialogo).getByTestId("el-dia")).toBeInTheDocument();
     expect(supa.update).not.toHaveBeenCalled();
 
-    fireEvent.click(within(dialogo).getByRole("button", { name: "Aceptar reserva" }));
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Verificar reserva" }));
     await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
@@ -2267,11 +2275,15 @@ describe("ListaReservasAvanzada · aceptar, confirmar y verificar abren el diál
     expect(supa.update).not.toHaveBeenCalled();
   });
 
-  it("«Verificar» de «Más» también pasa por el diálogo antes de abrir el de verificar", async () => {
+  it("una sola «Verificar»: no está en «Más» y su diálogo ofrece «Verificar con otra hora» (elegir la hora)", async () => {
     const { tabla } = await montar();
-    fireEvent.click(opcionMas(filaDe(tabla, "Ana Pendiente"), "Verificar"));
+    expect(textosMas(filaDe(tabla, "Ana Pendiente"))).not.toContain("Verificar");
+    fireEvent.click(principalDe(filaDe(tabla, "Ana Pendiente"))!);
     const dialogo = await screen.findByRole("dialog");
     expect(within(dialogo).getByRole("heading", { name: /Verificar reserva · Ana Pendiente/ })).toBeInTheDocument();
-    expect(within(dialogo).getByRole("button", { name: "Verificar" })).toBeInTheDocument();
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Verificar con otra hora" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(supa.verificacion.mock.calls.at(-1)?.[0]).toMatchObject({ open: true, reserva: expect.objectContaining({ id: "res-pendiente" }) }));
+    expect(supa.update).not.toHaveBeenCalled();
   });
 });
