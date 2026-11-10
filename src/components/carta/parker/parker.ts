@@ -103,6 +103,33 @@ export function anadaDeNombre(nombre: string | null | undefined): number | null 
   return anos.length ? anos[anos.length - 1] : null;
 }
 
+/**
+ * Formatos que van al final del nombre, detrás de la añada: «Carraovejas 2023
+ * (Magnum)», como «L. Roederer Brut Vintage Rosé 2012 (Magnum)» en la carta.
+ */
+const FORMATO_FINAL = /\s*\((?:magnum|doble magnum|jeroboam|rehoboam|matusal[eé]n|imperial|media botella|medio|37[,.]5 ?cl|150 ?cl|1[,.]5 ?l)\)\s*$/i;
+
+/**
+ * El nombre de la carta con la añada que se sirve (10/11/2026, petición del
+ * dueño: «las añadas de los vinos en el nombre según las fotos»). Si el nombre
+ * ya lleva un año, se cambia el último por `anada`; si no, se añade al final,
+ * delante de un formato entre paréntesis («(Magnum)»). Sin añada (null) o con
+ * un nombre vacío, el nombre no cambia. Misma regla que
+ * scripts/parker/generar-sql-anadas.mjs (la usan los scripts de datos).
+ */
+export function nombreConAnada(nombre: string | null | undefined, anada: number | null | undefined): string {
+  const base = String(nombre ?? "").replace(/\s+/g, " ").trim();
+  if (!base || typeof anada !== "number" || !Number.isInteger(anada) || anada < 1900 || anada > 2100) return base;
+  const anos = [...base.matchAll(/\b(?:19|20)\d{2}\b/g)];
+  const ultimo = anos[anos.length - 1];
+  if (ultimo?.index !== undefined) {
+    return base.slice(0, ultimo.index) + String(anada) + base.slice(ultimo.index + ultimo[0].length);
+  }
+  const formato = FORMATO_FINAL.exec(base);
+  if (formato) return `${base.slice(0, formato.index).trim()} ${anada} ${formato[0].trim()}`;
+  return `${base} ${anada}`;
+}
+
 /** La fila de la añada que se sirve (o la NV), si existe. */
 export function filaDeAnada<T extends Pick<FilaParker, "anada" | "sin_anada">>(
   filas: readonly T[],

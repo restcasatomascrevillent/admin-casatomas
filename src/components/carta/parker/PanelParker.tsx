@@ -11,6 +11,7 @@ import { urlSegura } from "@/lib/url-segura";
 import type { DatosVinoFoto } from "../leerVinoFoto";
 import {
   anadaDeNombre,
+  nombreConAnada,
   faltaParaVerificar,
   fechaCorta,
   filaDeAnada,
@@ -206,7 +207,16 @@ export function PanelParker<T extends ValoresParkerForm>({
     procesada.current = datosEtiqueta;
     const vacia = anadaDeCampo(getValues(n("anada"))) === null && getValues(n("sin_anada")) !== true;
     if (vacia && datosEtiqueta.sin_anada === true) setValue(n("sin_anada"), true as never, { shouldDirty: true });
-    else if (vacia && typeof datosEtiqueta.anada === "number") setValue(n("anada"), String(datosEtiqueta.anada) as never, { shouldDirty: true, shouldValidate: true });
+    else if (vacia && typeof datosEtiqueta.anada === "number") {
+      setValue(n("anada"), String(datosEtiqueta.anada) as never, { shouldDirty: true, shouldValidate: true });
+      // La añada leída va también al nombre de la carta si aún no lleva año
+      // (10/11/2026). Si el nombre ya dice otro año, no se toca: sale el aviso
+      // con el botón para cambiarlo.
+      const nombreActual = String(getValues(n("nombre")) ?? "");
+      if (nombreActual.trim() && anadaDeNombre(nombreActual) === null) {
+        setValue(n("nombre"), nombreConAnada(nombreActual, datosEtiqueta.anada) as never, { shouldDirty: true, shouldValidate: true });
+      }
+    }
     // La añada de la búsqueda: la del formulario si ya había una; si no, la leída.
     const p = peticion(
       false,
@@ -288,11 +298,49 @@ export function PanelParker<T extends ValoresParkerForm>({
       {anadaNombre !== null && anada !== null && anadaNombre !== anada && (
         <p className="flex gap-1 text-xs text-amber-700 dark:text-amber-300">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          El nombre dice {anadaNombre} y la añada que se sirve es {anada}. Revisa cuál es la buena.
+          <span>
+            El nombre dice {anadaNombre} y la añada que se sirve es {anada}. Revisa cuál es la buena.{" "}
+            <button
+              type="button"
+              className="font-medium underline underline-offset-2"
+              data-testid="parker-anada-al-nombre"
+              onClick={() => setValue(n("nombre"), nombreConAnada(String(nombre ?? ""), anada) as never, { shouldDirty: true, shouldValidate: true })}
+            >
+              Poner {anada} en el nombre
+            </button>
+          </span>
+        </p>
+      )}
+      {anadaNombre === null && anada !== null && Boolean(String(nombre ?? "").trim()) && (
+        <p className="text-xs text-muted-foreground">
+          El nombre de la carta no dice la añada.{" "}
+          <button
+            type="button"
+            className="font-medium text-foreground underline underline-offset-2"
+            data-testid="parker-anada-al-nombre"
+            onClick={() => setValue(n("nombre"), nombreConAnada(String(nombre ?? ""), anada) as never, { shouldDirty: true, shouldValidate: true })}
+          >
+            Añadir {anada} al nombre
+          </button>
         </p>
       )}
       {anada === null && sinAnada !== true && (
-        <p className="text-xs text-muted-foreground">Sin añada la web no enseña la puntuación: no se puede saber si es la de la botella que se sirve.</p>
+        <p className="text-xs text-muted-foreground">
+          Sin añada la web no enseña la puntuación: no se puede saber si es la de la botella que se sirve.
+          {anadaNombre !== null && (
+            <>
+              {" "}
+              <button
+                type="button"
+                className="font-medium text-foreground underline underline-offset-2"
+                data-testid="parker-anada-del-nombre"
+                onClick={() => setValue(n("anada"), String(anadaNombre) as never, { shouldDirty: true, shouldValidate: true })}
+              >
+                Usar {anadaNombre} (la del nombre)
+              </button>
+            </>
+          )}
+        </p>
       )}
 
       {etiqueta.length > 0 && (

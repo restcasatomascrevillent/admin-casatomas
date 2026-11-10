@@ -25,4 +25,6 @@ los arregle, la prueba avisará («expected to fail, but passed») y habrá que 
 
 Capturas del flujo «foto de la etiqueta → puntuación Parker» (08/11/2026): `node tests/e2e-movil/parker-foto.capturas.mjs [carpeta]`, con el mismo build y `vite preview`. Simula la lectura de la etiqueta y la búsqueda (verificada, sin añada legible, contradicción, fallo, lista y edición).
 
+Capturas de «añada en el nombre» (10/11/2026): `node tests/e2e-movil/anadas-nombre.capturas.mjs [carpeta]`, con el mismo build y `vite preview`. Edición con añada y nombre sin año («Añadir 2022 al nombre») y nombre con otra añada («Poner … en el nombre»).
+
 Medición de «Reservas › Hoy» con mala cobertura (09/11/2026): `node tests/e2e-movil/medir-hoy.mjs [--base URL] [--latencia 600] [--veces 3]`, con el mismo build y `vite preview`. Da el tiempo hasta ver la lista de reservas y las salas (escritorio 1440×900 y móvil 390×844), en frío y en caliente (volver a abrir el panel con la copia del dispositivo). No es una prueba: no entra en `npm test`.
