@@ -543,3 +543,16 @@ body:has([data-dialogo-nueva-reserva]) [data-sonner-toaster][data-x-position="ri
   right: auto !important;
   left: var(--offset-right, 24px) !important;
 }
+/* Pie fijo del formulario («Crear Reserva») en la columna derecha (10/11/2026, revisión del dueño: el selector
+   «Dentro | Fuera» asomaba por detrás del botón). Fondo opaco, borde superior marcado y por encima de los campos;
+   y un hueco antes del pie (≥ su alto + 16 px) para que el último campo se vea entero encima del botón. */
+.formulario-una-columna form > div.sticky:last-child {
+  z-index: 40;
+  background-color: hsl(var(--background));
+  border-top: 2px solid hsl(var(--border));
+  box-shadow: 0 -8px 16px -8px hsl(var(--foreground) / 0.15);
+  margin-bottom: 0;
+}
+.formulario-una-columna form > :nth-last-child(2) {
+  padding-bottom: 6.25rem;
+}

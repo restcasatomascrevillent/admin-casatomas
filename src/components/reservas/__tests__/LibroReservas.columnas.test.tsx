@@ -99,6 +99,26 @@ describe("LibroReservas · dos columnas en horizontal, una en vertical", () => {
     fireEvent.click(screen.getByRole("button", { name: /Formulario/ }));
     const caja = screen.getByTestId("formulario").parentElement!.parentElement!;
     expect(caja).toHaveClass("formulario-una-columna", "overflow-y-auto", "flex-1");
+    // Sin relleno inferior: con él, por debajo del «Crear Reserva» fijo asomaban los campos.
+    expect(caja).toHaveClass("pb-0");
+    expect(caja).not.toHaveClass("pb-6");
+  });
+
+  it("en ancho, el renglón del lápiz ocupa el alto de la columna (mínimo 280 px) con los botones abajo", () => {
+    pantalla(true);
+    montar();
+    expect(screen.getByTestId("zona-lapiz")).toHaveClass("flex", "flex-col", "flex-1");
+    const caja = screen.getByTestId("caja-lienzo");
+    expect(caja).toHaveClass("flex-1", "min-h-[280px]");
+    expect(caja).not.toHaveClass("h-[clamp(11rem,32dvh,20rem)]");
+    // Los botones, después del renglón.
+    expect(caja.nextElementSibling!.textContent).toMatch(/Borrar.*Deshacer.*Guardar sin interpretar.*Interpretar/);
+  });
+
+  it("apilado, el renglón del lápiz conserva su alto de siempre", () => {
+    pantalla(false);
+    montar();
+    expect(screen.getByTestId("caja-lienzo")).toHaveClass("h-[clamp(11rem,32dvh,20rem)]");
   });
 
   it("en estrecho (o sin matchMedia): apilado como antes", () => {
