@@ -34,6 +34,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Cheques = lazy(CARGADORES_SECCION["/cheques"]);
 const Tienda = lazy(CARGADORES_SECCION["/tienda"]);
 const Facturas = lazy(CARGADORES_SECCION["/facturas"]);
+const Albaranes = lazy(CARGADORES_SECCION["/albaranes"]);
 const AnalisisGeneral = lazy(CARGADORES_SECCION["/analisis"]);
 const Usuarios = lazy(CARGADORES_SECCION["/usuarios"]);
 const Ayuda = lazy(CARGADORES_SECCION["/ayuda"]);
@@ -201,6 +202,8 @@ const App = () => (
                     <Route path="/facturas/ia" element={pagina(<Facturas />, ["facturas", "facturas_subida"])} />
                     {/* «Análisis general» (07/11/2026): sección propia con los permisos de Facturas (solo «Ver», no Subida). */}
                     <Route path="/analisis" element={pagina(<AnalisisGeneral />, "facturas")} />
+                    {/* «Subir albaranes» (10/11/2026): tipo de usuario «Albaranes» («Facturas · Solo fotos»), pensada para el móvil. */}
+                    <Route path="/albaranes" element={pagina(<Albaranes />, "facturas_albaranes")} />
                     <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                     {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
                     {/* Historial de avisos (campana): para todos los roles. */}

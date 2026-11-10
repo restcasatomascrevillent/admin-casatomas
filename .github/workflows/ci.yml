@@ -85,6 +85,8 @@ jobs:
         run: npm run test:logs-web:db
       - name: Facturas, «Ver» solo consulta y permiso «Facturas · Subida» (PGlite)
         run: npm run test:permisos-facturas-subida:db
+      - name: Tipos de usuario «Reservas» (ver y crear) y «Albaranes» (solo fotos) (PGlite)
+        run: npm run test:usuarios-reservas-albaranes:db
       - name: Vino por copas, Parker, votación del vino favorito, horario de menú y tapas y platos vegetarianos (PGlite)
         run: npm run test:vinos-copeo-encuesta:db
       - name: Puntuaciones Parker con fuente, solo verificadas en la web (PGlite)

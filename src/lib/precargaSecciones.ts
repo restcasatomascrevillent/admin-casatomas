@@ -13,6 +13,8 @@ export const CARGADORES_SECCION = {
   "/cheques": () => import("@/pages/Cheques"),
   "/tienda": () => import("@/pages/Tienda"),
   "/facturas": () => import("@/pages/Facturas"),
+  // «Subir albaranes» (10/11/2026): la única pantalla del tipo de usuario «Albaranes».
+  "/albaranes": () => import("@/pages/Albaranes"),
   "/analisis": () => import("@/pages/AnalisisGeneral"),
   "/usuarios": () => import("@/pages/Usuarios"),
   "/avisos": () => import("@/pages/Avisos"),

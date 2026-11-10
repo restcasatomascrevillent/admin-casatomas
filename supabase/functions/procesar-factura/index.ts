@@ -1,7 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
-import { autenticar, type ConfigAuth, corsHeaders, esDocumentoPropio, jsonResponse, MENSAJE_SOLO_LO_PROPIO } from "./auth.ts";
+import {
+  autenticar,
+  type ConfigAuth,
+  corsHeaders,
+  esDocumentoPropio,
+  jsonResponse,
+  MENSAJE_SOLO_FOTOS,
+  MENSAJE_SOLO_LO_PROPIO,
+} from "./auth.ts";
 import { configModelo } from "./modelo.ts";
 import { modeloDeFuncion } from "../_shared/modelo-funcion.ts";
 import { crearClienteOpenAI } from "./openai.ts";
@@ -41,7 +49,10 @@ const createClient = clienteConAuditoria(createClientBase, "procesar-factura");
 //     líneas sin borrar nada y recalcula (mismo permiso que sustituir).
 //
 //  Permisos (06/11/2026, dueño): subir exige «Facturas · Subida» o «Editar»
-//  en Facturas; con solo «Ver» ya no se sube (ver auth.ts).
+//  en Facturas; con solo «Ver» ya no se sube (ver auth.ts). Desde el
+//  10/11/2026, el usuario «Albaranes» («Facturas · Solo fotos») solo puede
+//  `modo: "iniciar"` (no devuelve nada de lo leído): ni sustituir, ni añadir
+//  página, ni el camino síncrono, que devuelve los datos con sus importes.
 //
 //  Desde el 05-oct-2026 el código vive en módulos (prompts, modelo, openai,
 //  extraccion, guardado, archivo, auth, pagina, pieza, consolidacion,
@@ -120,6 +131,11 @@ serve(conAuditoriaDePeticion("procesar-factura", createClientBase, async (req) =
 
   try {
     const payload = await req.json();
+
+    // «Facturas · Solo fotos»: solo crear el trabajo de lectura.
+    if (auth.soloFotos && payload?.modo !== "iniciar") {
+      return jsonResponse({ success: false, error: MENSAJE_SOLO_FOTOS }, 403);
+    }
 
     // ── Documento largo: crear el trabajo ──
     if (payload?.modo === "iniciar") {
