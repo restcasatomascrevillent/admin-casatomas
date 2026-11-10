@@ -1157,9 +1157,9 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
     serviciosCerrados: turnosCerrados,
     ahora: ahoraEnMadrid(),
     politica: {
-      // `/crear` rechaza SIEMPRE las reservas para hoy (motivo `reserva_hoy`).
-      // Ofrecer huecos de hoy sería mandar al visitante a un rechazo seguro.
-      permitirMismoDia: false,
+      // Desde el 10/11/2026 la web admite reservas para hoy (con el corte
+      // horario), salvo 12:30-16:00, que va por teléfono (reglas.ts).
+      permitirMismoDia: true,
       minutosCorte: config.minutos_corte_antes_servicio || 60,
       diasMaxAntelacion: config.dias_max_antelacion || 60,
       maxComensales: config.max_comensales_por_reserva || null,
@@ -1556,9 +1556,8 @@ async function handleCrear(req: Request): Promise<Response> {
   const hoyRef = hoyEnMadrid();
   const reservaDateRef = new Date(fecha + "T00:00:00Z");
   const diffDiasRef = Math.ceil((reservaDateRef.getTime() - hoyRef.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDiasRef === 0) {
-    return await avisar("reserva_hoy", "Intentó reservar para hoy desde la web.", "Las reservas para hoy se gestionan por teléfono.", 422);
-  }
+  // Hoy ya se admite (10/11/2026): lo frenan el corte horario y la franja
+  // 12:30-16:00 solo por teléfono (más arriba).
   // Fecha pasada y fecha demasiado lejana: la fecha es válida y parseable,
   // lo que incumple es una regla de negocio corregible -> 422, no 400.
   if (diffDiasRef < 0) {
