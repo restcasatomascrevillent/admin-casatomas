@@ -63,6 +63,8 @@ jobs:
         run: npm run test:restricciones-bebidas:db
       - name: Platos.updated_at cambia al editar (PGlite)
         run: npm run test:platos-updated-at:db
+      - name: Platos «Apto para» a mano (PGlite)
+        run: npm run test:platos-aptitudes:db
       - name: Alertas de un documento al añadir o borrar líneas (PGlite)
         run: npm run test:alertas-lineas:db
       - name: Indicaciones para la IA por proveedor (PGlite)
@@ -85,6 +87,8 @@ jobs:
         run: npm run test:logs-web:db
       - name: Facturas, «Ver» solo consulta y permiso «Facturas · Subida» (PGlite)
         run: npm run test:permisos-facturas-subida:db
+      - name: Tipos de usuario «Reservas» (ver y crear) y «Albaranes» (solo fotos) (PGlite)
+        run: npm run test:usuarios-reservas-albaranes:db
       - name: Vino por copas, Parker, votación del vino favorito, horario de menú y tapas y platos vegetarianos (PGlite)
         run: npm run test:vinos-copeo-encuesta:db
       - name: Puntuaciones Parker con fuente, solo verificadas en la web (PGlite)
@@ -115,8 +119,12 @@ jobs:
         run: npm run test:instagram-carrusel:db
       - name: RRSS, editor IA, generación única por trabajo, topes diarios, cubo privado y rollback (PGlite)
         run: npm run test:rrss:db
+      - name: Reseñas, contestador con IA, ajustes solo super admin, token de Google solo servidor y cron (PGlite)
+        run: npm run test:resenas:db
       - name: «Editar» para escribir en la carta y en el newsletter; con solo «Ver», consulta (PGlite)
         run: npm run test:permisos-carta-newsletter:db
+      - name: Plantillas de newsletter guardadas y tope diario de «Crear con IA» (PGlite)
+        run: npm run test:newsletter-plantillas:db
       - name: Mesa fijada de una reserva, migración y rollback (PGlite)
         run: npm run test:mesa-fijada:db
       - name: Evento con la sala entera, aforo y cierre que sigue a la reserva (PGlite)

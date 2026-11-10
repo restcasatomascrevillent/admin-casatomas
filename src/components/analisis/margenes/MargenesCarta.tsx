@@ -1,4 +1,4 @@
-// «Análisis general › Márgenes de carta»: dónde NO funciona el margen.
+// «Facturas › Márgenes» (antes «Análisis general › Márgenes de carta»): dónde NO funciona el margen.
 //
 //   · Arriba, cifras SOLO con lo comparable (petición del dueño, 07/11/2026:
 //     «pon el precio por kilo de las cosas que vendemos por kilo primero»):
@@ -12,7 +12,7 @@
 //   · Tocar un artículo (lista o gráfica) abre su detalle editable.
 //   · Sin scroll de página (regla del dueño): el bloque ocupa el alto que le da
 //     la página y solo la lista hace scroll por dentro.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChefHat, CircleSlash, Loader2, Scale, Settings2, Wine } from "lucide-react";
 import { CartesianGrid, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -213,11 +213,24 @@ function ordenTodos(lista: ArticuloMargen[]): ArticuloMargen[] {
   });
 }
 
-export function MargenesCarta({ puedeEditar }: { puedeEditar: boolean }) {
+type Elegido = { tipo: "plato" | "vino"; id: string };
+
+/**
+ * `articuloInicial`: ficha que se abre al entrar (enlace del Dashboard, `?articulo=plato:<id>`);
+ * si es un vino, empieza en la vista Vinos.
+ */
+export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEditar: boolean; articuloInicial?: Elegido | null }) {
   const q = useMargenesCarta();
-  const [vista, setVista] = useState<Vista>("peso");
+  const [vista, setVista] = useState<Vista>(articuloInicial?.tipo === "vino" ? "vinos" : "peso");
   const [filtro, setFiltro] = useState<Filtro>("problemas");
-  const [elegido, setElegido] = useState<{ tipo: "plato" | "vino"; id: string } | null>(null);
+  const [elegido, setElegido] = useState<Elegido | null>(articuloInicial);
+  const claveInicial = articuloInicial ? `${articuloInicial.tipo}:${articuloInicial.id}` : null;
+  useEffect(() => {
+    if (!claveInicial) return;
+    const [tipo, ...resto] = claveInicial.split(":");
+    setElegido({ tipo: tipo as Elegido["tipo"], id: resto.join(":") });
+    if (tipo === "vino") setVista("vinos");
+  }, [claveInicial]);
   const [umbrales, setUmbrales] = useState(false);
 
   const d = q.data;

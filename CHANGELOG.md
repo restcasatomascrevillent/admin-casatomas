@@ -2,6 +2,28 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.15.0] - 2026-11-10
+
+Objetivo: Libro de reservas con lápiz, avisos de reservas nuevas y canceladas, facturas (comparar y gráficas), newsletter, cheques, reseñas, servicios, usuarios y más
+
+### Añadido
+- Reservas: la Lista se pone al día sola con los cambios de otros dispositivos ([#65](https://github.com/restcasatomascrevillent/admin-casatomas/pull/65))
+- Rama feature/gestor-web-dietas ([#68](https://github.com/restcasatomascrevillent/admin-casatomas/pull/68))
+- Dashboard: módulos «Márgenes de precio» y «Avisos»; «Análisis general» pasa a Facturas › Márgenes ([#70](https://github.com/restcasatomascrevillent/admin-casatomas/pull/70))
+- Rama feature/servicios-costes ([#72](https://github.com/restcasatomascrevillent/admin-casatomas/pull/72))
+- Resenas: contestador con IA y reseñas de Google que se traen solas ([#73](https://github.com/restcasatomascrevillent/admin-casatomas/pull/73))
+- Rama feature/usuarios-reservas-albaranes ([#74](https://github.com/restcasatomascrevillent/admin-casatomas/pull/74))
+- Newsletter: plantillas con la estética de Casa Tomás, plantillas nuevas y «Crear con IA» ([#76](https://github.com/restcasatomascrevillent/admin-casatomas/pull/76))
+- Cheques: pestaña Stripe revisada e informe de cheques regalo en diapositivas y PDF ([#79](https://github.com/restcasatomascrevillent/admin-casatomas/pull/79))
+- Reservas: libro de reservas para escribir la reserva a mano con el lápiz ([#81](https://github.com/restcasatomascrevillent/admin-casatomas/pull/81))
+- Reservas: Avisos solo con reservas nuevas y canceladas ([#87](https://github.com/restcasatomascrevillent/admin-casatomas/pull/87))
+- Facturas: «Comparar facturas» en los avisos de precio que sube o baja ([#86](https://github.com/restcasatomascrevillent/admin-casatomas/pull/86))
+- Facturas: gráficas de precio sin ejes vacíos y selector de unidad ([#88](https://github.com/restcasatomascrevillent/admin-casatomas/pull/88))
+
+### Cambiado
+- Instagram: en Crear, los vinos de la carta salen en su filtro y con su miniatura ([04f2fb8](https://github.com/restcasatomascrevillent/admin-casatomas/commit/04f2fb880c3a32bd028215616751087283563e5b))
+- Reservas: libro — el calendario cambia de fecha y renglón más alto ([#85](https://github.com/restcasatomascrevillent/admin-casatomas/pull/85))
+
 ## [1.14.0] - 2026-11-10
 
 Objetivo: Reservas: bloqueo de servicio, menú del día, reservas del mismo día, campana y avisos, Hoy mejorado (sentar al tocar mesa, colores, personas, tamaños), estrella importante, registro de origen y jueves de tapas

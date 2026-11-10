@@ -16,6 +16,9 @@ const h = vi.hoisted(() => {
     "jwt-subida-flag": { id: "10000000-0000-4000-8000-000000000005", permisos: { facturas_subida: { edit: true } } },
     "jwt-edita": { id: "10000000-0000-4000-8000-000000000006", permisos: { facturas: { view: true, edit: true } } },
     "jwt-sa": { id: "10000000-0000-4000-8000-000000000007", permisos: {}, superAdmin: true },
+    // Tipo «Albaranes» (10/11/2026): solo «Facturas · Solo fotos».
+    "jwt-albaranes": { id: "10000000-0000-4000-8000-000000000008", permisos: { facturas_albaranes: { view: true } } },
+    "jwt-albaranes-flag": { id: "10000000-0000-4000-8000-000000000009", permisos: { facturas_albaranes: { edit: true } } },
   };
   const SUBIDA = USUARIOS["jwt-subida"].id;
   const estado = {
@@ -156,6 +159,44 @@ describe("procesar-factura · subir", () => {
     expect(h.estado.rpcs.map((r) => `${r.args._section}:${r.args._permission}`)).toEqual([
       "facturas:edit", "facturas_subida:view", "facturas_subida:edit",
     ]);
+  });
+});
+
+describe("procesar-factura · usuario «Albaranes» (solo fotos)", () => {
+  it.each(["jwt-albaranes", "jwt-albaranes-flag"])("%s pasa el permiso para crear el trabajo (modo iniciar)", async (token) => {
+    const res = await llamar("procesar-factura", token, INICIAR_MAL);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: false, error: "trabajo_id no es un UUID válido" });
+  });
+
+  it("comprueba «Solo fotos» la última (Editar y Subida antes)", async () => {
+    await llamar("procesar-factura", "jwt-albaranes-flag", INICIAR_MAL);
+    expect(h.estado.rpcs.map((r) => `${r.args._section}:${r.args._permission}`)).toEqual([
+      "facturas:edit", "facturas_subida:view", "facturas_subida:edit", "facturas_albaranes:view", "facturas_albaranes:edit",
+    ]);
+  });
+
+  it.each(["sustituir", "anadir_pagina"])("%s → 403 sin leer nada (ni sobre lo suyo)", async (modo) => {
+    const res = await llamar("procesar-factura", "jwt-albaranes", sustituir(1, "t-mio", modo));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ success: false, error: expect.stringMatching(/Solo fotos/) });
+    expect(h.estado.lecturas).toEqual([]);
+    expect(h.estado.fetchs).toEqual([]);
+  });
+
+  it("el camino síncrono (que devuelve lo leído con sus importes) → 403 sin llamar a OpenAI", async () => {
+    const res = await llamar("procesar-factura", "jwt-albaranes", {
+      tipo: "AUTO",
+      archivo: { nombre: "a.jpg", tipo: "image/jpeg", size: 3, contenido_base64: "AAAA" },
+    });
+    expect(res.status).toBe(403);
+    expect(h.estado.fetchs).toEqual([]);
+  });
+
+  it("con «Facturas · Subida», el camino síncrono no se corta aquí", async () => {
+    const res = await llamar("procesar-factura", "jwt-subida", { tipo: "AUTO", archivo: {} });
+    expect(res.status).toBe(200);
+    expect((await res.json()).error).not.toMatch(/Solo fotos/);
   });
 });
 

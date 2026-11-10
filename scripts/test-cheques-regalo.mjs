@@ -25,6 +25,7 @@ const FUNCIONES = [
   "public.crear_cheque_manual",
   "public.crear_cheque_manual_v2",
   "public.metricas_cheques_regalo",
+  "public.informe_cheques_regalo",
 ];
 
 /** Última definición (por orden de migración) de cada función pedida. */
@@ -288,5 +289,55 @@ igual([delta("valor_cheques_eur"), delta("gastos_gestion_eur"), delta("bruto_eur
 // 1,02 real + round(101,78 × 1,5 % + 0,25) = 1,78 estimada.
 igual([delta("comision_eur"), delta("neto_eur")], [2.8, 150], "los gastos cubren la comisión: al restaurante le queda el valor íntegro");
 igual(despues.comision_incompleta, true, "avisa de que hay comisiones estimadas");
+
+// --- 11. Informe de cheques regalo (sin datos personales) ---------------------------------------
+await como(AJENO);
+await falla(sql(`select public.informe_cheques_regalo('2026-01-01', '2026-01-31')`), /permiso/, "sin permiso de Cheques no hay informe");
+await como(LECTOR);
+await falla(sql(`select public.informe_cheques_regalo('2026-02-01', '2026-01-01')`), /Rango/, "rango al revés");
+await falla(sql(`select public.informe_cheques_regalo(null, '2026-01-01')`), /Rango/, "rango sin inicio");
+// Filas con fechas fijas (sin el trigger de caducidad, que pondría la de hoy). Fechas en hora de Madrid.
+await db.exec(`alter table public.cheques_regalo disable trigger cheques_controlar_caducidad`);
+const filaInforme = (codigo, creado) => db.exec(`insert into public.cheques_regalo
+  (importe_eur, comprador_nombre, comprador_email, estado, codigo, stripe_payment_intent_id, origen, pago_manual_metodo,
+   created_at, caduca_el, usado, canjeado_en, gastos_gestion_eur, stripe_fee_eur)
+  select importe, 'Persona Privada', 'privada@test.local', estado, '${codigo}', pi, origen, metodo,
+    ('${creado}'::timestamp at time zone 'Europe/Madrid'), caduca::date, usado, (canjeado::timestamp at time zone 'Europe/Madrid'), gastos, fee
+  from (select 50::numeric importe, 'pagado'::text estado, 'pi_${codigo}'::text pi, 'web'::text origen, null::text metodo,
+    '${creado}'::date + 365 caduca, false usado, null::text canjeado, 0::numeric gastos, null::numeric fee) d`);
+await filaInforme("CT-INF-A", "2026-01-15 12:00");
+await filaInforme("CT-INF-B", "2025-12-20 10:00");
+await filaInforme("CT-INF-C", "2025-12-10 10:00");
+await sql(`update public.cheques_regalo set usado = true, canjeado_en = '2025-12-28 13:00+01' where codigo = 'CT-INF-C'`);
+await filaInforme("CT-INF-D", "2025-02-01 10:00");
+await sql(`update public.cheques_regalo set caduca_el = '2025-12-31' where codigo = 'CT-INF-D'`);
+await filaInforme("CT-INF-E", "2026-02-01 00:30");
+await filaInforme("CT-INF-F", "2026-01-31 23:30");
+await filaInforme("CT-INF-G", "2026-01-10 18:00");
+await sql(`update public.cheques_regalo set estado = 'cancelado' where codigo = 'CT-INF-G'`);
+await filaInforme("CT-INF-H", "2026-01-11 18:00");
+await sql(`update public.cheques_regalo set estado = 'cancelado', stripe_payment_intent_id = null where codigo = 'CT-INF-H'`);
+await filaInforme("CT-INF-I", "2026-01-05 09:15");
+await sql(`update public.cheques_regalo set origen = 'manual', pago_manual_metodo = 'cortesia', stripe_payment_intent_id = null where codigo = 'CT-INF-I'`);
+await filaInforme("CT-INF-J", "2025-11-03 20:00");
+await sql(`update public.cheques_regalo set usado = true, canjeado_en = '2026-01-20 21:10+01', gastos_gestion_eur = 1.02, stripe_fee_eur = 1.02 where codigo = 'CT-INF-J'`);
+await db.exec(`alter table public.cheques_regalo enable trigger cheques_controlar_caducidad`);
+const inf = (await una(`select public.informe_cheques_regalo('2026-01-01', '2026-01-31') as r`)).r;
+const deInforme = inf.cheques.filter((c) => c.creado >= "2025-01-01" && c.creado < "2026-03-01" && !c.creado.startsWith(hoy));
+igual(deInforme.map((c) => c.creado), ["2025-11-03T20:00:00", "2025-12-20T10:00:00", "2026-01-05T09:15:00", "2026-01-10T18:00:00", "2026-01-15T12:00:00", "2026-01-31T23:30:00"],
+  "entran los del periodo (día de Madrid) y los anteriores aún vivos; no los canjeados o caducados antes, ni los posteriores, ni los cancelados sin pago");
+const porCreado = Object.fromEntries(deInforme.map((c) => [c.creado, c]));
+igual([porCreado["2026-01-10T18:00:00"].estado, porCreado["2026-01-05T09:15:00"].canal, porCreado["2026-01-15T12:00:00"].canal], ["reembolsado", "cortesia", "web"], "estado reembolsado y canal de venta");
+const j = porCreado["2025-11-03T20:00:00"];
+igual([j.canjeado, Number(j.gastos_gestion_eur), Number(j.stripe_fee_eur), j.caduca_el], ["2026-01-20T21:10:00", 1.02, 1.02, "2026-11-03"], "fecha de canje en hora de Madrid, gastos, comisión y caducidad");
+igual(Object.keys(j).sort(), ["caduca_el", "canal", "canjeado", "creado", "estado", "gastos_gestion_eur", "importe_eur", "stripe_fee_eur"], "sin código, nombres ni correos");
+igual(JSON.stringify(inf).includes("privada"), false, "ningún dato personal en la respuesta");
+igual([inf.desde, inf.hasta, inf.hoy], ["2026-01-01", "2026-01-31", hoy], "devuelve el periodo y el día de hoy en Madrid");
+
+// La vuelta atrás quita la RPC del informe y nada más.
+await db.exec("reset role");
+await db.exec((await readFile("supabase/rollbacks/20261122093700_informe_cheques_regalo_ROLLBACK.sql", "utf8")).replace(/^set client_encoding.*$/m, "").replace(/notify pgrst.*$/m, ""));
+igual((await una(`select to_regprocedure('public.informe_cheques_regalo(date,date)') is null as quitada`)).quitada, true, "el rollback quita la RPC del informe");
+igual((await una(`select to_regprocedure('public.metricas_cheques_regalo(date,date)') is null as quitada`)).quitada, false, "el rollback no toca las métricas");
 
 console.log(`test-cheques-regalo: ${comprobaciones} comprobaciones superadas`);

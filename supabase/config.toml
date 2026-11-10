@@ -227,6 +227,11 @@ verify_jwt = true
 [functions.rrss-ia]
 verify_jwt = true
 
+# Newsletter › «Crear con IA» (newsletter-ia/ia.ts): JWT de usuario + «Editar»
+# en Marketing; la propuesta nunca se envía sola.
+[functions.newsletter-ia]
+verify_jwt = true
+
 # Marketing › Instagram › Métricas (docs/instagram-metricas.md). verify_jwt =
 # false porque la llama pg_cron (net.http_post, tarea instagram-metricas-diarias)
 # SIN usuario ni JWT, igual que sync-trafico-web. Autenticación real dentro:
@@ -259,6 +264,10 @@ verify_jwt = true
 [functions.extraer-vino-foto]
 verify_jwt = true
 
+# «Escribir reserva» (libro de reservas): exige además reservas_puede_crear() con el JWT del usuario.
+[functions.interpretar-reserva-manuscrita]
+verify_jwt = true
+
 [functions.buscar-puntuacion-parker]
 verify_jwt = true
 
@@ -272,6 +281,11 @@ verify_jwt = true
 # pelado a la URL dispara la sincronización entera. Es la más expuesta del lote.
 [functions.sync-google-reviews]
 verify_jwt = true
+
+# Contestador de reseñas: la vuelta de Google OAuth (GET) y el cron no traen
+# JWT; la función exige super admin, el secreto del cron o el state firmado.
+[functions.resenas-contestador]
+verify_jwt = false
 
 # Endpoint público del chatbot de casa-tomas-story. Sin JWT (igual que
 # reservas-web): la web manda una publishable key `sb_publishable_…`, que no es

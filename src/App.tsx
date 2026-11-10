@@ -34,7 +34,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Cheques = lazy(CARGADORES_SECCION["/cheques"]);
 const Tienda = lazy(CARGADORES_SECCION["/tienda"]);
 const Facturas = lazy(CARGADORES_SECCION["/facturas"]);
-const AnalisisGeneral = lazy(CARGADORES_SECCION["/analisis"]);
+const Albaranes = lazy(CARGADORES_SECCION["/albaranes"]);
 const Usuarios = lazy(CARGADORES_SECCION["/usuarios"]);
 const Ayuda = lazy(CARGADORES_SECCION["/ayuda"]);
 const Avisos = lazy(CARGADORES_SECCION["/avisos"]);
@@ -199,8 +199,8 @@ const App = () => (
                         (mismo árbol, no se desmonta al ir y volver). La IA exige «Editar»: sin él, la
                         página vuelve a /facturas (con solo «Facturas · Subida», a Cargar). */}
                     <Route path="/facturas/ia" element={pagina(<Facturas />, ["facturas", "facturas_subida"])} />
-                    {/* «Análisis general» (07/11/2026): sección propia con los permisos de Facturas (solo «Ver», no Subida). */}
-                    <Route path="/analisis" element={pagina(<AnalisisGeneral />, "facturas")} />
+                    {/* «Subir albaranes» (10/11/2026): tipo de usuario «Albaranes» («Facturas · Solo fotos»), pensada para el móvil. */}
+                    <Route path="/albaranes" element={pagina(<Albaranes />, "facturas_albaranes")} />
                     <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                     {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
                     {/* Historial de avisos (campana): para todos los roles. */}
@@ -212,6 +212,9 @@ const App = () => (
                       conserva la ruta para que marcadores/enlaces antiguos no den 404. */}
                   <Route path="/trabajadores" element={<Navigate to="/" replace />} />
                   <Route path="/gestor-carta" element={<Navigate to="/gestion-web?tab=carta" replace />} />
+                  {/* «Análisis general» (sección propia del 07/11/2026) es desde el 10/11/2026 la pestaña «Márgenes»
+                      de Facturas (petición del dueño). Los marcadores y enlaces antiguos llegan a ella. */}
+                  <Route path="/analisis" element={<Navigate to="/facturas?tab=margenes" replace />} />
                   {/* /instagram?tab=…&encargo=… (marcadores, avisos push, notificar-video) → RRSS › Instagram con los mismos parámetros. */}
                   <Route path="/instagram" element={<RedirigirInstagram />} />
                   <Route path="/gestion-bot" element={<Navigate to="/super-admin/bot-web" replace />} />

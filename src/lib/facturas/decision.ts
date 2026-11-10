@@ -288,6 +288,19 @@ export function resumenDecision(d: DecisionFacturas): ResumenDecision {
   };
 }
 
+/**
+ * Texto bajo la cifra «Puedes ahorrar». Sale de las alertas «más barato en otro
+ * proveedor» vigentes (cron diario facturas-alertas: mismo producto del
+ * catálogo, en €/kg o €/l, que en los últimos 90 días has comprado a otro que
+ * ya usas al menos un 15 % más barato y cuya última compra fue al caro). Con
+ * 0 € se dice por qué en vez de «0 productos» (10/11/2026, el dueño veía 0 €
+ * sin explicación).
+ */
+export function detalleAhorro(r: Pick<ResumenDecision, "masBarato">): string {
+  if (r.masBarato === 0) return "ningún producto más barato en otro proveedor que ya usas";
+  return `cada 90 días · ${r.masBarato} ${r.masBarato === 1 ? "producto" : "productos"}`;
+}
+
 /** «mayo–agosto» (o «mayo de 2026» si es uno) a partir de «AAAA-MM». */
 export function textoMesesReferencia(meses: string[]): string | null {
   if (meses.length === 0) return null;

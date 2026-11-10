@@ -2,8 +2,8 @@ import { lazy, Suspense, useState, useEffect, useMemo, useRef, type ComponentPro
 import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Clock, Mail, Plus, Settings, SlidersHorizontal, Timer } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Clock, Mail, PenLine, Plus, Settings, SlidersHorizontal, Timer } from "lucide-react";
 import { EtiquetaSoloLectura } from "@/components/panel/EtiquetaSoloLectura";
 import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -14,6 +14,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { LayoutGrid, Utensils } from "lucide-react";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useCanAccessSection } from "@/hooks/useUserRole";
+import { usePuedeCrearReservas } from "@/hooks/usePuedeCrearReservas";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import {
   ETIQUETAS_SUBPESTANA_CONFIGURACION,
@@ -40,6 +41,10 @@ import { toast } from "sonner";
 // ============================================================================
 const FormularioReserva = lazy(() =>
   import("@/components/reservas/FormularioReserva").then((m) => ({ default: m.FormularioReserva })),
+);
+// «Escribir reserva» (10/11/2026): libro de reservas con lápiz, también bajo demanda.
+const LibroReservas = lazy(() =>
+  import("@/components/reservas/libro/LibroReservas").then((m) => ({ default: m.LibroReservas })),
 );
 const ListaReservasAvanzada = lazy(() =>
   import("@/components/reservas/ListaReservasAvanzada").then((m) => ({ default: m.ListaReservasAvanzada })),
@@ -144,6 +149,7 @@ export default function Reservas() {
   // Móvil (< 768 px): solo «Hoy» para sentar (ver más abajo).
   const esMovil = useIsMobile();
   const [openDialog, setOpenDialog] = useState(false);
+  const [libroAbierto, setLibroAbierto] = useState(false);
   const [selectedEspacio, setSelectedEspacio] = useState<{ id: string; nombre: string } | null>(null);
   // Dentro de una sala: "plano" es el editor/asignación de siempre
   // (PlanoEspacio2D); "servicio" es la vista en vivo del modo servicio
@@ -174,6 +180,9 @@ export default function Reservas() {
   // «Reservas». Sin él (solo «Ver», 06/11/2026) cada vista OCULTA lo que escribe y aquí, junto a las
   // pestañas, sale la etiqueta común «Solo lectura» en lugar de «Nueva Reserva».
   const { canAccess: puedeEditarReservas, loading: cargandoEdicion } = useCanAccessSection("reservas", "edit");
+  // Tipo de usuario «Reservas» (10/11/2026): con «Reservas · Crear» sale «Nueva Reserva» aunque no
+  // tenga «Editar»; lo demás sigue en solo lectura (la BD solo le deja el alta, 20261122143500).
+  const { puedeCrear: puedeCrearReservas, soloCrear } = usePuedeCrearReservas();
   const soloLectura = !cargandoEdicion && !puedeEditarReservas;
   const listaRef = useRef<HTMLElement | null>(null);
 
@@ -392,8 +401,31 @@ export default function Reservas() {
             <>
             {/* Avisos de reservas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral). */}
             <BotonAvisosSeccion seccion="reservas" />
-            {soloLectura && <EtiquetaSoloLectura />}
-            {puedeEditarReservas && (
+            {soloLectura && (soloCrear ? <EtiquetaSoloLectura
+                  texto="Solo ver y crear"
+                  detalle="Puedes ver las reservas y crear reservas nuevas, pero no modificarlas, cambiar su estado ni configurar. Si necesitas más, pídeselo a un administrador."
+                /> : <EtiquetaSoloLectura />)}
+            {/* «Escribir reserva» (10/11/2026, petición del dueño): el libro de reservas con lápiz. Mismo
+                permiso que «Nueva Reserva» (guarda con el mismo formulario de alta). El diálogo ocupa casi
+                toda la pantalla y hace scroll por dentro: la página sigue sin desplazar. */}
+            {puedeCrearReservas && (
+              <Dialog open={libroAbierto} onOpenChange={setLibroAbierto}>
+                <DialogTrigger asChild>
+                  <Button className="touch-hit h-9 shrink-0 bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-700 pointer-coarse:h-9">
+                    <PenLine className="mr-2 h-4 w-4" />
+                    Escribir reserva
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="flex h-[94dvh] max-h-[94dvh] w-[98vw] max-w-[98vw] flex-col gap-0 overflow-hidden p-0">
+                  <DialogHeader className="sr-only">
+                    <DialogTitle>Libro de reservas</DialogTitle>
+                    <DialogDescription>Escribe la reserva a mano en la hoja del día e interprétala.</DialogDescription>
+                  </DialogHeader>
+                  {bajoDemanda(<LibroReservas soloCrear={soloCrear} />)}
+                </DialogContent>
+              </Dialog>
+            )}
+            {puedeCrearReservas && (
               <Dialog open={openDialog} onOpenChange={setOpenDialog}>
                 <DialogTrigger asChild>
                   <Button className="touch-hit h-9 shrink-0 pointer-coarse:h-9">
@@ -409,6 +441,7 @@ export default function Reservas() {
                     <FormularioReserva
                       datosPreseleccionados={datosNuevaReserva}
                       onSuccess={() => setOpenDialog(false)}
+                      soloCrear={soloCrear}
                     />,
                   )}
                 </DialogContent>

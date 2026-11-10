@@ -50,7 +50,7 @@ import { useConfigTablero } from "@/hooks/useConfigTablero";
 import { useAlertasFacturas } from "@/hooks/useAlertasFacturas";
 import { alertasDelPeriodo, umbralSubida } from "@/lib/facturas/alertas";
 import { useDecisionFacturas } from "@/hooks/useDecisionFacturas";
-import { resumenDecision } from "@/lib/facturas/decision";
+import { detalleAhorro, resumenDecision } from "@/lib/facturas/decision";
 import { resumenCortoAlerta, tituloCortoAlerta } from "@/lib/facturas/alertas";
 import { VISTAS, type IdVista } from "@/lib/facturas/vistasAnalisis";
 import { FamiliasFrenteMedia } from "./Decision";
@@ -589,7 +589,7 @@ export function TableroCompras({
       vista: "ahorro",
       etiqueta: "Puedes ahorrar",
       valor: rd ? formasImporte(Math.round(rd.ahorro90)) : ["…"],
-      detalle: rd ? `cada 90 días · ${plural(rd.masBarato, "producto", "productos")}` : "Cargando…",
+      detalle: rd ? detalleAhorro(rd) : "Cargando…",
       listo: !!rd || !!(decisionQ.isError || (!decisionQ.isPending && !dec)),
     },
     {

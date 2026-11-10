@@ -10,16 +10,21 @@ import { SubirFotoDialog } from "@/components/marketing/instagram/SubirFotoDialo
 import { textoError } from "@/components/marketing/instagram/api";
 import { useFotosInstagram } from "@/components/marketing/instagram/useFotosInstagram";
 
-type Origen = "todas" | "drive" | "carta";
+type Origen = "todas" | "drive" | "carta" | "vinos";
 const ORIGENES: ReadonlyArray<{ id: Origen; nombre: string }> = [
   { id: "todas", nombre: "Todas" },
   { id: "drive", nombre: "Drive" },
   { id: "carta", nombre: "Carta" },
+  { id: "vinos", nombre: "Vinos" },
 ];
+
+/** De dónde sale una foto: los vinos de la carta no son de Drive (10/11/2026). */
+const origenDe = (f: Foto): Exclude<Origen, "todas"> => (f.vinoId ? "vinos" : f.platoId ? "carta" : "drive");
 
 /** Miniatura de cualquier foto del catálogo (Drive, carta o bucket). */
 export function MiniaturaFoto({ foto, baseFotos }: { foto: Foto; baseFotos: string }) {
-  if (foto.platoId && foto.urlCarta) return <MiniaturaCarta platoId={foto.platoId} url={foto.urlCarta} />;
+  const idCarta = foto.platoId ?? foto.vinoId;
+  if (idCarta && foto.urlCarta) return <MiniaturaCarta platoId={idCarta} url={foto.urlCarta} />;
   if (foto.driveId) return <MiniaturaDrive marca={foto.marca} driveId={foto.driveId} />;
   return <img src={urlRecurso(baseFotos, foto.ruta)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />;
 }
@@ -51,10 +56,11 @@ export function BibliotecaFotos({ marca, formato, elegidas, onAlternar, onSubida
   const [subir, setSubir] = useState(false);
   const cuantas: Record<Origen, number> = {
     todas: todas.length,
-    drive: todas.filter((f) => !f.platoId).length,
-    carta: todas.filter((f) => !!f.platoId).length,
+    drive: todas.filter((f) => origenDe(f) === "drive").length,
+    carta: todas.filter((f) => origenDe(f) === "carta").length,
+    vinos: todas.filter((f) => origenDe(f) === "vinos").length,
   };
-  const fotos = origen === "todas" ? todas : todas.filter((f) => (origen === "carta" ? !!f.platoId : !f.platoId));
+  const fotos = origen === "todas" ? todas : todas.filter((f) => origenDe(f) === origen);
   const lleno = elegidas.length >= MAX_FOTOS_CARRUSEL;
 
   return (
@@ -129,7 +135,7 @@ export function BibliotecaFotos({ marca, formato, elegidas, onAlternar, onSubida
               role="checkbox"
               aria-checked={elegida}
               aria-disabled={motivo || (lleno && !elegida) ? true : undefined}
-              aria-label={`${foto.platoId ? "Carta: " : ""}${nombre}${elegida ? `. Elegida, número ${orden + 1}` : ""}${motivo ? `. No sirve: ${motivo}` : ""}`}
+              aria-label={`${foto.vinoId ? "Vino: " : foto.platoId ? "Carta: " : ""}${nombre}${elegida ? `. Elegida, número ${orden + 1}` : ""}${motivo ? `. No sirve: ${motivo}` : ""}`}
               title={motivo ?? nombre}
               data-testid={`foto-${foto.id}`}
               onClick={() => {
@@ -145,9 +151,9 @@ export function BibliotecaFotos({ marca, formato, elegidas, onAlternar, onSubida
               )}
             >
               <MiniaturaFoto foto={foto} baseFotos={baseFotos} />
-              {foto.platoId && (
+              {(foto.platoId || foto.vinoId) && (
                 <span className="absolute bottom-1 left-1 rounded bg-primary px-1 text-xs font-medium leading-4 text-primary-foreground" aria-hidden="true">
-                  Carta
+                  {foto.vinoId ? "Vino" : "Carta"}
                 </span>
               )}
               <EtiquetaOriginal foto={foto} />

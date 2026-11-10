@@ -195,7 +195,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
           "Para encontrar uno, escribe en el buscador (busca en el nombre y la descripción), elige una categoría o filtra por lo que está visible u oculto en Casa Tomás o en Touza.",
           "Cada tarjeta enseña el precio, la descripción, los ingredientes, los alérgenos y si se puede hacer sin gluten. El ojo enseña u oculta la foto aquí en el panel; «Foto expandida en carta web» la saca en grande en la web, y con el botón de mover eliges qué parte de la foto se ve.",
           "Los interruptores «Restaurante» (Casa Tomás) y «Touza» lo enseñan u ocultan en cada web. Ocultar no borra nada: lo puedes volver a enseñar cuando quieras.",
-          "Pulsa «Añadir» para crear uno o «Editar» en uno que ya existe para cambiar el nombre, la categoría, el precio, la descripción, los ingredientes, los alérgenos, «Se puede hacer sin gluten» o la foto. Nada cambia hasta que pulsas guardar. «Eliminar» lo borra del todo (te pide confirmarlo).",
+          "Pulsa «Añadir» para crear uno o «Editar» en uno que ya existe para cambiar el nombre, la categoría, el precio, la descripción, los ingredientes, los alérgenos, los interruptores de «Apto para» (se puede hacer para celíacos, apto para celíacos, para vegetarianos y sin lactosa) o la foto. Nada cambia hasta que pulsas guardar. «Eliminar» lo borra del todo (te pide confirmarlo).",
         ],
       },
       {
@@ -253,7 +253,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         pregunta: "¿Cómo pongo los alérgenos o «sin gluten»?",
         respuesta:
-          "Pulsa «Editar» en el plato, marca sus alérgenos y, si se puede preparar sin gluten, activa «Se puede hacer sin gluten». Guarda. En el menú del día, los platos «De la carta» los copian solos; a los «A mano» se los pones tú.",
+          "Pulsa «Editar» en el plato, marca sus alérgenos y, si se puede preparar sin gluten, activa «Se puede hacer para celíacos». En «Apto para» también puedes decidir a mano si es apto para celíacos o sin lactosa (si no lo tocas, sale de los alérgenos). Guarda. En el menú del día, los platos «De la carta» los copian solos; a los «A mano» se los pones tú.",
       },
       {
         pregunta: "Me he equivocado subiendo precios, ¿lo puedo deshacer?",

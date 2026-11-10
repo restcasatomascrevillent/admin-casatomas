@@ -126,7 +126,7 @@ function espiarCadenas() {
   return { cadenas, insert };
 }
 
-function montar(datos: Record<string, unknown>) {
+function montar(datos: Record<string, unknown>, soloCrear = false) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const invalidar = vi.spyOn(qc, "invalidateQueries");
   const onSuccess = vi.fn();
@@ -135,6 +135,7 @@ function montar(datos: Record<string, unknown>) {
       <MemoryRouter>
         <FormularioReserva
           onSuccess={onSuccess}
+          soloCrear={soloCrear}
           datosPreseleccionados={{
             fecha: addDays(new Date(), 3),
             hora: "21:00",
@@ -424,5 +425,25 @@ describe("FormularioReserva · sin permiso para crear (RLS)", () => {
     await crearYQueFalle({ message: RECHAZO_RLS.message });
 
     expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/^No tienes permiso para crear reservas\. Pide a un super admin/));
+  });
+});
+
+// Tipo de usuario «Reservas» (10/11/2026): solo crea. «Ocupa la sala entera» cierra la sala y exige «Editar».
+describe("FormularioReserva · solo crear («Reservas · Crear»)", () => {
+  const desplegarSala = () => fireEvent.click(screen.getByRole("button", { name: /asignación interna \(opcional\)/i }));
+
+  it("sin «Editar» no se ofrece «Ocupa la sala entera (evento)»", async () => {
+    espiarInsert();
+    montar({}, true);
+    desplegarSala();
+    await screen.findByText(/No se le dice al cliente ni limita la hora/);
+    expect(screen.queryByTestId("casilla-sala-entera")).not.toBeInTheDocument();
+  });
+
+  it("con «Editar» sigue ahí", async () => {
+    espiarInsert();
+    montar({});
+    desplegarSala();
+    expect(await screen.findByTestId("casilla-sala-entera")).toBeInTheDocument();
   });
 });

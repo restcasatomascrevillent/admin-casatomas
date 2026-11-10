@@ -883,6 +883,21 @@ describe("Análisis en una pantalla: vistas con las gráficas de decisión", () 
     expect(within(det).getByRole("button", { name: "Quitar precio pactado" })).toBeInTheDocument();
   });
 
+  it("«Precios» con un solo mes de compras: una frase con el precio, sin ejes vacíos", async () => {
+    doble.rpcs.facturas_decision = () => ({
+      ...RESPUESTA,
+      top: [{ ...RESPUESTA.top[0], meses: [{ mes: "2026-08", precio: null }, { mes: "2026-09", precio: 203.98 }], pactado: null }],
+    });
+    montar();
+    const lista5 = await screen.findByRole("list", { name: "Decisiones, de más a menos dinero" });
+    fireEvent.click(within(within(lista5).getAllByRole("listitem")[1]).getByRole("button", { name: "Ver precio" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lo más comprado" }));
+    const det = screen.getByTestId("caja-precio-detalle");
+    expect(within(det).getByTestId("precio-un-solo-mes")).toHaveTextContent(/Solo 1 mes con compras: 203,98 €\/barril en septiembre 2026 en Catral\. Sin IVA/);
+    expect(within(det).queryByRole("img")).not.toBeInTheDocument();
+    expect(within(det).queryByText(/€ por barril, sin IVA/)).not.toBeInTheDocument();
+  });
+
   it("«Puedes ahorrar» abre «Ahorro»: dos barras (ahora / más barato), el −18 % y la frase con lo que compraste", async () => {
     montar();
     await screen.findByText("1.362.491,57 €");
@@ -915,6 +930,21 @@ describe("Análisis en una pantalla: vistas con las gráficas de decisión", () 
     const avisos = await screen.findByTestId("caja-avisos");
     expect(within(avisos).getByTestId("aviso-por-revisar")).toHaveTextContent(/Proveedor nuevo/);
     expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Por revisar/ })).toHaveAccessibleName(/1 con aviso/);
+  });
+
+  it("petición del dueño: una subida con la compra anterior más barata (doc_otro) da «Comparar facturas» y abre las dos, la anterior primero", async () => {
+    const [s1, ...resto] = RESPUESTA.cambios.sube;
+    const anterior = { id: 70, fecha: "2026-09-12", proveedor: "Cetárea Angelmar", numero: "260401", tipo: "factura", local: "casa_tomas", total: 700, drive_url: "https://drive.google.com/file/d/ant/view", archivo_path: null };
+    doble.rpcs.facturas_decision = () => ({ ...RESPUESTA, cambios: { ...RESPUESTA.cambios, sube: [{ ...s1, doc_otro: anterior }, ...resto] } });
+    montar();
+    const lista5 = await screen.findByRole("list", { name: "Decisiones, de más a menos dinero" });
+    const fila = within(lista5).getAllByRole("listitem")[1];
+    expect(fila).toHaveTextContent(/PERCEBE GALLEGO G ha subido/);
+    expect(within(fila).queryByRole("button", { name: "Ver factura" })).not.toBeInTheDocument();
+    fireEvent.click(within(fila).getByRole("button", { name: "Comparar facturas" }));
+    const visor = await screen.findByTestId("visor-documento");
+    expect(within(visor).getByText("1 de 2")).toBeInTheDocument();
+    expect(within(visor).getByTitle(/^Factura 260401/)).toBeInTheDocument();
   });
 
   it("bug del dueño: con «Año» sin meses anteriores, «¿En qué se va el dinero?» compara el último mes completo y lo explica", async () => {

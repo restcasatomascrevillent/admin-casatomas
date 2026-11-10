@@ -10,7 +10,6 @@ import {
   Settings,
   HelpCircle,
   Share2,
-  ChartNoAxesCombined,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -39,7 +38,7 @@ import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
 import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
 import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
-import { ShoppingBag } from "lucide-react";
+import { Camera, ShoppingBag } from "lucide-react";
 
 // `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
 // cualquiera de ellas (el Gestor Web agrupa carta, contenido web y bot).
@@ -54,6 +53,8 @@ const menuItems: {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   sectionKey?: SectionKey | SectionKey[];
   toggleKey?: string;
+  /** Solo con el permiso guardado (el super admin no lo ve por serlo). */
+  soloConPermiso?: boolean;
 }[] = [
   {
     title: "Dashboard",
@@ -120,15 +121,18 @@ const menuItems: {
     sectionKey: ["facturas", "facturas_subida"],
     toggleKey: "facturas",
   },
-  // «Análisis general» (07/11/2026, petición del dueño): sección propia, fuera de Facturas. Primera
-  // pantalla, Márgenes de carta. Usa el permiso y el interruptor de Facturas (no hay sección «analisis»).
+  // «Subir albaranes» (10/11/2026): la pantalla del tipo de usuario «Albaranes» (solo fotos). No la ve el super
+  // admin (tiene Cargar en Facturas): solo quien tiene el permiso. Interruptor del Super Admin: el de Facturas.
   {
-    title: "Análisis general",
-    url: "/analisis",
-    icon: ChartNoAxesCombined,
-    sectionKey: "facturas",
+    title: "Subir albaranes",
+    url: "/albaranes",
+    icon: Camera,
+    sectionKey: "facturas_albaranes",
     toggleKey: "facturas",
+    soloConPermiso: true,
   },
+  // «Análisis general» (07/11/2026) ya no va aquí: desde el 10/11/2026 es la pestaña «Márgenes» de Facturas
+  // (petición del dueño). /analisis lleva a ella.
   {
     title: "Usuarios",
     url: "/usuarios",
@@ -173,7 +177,7 @@ export function AppSidebar() {
     // Usuarios se configura por permisos como las demás desde el 06/11/2026 (antes, rol admin).
     // Ser "admin" ya no da acceso a todo lo demás: solo un super admin lo ve
     // todo pase lo que pase en la tabla de permisos.
-    if (isSuperAdmin) return true;
+    if (isSuperAdmin && !item.soloConPermiso) return true;
     return keys.some(
       (key) => permissions.find((p) => p.section_key === key)?.can_view,
     );

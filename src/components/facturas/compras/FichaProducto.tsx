@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pencil, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -65,6 +65,9 @@ export function FichaProducto({
   const categoriasQ = useCategoriasProducto();
   const lineasQ = useLineasProducto(productoId);
   const [editando, setEditando] = useState(false);
+  // Unidad de la gráfica (null = la más comprada); vuelve a la de defecto al cambiar de producto.
+  const [unidadSerie, setUnidadSerie] = useState<string | null>(null);
+  useEffect(() => setUnidadSerie(null), [productoId]);
 
   const catalogo = useMemo(() => resumenQ.data ?? [], [resumenQ.data]);
   const categorias = useMemo(() => categoriasQ.data ?? [], [categoriasQ.data]);
@@ -82,8 +85,8 @@ export function FichaProducto({
       ...l,
       proveedor: (l.proveedor_id != null ? porId.get(l.proveedor_id) : undefined) ?? (l.proveedor ? resolver(l.proveedor).nombre : null),
     }));
-    return serieDesdeLineas(producto.nombre, lineas);
-  }, [producto, lineasQ.data, proveedoresQ.data]);
+    return serieDesdeLineas(producto.nombre, lineas, undefined, unidadSerie);
+  }, [producto, lineasQ.data, proveedoresQ.data, unidadSerie]);
 
   if (!producto) {
     // Con error del catálogo no se dice «puede que se haya fusionado» (QA C-10).
@@ -178,7 +181,12 @@ export function FichaProducto({
               No se ha podido calcular la evolución del precio.
             </p>
           ) : (
-            <GraficoSeriePrecio datos={serie} compacto />
+            <GraficoSeriePrecio
+              datos={serie}
+              compacto
+              unidades={"unidades" in serie ? serie.unidades : undefined}
+              onElegirUnidad={setUnidadSerie}
+            />
           )}
         </section>
 
