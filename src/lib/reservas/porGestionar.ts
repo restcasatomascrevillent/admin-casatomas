@@ -23,6 +23,8 @@ export interface ReservaPorGestionarFila {
   numero_comensales: number | null;
   estado: string;
   marca?: string | null;
+  /** Para no dar aviso emergente de lo que se da de alta en el propio panel (`manual`, `presencial`). */
+  canal?: string | null;
 }
 
 export interface SolicitudPorGestionarFila {
@@ -49,6 +51,8 @@ export interface ItemPorGestionar {
   detalle: string;
   /** Adónde lleva al tocarla. */
   ruta: string;
+  /** Canal de la reserva (las solicitudes no lo llevan: vienen siempre del asistente). */
+  canal?: string | null;
 }
 
 const MOTIVOS_SOLICITUD: Record<string, string> = {
@@ -92,6 +96,7 @@ export function construirItemsPorGestionar(
       personas: r.numero_comensales,
       detalle: r.estado === ESTADO_VERIFICADA ? "Verificada · falta confirmar" : "Pendiente de confirmar",
       ruta: rutaReservaPorGestionar(r.estado),
+      canal: r.canal ?? null,
     }));
   const deSolicitudes: ItemPorGestionar[] = solicitudes
     .filter((s) => esSolicitudAbierta(s.estado) && admiteReservas(s.marca))

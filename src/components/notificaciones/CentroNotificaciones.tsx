@@ -10,6 +10,9 @@ import { useReservasPorGestionar } from "@/hooks/useReservasPorGestionar";
 import { contarAvisosSinLeer } from "@/lib/reservas/porGestionar";
 import { useNotificacionesDashboard } from "@/hooks/useNotificacionesDashboard";
 import { cn } from "@/lib/utils";
+import { AjustesAvisosEnVivo } from "@/components/notificaciones/AvisosEnVivo";
+import { useEstadoAvisosEnVivo } from "@/hooks/useAvisosEnVivo";
+import { avisosEnVivo } from "@/lib/avisosEnVivo/preferencias";
 
 function timeAgo(dateStr: string): string {
   const now = new Date();
@@ -42,6 +45,13 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
   const { items: porGestionar, count: countPorGestionar } = useReservasPorGestionar(veReservas);
   // Los avisos de solicitud ya salen en «Por gestionar»: no se cuentan dos veces.
   const total = countPorGestionar + contarAvisosSinLeer(notificaciones, veReservas);
+  // Algo nuevo que nadie ha mirado (AvisosEnVivo): la campana late hasta que se abre.
+  const { sinVer } = useEstadoAvisosEnVivo();
+  const late = sinVer > 0 && total > 0;
+  const cambiarAbierto = (valor: boolean) => {
+    setAbierto(valor);
+    if (valor) avisosEnVivo.marcarVistos();
+  };
 
   const handleClick = (notif: (typeof notificaciones)[0]) => {
     marcarLeida(notif.id);
@@ -53,7 +63,7 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
   };
 
   return (
-    <Popover open={abierto} onOpenChange={setAbierto}>
+    <Popover open={abierto} onOpenChange={cambiarAbierto}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -68,9 +78,15 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
               : "Notificaciones"
           }
         >
-          <Bell className="h-4 w-4" />
+          <Bell className={cn("h-4 w-4", total > 0 && "text-red-600 dark:text-red-400", late && "motion-safe:animate-pulse")} />
+          {late && (
+            <span aria-hidden="true" className="pointer-events-none absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-red-500/60 motion-safe:animate-ping" />
+          )}
           {total > 0 && (
-            <Badge className="absolute -top-1 -right-1 h-5 min-w-[20px] animate-in justify-center rounded-full px-1 text-[10px] pointer-coarse:text-xs leading-none tabular-nums zoom-in-50 bg-destructive text-destructive-foreground">
+            <Badge
+              data-testid="campana-cifra"
+              className="absolute -top-1.5 -right-1.5 h-6 min-w-6 animate-in justify-center rounded-full border-2 border-background bg-red-600 px-1 text-xs font-bold leading-none tabular-nums text-white zoom-in-50 hover:bg-red-600"
+            >
               {total > 99 ? "99+" : total}
             </Badge>
           )}
@@ -221,6 +237,8 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
             </div>
           )}
         </div>
+
+        {veReservas && <AjustesAvisosEnVivo className="border-t px-3 py-2" />}
 
         <div className="border-t p-2">
           <Button

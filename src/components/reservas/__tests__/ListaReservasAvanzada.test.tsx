@@ -1511,7 +1511,7 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
 
     fireEvent.click(desplegableCanal());
     const deCanal = (await screen.findAllByRole("option")).map((o) => textoDe(o));
-    expect(deCanal).toEqual(["Todos los canales", "📞 Tel", "🌐 Web", "✏️ Manual"]);
+    expect(deCanal).toEqual(["Todos los canales", "📞 Tel", "🌐 Web", "✏️ Manual", "🏠 En local"]);
   });
 
   // ── «Por atender» ───────────────────────────────────────────────────────────

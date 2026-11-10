@@ -49,6 +49,7 @@ const ETIQUETA_CANAL: Record<string, string> = {
   telefono: "Teléfono",
   web: "Web",
   manual: "Manual",
+  presencial: "En local",
 };
 
 async function cargarReserva(id: string): Promise<ReservaEditable | null> {

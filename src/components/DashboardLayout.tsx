@@ -2,6 +2,7 @@ import { createContext, useContext, useLayoutEffect, type ReactNode } from "reac
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
+import { AvisosEnVivo } from "@/components/notificaciones/AvisosEnVivo";
 import { RouteErrorBoundary } from "@/components/ErrorBoundary";
 import { useIsCompactNav, useIsMobile } from "@/hooks/use-mobile";
 import { NavAutoCollapse, defaultSidebarOpen } from "@/components/NavAutoCollapse";
@@ -82,6 +83,8 @@ export function MarcoPanel({ children, fixedHeight = false, sinCabeceraMovil = f
       <NavAutoCollapse />
       {/* Baja en segundo plano el modelo del recorte de fotos de la carta. */}
       <PrecargaRecorte />
+      {/* Aviso grande, sonido y cifra en la pestaña cuando entra algo que gestionar (10/11/2026). */}
+      <AvisosEnVivo />
       {/* `h-app`/`min-h-app` (index.css): en iPad/Android el alto de `100vh` incluye la barra del
           navegador y cortaba el pie de la página; `dvh` la descuenta (con `vh` de respaldo). */}
       <div
