@@ -21,12 +21,14 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 export interface OpcionesPdf {
   titulo: string;
   nombreArchivo: string;
+  /** Asunto del PDF (propiedades del documento). Por defecto, el del informe de tráfico web. */
+  asunto?: string;
   /** Avance: (diapositivas hechas, total). */
   alAvanzar?: (hechas: number, total: number) => void;
 }
 
 /** Genera el PDF con las diapositivas dadas (en orden) y devuelve el Blob. */
-export async function crearPdfInforme(diapositivas: HTMLElement[], { titulo, alAvanzar }: Omit<OpcionesPdf, "nombreArchivo">): Promise<Blob> {
+export async function crearPdfInforme(diapositivas: HTMLElement[], { titulo, asunto, alAvanzar }: Omit<OpcionesPdf, "nombreArchivo">): Promise<Blob> {
   if (diapositivas.length === 0) throw new Error("No hay diapositivas que exportar.");
   const [{ default: html2canvas }, { jsPDF }, cssFuente] = await Promise.all([
     import("html2canvas"),
@@ -45,7 +47,7 @@ export async function crearPdfInforme(diapositivas: HTMLElement[], { titulo, alA
   arregloLineaBase.textContent = 'body > div[style*="visibility: hidden"] > img { display: inline !important; }';
   document.head.appendChild(arregloLineaBase);
   try {
-    return await rasterizar(diapositivas, { titulo, alAvanzar }, html2canvas, jsPDF, cssFuente);
+    return await rasterizar(diapositivas, { titulo, asunto, alAvanzar }, html2canvas, jsPDF, cssFuente);
   } finally {
     arregloLineaBase.remove();
   }
@@ -53,13 +55,13 @@ export async function crearPdfInforme(diapositivas: HTMLElement[], { titulo, alA
 
 async function rasterizar(
   diapositivas: HTMLElement[],
-  { titulo, alAvanzar }: Omit<OpcionesPdf, "nombreArchivo">,
+  { titulo, asunto = "Informe mensual de tráfico web", alAvanzar }: Omit<OpcionesPdf, "nombreArchivo">,
   html2canvas: typeof import("html2canvas").default,
   jsPDF: typeof import("jspdf").jsPDF,
   cssFuente: string | null,
 ): Promise<Blob> {
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: [ANCHO_PT, ALTO_PT], compress: true });
-  doc.setProperties({ title: titulo, subject: "Informe mensual de tráfico web", author: "Casa Tomás", creator: "Panel de Casa Tomás" });
+  doc.setProperties({ title: titulo, subject: asunto, author: "Casa Tomás", creator: "Panel de Casa Tomás" });
 
   for (let i = 0; i < diapositivas.length; i++) {
     const graficos = svgsComoImagenes(diapositivas[i], cssFuente);

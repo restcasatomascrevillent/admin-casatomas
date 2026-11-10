@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.6.0] - 2026-11-09
+
+Objetivo: RRSS: un solo panel de métricas para todas las redes, con informe mensual en diapositivas y PDF
+
+### Añadido
+- Rrss: panel de métricas global con informe mensual (diapositivas y PDF) ([#43](https://github.com/restcasatomascrevillent/admin-casatomas/pull/43))
+
 ## [1.5.0] - 2026-11-09
 
 Objetivo: Premio y último día del sorteo «Vota tu vino favorito» desde el panel (bases legales)

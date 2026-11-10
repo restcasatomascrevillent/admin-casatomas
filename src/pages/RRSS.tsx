@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Facebook, Instagram, Lightbulb, Sparkles, Wand2 } from "lucide-react";
+import { BarChart3, Facebook, Instagram, Lightbulb, Sparkles, Wand2 } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,8 +14,9 @@ import { ContenidoInstagram } from "@/pages/Instagram";
 const FacebookRRSS = lazy(() => import("@/components/rrss/facebook/FacebookRRSS").then((m) => ({ default: m.FacebookRRSS })));
 const EditorIA = lazy(() => import("@/components/rrss/editor/EditorIA").then((m) => ({ default: m.EditorIA })));
 const IdeasGrabar = lazy(() => import("@/components/rrss/ideas/IdeasGrabar").then((m) => ({ default: m.IdeasGrabar })));
+const MetricasRRSS = lazy(() => import("@/components/rrss/metricas/MetricasRRSS").then((m) => ({ default: m.MetricasRRSS })));
 
-export const REDES = ["instagram", "facebook", "editor"] as const;
+export const REDES = ["instagram", "facebook", "editor", "metricas"] as const;
 export type RedRrss = (typeof REDES)[number];
 
 const ALTURA_MINIMA = 360;
@@ -54,11 +55,15 @@ function EtiquetaChip({ larga, corta }: { larga: string; corta: string }) {
  *  · Subida de fotos — Editor IA de fotos y vídeos: subir fotos y vídeos, que
  *    la IA proponga la edición y el motor la haga de verdad; y «Dame ideas
  *    para grabar». Ver docs/rrss.md.
+ *  · Métricas (09/11/2026): un solo panel para todas las redes, con
+ *    «Generar informe» mensual como el de Tráfico web. Sustituye a
+ *    Instagram › Métricas. Ver docs/rrss.md.
  *
- * `?red=instagram|facebook|editor` abre esa pestaña; `?trabajo=<id>` abre un
- * trabajo del editor; `/instagram?…` redirige aquí con `red=instagram` y el
- * resto de parámetros (tab, encargo, pieza…), así que los enlaces y avisos
- * antiguos siguen funcionando.
+ * `?red=instagram|facebook|editor|metricas` abre esa pestaña; `?trabajo=<id>`
+ * abre un trabajo del editor; `/instagram?…` redirige aquí con `red=instagram`
+ * y el resto de parámetros (tab, encargo, pieza…), así que los enlaces y
+ * avisos antiguos siguen funcionando. El antiguo `?tab=metricas` de Instagram
+ * abre RRSS › Métricas.
  */
 export default function RRSS() {
   const [params, setParams] = useSearchParams();
@@ -67,7 +72,9 @@ export default function RRSS() {
   const roles = useRolesEncargos();
   // Agencia sin Marketing: solo Instagram (y dentro, solo Encargos).
   const soloAgencia = !roles.cargando && roles.agencia && !roles.restaurante;
-  const pedida = params.get("red") as RedRrss | null;
+  // Enlaces antiguos a Instagram › Métricas (`?tab=metricas`, con o sin `red=instagram`): ahora es RRSS › Métricas.
+  const metricasAntigua = params.get("tab") === "metricas" && (params.get("red") ?? "instagram") === "instagram";
+  const pedida = metricasAntigua ? "metricas" : (params.get("red") as RedRrss | null);
   const red: RedRrss = soloAgencia ? "instagram" : pedida && REDES.includes(pedida) ? pedida : "instagram";
   const [modoEditor, setModoEditor] = useState<"editor" | "ideas">(() => (params.get("modo") === "ideas" ? "ideas" : "editor"));
   const trabajo = params.get("trabajo");
@@ -84,7 +91,7 @@ export default function RRSS() {
   const cambiarRed = (r: string) => {
     if (!REDES.includes(r as RedRrss)) return;
     // Los parámetros de Instagram (tab, encargo, pieza) solo valen en Instagram.
-    cambiar(r === "instagram" ? { red: r } : { red: r, tab: null, encargo: null, pieza: null });
+    cambiar(r === "instagram" && params.get("tab") !== "metricas" ? { red: r } : { red: r, tab: null, encargo: null, pieza: null });
   };
 
   return (
@@ -94,16 +101,19 @@ export default function RRSS() {
         <Tabs value={red} onValueChange={cambiarRed} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
           {!soloAgencia && (
             <PestanasPagina
+              // Cuatro pestañas no caben con iconos a 390 px: en el móvil, solo el texto.
+              iconosSoloEscritorio
               pestanas={[
                 { valor: "instagram", etiqueta: "Instagram", icono: <Instagram /> },
                 { valor: "facebook", etiqueta: "Facebook", icono: <Facebook /> },
                 { valor: "editor", etiqueta: "Subida de fotos", etiquetaCorta: "Subida", icono: <Sparkles /> },
+                { valor: "metricas", etiqueta: "Métricas", icono: <BarChart3 /> },
               ]}
             />
           )}
 
           <TabsContent value="instagram" className={`${CONTENIDO} flex flex-col`}>
-            {red === "instagram" && <ContenidoInstagram />}
+            {red === "instagram" && <ContenidoInstagram onIrMetricas={() => cambiarRed("metricas")} />}
           </TabsContent>
 
           <TabsContent value="facebook" className={`${CONTENIDO} overflow-y-auto overscroll-contain`}>
@@ -144,6 +154,14 @@ export default function RRSS() {
                   )}
                 </TabsContent>
               </Tabs>
+            )}
+          </TabsContent>
+
+          <TabsContent value="metricas" className={`${CONTENIDO} overflow-y-auto overscroll-contain`}>
+            {red === "metricas" && (
+              <Perezosa>
+                <MetricasRRSS />
+              </Perezosa>
             )}
           </TabsContent>
         </Tabs>
