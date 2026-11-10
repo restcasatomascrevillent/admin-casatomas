@@ -84,6 +84,7 @@ import {
 import { BotonSentarSinReserva } from "@/components/reservas/SentarSinReserva";
 import { InterruptoresServiciosOnline, InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
+import { COLORES_MESA, estadoColorMovil } from "@/lib/reservas/coloresMesa";
 import { configServicioSalaDesde, type ReservaMesaServicio } from "@/lib/reservas/servicioSala";
 import { turnoDeHora } from "@/lib/reservas/asignacionMesas";
 import { ESTADOS_RESERVA, type EstadoReserva } from "@/lib/reservas/estadosReserva";
@@ -800,11 +801,11 @@ function CasillaMesa({
       type="button"
       onClick={pulsar}
       className={cn(
-        "flex min-h-20 flex-col items-start justify-between rounded-lg border-2 p-2 text-left active:scale-[0.98]",
-        estado.tipo === "libre" && "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40",
-        estado.tipo === "sentada" && "border-amber-500 bg-amber-50 dark:bg-amber-950/40",
-        estado.tipo === "reservada" && "border-sky-500 bg-sky-50 dark:bg-sky-950/40",
+        "flex min-h-20 flex-col items-start justify-between rounded-lg p-2 text-left active:scale-[0.98]",
+        // Mismos colores que el plano de escritorio (`coloresMesa.ts`, 10/11/2026).
+        COLORES_MESA[estadoColorMovil(estado.tipo)].mesa,
       )}
+      data-estado={estadoColorMovil(estado.tipo)}
       aria-label={`Mesa ${opcion.nombre}, ${opcion.plazas} plazas, ${estado.tipo === "libre" ? "libre" : estado.tipo === "sentada" ? `sentada: ${estado.nombre}` : `${fijada ? "fijada" : "prevista"} a las ${horaCorta(estado.hora)} para ${estado.nombre || "una reserva"}`}`}
     >
       <span className="flex w-full items-baseline justify-between gap-1">
@@ -830,11 +831,12 @@ function CasillaMesa({
 }
 
 // ─── Leyenda de colores (vista Mesas) ─────────────────────────────────────────
-// Pedida por el dueño el 08/11/2026: en el móvil no se sabía qué era cada color. Mismos colores que `CasillaMesa`.
+// Pedida por el dueño el 08/11/2026: en el móvil no se sabía qué era cada color. Desde el 10/11/2026 los colores
+// salen de `coloresMesa.ts`, los mismos que el plano y la leyenda de escritorio («Sentada» = «Ocupada»).
 const LEYENDA_MOVIL = [
-  { texto: "Libre", clase: "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" },
-  { texto: "Reservada", clase: "border-sky-500 bg-sky-50 dark:bg-sky-950/40" },
-  { texto: "Sentada", clase: "border-amber-500 bg-amber-50 dark:bg-amber-950/40" },
+  { texto: "Libre", estado: "libre" },
+  { texto: "Reservada", estado: "reservada" },
+  { texto: "Sentada", estado: "ocupada" },
 ] as const;
 
 export function LeyendaMesasMovil() {
@@ -842,7 +844,7 @@ export function LeyendaMesasMovil() {
     <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1 text-xs text-muted-foreground" aria-label="Leyenda de colores de las mesas" data-testid="leyenda-mesas-movil">
       {LEYENDA_MOVIL.map((l) => (
         <li key={l.texto} className="flex items-center gap-1">
-          <span className={cn("inline-block h-3.5 w-3.5 rounded border-2", l.clase)} aria-hidden="true" />
+          <span className={cn("inline-block h-3.5 w-3.5 rounded", COLORES_MESA[l.estado].mesa)} aria-hidden="true" data-muestra={l.estado} />
           {l.texto}
         </li>
       ))}
