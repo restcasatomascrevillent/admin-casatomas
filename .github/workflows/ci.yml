@@ -123,6 +123,8 @@ jobs:
         run: npm run test:resenas:db
       - name: «Editar» para escribir en la carta y en el newsletter; con solo «Ver», consulta (PGlite)
         run: npm run test:permisos-carta-newsletter:db
+      - name: Plantillas de newsletter guardadas y tope diario de «Crear con IA» (PGlite)
+        run: npm run test:newsletter-plantillas:db
       - name: Mesa fijada de una reserva, migración y rollback (PGlite)
         run: npm run test:mesa-fijada:db
       - name: Evento con la sala entera, aforo y cierre que sigue a la reserva (PGlite)
