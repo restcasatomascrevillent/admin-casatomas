@@ -103,7 +103,7 @@ export function ListaCocteles({ cocteles, soloLectura = false }: ListaCoctelesPr
               className={cn(!coctel.activado && "opacity-60")}
               foto={tieneFoto && !fotoOculta ? { url: coctel.imagen_url!, alt: coctel.nombre || "Coctel" } : null}
               categoria={<EtiquetaCategoria categoria={coctel.categoria} />}
-              titulo={<h3 className="font-semibold text-base leading-tight [overflow-wrap:anywhere]">{coctel.nombre}</h3>}
+              titulo={<h3 className="font-semibold text-lg leading-tight [overflow-wrap:anywhere]">{coctel.nombre}</h3>}
               controlesFoto={
                 <Button
                   type="button"

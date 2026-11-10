@@ -217,7 +217,7 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[500px]">
+      <DialogContent className="carta-contraste max-h-[92dvh] overflow-y-auto sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Ajuste Masivo de Precios</DialogTitle>
           <DialogDescription>

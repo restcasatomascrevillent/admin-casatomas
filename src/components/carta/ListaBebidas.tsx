@@ -93,7 +93,7 @@ export function ListaBebidas({ bebidas, soloLectura = false }: ListaBebidasProps
               className={cn(!bebida.activado && "opacity-60")}
               foto={tieneFoto && !fotoOculta ? { url: bebida.imagen_url!, alt: bebida.nombre || "Bebida" } : null}
               categoria={<EtiquetaCategoria categoria={bebida.categoria} />}
-              titulo={<h3 className="font-semibold text-base leading-tight [overflow-wrap:anywhere]">{bebida.nombre}</h3>}
+              titulo={<h3 className="font-semibold text-lg leading-tight [overflow-wrap:anywhere]">{bebida.nombre}</h3>}
               controlesFoto={
                 <Button
                   type="button"

@@ -136,7 +136,7 @@ export default function GestorWeb() {
         ) : !pestanaActiva ? (
           <p className="text-sm text-muted-foreground">No tienes acceso a ninguna parte del Gestor Web.</p>
         ) : (
-          <Tabs value={pestanaActiva} onValueChange={cambiarPestana} className="shrink-0">
+          <Tabs value={pestanaActiva} onValueChange={cambiarPestana} className="carta-contraste shrink-0">
             <PestanasPagina
               // QA-MDN-03: a 390 px las cuatro pestañas con icono no cabían y «Tapas» quedaba fuera.
               iconosSoloEscritorio
@@ -179,7 +179,7 @@ export default function GestorWeb() {
                   hidden={!activa}
                   role="tabpanel"
                   aria-label={p.label}
-                  className="pt-2 flex-1 min-h-0 overflow-y-auto overscroll-contain"
+                  className={`pt-2 flex-1 min-h-0 overflow-y-auto overscroll-contain${p.id === "carta" ? " carta-contraste" : ""}`}
                 >
                   <Suspense fallback={<Cargando />}>
                     <Componente />

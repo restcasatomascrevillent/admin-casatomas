@@ -93,7 +93,7 @@ export function BarraFiltrosVino({ opciones, seleccionado, onChange, etiqueta }:
               aria-pressed={activo}
               onClick={() => onChange(opcion.valor)}
               className={cn(
-                "h-11 shrink-0 justify-center gap-2 rounded-lg border px-2.5 py-0 text-xs font-medium hover:text-foreground sm:text-sm pointer-coarse:px-2.5",
+                "h-11 shrink-0 justify-center gap-2 rounded-lg border px-2.5 py-0 text-sm font-medium hover:text-foreground pointer-coarse:px-2.5",
                 activo
                   ? "border-primary/30 bg-background text-foreground shadow-sm hover:bg-background"
                   : "border-transparent text-muted-foreground hover:bg-background/70",

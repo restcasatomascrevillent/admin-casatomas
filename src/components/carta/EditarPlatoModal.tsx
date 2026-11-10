@@ -372,7 +372,7 @@ export function EditarPlatoModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" onInteractOutside={noCerrarAlTocarFuera}>
+      <DialogContent className="carta-contraste max-w-2xl max-h-[90dvh] overflow-y-auto" onInteractOutside={noCerrarAlTocarFuera}>
         <DialogHeader>
           <DialogTitle>Editar Plato</DialogTitle>
           <DialogDescription>
