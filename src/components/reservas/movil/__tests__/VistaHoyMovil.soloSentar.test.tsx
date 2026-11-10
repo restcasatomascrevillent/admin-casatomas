@@ -190,6 +190,20 @@ describe("VistaHoyMovil · como columna de escritorio", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
+  it("el nombre tiene su propia línea con todo el ancho (y entero en el title); mesa y estado van debajo", () => {
+    montarEstados();
+    const porLlegar = screen.getByRole("region", { name: "Por llegar" });
+    const nombre = within(porLlegar).getAllByTestId("nombre-fila")[0];
+    expect(nombre).toHaveTextContent("Ana Espera");
+    expect(nombre).toHaveAttribute("title", "Ana Espera");
+    // La mesa no comparte línea con el nombre: va en la segunda línea, dentro de la misma columna.
+    expect(nombre.parentElement).toHaveClass("flex-1");
+    expect(nombre.parentElement).toContainElement(within(porLlegar).getAllByTestId("mesa-fila")[0]);
+    // Botones de la fila estrechos pero de 44 px de alto.
+    const sentar = within(porLlegar).getByRole("button", { name: /^Sentar a Ana Espera/ });
+    expect(sentar).toHaveClass("h-11", "w-[4.25rem]");
+  });
+
   it("objetivos táctiles de 44 px: «Sentar» y la cabecera del grupo plegado", () => {
     montarEstados();
     expect(screen.getByRole("button", { name: /^Sentar a Ana Espera/ })).toHaveClass("h-11");
