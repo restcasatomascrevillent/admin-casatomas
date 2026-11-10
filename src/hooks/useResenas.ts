@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
+import type { AjustesContestador, ResenaPanel } from "@/lib/resenas/contestador";
 
 export function useResenas() {
   const queryClient = useQueryClient();
@@ -25,13 +26,15 @@ export function useResenas() {
 
   return useQuery({
     queryKey: ["resenas"],
-    queryFn: async () => {
-      const { data } = await supabase
+    // Todas, también las ocultas en la web (el panel las marca): antes solo se veían las publicadas y, en la demo,
+    // con las 11 reseñas ocultas la página salía vacía.
+    queryFn: async (): Promise<ResenaPanel[]> => {
+      const { data, error } = await supabase
         .from("resenas")
         .select("*")
-        .eq("estado", "publicada")
         .order("fecha", { ascending: false });
-      return data || [];
+      if (error) throw error;
+      return (data ?? []) as unknown as ResenaPanel[];
     },
   });
 }
@@ -64,6 +67,19 @@ export function useConfigGooglePlaces() {
         .select("*")
         .single();
       return data;
+    },
+  });
+}
+
+/** Ajustes del contestador (una fila, solo super admin). `null` si la migración aún no está aplicada. */
+export function useAjustesContestador() {
+  return useQuery({
+    queryKey: ["resenas-ajustes"],
+    queryFn: async (): Promise<AjustesContestador | null> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).from("resenas_ajustes").select("*").eq("id", true).maybeSingle();
+      if (error) return null;
+      return (data ?? null) as AjustesContestador | null;
     },
   });
 }

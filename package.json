@@ -52,6 +52,7 @@
     "test:instagram-seguridad:db": "node scripts/test-instagram-seguridad.mjs",
     "test:instagram-carrusel:db": "node scripts/test-instagram-carrusel.mjs",
     "test:rrss:db": "node scripts/test-rrss.mjs",
+    "test:resenas:db": "node scripts/test-resenas-contestador.mjs",
     "test:permisos-carta-newsletter:db": "node scripts/test-permisos-carta-newsletter.mjs",
     "test:mesa-fijada:db": "node scripts/test-reservas-mesa-fijada.mjs",
     "test:sala-evento:db": "node scripts/test-sala-entera-evento.mjs",

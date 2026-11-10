@@ -1,27 +1,63 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { TiraCifras } from "@/components/panel/TiraCifras";
 import { ListaPlana } from "@/components/panel/ListaPlana";
 import { Plegable } from "@/components/panel/Plegable";
+import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
+import { Tabs } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Star, RefreshCw, Settings, ExternalLink, AlertCircle } from "lucide-react";
-import { useResenas, useConfigGooglePlaces } from "@/hooks/useResenas";
+import { Star, RefreshCw, Settings, ExternalLink, AlertCircle, Bot, Link2, Eye, EyeOff, MessageSquareReply, Sparkles } from "lucide-react";
+import { useResenas, useConfigGooglePlaces, useAjustesContestador } from "@/hooks/useResenas";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { mensajeUsuario } from "@/lib/mensaje-usuario";
+import { mensajeUsuario, ErrorNegocio } from "@/lib/mensaje-usuario";
+import {
+  contar,
+  enlaceGoogle,
+  estadoDe,
+  ETIQUETA_ESTADO,
+  filtrar,
+  llamarContestador,
+  TONO_ESTADO,
+  type EstadoContestador,
+  type FiltroResenas,
+  type ResenaPanel,
+} from "@/lib/resenas/contestador";
+import { Estrellas } from "@/components/resenas/Estrellas";
+import { DialogoRespuesta } from "@/components/resenas/DialogoRespuesta";
+import { AjustesContestadorForm, ConexionGoogle } from "@/components/resenas/AjustesContestador";
 
 /** Suelo (px) del alto de la página: por debajo deja de encoger y vuelve el scroll de página. */
 const ALTURA_MINIMA_RESENAS = 360;
 
+const AVISOS_GOOGLE: Record<string, [ "success" | "error" | "info", string ]> = {
+  conectado: ["success", "Cuenta de Google conectada. Las respuestas aprobadas se publicarán directamente."],
+  error: ["error", "No se pudo conectar con Google. Mira el aviso en «Google Business Profile»."],
+  cancelado: ["info", "Conexión con Google cancelada."],
+};
+
 export default function GestionResenas() {
     const { data: resenas, isLoading: resenasLoading } = useResenas();
     const { data: config, isLoading: configLoading } = useConfigGooglePlaces();
+    const { data: ajustes } = useAjustesContestador();
+    const { data: estadoContestador } = useQuery({
+        queryKey: ["resenas-contestador-estado"],
+        queryFn: async () => {
+            try {
+                return await llamarContestador<EstadoContestador>({ accion: "estado" });
+            } catch {
+                return null;
+            }
+        },
+        retry: false,
+        staleTime: 60_000,
+    });
     // Alto de la pantalla (regla del dueño, 2026-10-07: sin scroll de página).
     // Cifras y botón fijos arriba; la configuración va plegada (acordeón) y la
     // lista de reseñas ocupa el resto con su propio scroll. Sin medida (jsdom,
@@ -32,23 +68,57 @@ export default function GestionResenas() {
     const [editingPlaceId, setEditingPlaceId] = useState(false);
     const [newPlaceId, setNewPlaceId] = useState("");
     const [savingPlaceId, setSavingPlaceId] = useState(false);
+    const [abierta, setAbierta] = useState<string | null>(null);
     const queryClient = useQueryClient();
+
+    const lista = useMemo(() => (resenas ?? []) as ResenaPanel[], [resenas]);
+    const cuentas = useMemo(() => contar(lista), [lista]);
+    const [filtro, setFiltro] = useState<FiltroResenas | null>(null);
+    // Por defecto «Por responder» si hay alguna; si no, todas.
+    const filtroActivo: FiltroResenas = filtro ?? (cuentas.por_responder > 0 ? "por_responder" : "todas");
+    const visibles = useMemo(() => filtrar(lista, filtroActivo), [lista, filtroActivo]);
+    const resenaAbierta = lista.find((r) => r.id === abierta) ?? null;
+    const googleConectado = !!estadoContestador?.google.conectada && !!estadoContestador.google.ubicacion;
+
+    // Vuelta de Google OAuth: ?google=conectado|error|cancelado
+    useEffect(() => {
+        const p = new URLSearchParams(window.location.search);
+        const g = p.get("google");
+        if (g && AVISOS_GOOGLE[g]) {
+            const [tipo, texto] = AVISOS_GOOGLE[g];
+            toast[tipo](texto, { duration: 7000 });
+            p.delete("google");
+            window.history.replaceState(null, "", `${window.location.pathname}${p.toString() ? `?${p}` : ""}`);
+        }
+    }, []);
+
+    const refrescar = () => {
+        queryClient.invalidateQueries({ queryKey: ["resenas"] });
+        queryClient.invalidateQueries({ queryKey: ["resenas-ajustes"] });
+        queryClient.invalidateQueries({ queryKey: ["resenas-contestador-estado"] });
+        queryClient.invalidateQueries({ queryKey: ["config-google-places"] });
+    };
 
     const handleSync = async () => {
         setSyncing(true);
         try {
-            const { error } = await supabase.functions.invoke("sync-google-reviews");
-            if (error) throw error;
-            // El realtime se encargará de actualizar la UI automáticamente
-            toast.success("✅ Reseñas sincronizadas desde Google");
-        } catch (error: any) {
-            console.error("Error syncing reviews:", error);
-            const msg = error?.message ?? "Error desconocido";
-            if (msg.includes("GOOGLE_PLACES_API_KEY")) {
-                toast.error("Falta la API Key de Google. Añádela en Supabase Secrets.", { duration: 6000 });
-            } else {
-                toast.error(`Error al sincronizar: ${msg}`);
+            try {
+                const r = await llamarContestador<{ propuestas?: number; errores?: string[]; ok?: boolean }>({ accion: "ciclo" });
+                const extra = r.propuestas ? ` · ${r.propuestas} respuesta${r.propuestas === 1 ? "" : "s"} propuesta${r.propuestas === 1 ? "" : "s"}` : "";
+                if (r.errores?.length) toast.warning(`Sincronizado con avisos${extra}: ${r.errores[0]}`, { duration: 8000 });
+                else toast.success(`Reseñas sincronizadas desde Google${extra}`);
+            } catch (e) {
+                // Mientras el contestador no esté desplegado, la sincronización de siempre.
+                if (!(e instanceof ErrorNegocio && /no está desplegado/.test(e.message))) throw e;
+                const { error } = await supabase.functions.invoke("sync-google-reviews");
+                if (error) throw error;
+                toast.success("Reseñas sincronizadas desde Google");
             }
+            refrescar();
+        } catch (error: unknown) {
+            const msg = (error as Error)?.message ?? "";
+            if (msg.includes("GOOGLE_PLACES_API_KEY")) toast.error("Falta la API Key de Google. Añádela en Supabase Secrets.", { duration: 6000 });
+            else toast.error(`Error al sincronizar: ${mensajeUsuario(error, "inténtalo de nuevo")}`);
         } finally {
             setSyncing(false);
         }
@@ -68,27 +138,31 @@ export default function GestionResenas() {
             toast.success("Place ID actualizado correctamente");
             setEditingPlaceId(false);
             setNewPlaceId("");
-        } catch (error: any) {
+        } catch (error: unknown) {
             toast.error(`Error al guardar Place ID: ${mensajeUsuario(error, "inténtalo de nuevo")}`);
         } finally {
             setSavingPlaceId(false);
         }
     };
 
-    const renderEstrellas = (valoracion: number) => (
-        <div className="flex gap-0.5" role="img" aria-label={`${valoracion} de 5 estrellas`}>
-            {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                    key={star}
-                    className={`h-3.5 w-3.5 ${star <= valoracion ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`}
-                />
-            ))}
-        </div>
-    );
+    const alternarWeb = async (r: ResenaPanel) => {
+        const nuevo = r.estado === "oculta" ? "publicada" : "oculta";
+        const { error } = await supabase.from("resenas").update({ estado: nuevo }).eq("id", r.id);
+        if (error) toast.error(mensajeUsuario(error, "No se pudo cambiar."));
+        else {
+            toast.success(nuevo === "oculta" ? "Oculta en la web" : "Visible en la web");
+            queryClient.invalidateQueries({ queryKey: ["resenas"] });
+        }
+    };
 
     const googleRating = config?.rating_promedio ? Number(config.rating_promedio) : 0;
     const isPlaceholderPlaceId = config?.place_id?.includes("_casa_") || !config?.place_id?.startsWith("ChIJ");
     const ultimaSync = config?.ultima_sincronizacion ? new Date(config.ultima_sincronizacion) : null;
+    const resumenContestador = !ajustes
+        ? undefined
+        : ajustes.autorespuesta_activa
+            ? `Automática: ${[...ajustes.autorespuesta_estrellas].sort((a, b) => b - a).join(", ")} ★`
+            : "Todo con tu aprobación";
 
     return (
         <SuperAdminLayout>
@@ -104,17 +178,17 @@ export default function GestionResenas() {
                                 valor: configLoading ? "—" : (
                                     <span className="inline-flex items-center gap-2">
                                         {googleRating.toFixed(1)}
-                                        {renderEstrellas(Math.round(googleRating))}
+                                        <Estrellas valor={Math.round(googleRating)} />
                                     </span>
                                 ),
                                 detalle: `de ${config?.total_resenas ?? 0} reseñas`,
                             },
+                            { etiqueta: "Por responder", valor: resenasLoading ? "—" : cuentas.por_responder, detalle: `de ${lista.length} aquí` },
                             {
                                 etiqueta: "Última sincronización",
                                 valor: ultimaSync ? formatDistanceToNow(ultimaSync, { addSuffix: true, locale: es }) : "Nunca",
                                 detalle: ultimaSync ? format(ultimaSync, "dd MMM HH:mm", { locale: es }) : undefined,
                             },
-                            { etiqueta: "En base de datos", valor: resenasLoading ? "—" : resenas?.length ?? 0, detalle: "reseñas" },
                         ]}
                     />
                     <Button onClick={handleSync} disabled={syncing} className="h-11 gap-2 px-5">
@@ -143,6 +217,21 @@ export default function GestionResenas() {
                         </p>
                     </div>
                 )}
+
+                {/* Contestador: ajustes (respuesta automática apagada por defecto). */}
+                <Plegable titulo="Contestador" icono={<Bot />} resumen={resumenContestador} data-testid="resenas-contestador-ajustes">
+                    <AjustesContestadorForm ajustes={ajustes} estado={estadoContestador} onCambio={refrescar} />
+                </Plegable>
+
+                {/* Google Business Profile: para publicar respuestas desde aquí. */}
+                <Plegable
+                    titulo="Google Business Profile"
+                    icono={<Link2 />}
+                    resumen={estadoContestador === undefined ? undefined : googleConectado ? "Conectada" : "Sin conectar"}
+                    data-testid="resenas-google-plegable"
+                >
+                    <ConexionGoogle estado={estadoContestador} onCambio={refrescar} />
+                </Plegable>
 
                 {/* Configuración Google Places: plegada, se usa una vez. */}
                 <Plegable
@@ -224,15 +313,28 @@ export default function GestionResenas() {
                                 <li>Valor: tu API Key de Google Cloud con permiso de <em>Places API (New)</em></li>
                                 <li>Guarda y pulsa <strong>"Sincronizar ahora"</strong> arriba</li>
                             </ol>
+                            <p className="text-xs text-muted-foreground">
+                                Se sincroniza sola dos veces al día (9:10 y 21:10). Google Places solo deja leer las 5 reseñas más recientes de cada vez;
+                                con Business Profile conectado se leen todas.
+                            </p>
                         </div>
                     </div>
                 </Plegable>
 
                 {/* Lista de reseñas: ocupa el resto y es lo único que hace scroll. */}
-                <h2 className="shrink-0 text-base font-semibold leading-tight">
-                    Todas las reseñas
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">se actualizan en tiempo real tras cada sincronización</span>
-                </h2>
+                <Tabs value={filtroActivo} onValueChange={(v) => setFiltro(v as FiltroResenas)} className="shrink-0">
+                    <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none]">
+                        <ChipsSubnivel
+                            className="flex-nowrap"
+                            chips={[
+                                { valor: "por_responder", etiqueta: `Por responder · ${cuentas.por_responder}` },
+                                { valor: "aprobadas", etiqueta: `Aprobadas · ${cuentas.aprobadas}` },
+                                { valor: "respondidas", etiqueta: `Respondidas · ${cuentas.respondidas}` },
+                                { valor: "todas", etiqueta: `Todas · ${cuentas.todas}` },
+                            ]}
+                        />
+                    </div>
+                </Tabs>
                 {resenasLoading ? (
                     <div className="space-y-3">
                         {[1, 2, 3].map((i) => (
@@ -248,29 +350,79 @@ export default function GestionResenas() {
                         vacio={
                             <div className="py-12 text-center text-muted-foreground">
                                 <Star className="mx-auto mb-3 h-10 w-10 opacity-20" />
-                                <p>No hay reseñas todavía.</p>
-                                <p className="mt-1 text-sm">Pulsa "Sincronizar ahora" para obtener las reseñas de Google.</p>
+                                {lista.length ? (
+                                    <p>No hay reseñas en este filtro.</p>
+                                ) : (
+                                    <>
+                                        <p>No hay reseñas todavía.</p>
+                                        <p className="mt-1 text-sm">Pulsa "Sincronizar ahora" para obtener las reseñas de Google.</p>
+                                    </>
+                                )}
                             </div>
                         }
                     >
-                        {(resenas ?? []).map((resena: any) => (
-                            <li key={resena.id} className="space-y-1 px-2 py-2.5">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                        <span className="text-sm font-semibold">{resena.nombre_cliente}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                            {resena.fuente === "google" ? "Google" : resena.fuente} · {resena.estado} ·{" "}
-                                            {format(new Date(resena.fecha), "dd MMMM yyyy", { locale: es })}
-                                        </span>
+                        {visibles.map((resena) => {
+                            const estado = estadoDe(resena);
+                            const enlace = enlaceGoogle(resena, config?.place_id);
+                            const borrador = estado === "publicada" ? resena.respuesta : resena.respuesta_propuesta;
+                            return (
+                                <li key={resena.id} className="space-y-1.5 px-2 py-3" data-testid="resena-fila">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                            <span className="text-sm font-semibold">{resena.nombre_cliente}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {resena.fuente === "google" ? "Google" : resena.fuente} · {format(new Date(resena.fecha), "d MMM yyyy", { locale: es })}
+                                            </span>
+                                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium leading-4 ${TONO_ESTADO[estado]}`}>{ETIQUETA_ESTADO[estado]}</span>
+                                            {resena.estado === "oculta" && (
+                                                <span className="rounded-full border border-border px-2 py-0.5 text-[11px] leading-4 text-muted-foreground">Oculta en la web</span>
+                                            )}
+                                        </div>
+                                        <Estrellas valor={resena.valoracion} />
                                     </div>
-                                    {renderEstrellas(resena.valoracion)}
-                                </div>
-                                {resena.comentario && <p className="line-clamp-3 text-sm text-muted-foreground">{resena.comentario}</p>}
-                            </li>
-                        ))}
+                                    {resena.comentario && <p className="line-clamp-3 text-sm text-muted-foreground">{resena.comentario}</p>}
+                                    {borrador && (
+                                        <p className={`line-clamp-2 whitespace-pre-line border-l-2 pl-2.5 text-sm ${estado === "publicada" ? "border-emerald-400/70 text-foreground/80" : "border-amber-400/70 italic text-muted-foreground"}`}>
+                                            {borrador}
+                                        </p>
+                                    )}
+                                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                        {estado !== "publicada" ? (
+                                            <Button size="sm" variant={estado === "pendiente" ? "outline" : "default"} className="h-9 gap-1.5 px-3 pointer-coarse:h-11" onClick={() => setAbierta(resena.id)} data-testid="resena-abrir">
+                                                {estado === "pendiente" ? <Sparkles className="h-4 w-4" /> : <MessageSquareReply className="h-4 w-4" />}
+                                                {estado === "pendiente" ? "Responder" : "Revisar respuesta"}
+                                            </Button>
+                                        ) : (
+                                            <Button size="sm" variant="ghost" className="h-9 gap-1.5 px-3 pointer-coarse:h-11" onClick={() => setAbierta(resena.id)}>
+                                                <MessageSquareReply className="h-4 w-4" /> Ver respuesta
+                                            </Button>
+                                        )}
+                                        {enlace && (
+                                            <Button asChild size="sm" variant="ghost" className="h-9 gap-1.5 px-3 pointer-coarse:h-11">
+                                                <a href={enlace} target="_blank" rel="noopener noreferrer" aria-label="Abrir la reseña en Google">
+                                                    <ExternalLink className="h-4 w-4" /> <span className="hidden min-[400px]:inline">En Google</span>
+                                                </a>
+                                            </Button>
+                                        )}
+                                        <Button size="sm" variant="ghost" className="ml-auto h-9 gap-1.5 px-3 text-muted-foreground pointer-coarse:h-11" onClick={() => alternarWeb(resena)}
+                                            aria-label={resena.estado === "oculta" ? "Mostrar en la web" : "Ocultar en la web"}>
+                                            {resena.estado === "oculta" ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                            <span className="hidden sm:inline">{resena.estado === "oculta" ? "Mostrar en la web" : "Ocultar en la web"}</span>
+                                        </Button>
+                                    </div>
+                                </li>
+                            );
+                        })}
                     </ListaPlana>
                 )}
             </div>
+            <DialogoRespuesta
+                resena={resenaAbierta}
+                placeId={config?.place_id}
+                googleConectado={googleConectado}
+                onClose={() => setAbierta(null)}
+                onCambio={() => queryClient.invalidateQueries({ queryKey: ["resenas"] })}
+            />
         </SuperAdminLayout>
     );
 }

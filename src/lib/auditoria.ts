@@ -437,6 +437,7 @@ export function resumenEntrada(entrada: AuditLogEntry): string {
       "clasificar-productos": "clasificar productos de facturas",
       "buscar-precios-mercado": "consultar precios de mercado",
       "sync-google-reviews": "sincronizar reseñas de Google",
+      "resenas-contestador": "gestionar las respuestas a las reseñas de Google",
       "sincronizar-costes-openai": "sincronizar costes de IA",
       "enviar-imagen-webhook": "enviar una imagen para su procesamiento",
       "procesar-dibujo-perimetro": "procesar el plano de un espacio",
