@@ -38,7 +38,7 @@ import {
   validarPieza,
   type DatosPieza,
 } from "./nucleo.js";
-import { CONCURRENCIA_LOTE, crearRenderizadorLote, ErrorRender, loteDesde, type PeticionRender, type RenderizadorLote } from "./render.js";
+import { CONCURRENCIA_LOTE, crearRenderizadorLote, ErrorRender, loteDesde, type PeticionRender, type RenderizadorLote, type ResultadoLote } from "./render.js";
 import { catalogoParaPieza, ErrorFotoPreparada } from "./fotos.js";
 import { registro, sanear } from "./secretos.js";
 import {
@@ -153,7 +153,11 @@ export async function manejarRenderCarrusel(
   t0: number,
 ): Promise<Response> {
   const v = await validar(s, entrada);
-  if (!v.ok) return json(v.estado, v.cuerpo);
+  if (!v.ok) {
+    // Cast explícito: Vercel compila api/ sin strictNullChecks y ahí `ok: false` no estrecha la unión.
+    const fallo = v as Extract<typeof v, { ok: false }>;
+    return json(fallo.estado, fallo.cuerpo);
+  }
 
   let existente: FilaPieza | null = null;
   const idPedido = typeof entrada.id === "string" ? entrada.id : null;
@@ -198,7 +202,7 @@ export async function manejarRenderCarrusel(
     return json(500, { ok: false, error: "No se pudo generar el carrusel en el servidor", detalle: sanear((e as Error)?.message ?? e) });
   }
   const msRender = Math.round(performance.now() - tRender);
-  const fallos = resultados.flatMap((r, i) => (r.ok ? [] : [{ n: i + 1, error: r.error }]));
+  const fallos = resultados.flatMap((r, i) => (r.ok ? [] : [{ n: i + 1, error: (r as Extract<ResultadoLote, { ok: false }>).error }]));
   if (fallos.length) {
     const inesperado = fallos.find((f) => !(f.error instanceof ErrorRender));
     if (inesperado) {

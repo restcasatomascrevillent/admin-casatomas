@@ -21,7 +21,7 @@
  * luz y encuadre). Lo que cambia la escena (desenfocar o cambiar el fondo) es
  * aparte, `creativo` en el plan, y solo si el usuario lo permite.
  */
-import type { MarcaId } from "../instagram/tokens";
+import type { MarcaId } from "../instagram/tokens.js";
 
 export type EstiloId = "elegante" | "natural" | "moderno" | "promocion" | "minimalista" | "marca";
 export const ESTILOS_IDS: readonly EstiloId[] = ["elegante", "natural", "moderno", "promocion", "minimalista", "marca"];
