@@ -138,6 +138,7 @@ export const ETIQUETA_CAMPO_FORMULARIO: Record<string, string> = {
   menu_del_dia: "menú del día",
   menu_cerrado: "menú cerrado",
   menu_precio: "precio del menú",
+  zona_preferida: "dentro o fuera",
   acepta_condiciones: "condiciones",
   consentimiento_newsletter: "newsletter",
 };

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
+import { textoZona } from "@/lib/reservas/zonaPreferida";
 import { servicioComidaDeReserva } from "@/lib/reservas/menuDelDia";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -215,6 +216,37 @@ export function InsigniaMenuCerrado({
       )}
     >
       {textoInsigniaMenu(reserva.menu_precio)}
+    </span>
+  );
+}
+
+/**
+ * Insignia pequeña «Dentro» / «Fuera» (`reservas.zona_preferida`, 20261122200000): lo que pidió el cliente al
+ * reservar. Nada si no se dijo. NO es «Sentar fuera» (Touza), que tiene su propia etiqueta.
+ */
+export function InsigniaZona({
+  reserva,
+  className,
+}: {
+  reserva: { zona_preferida?: string | null };
+  className?: string;
+}) {
+  const texto = textoZona(reserva.zona_preferida);
+  if (!texto) return null;
+  const fuera = reserva.zona_preferida === "fuera";
+  return (
+    <span
+      data-testid="insignia-zona"
+      title={fuera ? "Quiere fuera (Terraza)" : "Quiere dentro"}
+      className={cn(
+        "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+        fuera
+          ? "border-emerald-300 text-emerald-800 dark:border-emerald-800 dark:text-emerald-300"
+          : "border-amber-300 text-amber-800 dark:border-amber-800 dark:text-amber-300",
+        className,
+      )}
+    >
+      {texto}
     </span>
   );
 }

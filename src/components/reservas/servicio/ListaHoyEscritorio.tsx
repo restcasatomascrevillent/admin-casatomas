@@ -18,6 +18,7 @@
 
 import { useState, type ReactNode } from "react";
 import { formatearPrecioMenu, textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
+import { InsigniaZona } from "@/components/reservas/InterruptoresServiciosOnline";
 import { AlertTriangle, ChevronDown, Lock, Phone, StickyNote, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BotonPersonas } from "@/components/reservas/CambiarPersonas";
@@ -272,6 +273,7 @@ function FilaEscritorio({
                 {textoInsigniaMenu(reserva.menu_precio)}
               </span>
             )}
+            <InsigniaZona reserva={reserva} className="px-1.5 py-0 leading-5" />
             {alergia && <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" aria-label="Alergia" />}
             {notas && !alergia && <StickyNote className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-label="Notas del cliente" />}
             {notas && <span className="sr-only">{notas}</span>}

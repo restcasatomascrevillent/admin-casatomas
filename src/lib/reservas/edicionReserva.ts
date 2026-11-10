@@ -45,6 +45,7 @@ import {
   PEDIR_PERMISO_EDICION,
 } from "./altaPanel";
 import { leerPrecioMenu, precioMenuParaCampo } from "./menuCerrado";
+import { normalizarZona, type ZonaPreferida } from "./zonaPreferida";
 import { eligeMenuOCarta, type ServicioComida } from "./menuDelDia";
 import { horaCorta } from "./ocupacionSalas";
 import { esErrorSalaPrivadaOcupada, mensajeSalaPrivadaOcupada } from "./salaPrivada";
@@ -75,6 +76,8 @@ export interface ReservaEditable {
   menu_cerrado?: boolean | null;
   /** Precio del menú cerrado en euros (numeric(6,2): llega como número o texto). NULL = sin precio. */
   menu_precio?: number | string | null;
+  /** «¿Dentro o fuera?» (20261122200000): 'dentro' | 'fuera' | null (no se ha dicho). */
+  zona_preferida?: string | null;
 }
 
 /** Lo que cuenta en el aforo del turno: pendiente, verificada y confirmada. */
@@ -99,6 +102,8 @@ export interface ValoresFormularioEdicion {
   menu_precio: string;
   /** «Menú del día | Carta» (solo martes a jueves comida; si no, `undefined`). */
   servicio_comida?: ServicioComida;
+  /** «¿Dentro o fuera?»: null = no se ha dicho nada. */
+  zona_preferida: ZonaPreferida | null;
 }
 
 /** "2026-10-10" → esa fecha a MEDIODÍA local (un `new Date("2026-10-10")` es UTC y en husos negativos cae el día anterior). */
@@ -120,6 +125,7 @@ export function valoresFormularioDesdeReserva(reserva: ReservaEditable): Valores
     menu_cerrado: !!reserva.menu_cerrado,
     menu_precio: reserva.menu_cerrado ? precioMenuParaCampo(reserva.menu_precio) : "",
     servicio_comida: eligeMenuOCarta(reserva.fecha, reserva.hora) ? (reserva.menu_del_dia ? "menu_del_dia" : "carta") : undefined,
+    zona_preferida: normalizarZona(reserva.zona_preferida),
   };
 }
 
@@ -142,6 +148,8 @@ export interface ValoresEditados {
    * guarda `menu_del_dia` según la elección; fuera, `menu_del_dia` = false.
    */
   servicio_comida?: ServicioComida | null;
+  /** «¿Dentro o fuera?». `undefined` = no se toca; null = sin zona. */
+  zona_preferida?: ZonaPreferida | null;
 }
 
 /** Columnas de `reservas` que puede tocar una edición. Ninguna otra. */
@@ -158,6 +166,7 @@ export interface CambiosReserva {
   menu_del_dia?: boolean;
   menu_cerrado?: boolean;
   menu_precio?: number | null;
+  zona_preferida?: ZonaPreferida | null;
   /** Solo si cambia el teléfono o el email y el resultado de la lista negra difiere de lo guardado. */
   en_blacklist?: boolean;
 }
@@ -174,7 +183,8 @@ export type CampoEditable =
   | "importante"
   | "menu_del_dia"
   | "menu_cerrado"
-  | "menu_precio";
+  | "menu_precio"
+  | "zona_preferida";
 
 /** Orden y nombre (en castellano) con los que se cuentan los campos cambiados. */
 export const ETIQUETA_CAMPO: Record<CampoEditable, string> = {
@@ -190,6 +200,7 @@ export const ETIQUETA_CAMPO: Record<CampoEditable, string> = {
   menu_del_dia: "menú del día o carta",
   menu_cerrado: "menú cerrado",
   menu_precio: "precio del menú",
+  zona_preferida: "dentro o fuera",
 };
 
 const CAMPOS: readonly CampoEditable[] = Object.keys(ETIQUETA_CAMPO) as CampoEditable[];
@@ -260,6 +271,11 @@ export function calcularCambiosEdicion(
     const precio = menu ? leerPrecioMenu(editado.menu_precio ?? null) : null;
     const precioOriginal = original.menu_precio == null || original.menu_precio === "" ? null : Number(original.menu_precio);
     if (precio !== undefined && precio !== precioOriginal) cambios.menu_precio = precio;
+  }
+
+  if (editado.zona_preferida !== undefined) {
+    const zona = normalizarZona(editado.zona_preferida);
+    if (zona !== normalizarZona(original.zona_preferida)) cambios.zona_preferida = zona;
   }
 
   const cambiaContacto = "telefono" in cambios || "email" in cambios;
