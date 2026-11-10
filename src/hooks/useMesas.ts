@@ -113,9 +113,48 @@ export const COLUMNAS_MESAS =
  * escritura se verifica. Las filas duplicadas de producción siguen ahí, así
  * que el aviso de arriba sigue vigente.
  */
+/** Lee las mesas (activas, o todas con `incluirInactivas`) de una sala o de todas. */
+async function leerMesas(espacioId: string | undefined, incluirInactivas: boolean): Promise<Mesa[]> {
+  let query = supabase
+    .from("mesas")
+    .select(COLUMNAS_MESAS)
+    .order("nombre");
+
+  if (!incluirInactivas) {
+    query = query.eq("activa", true);
+  }
+
+  if (espacioId) {
+    query = query.eq("espacio_id", espacioId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  // Convertir original_mesas de Json a OriginalMesaData[]
+  return (data || []).map(mesa => ({
+    ...mesa,
+    original_mesas: mesa.original_mesas as unknown as OriginalMesaData[] | null,
+  })) as Mesa[];
+}
+
+/** Las mesas cambian poco (ver `useMesas`). */
+export const FRESCURA_MESAS_MS = 2 * 60_000;
+
+/**
+ * Consulta de TODAS las mesas activas (`["mesas"]`), la de «Hoy». Exportada para precargarla al abrir el
+ * panel en Reservas (`lib/reservas/precargaHoy.ts`) con la misma clave y la misma lectura que el hook.
+ */
+export const consultaMesas = () => ({
+  queryKey: ["mesas"] as const,
+  queryFn: () => leerMesas(undefined, false),
+  staleTime: FRESCURA_MESAS_MS,
+});
+
 export function useMesas(espacioId?: string, opciones?: OpcionesMesas) {
   const incluirInactivas = opciones?.incluirInactivas === true;
   const habilitado = opciones?.habilitado !== false;
+  const qc = useQueryClient();
 
   return useQuery({
     // La clave lleva `incluirInactivas` para que las dos variantes no se pisen
@@ -129,34 +168,22 @@ export function useMesas(espacioId?: string, opciones?: OpcionesMesas) {
         ? ["mesas", espacioId]
         : ["mesas"],
     enabled: habilitado,
-    queryFn: async () => {
-      let query = supabase
-        .from("mesas")
-        .select(COLUMNAS_MESAS)
-        .order("nombre");
-
-      if (!incluirInactivas) {
-        query = query.eq("activa", true);
-      }
-
-      if (espacioId) {
-        query = query.eq("espacio_id", espacioId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Convertir original_mesas de Json a OriginalMesaData[]
-      return (data || []).map(mesa => ({
-        ...mesa,
-        original_mesas: mesa.original_mesas as unknown as OriginalMesaData[] | null,
-      })) as Mesa[];
-    },
+    queryFn: () => leerMesas(espacioId, incluirInactivas),
+    // Las de UNA sala salen al momento de las de todas (`["mesas"]`) si ya están en la caché (09/11/2026,
+    // plano de «Hoy» con mala cobertura: antes esperaba a saber la sala para pedirlas, un viaje más en
+    // serie). Llevan la hora de esas, así que si están viejas se vuelven a pedir igual, sin esqueleto.
+    ...(espacioId && !incluirInactivas
+      ? {
+          initialData: () =>
+            qc.getQueryData<Mesa[]>(["mesas"])?.filter((m) => m.espacio_id === espacioId),
+          initialDataUpdatedAt: () => qc.getQueryState(["mesas"])?.dataUpdatedAt,
+        }
+      : {}),
     // Las mesas cambian poco (07/11/2026, «Hoy» con poca cobertura): antes `staleTime: 0` y cada
     // montaje (cambiar Kanban ↔ Plano, abrir un diálogo) las volvía a pedir. Lo que se guarda en ESTE
     // dispositivo invalida `["mesas"]` y se relee al momento. La gestión de mesas de Configuración
     // (`incluirInactivas`) sigue leyendo siempre de nuevo.
-    staleTime: incluirInactivas ? 0 : 2 * 60_000,
+    staleTime: incluirInactivas ? 0 : FRESCURA_MESAS_MS,
   });
 }
 

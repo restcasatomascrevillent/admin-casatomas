@@ -14,6 +14,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { admiteReservas } from "@/lib/reservas/negocios";
 import { COLUMNAS_RESERVAS_HOY, guardarSalaPlanoHoy, leerSalaPlanoHoy, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
 import { VistaPlanoHoy, type ReservaPlanoHoy } from "./servicio/VistaPlanoHoy";
+import { consultaReservasHoy } from "@/lib/reservas/consultaReservasHoy";
+import { AvisoActualizando } from "@/components/panel/AvisoActualizando";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { VistaHoyMovil } from "./movil/VistaHoyMovil";
@@ -138,18 +140,8 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   } = useQuery({
     // En el móvil ya las relee `useAlDiaMovil` (cada 30 s): sin el sondeo de cada minuto, para no pedirlas dos veces.
     ...(esMovil ? SIN_SONDEO : REFRESCO_PERIODICO),
-    queryKey: ["reservas-hoy", "pendientes-mesa", hoy],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("reservas" as any)
-        .select(COLUMNAS_RESERVAS_HOY)
-        .eq("fecha", hoy)
-        .neq("estado", "cancelada")
-        .order("hora");
-      if (error) throw error;
-      // `ReservaPlanoHoy`: con `salida_at` si la columna existe (la vista Plano pinta las mesas con esta lista).
-      return ((data ?? []) as unknown as ReservaPlanoHoy[]).filter((r) => admiteReservas(r.marca));
-    },
+    // Clave y lectura en `consultaReservasHoy` (la misma que precarga `App.tsx` al abrir el panel en «Hoy»).
+    ...consultaReservasHoy(hoy),
   });
 
   /**
@@ -176,11 +168,15 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   // Con datos guardados (caché o copia sin conexión, `cacheOffline.ts`) un fallo de red NO tapa la lista:
   // se siguen viendo las reservas que había y `AvisoSinConexion` dice de qué hora son.
   const errorReservasHoy = falloReservasHoy && !reservasHoy;
+  // Con la copia del dispositivo en pantalla mientras se vuelve a pedir: «Actualizando…» (pastilla flotante).
   const avisoRed = (
-    <AvisoSinConexion
-      actualizadoEn={reservasHoyActualizadas}
-      falloRed={(falloReservasHoy && esErrorDeRed(errorDetalleReservasHoy)) || estadoPeticionReservasHoy === "paused"}
-    />
+    <>
+      <AvisoSinConexion
+        actualizadoEn={reservasHoyActualizadas}
+        falloRed={(falloReservasHoy && esErrorDeRed(errorDetalleReservasHoy)) || estadoPeticionReservasHoy === "paused"}
+      />
+      <AvisoActualizando actualizadoEn={reservasHoyActualizadas} pidiendo={estadoPeticionReservasHoy === "fetching"} />
+    </>
   );
 
   if (esMovil) {

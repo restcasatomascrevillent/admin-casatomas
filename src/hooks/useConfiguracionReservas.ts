@@ -85,26 +85,33 @@ const DEFAULTS: Omit<ConfiguracionReservas, "id" | "created_at" | "updated_at"> 
   asignacion_mesas_al_final: [],
 };
 
-export function useConfiguracionReservas() {
-  return useQuery({
-    queryKey: ["configuracion-reservas"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("configuracion_reservas" as any)
-        .select("*")
-        .limit(1)
-        .single();
+/**
+ * La consulta de la configuración, exportada para precargar «Hoy» (`lib/reservas/precargaHoy.ts`) con la
+ * misma clave. Cambia poco (09/11/2026): 5 min sin volver a pedirla; guardarla aquí la invalida al momento.
+ */
+export const consultaConfiguracionReservas = {
+  queryKey: ["configuracion-reservas"],
+  staleTime: 5 * 60_000,
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("configuracion_reservas" as any)
+      .select("*")
+      .limit(1)
+      .single();
 
-      if (error) {
-        // If no row exists, return defaults
-        if (error.code === "PGRST116") {
-          return DEFAULTS as ConfiguracionReservas;
-        }
-        throw error;
+    if (error) {
+      // If no row exists, return defaults
+      if (error.code === "PGRST116") {
+        return DEFAULTS as ConfiguracionReservas;
       }
-      return data as unknown as ConfiguracionReservas;
-    },
-  });
+      throw error;
+    }
+    return data as unknown as ConfiguracionReservas;
+  },
+};
+
+export function useConfiguracionReservas() {
+  return useQuery(consultaConfiguracionReservas);
 }
 
 export function useActualizarConfiguracionReservas() {

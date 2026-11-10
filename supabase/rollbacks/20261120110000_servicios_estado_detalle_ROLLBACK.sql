@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- ROLLBACK de 20261120100000_servicios_estado_detalle.sql: quita la RPC de
+-- ROLLBACK de 20261120110000_servicios_estado_detalle.sql: quita la RPC de
 -- conexiones y tablas mayores, devuelve a GitHub el límite de 12 US$ de
 -- «Pruebas automáticas» y el nombre «Minutos de Actions», y quita el límite de
 -- memoria de las funciones de Vercel. No toca las lecturas guardadas.
