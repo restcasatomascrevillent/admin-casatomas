@@ -300,6 +300,12 @@ interface FormularioReservaProps {
    * lo que se cambia con `setValue` desde el calendario o las rejillas).
    */
   onCambiosSinGuardar?: (hayCambios: boolean) => void;
+  /**
+   * Tipo de usuario «Reservas» (10/11/2026): quien solo tiene «Reservas · Crear» (sin «Editar») solo
+   * crea la reserva; no se le ofrece «Ocupa la sala entera (evento)», que cierra la sala y exige «Editar»
+   * (la BD tampoco le deja escribir en salas_cerradas_servicio). Lo decide Reservas con usePuedeCrearReservas.
+   */
+  soloCrear?: boolean;
 }
 
 export const FormularioReserva = ({
@@ -309,6 +315,7 @@ export const FormularioReserva = ({
   reservaAEditar,
   mesasAsignadas = [],
   onCambiosSinGuardar,
+  soloCrear: soloCrearReservas = false,
 }: FormularioReservaProps) => {
   const editando = !!reservaAEditar;
   const navigate = useNavigate();
@@ -334,6 +341,7 @@ export const FormularioReserva = ({
   const [ocupaSalaElegido, setOcupaSalaElegido] = useState<boolean | null>(null);
   // «Menú del día» (solo en el alta, martes a jueves antes de las 17:00).
   const [menuDelDia, setMenuDelDia] = useState(false);
+
 
   const esquema = useMemo(() => (reservaAEditar ? esquemaEdicion(reservaAEditar) : formSchema), [reservaAEditar]);
   const form = useForm<FormValues>({
@@ -1405,7 +1413,10 @@ export const FormularioReserva = ({
                 )}
               />
               {/* «Evento: sala entera» (20261119100000): la reserva se queda la sala ese día y
-                  turno. Resta la sala del aforo, nadie más puede entrar y Organizar no la toca. */}
+                  turno. Resta la sala del aforo, nadie más puede entrar y Organizar no la toca.
+                  Cerrar la sala exige «Editar» en Reservas: con solo «Reservas · Crear» no sale
+                  (10/11/2026; la BD tampoco le deja escribir en salas_cerradas_servicio). */}
+              {!soloCrearReservas && (
               <label
                 className={cn(
                   "flex min-h-11 items-center gap-3 rounded-md border px-3 py-2 text-sm",
@@ -1428,6 +1439,7 @@ export const FormularioReserva = ({
                   </span>
                 </span>
               </label>
+              )}
               <OcupacionSalas
                 fecha={fechaStr}
                 comensales={Number(watchedComensales) || 0}

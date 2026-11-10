@@ -35,6 +35,10 @@ export interface ConfigAuth {
  *   · "subir"  (procesar-factura: subir y decidir sobre lo propio): «Editar» en
  *     Facturas o el permiso «Facturas · Subida» (facturas_subida, can_view o
  *     can_edit). Con solo «Ver» en Facturas NO se sube (dueño, 06/11/2026).
+ *     Desde el 10/11/2026 también «Facturas · Solo fotos (albaranes)»
+ *     (facturas_albaranes), que se comprueba la ÚLTIMA y devuelve
+ *     `soloFotos: true`: index.ts solo le deja crear el trabajo (modo
+ *     «iniciar», que no devuelve nada de lo leído).
  *   · "edit"   (sustituir una factura ajena, clasificar, importar): «Editar».
  *   · "view"   (consultar): «Ver» en Facturas.
  */
@@ -43,25 +47,35 @@ export type PermisoFacturas = "view" | "edit" | "subir";
 export const COMPROBACIONES_PERMISO: Record<PermisoFacturas, ReadonlyArray<readonly [string, "view" | "edit"]>> = {
   view: [["facturas", "view"]],
   edit: [["facturas", "edit"]],
-  subir: [["facturas", "edit"], ["facturas_subida", "view"], ["facturas_subida", "edit"]],
+  subir: [
+    ["facturas", "edit"], ["facturas_subida", "view"], ["facturas_subida", "edit"],
+    ["facturas_albaranes", "view"], ["facturas_albaranes", "edit"],
+  ],
 };
+
+/** Permiso «Facturas · Solo fotos (albaranes)»: solo crear el trabajo de lectura (10/11/2026). */
+export const SECCION_SOLO_FOTOS = "facturas_albaranes";
+
+export const MENSAJE_SOLO_FOTOS =
+  "Con «Facturas · Solo fotos» solo se suben fotos para leer. Ver lo leído, sustituir o completar documentos exige «Facturas · Subida» o «Editar» en Facturas.";
 
 const MENSAJE_SIN_PERMISO: Record<PermisoFacturas, string> = {
   view: "Sin permisos sobre la sección de facturas",
   edit: "Esta acción exige permiso de edición en Facturas",
-  subir: "Subir documentos exige el permiso «Facturas · Subida» o «Editar» en Facturas",
+  subir: "Subir documentos exige el permiso «Facturas · Subida», «Facturas · Solo fotos» o «Editar» en Facturas",
 };
 
 /**
  * Comprueba que detrás del token hay un usuario y que tiene `permiso` sobre
  * facturas (ver COMPROBACIONES_PERMISO). `editar`: además tiene «Editar» en
- * Facturas (puede decidir sobre documentos de otros).
+ * Facturas (puede decidir sobre documentos de otros). `soloFotos`: entra solo
+ * por «Facturas · Solo fotos» (no puede ver lo leído).
  */
 export async function autenticar(
   req: Request,
   cfg: ConfigAuth,
   permiso: PermisoFacturas = "view",
-): Promise<{ ok: true; userId: string; editar: boolean } | { ok: false; response: Response }> {
+): Promise<{ ok: true; userId: string; editar: boolean; soloFotos: boolean } | { ok: false; response: Response }> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
     console.error("[procesar-factura] Sin cabecera Authorization");
@@ -86,6 +100,7 @@ export async function autenticar(
     return { ok: false, response: jsonResponse({ success: false, error: MENSAJE_SIN_PERMISO.edit }, 403) };
   }
   let editar = false;
+  let soloFotos = false;
   let permitido = false;
   for (const [seccion, modo] of comprobaciones) {
     const { data, error: permError } = await supabaseAdmin.rpc("has_section_permission", {
@@ -100,6 +115,7 @@ export async function autenticar(
     if (data === true) {
       permitido = true;
       editar = seccion === "facturas" && modo === "edit";
+      soloFotos = seccion === SECCION_SOLO_FOTOS;
       break;
     }
   }
@@ -107,7 +123,7 @@ export async function autenticar(
     console.error(`[procesar-factura] Usuario sin permiso '${permiso}' en facturas:`, user.id);
     return { ok: false, response: jsonResponse({ success: false, error: MENSAJE_SIN_PERMISO[permiso] }, 403) };
   }
-  return { ok: true, userId: user.id, editar };
+  return { ok: true, userId: user.id, editar, soloFotos };
 }
 
 export const MENSAJE_SOLO_LO_PROPIO =

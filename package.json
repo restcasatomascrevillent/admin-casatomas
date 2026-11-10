@@ -38,6 +38,7 @@
     "test:reservas-configuracion:db": "node scripts/test-permiso-reservas-configuracion.mjs",
     "test:permisos-solo-ver:db": "node scripts/test-permisos-solo-ver.mjs",
     "test:permisos-facturas-subida:db": "node scripts/test-permisos-facturas-subida.mjs",
+    "test:usuarios-reservas-albaranes:db": "node scripts/test-usuarios-reservas-albaranes.mjs",
     "test:vinos-copeo-encuesta:db": "node scripts/test-vinos-copeo-encuesta.mjs",
     "test:vinos-parker:db": "node scripts/test-vinos-parker.mjs",
     "test:instagram:db": "node scripts/test-instagram.mjs",
