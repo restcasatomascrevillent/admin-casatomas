@@ -95,18 +95,19 @@ export function InterruptoresServiciosOnline({
             type="button"
             size="sm"
             variant={bloqueado ? "destructive" : "outline"}
-            className={cn("touch-hit min-h-11", compacta ? "min-w-0 shrink gap-1.5 px-2.5" : "gap-2")}
+            className={cn("touch-hit min-h-11", compacta ? "min-w-0 flex-1 gap-1.5 px-2" : "gap-2")}
             data-testid={`boton-servicio-online-${turno}`}
             aria-pressed={bloqueado}
             disabled={!disponible || !puedeEditar || guardando}
             onClick={() => setPreguntando(turno)}
           >
-            {bloqueado ? (
+            {/* En el móvil (compacta) sin candado: así «Comida cerrada» cabe entero junto al (i). */}
+            {compacta ? null : bloqueado ? (
               <Lock className="h-4 w-4" aria-hidden />
             ) : (
               <LockOpen className="h-4 w-4" aria-hidden />
             )}
-            <span className={compacta ? "truncate" : undefined}>{bloqueado ? cerrado : abrir}</span>
+            <span className={compacta ? "truncate text-[15px]" : undefined}>{bloqueado ? cerrado : abrir}</span>
           </Button>
         );
       })}
