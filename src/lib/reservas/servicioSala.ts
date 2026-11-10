@@ -246,6 +246,8 @@ export interface ReservaServicio {
   notas_cliente?: string | null;
   /** «Fijar mesa» (20261107120000): los recálculos no la mueven ni se le quita al sentar a otro. */
   mesa_fijada?: boolean | null;
+  /** «Menú del día» (martes a jueves, comida). */
+  menu_del_dia?: boolean | null;
 }
 
 export const haLlegado = (estado: string) => estado === ESTADO_LLEGADA;
