@@ -144,6 +144,7 @@ import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-cl
 import {
   puedeEnviarCorreoRechazo,
   reservarCupoCrear,
+  reservarCupoDisponibilidad,
   respuestaDemasiadasSolicitudes,
   respuestaLimitadorNoDisponible,
 } from "./limitador.ts";
@@ -998,6 +999,14 @@ function pageTokenInvalido(): string {
 //
 // En error (4xx/5xx) el cuerpo sigue siendo `{ ok:false, error }`: hay
 // que comprobar `response.ok` ANTES de mapear.
+// GET /salud — sonda de keep-warm (CT-REM-FN-07c). Sin BD y sin secretos: solo
+// mantiene caliente el isolate de la función para evitar el arranque en frío
+// (~22 s en la 1.ª petición tras un rato de inactividad). La llama el cron
+// `reservas-web-keep-warm` (migración 20261119120000). No revela nada.
+function handleSalud(): Response {
+  return json({ ok: true, servicio: "reservas-web" });
+}
+
 async function handleDisponibilidad(req: Request): Promise<Response> {
   if (!checkSharedSecret(req)) return json({ ok: false, error: "unauthorized" }, 401);
   let body: Record<string, unknown>;
@@ -1008,6 +1017,19 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
   }
   const fecha = typeof body?.fecha === "string" ? body.fecha : "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ ok: false, error: "fecha_invalida" }, 400);
+
+  // CT-REM-FN-07b: limitador por IP de /disponibilidad (solo lectura). Tras
+  // validar la fecha y ANTES de cualquier consulta a la BD: una consulta
+  // throttled no toca la BD. FALLA EN ABIERTO a propósito —al revés que
+  // /crear—: disponibilidad es el corazón del flujo de reserva, así que si el
+  // limitador no está disponible la consulta se SIRVE igual; solo se bloquea
+  // cuando dice "denegado" (se superó el límite por IP/hora o el diario).
+  const cupoDisponibilidad = await reservarCupoDisponibilidad(supabase, req, IP_SALT);
+  if (cupoDisponibilidad.estado === "denegado") {
+    console.warn(`[reservas-web] /disponibilidad bloqueada por el limitador (${cupoDisponibilidad.motivo})`);
+    const r = respuestaDemasiadasSolicitudes(RESTAURANTE_TEL_TEXTO);
+    return json(r.cuerpo, r.status);
+  }
 
   const comensalesRaw = parseInt(String(body?.numero_comensales ?? body?.comensales ?? ""), 10);
   const comensales = Number.isFinite(comensalesRaw) && comensalesRaw > 0 ? comensalesRaw : 1;
@@ -1831,6 +1853,7 @@ serve(conAuditoriaDePeticion("reservas-web", createClientBase, async (req: Reque
       case "confirmar": return await handleConfirmar(req);
       case "cancelar": return await handleCancelarPreview(req);
       case "cancelar/ejecutar": return await handleCancelarEjecutar(req);
+      case "salud": return handleSalud();
       default: return json({ ok: false, error: "not_found", route: rutaDelPath(pathname) }, 404);
     }
   } catch (err) {

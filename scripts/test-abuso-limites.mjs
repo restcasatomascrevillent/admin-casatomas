@@ -126,6 +126,77 @@ const hex = (c) => c.repeat(64);
 }
 
 // =============================================================================
+// FN-07b · reservas-web/disponibilidad (limitador por IP, falla en abierto)
+//          20261119110000_reservas_web_limitador_disponibilidad.sql
+// =============================================================================
+{
+  const db = new PGlite();
+  await db.exec(`
+    create role anon; create role authenticated; create role service_role bypassrls;
+    create table public.configuracion_reservas (id uuid primary key default gen_random_uuid(), max_comensales_por_reserva int);
+    insert into public.configuracion_reservas (max_comensales_por_reserva) values (12);
+  `);
+  const MIG = await leer("20261119110000_reservas_web_limitador_disponibilidad.sql");
+  await db.exec(MIG);
+  await db.exec(MIG); // idempotente
+
+  igual((await una(db, "select limite_web_disponibilidad_ip_hora a, limite_web_disponibilidad_dia b from public.configuracion_reservas")), { a: 120, b: 5000 }, "umbrales disponibilidad por defecto 120/h y 5000/día");
+
+  const cupo = async (ip) => (await una(db, "select public.reservas_web_reservar_cupo_disponibilidad($1) r", [ip])).r;
+  const filas = async () => (await una(db, "select count(*)::int n from public.reservas_web_intentos_disponibilidad")).n;
+
+  // Umbral por IP bajado a 3 para probar rápido (sin 120 llamadas).
+  await db.exec("update public.configuracion_reservas set limite_web_disponibilidad_ip_hora = 3");
+  for (let i = 0; i < 3; i++) igual((await cupo(hex("a"))).permitido, true, `consulta ${i + 1}/3 de la IP admitida`);
+  igual(await cupo(hex("a")), { permitido: false, motivo: "max_ip_hora" }, "la consulta 4 de la misma IP en la hora se bloquea");
+  igual(await filas(), 3, "la consulta bloqueada no deja fila");
+  igual((await cupo(hex("b"))).permitido, true, "otra IP no se ve afectada");
+
+  // La ventana se desliza.
+  await db.exec("update public.reservas_web_intentos_disponibilidad set created_at = now() - interval '61 minutes' where ip_hash = repeat('a', 64)");
+  igual((await cupo(hex("a"))).permitido, true, "pasada una hora la IP vuelve a tener cupo");
+
+  // Cupo global diario (configurable), con tabla separada de la de /crear.
+  await db.exec("delete from public.reservas_web_intentos_disponibilidad; update public.configuracion_reservas set limite_web_disponibilidad_dia = 5, limite_web_disponibilidad_ip_hora = 120");
+  for (let i = 0; i < 5; i++) await cupo((i + 1).toString(16).repeat(64).slice(0, 64));
+  igual(await cupo(hex("f")), { permitido: false, motivo: "max_dia" }, "cupo global diario de disponibilidad agotado bloquea a cualquier IP");
+  igual(await filas(), 5, "sin fila al superar el cupo diario");
+
+  // Sin fila de configuración: valores por defecto (120/h).
+  await db.exec("delete from public.reservas_web_intentos_disponibilidad; delete from public.configuracion_reservas");
+  igual((await cupo(hex("c"))).permitido, true, "sin configuración se admite (defecto 120/h)");
+  await db.exec("insert into public.configuracion_reservas (max_comensales_por_reserva) values (12)");
+
+  // Advisory lock (clave distinta a la de /crear: no se serializan entre sí).
+  await db.exec("delete from public.reservas_web_intentos_disponibilidad");
+  await db.exec("begin");
+  await db.query("select public.reservas_web_reservar_cupo_disponibilidad($1)", [hex("e")]);
+  const locks = await una(db, "select count(*)::int n from pg_locks where locktype = 'advisory'");
+  await db.exec("rollback");
+  igual(locks.n >= 1, true, "el cupo de disponibilidad se toma bajo advisory lock de transacción");
+
+  await falla(db.query("select public.reservas_web_reservar_cupo_disponibilidad('203.0.113.7')"), /HMAC/, "rechaza IP en claro (solo hash hex)");
+  await falla(db.query("select public.reservas_web_reservar_cupo_disponibilidad(null)"), /HMAC/, "rechaza hash nulo");
+
+  // Retención 2 días.
+  await db.exec("insert into public.reservas_web_intentos_disponibilidad (ip_hash, created_at) values (repeat('9', 64), now() - interval '3 days')");
+  await cupo(hex("8"));
+  igual((await una(db, "select count(*)::int n from public.reservas_web_intentos_disponibilidad where ip_hash = repeat('9', 64)")).n, 0, "retención de 2 días");
+
+  // Permisos.
+  const fdisp = "reservas_web_reservar_cupo_disponibilidad(text)";
+  for (const rol of ["anon", "authenticated"]) {
+    igual((await una(db, "select has_function_privilege($1, $2, 'execute') p", [rol, `public.${fdisp}`])).p, false, `${rol} no puede ejecutar ${fdisp}`);
+  }
+  igual((await una(db, "select has_function_privilege('service_role', $1, 'execute') p", [`public.${fdisp}`])).p, true, `service_role ejecuta ${fdisp}`);
+  igual((await una(db, "select prosecdef d, proconfig c from pg_proc where oid = $1::regprocedure", [`public.${fdisp}`])), { d: true, c: ['search_path=""'] }, `${fdisp}: SECURITY DEFINER con search_path vacío`);
+  for (const rol of ["anon", "authenticated"]) {
+    igual((await una(db, "select has_table_privilege($1, 'public.reservas_web_intentos_disponibilidad', 'select') p", [rol])).p, false, `${rol} no lee reservas_web_intentos_disponibilidad`);
+  }
+  await db.close();
+}
+
+// =============================================================================
 // FN-03 · iniciar_intento_panel con límite por email
 // =============================================================================
 {
