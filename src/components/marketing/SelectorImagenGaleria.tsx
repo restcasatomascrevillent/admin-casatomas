@@ -11,12 +11,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface SelectorImagenGaleriaProps {
   imagenSeleccionada?: string;
   onSeleccionar: (url: string | undefined) => void;
+  /** Texto de la etiqueta (por defecto «Imagen (opcional)»). */
+  etiqueta?: string;
 }
 
-export function SelectorImagenGaleria({ imagenSeleccionada, onSeleccionar }: SelectorImagenGaleriaProps) {
-  const [open, setOpen] = useState(false);
-
-  const { data: imagenes, isLoading } = useQuery({
+/** Fotos recientes de los cubos de la carta (platos, bebidas, vinos): la galería del correo y de «Crear con IA». */
+export function useGaleriaImagenes() {
+  return useQuery({
     queryKey: ['galeria-imagenes'],
     queryFn: async () => {
       const buckets = ['platos', 'bebidas', 'vinos'];
@@ -43,6 +44,12 @@ export function SelectorImagenGaleria({ imagenSeleccionada, onSeleccionar }: Sel
       return allImages;
     },
   });
+}
+
+export function SelectorImagenGaleria({ imagenSeleccionada, onSeleccionar, etiqueta = "Imagen (opcional)" }: SelectorImagenGaleriaProps) {
+  const [open, setOpen] = useState(false);
+
+  const { data: imagenes, isLoading } = useGaleriaImagenes();
 
   const handleSelect = (url: string | undefined) => {
     onSeleccionar(url);
@@ -51,7 +58,7 @@ export function SelectorImagenGaleria({ imagenSeleccionada, onSeleccionar }: Sel
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium">Imagen (opcional)</label>
+      <label className="text-sm font-medium">{etiqueta}</label>
       
       {imagenSeleccionada ? (
         <div className="relative rounded-lg overflow-hidden border">
