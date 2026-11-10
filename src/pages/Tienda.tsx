@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { VinosTienda } from "@/components/tienda/VinosTienda";
 import { AjustesTienda } from "@/components/tienda/AjustesTienda";
+import { InterruptorTiendaWeb } from "@/components/tienda/InterruptorTiendaWeb";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useConfiguracionTienda } from "@/hooks/useTienda";
 import { EtiquetaSoloLectura } from "@/components/panel/EtiquetaSoloLectura";
-import { porcentaje } from "@/lib/tienda";
 import { cn } from "@/lib/utils";
 
 /** Suelo (px) del alto: por debajo (teclado abierto, ventana muy baja) vuelve el scroll de página. */
@@ -32,7 +32,9 @@ const pestanaDeUrl = (v: string | null): Pestana => (PESTANAS as readonly string
  * Tienda (petición del dueño, 03/11/2026): los vinos de la carta en la web con
  * un descuento sobre el precio de carta. Es un ESCAPARATE («no puede permitir
  * pago por internet, solo vista»): se compran en el restaurante. Vinos (cuáles
- * salen y a qué precio) y Ajustes (visible sí/no, %, aviso y cómo comprar).
+ * salen y a qué precio) y Ajustes (%, aviso y cómo comprar). Arriba, junto a las
+ * pestañas, el interruptor «Visible en la web» (10/11/2026, petición del dueño:
+ * enciende o apaga la tienda de la web al momento; ver `InterruptorTiendaWeb`).
  * Sección de permisos «tienda»: con «Ver» se consulta; cambiar algo pide
  * «Puede editar» (también en la BD: la RLS de configuracion_tienda exige
  * can_write_section('tienda')). Con solo «Ver» (06/11/2026, decisión del dueño)
@@ -91,14 +93,7 @@ export default function Tienda() {
           acciones={
             <span className="flex items-center gap-2">
               {soloLectura && <EtiquetaSoloLectura />}
-              <span
-                className={cn(
-                  "whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium",
-                  config.activa ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900",
-                )}
-              >
-                {config.activa ? `Visible · ${porcentaje(config.descuento_pct)}` : "Oculta en la web"}
-              </span>
+              {!cargandoPermisos && <InterruptorTiendaWeb config={config} puedeEditar={puedeEditar} />}
             </span>
           }
         />

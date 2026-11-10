@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useGuardarAjustesTienda, useVinosTienda } from "@/hooks/useTienda";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
@@ -28,7 +27,12 @@ interface Props {
 
 type Errores = Partial<Record<keyof FormularioAjustesTienda, string>>;
 
-/** Tienda › Ajustes: visible sí/no, % de descuento (con ejemplos) y los textos de la web. */
+/**
+ * Tienda › Ajustes: % de descuento (con ejemplos) y los textos de la web. Si la
+ * tienda sale o no en la web va arriba de la página, en el interruptor «Visible
+ * en la web» (`InterruptorTiendaWeb`, se guarda al momento): este formulario ya
+ * no envía `activa`, para no deshacer lo que se cambie allí.
+ */
 export function AjustesTienda({ config, puedeEditar }: Props) {
   const guardar = useGuardarAjustesTienda();
   const vinos = useVinosTienda();
@@ -76,19 +80,6 @@ export function AjustesTienda({ config, puedeEditar }: Props) {
     <form onSubmit={(e) => void enviar(e)} className="flex max-w-3xl flex-col gap-5" noValidate>
       <fieldset disabled={!puedeEditar || guardar.isPending} className="flex flex-col gap-5">
         <legend className="sr-only">Ajustes de la tienda</legend>
-
-        <div className="flex items-start justify-between gap-4 rounded-xl border bg-card p-4">
-          <div className="min-w-0">
-            <Label htmlFor="tienda-activa" className="text-base">Tienda visible en la web</Label>
-            <p id="tienda-activa-ayuda" className="text-sm text-muted-foreground">
-              {form.activa
-                ? "La web enseña la tienda con los vinos a la venta y su precio de tienda."
-                : "La web no enseña la tienda."}
-              {" "}Los vinos se compran en el restaurante: en la web no se paga nada.
-            </p>
-          </div>
-          <Switch id="tienda-activa" checked={form.activa} aria-describedby="tienda-activa-ayuda" onCheckedChange={(v) => cambiar("activa", v)} />
-        </div>
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="tienda-descuento">Descuento sobre el precio de carta (%)</Label>

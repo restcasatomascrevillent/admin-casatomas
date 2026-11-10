@@ -97,14 +97,15 @@ describe("Ajustes", () => {
   const base = formularioDesdeConfiguracion(CONFIGURACION_TIENDA_POR_DEFECTO);
 
   it("el formulario parte de la configuración (coma decimal)", () => {
-    expect(base).toEqual({ activa: true, descuento: "30", aviso: "", recogida: "" });
+    // Sin `activa`: eso va en el interruptor de arriba de la página, que se guarda al momento.
+    expect(base).toEqual({ descuento: "30", aviso: "", recogida: "" });
     expect(formularioDesdeConfiguracion({ ...CONFIGURACION_TIENDA_POR_DEFECTO, descuento_pct: 27.5 }).descuento).toBe("27,5");
   });
 
   it("acepta lo válido y lo deja listo para guardar", () => {
     expect(validarAjustes({ ...base, descuento: "27,5", aviso: "  Navidad  ", recogida: "" })).toEqual({
       ok: true,
-      cambios: { activa: true, descuento_pct: 27.5, aviso: "Navidad", recogida: null },
+      cambios: { descuento_pct: 27.5, aviso: "Navidad", recogida: null },
     });
     expect(validarAjustes({ ...base, descuento: "0" })).toMatchObject({ ok: true, cambios: { descuento_pct: 0 } });
     expect(validarAjustes({ ...base, descuento: "90" })).toMatchObject({ ok: true, cambios: { descuento_pct: 90 } });

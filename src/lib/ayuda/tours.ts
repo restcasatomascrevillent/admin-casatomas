@@ -60,7 +60,6 @@ const GW_CARTA_VINOS = "gw-carta-vinos";
 const GW_NOVEDADES = "gw-pestana-novedades";
 const GW_MENUS = "gw-pestana-menus";
 const GW_TAPAS = "gw-pestana-tapas";
-const GW_TIENDA = "gw-pestana-tienda";
 
 export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
   facturas: [
@@ -427,16 +426,6 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       texto: "Elige la fecha y escribe una tapa por línea. Al guardar se traducen solas al inglés y al francés; a la derecha ves cómo quedan.",
       opcional: true,
       lado: "top",
-    },
-    // --- Tienda (solo con permiso de Tienda: si no está la pestaña, `opcional` la salta) ---
-    {
-      elemento: GW_TIENDA,
-      pestana: GW_TIENDA,
-      titulo: "Tienda",
-      texto:
-        "Enciende o apaga la tienda de vinos en la web de Casa Tomás. Apagada, desaparece del menú y del pie de la web; los vinos, el descuento y los textos se quedan guardados para cuando la vuelvas a encender.",
-      opcional: true,
-      lado: "bottom",
     },
     PASO_FINAL,
   ],

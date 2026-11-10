@@ -113,7 +113,8 @@ describe("Tienda › Vinos", () => {
     await tablaVinos();
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Vinos", "Ajustes"]);
     expect(screen.getByRole("tab", { name: /Vinos/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Visible · 30 %")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Visible en la web" })).toBeChecked();
+    expect(screen.getByText("· 30 %")).toBeInTheDocument();
     // Sin aviso de «Maqueta» (dueño, 04/11/2026).
     expect(screen.queryByText(/maqueta/i)).toBeNull();
   });
@@ -181,6 +182,9 @@ describe("Tienda › Vinos", () => {
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Vinos"]);
     expect(screen.getByTestId("etiqueta-solo-lectura")).toHaveTextContent("Solo lectura");
     expect(screen.queryByText(/necesitas el permiso «Puede editar» de Tienda/)).toBeNull();
+    // Ni el interruptor de la tienda en la web: solo su estado.
+    expect(screen.queryByRole("switch", { name: "Visible en la web" })).toBeNull();
+    expect(screen.getByText("Visible · 30 %")).toBeInTheDocument();
     // Ni con un filtro puesto salen las acciones sobre los mostrados.
     fireEvent.change(screen.getByLabelText("Buscar vino"), { target: { value: "rioja" } });
     expect(screen.queryByRole("button", { name: /a la venta/i })).toBeNull();
@@ -266,13 +270,27 @@ describe("Tienda › Ajustes", () => {
     const vista = screen.getByRole("region", { name: "Así quedan los precios" });
     await waitFor(() => expect(vista).toHaveTextContent(/Carta 24,00\s€→Tienda 18,00\s€/));
     fireEvent.change(screen.getByLabelText("Aviso para la web"), { target: { value: "  Navidad: 25 % en vinos  " } });
-    fireEvent.click(screen.getByRole("switch", { name: "Tienda visible en la web" }));
+    // Si sale o no en la web ya no está en el formulario (va arriba y se guarda al momento).
+    expect(screen.queryByRole("switch", { name: /Tienda visible en la web/ })).toBeNull();
     await act(async () => { fireEvent.click(guardar); });
+    // Sin `activa`: guardar Ajustes no deshace lo que se haya cambiado con el interruptor de arriba.
     await waitFor(() => expect(h.updates).toEqual([
-      { activa: false, descuento_pct: 25, aviso: "Navidad: 25 % en vinos", recogida: "Pregunta en la barra" },
+      { descuento_pct: 25, aviso: "Navidad: 25 % en vinos", recogida: "Pregunta en la barra" },
     ]));
-    await waitFor(() => expect(h.toast.success).toHaveBeenCalledWith("Ajustes guardados: la tienda está oculta en la web"));
-    expect(screen.getByText("Oculta en la web")).toBeInTheDocument();
+    await waitFor(() => expect(h.toast.success).toHaveBeenCalledWith("Ajustes de la tienda guardados"));
+    expect(screen.getByText("· 25 %")).toBeInTheDocument();
+  });
+
+  it("guardar Ajustes con cambios a medias no vuelve a encender la tienda apagada arriba", async () => {
+    pintar("/tienda?tab=ajustes");
+    fireEvent.change(await campoDescuento(), { target: { value: "20" } });
+    fireEvent.click(screen.getByRole("switch", { name: "Visible en la web" }));
+    await waitFor(() => expect(h.toast.success).toHaveBeenCalledWith("Tienda oculta en la web"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Guardar ajustes" })); });
+    await waitFor(() => expect(h.updates).toHaveLength(2));
+    expect(h.updates[1]).not.toHaveProperty("activa");
+    expect(h.config).toMatchObject({ activa: false, descuento_pct: 20 });
+    expect(screen.getByRole("switch", { name: "Visible en la web" })).not.toBeChecked();
   });
 
   it("si la base de datos no deja guardar (la RLS no actualiza ninguna fila), lo dice", async () => {
@@ -294,6 +312,56 @@ describe("Tienda › Ajustes", () => {
     expect(screen.queryByRole("tab", { name: /Ajustes/ })).toBeNull();
     expect(screen.queryByLabelText(/Descuento/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Guardar ajustes" })).toBeNull();
+  });
+});
+
+// 10/11/2026 (petición del dueño): un botón para encender o apagar la tienda de la web, arriba de la
+// sección (se ve desde Vinos y desde Ajustes). Se guarda al momento y solo cambia `activa`.
+describe("Tienda › interruptor «Visible en la web»", () => {
+  it("apaga la tienda al momento cambiando SOLO `activa`, y la vuelve a encender", async () => {
+    pintar();
+    await tablaVinos();
+    const interruptor = screen.getByRole("switch", { name: "Visible en la web" });
+    expect(interruptor).toBeChecked();
+
+    fireEvent.click(interruptor);
+    await waitFor(() => expect(h.toast.success).toHaveBeenCalledWith("Tienda oculta en la web"));
+    // Ni el descuento, ni los textos, ni los vinos excluidos.
+    expect(h.updates).toEqual([{ activa: false }]);
+    expect(h.config).toMatchObject({ activa: false, descuento_pct: "30.00", vinos_excluidos: ["albarino"], recogida: "Pregunta en la barra" });
+    expect(screen.getByRole("switch", { name: "Visible en la web" })).not.toBeChecked();
+    expect(screen.queryByText("· 30 %")).toBeNull();
+
+    fireEvent.click(screen.getByRole("switch", { name: "Visible en la web" }));
+    await waitFor(() => expect(h.toast.success).toHaveBeenCalledWith("Tienda visible en la web"));
+    expect(h.updates).toEqual([{ activa: false }, { activa: true }]);
+  });
+
+  it("también está en la pestaña Ajustes", async () => {
+    pintar("/tienda?tab=ajustes");
+    await campoDescuento();
+    expect(screen.getByRole("switch", { name: "Visible en la web" })).toBeChecked();
+  });
+
+  it("si la base de datos no lo guarda (RLS), vuelve a como estaba y lo dice", async () => {
+    h.bdDejaEditar = false;
+    pintar();
+    await tablaVinos();
+    fireEvent.click(screen.getByRole("switch", { name: "Visible en la web" }));
+    await waitFor(() => expect(h.toast.error).toHaveBeenCalledWith("No se pudo cambiar la tienda en la web", {
+      description: "No se ha guardado: tu usuario no tiene permiso para cambiar la tienda.",
+    }));
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Visible en la web" })).toBeChecked());
+    expect(h.toast.success).not.toHaveBeenCalled();
+  });
+
+  it("con solo «Ver» y la tienda apagada: «Oculta en la web», sin interruptor", async () => {
+    h.puedeEditar = false;
+    h.config.activa = false;
+    pintar();
+    await tablaVinos();
+    expect(screen.getByText("Oculta en la web")).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Visible en la web" })).toBeNull();
   });
 });
 
