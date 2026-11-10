@@ -115,7 +115,7 @@ export const COLUMNAS_FUERA = "fuera_lugar, fuera_mesa, fuera_espacio_previo_id"
 export function esErrorColumnasFueraInexistentes(error: unknown): boolean {
   const e = error as { code?: string; message?: string } | null;
   const texto = `${e?.message ?? ""}`;
-  return (e?.code === "42703" || e?.code === "PGRST204" || /column|columna/i.test(texto)) && /fuera_/.test(texto);
+  return (e?.code === "42703" || e?.code === "PGRST204" || /column|columna/i.test(texto)) && /fuera_|menu_cerrado|menu_precio|zona_preferida/.test(texto);
 }
 
 /** Mensaje si se intenta sentar fuera sin la migración aplicada. */

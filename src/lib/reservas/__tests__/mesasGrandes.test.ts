@@ -28,6 +28,13 @@ describe("«Ordenadas»", () => {
     }
   });
 
+  it("tarjetas pequeñas (10/11/2026): como mucho 144 × 100 aunque sobre sitio", () => {
+    const r = rejillaOrdenadas(3, 1200, 800);
+    expect(r.tarjetaAncho).toBeLessThanOrEqual(144);
+    expect(r.tarjetaAlto).toBeLessThanOrEqual(100);
+    expect(r.tarjetaAlto).toBeGreaterThanOrEqual(92); // con el nombre de la reserva dentro
+  });
+
   it("medidasTarjetas nunca se pasa del hueco", () => {
     const { tarjetaAncho, tarjetaAlto, hueco } = medidasTarjetas(480, 560, 6, 3);
     expect(3 * tarjetaAncho + 2 * hueco + 16).toBeLessThanOrEqual(480);

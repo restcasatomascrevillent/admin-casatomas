@@ -16,6 +16,8 @@
 // NUNCA SOLO EL COLOR (revisión de diseño, 07/10/2026): cada estado tiene además su forma de contorno (y en el
 // plano su icono, `servicio/estadosMesa.ts`), así que con daltonismo se siguen distinguiendo.
 // Las insignias (`badge`) llevan texto blanco sobre un tono 700/800: contraste AA (≥ 4,5:1).
+// 10/11/2026 (dueño: «pon más fuertes los colores para tener contraste»): rellenos un tono más
+// fuertes (100-300) y bordes 700, para distinguirse bien en la tablet y el móvil.
 // ============================================================================
 
 export type EstadoColorMesa = "libre" | "reservada" | "retrasada" | "ocupada" | "por_liberar";
@@ -36,31 +38,31 @@ export const ESTADOS_COLOR_MESA: readonly EstadoColorMesa[] = ["libre", "reserva
 export const COLORES_MESA: Record<EstadoColorMesa, ColorMesa> = {
   libre: {
     etiqueta: "Libre",
-    mesa: "border-2 border-dashed border-emerald-600 bg-emerald-50 dark:border-emerald-400 dark:bg-emerald-950/40",
+    mesa: "border-2 border-dashed border-emerald-700 bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-900/60",
     badge: "bg-emerald-700 text-white",
     icono: "text-emerald-700 dark:text-emerald-300",
   },
   reservada: {
     etiqueta: "Reservada",
-    mesa: "border-[3px] border-solid border-sky-600 bg-sky-50 dark:border-sky-400 dark:bg-sky-950/40",
+    mesa: "border-[3px] border-solid border-sky-700 bg-sky-200 dark:border-sky-400 dark:bg-sky-900/60",
     badge: "bg-sky-700 text-white",
     icono: "text-sky-700 dark:text-sky-300",
   },
   retrasada: {
     etiqueta: "Retrasada",
-    mesa: "border-[3px] border-dashed border-rose-600 bg-rose-50 dark:border-rose-400 dark:bg-rose-950/40",
+    mesa: "border-[3px] border-dashed border-rose-700 bg-rose-200 dark:border-rose-400 dark:bg-rose-900/60",
     badge: "bg-rose-700 text-white",
     icono: "text-rose-700 dark:text-rose-300",
   },
   ocupada: {
     etiqueta: "Ocupada",
-    mesa: "border-2 border-solid border-amber-600 bg-amber-200 dark:border-amber-400 dark:bg-amber-900/60",
+    mesa: "border-2 border-solid border-amber-700 bg-amber-300 dark:border-amber-400 dark:bg-amber-800/70",
     badge: "bg-amber-800 text-white",
     icono: "text-amber-900 dark:text-amber-200",
   },
   por_liberar: {
     etiqueta: "Por liberar",
-    mesa: "border-4 border-double border-violet-700 bg-violet-200 dark:border-violet-400 dark:bg-violet-900/60",
+    mesa: "border-4 border-double border-violet-800 bg-violet-300 dark:border-violet-400 dark:bg-violet-800/70",
     badge: "bg-violet-700 text-white",
     icono: "text-violet-900 dark:text-violet-200",
   },

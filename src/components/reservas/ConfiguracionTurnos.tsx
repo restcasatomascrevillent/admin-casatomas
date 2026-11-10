@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { leerHorasFijasTexto, textoHorasFijas } from "@/lib/reservas/horasFijas";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -89,6 +90,11 @@ const formSchema = z.object({
   niveles_escalera: z.array(nivelEscaleraSchema).min(1).max(8),
   ocultar_nivel_anterior: z.boolean(),
   base_umbral: z.enum(["aforo_total", "reparto_nivel_base"]),
+  // Turnos de hora fija (20261122200100, jueves de tapas: «20:30, 22:00»). Vacío = escalera.
+  horas_fijas_texto: z.string().superRefine((texto, ctx) => {
+    const leido = leerHorasFijasTexto(texto);
+    if ("error" in leido) ctx.addIssue({ code: z.ZodIssueCode.custom, message: leido.error });
+  }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -133,6 +139,7 @@ export function ConfiguracionTurnos() {
       niveles_escalera: NIVELES_POR_DEFECTO,
       ocultar_nivel_anterior: false,
       base_umbral: "reparto_nivel_base",
+      horas_fijas_texto: "",
     },
   });
 
@@ -182,6 +189,7 @@ export function ConfiguracionTurnos() {
       niveles_escalera: NIVELES_POR_DEFECTO,
       ocultar_nivel_anterior: false,
       base_umbral: "reparto_nivel_base",
+      horas_fijas_texto: "",
     });
     setDialogOpen(true);
   };
@@ -220,6 +228,7 @@ export function ConfiguracionTurnos() {
       niveles_escalera: crudos ?? derivadaDeLegacy ?? NIVELES_POR_DEFECTO,
       ocultar_nivel_anterior: ocultarNivelAnterior,
       base_umbral: baseUmbral,
+      horas_fijas_texto: textoHorasFijas(config.horas_fijas),
     });
     setDialogOpen(true);
   };
@@ -234,6 +243,13 @@ export function ConfiguracionTurnos() {
         activo: values.activo,
         espacio_id: values.espacio_id,
       };
+      const horasFijas = leerHorasFijasTexto(values.horas_fijas_texto);
+      // Solo se manda si tiene valor o si el periodo ya tenía (para quitarlas): así un periodo normal se
+      // sigue guardando igual aunque la columna no exista aún (migración 20261122200100 sin aplicar).
+      const conHorasFijas =
+        "horas" in horasFijas && (horasFijas.horas || editingConfig?.horas_fijas)
+          ? { horas_fijas: horasFijas.horas }
+          : {};
       // En modo avanzado se guarda la escalera nueva y las columnas viejas
       // se dejan tal cual estén (el motor prioriza `niveles_escalera` en
       // cuanto existe, así que no hace falta mantenerlas sincronizadas).
@@ -245,6 +261,7 @@ export function ConfiguracionTurnos() {
         values.modo_escalera === "avanzado"
           ? {
               ...base,
+              ...conHorasFijas,
               // Cast: react-hook-form tipa los arrays de objetos anidados de
               // forma parcial en algunos puntos de su inferencia genérica;
               // el shape real (validado por `nivelEscaleraSchema`) es
@@ -255,6 +272,7 @@ export function ConfiguracionTurnos() {
             }
           : {
               ...base,
+              ...conHorasFijas,
               intervalo_base_minutos: values.intervalo_base_minutos,
               umbral_apertura_secundario: values.umbral_apertura_secundario,
               ocultar_primario_si_secundario: values.ocultar_primario_si_secundario,
@@ -397,6 +415,24 @@ export function ConfiguracionTurnos() {
                       )}
                     />
                   </div>
+
+                  <FormField
+                    control={form.control}
+                    name="horas_fijas_texto"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Turnos de hora fija (opcional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ej: 20:30, 22:00" inputMode="text" autoComplete="off" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Si escribes horas, este periodo solo ofrece esas (p. ej. el jueves de tapas: 20:30 y 22:00) y
+                          la mesa del primer turno queda libre a la hora del segundo. Vacío: horas por la escalera.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -680,6 +716,12 @@ export function ConfiguracionTurnos() {
                   {config.hora_inicio} - {config.hora_fin}
                 </span>
               </div>
+              {textoHorasFijas(config.horas_fijas) && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Turnos fijos:</span>
+                  <span className="font-medium">{textoHorasFijas(config.horas_fijas)}</span>
+                </div>
+              )}
 
               {enAvanzado && "niveles" in escalera ? (
                 <>

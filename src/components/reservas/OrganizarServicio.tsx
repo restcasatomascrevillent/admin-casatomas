@@ -8,6 +8,8 @@
 // Si algo falla al aplicar, un aviso y el panel sigue usable.
 // ============================================================================
 
+import { servicioComidaDeReserva } from "@/lib/reservas/menuDelDia";
+import { esSalaExterior, normalizarZona } from "@/lib/reservas/zonaPreferida";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -76,6 +78,8 @@ interface FilaReserva {
   marca?: string | null;
   salida_at?: string | null;
   mesa_fijada?: boolean | null;
+  /** «¿Dentro o fuera?» (20261122200000); sin la migración, no viene. */
+  zona_preferida?: string | null;
 }
 
 /**
@@ -108,7 +112,7 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
     () =>
       ((espacios ?? []) as Array<{ id: string; nombre: string; activa?: boolean | null; caracteristicas?: unknown }>)
         .filter((e) => e.activa !== false && !esSalaPrivada(e))
-        .map((e) => ({ id: e.id, nombre: e.nombre, terraza: /terraza/i.test(e.nombre) })),
+        .map((e) => ({ id: e.id, nombre: e.nombre, terraza: /terraza/i.test(e.nombre), exterior: esSalaExterior(e) })),
     [espacios],
   );
   const terraza = salas.find((s) => s.terraza) ?? null;
@@ -186,6 +190,10 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
         mesaIds: mesasDe.get(r.id) ?? [],
         salidaAt: r.salida_at ?? null,
         fijada: !!r.mesa_fijada,
+        // Martes a jueves comida: menú del día → Comedor/Terraza; carta → Salón, Comedor o Terraza.
+        servicioComida: servicioComidaDeReserva({ fecha, hora: r.hora, menu_del_dia: (r as { menu_del_dia?: boolean | null }).menu_del_dia }),
+        // «¿Dentro o fuera?»: fuera → Terraza (salas exteriores); dentro → interiores.
+        zonaPreferida: normalizarZona(r.zona_preferida),
       }));
     const ahora = new Date();
     const empezado = fecha === hoyLocal() && turnoDeHora(ahora.toTimeString().slice(0, 8)) === turno;

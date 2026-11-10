@@ -183,7 +183,7 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
           if (!abierto && !guardando) cerrar();
         }}
       >
-        <DialogContent className="max-w-md" onInteractOutside={noCerrarAlTocarFuera}>
+        <DialogContent className="carta-contraste max-w-md" onInteractOutside={noCerrarAlTocarFuera}>
           <DialogHeader>
             <DialogTitle>Foto de {nombre}</DialogTitle>
             <DialogDescription>

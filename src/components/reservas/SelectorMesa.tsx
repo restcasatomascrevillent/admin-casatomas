@@ -9,13 +9,16 @@ import { Lock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { MesaParaConfirmar, SelectorMesas } from "@/lib/reservas/confirmarMesa";
 import { cn } from "@/lib/utils";
+import { COLORES_MESA } from "@/lib/reservas/coloresMesa";
 
 const horaCorta = (h: string) => (h ?? "").slice(0, 5);
 
 /**
  * Rejilla de botones grandes con las mesas de TODAS las salas donde cabe la reserva, agrupadas por sala:
- * arriba la suya (la prevista, o donde está sentada); cada una marcada libre (verde), prevista para otra
- * reserva (ámbar, se puede elegir) u ocupada por alguien sentado (gris, no se puede).
+ * arriba la suya (la prevista, o donde está sentada); cada una con el código de colores común
+ * (`coloresMesa.ts`, 10/11/2026, petición del dueño: «el código de colores no se respeta»): libre en verde,
+ * prevista o fijada para otra reserva en azul (la prevista se puede elegir; la fijada, con candado, no) y
+ * ocupada por alguien sentado en ámbar (no se puede).
  * Con `elegidaId` (quien entra sin reserva) la mesa marcada se resalta y cada botón dice si está pulsado.
  */
 export function SelectorMesaMovil({
@@ -67,11 +70,13 @@ export function SelectorMesaMovil({
           aria-label={`Mesa ${m.nombre}, ${m.plazas} plazas, ${m.salaNombre}: ${detalle}`}
           aria-pressed={conMarca && !deshabilitada ? marcada : undefined}
           className={cn(
-            "flex min-h-16 w-full flex-col items-start justify-between rounded-lg border-2 p-2 text-left active:scale-[0.98] disabled:cursor-not-allowed",
+            "flex min-h-16 w-full flex-col items-start justify-between rounded-lg border-2 p-2 text-stone-950 dark:text-stone-50 text-left active:scale-[0.98] disabled:cursor-not-allowed",
             m.propia && "border-primary bg-primary/10",
-            !m.propia && m.estado.tipo === "libre" && "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40",
-            !m.propia && m.estado.tipo === "prevista" && "border-amber-500 bg-amber-50 dark:bg-amber-950/40",
-            !m.propia && (m.estado.tipo === "ocupada" || m.estado.tipo === "fijada") && "border-muted bg-muted/60 text-muted-foreground opacity-70",
+            !m.propia && m.estado.tipo === "libre" && COLORES_MESA.libre.mesa,
+            !m.propia && (m.estado.tipo === "prevista" || m.estado.tipo === "fijada") && COLORES_MESA.reservada.mesa,
+            !m.propia && m.estado.tipo === "ocupada" && COLORES_MESA.ocupada.mesa,
+            // No elegibles: se ven con su color, apenas atenuadas (antes en gris, se confundían con libres).
+            !m.propia && (m.estado.tipo === "ocupada" || fijadaOtra) && "opacity-80",
             marcada && "ring-4 ring-primary ring-offset-2 ring-offset-background",
           )}
         >
@@ -80,12 +85,12 @@ export function SelectorMesaMovil({
               {m.nombre}
               {candado && <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
             </span>
-            <span className="flex items-center gap-0.5 text-xs text-muted-foreground tabular-nums">
+            <span className="flex items-center gap-0.5 text-xs font-semibold tabular-nums">
               <Users className="h-3 w-3" aria-hidden />
               {m.plazas}
             </span>
           </span>
-          <span className="line-clamp-2 w-full text-xs">{detalle}</span>
+          <span className="line-clamp-2 w-full text-xs font-medium">{detalle}</span>
         </button>
       </li>
     );

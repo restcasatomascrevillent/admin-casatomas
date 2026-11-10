@@ -1315,6 +1315,7 @@ export type Database = {
           espacio_id: string | null
           hora_fin: string
           hora_inicio: string
+          horas_fijas: string[] | null
           id: string
           intervalo_base_minutos: number
           nombre_periodo: string
@@ -1329,6 +1330,7 @@ export type Database = {
           espacio_id?: string | null
           hora_fin: string
           hora_inicio: string
+          horas_fijas?: string[] | null
           id?: string
           intervalo_base_minutos?: number
           nombre_periodo: string
@@ -1343,6 +1345,7 @@ export type Database = {
           espacio_id?: string | null
           hora_fin?: string
           hora_inicio?: string
+          horas_fijas?: string[] | null
           id?: string
           intervalo_base_minutos?: number
           nombre_periodo?: string
@@ -4361,6 +4364,10 @@ export type Database = {
           importante: boolean
           /** «Menú del día» (martes a jueves, comida): marca de la reserva. Solo existe si la migración de servicios_bloqueados/menu_del_dia está aplicada. */
           menu_del_dia: boolean
+          /** «Menú cerrado» (de grupo; 20261122190000_reservas_menu_cerrado). NO es `menu_del_dia`. */
+          menu_cerrado: boolean
+          /** Precio del menú cerrado en euros (20261122190000): numeric(6,2) >= 0, NULL = sin precio. */
+          menu_precio: number | null
           /** «Fijar mesa» (20261107120000_reservas_mesa_fijada.sql): los recálculos no la mueven. */
           mesa_fijada: boolean
           nombre: string | null
@@ -4376,6 +4383,8 @@ export type Database = {
           consentimiento_newsletter_at: string | null
           /** «Cómo se hizo la reserva» (20261122121500_reservas_origen.sql). Solo reservas web; la escribe reservas-web. Ver src/lib/reservas/origenReserva.ts. */
           origen: Json | null
+          /** «¿Dentro o fuera?» (20261122200000_reservas_zona_preferida): 'dentro' | 'fuera' | null (no se dijo). Ver src/lib/reservas/zonaPreferida.ts. */
+          zona_preferida: string | null
         }
         Insert: {
           canal?: string | null
@@ -4391,6 +4400,8 @@ export type Database = {
           id?: string
           importante?: boolean
           menu_del_dia?: boolean
+          menu_cerrado?: boolean
+          menu_precio?: number | null
           mesa_fijada?: boolean
           nombre?: string | null
           notas_cliente?: string | null
@@ -4402,6 +4413,7 @@ export type Database = {
           email_verificado_at?: string | null
           consentimiento_newsletter_at?: string | null
           origen?: Json | null
+          zona_preferida?: string | null
         }
         Update: {
           canal?: string | null
@@ -4417,6 +4429,8 @@ export type Database = {
           id?: string
           importante?: boolean
           menu_del_dia?: boolean
+          menu_cerrado?: boolean
+          menu_precio?: number | null
           mesa_fijada?: boolean
           nombre?: string | null
           notas_cliente?: string | null
@@ -4428,6 +4442,7 @@ export type Database = {
           email_verificado_at?: string | null
           consentimiento_newsletter_at?: string | null
           origen?: Json | null
+          zona_preferida?: string | null
         }
         Relationships: [
           {

@@ -22,6 +22,7 @@
 // ============================================================================
 
 import { turnoDeHora } from "./asignacionMesas";
+import { minutosHastaSiguienteTurnoFijo } from "../../../supabase/functions/_shared/disponibilidad";
 import { CONFIG_SERVICIO_SALA_POR_DEFECTO, type ConfigServicioSala } from "./servicioSala";
 
 /** Minutos desde medianoche [inicio, fin). `fin` puede pasar de 1440 (cenas tardías). */
@@ -44,7 +45,7 @@ export interface AsignacionConReserva {
 }
 
 /** Lo que el ajuste necesita: los dos minutajes del turno. */
-export type ConfigOcupacionMesa = Pick<ConfigServicioSala, "estanciaComidaMinutos" | "estanciaCenaMinutos">;
+export type ConfigOcupacionMesa = Pick<ConfigServicioSala, "estanciaComidaMinutos" | "estanciaCenaMinutos" | "horasFijas">;
 
 export const CONFIG_OCUPACION_POR_DEFECTO: ConfigOcupacionMesa = {
   estanciaComidaMinutos: CONFIG_SERVICIO_SALA_POR_DEFECTO.estanciaComidaMinutos,
@@ -61,12 +62,22 @@ export function minutosDeHora(hora: string): number | null {
   return h * 60 + min;
 }
 
-/** Minutos que ocupa la mesa una reserva a esa hora (por el turno de esa hora). */
+/**
+ * Minutos que ocupa la mesa una reserva a esa hora (por el turno de esa hora).
+ * Con turnos de hora fija (`config.horasFijas`, jueves de tapas 20:30 y 22:00)
+ * se recorta en el turno siguiente, como `fn_franja_ocupacion_mesa` (20261122200100).
+ */
 export function minutosOcupacionMesa(hora: string, config: ConfigOcupacionMesa = CONFIG_OCUPACION_POR_DEFECTO): number {
   const comida = turnoDeHora(hora) === "comida";
   const minutos = Number(comida ? config?.estanciaComidaMinutos : config?.estanciaCenaMinutos);
-  if (Number.isFinite(minutos) && minutos > 0) return minutos;
-  return comida ? CONFIG_OCUPACION_POR_DEFECTO.estanciaComidaMinutos : CONFIG_OCUPACION_POR_DEFECTO.estanciaCenaMinutos;
+  const base =
+    Number.isFinite(minutos) && minutos > 0
+      ? minutos
+      : comida
+        ? CONFIG_OCUPACION_POR_DEFECTO.estanciaComidaMinutos
+        : CONFIG_OCUPACION_POR_DEFECTO.estanciaCenaMinutos;
+  const hastaSiguiente = minutosHastaSiguienteTurnoFijo(hora, config?.horasFijas);
+  return hastaSiguiente === null ? base : Math.min(base, hastaSiguiente);
 }
 
 /** Franja de una reserva, o `null` si su hora es ilegible (entonces no se compara). */

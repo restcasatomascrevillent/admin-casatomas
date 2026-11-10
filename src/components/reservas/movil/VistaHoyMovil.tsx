@@ -69,6 +69,7 @@ import { useAsignacionesMesa, type AsignacionConDetalles } from "@/hooks/useAsig
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAccionesModoServicio } from "@/hooks/useAccionesModoServicio";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { useHorasFijasDelDia } from "@/hooks/useConfiguracionTurnos";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useAlDiaMovil } from "@/hooks/useAlDiaMovil";
 import { useSalaCerradaServicio } from "@/hooks/useSalaCerradaServicio";
@@ -85,7 +86,7 @@ import { BotonSentarSinReserva } from "@/components/reservas/SentarSinReserva";
 import { ConfirmarDesplazamiento, SelectorMesaMovil, type Pendiente } from "@/components/reservas/SelectorMesa";
 import { useAsignarConCambioLocal, useDesplazar } from "@/hooks/useDesplazarReservas";
 import { BotonPersonas } from "@/components/reservas/CambiarPersonas";
-import { InterruptoresServiciosOnline, InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
+import { InterruptoresServiciosOnline, InsigniaMenuCerrado, InsigniaMenuDelDia, InsigniaZona } from "@/components/reservas/InterruptoresServiciosOnline";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { COLORES_MESA, estadoColorMovil } from "@/lib/reservas/coloresMesa";
 import { configServicioSalaDesde, type ReservaMesaServicio } from "@/lib/reservas/servicioSala";
@@ -129,6 +130,7 @@ import type { ConfigOcupacionMesa } from "@/lib/reservas/ocupacionMesa";
 import { proponerRecalculo, recolocarDesplazadas, textoSinSitio } from "@/lib/reservas/recalcularMesas";
 import { useFijarMesa } from "@/hooks/useMesaFijada";
 import { ListaHoyEscritorio } from "@/components/reservas/servicio/ListaHoyEscritorio";
+import { FilasPorMenu } from "@/components/reservas/servicio/FilasPorMenu";
 import { BotonSentarFuera, EtiquetaFuera } from "@/components/reservas/SentarFuera";
 import { estaSentadaFuera, puedeSentarseFuera } from "@/lib/reservas/sentarFuera";
 import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
@@ -212,6 +214,7 @@ export function VistaHoyMovil({
   const { data: asignaciones } = useAsignacionesMesa(fecha);
   const { data: ajustesDia } = useAjustesMesaDia(fecha);
   const { data: config } = useConfiguracionReservas();
+  const horasFijas = useHorasFijasDelDia(fecha);
 
   const salas = useMemo(
     () => ((espacios ?? []) as Array<{ id: string; nombre: string }>).map((e) => ({ id: e.id, nombre: e.nombre })),
@@ -220,7 +223,7 @@ export function VistaHoyMovil({
   const salaPorId = useMemo(() => new Map(salas.map((s) => [s.id, s.nombre])), [salas]);
   const asignacionesDia = useMemo(() => asignaciones ?? [], [asignaciones]);
   const mesaPorId = useMemo(() => new Map((mesas ?? []).map((m) => [m.id, m])), [mesas]);
-  const configOcupacion = useMemo(() => configServicioSalaDesde(config), [config]);
+  const configOcupacion = useMemo(() => configServicioSalaDesde(config, horasFijas), [config, horasFijas]);
 
   // Turno que pintan las mesas: el del filtro o, con «Todo el día», el del reloj.
   const turno: TurnoServicio =
@@ -439,6 +442,7 @@ export function VistaHoyMovil({
             ocupadaId={sentandoId ?? (señalada && liberando?.(señalada) ? señalada : null)}
             señalada={señalada}
             onSeñalar={setSeñaladaRaton}
+            servicio={{ fecha, filtroTurno }}
           />
         ) : vacia ? (
           <p className="p-4 text-sm text-muted-foreground">No hay reservas para este filtro.</p>
@@ -463,7 +467,11 @@ export function VistaHoyMovil({
                     {lista.porLlegar.length} {lista.porLlegar.length === 1 ? "reserva" : "reservas"} · {pax(lista.porLlegar)} pax
                   </span>
                 </h3>
-                <ul className="divide-y">{lista.porLlegar.map((f) => fila(f.reserva, f.mesas, { tarde: f.tarde }))}</ul>
+                <FilasPorMenu
+                  filas={lista.porLlegar}
+                  servicio={{ fecha, filtroTurno }}
+                  pintar={(f) => fila(f.reserva, f.mesas, { tarde: f.tarde })}
+                />
               </section>
             )}
             {/* Sentadas fuera (Touza, Terraza Touza…): no están en ninguna mesa de «Mesas», así que se ven aquí,
@@ -642,6 +650,8 @@ export function FilaReservaMovil({
               info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
             )}
             <InsigniaMenuDelDia reserva={reserva} />
+            <InsigniaMenuCerrado reserva={reserva} />
+            <InsigniaZona reserva={reserva} />
           </span>
           {/* La protagonista es la MESA (07/11/2026, petición del dueño): «Sentar» pequeño encima y debajo, en
               grande, sala y mesa. Un toque = sentar en ella (con `decidirSentarPrevista`). Sin mesa (o con la
@@ -1434,6 +1444,7 @@ export function HojaMesaSentar({
   const { data: asignaciones } = useAsignacionesMesa(fecha);
   const { data: ajustesDia } = useAjustesMesaDia(fecha);
   const { data: config } = useConfiguracionReservas();
+  const horasFijas = useHorasFijasDelDia(fecha);
   const salas = useMemo(
     () => ((espacios ?? []) as Array<{ id: string; nombre: string }>).map((e) => ({ id: e.id, nombre: e.nombre })),
     [espacios],
@@ -1448,7 +1459,7 @@ export function HojaMesaSentar({
       reservas={reservas}
       mesas={mesas ?? []}
       asignaciones={asignaciones ?? []}
-      configOcupacion={configServicioSalaDesde(config)}
+      configOcupacion={configServicioSalaDesde(config, horasFijas)}
       minutoAhora={minutoAhora}
       salas={salas}
       ajustesDia={ajustesDia ?? []}
@@ -1706,6 +1717,8 @@ export function PanelReservaMovil({
           <span className="truncate">{reserva.nombre || "Sin nombre"}</span>
           {info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>}
           <InsigniaMenuDelDia reserva={reserva} />
+          <InsigniaMenuCerrado reserva={reserva} />
+            <InsigniaZona reserva={reserva} />
         </SheetTitle>
         <SheetDescription asChild>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">

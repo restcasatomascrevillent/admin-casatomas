@@ -1,10 +1,15 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 // Tipos de la escalera de niveles — el MISMO módulo que usan la web y el
 // teléfono (ver `disponibilidad.ts`). `niveles_escalera` viaja tal cual el
 // jsonb de Supabase: puede ser un array ya parseado, un string, o no venir
 // (columna aún sin aplicar / fila creada antes de la migración).
-import type { NivelEscalera, BaseUmbral } from "../../supabase/functions/_shared/disponibilidad";
+import {
+  horasFijasDelDia,
+  type NivelEscalera,
+  type BaseUmbral,
+} from "../../supabase/functions/_shared/disponibilidad";
 
 export interface ConfiguracionTurno {
   id: string;
@@ -23,6 +28,8 @@ export interface ConfiguracionTurno {
   niveles_escalera?: NivelEscalera[] | string | null;
   ocultar_nivel_anterior?: boolean | null;
   base_umbral?: BaseUmbral | string | null;
+  /** Turnos de hora fija (20261122200100, jueves de tapas: ["20:30:00","22:00:00"]). `null` = escalera. */
+  horas_fijas?: string[] | null;
 }
 
 export interface ConfiguracionTurnoInsert {
@@ -38,6 +45,7 @@ export interface ConfiguracionTurnoInsert {
   niveles_escalera?: NivelEscalera[] | null;
   ocultar_nivel_anterior?: boolean;
   base_umbral?: BaseUmbral;
+  horas_fijas?: string[] | null;
 }
 
 export interface ConfiguracionTurnoUpdate extends Partial<ConfiguracionTurnoInsert> {
@@ -83,6 +91,16 @@ export function useConfiguracionTurnosPorEspacio(espacioId: string | null) {
     },
     enabled: espacioId !== undefined,
   });
+}
+
+/**
+ * Turnos de hora fija de ese día ("HH:MM"): el jueves de tapas por la noche,
+ * 20:30 y 22:00 (`configuracion_turnos.horas_fijas`). Vacío = día normal.
+ * Misma consulta (y caché) que `useConfiguracionTurnos`.
+ */
+export function useHorasFijasDelDia(fecha: string | null | undefined): string[] {
+  const { data } = useConfiguracionTurnos();
+  return useMemo(() => horasFijasDelDia(fecha, data), [fecha, data]);
 }
 
 /**

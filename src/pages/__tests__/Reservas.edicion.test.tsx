@@ -1,8 +1,7 @@
 /**
  * Página /reservas: el permiso de edición de la sección «reservas» gobierna «Nueva Reserva»
  * (2026-10-01), la insignia de solicitudes cuenta lo mismo que la lista, y el alta manual no cambia:
- * `datosNuevaReserva` se memoiza con `useMemo([openDialog])` para que el formulario no reescriba la
- * fecha en cada render, y eso NO se puede romper.
+ * (desde el 10/11/2026 el alta va dentro de LibroReservas, que memoiza la fecha del formulario).
  *
  * (04/10/2026: «Hoy» ya no recibe callbacks de edición ni de asignación —se retiró la franja
  * «Pendientes de mesa»; el kanban lleva su propio editor—, así que `VistaHoy` se monta sin props.)
@@ -13,7 +12,7 @@
  * su sitio, junto a las pestañas, sale la etiqueta común «Solo lectura»; también en el plano de una sala.)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 const h = vi.hoisted(() => ({
@@ -32,7 +31,12 @@ vi.mock("@/components/reservas/FormularioReserva", () => ({
     return <div data-testid="formulario-alta" />;
   },
 }));
+// «Nueva reserva» única (10/11/2026): el diálogo monta LibroReservas, que lleva dentro el formulario.
+vi.mock("@/components/reservas/libro/LibroReservas", () => ({
+  LibroReservas: () => <div data-testid="formulario-alta" />,
+}));
 vi.mock("@/components/reservas/ListaReservasAvanzada", () => ({ ListaReservasAvanzada: () => null }));
+vi.mock("@/components/reservas/libro/ListaComoLibro", () => ({ ListaComoLibro: () => null }));
 vi.mock("@/components/reservas/CalendarioOcupacion", () => ({ CalendarioOcupacion: () => null }));
 vi.mock("@/components/reservas/PlanoEspacio2D", () => ({ PlanoEspacio2D: () => null }));
 vi.mock("@/components/reservas/servicio/ModoServicioPlano", () => ({ ModoServicioPlano: () => null }));
@@ -98,26 +102,8 @@ describe("Reservas (página) · «Nueva Reserva» pide permiso de edición", () 
   });
 });
 
-describe("Reservas (página) · el alta manual sigue igual", () => {
-  it("`datosPreseleccionados` del formulario de alta conserva su identidad mientras el diálogo está abierto", async () => {
-    montar();
-
-    fireEvent.click(screen.getByRole("button", { name: /Nueva Reserva/ }));
-    await screen.findByTestId("formulario-alta");
-    const alAbrir = h.formulario.mock.calls.at(-1)![0] as { datosPreseleccionados: { fecha: Date } };
-
-    // Cualquier render de la página mientras el diálogo sigue abierto (aquí, cambiar de
-    // pestaña). Con el diálogo abierto Radix marca el resto como `aria-hidden`, de ahí `hidden: true`.
-    const pestana = screen.getByRole("tab", { name: "Calendario", hidden: true });
-    fireEvent.mouseDown(pestana);
-    fireEvent.click(pestana);
-    await waitFor(() => expect(h.formulario.mock.calls.length).toBeGreaterThan(0));
-
-    for (const [props] of h.formulario.mock.calls as Array<[{ datosPreseleccionados: { fecha: Date } }]>) {
-      expect(props.datosPreseleccionados).toBe(alAbrir.datosPreseleccionados);
-    }
-  });
-});
+// (10/11/2026) La identidad estable de `datosPreseleccionados` vive ahora en LibroReservas
+// (`useMemo` por la fecha de la hoja); la página ya no monta el formulario directamente.
 
 // 2026-10-06, petición del dueño («Perdemos mucho espacio vertical… quita el título de "Todas las reservas" y la
 // parte de "Historial completo"»): la pestaña Lista ya no lleva título ni subtítulo encima de la lista. La región

@@ -108,6 +108,7 @@ import { useAsignacionesMesa, useAsignarMesasReserva } from "@/hooks/useAsignaci
 import { useMesas, type Mesa } from "@/hooks/useMesas";
 import { usePlanoEspacio } from "@/hooks/usePlanosEspacio";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { useHorasFijasDelDia } from "@/hooks/useConfiguracionTurnos";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAccionesModoServicio } from "@/hooks/useAccionesModoServicio";
 import { useCanAccessSection } from "@/hooks/useUserRole";
@@ -138,7 +139,9 @@ import {
   ALTURA_MINIMA_PLANO_HOY,
   ALTURA_MINIMA_PLANO_HOY_MOVIL,
   coincideFiltroHoy,
+  textoTurnoFijo,
   turnoDelPlano,
+  turnoFijoEnCurso,
   turnoYaCerrado,
   type FiltroTurnoHoy,
 } from "@/lib/reservas/vistaHoy";
@@ -273,7 +276,8 @@ export function VistaPlanoHoy({
   const planoQuery = usePlanoEspacio(sala?.id);
   const plano = planoQuery.data;
   const { data: configReservas } = useConfiguracionReservas();
-  const config = useMemo(() => configServicioSalaDesde(configReservas), [configReservas]);
+  const horasFijas = useHorasFijasDelDia(hoy);
+  const config = useMemo(() => configServicioSalaDesde(configReservas, horasFijas), [configReservas, horasFijas]);
 
   // ── Acciones: las del kanban y las del modo servicio ────────────────────────
   const acciones = useAccionesServicioReserva();
@@ -773,7 +777,9 @@ export function VistaPlanoHoy({
     return h * 60 + (m || 0) - (ahora.getHours() * 60 + ahora.getMinutes());
   };
 
-  const etiquetaTurno = `${ETIQUETA_TURNO[turno]}${filtroTurno === "todo" ? " · turno en curso" : ""}`;
+  // Jueves de tapas (horas fijas 20:30 y 22:00): «Cena · 2.º turno (22:00) · turno en curso».
+  const turnoFijo = turnoFijoEnCurso(horasFijas, turno, ahora);
+  const etiquetaTurno = `${ETIQUETA_TURNO[turno]}${turnoFijo ? ` · ${textoTurnoFijo(turnoFijo)}` : ""}${filtroTurno === "todo" ? " · turno en curso" : ""}`;
 
   // ── ¿Está todo cargado? (revisión 07/10/2026) ─────────────────────────────
   // Sin las mesas asignadas (cargando o con error) cada mesa salía «Libre» y la lista decía «Todas las
