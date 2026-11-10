@@ -155,6 +155,7 @@ describe("menú del Super Admin", () => {
     renderSuperAdmin();
     expect(screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"))).toEqual([
       "Control del Panel", "Usuarios", "Auditoría",
+      "Informes",
       // «Costes» es una pestaña de Servicios desde el 2026-11-04: ya no tiene entrada propia.
       // «Gestor Gasto» está en «Más módulos» desde el 2026-11-10.
       "Servicios",
