@@ -264,6 +264,10 @@ verify_jwt = true
 [functions.extraer-vino-foto]
 verify_jwt = true
 
+# «Escribir reserva» (libro de reservas): exige además reservas_puede_crear() con el JWT del usuario.
+[functions.interpretar-reserva-manuscrita]
+verify_jwt = true
+
 [functions.buscar-puntuacion-parker]
 verify_jwt = true
 
