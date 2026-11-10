@@ -552,8 +552,10 @@ export function pendientesServicios(args: {
   /** Proveedores sin lectura automática (no se les pide clave). */
   sinLector?: Set<string>;
   ia?: { sinRegistro: number; modelosSinTarifa: number } | null;
+  /** Costes de meses ya cerrados (o precios) que faltan por meter (Costes › «Costes por meter»). */
+  costesPorMeter?: number;
 }): Pendiente[] {
-  const { servicios, lecturas, renovaciones, resumen, sinLector = new Set<string>(), ia } = args;
+  const { servicios, lecturas, renovaciones, resumen, sinLector = new Set<string>(), ia, costesPorMeter = 0 } = args;
   const enUso = servicios.filter((s) => s.activo !== false);
   const salida: Pendiente[] = [];
 
@@ -631,6 +633,17 @@ export function pendientesServicios(args: {
       gravedad: "ambar",
       titulo: ia.modelosSinTarifa === 1 ? "Un modelo de IA no tiene tarifa" : `${ia.modelosSinTarifa} modelos de IA no tienen tarifa`,
       detalle: "Su coste sale como «sin datos» y no suma.",
+      destino: { pestana: "costes" },
+      accion: "Ver en Costes",
+    });
+  }
+
+  if (costesPorMeter > 0) {
+    salida.push({
+      clave: "costes:por-meter",
+      gravedad: "ambar",
+      titulo: costesPorMeter === 1 ? "Falta meter 1 coste" : `Faltan por meter ${costesPorMeter} costes`,
+      detalle: "Servicios de pago sin precio o sin el coste de algún mes: el informe mensual se queda corto.",
       destino: { pestana: "costes" },
       accion: "Ver en Costes",
     });
@@ -758,6 +771,33 @@ export const AYUDA_SECRETOS: Record<string, AyudaSecreto> = {
       "Si no, en Vapi → Organización → API Keys copia la «Private Key».",
     ],
     permisos: "Opcional: sin ella, el número de llamadas, los minutos y su coste salen de call_logs. Con ella, el coste del mes lo da Vapi.",
+  },
+  GOOGLE_REFRESH_TOKEN: {
+    titulo: "Cuenta de Google de las facturas",
+    enlace: "https://console.cloud.google.com/apis/credentials",
+    textoEnlace: "Abrir las credenciales de Google",
+    pasos: [
+      "Son las mismas claves que guardan las copias de las facturas en Drive (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN).",
+      "Si las facturas ya se copian a Drive, existen: no hay que hacer nada. Si no, se configuran una vez para las facturas y esta tarjeta las aprovecha.",
+    ],
+    permisos: "Solo lee el espacio usado de la cuenta; no abre ni cambia ningún fichero.",
+    yaExiste: true,
+  },
+  GOOGLE_CLIENT_ID: {
+    titulo: "Cuenta de Google de las facturas",
+    enlace: "https://console.cloud.google.com/apis/credentials",
+    textoEnlace: "Abrir las credenciales de Google",
+    pasos: ["Es una de las tres claves de la copia de facturas en Drive (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN)."],
+    permisos: "Solo lee el espacio usado de la cuenta.",
+    yaExiste: true,
+  },
+  GOOGLE_CLIENT_SECRET: {
+    titulo: "Cuenta de Google de las facturas",
+    enlace: "https://console.cloud.google.com/apis/credentials",
+    textoEnlace: "Abrir las credenciales de Google",
+    pasos: ["Es una de las tres claves de la copia de facturas en Drive (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN)."],
+    permisos: "Solo lee el espacio usado de la cuenta.",
+    yaExiste: true,
   },
   STRIPE_SECRET_KEY: {
     titulo: "Clave de Stripe",
