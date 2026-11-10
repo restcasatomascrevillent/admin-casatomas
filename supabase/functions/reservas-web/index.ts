@@ -144,6 +144,7 @@ import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-cl
 import {
   puedeEnviarCorreoRechazo,
   reservarCupoCrear,
+  reservarCupoDisponibilidad,
   respuestaDemasiadasSolicitudes,
   respuestaLimitadorNoDisponible,
 } from "./limitador.ts";
@@ -1008,6 +1009,19 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
   }
   const fecha = typeof body?.fecha === "string" ? body.fecha : "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ ok: false, error: "fecha_invalida" }, 400);
+
+  // CT-REM-FN-07b: limitador por IP de /disponibilidad (solo lectura). Tras
+  // validar la fecha y ANTES de cualquier consulta a la BD: una consulta
+  // throttled no toca la BD. FALLA EN ABIERTO a propósito —al revés que
+  // /crear—: disponibilidad es el corazón del flujo de reserva, así que si el
+  // limitador no está disponible la consulta se SIRVE igual; solo se bloquea
+  // cuando dice "denegado" (se superó el límite por IP/hora o el diario).
+  const cupoDisponibilidad = await reservarCupoDisponibilidad(supabase, req, IP_SALT);
+  if (cupoDisponibilidad.estado === "denegado") {
+    console.warn(`[reservas-web] /disponibilidad bloqueada por el limitador (${cupoDisponibilidad.motivo})`);
+    const r = respuestaDemasiadasSolicitudes(RESTAURANTE_TEL_TEXTO);
+    return json(r.cuerpo, r.status);
+  }
 
   const comensalesRaw = parseInt(String(body?.numero_comensales ?? body?.comensales ?? ""), 10);
   const comensales = Number.isFinite(comensalesRaw) && comensalesRaw > 0 ? comensalesRaw : 1;
