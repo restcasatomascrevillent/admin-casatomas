@@ -23,7 +23,6 @@ vi.mock("@/components/notificaciones/CentroNotificaciones", () => ({
 }));
 vi.mock("@/components/carta/recorte/PrecargaRecorte", () => ({ PrecargaRecorte: () => null }));
 vi.mock("@/components/NavAutoCollapse", () => ({ NavAutoCollapse: () => null, defaultSidebarOpen: () => true }));
-vi.mock("@/components/panel/InstalarApp", () => ({ AvisoInstalarApp: () => null }));
 vi.mock("@/lib/audit-access", () => ({ auditDeniedAccess: vi.fn() }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" }, loading: false }) }));
 vi.mock("@/hooks/useSuperAdmin", () => ({ useSuperAdmin: () => ({ isSuperAdmin: false, loading: false }) }));
