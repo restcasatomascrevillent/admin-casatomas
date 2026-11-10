@@ -1,5 +1,5 @@
 import { EtiquetaFuera } from "./SentarFuera";
-import { useState, useMemo, useRef, useEffect, type ReactNode } from "react";
+import { useState, useMemo, useRef, useEffect, type MouseEvent, type ReactNode } from "react";
 import { InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -148,8 +148,11 @@ type Reservation = ReservaParaVerificar;
 //     con el año entero y Canal con la palabra.
 // Cliente, lo que queda (medido): 219 px a 1280×711, 305 a 1366, 379 a 1440 y
 // 859 a 1920; con dedo, 222 a 1024 (tablet apaisada, menú plegado a iconos).
-const ALTO_FILA = "h-14";
-const CELDA = "px-1.5 py-2 align-middle xl:px-2";
+// 10/11/2026 (petición del dueño: «los botones de acción y las cosas más grandes»): filas más altas, texto a
+// 16 px, insignias a 14 px y botones de 44 px. Para que siga sin haber scroll horizontal, la fecha va siempre en
+// dos líneas y Canal solo con su icono hasta 1536 px (`2xl`).
+const ALTO_FILA = "h-16";
+const CELDA = "px-2 py-2 align-middle";
 
 /** Filas por página. Ver el comentario de "Paginación" más abajo. */
 const TAMANO_PAGINA = 50;
@@ -170,6 +173,21 @@ const TAMANO_PAGINA = 50;
  */
 const ALTURA_MINIMA_LISTA = 280;
 
+/**
+ * Tocar la fila (o la tarjeta) fuera de sus botones abre la ficha (10/11/2026, petición del dueño): el editor
+ * en una reserva y «Gestionar» en una solicitud. Lo que se toque dentro de un control (botones, casillas,
+ * enlaces, el menú «Más», que va en un portal pero sus eventos suben por React hasta la fila) no cuenta.
+ */
+function alTocarFila(abrir?: () => void) {
+  return (e: MouseEvent<HTMLElement>) => {
+    if (!abrir) return;
+    const destino = e.target as Element | null;
+    if (destino?.closest?.("button, a, input, label, [role='checkbox'], [role='menu'], [role='menuitem']")) return;
+    if (!e.currentTarget.contains(destino as Node)) return;
+    abrir();
+  };
+}
+
 /** Lleva arriba del todo los contenedores con scroll propio que se le den (la tabla y las tarjetas). */
 function subirArriba(...contenedores: (Element | null | undefined)[]) {
   for (const contenedor of contenedores) if (contenedor) contenedor.scrollTop = 0;
@@ -182,9 +200,9 @@ function subirArriba(...contenedores: (Element | null | undefined)[]) {
 // Los `lg:` encogen SOLO en la franja 1024–1279 px, que es donde falta sitio:
 // en las tarjetas de móvil y a partir de 1280 px la insignia queda a 11 px.
 const INSIGNIA =
-  "h-5 shrink-0 gap-1 whitespace-nowrap px-1.5 py-0 text-[11px] pointer-coarse:text-xs font-medium lg:px-1 lg:text-[10px] xl:px-1.5 xl:text-[11px]";
+  "h-7 shrink-0 gap-1.5 whitespace-nowrap px-2 py-0 text-sm font-medium [&_svg]:h-4 [&_svg]:w-4";
 /** Segunda línea del estado (motivo, propuesta): aún más compacta. */
-const INSIGNIA_SECUNDARIA = "h-4 shrink-0 gap-1 whitespace-nowrap px-1 py-0 text-[10px] pointer-coarse:text-xs font-medium";
+const INSIGNIA_SECUNDARIA = "h-6 shrink-0 gap-1 whitespace-nowrap px-1.5 py-0 text-xs font-medium";
 
 /**
  * "Propuesta enviada 24/09 18:44" no cabe en la columna Estado. En la lista
@@ -218,13 +236,14 @@ function etiquetaPropuestaCorta(vista: EstadoPropuestaVista, enviadaAt: string |
 // 703 px: a Cliente le quedan 167. Con dedo y el menú desplegado a mano (718 px),
 // solo 38: el nombre se ve con «…», pero sin scroll horizontal (el menú, en esa
 // anchura, arranca plegado a iconos).
-const ANCHO_ACCIONES = "w-[240px] xl:w-[276px] pointer-coarse:w-[384px] pointer-coarse:xl:w-[388px]";
-const ANCHO_FECHA = "w-[64px] xl:w-[132px]";
+// 10/11/2026: casilla 24 + principal 136 + «Más» ~82 + huecos 2×8 + relleno 16 + borde 1 = 275 → 280.
+const ANCHO_ACCIONES = "w-[280px]";
+const ANCHO_FECHA = "w-[92px]";
 /** Envoltorio del nombre: ocupa lo que le deje la celda, ni más ni menos. */
 const ANCHO_NOMBRE = "min-w-0 flex-1";
-const ANCHO_PAX = "w-[44px] xl:w-[52px]";
-const ANCHO_CANAL = "w-[44px] xl:w-[92px]";
-const ANCHO_ESTADO = "w-[144px] xl:w-[188px]";
+const ANCHO_PAX = "w-[64px]";
+const ANCHO_CANAL = "w-[60px] 2xl:w-[130px]";
+const ANCHO_ESTADO = "w-[200px] xl:w-[220px]";
 
 // Fondos de fila. Hay que aplicarlos también a la celda de acciones: al ser
 // `position: sticky` necesita fondo opaco propio (hoy no debería haber scroll
@@ -271,7 +290,7 @@ function CeldaAcciones({
       className={cn(
         // Relleno propio, más apretado que `CELDA`: esta columna es la más
         // ancha de todas y sus 6 ranuras no cambian de tamaño con la pantalla.
-        "px-1.5 py-2 align-middle xl:px-2",
+        "px-2 py-2 align-middle",
         ANCHO_ACCIONES,
         "sticky left-0 z-10 border-r border-border/60",
         // La franja va como sombra interior y NO como `border-l-4` en la fila:
@@ -283,7 +302,7 @@ function CeldaAcciones({
       )}
     >
       {/* Huecos de 2 px con ratón (también en `xl`: antes 4, son 12 px menos de columna); con dedo, 4. */}
-      <div className="flex items-center justify-start gap-0.5 pointer-coarse:gap-1">{children}</div>
+      <div className="flex items-center justify-start gap-2">{children}</div>
     </TableCell>
   );
 }
@@ -326,15 +345,9 @@ function CeldaFechaHora({ dia, hora }: { dia: Date | null; hora: string | null |
   const corta = `${dd}/${mm}/${String(dia.getFullYear()).slice(-2)}`;
   return (
     <TableCell className={cn(CELDA, ANCHO_FECHA, "whitespace-nowrap tabular-nums")}>
-      <span
-        className="flex flex-col text-xs leading-tight xl:flex-row xl:items-baseline xl:gap-2 xl:text-sm"
-        title={`${larga} · ${hhmm}`}
-      >
-        <span>
-          <span className="xl:hidden">{corta}</span>
-          <span className="hidden xl:inline">{larga}</span>
-        </span>
-        <span className="font-medium">{hhmm}</span>
+      <span className="flex flex-col text-base leading-tight" title={`${larga} · ${hhmm}`}>
+        <span>{corta}</span>
+        <span className="font-semibold">{hhmm}</span>
       </span>
     </TableCell>
   );
@@ -704,7 +717,7 @@ export function ListaReservasAvanzada({
   // para que Estado enseñe sus insignias enteras. A partir de 1280 px, y en
   // las tarjetas de móvil (`completo`), se lee la palabra.
   const getCanalBadge = (canal: string | null, completo = false) => {
-    const ETIQUETA_CANAL = completo ? "" : "hidden xl:inline";
+    const ETIQUETA_CANAL = completo ? "" : "hidden 2xl:inline";
     switch (canal) {
       case 'telefono':
         return (
@@ -1137,7 +1150,11 @@ export function ListaReservasAvanzada({
                 />
               )
             ) : (() => { const reservation = fila.reserva; const al = alPulsar(reservation); return (
-              <Card key={reservation.id} className={(reservation as any).importante ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}>
+              <Card
+                key={reservation.id}
+                className={cn((reservation as { importante?: boolean | null }).importante && "bg-amber-50/60 dark:bg-amber-950/20", canEdit && "cursor-pointer")}
+                onClick={canEdit ? alTocarFila(al.editar) : undefined}
+              >
                 <CardContent className="p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1149,20 +1166,20 @@ export function ListaReservasAvanzada({
                         className="shrink-0"
                       />
                       <EstrellaImportante reserva={reservation} canEdit={canEdit} variante="tarjeta" onClick={al.importante} />
-                      <span className="text-base font-semibold">{reservation.nombre || "Sin nombre"}</span>
+                      <span className="text-lg font-semibold">{reservation.nombre || "Sin nombre"}</span>
                     </div>
                     <InsigniaEstado estado={reservation.estado} />
                     <EtiquetaFuera reserva={reservation as never} compacta />
                     <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} />
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-base text-muted-foreground">
                     <span>{new Date(reservation.fecha).toLocaleDateString("es-ES")}</span>
                     <span className="font-medium text-foreground tabular-nums">{reservation.hora?.slice(0, 5)}</span>
                     <span className="flex items-center gap-1 tabular-nums"><Users className="h-4 w-4" />{reservation.numero_comensales}</span>
                     {getCanalBadge(reservation.canal, true)}
                   </div>
                   {reservation.telefono && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <p className="text-base text-muted-foreground flex items-center gap-1">
                       <Phone className="h-4 w-4" />{reservation.telefono}
                     </p>
                   )}
@@ -1210,7 +1227,7 @@ export function ListaReservasAvanzada({
                 Cliente, lo que sobra (ver «CERO scroll horizontal» al principio
                 del fichero). El nombre accesible sustituye al título que había
                 encima («Todas las reservas y solicitudes», quitado el 2026-10-06). */}
-            <Table aria-label="Reservas y solicitudes" className="table-fixed text-xs xl:text-sm">
+            <Table aria-label="Reservas y solicitudes" className="table-fixed text-base">
               <TableHeader className="sticky top-0 z-20">
                 <TableRow className="hover:bg-transparent">
                   {/* Cabecera SIN título (2026-09-26, petición del dueño). Lo
@@ -1267,7 +1284,11 @@ export function ListaReservasAvanzada({
                     const nombre = reservation.nombre || "Sin nombre";
                     const al = alPulsar(reservation);
                     return (
-                    <TableRow key={reservation.id} className={cn("group", ALTO_FILA, fondo.fila)}>
+                    <TableRow
+                      key={reservation.id}
+                      className={cn("group", ALTO_FILA, fondo.fila, canEdit && "cursor-pointer")}
+                      onClick={canEdit ? alTocarFila(al.editar) : undefined}
+                    >
                       {/* Acciones PRIMERO (2026-09-26, petición del dueño). El
                           juego de acciones es el mismo en todas las filas; lo
                           que no aplica va deshabilitado, nunca se quita. Sin
@@ -1299,7 +1320,7 @@ export function ListaReservasAvanzada({
                               <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} className="px-1.5 py-0 text-[10px]" />
                             </div>
                             {reservation.telefono && (
-                              <p className="truncate text-[11px] pointer-coarse:text-xs leading-tight text-muted-foreground xl:text-xs" title={reservation.telefono}>
+                              <p className="truncate text-sm leading-tight text-muted-foreground" title={reservation.telefono}>
                                 {reservation.telefono}
                               </p>
                             )}
@@ -1307,8 +1328,8 @@ export function ListaReservasAvanzada({
                         </div>
                       </TableCell>
                       <TableCell className={cn(CELDA, ANCHO_PAX)}>
-                        <div className="flex items-center gap-0.5 tabular-nums xl:gap-1" title={`${reservation.numero_comensales} comensales`}>
-                          <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <div className="flex items-center gap-1 font-medium tabular-nums" title={`${reservation.numero_comensales} comensales`}>
+                          <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
                           {reservation.numero_comensales}
                         </div>
                       </TableCell>
@@ -1557,7 +1578,9 @@ function FilaSolicitud({
         ALTO_FILA,
         FONDOS.destacada.fila,
         !abierta && "opacity-70",
+        canEdit && "cursor-pointer",
       )}
+      onClick={canEdit ? alTocarFila(onGestionar) : undefined}
     >
       {/* Mismas ranuras que una fila de reserva (el mismo molde,
           `RanurasDeAcciones`) y en el mismo orden: lo que una solicitud no
@@ -1584,6 +1607,7 @@ function FilaSolicitud({
             }}
             cancelar={{ titulo: "Descartar la solicitud: se hace desde «Gestionar»" }}
             listaNegra={{ titulo: "Lista negra: solo para reservas" }}
+            nombre={nombre}
           />
         </CeldaAcciones>
       )}
@@ -1600,7 +1624,7 @@ function FilaSolicitud({
             <a
               href={`tel:${solicitud.telefono}`}
               title={solicitud.telefono}
-              className="block truncate text-[11px] pointer-coarse:text-xs leading-tight text-muted-foreground hover:underline xl:text-xs"
+              className="block truncate text-sm leading-tight text-muted-foreground hover:underline"
             >
               {solicitud.telefono}
             </a>
@@ -1609,8 +1633,8 @@ function FilaSolicitud({
       </TableCell>
       <TableCell className={cn(CELDA, ANCHO_PAX)}>
         {solicitud.numero_comensales ? (
-          <div className="flex items-center gap-0.5 tabular-nums xl:gap-1" title={`${solicitud.numero_comensales} comensales`}>
-            <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <div className="flex items-center gap-1 font-medium tabular-nums" title={`${solicitud.numero_comensales} comensales`}>
+            <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
             {solicitud.numero_comensales}
           </div>
         ) : "—"}
@@ -1618,7 +1642,7 @@ function FilaSolicitud({
       <TableCell className={cn(CELDA, ANCHO_CANAL)}>
         <Badge title="Canal: asistente telefónico" className={cn(INSIGNIA, "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300")}>
           <Phone className="h-3 w-3" />
-          <span className="hidden xl:inline">Bot</span>
+          <span className="hidden 2xl:inline">Bot</span>
         </Badge>
       </TableCell>
       <TableCell className={cn(CELDA, ANCHO_ESTADO)}>
