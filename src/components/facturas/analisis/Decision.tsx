@@ -249,6 +249,11 @@ function FilaCambio({
                 <FileText className="h-3.5 w-3.5" aria-hidden /> Comparar facturas
               </button>
             )
+          ) : c.doc && c.docOtro && (a.tipo === "facturas_precio_sube" || a.tipo === "facturas_precio_baja") ? (
+            // La compra anterior (más barata si sube, más cara si baja) al lado de la de ahora.
+            <button type="button" className={cn(BOTON, FOCO)} onClick={() => onVerDocs([c.docOtro, c.doc])}>
+              <FileText className="h-3.5 w-3.5" aria-hidden /> Comparar facturas
+            </button>
           ) : (
             c.doc && (
               <button type="button" className={cn(BOTON, FOCO)} onClick={() => onVerDocs([c.doc])}>
