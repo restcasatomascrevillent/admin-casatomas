@@ -85,7 +85,7 @@ describe("crearPdfCarta", () => {
     expect(sangrado.width).toBeCloseTo(ancho + 2 * mm(3), 1);
   });
 
-  it("no genera la carta si una sección no cabe en su cara", async () => {
+  it("una sección larga sale en varias páginas; solo se niega con un texto que no cabe ni en una página entera", async () => {
     const muchos: FilaPlato[] = Array.from({ length: 40 }, (_, i) => ({
       id: `m${i}`,
       nombre: `Mariscada número ${i + 1} con su nombre largo de verdad`,
@@ -96,12 +96,15 @@ describe("crearPdfCarta", () => {
       restaurante: true,
     }));
     const maqueta = maquetarCarta(medidor, contenidoPlatos(muchos, { carta: "restaurante", idioma: "es" }), "A5");
-    expect(maqueta.secciones[0].cabe).toBe(false);
-    await expect(crearPdfCarta(maqueta.paginas, recursos, { sangrado: false, titulo: "Carta", idioma: "es", tamano: "A5" })).rejects.toBeInstanceOf(SeccionNoCabeError);
-    // Repartida a propósito, sí.
-    const repartida = maquetarCarta(medidor, contenidoPlatos(muchos, { carta: "restaurante", idioma: "es" }), "A5", { repartir: ["MARISCOS"] });
-    const doc = await PDFDocument.load(await crearPdfCarta(repartida.paginas, recursos, { sangrado: false, titulo: "Carta", idioma: "es", tamano: "A5" }));
-    expect(doc.getPageCount()).toBe(repartida.secciones[0].caras + 2);
+    expect(maqueta.secciones[0]).toMatchObject({ cabe: true });
+    expect(maqueta.secciones[0].caras).toBeGreaterThan(1);
+    const doc = await PDFDocument.load(await crearPdfCarta(maqueta.paginas, recursos, { sangrado: false, titulo: "Carta", idioma: "es", tamano: "A5" }));
+    expect(doc.getPageCount()).toBe(maqueta.secciones[0].caras + 2);
+
+    const imposible: FilaPlato[] = [{ id: "x", nombre: `Plato${"o".repeat(120)}`, categoria: "CARNES", precio_eur: 9, activado: true, restaurante: true }];
+    const mala = maquetarCarta(medidor, contenidoPlatos(imposible, { carta: "restaurante", idioma: "es" }), "A5");
+    expect(mala.secciones[0].cabe).toBe(false);
+    await expect(crearPdfCarta(mala.paginas, recursos, { sangrado: false, titulo: "Carta", idioma: "es", tamano: "A5" })).rejects.toBeInstanceOf(SeccionNoCabeError);
   });
 
   it("lleva incrustadas las tres Libre Baskerville (texto vectorial, no imágenes)", async () => {
