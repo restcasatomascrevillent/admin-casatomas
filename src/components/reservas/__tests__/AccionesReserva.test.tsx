@@ -108,16 +108,16 @@ describe("AccionesReserva · una acción clara y «Más», por estado y permiso"
     });
   });
 
-  it("sin acción principal queda un hueco del mismo ancho, así «Más» cae en la misma X", () => {
+  it("sin acción principal no queda hueco: «Más» va justo detrás de la casilla (10/11/2026)", () => {
     const { celda } = montar({ reserva: reserva("confirmada") });
-    const hueco = within(celda).getByTestId("sin-accion-principal");
-    expect(hueco).toHaveAttribute("aria-hidden");
-    expect(hueco.className).toContain("w-[9.5rem]");
+    expect(within(celda).queryByTestId("sin-accion-principal")).toBeNull();
+    const botones = within(celda).getAllByRole("button");
+    expect(botones).toHaveLength(1);
+    expect(botones[0]).toHaveAccessibleName("Más acciones de Ana");
     cleanup();
     const { celda: otra } = montar({ reserva: reserva("pendiente") });
     expect(principal(otra)!.className).toContain("w-[9.5rem]");
   });
-
   it("grande: la principal y «Más» miden 52 px de alto y llevan texto a 17 px", () => {
     const { celda } = montar({ reserva: reserva("pendiente") });
     const mas = within(celda).getByRole("button", { name: "Más acciones de Ana" });
@@ -339,7 +339,7 @@ describe("RanurasDeAcciones · el molde que comparten reservas y solicitudes", (
     expect(onGestionar).toHaveBeenCalledTimes(1);
   });
 
-  it("sin principal ni opciones: solo el hueco, sin «Más»", () => {
+  it("sin principal ni opciones: nada, ni hueco ni «Más»", () => {
     const { container } = render(
       <div>
         <RanurasDeAcciones
@@ -353,7 +353,7 @@ describe("RanurasDeAcciones · el molde que comparten reservas y solicitudes", (
       </div>,
     );
     expect(container.querySelectorAll("button")).toHaveLength(0);
-    expect(within(container as HTMLElement).getByTestId("sin-accion-principal")).toBeInTheDocument();
+    expect((container.firstElementChild as HTMLElement).childElementCount).toBe(0);
   });
 });
 

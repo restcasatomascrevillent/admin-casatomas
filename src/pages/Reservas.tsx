@@ -118,7 +118,16 @@ function leerVistaLista(): VistaLista {
  * siempre con sus filtros, intacta. Si se llega con un filtro en la URL (la campana, «Por atender»…) se abre
  * la tabla, que es la que filtra, sin cambiar lo recordado.
  */
-function PestanaLista(props: Omit<ComponentProps<typeof ListaReservasAvanzada>, "solicitudesState">) {
+function PestanaLista({
+  onAnadirReserva,
+  resaltar,
+  ...props
+}: Omit<ComponentProps<typeof ListaReservasAvanzada>, "solicitudesState"> & {
+  /** «+ Añadir reserva a este día» del libro: abre «Nueva Reserva» en ese día. Sin permiso de crear, no sale. */
+  onAnadirReserva?: (fecha: string) => void;
+  /** La última reserva creada desde «Nueva Reserva»: el libro va a su día y la resalta. */
+  resaltar?: { id: string; fecha: string } | null;
+}) {
   const conFiltro = !!(props.initialStatusFilter || props.initialDateFilter);
   const [vista, setVista] = useState<VistaLista>(() => (conFiltro ? "tabla" : leerVistaLista()));
   const elegir = (v: string) => {
@@ -140,7 +149,7 @@ function PestanaLista(props: Omit<ComponentProps<typeof ListaReservasAvanzada>, 
       </ToggleGroupItem>
     </ToggleGroup>
   );
-  if (vista === "libro") return bajoDemanda(<ListaComoLibro extra={conmutador} />);
+  if (vista === "libro") return bajoDemanda(<ListaComoLibro extra={conmutador} onAnadirReserva={onAnadirReserva} resaltar={resaltar} />);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-end">{conmutador}</div>
@@ -199,6 +208,18 @@ export default function Reservas() {
   // Móvil (< 768 px): solo «Hoy» para sentar (ver más abajo).
   const esMovil = useIsMobile();
   const [openDialog, setOpenDialog] = useState(false);
+  // «+ Añadir reserva a este día» (libro de la Lista, 10/11/2026): el MISMO diálogo «Nueva Reserva», abierto en
+  // ese día. `null` = abierto desde el botón de arriba (hoy).
+  const [fechaNuevaReserva, setFechaNuevaReserva] = useState<string | null>(null);
+  const [ultimaCreada, setUltimaCreada] = useState<{ id: string; fecha: string } | null>(null);
+  const abrirNuevaReserva = (fecha: string | null = null) => {
+    setFechaNuevaReserva(fecha);
+    setOpenDialog(true);
+  };
+  const cambiarDialogoNueva = (abierto: boolean) => {
+    if (abierto) setFechaNuevaReserva(null);
+    setOpenDialog(abierto);
+  };
   const [selectedEspacio, setSelectedEspacio] = useState<{ id: string; nombre: string } | null>(null);
   // Dentro de una sala: "plano" es el editor/asignación de siempre
   // (PlanoEspacio2D); "servicio" es la vista en vivo del modo servicio
@@ -458,7 +479,7 @@ export default function Reservas() {
                 «Escribir con lápiz» o «Formulario» (LibroReservas; se recuerda la elección en este dispositivo). Ocupa casi toda la pantalla y hace scroll por
                 dentro: la página sigue sin desplazar. */}
             {puedeCrearReservas && (
-              <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <Dialog open={openDialog} onOpenChange={cambiarDialogoNueva}>
                 <DialogTrigger asChild>
                   <Button className="touch-hit h-9 shrink-0 bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-700 pointer-coarse:h-9">
                     <Plus className="mr-2 h-4 w-4" />
@@ -470,7 +491,7 @@ export default function Reservas() {
                     <DialogTitle className="text-lg">Nueva reserva</DialogTitle>
                     <DialogDescription className="sr-only">Las reservas del día y, debajo, apuntar una nueva con el lápiz o con el formulario.</DialogDescription>
                   </DialogHeader>
-                  {bajoDemanda(<LibroReservas soloCrear={soloCrear} />)}
+                  {bajoDemanda(<LibroReservas soloCrear={soloCrear} fechaInicial={fechaNuevaReserva} onReservaCreada={setUltimaCreada} />)}
                 </DialogContent>
               </Dialog>
             )}
@@ -517,6 +538,8 @@ export default function Reservas() {
               // (p. ej. desde la campana), la lista se reinicia con él.
               key={`${statusFromUrl ?? ""}|${dateFromUrl ?? ""}`}
               onAsignarMesa={handleAsignarMesa}
+              onAnadirReserva={puedeCrearReservas ? abrirNuevaReserva : undefined}
+              resaltar={ultimaCreada}
               initialStatusFilter={statusFromUrl || undefined}
               initialDateFilter={dateFromUrl === "today" ? new Date() : undefined}
             />

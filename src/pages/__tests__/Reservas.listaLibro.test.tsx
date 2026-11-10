@@ -4,7 +4,7 @@
  * filtro en la URL (la campana) se abre la tabla, que es la que filtra, sin tocar lo recordado.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 vi.mock("@/components/DashboardLayout", () => ({
@@ -13,10 +13,33 @@ vi.mock("@/components/DashboardLayout", () => ({
 vi.mock("@/components/reservas/VistaHoy", () => ({ VistaHoy: () => null }));
 vi.mock("@/components/reservas/FormularioReserva", () => ({ FormularioReserva: () => null }));
 vi.mock("@/components/reservas/ListaReservasAvanzada", () => ({ ListaReservasAvanzada: () => <div data-testid="tabla-lista" /> }));
+const pag = vi.hoisted(() => ({ puedeEditar: true, libro: vi.fn(), lista: vi.fn() }));
 vi.mock("@/components/reservas/libro/ListaComoLibro", () => ({
-  ListaComoLibro: ({ extra }: { extra?: React.ReactNode }) => (
-    <div data-testid="libro-lista">{extra}</div>
-  ),
+  ListaComoLibro: (props: { extra?: React.ReactNode; onAnadirReserva?: (f: string) => void; resaltar?: unknown }) => {
+    pag.lista(props);
+    return (
+      <div data-testid="libro-lista">
+        {props.extra}
+        {props.onAnadirReserva && (
+          <button type="button" onClick={() => props.onAnadirReserva!("2026-11-20")}>
+            Añadir reserva a este día
+          </button>
+        )}
+      </div>
+    );
+  },
+}));
+vi.mock("@/components/reservas/libro/LibroReservas", () => ({
+  LibroReservas: (props: { fechaInicial?: string | null; onReservaCreada?: (r: { id: string; fecha: string }) => void }) => {
+    pag.libro(props);
+    return (
+      <div data-testid="libro-nueva" data-fecha={props.fechaInicial ?? "hoy"}>
+        <button type="button" onClick={() => props.onReservaCreada?.({ id: "nueva-1", fecha: "2026-11-20" })}>
+          Guardar (simulado)
+        </button>
+      </div>
+    );
+  },
 }));
 vi.mock("@/components/reservas/CalendarioOcupacion", () => ({ CalendarioOcupacion: () => null }));
 vi.mock("@/components/reservas/PlanoEspacio2D", () => ({ PlanoEspacio2D: () => null }));
@@ -28,7 +51,11 @@ vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data
 vi.mock("@/hooks/useSolicitudesPendientes", () => ({ useSolicitudesPendientes: () => ({ solicitudes: [] }) }));
 vi.mock("@/hooks/useUserRole", () => ({
   useUserRole: () => ({ role: "admin" }),
-  useCanAccessSection: () => ({ canAccess: true, loading: false }),
+  useCanAccessSection: (seccion: string, tipo = "view") => ({
+    // Sin `puedeEditar`: ni editar ni crear (solo ver).
+    canAccess: (tipo === "edit" && seccion !== "reservas_configuracion") || seccion === "reservas_crear" ? pag.puedeEditar : true,
+    loading: false,
+  }),
 }));
 
 import Reservas from "@/pages/Reservas";
@@ -43,6 +70,9 @@ function montar(ruta = "/reservas?tab=reservas") {
 
 beforeEach(() => {
   localStorage.clear();
+  pag.puedeEditar = true;
+  pag.libro.mockClear();
+  pag.lista.mockClear();
 });
 
 describe("Reservas › Lista · conmutador «Libro | Tabla»", () => {
@@ -91,5 +121,38 @@ describe("Reservas › Lista · conmutador «Libro | Tabla»", () => {
     montar("/reservas?tab=reservas&status=pendiente");
     expect(await screen.findByTestId("tabla-lista")).toBeInTheDocument();
     expect(localStorage.getItem("reservas.vistaLista")).toBeNull();
+  });
+});
+
+// 10/11/2026 (dueño: «que se pueda añadir la reserva ahí desde abrir reserva directamente, se abra en el día en
+// el pop up»): el botón de la hoja abre el MISMO diálogo «Nueva Reserva» en el día de la hoja.
+describe("Reservas › Lista · «Añadir reserva a este día» desde la hoja del libro", () => {
+  it("abre «Nueva Reserva» en el día de la hoja; el botón de arriba la abre en hoy", async () => {
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: "Añadir reserva a este día" }));
+    const dialogo = await screen.findByRole("dialog");
+    expect(await within(dialogo).findByTestId("libro-nueva")).toHaveAttribute("data-fecha", "2026-11-20");
+    // Un solo diálogo: el de siempre.
+    expect(within(dialogo).getByRole("heading", { name: "Nueva reserva" })).toBeInTheDocument();
+
+    fireEvent.keyDown(dialogo, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: /Nueva Reserva/ }));
+    expect(await screen.findByTestId("libro-nueva")).toHaveAttribute("data-fecha", "hoy");
+  });
+
+  it("al guardar, el libro de la Lista recibe la reserva nueva para ir a su día y resaltarla", async () => {
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: "Añadir reserva a este día" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Guardar (simulado)" }));
+    await waitFor(() => expect(pag.lista.mock.calls.at(-1)![0].resaltar).toEqual({ id: "nueva-1", fecha: "2026-11-20" }));
+  });
+
+  it("sin permiso de crear no hay botón en la hoja", async () => {
+    pag.puedeEditar = false;
+    montar();
+    await screen.findByTestId("libro-lista");
+    expect(screen.queryByRole("button", { name: "Añadir reserva a este día" })).toBeNull();
+    expect(pag.lista.mock.calls.at(-1)![0].onAnadirReserva).toBeUndefined();
   });
 });

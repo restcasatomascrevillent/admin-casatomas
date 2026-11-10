@@ -2074,27 +2074,42 @@ describe("ListaReservasAvanzada · más alto para las filas: sin recuento, sin s
     expect(within(tabla).queryByRole("columnheader", { name: "Canal" })).toBeNull();
     // Lo largo de Cliente se recorta con «…» y va entero en el `title`.
     const fila = filaDe(tabla, "Ana Pendiente");
-    expect(within(fila).getByText("Ana Pendiente")).toHaveClass("truncate");
+    // 10/11/2026 (dueño: el teléfono salía cortado): nombre y teléfono COMPLETOS, el teléfono en grupos de tres.
+    expect(within(fila).getByText("Ana Pendiente")).not.toHaveClass("truncate");
     expect(within(fila).getByText("Ana Pendiente")).toHaveAttribute("title", "Ana Pendiente");
-    expect(within(fila).getByText("+34 600 111 222")).toHaveClass("truncate");
+    expect(within(fila).getByText("600 111 222")).toHaveClass("whitespace-nowrap");
+    expect(within(fila).getByText("600 111 222")).not.toHaveClass("truncate");
+    // «Fecha y hora» en una línea.
+    expect(within(tabla).getByText("Fecha y hora")).toHaveClass("whitespace-nowrap");
     // Con nombre accesible: el título que había encima de la lista se quitó.
     expect(tabla).toHaveAccessibleName("Reservas y solicitudes");
   });
 
-  it("la acción principal (o su hueco) mide lo mismo en todas las filas y es grande: 52 px de alto y texto a 17 px", async () => {
+  it("la acción principal es grande (52 px, 17 px) y la columna de acciones va al ancho justo, sin hueco", async () => {
     const { tabla } = await montar();
     const filas = [...tabla.querySelectorAll("tbody tr")] as HTMLElement[];
 
     const principales = filas.map(principalDe).filter((b): b is HTMLButtonElement => !!b);
     expect(principales.map((b) => b.textContent?.trim())).toEqual(expect.arrayContaining(["Aceptar", "Confirmar", "Convertir"]));
     for (const b of principales) expect(b).toHaveClass("w-[9.5rem]", "h-[52px]", "text-[17px]");
-    // Las filas sin nada que hacer dejan el hueco del mismo ancho: «Más» cae en la misma X.
-    const huecos = filas.flatMap((f) => [...f.querySelectorAll('[data-testid="sin-accion-principal"]')]);
-    expect(huecos.length).toBe(filas.length - principales.length);
-    for (const h of huecos) expect(h).toHaveClass("w-[9.5rem]");
+    // Fila sin acción principal (confirmada): casilla vacía y «Más» justo detrás, sin hueco.
+    expect(botonesDeFila(filaDe(tabla, "Carlos Confirmado"))).toHaveLength(1);
+    expect(tabla.querySelector('[data-testid="sin-accion-principal"]')).toBeNull();
+    // Con alguna acción principal en la página, la columna cabe casilla + principal + «Más».
+    expect(tabla.querySelector("thead th")).toHaveClass("w-[336px]");
     // Filas altas y con aire (dueño: «ojo con los padding y los márgenes»).
     for (const f of filas) expect(f).toHaveClass("h-[76px]");
     for (const td of filas[0].querySelectorAll("td")) expect(td).toHaveClass("px-4", "py-3");
+  });
+
+  it("si ninguna fila de la página tiene acción principal, la columna de acciones se estrecha a casilla + «Más»", async () => {
+    supa.filas = [reserva("res-c1", "confirmada", "Carlos Confirmado"), reserva("res-c2", "completada", "Elena Llegó")];
+    const { tabla } = await montar({ solicitudesState: { ...estadoSolicitudes, solicitudes: [] } as typeof estadoSolicitudes });
+    expect(tabla.querySelector("thead th")).toHaveClass("w-[176px]");
+    for (const f of [...tabla.querySelectorAll("tbody tr")] as HTMLElement[]) {
+      expect(f.querySelector("td")).toHaveClass("w-[176px]");
+      expect(botonesDeFila(f)).toHaveLength(1);
+    }
   });
   // ── La posición de las filas ────────────────────────────────────────────────
 

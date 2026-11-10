@@ -124,7 +124,8 @@ function AccionPrincipal({
   cargando?: boolean;
   children: ReactNode;
 }) {
-  if (!onClick && !cargando) return <span aria-hidden className={cn("shrink-0", ANCHO_PRINCIPAL)} data-testid="sin-accion-principal" />;
+  // Sin nada que hacer, nada: ni botón gris ni hueco (10/11/2026: «Más» va justo detrás de la casilla).
+  if (!onClick && !cargando) return null;
   return (
     <Button
       type="button"

@@ -462,3 +462,19 @@ html {
 .carta-contraste label {
   font-size: 1.0625rem;
 }
+
+/* «Nueva reserva» en dos columnas (10/11/2026): en la columna derecha el formulario va en UNA columna (su rejilla
+   de dos, `lg:grid-cols-2`, se apretaba en el ~60 % del diálogo). Ver LibroReservas.tsx. */
+.formulario-una-columna form .lg\:grid-cols-2 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  column-gap: 0;
+}
+.formulario-una-columna form .lg\:space-y-0 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1.25rem;
+}
+/* Con «Nueva reserva» abierta, los avisos (toasts) salen a la IZQUIERDA para no tapar «Crear Reserva», que va
+   abajo a la derecha. */
+body:has([data-dialogo-nueva-reserva]) [data-sonner-toaster][data-x-position="right"] {
+  right: auto !important;
+  left: var(--offset-right, 24px) !important;
+}
