@@ -26,6 +26,7 @@ import type { ResultadoInformeTabla } from "./tabla";
 import { mesesSeleccionables as mesesTrafico, mesPorDefecto as mesPorDefectoTrafico } from "@/components/trafico-web/informe/modelo";
 import { obtenerInformeFacturas } from "./fuentes/facturas";
 import { obtenerInformeVinoFavorito } from "./fuentes/vinoFavorito";
+import { obtenerInformeServicios } from "./fuentes/servicios";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -156,8 +157,28 @@ export const INFORMES: DefinicionInforme[] = [
     origen: { etiqueta: "Gestor Web › Carta › Vinos", ruta: "/gestion-web?tab=carta" },
     generador: { tipo: "tabla", obtener: (_periodo, ctx) => obtenerInformeVinoFavorito(ctx) },
   },
-  // Pendientes de conectar al integrar el lote del 10/11/2026 (ramas feature/servicios-costes y
-  // feature/cheques-stripe-informe): informe mensual de Servicios y el de Cheques/Stripe.
+  {
+    id: "servicios-mensual",
+    titulo: "Informe mensual de servicios",
+    descripcion: "Gasto de cada servicio contratado en el mes, el total, la comparación con el mes anterior y lo que falta por meter.",
+    seccion: "servicios",
+    permiso: { tipo: "superadmin" },
+    periodo: "mes",
+    formatos: ["pdf", "csv"],
+    origen: { etiqueta: "Servicios › Costes", ruta: "/super-admin/servicios" },
+    generador: { tipo: "tabla", obtener: (periodo) => obtenerInformeServicios(periodo) },
+  },
+  {
+    id: "cheques-mensual",
+    titulo: "Informe de cheques regalo",
+    descripcion: "Ventas, canjes, pendiente de canjear, caducidades y comisiones de Stripe del mes, comparado con el anterior.",
+    seccion: "cheques",
+    permiso: { tipo: "seccion", seccion: "cheques", nivel: "view" },
+    periodo: "mes",
+    formatos: ["pdf"],
+    origen: { etiqueta: "Cheques › Stripe", ruta: "/cheques" },
+    generador: { tipo: "componente", cargar: () => import("@/components/informes/generadores/InformeChequesGenerador") },
+  },
 ];
 
 // ─── Permisos ───────────────────────────────────────────────────────────────
