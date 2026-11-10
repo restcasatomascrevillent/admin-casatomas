@@ -39,6 +39,7 @@
     "test:permisos-facturas-subida:db": "node scripts/test-permisos-facturas-subida.mjs",
     "test:vinos-copeo-encuesta:db": "node scripts/test-vinos-copeo-encuesta.mjs",
     "test:vinos-parker:db": "node scripts/test-vinos-parker.mjs",
+    "test:vinos-anadas:db": "node scripts/test-vinos-anadas-parker.mjs",
     "test:instagram:db": "node scripts/test-instagram.mjs",
     "test:carta-originales:db": "node scripts/test-carta-originales.mjs",
     "test:instagram-programar:db": "node scripts/test-instagram-programar.mjs",
