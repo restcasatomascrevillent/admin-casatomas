@@ -17,6 +17,7 @@
 // ============================================================================
 
 import { useState, type ReactNode } from "react";
+import { formatearPrecioMenu, textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
 import { AlertTriangle, ChevronDown, Lock, Phone, StickyNote, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BotonPersonas } from "@/components/reservas/CambiarPersonas";
@@ -261,6 +262,14 @@ function FilaEscritorio({
             {reserva.menu_del_dia && (
               <span className="shrink-0 rounded-full bg-violet-100 px-1.5 text-xs font-medium leading-5 text-violet-900 dark:bg-violet-950/60 dark:text-violet-200" title="Menú del día">
                 Menú
+              </span>
+            )}
+            {reserva.menu_cerrado && (
+              <span
+                className="shrink-0 rounded-full bg-teal-100 px-1.5 text-xs font-medium leading-5 text-teal-900 dark:bg-teal-950/60 dark:text-teal-200"
+                title={`Menú cerrado${formatearPrecioMenu(reserva.menu_precio) ? ` · ${formatearPrecioMenu(reserva.menu_precio)}` : ""}`}
+              >
+                {textoInsigniaMenu(reserva.menu_precio)}
               </span>
             )}
             {alergia && <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" aria-label="Alergia" />}

@@ -8,6 +8,7 @@
 // Si algo falla al aplicar, un aviso y el panel sigue usable.
 // ============================================================================
 
+import { servicioComidaDeReserva } from "@/lib/reservas/menuDelDia";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -186,6 +187,8 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
         mesaIds: mesasDe.get(r.id) ?? [],
         salidaAt: r.salida_at ?? null,
         fijada: !!r.mesa_fijada,
+        // Martes a jueves comida: menú del día → Comedor/Terraza; carta → Salón, Comedor o Terraza.
+        servicioComida: servicioComidaDeReserva({ fecha, hora: r.hora, menu_del_dia: (r as { menu_del_dia?: boolean | null }).menu_del_dia }),
       }));
     const ahora = new Date();
     const empezado = fecha === hoyLocal() && turnoDeHora(ahora.toTimeString().slice(0, 8)) === turno;

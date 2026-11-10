@@ -236,6 +236,39 @@ beforeEach(() => {
   mocks.config.max_reservas_por_email_dia = 0;
 });
 
+describe("FormularioReserva · edición · menú y precio", () => {
+  it("poner «Menú cerrado: Sí» con precio en una reserva sin menú manda solo menu_cerrado y menu_precio", async () => {
+    const bd = prepararBD();
+    montar();
+    expect(screen.getByTestId("menu-cerrado-no")).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByTestId("menu-cerrado-si"));
+    fireEvent.change(screen.getByTestId("menu-precio"), { target: { value: "22.5" } });
+    fireEvent.click(await guardar());
+    await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
+    expect(bd.update.mock.calls[0][0]).toEqual({ menu_cerrado: true, menu_precio: 22.5 });
+  });
+
+  it("arranca con el menú y el precio guardados y cambiar el precio manda solo el precio", async () => {
+    const bd = prepararBD();
+    montar({ menu_cerrado: true, menu_precio: "18.00" });
+    expect(screen.getByTestId("menu-cerrado-si")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId("menu-precio")).toHaveValue("18");
+    fireEvent.change(screen.getByTestId("menu-precio"), { target: { value: "20,00" } });
+    fireEvent.click(await guardar());
+    await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
+    expect(bd.update.mock.calls[0][0]).toEqual({ menu_precio: 20 });
+  });
+
+  it("pasar a «Menú cerrado: No» quita la marca y el precio", async () => {
+    const bd = prepararBD();
+    montar({ menu_cerrado: true, menu_precio: 18 });
+    fireEvent.click(screen.getByTestId("menu-cerrado-no"));
+    fireEvent.click(await guardar());
+    await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
+    expect(bd.update.mock.calls[0][0]).toEqual({ menu_cerrado: false, menu_precio: null });
+  });
+});
+
 describe("FormularioReserva · edición · arranque y guardado", () => {
   it("arranca con los datos de la reserva y el botón dice «Guardar cambios», no «Crear Reserva»", async () => {
     prepararBD();
