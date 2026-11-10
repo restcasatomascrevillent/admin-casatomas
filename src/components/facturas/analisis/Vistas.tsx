@@ -159,10 +159,16 @@ export function QueDecidirHoy({
                 detalle={`${d.proveedor ? `${d.proveedor} · ` : ""}${resumenCortoAlerta(c.alerta)}`}
                 euros={`+${formatEntero(x.eurosMes)} €/mes`}
               >
-                {!pendiente && c.doc && (
-                  <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc])}>
-                    <FileText className="h-3.5 w-3.5" aria-hidden /> Ver factura
+                {!pendiente && c.doc && c.docOtro ? (
+                  <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.docOtro, c.doc])}>
+                    <FileText className="h-3.5 w-3.5" aria-hidden /> Comparar facturas
                   </button>
+                ) : (
+                  !pendiente && c.doc && (
+                    <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc])}>
+                      <FileText className="h-3.5 w-3.5" aria-hidden /> Ver factura
+                    </button>
+                  )
                 )}
                 {!pendiente && (
                   <button type="button" className={cn(BOTON, FOCO)} onClick={() => onVerPrecio(c.alerta.id)}>
@@ -495,10 +501,17 @@ function DetallePrecio({
       )}
       {!pendiente && (
         <div className="mt-2 flex shrink-0 flex-wrap gap-1.5">
-          {e.cambio?.doc && (
-            <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([e.cambio!.doc])}>
-              <FileText className="h-3.5 w-3.5" aria-hidden /> Ver factura
+          {e.cambio?.doc && e.cambio.docOtro && (e.cambio.alerta.tipo === "facturas_precio_sube" || e.cambio.alerta.tipo === "facturas_precio_baja") ? (
+            // La compra anterior (más barata si sube, más cara si baja) al lado de la de ahora.
+            <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([e.cambio!.docOtro, e.cambio!.doc])}>
+              <FileText className="h-3.5 w-3.5" aria-hidden /> Comparar facturas
             </button>
+          ) : (
+            e.cambio?.doc && (
+              <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([e.cambio!.doc])}>
+                <FileText className="h-3.5 w-3.5" aria-hidden /> Ver factura
+              </button>
+            )
           )}
           {e.top && (
             <button type="button" className={cn(BOTON, FOCO)} onClick={() => onVerDocumentosTop(e.top!)}>
