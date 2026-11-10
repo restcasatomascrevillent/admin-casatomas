@@ -48,7 +48,8 @@ import {
   horaCorta,
 } from "@/lib/reservas/ocupacionSalas";
 import { OcupacionSalas } from "./OcupacionSalas";
-import { DisponibilidadCuartos, useRejillaCuartos } from "./DisponibilidadCuartos";
+import { useRejillaCuartos } from "./DisponibilidadCuartos";
+import { ReservasDelDia } from "./ReservasDelDia";
 import { admiteMenuDelDia } from "@/lib/reservas/menuDelDia";
 import { formatearTelefonoReserva, variantesTelefono } from "@/lib/reservas/telefono";
 import {
@@ -1335,9 +1336,8 @@ export const FormularioReserva = ({
 
         {!isPublic && (
           <div className="rounded-lg border p-3">
-            <DisponibilidadCuartos
+            <ReservasDelDia
               fecha={fechaStr}
-              comensales={Number(watchedComensales) || 0}
               hora={watchedHora || null}
               excluirReservaId={reservaAEditar?.id}
               onSeleccionarHora={(hora) => {
