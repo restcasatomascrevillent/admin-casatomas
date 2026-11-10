@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CalendarIcon, ChevronLeft, ChevronRight, Eraser, Loader2, PenLine, Sparkles, Undo2 } from "lucide-react";
+import { AlertTriangle, CalendarIcon, ChevronLeft, ChevronRight, Eraser, Loader2, PenLine, Save, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { agruparReservasDelDia } from "@/components/reservas/ReservasDelDia";
 import { useReservasServicioDia, CLAVE_RESERVAS_SERVICIO_DIA } from "@/hooks/useReservasServicioDia";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { useBorradoresPendientes, useGuardarBorrador, useResolverBorrador, type BorradorManuscrito } from "@/hooks/useBorradoresManuscritos";
 import { ETIQUETA_TURNO, horaCorta } from "@/lib/reservas/ocupacionSalas";
 import { ESTADO_NO_SHOW, infoEstadoReserva } from "@/lib/reservas/estadosReserva";
 import {
@@ -125,6 +126,44 @@ function ReservasDeLaHoja({ fecha, resaltada }: { fecha: string; resaltada: stri
   );
 }
 
+/** Escritas a mano y guardadas sin interpretar en esta hoja: se pasan a limpio cuando haya tiempo. */
+function PorPasarALimpio({
+  borradores,
+  ocupado,
+  onInterpretar,
+  onDescartar,
+}: {
+  borradores: BorradorManuscrito[];
+  ocupado: boolean;
+  onInterpretar: (b: BorradorManuscrito) => void;
+  onDescartar: (b: BorradorManuscrito) => void;
+}) {
+  if (!borradores.length) return null;
+  return (
+    <section className="mb-5 rounded-lg border-2 border-amber-300 bg-amber-50/80 p-3" aria-label="Por pasar a limpio">
+      <h3 className="mb-2 text-base font-semibold uppercase tracking-wide text-amber-800">
+        Por pasar a limpio · {borradores.length}
+      </h3>
+      <ul className="space-y-2">
+        {borradores.map((b) => (
+          <li key={b.id} className="flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-white/80 p-2">
+            <img src={b.imagen} alt="Reserva escrita a mano, sin interpretar" className="h-16 max-w-full flex-1 object-contain object-left" />
+            <div className="flex shrink-0 gap-2">
+              <Button type="button" className="h-11 bg-emerald-600 text-white hover:bg-emerald-700" disabled={ocupado} onClick={() => onInterpretar(b)}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Interpretar
+              </Button>
+              <Button type="button" variant="outline" className="h-11 bg-white" disabled={ocupado} onClick={() => onDescartar(b)} aria-label="Descartar lo escrito">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function LibroReservas({ soloCrear = false }: Props) {
   const queryClient = useQueryClient();
   const { data: espaciosData } = useEspaciosReserva();
@@ -140,6 +179,13 @@ export function LibroReservas({ soloCrear = false }: Props) {
   const [interpretada, setInterpretada] = useState<ReservaInterpretada | null>(null);
   const [resaltada, setResaltada] = useState<string | null>(null);
   const lienzo = useRef<LienzoManuscritoApi | null>(null);
+  // Borrador que se está pasando a limpio (guardado antes sin interpretar).
+  const [borradorActivo, setBorradorActivo] = useState<string | null>(null);
+  const { data: pendientes = [] } = useBorradoresPendientes();
+  const guardarBorrador = useGuardarBorrador();
+  const resolverBorrador = useResolverBorrador();
+  const pendientesHoja = pendientes.filter((b) => b.fecha === fecha);
+  const primerDiaPendiente = pendientes.find((b) => b.fecha !== fecha)?.fecha ?? null;
 
   const revisando = !!interpretada;
   // Identidad estable: FormularioReserva reescribe sus campos si cambia.
@@ -154,19 +200,49 @@ export function LibroReservas({ soloCrear = false }: Props) {
   const nuevaReserva = () => {
     setInterpretada(null);
     setImagen(null);
+    setBorradorActivo(null);
     lienzo.current?.borrar();
   };
 
-  const interpretar = async () => {
+  // «Guardar sin interpretar» (10/11/2026): por si no da tiempo; se pasa a limpio después.
+  const guardarSinInterpretar = async () => {
     const png = lienzo.current?.exportar();
     if (!png) {
       toast.info("Escribe primero la reserva en el renglón");
       return;
     }
+    try {
+      await guardarBorrador.mutateAsync({ fecha, imagen: png });
+      lienzo.current?.borrar();
+      toast.success("Guardada sin interpretar", { description: `Queda en «Por pasar a limpio» del ${fechaCorta(fecha)}.` });
+    } catch (e) {
+      toast.error("No se pudo guardar", { description: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
+  const descartarBorrador = (b: BorradorManuscrito) => {
+    if (!window.confirm("¿Descartar lo escrito? No se creará ninguna reserva.")) return;
+    resolverBorrador.mutate(
+      { id: b.id, estado: "descartado" },
+      { onError: (e) => toast.error("No se pudo descartar", { description: e instanceof Error ? e.message : String(e) }) },
+    );
+  };
+
+  const interpretar = (borrador?: BorradorManuscrito) => {
+    const png = borrador ? borrador.imagen : lienzo.current?.exportar();
+    if (!png) {
+      toast.info("Escribe primero la reserva en el renglón");
+      return;
+    }
+    void interpretarImagen(png, borrador ? borrador.fecha : fecha, borrador?.id ?? null);
+  };
+
+  const interpretarImagen = async (png: string, fechaDeHoja: string, borradorId: string | null) => {
     setInterpretando(true);
     try {
-      const r = await interpretarReservaEscrita(png, espacios, fecha);
+      const r = await interpretarReservaEscrita(png, espacios, fechaDeHoja);
       setImagen(png);
+      setBorradorActivo(borradorId);
       setInterpretada(r);
       if (!r.texto && !r.nombre) toast.warning("No se ha entendido lo escrito: revisa los campos o vuelve a escribirlo");
     } catch (e) {
@@ -214,6 +290,16 @@ export function LibroReservas({ soloCrear = false }: Props) {
         <Button type="button" variant="ghost" className="h-11" onClick={() => irA(claveDia(new Date()))}>
           Hoy
         </Button>
+        {!revisando && primerDiaPendiente && (
+          <Button
+            type="button"
+            variant="outline"
+            className="ml-auto h-11 border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100"
+            onClick={() => irA(primerDiaPendiente)}
+          >
+            {pendientes.length - pendientesHoja.length} por pasar a limpio en otros días
+          </Button>
+        )}
         {revisando && (
           <Button type="button" variant="outline" className="ml-auto h-11" onClick={nuevaReserva}>
             <PenLine className="mr-2 h-4 w-4" />
@@ -225,6 +311,12 @@ export function LibroReservas({ soloCrear = false }: Props) {
       {/* Hoja: lo apuntado + renglón para escribir */}
       <div className={cn("flex min-h-0 flex-1 flex-col", PAPEL, revisando && "hidden")}>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-l-4 border-rose-300/70 px-6 py-4">
+          <PorPasarALimpio
+            borradores={pendientesHoja}
+            ocupado={interpretando || resolverBorrador.isPending}
+            onInterpretar={(b) => interpretar(b)}
+            onDescartar={descartarBorrador}
+          />
           <ReservasDeLaHoja fecha={fecha} resaltada={resaltada} />
         </div>
         <div className="border-t-2 border-dashed border-stone-300 px-6 pb-3 pt-2">
@@ -245,8 +337,18 @@ export function LibroReservas({ soloCrear = false }: Props) {
             </Button>
             <Button
               type="button"
-              className="ml-auto h-11 bg-emerald-600 px-6 text-base text-white hover:bg-emerald-700"
-              onClick={() => void interpretar()}
+              variant="outline"
+              className="ml-auto h-11 border-amber-400 bg-amber-50 px-5 text-base text-amber-900 hover:bg-amber-100"
+              onClick={() => void guardarSinInterpretar()}
+              disabled={!trazos || interpretando || guardarBorrador.isPending}
+            >
+              {guardarBorrador.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Guardar sin interpretar
+            </Button>
+            <Button
+              type="button"
+              className="h-11 bg-emerald-600 px-6 text-base text-white hover:bg-emerald-700"
+              onClick={() => interpretar()}
               disabled={!trazos || interpretando}
             >
               {interpretando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
@@ -295,6 +397,9 @@ export function LibroReservas({ soloCrear = false }: Props) {
               soloCrear={soloCrear}
               onSuccess={(creada) => {
                 void queryClient.invalidateQueries({ queryKey: [CLAVE_RESERVAS_SERVICIO_DIA] });
+                if (borradorActivo) {
+                  resolverBorrador.mutate({ id: borradorActivo, estado: "pasado", reservaId: creada?.id ?? null });
+                }
                 nuevaReserva();
                 if (creada?.fecha) setFecha(creada.fecha);
                 setResaltada(creada?.id ?? null);
