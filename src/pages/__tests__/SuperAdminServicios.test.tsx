@@ -5,8 +5,9 @@ import { MemoryRouter, Navigate, Route, Routes, useLocation } from "react-router
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type LecturaServicio, type ServicioContratado, formatearEur } from "@/lib/servicios";
 import { rutaServicios } from "@/components/servicios/pestanas";
+import { mesAnterior, mesDe, textoMes, textoMesCorto } from "@/lib/informeServicios";
 
-type Estado = { op: "select" | "update" | "insert" | "delete"; cambios: Record<string, unknown> | null; filtros: Record<string, unknown> };
+type Estado = { op: "select" | "update" | "insert" | "delete" | "upsert"; cambios: Record<string, unknown> | null; filtros: Record<string, unknown> };
 type Toast = { action?: { label: string; onClick: () => void } };
 
 const h = vi.hoisted(() => ({
@@ -24,6 +25,8 @@ const h = vi.hoisted(() => ({
   deletes: [] as Array<Record<string, unknown>>,
   updatesConfig: [] as Array<Record<string, unknown>>,
   selects: [] as string[],
+  upsertsCoste: [] as Array<Record<string, unknown>>,
+  descargas: [] as Array<{ nombre: string; tipo: string }>,
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
@@ -61,6 +64,13 @@ function responder(tabla: string, e: Estado, columnas: string) {
     }
     return h.config ? { data: [h.config], error: null } : { data: null, error: { code: "42P01", message: "relation does not exist" } };
   }
+  if (tabla === "servicios_costes_mes") {
+    if (e.op === "upsert") {
+      h.upsertsCoste.push(e.cambios!);
+      return { data: [{ proveedor: e.cambios!.proveedor }], error: null };
+    }
+    return { data: [], error: null };
+  }
   if (tabla === "tipo_cambio_usd_eur") return { data: [{ fecha: "2026-10-26", eur_por_usd: 0.893815 }], error: null };
   return { data: null, error: { message: `tabla ${tabla} no simulada` } };
 }
@@ -75,6 +85,7 @@ vi.mock("@/integrations/supabase/client", () => ({
         limit: () => b,
         update: (c: Record<string, unknown>) => { e.op = "update"; e.cambios = c; return b; },
         insert: (c: Record<string, unknown>) => { e.op = "insert"; e.cambios = c; return b; },
+        upsert: (c: Record<string, unknown>) => { e.op = "upsert"; e.cambios = c; return b; },
         delete: () => { e.op = "delete"; return b; },
         eq: (col: string, v: unknown) => { e.filtros[col] = v; return b; },
         then: (ok: (v: unknown) => unknown, ko: (e: unknown) => unknown) => Promise.resolve(responder(tabla, e, columnas)).then(ok, ko),
@@ -90,6 +101,9 @@ vi.mock("@/components/SuperAdminLayout", () => ({
 }));
 vi.mock("@/hooks/useAlturaDisponible", () => ({ useAlturaDisponible: () => undefined }));
 vi.mock("sonner", () => ({ toast: h.toast }));
+vi.mock("@/components/trafico-web/informe/pdf", () => ({
+  descargarBlob: (blob: Blob, nombre: string) => { h.descargas.push({ nombre, tipo: blob.type }); },
+}));
 
 import SuperAdminServicios from "../SuperAdminServicios";
 
@@ -193,6 +207,8 @@ beforeEach(() => {
   h.deletes = [];
   h.updatesConfig = [];
   h.selects = [];
+  h.upsertsCoste = [];
+  h.descargas = [];
   h.invoke.mockReset().mockResolvedValue({ data: { lecturas: LECTURAS, sin_lector: ["loading"], generado_en: AHORA }, error: null });
   h.rpc.mockReset().mockResolvedValue({ data: [], error: null });
   for (const f of Object.values(h.toast)) f.mockReset();
@@ -251,7 +267,8 @@ describe("Super Admin › Servicios › Estado", () => {
     await waitFor(() => expect(general).toHaveAttribute("data-estado", "rojo"));
     expect(within(general).getByRole("heading", { level: 2, name: "2 servicios necesitan atención" })).toBeInTheDocument();
     const cuenta = within(general).getByRole("list", { name: "Servicios por estado" });
-    expect(within(cuenta).getAllByRole("listitem").map((li) => t(li.textContent))).toEqual(["2 urgentes", "3 avisos", "3 bien"]);
+    // Loading no tiene lectura automática: desde el 10/11/2026 no sale en Estado (su renovación, en «Qué mirar»).
+    expect(within(cuenta).getAllByRole("listitem").map((li) => t(li.textContent))).toEqual(["2 urgentes", "2 avisos", "3 bien"]);
     const gasto = screen.getByTestId("estado-gasto");
     await waitFor(() => expect(t(gasto.textContent)).toContain("12,15 €"));
     expect(t(gasto.textContent)).toContain(`≈ ${eur(previsiones().mes)} a fin de mes`);
@@ -262,20 +279,22 @@ describe("Super Admin › Servicios › Estado", () => {
   it("una ficha por servicio: lo urgente primero, con anillo de consumo y dos o tres palabras", async () => {
     pintar();
     const lista = await screen.findByRole("list", { name: "Estado de cada servicio" });
-    await waitFor(() => expect(within(lista).getAllByRole("listitem").length).toBe(8));
+    await waitFor(() => expect(within(lista).getAllByRole("listitem").length).toBe(7));
     const fichas = within(lista).getAllByRole("listitem");
     expect(fichas.map((f) => [f.getAttribute("data-ficha"), f.getAttribute("data-estado")])).toEqual([
       ["github", "rojo"], ["resend", "rojo"],
-      ["vercel", "ambar"], ["supabase", "ambar"], ["loading", "ambar"],
+      ["vercel", "ambar"], ["supabase", "ambar"],
       ["stripe", "verde"], ["openai", "verde"], ["hostinger", "verde"],
     ]);
     const resend = fichas.find((f) => f.getAttribute("data-ficha") === "resend")!;
     expect(t(resend.textContent)).toMatch(/Resend.*98%.*Al 98 %.*Correos este mes/);
     expect(within(fichas[0]).getByRole("button")).toHaveAccessibleName(/GitHub: Urgente, Clave rechazada/);
     expect(t(fichas.find((f) => f.getAttribute("data-ficha") === "vercel")!.textContent)).toContain("Falta la clave");
-    // Loading no tiene lectura automática, pero renueva en 20 días: aviso, con su ficha.
-    expect(fichas.find((f) => f.getAttribute("data-ficha") === "loading")).toHaveTextContent("Renueva en 20 días");
-    expect(screen.queryByRole("list", { name: "Servicios sin datos automáticos" })).toBeNull();
+    // Solo los servicios con lectura automática («controles», 10/11/2026): Loading no tiene ficha
+    // (su renovación sigue en «Qué mirar») ni sale en pequeño.
+    expect(fichas.find((f) => f.getAttribute("data-ficha") === "loading")).toBeUndefined();
+    expect(screen.queryByRole("list", { name: "Servicios sin datos todavía" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Loading/ })).toBeNull();
   });
 
   it("varios anillos por servicio (Vercel: visitas, datos…) y datos sin límite (Stripe); el contador cuenta servicios", async () => {
@@ -335,7 +354,7 @@ describe("Super Admin › Servicios › Estado", () => {
   it("«Qué mirar»: una línea por cosa (sin párrafos), lo urgente primero; lo informativo va aparte, en pequeño", async () => {
     pintar();
     const bloque = await screen.findByRole("region", { name: "Qué mirar" });
-    await waitFor(() => expect(within(bloque).getAllByRole("listitem").length).toBe(5));
+    await waitFor(() => expect(within(bloque).getAllByRole("listitem").length).toBe(6));
     const filas = within(bloque).getAllByRole("listitem");
     expect(filas.map((f) => [f.getAttribute("data-pendiente")?.split(":").slice(0, 2).join(":"), f.getAttribute("data-gravedad")])).toEqual([
       ["consumo:resend", "rojo"],
@@ -343,7 +362,10 @@ describe("Super Admin › Servicios › Estado", () => {
       ["consumo:supabase", "ambar"],
       ["renovacion:loading", "ambar"],
       ["error:falta_secreto", "ambar"],
+      // Loading no tiene precio: falta meter su coste (10/11/2026).
+      ["costes:por-meter", "ambar"],
     ]);
+    expect(filas[5]).toHaveTextContent("Falta meter 1 coste");
     expect(filas[0]).toHaveTextContent("Resend · Correos este mes");
     expect(filas[0]).not.toHaveTextContent(/del límite/); // sin el detalle
     // Lo informativo (planes por confirmar) no es una fila: un enlace pequeño a Configurar.
@@ -363,7 +385,7 @@ describe("Super Admin › Servicios › Estado", () => {
     expect(ubicacion()).toBe("/super-admin/servicios?tab=costes");
   });
 
-  it("todo bien: «Todo en orden» en verde, sin «Qué mirar»; lo que no tiene lectura automática, en pequeño y sin empeorar el total", async () => {
+  it("todo bien: «Todo en orden» en verde, sin «Qué mirar»; lo que no tiene lectura automática no sale en Estado", async () => {
     h.servicios = [
       servicio({ proveedor: "supabase", nombre: "Supabase", limites: { bd_tamano: { etiqueta: "BD", limite: 500, unidad: "MB" } } }),
       servicio({ proveedor: "google", nombre: "Google Maps Platform (reseñas)", categoria: "mapas" }),
@@ -373,10 +395,10 @@ describe("Super Admin › Servicios › Estado", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "Todo en orden" })).toBeInTheDocument();
     expect(screen.getByTestId("estado-general")).toHaveAttribute("data-estado", "verde");
     expect(screen.queryByRole("region", { name: "Qué mirar" })).toBeNull();
-    const sinDatos = screen.getByRole("list", { name: "Servicios sin datos automáticos" });
-    const google = within(sinDatos).getByRole("button", { name: /Google Maps Platform \(reseñas\): Se mira en su panel/ });
-    expect(google).toHaveTextContent("Google Maps Platform");
-    expect(google).not.toHaveTextContent("reseñas");
+    // Sin lectura automática (Google Maps): fuera de Estado (10/11/2026); sigue en Servicios y Costes.
+    expect(screen.queryByRole("list", { name: "Servicios sin datos todavía" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Google Maps Platform/ })).toBeNull();
+    expect(within(screen.getByRole("list", { name: "Servicios por estado" })).getAllByRole("listitem").map((li) => t(li.textContent))).toEqual(["1 bien"]);
   });
 });
 
@@ -528,6 +550,90 @@ describe("Super Admin › Servicios › Costes", () => {
     // Sin duplicar el Resumen: ni las cifras de cabecera ni lo que requiere atención.
     expect(screen.queryByTestId("cifra-mes")).toBeNull();
     expect(screen.queryByRole("region", { name: /Requiere atención/ })).toBeNull();
+  });
+  it("costes por meter: sin precio (a su ficha) y meses de pago por uso sin coste (meterlo); el contador de la pestaña", async () => {
+    const actual = mesDe(new Date());
+    const pasado = mesAnterior(actual);
+    h.rpc.mockImplementation(async (fn: string, args?: { p_mes?: string }) => {
+      if (fn !== "servicios_resumen_mes") return { data: [], error: null };
+      // OpenAI: este mes con su coste; el pasado se leyó, pero sin coste → falta.
+      if (args?.p_mes === actual) return { data: [{ proveedor: "openai", lecturas: 5, coste_variable: { importe: 2.9, moneda: "USD" } }, { proveedor: "stripe", lecturas: 5, coste_variable: { importe: 1, moneda: "EUR" } }], error: null };
+      if (args?.p_mes === pasado) return { data: [{ proveedor: "openai", lecturas: 3, coste_variable: null }, { proveedor: "stripe", lecturas: 3, coste_variable: { importe: 0, moneda: "EUR" } }], error: null };
+      return { data: [], error: null };
+    });
+    pintar("/super-admin/servicios?tab=costes");
+    const bloque = await screen.findByRole("region", { name: /Costes por meter: 2 pendientes/ });
+    expect(pestana("Costes")).toHaveTextContent(/2$/);
+    const filas = within(bloque).getAllByRole("listitem");
+    expect(filas.map((f) => [f.getAttribute("data-faltante"), f.getAttribute("data-motivo")])).toEqual([["loading", "sin_precio"], ["openai", "sin_coste_uso"]]);
+    expect(filas[1]).toHaveTextContent(textoMes(pasado));
+
+    // Sin precio → su ficha.
+    fireEvent.click(within(filas[0]).getByRole("button", { name: /Poner el precio/ }));
+    expect(await screen.findByRole("dialog", { name: "Editar Loading" })).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    // Mes sin coste → meter el de la factura (con coma decimal).
+    fireEvent.click(within(filas[1]).getByRole("button", { name: new RegExp(`Meter.*${textoMes(pasado)}.*OpenAI`) }));
+    const dialogo = await screen.findByRole("dialog", { name: "Coste de OpenAI" });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar" }));
+    expect(await within(dialogo).findByRole("alert")).toHaveTextContent(/Escribe el importe/);
+    fireEvent.change(within(dialogo).getByLabelText("Importe"), { target: { value: "7,5" } });
+    fireEvent.change(within(dialogo).getByLabelText("Nota (opcional)"), { target: { value: "Factura 42" } });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(h.upsertsCoste).toEqual([{ proveedor: "openai", mes: pasado, importe: 7.5, moneda: "USD", nota: "Factura 42" }]));
+    expect(h.toast.success).toHaveBeenCalledWith(`OpenAI: coste de ${textoMes(pasado)} guardado`);
+  });
+
+  it("informe mensual: el mes pasado por defecto, gasto por servicio, comparación, lo que falta, y descarga en CSV y PDF", async () => {
+    const actual = mesDe(new Date());
+    const pasado = mesAnterior(actual);
+    const antepasado = mesAnterior(actual, 2);
+    h.rpc.mockImplementation(async (fn: string, args?: { p_mes?: string }) => {
+      if (fn !== "servicios_resumen_mes") return { data: [], error: null };
+      if (args?.p_mes === pasado) {
+        return { data: [
+          { proveedor: "openai", lecturas: 30, coste_variable: { importe: 10, moneda: "USD" } },
+          { proveedor: "stripe", lecturas: 30, coste_variable: { importe: 2, moneda: "EUR" } },
+          { proveedor: "loading", lecturas: 0, manual_importe: "15.00", manual_moneda: "EUR", manual_nota: "Dominio" },
+        ], error: null };
+      }
+      if (args?.p_mes === antepasado) return { data: [{ proveedor: "openai", lecturas: 30, coste_variable: { importe: 5, moneda: "USD" } }], error: null };
+      return { data: [], error: null };
+    });
+    pintar("/super-admin/servicios?tab=costes");
+    const informe = await screen.findByTestId("informe-mensual");
+    expect(informe).toHaveAttribute("data-mes", pasado);
+    // Hostinger 7,99 (cuota) + OpenAI 9,00 + Stripe 2,00 + Loading 15,00 (a mano) = 33,99; antes: 7,99 + 4,50 + 0 + 0 = 12,49.
+    expect(t(informe.textContent)).toContain(`Total de ${textoMes(pasado)}33,99 €`);
+    expect(t(informe.textContent)).toContain(`${textoMesCorto(antepasado)}12,49 €`);
+    expect(t(informe.textContent)).toContain("+21,50 €");
+    const tabla = within(informe).getByRole("table");
+    const fila = (p: string) => tabla.querySelector(`[data-fila-informe='${p}']`)!;
+    expect(t(fila("loading").textContent)).toMatch(/Loading.*Dominio.*15,00 €.*Metido a mano/);
+    expect(t(fila("openai").textContent)).toMatch(/9,00 €.*4,50 €.*Estimado/);
+    expect(screen.getByTestId("informe-completo")).toHaveTextContent(`No falta ningún coste por meter en ${textoMes(pasado)}`);
+
+    fireEvent.click(within(screen.getByRole("region", { name: "Informe mensual" })).getByRole("button", { name: "CSV" }));
+    expect(h.descargas).toEqual([{ nombre: `informe-servicios-${pasado.slice(0, 7)}.csv`, tipo: "text/csv;charset=utf-8" }]);
+    fireEvent.click(within(screen.getByRole("region", { name: "Informe mensual" })).getByRole("button", { name: "PDF" }));
+    await waitFor(() => expect(h.descargas[1]?.nombre).toBe(`informe-servicios-${pasado.slice(0, 7)}.pdf`), { timeout: 10_000 });
+    expect(h.descargas[1].tipo).toBe("application/pdf");
+  });
+
+  it("sin la migración de costes por mes (20261122153000) lo dice y no rompe la pestaña", async () => {
+    h.rpc.mockImplementation(async (fn: string) => fn === "servicios_resumen_mes"
+      ? { data: null, error: { code: "PGRST202", message: "Could not find the function public.servicios_resumen_mes" } }
+      : { data: [], error: null });
+    pintar("/super-admin/servicios?tab=costes");
+    const bloque = await screen.findByRole("region", { name: /Costes por meter/ });
+    expect(await within(bloque).findByRole("alert")).toHaveTextContent("20261122153000_servicios_costes_mes");
+    // Lo que no tiene precio se avisa igual.
+    expect(within(bloque).getByRole("button", { name: /Poner el precio/ })).toBeInTheDocument();
+    const informe = screen.getByRole("region", { name: "Informe mensual" });
+    expect(await within(informe).findByRole("alert")).toHaveTextContent(/sin ella no se puede hacer el informe/);
+    expect(within(informe).getByRole("button", { name: "CSV" })).toBeDisabled();
   });
 });
 
