@@ -2,6 +2,19 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.21.0] - 2026-11-10
+
+Objetivo: Aceptar, confirmar y verificar viendo el día y los datos; tabla más grande y con aire; libro de una sola hoja con nombres enteros
+
+### Añadido
+- Reservas: aceptar, confirmar y verificar abren una ventana con los datos completos y el día (aforo, cierres, reservas del día) ([#113](https://github.com/restcasatomascrevillent/admin-casatomas/pull/113))
+
+### Cambiado
+- Reservas: tabla más grande (filas de 76 px, texto 18 px, botones 52 px) y sin la columna Canal ([#113](https://github.com/restcasatomascrevillent/admin-casatomas/pull/113))
+- Reservas: la Lista como libro con una sola hoja y el nombre entero, notas debajo ([#116](https://github.com/restcasatomascrevillent/admin-casatomas/pull/116))
+
+Nota: montada igualando producción con staging; entradas escritas a mano, no por scripts/release.mjs. Sin migraciones.
+
 ## [1.20.0] - 2026-11-10
 
 Objetivo: Todo lo de Reservas y Carta pendiente: lista como libro, tabla clara, Hoy con nombres visibles, menú cerrado y menú del día o carta, dentro o fuera, jueves de tapas en dos turnos, formulario y Carta con letra grande, gasto de leer reservas escritas a mano (incluye lo de la 1.19.0, que no llegó a publicarse)

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { useIsBelow } from "@/hooks/use-mobile";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { claveDia, diaDeClave, pasarHoja, tituloHoja } from "@/lib/reservas/libroReservas";
@@ -29,8 +28,6 @@ import { ReservasDeLaHoja } from "./ReservasDeLaHoja";
 const ALTURA_MINIMA_LIBRO = 360;
 /** Desplazamiento horizontal mínimo (px) para que deslizar pase hoja. */
 const UMBRAL_DESLIZAR = 60;
-/** Ancho desde el que se ven dos hojas (libro abierto). */
-const ANCHO_DOS_HOJAS = 1280;
 
 interface Props {
   /** Algo más para la barra de arriba (el conmutador «Libro | Tabla»). */
@@ -61,7 +58,8 @@ export function ListaComoLibro({ extra }: Props) {
   // Hacia dónde se pasó la última hoja: decide de qué lado entra la nueva.
   const [sentido, setSentido] = useState<1 | -1>(1);
   const [calendarioAbierto, setCalendarioAbierto] = useState(false);
-  const dosHojas = !useIsBelow(ANCHO_DOS_HOJAS);
+  // Una sola hoja siempre (10/11/2026, petición del dueño: con dos hojas no se veían los nombres).
+  const dosHojas = false as boolean;
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
   const [bloque, setBloque] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(bloque, ALTURA_MINIMA_LIBRO);
