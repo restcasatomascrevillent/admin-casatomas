@@ -16,6 +16,13 @@
 // mientras la migración no esté aplicada), agrupar el resultado por día y
 // decidir qué fila escribir al cerrar/abrir.
 //
+// JUEVES DE TAPAS (dueño, 2026-11-10: «Abierto, sin reservas web»): el jueves
+// sigue SIN reservas por la web y el teléfono —la regla de arriba y la RPC no
+// cambian, así que reservas-web y el bot se comportan igual—, pero el local
+// ABRE. Lo dice `configuracion_reservas.dias_abiertos_sin_reserva_online`
+// (migración 20261122103000) y solo lo usa el PANEL para no pintar «Cerrado»
+// ni avisar de día cerrado: ver `separarCierres`.
+//
 // Mismas reglas que `disponibilidad.ts`: CERO imports, CERO efectos.
 // La copia JS del bot telefónico (restaurante-phone/api/_cierres.js) tiene
 // la MISMA regla por defecto: si se cambia aquí, cámbiese allí.
@@ -45,6 +52,45 @@ export const CIERRE_SEMANAL_POR_DEFECTO: CierreSemanal = {
   comida: [1, 4],
   cena: [0, 1, 4],
 };
+
+/**
+ * Días de la semana (0 = domingo … 6 = sábado) en que el local ABRE aunque la
+ * regla semanal no coja reservas por la web ni por teléfono: el jueves de tapas.
+ * Es el respaldo mientras la columna no exista (migración sin aplicar).
+ */
+export const DIAS_ABIERTOS_SIN_RESERVA_ONLINE_POR_DEFECTO: readonly number[] = [4];
+
+/** Lee `dias_abiertos_sin_reserva_online` de `configuracion_reservas` (o el respaldo). */
+export function diasAbiertosSinReservaOnlineDesde(config: unknown): number[] {
+  const v = ((config ?? {}) as { dias_abiertos_sin_reserva_online?: unknown }).dias_abiertos_sin_reserva_online;
+  const lista = Array.isArray(v) ? v : DIAS_ABIERTOS_SIN_RESERVA_ONLINE_POR_DEFECTO;
+  return lista.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+}
+
+/**
+ * ¿Este servicio «cerrado» es solo sin reservas web/teléfono con el local
+ * abierto? Solo los de la regla SEMANAL en un día de esa lista: un cierre a
+ * mano (origen «manual») es un cierre de verdad.
+ */
+export function esSoloSinReservaOnline(c: ServicioCerrado, abiertosSinOnline: readonly number[]): boolean {
+  const dia = diaSemanaDe(c.fecha);
+  return c.origen === "semanal" && dia !== null && abiertosSinOnline.includes(dia);
+}
+
+/**
+ * Para el PANEL: separa los servicios cerrados de verdad («Cerrado», aviso al
+ * dar de alta) de los que solo no admiten reservas web/teléfono con el local
+ * abierto (jueves de tapas: el personal sí puede apuntar reservas).
+ */
+export function separarCierres(
+  cierres: readonly ServicioCerrado[],
+  abiertosSinOnline: readonly number[],
+): { cerrados: ServicioCerrado[]; sinReservaOnline: ServicioCerrado[] } {
+  const cerrados: ServicioCerrado[] = [];
+  const sinReservaOnline: ServicioCerrado[] = [];
+  for (const c of cierres) (esSoloSinReservaOnline(c, abiertosSinOnline) ? sinReservaOnline : cerrados).push(c);
+  return { cerrados, sinReservaOnline };
+}
 
 /** Corte comida/cena: el mismo que `turnoDeHora` y el trigger de aforo. */
 export function turnoDeHoraServicio(hora: string): TurnoServicio {

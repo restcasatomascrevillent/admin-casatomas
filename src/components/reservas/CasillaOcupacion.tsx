@@ -67,6 +67,11 @@ export interface CasillaOcupacionProps {
   /** Servicios sin reservas web/teléfono ese día (cierre semanal o manual). */
   cierres?: readonly ServicioCerrado[];
   /**
+   * Servicios sin reservas web/teléfono con el local ABIERTO (jueves de tapas, dueño 2026-11-10:
+   * «Abierto, sin reservas web»). No se pinta «Cerrado» ni rayado: solo «Sin reservas web», discreto.
+   */
+  sinReservaWeb?: readonly ServicioCerrado[];
+  /**
    * «Evento: sala entera» (20261119100000): un texto por evento del día, p. ej.
    * «Evento: Boda García (Salón, comida)». La casilla enseña el primero.
    */
@@ -99,22 +104,34 @@ export function CasillaOcupacion({
   densidad,
   fuenteComensales,
   cierres,
+  sinReservaWeb,
   eventos,
 }: CasillaOcupacionProps) {
   const cierraComida = !!cierres?.some((c) => c.turno === "comida");
   const cierraCena = !!cierres?.some((c) => c.turno === "cena");
   const textoCierre =
     cierraComida && cierraCena ? "Cerrado" : cierraComida ? "Sin comida" : cierraCena ? "Sin cena" : null;
+  // Si además hay un cierre de verdad, manda el cierre (es lo que importa en la casilla).
+  const textoSinWeb = !textoCierre && sinReservaWeb && sinReservaWeb.length > 0 ? "Sin reservas web" : null;
+  const textoEtiqueta = textoCierre ?? textoSinWeb;
   const fija = densidad !== undefined;
   const compacta = densidad === "compacta";
-  const verReservas = fija && densidad === "completa";
+  // Con etiqueta de cierre (o de evento) la casilla de alto fijo tiene una línea más: la cifra cede
+  // ese alto y «N res.» se calla (sigue en el tooltip y el aria-label) para que nada se monte ni se
+  // corte por abajo (el tamaño de `medirCasilla` no cuenta con ella).
+  const lineasExtra = (textoEtiqueta ? 1 : 0) + (eventos && eventos.length > 0 && !compacta ? 1 : 0);
+  const verReservas = fija && densidad === "completa" && lineasExtra === 0;
   const verPorcentaje = fija && densidad !== "compacta";
   const nivel = resumen?.nivel ?? "vacio";
   // Un día pasado se ve atenuado, tenga o no reservas.
   const estilo = estiloNivel(esPasado ? "pasado" : nivel);
   const descripcion = describirDia(resumen, ventanaHoras);
   const etiqueta = `${format(dia, "d 'de' MMMM", { locale: es })}: ${descripcion.aria}${
-    textoCierre ? `. ${textoCierre} para reservas` : ""
+    textoCierre
+      ? `. ${textoCierre} para reservas`
+      : textoSinWeb
+        ? ". Abierto, sin reservas por la web ni por teléfono"
+        : ""
   }${eventos && eventos.length > 0 ? `. ${eventos.join(". ")}` : ""}`;
 
   const conReservas = !!resumen && resumen.reservas > 0;
@@ -147,16 +164,18 @@ export function CasillaOcupacion({
   // sale de la casilla medida (px); sin ella, del ancho (`cqw`).
   // Una cifra de 2-3 dígitos nunca puede ser más ancha que la casilla: el tamaño en px es el techo y `cqw` lo recorta por nº de dígitos (P-01).
   const digitos = String(resumen?.comensales ?? 0).length;
+  const fuenteCifra = fuenteComensales ? Math.max(14, fuenteComensales - lineasExtra * (compacta ? 8 : 10)) : 0;
   const cifra = conReservas ? (
     <span
       data-testid="comensales-casilla"
+      data-fuente={fija && fuenteComensales ? fuenteCifra : undefined}
       aria-hidden="true"
       className={cn(
         "font-bold leading-none",
         "text-center",
         !fija && "[font-size:clamp(1.125rem,30cqw,2rem)]",
       )}
-      style={fija && fuenteComensales ? { fontSize: `min(${fuenteComensales}px, calc(100cqw / ${(digitos * 0.62 + 0.3).toFixed(2)}))` } : undefined}
+      style={fija && fuenteComensales ? { fontSize: `min(${fuenteCifra}px, calc(100cqw / ${(digitos * 0.62 + 0.3).toFixed(2)}))` } : undefined}
     >
       {resumen.comensales}
     </span>
@@ -171,7 +190,9 @@ export function CasillaOcupacion({
       data-fecha={fechaISO}
       data-densidad={densidad}
       data-nivel={esPasado && conReservas ? "pasado" : nivel}
-      data-cierre={textoCierre ? (cierraComida && cierraCena ? "dia" : cierraComida ? "comida" : "cena") : undefined}
+      data-cierre={
+        textoCierre ? (cierraComida && cierraCena ? "dia" : cierraComida ? "comida" : "cena") : textoSinWeb ? "sin-web" : undefined
+      }
       className={cn(
         "relative flex w-full cursor-pointer flex-col overflow-hidden rounded-lg border text-left",
         "transition-shadow hover:shadow-md motion-reduce:transition-none",
@@ -207,16 +228,27 @@ export function CasillaOcupacion({
         {!compacta && <span className="flex shrink-0 items-center gap-0.5">{indicadores}</span>}
       </span>
 
-      {textoCierre && (
+      {/* La etiqueta de cierre no se recorta nunca (dueño, 2026-11-10: «la palabra cerrado se ve
+          cortada»): `shrink-0` para que la columna flex no la aplaste contra la cifra en una casilla
+          de alto fijo, sin `truncate` (si un día no cabe en una línea, parte en dos) y también en la
+          densidad compacta, donde antes los días de medio servicio la escondían. */}
+      {textoEtiqueta && (
         <span
           data-testid="cierre-casilla"
           className={cn(
-            "truncate text-[10px] pointer-coarse:text-xs font-semibold uppercase leading-none tracking-wide",
+            "block shrink-0 break-words text-[10px] pointer-coarse:text-xs leading-none",
+            textoCierre ? "font-semibold uppercase" : "font-medium",
             cierraComida && cierraCena ? "text-destructive" : "text-muted-foreground",
-            compacta && !(cierraComida && cierraCena) && "hidden",
           )}
         >
-          {textoCierre}
+          {textoCierre ?? (
+            // «Sin reservas web» parte en dos líneas en una casilla estrecha (iPad vertical) y empuja
+            // el % fuera: ahí basta «Sin web» (el aria-label lo dice entero). La casilla es contenedor.
+            <>
+              <span className="[@container(min-width:6.5rem)]:hidden">Sin web</span>
+              <span className="hidden [@container(min-width:6.5rem)]:inline">{textoSinWeb}</span>
+            </>
+          )}
         </span>
       )}
       {eventos && eventos.length > 0 && (
@@ -224,7 +256,7 @@ export function CasillaOcupacion({
           data-testid="evento-casilla"
           aria-hidden="true"
           className={cn(
-            "truncate rounded bg-violet-100 px-1 text-[10px] pointer-coarse:text-xs font-semibold leading-tight text-violet-900 dark:bg-violet-900/40 dark:text-violet-100",
+            "shrink-0 truncate rounded bg-violet-100 px-1 text-[10px] pointer-coarse:text-xs font-semibold leading-tight text-violet-900 dark:bg-violet-900/40 dark:text-violet-100",
             compacta && "hidden",
           )}
         >

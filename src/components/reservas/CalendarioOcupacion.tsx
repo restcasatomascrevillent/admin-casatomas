@@ -96,7 +96,11 @@ import { CasillaOcupacion } from "./CasillaOcupacion";
 import { LeyendaOcupacion } from "./LeyendaOcupacion";
 import { DialogoCierreDia } from "./DialogoCierreDia";
 import { useCierresReserva } from "@/hooks/useCierresReserva";
-import { cierresPorDia } from "../../../supabase/functions/_shared/cierres";
+import {
+  cierresPorDia,
+  diasAbiertosSinReservaOnlineDesde,
+  separarCierres,
+} from "../../../supabase/functions/_shared/cierres";
 import { textoEvento, useSalasEvento } from "@/hooks/useSalaEvento";
 
 
@@ -276,12 +280,21 @@ export function CalendarioOcupacion() {
     [espacios],
   );
 
-  // Cierres de reservas del mes (lunes, jueves, domingo noche + los manuales).
+  // Cierres de reservas del mes (lunes, jueves, domingo noche + los manuales). Los jueves, sin
+  // reservas web/teléfono pero con el local abierto: ver `cierresCasilla`.
   const { data: cierresMes } = useCierresReserva(
     format(startOfMonth(currentMonth), "yyyy-MM-dd"),
     format(endOfMonth(currentMonth), "yyyy-MM-dd"),
   );
   const cierresDia = useMemo(() => cierresPorDia(cierresMes?.cierres ?? []), [cierresMes]);
+  // Jueves de tapas (dueño, 2026-11-10: «Abierto, sin reservas web»): la regla los da sin reservas
+  // web/teléfono, pero el local abre. La casilla no dice «Cerrado»: dice «Sin reservas web».
+  const abiertosSinOnline = useMemo(() => diasAbiertosSinReservaOnlineDesde(configuracion), [configuracion]);
+  const cierresCasilla = useMemo(() => {
+    const mapa: Record<string, ReturnType<typeof separarCierres>> = {};
+    for (const [fecha, lista] of Object.entries(cierresDia)) mapa[fecha] = separarCierres(lista, abiertosSinOnline);
+    return mapa;
+  }, [cierresDia, abiertosSinOnline]);
 
   // «Evento: sala entera» del mes (20261119100000): «Evento: Boda (Salón, comida)».
   const { data: eventosMes } = useSalasEvento(
@@ -444,7 +457,8 @@ export function CalendarioOcupacion() {
                           dia={day}
                           fechaISO={dateKey}
                           resumen={resumenes[dateKey]}
-                          cierres={cierresDia[dateKey]}
+                          cierres={cierresCasilla[dateKey]?.cerrados}
+                          sinReservaWeb={cierresCasilla[dateKey]?.sinReservaOnline}
                           eventos={eventosDia[dateKey]}
                           esPasado={dateKey < hoy}
                           esHoy={dateKey === hoy}
