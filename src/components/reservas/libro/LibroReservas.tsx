@@ -16,6 +16,8 @@ import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { agruparReservasDelDia } from "@/components/reservas/ReservasDelDia";
 import { useReservasServicioDia, CLAVE_RESERVAS_SERVICIO_DIA } from "@/hooks/useReservasServicioDia";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { useGastoLecturaManuscrita } from "@/hooks/useGastoLecturaManuscrita";
+import { formatearEurPequeno } from "@/lib/reservas/gastoLecturaManuscrita";
 import { useBorradoresPendientes, useGuardarBorrador, useResolverBorrador, type BorradorManuscrito } from "@/hooks/useBorradoresManuscritos";
 import { ETIQUETA_TURNO, horaCorta } from "@/lib/reservas/ocupacionSalas";
 import { ESTADO_NO_SHOW, infoEstadoReserva } from "@/lib/reservas/estadosReserva";
@@ -215,6 +217,8 @@ export function LibroReservas({ soloCrear = false }: Props) {
   const guardarBorrador = useGuardarBorrador();
   const resolverBorrador = useResolverBorrador();
   const pendientesHoja = pendientes.filter((b) => b.fecha === fecha);
+  // Gasto de las lecturas (10/11/2026, «monitorizar el gasto»): línea discreta bajo los botones.
+  const { data: gastoLectura } = useGastoLecturaManuscrita();
   const primerDiaPendiente = pendientes.find((b) => b.fecha !== fecha)?.fecha ?? null;
 
   const revisando = !!interpretada;
@@ -431,6 +435,13 @@ export function LibroReservas({ soloCrear = false }: Props) {
               {interpretando ? "Interpretando…" : "Interpretar"}
             </Button>
           </div>
+          {gastoLectura && gastoLectura.mes.lecturas > 0 && (
+            <p className="mt-2 text-right text-xs text-stone-500" data-testid="gasto-lectura">
+              Este mes: {gastoLectura.mes.lecturas} {gastoLectura.mes.lecturas === 1 ? "lectura" : "lecturas"} ·{" "}
+              {formatearEurPequeno(gastoLectura.mes.eur)}
+              {gastoLectura.mes.eurPorLectura != null && <> ({formatearEurPequeno(gastoLectura.mes.eurPorLectura)} cada una)</>}
+            </p>
+          )}
         </div>
         )}
       </div>
