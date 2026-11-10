@@ -52,9 +52,11 @@ interface PestanasPaginaProps {
    * a la izquierda, entre dos barras de pestañas (al dueño no le gustaba, 02/11/2026). Desde `sm`, todo en
    * una fila como siempre. Con `"lg"` se queda debajo hasta 1024 px (Reservas: 6 pestañas + «Nueva reserva» no caben
    * en 768 ni en apaisado); con `"xl"`, hasta 1280 px (Gestor Web › Carta: con el menú lateral, las 4 secciones y sus
-   * botones no caben en una fila hasta entonces).
+   * botones no caben en una fila hasta entonces); con `"muyAncho"`, hasta 1800 px (Facturas › Análisis: periodo,
+   * local, personalizar, IA y avisos no caben junto a las pestañas en una tablet o un portátil y se partían en dos
+   * líneas, con las pestañas descolgadas; 09/11/2026).
    */
-  accionesDebajoEnMovil?: boolean | "lg" | "xl";
+  accionesDebajoEnMovil?: boolean | "lg" | "xl" | "muyAncho";
   /**
    * Por debajo de `sm`, solo el icono de cada pestaña (la etiqueta queda como nombre accesible) y un punto en vez del
    * contador: todas caben en una línea fina, sin scroll horizontal. Para pantallas que necesitan el alto (el asistente
@@ -90,6 +92,11 @@ const DEBAJO = {
     fila: "flex-wrap gap-y-3 border-b-0 xl:flex-nowrap xl:border-b",
     tira: "basis-full border-b border-border/60 sm:basis-full xl:basis-auto xl:border-b-0",
     acciones: "w-full xl:w-auto",
+  },
+  muyAncho: {
+    fila: "flex-wrap gap-y-3 border-b-0 min-[1800px]:flex-nowrap min-[1800px]:border-b",
+    tira: "basis-full border-b border-border/60 sm:basis-full min-[1800px]:basis-auto min-[1800px]:border-b-0",
+    acciones: "w-full min-[1800px]:w-auto",
   },
 } as const;
 
