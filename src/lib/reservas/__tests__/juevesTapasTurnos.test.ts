@@ -1,5 +1,5 @@
 // Jueves de tapas por la noche en el panel: dos turnos fijos, 20:30 y 22:00
-// (`configuracion_turnos.horas_fijas`, migración 20261122200000).
+// (`configuracion_turnos.horas_fijas`, migración 20261122200100).
 // Alta (rejilla que alimenta el selector de hora), Hoy (turno en curso, estancia
 // de la mesa) y reparto de mesas (la mesa del 1.er turno queda libre a las 22:00).
 import { describe, expect, it } from "vitest";

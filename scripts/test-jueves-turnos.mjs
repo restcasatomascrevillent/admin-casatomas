@@ -1,4 +1,4 @@
-// Jueves de tapas por la noche en dos turnos fijos (20261122200000) contra un
+// Jueves de tapas por la noche en dos turnos fijos (20261122200100) contra un
 // Postgres en memoria (PGlite). Nunca toca Supabase.
 //
 //   npm run test:jueves-turnos:db
@@ -12,8 +12,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 
-const MIGRACION = await readFile("supabase/migrations/20261122200000_turnos_horas_fijas_jueves_tapas.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261122200000_turnos_horas_fijas_jueves_tapas_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261122200100_turnos_horas_fijas_jueves_tapas.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261122200100_turnos_horas_fijas_jueves_tapas_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };

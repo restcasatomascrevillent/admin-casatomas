@@ -1,5 +1,5 @@
 // Jueves de tapas por la noche: dos turnos fijos, 20:30 y 22:00
-// (`configuracion_turnos.horas_fijas`, migración 20261122200000).
+// (`configuracion_turnos.horas_fijas`, migración 20261122200100).
 // Motor común de la web, el bot y el panel: módulo puro, sin red.
 import { describe, expect, it } from "vitest";
 import {

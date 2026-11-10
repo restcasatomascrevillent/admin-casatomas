@@ -1,4 +1,4 @@
--- Vuelta atrás de 20261122200000_turnos_horas_fijas_jueves_tapas.sql
+-- Vuelta atrás de 20261122200100_turnos_horas_fijas_jueves_tapas.sql
 -- Deja el jueves por la noche con la «Cena» general (horas por escalera) y
 -- la franja de mesa como antes (hora + tiempo de ocupación, sin recorte).
 

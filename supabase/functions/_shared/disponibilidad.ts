@@ -310,7 +310,7 @@ export interface ConfiguracionTurnoInput {
   activo?: boolean | null;
   espacio_id?: string | null;
   /**
-   * Turnos de HORA FIJA (migración 20261122200000, jueves de tapas: 20:30 y
+   * Turnos de HORA FIJA (migración 20261122200100, jueves de tapas: 20:30 y
    * 22:00). `time[]` de Postgres: llega como `["20:30:00","22:00:00"]` (o en
    * texto `{20:30:00,22:00:00}`). Con valor, el periodo ofrece SOLO esas horas
    * (sin escalera). Ver `horasFijasDeConfig`.
@@ -789,7 +789,7 @@ export function resolverBaseUmbral(config: ConfiguracionTurnoInput): BaseUmbral 
 }
 
 // ------------------------------------------------------------
-// TURNOS DE HORA FIJA (jueves de tapas, migración 20261122200000)
+// TURNOS DE HORA FIJA (jueves de tapas, migración 20261122200100)
 // ------------------------------------------------------------
 
 /**

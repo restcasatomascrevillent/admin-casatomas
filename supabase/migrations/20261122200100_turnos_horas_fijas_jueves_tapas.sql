@@ -24,7 +24,7 @@
 -- (`dias_abiertos_sin_reserva_online`, 20261122103000): esto no la abre.
 --
 -- Idempotente: si ya hay un periodo de jueves con horas fijas, no toca datos.
--- Vuelta atrás: supabase/rollbacks/20261122200000_turnos_horas_fijas_jueves_tapas_ROLLBACK.sql
+-- Vuelta atrás: supabase/rollbacks/20261122200100_turnos_horas_fijas_jueves_tapas_ROLLBACK.sql
 -- ============================================================================
 
 -- 1. La columna -------------------------------------------------------------
@@ -45,7 +45,7 @@ begin
 end $$;
 
 comment on column public.configuracion_turnos.horas_fijas is
-  'Turnos de hora fija (p. ej. {20:30,22:00} el jueves de tapas). NULL = horas por la escalera de siempre. Con valor, el periodo ofrece SOLO esas horas y la mesa de un turno queda libre a la hora del siguiente. Migración 20261122200000.';
+  'Turnos de hora fija (p. ej. {20:30,22:00} el jueves de tapas). NULL = horas por la escalera de siempre. Con valor, el periodo ofrece SOLO esas horas y la mesa de un turno queda libre a la hora del siguiente. Migración 20261122200100.';
 
 -- 2. Minutos hasta el turno fijo siguiente ----------------------------------
 create or replace function public.fn_minutos_hasta_siguiente_turno_fijo(p_fecha date, p_hora time)
@@ -72,7 +72,7 @@ as $$
 $$;
 
 comment on function public.fn_minutos_hasta_siguiente_turno_fijo(date, time) is
-  'Minutos desde p_hora hasta el siguiente turno de hora fija de ese día (configuracion_turnos.horas_fijas), o NULL si no hay turnos fijos o no hay siguiente. Migración 20261122200000.';
+  'Minutos desde p_hora hasta el siguiente turno de hora fija de ese día (configuracion_turnos.horas_fijas), o NULL si no hay turnos fijos o no hay siguiente. Migración 20261122200100.';
 
 revoke all on function public.fn_minutos_hasta_siguiente_turno_fijo(date, time) from public, anon;
 grant execute on function public.fn_minutos_hasta_siguiente_turno_fijo(date, time) to authenticated, service_role;
@@ -92,7 +92,7 @@ as $$
 $$;
 
 comment on function public.fn_franja_ocupacion_mesa(date, time) is
-  'Franja [inicio, fin) en la que una reserva ocupa su mesa: de su hora a hora + fn_minutos_ocupacion_mesa, recortada en el siguiente turno de hora fija (20261122200000: jueves de tapas 20:30 → 22:00). Migración 20261005130000_mesas_ocupacion_por_tiempo.';
+  'Franja [inicio, fin) en la que una reserva ocupa su mesa: de su hora a hora + fn_minutos_ocupacion_mesa, recortada en el siguiente turno de hora fija (20261122200100: jueves de tapas 20:30 → 22:00). Migración 20261005130000_mesas_ocupacion_por_tiempo.';
 
 -- 4. Datos: el jueves por la noche, en dos turnos -----------------------------
 do $$

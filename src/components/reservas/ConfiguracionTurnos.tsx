@@ -90,7 +90,7 @@ const formSchema = z.object({
   niveles_escalera: z.array(nivelEscaleraSchema).min(1).max(8),
   ocultar_nivel_anterior: z.boolean(),
   base_umbral: z.enum(["aforo_total", "reparto_nivel_base"]),
-  // Turnos de hora fija (20261122200000, jueves de tapas: «20:30, 22:00»). Vacío = escalera.
+  // Turnos de hora fija (20261122200100, jueves de tapas: «20:30, 22:00»). Vacío = escalera.
   horas_fijas_texto: z.string().superRefine((texto, ctx) => {
     const leido = leerHorasFijasTexto(texto);
     if ("error" in leido) ctx.addIssue({ code: z.ZodIssueCode.custom, message: leido.error });
@@ -245,7 +245,7 @@ export function ConfiguracionTurnos() {
       };
       const horasFijas = leerHorasFijasTexto(values.horas_fijas_texto);
       // Solo se manda si tiene valor o si el periodo ya tenía (para quitarlas): así un periodo normal se
-      // sigue guardando igual aunque la columna no exista aún (migración 20261122200000 sin aplicar).
+      // sigue guardando igual aunque la columna no exista aún (migración 20261122200100 sin aplicar).
       const conHorasFijas =
         "horas" in horasFijas && (horasFijas.horas || editingConfig?.horas_fijas)
           ? { horas_fijas: horasFijas.horas }
