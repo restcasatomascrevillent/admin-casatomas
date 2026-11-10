@@ -132,6 +132,21 @@ describe("serieDesdeLineas (gráfica de la ficha de producto, QA C-04)", () => {
     expect(s).toMatchObject({ unidad: "kg", proveedores: ["A", "B"], n: 2, variacion_pct: null });
   });
 
+  it("varias unidades: las devuelve todas (con sus compras) y se puede elegir otra", () => {
+    const lineas = [
+      l("2026-09-01", "A", 2),
+      l("2026-09-02", "B", 3),
+      l("2026-09-02", "B", 3.2),
+      l("2026-09-03", "A", 20, { unidad: "Caja" }),
+    ];
+    const s = serieDesdeLineas("Limón", lineas);
+    expect(s).toMatchObject({ unidad: "kg", unidades: [{ unidad: "kg", n: 2 }, { unidad: "caja", n: 1 }] });
+    const caja = serieDesdeLineas("Limón", lineas, undefined, "caja");
+    expect(caja).toMatchObject({ unidad: "caja", n: 1, proveedores: ["A"], unidades: [{ unidad: "kg", n: 2 }, { unidad: "caja", n: 1 }] });
+    // Una unidad que ya no existe vuelve a la más comprada.
+    expect(serieDesdeLineas("Limón", lineas, undefined, "saco")).toMatchObject({ unidad: "kg" });
+  });
+
   it("sin líneas válidas: sin datos", () => {
     expect(serieDesdeLineas("Nada", [l("2026-09-01", "A", null)])).toEqual({ sin_datos: true, buscado: "Nada" });
   });
