@@ -1,5 +1,5 @@
 import { AptoParaPlato } from "./AptoParaPlato";
-import { cambioVegetariano } from "@/lib/dietas-plato";
+import { aptitudesManualesDisponibles, cambioVegetariano } from "@/lib/dietas-plato";
 import { guardarUnidadPlato, opcionesUnidadPlato } from "@/lib/unidades-platos";
 import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -71,6 +71,9 @@ const formSchema = z
     descripcion: descripcionCarta,
     sin_gluten_disponible: z.boolean().default(false),
     vegetariano: z.boolean().default(false),
+    // «Apto para celíacos» / «Apto sin lactosa» a mano; null = según alérgenos (20261122093000).
+    apto_celiacos: z.boolean().nullable().default(null),
+    apto_sin_lactosa: z.boolean().nullable().default(null),
     ingredientes: z.string().optional(),
     unidad: z.string().default("Unidad"),
     gramos: z.coerce.number().optional(),
@@ -122,7 +125,8 @@ export function PlatoForm({
   const [nuevoAlergeno, setNuevoAlergeno] = useState("");
   const [sinAlergenos, setSinAlergenos] = useState(false);
   const [errorAlergenos, setErrorAlergenos] = useState(false);
-  const tieneGluten = alergenosSeleccionados.includes("gluten");
+  // Columnas de «Apto para» a mano: se ven en los platos ya cargados (sin carta cargada, se asume que sí).
+  const aptitudesManuales = !platos?.length || aptitudesManualesDisponibles(platos[0]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -133,6 +137,8 @@ export function PlatoForm({
       descripcion: "",
       sin_gluten_disponible: false,
       vegetariano: false,
+      apto_celiacos: null,
+      apto_sin_lactosa: null,
       ingredientes: "",
       unidad: "Unidad",
       gramos: 100,
@@ -142,9 +148,6 @@ export function PlatoForm({
   const toggleAlergeno = (id: string) => {
     setSinAlergenos(false);
     setErrorAlergenos(false);
-    if (id === "gluten" && tieneGluten) {
-      form.setValue("sin_gluten_disponible", false, { shouldDirty: true });
-    }
     setAlergenosSeleccionados((prev) =>
       prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id],
     );
@@ -216,10 +219,13 @@ export function PlatoForm({
         categoria: values.categoria,
         precio_eur: values.precio_eur,
         descripcion: values.descripcion,
-        sin_gluten_disponible:
-          todosAlergenos.includes("gluten") && values.sin_gluten_disponible,
+        // «Se puede hacer para celíacos»: interruptor siempre editable (10/11/2026).
+        sin_gluten_disponible: values.sin_gluten_disponible,
         // Solo si se marca (ver `cambioVegetariano`).
         ...cambioVegetariano(null, values.vegetariano),
+        // Solo si se decide a mano (null = según alérgenos): sin la migración el alta sigue funcionando.
+        ...(aptitudesManuales && values.apto_celiacos !== null ? { apto_celiacos: values.apto_celiacos } : {}),
+        ...(aptitudesManuales && values.apto_sin_lactosa !== null ? { apto_sin_lactosa: values.apto_sin_lactosa } : {}),
         ingredientes: values.ingredientes,
         unidad: guardarUnidadPlato(values.unidad, values.gramos),
         alergenos_oficiales: todosAlergenos.length > 0 ? todosAlergenos : null,
@@ -419,7 +425,6 @@ export function PlatoForm({
                   setSinAlergenos((v) => !v);
                   setAlergenosSeleccionados([]);
                   setAlergenosPersonalizados([]);
-                  form.setValue("sin_gluten_disponible", false);
                   setErrorAlergenos(false);
                 }}
               >
@@ -512,10 +517,12 @@ export function PlatoForm({
               )}
             </div>
 
-            {/* «Apto para» (04/11/2026, dueño): celíacos, vegetarianos y sin lactosa, con su motivo y las
-                casillas «Se puede hacer sin gluten» y «Vegetariano». Mismas reglas que los filtros de la web. */}
+            {/* «Apto para» (04/11/2026, dueño): celíacos, vegetarianos y sin lactosa, con su motivo y los
+                interruptores editables (10/11/2026). Mismas reglas que los filtros de la web. */}
             <AptoParaPlato
               control={form.control}
+              setValue={form.setValue}
+              aptitudesManuales={aptitudesManuales}
               alergenos={sinAlergenos ? [SIN_ALERGENOS_DECLARADOS] : combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados)}
             />
 

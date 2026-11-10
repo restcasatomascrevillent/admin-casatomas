@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Cpu, Film, Loader2, Palette, RotateCcw, Smartphone, Trash2, Undo2, Video, X } from "lucide-react";
+import { Check, Film, Loader2, Palette, RotateCcw, Smartphone, Trash2, Undo2, Video, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -9,7 +9,6 @@ import type { VideoPlato } from "./useVideoPlato";
 import { ACEPTA_VIDEO } from "./lecturaVideo";
 import { accionCambioFondo, MENSAJE_SIN_ORIGINAL, temaDeVideoUrl, temaMarcado, type EstadoOriginal } from "./originalVideo";
 import { buscarOriginalVideo } from "./subirVideoPlato";
-import { leerMedidaCacheada } from "../potente/dispositivoPotente";
 
 interface Props {
   video: VideoPlato;
@@ -21,7 +20,7 @@ interface Props {
   temaFoto: NombreTema;
   /** true si en este formulario se está cambiando la foto/fondo. */
   fondoCambiado?: boolean;
-  /** Avisa del fondo marcado para el vídeo (p. ej. para «Mandar a un dispositivo potente»). */
+  /** Avisa del fondo marcado para el vídeo. */
   onTemaChange?: (tema: NombreTema) => void;
 }
 
@@ -72,30 +71,10 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
   const accion = platoId
     ? accionCambioFondo({ hayVideo: quiereCambio, elegido, real: temaReal, tieneArchivo: !!listo?.archivo, original })
     : "nada";
-  const [mandando, setMandando] = useState(false);
-  const esPotente = leerMedidaCacheada()?.potente === true;
-
   const cambiarFondo = () => {
     if (!elegido) return;
     if (video.cambiarFondo(elegido, original)) setElegido(null);
     else toast.error(MENSAJE_SIN_ORIGINAL);
-  };
-
-  const mandarCambioAPotente = async () => {
-    if (!elegido || !platoId || typeof original !== "string") return;
-    setMandando(true);
-    try {
-      const { mandarOriginalAPotente } = await import("../potente/trabajosVideo");
-      await mandarOriginalAPotente({ platoId, rutaOriginal: original, tema: elegido });
-      toast.success("Cambio de fondo mandado", {
-        description: "Lo hará el primer ordenador potente que tenga el panel abierto; el vídeo se guarda solo.",
-      });
-      setElegido(null);
-    } catch (e) {
-      toast.error("No se pudo mandar el vídeo", { description: (e as Error)?.message });
-    } finally {
-      setMandando(false);
-    }
   };
 
   const alElegir = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,12 +214,6 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
                   <Button type="button" onClick={cambiarFondo}>
                     <Palette className="mr-2 h-4 w-4" /> Cambiar fondo del vídeo a {nombreTema(tema)}
                   </Button>
-                  {!esPotente && typeof original === "string" && (
-                    <Button type="button" variant="secondary" onClick={() => void mandarCambioAPotente()} disabled={mandando}>
-                      {mandando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Cpu className="mr-2 h-4 w-4" />}
-                      Mandar a un dispositivo potente
-                    </Button>
-                  )}
                 </div>
               )}
               {accion === "buscando" && (

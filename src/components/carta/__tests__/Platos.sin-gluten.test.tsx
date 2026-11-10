@@ -37,37 +37,24 @@ beforeEach(() => {
   mutaciones.actualizar.mockResolvedValue(undefined);
 });
 
-describe("Marcador sin gluten al crear y editar platos", () => {
-  it("incluye el marcador al crear un plato", async () => {
+describe("«Se puede hacer para celíacos» al crear y editar platos", () => {
+  const interruptor = () => screen.getByRole("switch", { name: "Se puede hacer para celíacos" });
+
+  it("está siempre visible al crear y se guarda tal cual", async () => {
     render(<PlatoForm open onOpenChange={vi.fn()} categoriaInicial="SNACK" />);
     fireEvent.change(screen.getByLabelText("Nombre"), {
       target: { value: "Croquetas" },
     });
-    expect(
-      screen.queryByRole("checkbox", { name: "Se puede hacer sin gluten" }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Gluten" }),
-    );
-    const checkbox = screen.getByRole("checkbox", {
-      name: "Se puede hacer sin gluten",
-    });
-    expect(checkbox).not.toBeChecked();
-    fireEvent.click(checkbox);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Gluten" }),
-    );
-    expect(
-      screen.queryByRole("checkbox", { name: "Se puede hacer sin gluten" }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Gluten" }),
-    );
-    const checkboxRestablecido = screen.getByRole("checkbox", {
-      name: "Se puede hacer sin gluten",
-    });
-    expect(checkboxRestablecido).not.toBeChecked();
-    fireEvent.click(checkboxRestablecido);
+    // Sin gluten marcado también se puede cambiar (10/11/2026, dueño: «que sea modificable»).
+    expect(interruptor()).not.toBeDisabled();
+    expect(interruptor()).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Gluten" }));
+    fireEvent.click(interruptor());
+    expect(interruptor()).toBeChecked();
+    // Quitar el gluten ya no lo apaga solo.
+    fireEvent.click(screen.getByRole("button", { name: "Gluten" }));
+    expect(interruptor()).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Gluten" }));
     fireEvent.click(screen.getByRole("button", { name: "Guardar Plato" }));
     await waitFor(() =>
       expect(mutaciones.crear).toHaveBeenCalledWith(
@@ -79,26 +66,11 @@ describe("Marcador sin gluten al crear y editar platos", () => {
     );
   });
 
-  it("recupera el marcador guardado y permite quitarlo sin borrar el alérgeno gluten", async () => {
+  it("recupera lo guardado y permite quitarlo sin borrar el alérgeno gluten", async () => {
     render(<EditarPlatoModal open onOpenChange={vi.fn()} plato={plato} />);
-    const checkbox = screen.getByRole("checkbox", {
-      name: "Se puede hacer sin gluten",
-    });
-    await waitFor(() => expect(checkbox).toBeChecked());
-    fireEvent.click(checkbox);
-    fireEvent.click(checkbox);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Gluten" }),
-    );
-    expect(
-      screen.queryByRole("checkbox", { name: "Se puede hacer sin gluten" }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Gluten" }),
-    );
-    expect(
-      screen.getByRole("checkbox", { name: "Se puede hacer sin gluten" }),
-    ).not.toBeChecked();
+    await waitFor(() => expect(interruptor()).toBeChecked());
+    fireEvent.click(interruptor());
+    expect(interruptor()).not.toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
     await waitFor(() =>
       expect(mutaciones.actualizar).toHaveBeenCalledWith(

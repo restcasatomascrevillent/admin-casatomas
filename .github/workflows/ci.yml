@@ -63,6 +63,8 @@ jobs:
         run: npm run test:restricciones-bebidas:db
       - name: Platos.updated_at cambia al editar (PGlite)
         run: npm run test:platos-updated-at:db
+      - name: Platos «Apto para» a mano (PGlite)
+        run: npm run test:platos-aptitudes:db
       - name: Alertas de un documento al añadir o borrar líneas (PGlite)
         run: npm run test:alertas-lineas:db
       - name: Indicaciones para la IA por proveedor (PGlite)
