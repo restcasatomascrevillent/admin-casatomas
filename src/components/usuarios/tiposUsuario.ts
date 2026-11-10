@@ -11,7 +11,7 @@
  *   · Albaranes → solo «Facturas · Solo fotos (albaranes)». Al entrar va a «Subir albaranes» (/albaranes):
  *                 hace o elige fotos y ve si llegaron. Ni importes, ni lo leído, ni otras secciones.
  *
- * Lo hace cumplir la base de datos (migración 20261122143000_usuarios_reservas_albaranes) y, para las
+ * Lo hace cumplir la base de datos (migración 20261122143500_usuarios_reservas_albaranes) y, para las
  * fotos, la función procesar-factura. Rol base: Staff (ninguno edita nada; ver `rolSegunPermisos`).
  */
 import { mismosPermisos, permisosParaEditar, type PermisoSeccion } from "@/components/usuarios/permisosSecciones";

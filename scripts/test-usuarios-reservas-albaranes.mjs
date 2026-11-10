@@ -8,7 +8,7 @@
 // facturas, productos_factura, ocr_trabajos, ocr_trabajo_paginas y del bucket
 // facturas-originales tras 20261106510000; permisos por sección con el super
 // admin siempre dentro; sesión de panel viva) y aplica la migración REAL
-// 20261122143000 dos veces. Demuestra que el usuario «Reservas» solo ve y crea
+// 20261122143500 dos veces. Demuestra que el usuario «Reservas» solo ve y crea
 // reservas (como el formulario del panel; ni modificar, ni borrar, ni cambiar
 // el estado, ni mesas, ni configuración, ni otras secciones) y que el de
 // «Albaranes» solo sube fotos a su carpeta y ve el ESTADO de lo suyo (ni
@@ -18,8 +18,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 
-const MIGRACION = await readFile("supabase/migrations/20261122143000_usuarios_reservas_albaranes.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261122143000_usuarios_reservas_albaranes_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261122143500_usuarios_reservas_albaranes.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261122143500_usuarios_reservas_albaranes_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };

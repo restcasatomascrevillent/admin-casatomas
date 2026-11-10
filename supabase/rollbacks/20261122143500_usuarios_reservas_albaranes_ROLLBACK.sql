@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- ROLLBACK de 20261122143000_usuarios_reservas_albaranes.sql (tipos de usuario
+-- ROLLBACK de 20261122143500_usuarios_reservas_albaranes.sql (tipos de usuario
 -- «Reservas» y «Albaranes»). Aplicar a mano SOLO si hay que deshacerlo.
 -- Idempotente: se puede aplicar dos veces, y la migración se puede volver a
 -- aplicar después.

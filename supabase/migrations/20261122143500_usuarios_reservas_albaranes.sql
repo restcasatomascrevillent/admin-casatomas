@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- 20261122143000_usuarios_reservas_albaranes — Dos tipos de usuario nuevos:
+-- 20261122143500_usuarios_reservas_albaranes — Dos tipos de usuario nuevos:
 -- «Reservas» (ver y crear reservas) y «Albaranes» (solo subir fotos)
 -- (10/11/2026)
 -- ===========================================================================
@@ -73,10 +73,10 @@ set client_encoding = 'UTF8';
 -- producción (haqmmdfdzzatdnrrcgez) solo tras aceptar el PR de la release y con
 -- el «sí» del dueño, A LA VEZ que se despliega procesar-factura y se publica el
 -- panel:
---   supabase db query --linked -f supabase/migrations/20261122143000_usuarios_reservas_albaranes.sql
+--   supabase db query --linked -f supabase/migrations/20261122143500_usuarios_reservas_albaranes.sql
 -- Tiene que terminar en «usuarios_reservas_albaranes: aplicada | …».
 -- Requiere 20261106510000_permisos_facturas_subida (lo comprueba).
--- Deshacer: supabase/rollbacks/20261122143000_usuarios_reservas_albaranes_ROLLBACK.sql
+-- Deshacer: supabase/rollbacks/20261122143500_usuarios_reservas_albaranes_ROLLBACK.sql
 -- Pruebas (PGlite): npm run test:usuarios-reservas-albaranes:db
 -- ===========================================================================
 
@@ -134,7 +134,7 @@ stable
 security definer
 set search_path = public
 as $$
-  -- 20261122143000_usuarios_reservas_albaranes. Super admin: has_section_permission ya da true.
+  -- 20261122143500_usuarios_reservas_albaranes. Super admin: has_section_permission ya da true.
   select _user_id is not null and (
        coalesce(public.has_section_permission(_user_id, 'reservas', 'edit'), false)
     or (coalesce(public.has_section_permission(_user_id, 'reservas', 'view'), false)
@@ -142,7 +142,7 @@ as $$
              or coalesce(public.has_section_permission(_user_id, 'reservas_crear', 'edit'), false))))
 $$;
 comment on function public.reservas_puede_crear_usuario(uuid) is
-  'Puede dar de alta reservas: «Editar» en Reservas, o «Ver» en Reservas + «Reservas · Crear» (reservas_crear). 20261122143000.';
+  'Puede dar de alta reservas: «Editar» en Reservas, o «Ver» en Reservas + «Reservas · Crear» (reservas_crear). 20261122143500.';
 
 create or replace function public.reservas_puede_crear()
 returns boolean
@@ -154,7 +154,7 @@ as $$
   select public.reservas_puede_crear_usuario((select auth.uid()))
 $$;
 comment on function public.reservas_puede_crear() is
-  'RLS: el usuario actual puede dar de alta reservas (reservas_puede_crear_usuario). 20261122143000.';
+  'RLS: el usuario actual puede dar de alta reservas (reservas_puede_crear_usuario). 20261122143500.';
 
 revoke all on function public.reservas_puede_crear_usuario(uuid) from public, anon;
 revoke all on function public.reservas_puede_crear() from public, anon;
@@ -170,7 +170,7 @@ returns trigger
 language plpgsql
 set search_path = public
 as $$
--- 20261122143000_usuarios_reservas_albaranes
+-- 20261122143500_usuarios_reservas_albaranes
 begin
   if pg_trigger_depth() > 1 or current_user not in ('authenticated', 'anon') then
     return new;
@@ -218,14 +218,14 @@ stable
 security definer
 set search_path = public
 as $$
-  -- 20261122143000_usuarios_reservas_albaranes. Lo de antes («Editar» o «Facturas · Subida») o «Solo fotos».
+  -- 20261122143500_usuarios_reservas_albaranes. Lo de antes («Editar» o «Facturas · Subida») o «Solo fotos».
   select _user_id is not null and (
        coalesce(public.facturas_puede_subir_usuario(_user_id), false)
     or coalesce(public.has_section_permission(_user_id, 'facturas_albaranes', 'view'), false)
     or coalesce(public.has_section_permission(_user_id, 'facturas_albaranes', 'edit'), false))
 $$;
 comment on function public.facturas_puede_subir_fotos_usuario(uuid) is
-  'Puede subir fotos de albaranes y facturas a la lectura: facturas_puede_subir_usuario o «Facturas · Solo fotos (albaranes)» (facturas_albaranes). 20261122143000.';
+  'Puede subir fotos de albaranes y facturas a la lectura: facturas_puede_subir_usuario o «Facturas · Solo fotos (albaranes)» (facturas_albaranes). 20261122143500.';
 
 create or replace function public.facturas_puede_subir_fotos()
 returns boolean
@@ -237,7 +237,7 @@ as $$
   select public.facturas_puede_subir_fotos_usuario((select auth.uid()))
 $$;
 comment on function public.facturas_puede_subir_fotos() is
-  'RLS: el usuario actual puede subir fotos a facturas-originales/pendientes/{uid}/ (facturas_puede_subir_fotos_usuario). 20261122143000.';
+  'RLS: el usuario actual puede subir fotos a facturas-originales/pendientes/{uid}/ (facturas_puede_subir_fotos_usuario). 20261122143500.';
 
 revoke all on function public.facturas_puede_subir_fotos_usuario(uuid) from public, anon;
 revoke all on function public.facturas_puede_subir_fotos() from public, anon;
@@ -278,7 +278,7 @@ stable
 security definer
 set search_path = public
 as $$
--- 20261122143000_usuarios_reservas_albaranes. SOLO estado: nada de lo leído.
+-- 20261122143500_usuarios_reservas_albaranes. SOLO estado: nada de lo leído.
 declare
   v_uid uuid := (select auth.uid());
   v_sesion_ok boolean := true;
@@ -303,7 +303,7 @@ begin
 end;
 $$;
 comment on function public.albaranes_mis_subidas(integer) is
-  'Panel › Subir albaranes: estado de lo que ha subido el usuario (14 días), sin resultado ni importes. 20261122143000.';
+  'Panel › Subir albaranes: estado de lo que ha subido el usuario (14 días), sin resultado ni importes. 20261122143500.';
 revoke all on function public.albaranes_mis_subidas(integer) from public, anon;
 grant execute on function public.albaranes_mis_subidas(integer) to authenticated, service_role;
 

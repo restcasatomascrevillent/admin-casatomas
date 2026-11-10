@@ -176,7 +176,7 @@ export default function Reservas() {
   // pestañas, sale la etiqueta común «Solo lectura» en lugar de «Nueva Reserva».
   const { canAccess: puedeEditarReservas, loading: cargandoEdicion } = useCanAccessSection("reservas", "edit");
   // Tipo de usuario «Reservas» (10/11/2026): con «Reservas · Crear» sale «Nueva Reserva» aunque no
-  // tenga «Editar»; lo demás sigue en solo lectura (la BD solo le deja el alta, 20261122143000).
+  // tenga «Editar»; lo demás sigue en solo lectura (la BD solo le deja el alta, 20261122143500).
   const { puedeCrear: puedeCrearReservas, soloCrear } = usePuedeCrearReservas();
   const soloLectura = !cargandoEdicion && !puedeEditarReservas;
   const listaRef = useRef<HTMLElement | null>(null);

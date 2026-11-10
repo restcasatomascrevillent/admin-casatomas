@@ -8,7 +8,7 @@ import { useCanAccessSection } from "@/hooks/useUserRole";
  *     alta sin «Ocupa la sala entera» y el resto de la sección en solo lectura.
  *   · El super admin, siempre (useCanAccessSection ya da true).
  *
- * Lo mismo que reservas_puede_crear() en la BD (migración 20261122143000), que es la que manda.
+ * Lo mismo que reservas_puede_crear() en la BD (migración 20261122143500), que es la que manda.
  */
 export function usePuedeCrearReservas(): { puedeCrear: boolean; soloCrear: boolean; loading: boolean } {
   const ver = useCanAccessSection("reservas");

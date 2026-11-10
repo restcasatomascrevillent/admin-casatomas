@@ -5,7 +5,7 @@
  * Usa el mismo camino que la pestaña Cargar (fotos a facturas-originales/pendientes/{uid}/ y
  * procesar-factura en modo «iniciar», que no devuelve datos), pero no lee ocr_trabajos (ahí va el
  * resultado con sus importes): el estado sale de albaranes_mis_subidas(), que solo da nombre, estado,
- * páginas y fechas. La BD lo hace cumplir (migración 20261122143000_usuarios_reservas_albaranes).
+ * páginas y fechas. La BD lo hace cumplir (migración 20261122143500_usuarios_reservas_albaranes).
  */
 import { supabase } from "@/integrations/supabase/client";
 import {

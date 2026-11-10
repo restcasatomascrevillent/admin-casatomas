@@ -28,7 +28,7 @@ En la lista de usuarios salen con la etiqueta «Tipo: Reservas» o «Tipo: Albar
 
 ## Quién lo hace cumplir
 
-La base de datos, no solo el menú (migración `supabase/migrations/20261122143000_usuarios_reservas_albaranes.sql`, con su vuelta atrás en `supabase/rollbacks/`):
+La base de datos, no solo el menú (migración `supabase/migrations/20261122143500_usuarios_reservas_albaranes.sql`, con su vuelta atrás en `supabase/rollbacks/`):
 
 - `reservas`: política nueva `reservas_insert_crear` con `reservas_puede_crear()` («Editar», o «Ver» + «Reservas · Crear») y un trigger que, sin «Editar», solo deja dar de alta como el formulario (estado pendiente/verificada; canal manual, teléfono o presencial; sin solicitud, llegada, salida, «importante», mesa fijada ni email verificado). Modificar y borrar siguen exigiendo «Editar».
 - Storage `facturas-originales`: subir a `pendientes/{su uid}/` con `facturas_puede_subir_fotos()`; el de albaranes solo relee sus propias fotos pendientes.
