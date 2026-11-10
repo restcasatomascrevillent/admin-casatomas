@@ -29,14 +29,23 @@ const TONO = {
  * pedía «Guardar ajustes» y, con dos para lo mismo, guardar el formulario
  * podía deshacer lo cambiado aquí.
  */
-export function InterruptorTiendaWeb({ config, puedeEditar }: { config: ConfiguracionTienda; puedeEditar: boolean }) {
+export function InterruptorTiendaWeb({
+  config,
+  puedeEditar,
+  className,
+}: {
+  config: ConfiguracionTienda;
+  puedeEditar: boolean;
+  /** Para colocarlo (en el móvil, Tienda lo estira a todo el ancho de su fila). */
+  className?: string;
+}) {
   const id = useId();
   const cambiar = useCambiarTiendaVisible();
   const tono = config.activa ? TONO.visible : TONO.oculta;
 
   if (!puedeEditar) {
     return (
-      <span className={cn("whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium", tono)}>
+      <span className={cn("inline-flex h-7 items-center justify-center whitespace-nowrap rounded-full border px-3 text-xs font-medium", tono, className)}>
         {config.activa ? `Visible · ${porcentaje(config.descuento_pct)}` : "Oculta en la web"}
       </span>
     );
@@ -49,14 +58,15 @@ export function InterruptorTiendaWeb({ config, puedeEditar }: { config: Configur
     });
 
   return (
-    <div className={cn("flex h-9 items-center gap-2 rounded-full border pl-3 pr-1.5 pointer-coarse:h-11", tono)}>
+    <div className={cn("flex h-9 items-center gap-2 rounded-full border pl-3 pr-1.5 pointer-coarse:h-11", tono, className)}>
       <Label htmlFor={id} className="cursor-pointer whitespace-nowrap text-xs font-medium">
         Visible en la web
       </Label>
-      {/* El descuento, como en la pastilla de antes; en el móvil no cabe junto a las pestañas. */}
+      {/* El descuento, como en la pastilla de antes (en el móvil cabe: el interruptor va en su propia fila). */}
       {config.activa && (
-        <span className="hidden whitespace-nowrap text-xs tabular-nums sm:inline">· {porcentaje(config.descuento_pct)}</span>
+        <span className="whitespace-nowrap text-xs tabular-nums">· {porcentaje(config.descuento_pct)}</span>
       )}
+      <span className="flex-1 sm:hidden" aria-hidden="true" />
       <Switch id={id} checked={config.activa} disabled={cambiar.isPending} onCheckedChange={alternar} />
     </div>
   );
