@@ -917,6 +917,21 @@ describe("Análisis en una pantalla: vistas con las gráficas de decisión", () 
     expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Por revisar/ })).toHaveAccessibleName(/1 con aviso/);
   });
 
+  it("petición del dueño: una subida con la compra anterior más barata (doc_otro) da «Comparar facturas» y abre las dos, la anterior primero", async () => {
+    const [s1, ...resto] = RESPUESTA.cambios.sube;
+    const anterior = { id: 70, fecha: "2026-09-12", proveedor: "Cetárea Angelmar", numero: "260401", tipo: "factura", local: "casa_tomas", total: 700, drive_url: "https://drive.google.com/file/d/ant/view", archivo_path: null };
+    doble.rpcs.facturas_decision = () => ({ ...RESPUESTA, cambios: { ...RESPUESTA.cambios, sube: [{ ...s1, doc_otro: anterior }, ...resto] } });
+    montar();
+    const lista5 = await screen.findByRole("list", { name: "Decisiones, de más a menos dinero" });
+    const fila = within(lista5).getAllByRole("listitem")[1];
+    expect(fila).toHaveTextContent(/PERCEBE GALLEGO G ha subido/);
+    expect(within(fila).queryByRole("button", { name: "Ver factura" })).not.toBeInTheDocument();
+    fireEvent.click(within(fila).getByRole("button", { name: "Comparar facturas" }));
+    const visor = await screen.findByTestId("visor-documento");
+    expect(within(visor).getByText("1 de 2")).toBeInTheDocument();
+    expect(within(visor).getByTitle(/^Factura 260401/)).toBeInTheDocument();
+  });
+
   it("bug del dueño: con «Año» sin meses anteriores, «¿En qué se va el dinero?» compara el último mes completo y lo explica", async () => {
     doble.rpcs.facturas_decision = () => ({
       ...RESPUESTA,
