@@ -48,6 +48,7 @@ const SuperAdminBotWeb = lazy(() => import("./pages/SuperAdminBotWeb"));
 const SuperAdminAuditoria = lazy(() => import("./pages/SuperAdminAuditoria"));
 const SuperAdminServicios = lazy(() => import("./pages/SuperAdminServicios"));
 const SuperAdminLogs = lazy(() => import("./pages/SuperAdminLogs"));
+const SuperAdminInformes = lazy(() => import("./pages/SuperAdminInformes"));
 
 /**
  * Valores por defecto pensados para la red mala del local (07/11/2026, «Hoy» desde el móvil):
@@ -239,6 +240,7 @@ const App = () => (
                   <Route path="/super-admin/usuarios" element={paginaSuperAdmin(<SuperAdminUsuarios />)} />
                   <Route path="/super-admin/auditoria" element={paginaSuperAdmin(<SuperAdminAuditoria />)} />
                   <Route path="/super-admin/servicios" element={paginaSuperAdmin(<SuperAdminServicios />)} />
+                  <Route path="/super-admin/informes" element={paginaSuperAdmin(<SuperAdminInformes />)} />
                   <Route path="*" element={bajoDemanda(<NotFound />)} />
                 </Routes>
               </RouteErrorBoundary>
