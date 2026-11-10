@@ -165,17 +165,23 @@ function ContenidoSinReserva({ salaPreferida, onCerrar }: { salaPreferida: strin
           </Button>
         ))}
       </div>
+      {/* Cualquier número escrito a mano (10/11/2026, petición del dueño). */}
+      <label className="block text-sm text-muted-foreground" htmlFor="sentar-otras-personas">
+        O escribe el número de personas
+      </label>
       <Input
-        type="number"
+        id="sentar-otras-personas"
+        type="text"
         inputMode="numeric"
-        min={1}
-        placeholder="Más de 8…"
+        pattern="[0-9]*"
+        autoComplete="off"
         value={otras}
         className="h-11 text-base"
         aria-label="Número de personas"
         onChange={(e) => {
-          setOtras(e.target.value);
-          const n = parseInt(e.target.value, 10);
+          const d = e.target.value.replace(/\D/g, "").slice(0, 3);
+          setOtras(d);
+          const n = parseInt(d, 10);
           setPersonas(Number.isFinite(n) && n > 0 ? n : null);
           setElegidaId(null);
         }}

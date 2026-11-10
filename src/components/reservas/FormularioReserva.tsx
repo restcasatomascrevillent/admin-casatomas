@@ -120,7 +120,7 @@ const formSchema = z.object({
   fecha: z.date({ required_error: "Selecciona una fecha" }),
   hora: z.string().min(1, "Selecciona una hora"),
   numero_comensales: z
-    .number({ invalid_type_error: "Indica el número de comensales" })
+    .number({ required_error: "Indica el número de comensales", invalid_type_error: "Indica el número de comensales" })
     .int("El número de comensales debe ser entero")
     .min(1, "Mínimo 1 comensal"),
   notas_cliente: z.string().optional(),
@@ -892,7 +892,7 @@ export const FormularioReserva = ({
       return;
     }
     try {
-      // El esquema exige el teléfono; el email es opcional (los flags
+      // Teléfono y email opcionales en el panel (los flags
       // telefono_obligatorio/email_obligatorio de configuracion_reservas solo
       // aplican a los canales automáticos).
 
@@ -1104,7 +1104,7 @@ export const FormularioReserva = ({
               <FormItem>
                 <FormLabel>Nombre completo</FormLabel>
                 <FormControl>
-                  <Input placeholder="Juan Pérez" autoComplete="name" autoCapitalize="words" {...field} />
+                  <Input autoComplete="name" autoCapitalize="words" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -1118,7 +1118,7 @@ export const FormularioReserva = ({
               <FormItem>
                 <FormLabel>Teléfono (opcional)</FormLabel>
                 <FormControl>
-                  <Input type="tel" inputMode="tel" autoComplete="tel" placeholder="612345678" {...field} />
+                  <Input type="tel" inputMode="tel" autoComplete="tel" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -1133,7 +1133,7 @@ export const FormularioReserva = ({
             <FormItem>
               <FormLabel>Email (opcional)</FormLabel>
               <FormControl>
-                <Input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="juan@email.com" {...field} />
+                <Input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -1279,20 +1279,25 @@ export const FormularioReserva = ({
                   <Minus className="h-4 w-4" aria-hidden />
                 </Button>
                 <FormControl>
+                  {/* Se escribe a mano (10/11/2026, petición del dueño: «que se pueda poner manual un
+                      número de personas, por ejemplo 3 o 5»): texto con teclado numérico en vez de
+                      `type=number`, que en la tablet no dejaba borrar y teclear otro. Al tocarlo se
+                      selecciona para sobrescribir. Mínimo y máximo se validan al guardar (onSubmit). */}
                   <Input
-                    type="number"
+                    type="text"
                     inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="off"
                     className="pointer-coarse:text-center"
-                    // Al editar, el navegador no debe bloquear el envío por el mínimo
-                    // configurado: una reserva antigua con menos comensales tiene que
-                    // poder cambiar de nombre. El mínimo se exige en `guardarEdicion`,
-                    // y solo si se cambia este número.
-                    min={editando ? 1 : configReservas?.min_comensales_por_reserva || 1}
-                    // Solo la web pública se limita al máximo automático; el
-                    // personal puede dar de alta grupos grandes (ver onSubmit).
-                    max={isPublic ? configReservas?.max_comensales_por_reserva || 100 : undefined}
-                    {...field}
-                    onChange={(e) => field.onChange(parseInt(e.target.value))}
+                    name={field.name}
+                    ref={field.ref}
+                    onBlur={field.onBlur}
+                    value={Number.isFinite(field.value) ? String(field.value) : ""}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onChange={(e) => {
+                      const d = e.target.value.replace(/\D/g, "").slice(0, 3);
+                      field.onChange(d === "" ? undefined : Number(d));
+                    }}
                   />
                 </FormControl>
                 <Button
@@ -1464,10 +1469,7 @@ export const FormularioReserva = ({
             <FormItem>
               <FormLabel>Notas adicionales (opcional)</FormLabel>
               <FormControl>
-                <Textarea
-                  placeholder="Alergias, preferencias, ocasión especial..."
-                  {...field}
-                />
+                <Textarea {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -262,7 +262,6 @@ describe("FormularioReserva · qué se refresca al crear", () => {
 });
 
 describe("FormularioReserva · email opcional", () => {
-  const CAMPO_EMAIL = "juan@email.com"; // placeholder del campo
 
   it("el campo se rotula «Email (opcional)»", () => {
     espiarInsert();
@@ -298,7 +297,7 @@ describe("FormularioReserva · email opcional", () => {
     const insert = espiarInsert();
     montar({ email: undefined });
 
-    const campo = screen.getByPlaceholderText(CAMPO_EMAIL);
+    const campo = screen.getByLabelText(/^Email/);
     fireEvent.change(campo, { target: { value: "ana@ejemplo.com" } });
     fireEvent.change(campo, { target: { value: "" } });
     fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
@@ -355,7 +354,7 @@ describe("FormularioReserva · email opcional", () => {
     expect(screen.getByText(/Sin email: no se puede enviar el correo/i)).toBeInTheDocument();
     expect(screen.queryByText(/Se enviará al cliente un correo/)).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText(CAMPO_EMAIL), { target: { value: "ana@ejemplo.com" } });
+    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "ana@ejemplo.com" } });
 
     expect(await screen.findByText(/Se enviará al cliente un correo/)).toBeInTheDocument();
     expect(screen.queryByText(/Sin email: no se puede enviar el correo/i)).not.toBeInTheDocument();
