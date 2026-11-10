@@ -115,6 +115,11 @@ serve(conAuditoriaDePeticion("sync-google-reviews", createClientBase, async (req
         continue;
       }
       const rating = Math.round(rawRating);
+      // Enlace directo a la reseña en Google Maps (para «Abrir en Google» del
+      // contestador). Columna de 20261122143000_resenas_contestador.sql.
+      const mapsUri: string | null = typeof review.googleMapsUri === "string" && review.googleMapsUri.startsWith("https://")
+        ? review.googleMapsUri
+        : null;
 
       const insertPayload = {
         nombre_cliente: authorName,
@@ -126,6 +131,7 @@ serve(conAuditoriaDePeticion("sync-google-reviews", createClientBase, async (req
         fecha,
         google_review_id: googleReviewId,
         google_rating: rawRating,
+        google_maps_uri: mapsUri,
         estado: "publicada",
         updated_at: new Date().toISOString(),
       };
@@ -135,7 +141,7 @@ serve(conAuditoriaDePeticion("sync-google-reviews", createClientBase, async (req
       // reventaría la sincronización entera. Con limit(1) es tolerante.
       const { data: existingRows, error: selectError } = await supabaseClient
         .from("resenas")
-        .select("id, comentario, valoracion")
+        .select("id, comentario, valoracion, google_maps_uri")
         .eq("google_review_id", googleReviewId)
         .limit(1);
 
@@ -153,14 +159,19 @@ serve(conAuditoriaDePeticion("sync-google-reviews", createClientBase, async (req
           continue;
         }
         synced++;
-      } else if (existing.comentario !== insertPayload.comentario || existing.valoracion !== rating) {
-        // Si el texto o la puntuación cambiaron, actualizamos SOLO esa fila.
+      } else if (
+        existing.comentario !== insertPayload.comentario ||
+        existing.valoracion !== rating ||
+        (mapsUri && existing.google_maps_uri !== mapsUri)
+      ) {
+        // Si el texto, la puntuación o el enlace cambiaron, actualizamos SOLO esa fila.
         const { error: updateError } = await supabaseClient
           .from("resenas")
           .update({
             comentario: insertPayload.comentario,
             valoracion: rating,
             google_rating: rawRating,
+            ...(mapsUri ? { google_maps_uri: mapsUri } : {}),
             updated_at: new Date().toISOString(),
           })
           .eq("id", existing.id);
