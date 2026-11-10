@@ -1,5 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Download, LayoutGrid, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+  AlignVerticalJustifyStart,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  LayoutGrid,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,7 +36,17 @@ import {
   type FilaVino,
   type TipoCartaImpresa,
 } from "@/lib/carta-pdf/datos";
-import { maquetarCarta, seccionesQueNoCaben, TAMANOS_CARTA, type MaquetaCarta, type PaginaCarta, type TamanoCarta } from "@/lib/carta-pdf/maquetacion";
+import {
+  ALINEACION_POR_DEFECTO,
+  maquetarCarta,
+  seccionesQueNoCaben,
+  TAMANOS_CARTA,
+  type AlineacionHorizontal,
+  type AlineacionVertical,
+  type MaquetaCarta,
+  type PaginaCarta,
+  type TamanoCarta,
+} from "@/lib/carta-pdf/maquetacion";
 import { cargarMotorCarta, descargarPdf, type MotorCarta } from "@/lib/carta-pdf/navegador";
 import { crearPdfCarta } from "@/lib/carta-pdf/pdf";
 import { IDIOMAS_CARTA, NOMBRE_IDIOMA, TEXTOS, type IdiomaCarta } from "@/lib/carta-pdf/textos";
@@ -38,10 +62,11 @@ import { VistaPagina } from "./VistaPagina";
  * todas las páginas y «Descargar PDF». La maquetación y el PDF salen de
  * src/lib/carta-pdf; las fuentes y pdf-lib se cargan al abrir el diálogo.
  *
- * Una sección por cara (08/11/2026): si alguna no cabe en una cara del tamaño
- * elegido, se avisa (sección y tamaño) y no se descarga hasta revisarla
- * (RevisionSecciones): repartirla a propósito, quitar elementos o cambiar de
- * tamaño.
+ * Nunca dos secciones en el mismo folio, un plato por línea (08/11 y
+ * 10/11/2026): cada sección empieza en página nueva y, si no cabe en una,
+ * sigue en las siguientes. Se elige dónde va el texto (izquierda, centro o
+ * derecha; arriba, centro o abajo). RevisionSecciones dice qué secciones
+ * ocupan varias páginas y deja quitar platos o vinos solo de la carta impresa.
  */
 
 interface Props {
@@ -106,8 +131,8 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
   const [motor, setMotor] = useState<MotorCarta | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
-  /** Secciones que se ha pedido repartir en varias caras, por tamaño: «A5:tinto». */
-  const [repartidas, setRepartidas] = useState<Set<string>>(() => new Set());
+  const [horizontal, setHorizontal] = useState<AlineacionHorizontal>(ALINEACION_POR_DEFECTO.horizontal);
+  const [vertical, setVertical] = useState<AlineacionVertical>(ALINEACION_POR_DEFECTO.vertical);
   /** Platos o vinos (id) quitados a mano de la carta impresa. */
   const [excluidosElementos, setExcluidosElementos] = useState<Set<string>>(() => new Set());
 
@@ -150,19 +175,11 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
 
   const maqueta: MaquetaCarta | null = useMemo(() => {
     if (!motor || totalElementos === 0) return null;
-    const prefijo = `${tamano}:`;
-    const repartir = [...repartidas].filter((k) => k.startsWith(prefijo)).map((k) => k.slice(prefijo.length));
-    return maquetarCarta(motor.medidor, contenido, tamano, { repartir });
-  }, [motor, contenido, totalElementos, tamano, repartidas]);
+    return maquetarCarta(motor.medidor, contenido, tamano, { alineacion: { horizontal, vertical } });
+  }, [motor, contenido, totalElementos, tamano, horizontal, vertical]);
   const paginas: PaginaCarta[] = maqueta?.paginas ?? SIN_PAGINAS;
+  // Solo si un plato no cabe ni en una página entera (un texto desmesurado): entonces no se descarga.
   const problemas = useMemo(() => (maqueta ? seccionesQueNoCaben(maqueta) : []), [maqueta]);
-  const otroTamano: TamanoCarta = tamano === "A5" ? "A4" : "A5";
-  // Solo si algo no cabe: ¿cabría en una cara del otro tamaño?
-  const cabenEnOtro = useMemo(() => {
-    if (!motor || !problemas.length) return new Set<string>();
-    const otra = maquetarCarta(motor.medidor, contenido, otroTamano);
-    return new Set(otra.secciones.filter((s) => s.cabe).map((s) => s.clave));
-  }, [motor, contenido, otroTamano, problemas.length]);
   const nombrePorSeccion = useMemo(
     () => new Map((maqueta?.secciones ?? []).map((s) => [s.clave, nombreSeccion(tipo, s.clave)])),
     [maqueta, tipo],
@@ -187,14 +204,6 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
 
   const textos = TEXTOS[idioma];
   const tituloCarta = `${NOMBRE_CARTA[cartaActiva]} · ${tipo === "vinos" ? textos.tituloVinos : textos.tituloPlatos}`;
-
-  const repartir = (clave: string, si: boolean) =>
-    setRepartidas((previas) => {
-      const nuevas = new Set(previas);
-      if (si) nuevas.add(`${tamano}:${clave}`);
-      else nuevas.delete(`${tamano}:${clave}`);
-      return nuevas;
-    });
 
   const cambiarExcluidos = (ids: string[], excluir: boolean) =>
     setExcluidosElementos((previos) => {
@@ -230,7 +239,7 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
           <DialogTitle>Carta para imprimir (PDF)</DialogTitle>
           <DialogDescription>
             {tipo === "vinos" ? "Carta de vinos" : "Carta de platos"} en A5 o A4 vertical con la letra y los colores de la web,
-            con cada sección en su propia cara. Solo sale lo que está publicado en la carta elegida.
+            cada sección en sus propias páginas y un plato por línea. Solo sale lo que está publicado en la carta elegida.
           </DialogDescription>
         </DialogHeader>
 
@@ -308,6 +317,62 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
               {idioma !== "es" && (
                 <p className="text-xs text-muted-foreground">Lo que no esté traducido sale en español.</p>
               )}
+            </fieldset>
+
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Alineación del texto</legend>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={horizontal}
+                onValueChange={(valor) => valor && setHorizontal(valor as AlineacionHorizontal)}
+                className="grid grid-cols-3 gap-1"
+                aria-label="Alineación horizontal"
+              >
+                {(
+                  [
+                    ["izquierda", "Izquierda", "Texto a la izquierda", AlignLeft],
+                    ["centro", "Centro", "Texto centrado", AlignCenter],
+                    ["derecha", "Derecha", "Texto a la derecha", AlignRight],
+                  ] as const
+                ).map(([valor, etiqueta, nombre, Icono]) => (
+                  <ToggleGroupItem
+                    key={valor}
+                    value={valor}
+                    aria-label={nombre}
+                    className="h-auto flex-col gap-0.5 px-1 py-1.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    <Icono className="h-4 w-4" aria-hidden />
+                    {etiqueta}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={vertical}
+                onValueChange={(valor) => valor && setVertical(valor as AlineacionVertical)}
+                className="grid grid-cols-3 gap-1"
+                aria-label="Alineación vertical"
+              >
+                {(
+                  [
+                    ["arriba", "Arriba", "Arriba de la página", AlignVerticalJustifyStart],
+                    ["centro", "Centro", "En el centro de la página", AlignVerticalJustifyCenter],
+                    ["abajo", "Abajo", "Abajo de la página", AlignVerticalJustifyEnd],
+                  ] as const
+                ).map(([valor, etiqueta, nombre, Icono]) => (
+                  <ToggleGroupItem
+                    key={valor}
+                    value={valor}
+                    aria-label={nombre}
+                    className="h-auto flex-col gap-0.5 px-1 py-1.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    <Icono className="h-4 w-4" aria-hidden />
+                    {etiqueta}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
             </fieldset>
 
             <fieldset className="space-y-1">
@@ -414,12 +479,8 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
                     secciones={maqueta.secciones}
                     completo={completo}
                     excluidos={excluidosElementos}
-                    cabenEnOtro={cabenEnOtro}
-                    otroTamano={otroTamano}
                     alVerPagina={setAmpliada}
-                    alRepartir={repartir}
                     alCambiarExcluidos={cambiarExcluidos}
-                    alCambiarTamano={setTamano}
                   />
                 )}
                 {ampliada !== null ? (
@@ -462,7 +523,7 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
             ) : (
               <>
                 <p className="mb-3 text-sm text-muted-foreground">
-                  Una sección por cara. Toca una página para verla en grande.
+                  Cada sección empieza en página nueva. Toca una página para verla en grande.
                 </p>
                 <ol className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                   {paginas.map((pagina, i) => (
@@ -507,8 +568,8 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
             {problemas.length > 0 && (
               <p className="font-medium text-destructive">
                 {problemas.length === 1
-                  ? `${nombrePorSeccion.get(problemas[0].clave)} no cabe en una cara ${tamano}`
-                  : `${problemas.length} secciones no caben en una cara ${tamano}`}
+                  ? `${nombrePorSeccion.get(problemas[0].clave)} tiene un ${tipo === "vinos" ? "vino" : "plato"} que no cabe en una página ${tamano}`
+                  : `${problemas.length} secciones tienen un elemento que no cabe en una página ${tamano}`}
                 : revísalo antes de descargar.
               </p>
             )}

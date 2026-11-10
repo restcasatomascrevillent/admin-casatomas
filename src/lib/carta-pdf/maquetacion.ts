@@ -8,40 +8,35 @@
  * pintan la vista previa (SVG) y el PDF, así que lo que se ve es lo que se
  * imprime.
  *
- * Una sección por cara (08/11/2026, dueño: «cada sección ocupa exactamente una
- * página, equivalente a una cara del papel»). Las secciones son las de datos.ts:
- * las categorías de platos y los tipos de vino, en su orden. Cada una empieza
- * en página nueva y lleva en ella todos sus elementos; nunca se mezclan dos ni
- * una sigue sola en la página siguiente. Portada y contraportada se quedan.
+ * Nunca dos secciones en el mismo folio (dueño, 08/11 y 10/11/2026). Las
+ * secciones son las de datos.ts: las categorías de platos y los tipos de vino,
+ * en su orden. Cada una empieza en página nueva; si no cabe en una, sigue en
+ * las siguientes (que repiten el título con «(continuación)»), y la siguiente
+ * sección vuelve a empezar en página nueva. Portada y contraportada se quedan.
  *
- * Para que quepa, cada formato tiene su escalera de composiciones (`variantes`),
- * de la más holgada (la de diseño) a la más compacta: primero menos aire entre
- * elementos, luego márgenes algo más justos y letra un poco menor, y al final
- * más columnas. Se usa la primera con la que la sección entera cabe en su cara.
- * La más compacta respeta un cuerpo mínimo legible (`CUERPO_MINIMO`): nombres y
- * precios de 9 pt o más y descripciones de 8 pt o más. El A4 no es el A5
- * ampliado: márgenes, letra y columnas propios (platos a una columna centrada y
- * vinos a dos, que pasan a dos o tres si hace falta).
+ * Un plato por línea (10/11/2026): siempre una columna, un plato o vino debajo
+ * de otro. Para no gastar un folio por dos platos, cada formato tiene su
+ * escalera de composiciones (`variantes`), de la de diseño a la más compacta:
+ * menos aire entre elementos, márgenes algo más justos y letra un poco menor.
+ * Se usa la primera con la que la sección cabe en una página; si no cabe con
+ * ninguna, no se aprieta: va con la de diseño en las páginas que haga falta,
+ * equilibradas (no una llena y la última casi vacía). La más compacta respeta un cuerpo mínimo
+ * legible (`CUERPO_MINIMO`): nombres y precios de 9 pt o más y descripciones de
+ * 8 pt o más. El A4 no es el A5 ampliado: márgenes y letra propios.
  *
- * Si una sección no cabe ni con la más compacta, no se corta, no se oculta
- * nada ni se reparte sola: su página sale marcada (`desborda`), el informe
- * (`InformeSeccion`) lo dice y el PDF no se genera hasta que se reorganiza
- * (quitar elementos o denominaciones, cambiar de tamaño) o se pide de forma
- * expresa repartirla en varias caras (`repartir`). Repartida, cada cara repite
- * el título con «(continuación)».
+ * Alineación a elegir (10/11/2026): el texto de la sección (título, platos y
+ * descripciones) a la izquierda, al centro o a la derecha, y el bloque arriba,
+ * en el centro o abajo de la página (`Alineacion`). Una sección corta no se
+ * estira: se coloca, con su medida de diseño, donde diga la alineación.
  *
- * Una sección corta no se estira: se compone con su medida de diseño y el
- * bloque (título y elementos) se centra ópticamente en la página.
- *
- * Reglas dentro de una cara (en cada columna):
+ * Reglas al pasar de página:
  *  · Un plato o un vino nunca se parte.
  *  · Una denominación nunca se queda sola al pie: va con, al menos, sus dos
  *    primeros vinos (o el único que tenga).
- *  · Si al final de una denominación solo quedaría un vino para la columna
+ *  · Si al final de una denominación solo quedaría un vino para la página
  *    siguiente, se lleva también el anterior (no queda uno solo y huérfano).
- *  · Si una denominación sigue en la columna siguiente, allí se repite su
+ *  · Si una denominación sigue en la página siguiente, allí se repite su
  *    nombre con «(continuación)».
- *  · Con varias columnas, se equilibran: no queda una llena y otra casi vacía.
  *
  * Identidad de la web pública (web-casatomas/src/index.css): Libre Baskerville
  * en todo, pizarra para el texto, oro para precios, filetes y titulares, y
@@ -58,9 +53,8 @@ export const mm = (valor: number) => valor * PUNTOS_POR_MM;
 export const TAMANOS_CARTA = ["A5", "A4"] as const;
 export type TamanoCarta = (typeof TAMANOS_CARTA)[number];
 
-/** Una forma de componer una sección en su cara. Medidas en puntos. */
+/** Una forma de componer una sección (siempre a una columna). Medidas en puntos. */
 export interface Variante {
-  columnas: number;
   /** Cuerpo de letra e interlineado respecto al A5 de diseño (1 = nombres de plato de 10,5 pt). */
   escala: number;
   /** Aire entre elementos y bajo los títulos: 1 = el de diseño; menos, más juntos. */
@@ -68,7 +62,6 @@ export interface Variante {
   lateral: number;
   superior: number;
   inferior: number;
-  separacion: number;
 }
 
 export interface Formato {
@@ -86,19 +79,17 @@ export interface Formato {
   margenInferior: number;
   /** Cuerpo de diseño respecto al A5 (cabecera, pie y contraportada). */
   escala: Record<TipoCartaImpresa, number>;
-  /** De la más holgada a la más compacta: cada sección usa la primera con la que cabe en su cara. */
+  /** De la más holgada a la más compacta: cada sección usa la primera con la que cabe en una página. */
   variantes: Record<TipoCartaImpresa, Variante[]>;
 }
 
 /** Variante con las medidas en milímetros. */
-const v = (columnas: number, escala: number, holgura: number, lateral: number, superior: number, inferior = superior, separacion = 0): Variante => ({
-  columnas,
+const v = (escala: number, holgura: number, lateral: number, superior: number, inferior = superior): Variante => ({
   escala,
   holgura,
   lateral: mm(lateral),
   superior: mm(superior),
   inferior: mm(inferior),
-  separacion: mm(separacion),
 });
 
 export const FORMATOS: Record<TamanoCarta, Formato> = {
@@ -111,24 +102,8 @@ export const FORMATOS: Record<TamanoCarta, Formato> = {
     margenInferior: mm(18),
     escala: { platos: 1, vinos: 1 },
     variantes: {
-      // Una columna a todo el ancho; dos (de 59 mm) solo para las categorías más largas.
-      platos: [
-        v(1, 1, 1, 14, 18),
-        v(1, 1, 0.8, 14, 18),
-        v(1, 1, 0.65, 13, 15),
-        v(1, 0.95, 0.6, 13, 15),
-        v(1, 0.9, 0.55, 12, 15),
-        v(2, 0.95, 0.7, 12, 15, 15, 7),
-        v(2, 0.9, 0.55, 12, 15, 15, 6),
-      ],
-      vinos: [
-        v(1, 1, 1, 14, 18),
-        v(1, 1, 0.75, 14, 18),
-        v(1, 1, 0.6, 13, 15),
-        v(1, 0.95, 0.55, 12, 15),
-        v(2, 0.95, 0.7, 12, 15, 15, 7),
-        v(2, 0.9, 0.55, 12, 15, 15, 6),
-      ],
+      platos: [v(1, 1, 14, 18), v(1, 0.8, 14, 18), v(1, 0.65, 13, 15), v(0.95, 0.6, 13, 15), v(0.9, 0.55, 12, 15)],
+      vinos: [v(1, 1, 14, 18), v(1, 0.75, 14, 18), v(1, 0.6, 13, 15), v(0.95, 0.55, 12, 15), v(0.9, 0.55, 12, 15)],
     },
   },
   A4: {
@@ -140,33 +115,26 @@ export const FORMATOS: Record<TamanoCarta, Formato> = {
     margenInferior: mm(24),
     escala: { platos: 1.2, vinos: 1.1 },
     variantes: {
-      // Platos a una columna centrada con márgenes anchos (en dos columnas estrechas cada
-      // nombre se partía en tres o cuatro líneas); a dos, de 84 mm, solo si no caben.
-      platos: [
-        v(1, 1.2, 1, 26, 24),
-        v(1, 1.2, 0.8, 26, 24),
-        v(1, 1.15, 0.7, 24, 21),
-        v(1, 1.1, 0.65, 22, 20),
-        v(1, 1.05, 0.6, 22, 20),
-        v(2, 1.05, 0.8, 17, 20, 20, 10),
-        v(2, 1, 0.65, 15, 19, 19, 9),
-        v(2, 0.95, 0.55, 15, 19, 19, 8),
-      ],
-      // Vinos, de nombre corto: una columna si son pocos, dos y, para los tipos más largos, tres.
-      vinos: [
-        v(1, 1.1, 1, 34, 24),
-        v(2, 1.1, 1, 17, 24, 24, 10),
-        v(2, 1.1, 0.75, 17, 24, 24, 10),
-        v(2, 1.05, 0.65, 16, 21, 21, 9),
-        v(2, 1, 0.6, 15, 19, 19, 9),
-        v(2, 0.95, 0.55, 14, 19, 19, 8),
-        v(3, 1, 0.7, 15, 19, 19, 7),
-        v(3, 0.95, 0.55, 14, 19, 19, 6),
-      ],
+      // Una columna centrada con márgenes anchos (los vinos, de nombre corto, más estrecha).
+      platos: [v(1.2, 1, 26, 24), v(1.2, 0.8, 26, 24), v(1.15, 0.7, 24, 21), v(1.1, 0.65, 22, 20), v(1.05, 0.6, 22, 20), v(1, 0.55, 20, 19)],
+      vinos: [v(1.1, 1, 34, 24), v(1.1, 0.75, 30, 24), v(1.05, 0.65, 26, 21), v(1, 0.6, 22, 20), v(0.95, 0.55, 20, 19)],
     },
   },
 };
 
+export const ALINEACIONES_HORIZONTALES = ["izquierda", "centro", "derecha"] as const;
+export type AlineacionHorizontal = (typeof ALINEACIONES_HORIZONTALES)[number];
+export const ALINEACIONES_VERTICALES = ["arriba", "centro", "abajo"] as const;
+export type AlineacionVertical = (typeof ALINEACIONES_VERTICALES)[number];
+
+/** Dónde va el texto de cada sección: a qué lado y a qué altura de la página. */
+export interface Alineacion {
+  horizontal: AlineacionHorizontal;
+  vertical: AlineacionVertical;
+}
+
+/** La de siempre: platos a la izquierda con puntos guía hasta el precio, y el bloque centrado en la página. */
+export const ALINEACION_POR_DEFECTO: Alineacion = { horizontal: "izquierda", vertical: "centro" };
 /** Cuerpo mínimo legible (pt): ninguna variante baja de aquí. */
 export const CUERPO_MINIMO = { nombre: 9, detalle: 8 } as const;
 
@@ -248,25 +216,21 @@ export interface PaginaCarta {
   desborda?: boolean;
 }
 
-/** Cómo ha quedado cada sección: lo que lee el diálogo para avisar. */
+/** Cómo ha quedado cada sección: lo que lee el diálogo. */
 export interface InformeSeccion {
   clave: string;
   /** Título en el idioma de la carta («Tintos», «Entrantes fríos»). */
   titulo: string;
   /** Platos o vinos de la sección. */
   elementos: number;
-  /** Caras que ocupa en el PDF. */
+  /** Páginas que ocupa (1 si cabe en una). */
   caras: number;
-  /** false: no cabe en su cara (o en las pedidas) ni con la composición más compacta. */
+  /**
+   * false: algún elemento no cabe ni en una página entera (un nombre o una
+   * descripción desmesurados). Su página sale marcada y el PDF no se genera.
+   */
   cabe: boolean;
-  /** Ocupa varias caras porque se ha pedido repartirla. */
-  repartida: boolean;
-  /** Caras que necesita con la composición más compacta (1 si cabe en una). */
-  carasNecesarias: number;
-  /** Elementos que entran en una sola cara con la composición más compacta (todos, si cabe). */
-  caben: number;
-  /** Composición elegida: columnas y cuerpo de los nombres (pt). */
-  columnas: number;
+  /** Cuerpo de los nombres (pt) de la composición elegida. */
   cuerpo: number;
   /** Índice (desde 0) de su primera página en `paginas`. */
   pagina: number;
@@ -278,10 +242,9 @@ export interface MaquetaCarta {
 }
 
 export interface OpcionesMaquetacion {
-  /** Claves de las secciones que pueden ocupar varias caras (elegido expresamente en el diálogo). */
-  repartir?: ReadonlySet<string> | readonly string[];
+  /** Dónde va el texto de cada sección (por defecto, `ALINEACION_POR_DEFECTO`). */
+  alineacion?: Partial<Alineacion>;
 }
-
 /** Proporciones (ancho / alto) de los logos de logos.ts, para no cargar las rutas aquí. */
 export const PROPORCION_LOGO: Record<LogoCarta, number> = {
   casaTomas: 3017.2 / 1970.9,
@@ -411,7 +374,7 @@ const mayusculas = (texto: string, idioma: string) => texto.toLocaleUpperCase(id
 
 // ─── Contexto de una composición ────────────────────────────────────────────
 
-/** Una franja horizontal de la página (una columna o todo el ancho útil). */
+/** Una franja horizontal de la página: el ancho útil de la sección. */
 interface Marco {
   x0: number;
   x1: number;
@@ -425,21 +388,16 @@ interface Contexto {
   e: number;
   t: Tipografia;
   margenLateral: number;
-  /** Columnas del contenido. */
-  marcos: Marco[];
-  /** Todo el ancho útil (título de la sección). */
-  util: Marco;
+  /** Ancho útil: el de los platos y el del título. */
+  marco: Marco;
+  /** A qué lado va el texto. */
+  h: AlineacionHorizontal;
   y0: number;
   y1: number;
 }
 
-function crearContexto(medidor: Medidor, formato: Formato, tipo: TipoCartaImpresa, variante: Variante): Contexto {
-  const { columnas, lateral, separacion } = variante;
-  const anchoColumna = (formato.ancho - 2 * lateral - (columnas - 1) * separacion) / columnas;
-  const marcos = Array.from({ length: columnas }, (_, i) => {
-    const x0 = lateral + i * (anchoColumna + separacion);
-    return { x0, x1: x0 + anchoColumna };
-  });
+function crearContexto(medidor: Medidor, formato: Formato, tipo: TipoCartaImpresa, variante: Variante, h: AlineacionHorizontal): Contexto {
+  const { lateral } = variante;
   return {
     medidor,
     formato,
@@ -447,8 +405,8 @@ function crearContexto(medidor: Medidor, formato: Formato, tipo: TipoCartaImpres
     e: variante.escala,
     t: tipografia(variante.escala, variante.holgura),
     margenLateral: lateral,
-    marcos,
-    util: { x0: lateral, x1: formato.ancho - lateral },
+    marco: { x0: lateral, x1: formato.ancho - lateral },
+    h,
     y0: variante.superior,
     y1: formato.alto - variante.inferior,
   };
@@ -456,18 +414,24 @@ function crearContexto(medidor: Medidor, formato: Formato, tipo: TipoCartaImpres
 
 /** Composición de diseño: portada, contraportada, cabecera y pie. */
 function contextoDiseno(medidor: Medidor, formato: Formato, tipo: TipoCartaImpresa): Contexto {
-  return crearContexto(medidor, formato, tipo, {
-    columnas: 1,
+  const variante: Variante = {
     escala: formato.escala[tipo],
     holgura: 1,
     lateral: formato.margenLateral[tipo],
     superior: formato.margenSuperior,
     inferior: formato.margenInferior,
-    separacion: 0,
-  });
+  };
+  return crearContexto(medidor, formato, tipo, variante, "centro");
 }
 
 const centroDe = (marco: Marco) => (marco.x0 + marco.x1) / 2;
+
+/** x de inicio de un texto de ancho `ancho` alineado en el marco. */
+function inicioAlineado(marco: Marco, ancho: number, h: AlineacionHorizontal): number {
+  if (h === "izquierda") return marco.x0;
+  if (h === "derecha") return marco.x1 - ancho;
+  return centroDe(marco) - ancho / 2;
+}
 
 // ─── Medida de los elementos ────────────────────────────────────────────────
 
@@ -475,6 +439,8 @@ interface ElementoMedido {
   elemento: ElementoCarta;
   lineasNombre: string[];
   lineasDetalle: string[];
+  /** Al centro, la copa va en su propia línea, debajo de la descripción. */
+  copaAparte: boolean;
   /** Números de alérgenos ya como texto («1·3·7») y su ancho. */
   alergenos: string;
   anchoAlergenos: number;
@@ -491,7 +457,7 @@ function anchoPrecio(c: Contexto, elemento: ElementoCarta): number {
   return ancho;
 }
 
-/** Las descripciones de los platos no se meten bajo la columna de precios (en columnas estrechas, menos). */
+/** Las descripciones no son tan anchas como la línea del nombre y el precio (a la izquierda, no se meten bajo los precios). */
 function reservaPrecios(c: Contexto, anchoMarco: number): number {
   if (c.tipo === "vinos") return 24 * c.e;
   return (anchoMarco > 300 ? 64 : 36) * c.e;
@@ -505,7 +471,7 @@ function palabrasCaben(medidor: Medidor, texto: string, fuente: FuenteCarta, tam
 function medirElemento(c: Contexto, elemento: ElementoCarta): ElementoMedido {
   const { medidor, t } = c;
   const m = medidasElemento(c);
-  const anchoMarco = c.marcos[0].x1 - c.marcos[0].x0;
+  const anchoMarco = c.marco.x1 - c.marco.x0;
   const anchoNombre = anchoMarco - anchoPrecio(c, elemento) - t.huecoPrecio;
   const alergenos = elemento.alergenos.join("·");
   const anchoAlergenos = alergenos ? medidor.ancho(alergenos, "seminegrita", t.alergenos.tamano) + t.alergenos.separacion : 0;
@@ -516,7 +482,7 @@ function medirElemento(c: Contexto, elemento: ElementoCarta): ElementoMedido {
   if (palabrasCaben(medidor, nombre, "seminegrita", m.tamano, anchoNombre)) {
     lineasNombre = partirEnLineas(medidor, nombre, "seminegrita", m.tamano, anchoNombre);
   } else {
-    // Una palabra no cabe junto al precio (columna estrecha, «Consultar precio»): las primeras
+    // Una palabra no cabe junto al precio («Consultar precio»): las primeras
     // líneas usan todo el ancho y solo la última, la del precio, le deja sitio.
     lineasNombre = partirEnLineas(medidor, nombre, "seminegrita", m.tamano, anchoMarco);
     const palabras = (lineasNombre.pop() ?? "").split(" ");
@@ -535,63 +501,102 @@ function medirElemento(c: Contexto, elemento: ElementoCarta): ElementoMedido {
       lineasNombre = [...lineasNombre.slice(0, -1), palabras.slice(0, -1).join(" "), palabras[palabras.length - 1]];
     }
   }
+  // Copa: a la izquierda y a la derecha, junto a la primera línea de la descripción; al centro, debajo.
+  const copaAparte = Boolean(elemento.copa) && c.h === "centro";
+  const anchoCopa = elemento.copa && !copaAparte ? medidor.ancho(medidor.limpiar(elemento.copa), "regular", t.copa) + 12 : 0;
   let lineasDetalle: string[] = [];
   if (elemento.detalle) {
     const detalle = medidor.limpiar(elemento.detalle);
-    const anchoCopa = elemento.copa ? medidor.ancho(medidor.limpiar(elemento.copa), "regular", t.copa) + 12 : 0;
     const anchoDetalle = anchoMarco - Math.max(anchoCopa, reservaPrecios(c, anchoMarco));
     lineasDetalle = partirEnLineas(medidor, detalle, "italica", m.detalle, anchoDetalle);
     if (!palabrasCaben(medidor, detalle, "italica", m.detalle, anchoDetalle)) partido = true;
-  } else if (elemento.copa) {
+  } else if (elemento.copa && !copaAparte) {
     lineasDetalle = [""];
   }
+  const lineasBajo = lineasDetalle.length + (copaAparte ? 1 : 0);
   const alto =
     m.base +
     (lineasNombre.length - 1) * m.interlineado +
-    (lineasDetalle.length ? m.primerDetalle + (lineasDetalle.length - 1) * m.interDetalle : 0) +
+    (lineasBajo ? m.primerDetalle + (lineasBajo - 1) * m.interDetalle : 0) +
     m.bajo;
-  return { elemento, lineasNombre, lineasDetalle, alergenos, anchoAlergenos, alto, partido };
+  return { elemento, lineasNombre, lineasDetalle, copaAparte, alergenos, anchoAlergenos, alto, partido };
 }
 
 // ─── Dibujo de cada pieza ───────────────────────────────────────────────────
 
+/**
+ * Un plato o un vino, según la alineación:
+ *  · izquierda: nombre a la izquierda, puntos guía y precio al margen derecho;
+ *  · derecha: todo pegado al margen derecho, el precio detrás del nombre;
+ *  · centro: cada línea centrada, el precio detrás de la última del nombre.
+ */
 function dibujarElemento(c: Contexto, lienzo: Lienzo, marco: Marco, medido: ElementoMedido, y: number) {
-  const { medidor, t } = c;
+  const { medidor, t, h } = c;
   const m = medidasElemento(c);
   const { elemento, lineasNombre, lineasDetalle } = medido;
+  const ancho = (linea: string) => medidor.ancho(linea, "seminegrita", m.tamano);
+  const precio = anchoPrecio(c, elemento);
+  // Entre el nombre y el precio cuando no hay puntos guía.
+  const hueco = t.huecoPrecio * 0.6;
+  const ultima = lineasNombre.length - 1;
+  const anchoUltima = ancho(lineasNombre[ultima] ?? "") + medido.anchoAlergenos;
+  // Borde derecho del nombre (a la derecha) y comienzo de la última línea con su precio (al centro).
+  const finNombreDerecha = marco.x1 - precio - hueco;
+  const inicioUltimaCentro = centroDe(marco) - (anchoUltima + hueco + precio) / 2;
+
   let base = y + m.base;
+  let finNombre = marco.x0;
   lineasNombre.forEach((linea, i) => {
     if (i > 0) base += m.interlineado;
-    lienzo.texto(linea, marco.x0, base, "seminegrita", m.tamano, COLORES.pizarra);
+    const conAlergenos = i === ultima ? medido.anchoAlergenos : 0;
+    const x =
+      h === "izquierda"
+        ? marco.x0
+        : h === "derecha"
+          ? finNombreDerecha - ancho(linea) - conAlergenos
+          : i === ultima
+            ? inicioUltimaCentro
+            : centroDe(marco) - ancho(linea) / 2;
+    lienzo.texto(linea, x, base, "seminegrita", m.tamano, COLORES.pizarra);
+    finNombre = x + ancho(linea);
   });
-  const ultima = lineasNombre[lineasNombre.length - 1] ?? "";
-  let finNombre = marco.x0 + medidor.ancho(ultima, "seminegrita", m.tamano);
   if (medido.alergenos) {
     lienzo.texto(medido.alergenos, finNombre + t.alergenos.separacion, base - t.alergenos.subida, "seminegrita", t.alergenos.tamano, COLORES.oro);
     finNombre += medido.anchoAlergenos;
   }
-  // Precio a la derecha, en la línea de base de la última línea del nombre.
-  let inicioPrecio = marco.x1;
+  // Precio en la línea de base de la última línea del nombre.
+  const inicioPrecio = h === "centro" ? finNombre + hueco : marco.x1 - precio;
+  lienzo.texto(elemento.precio, inicioPrecio, base, "seminegrita", m.tamano, COLORES.oro);
   if (elemento.unidad) {
-    inicioPrecio -= lienzo.derecha(` / ${elemento.unidad}`, inicioPrecio, base, "regular", t.unidad, COLORES.piedra);
+    lienzo.texto(` / ${elemento.unidad}`, inicioPrecio + medidor.ancho(elemento.precio, "seminegrita", m.tamano), base, "regular", t.unidad, COLORES.piedra);
   }
-  inicioPrecio -= lienzo.derecha(elemento.precio, inicioPrecio, base, "seminegrita", m.tamano, COLORES.oro);
-  // Puntos guía, alineados a una rejilla común para que los de varias líneas caigan en columna.
-  const paso = t.puntos.separacion;
-  const desde = Math.ceil((finNombre + t.puntos.margen - marco.x0) / paso) * paso + marco.x0;
-  const hasta = Math.floor((inicioPrecio - t.puntos.margen - marco.x0) / paso) * paso + marco.x0;
-  if (hasta - desde >= paso * 2) {
-    const yPuntos = base - t.puntos.grosor / 2;
-    lienzo.linea(desde, yPuntos, hasta, yPuntos, t.puntos.grosor, COLORES.piedraClara, paso);
+  if (h === "izquierda") {
+    // Puntos guía, alineados a una rejilla común para que los de varias líneas caigan en columna.
+    const paso = t.puntos.separacion;
+    const desde = Math.ceil((finNombre + t.puntos.margen - marco.x0) / paso) * paso + marco.x0;
+    const hasta = Math.floor((inicioPrecio - t.puntos.margen - marco.x0) / paso) * paso + marco.x0;
+    if (hasta - desde >= paso * 2) {
+      const yPuntos = base - t.puntos.grosor / 2;
+      lienzo.linea(desde, yPuntos, hasta, yPuntos, t.puntos.grosor, COLORES.piedraClara, paso);
+    }
   }
-  if (lineasDetalle.length) {
-    base += m.primerDetalle;
-    const primeraDetalle = base;
-    lineasDetalle.forEach((linea, i) => {
-      if (i > 0) base += m.interDetalle;
-      lienzo.texto(linea, marco.x0, base, "italica", m.detalle, COLORES.piedra);
-    });
-    if (elemento.copa) lienzo.derecha(medidor.limpiar(elemento.copa), marco.x1, primeraDetalle, "regular", t.copa, COLORES.piedra);
+  if (!lineasDetalle.length && !medido.copaAparte) return;
+  base += m.primerDetalle;
+  const primeraDetalle = base;
+  const copa = elemento.copa ? medidor.limpiar(elemento.copa) : null;
+  const anchoCopa = copa && !medido.copaAparte ? medidor.ancho(copa, "regular", t.copa) + 12 : 0;
+  // Bloque de la descripción: a la derecha, todo pegado al margen (antes de la copa, si la hay).
+  const marcoDetalle: Marco = h === "derecha" ? { x0: marco.x0, x1: marco.x1 - anchoCopa } : marco;
+  lineasDetalle.forEach((linea, i) => {
+    if (i > 0) base += m.interDetalle;
+    lienzo.texto(linea, inicioAlineado(marcoDetalle, medidor.ancho(linea, "italica", m.detalle), h), base, "italica", m.detalle, COLORES.piedra);
+  });
+  if (!copa) return;
+  if (medido.copaAparte) {
+    if (lineasDetalle.length) base += m.interDetalle;
+    lienzo.centrado(copa, centroDe(marco), base, "regular", t.copa, COLORES.piedra);
+  } else {
+    lienzo.derecha(copa, marco.x1, primeraDetalle, "regular", t.copa, COLORES.piedra);
   }
 }
 
@@ -605,89 +610,103 @@ function lineasTitulo(c: Contexto, titulo: string, ancho: number): { lineas: str
   return { lineas: partirEnLineas(c.medidor, titulo, "regular", tamano, ancho, espaciado), espaciado };
 }
 
-/** Alto del título de una sección (con «(continuación)» debajo en las caras siguientes de una repartida). */
+/** Alto del título de una sección (con «(continuación)» debajo en las páginas siguientes). */
 function altoSeccion(c: Contexto, marco: Marco, titulo: string, continuacion = false): number {
   const { lineas } = lineasTitulo(c, titulo, marco.x1 - marco.x0);
   const s = c.t.seccion;
   return s.base + (lineas.length - 1) * s.interlineado + s.filete + (continuacion ? c.t.continuacion.alto : 0) + s.despues;
 }
 
+/** Título de sección con su filete y rombo dorados, alineado como el texto (`c.h`). */
 function dibujarSeccion(c: Contexto, lienzo: Lienzo, marco: Marco, titulo: string, y: number, continuacion?: string) {
   const s = c.t.seccion;
-  const centro = centroDe(marco);
   const { lineas, espaciado } = lineasTitulo(c, titulo, marco.x1 - marco.x0);
   let base = y + s.base;
   lineas.forEach((linea, i) => {
     if (i > 0) base += s.interlineado;
-    lienzo.centrado(linea, centro, base, "regular", s.tamano, COLORES.oro, espaciado);
+    lienzo.texto(linea, inicioAlineado(marco, c.medidor.ancho(linea, "regular", s.tamano, espaciado), c.h), base, "regular", s.tamano, COLORES.oro, espaciado);
   });
   // Filete dorado con un rombo en medio, como separador de categoría.
   const o = c.t.ornamento;
+  const anchoOrnamento = 2 * (o.brazo + o.hueco);
+  const centro = inicioAlineado(marco, anchoOrnamento, c.h) + anchoOrnamento / 2;
   const yFilete = base + s.filete;
   lienzo.linea(centro - o.hueco - o.brazo, yFilete, centro - o.hueco, yFilete, o.grosor, COLORES.oro);
   lienzo.linea(centro + o.hueco, yFilete, centro + o.hueco + o.brazo, yFilete, o.grosor, COLORES.oro);
   lienzo.rombo(centro, yFilete, o.rombo, COLORES.oro);
   if (continuacion) {
-    lienzo.centrado(continuacion, centro, yFilete + c.t.continuacion.base, "italica", c.t.continuacion.tamano, COLORES.piedra);
+    const k = c.t.continuacion;
+    lienzo.texto(continuacion, inicioAlineado(marco, c.medidor.ancho(continuacion, "italica", k.tamano), c.h), yFilete + k.base, "italica", k.tamano, COLORES.piedra);
   }
 }
 
-/** Cabecera de denominación en líneas que caben en la columna (en columnas estrechas, «… (continuación)» parte). */
+/** Cabecera de denominación en líneas que caben en el ancho («… (continuación)» puede partir). */
 function lineasGrupo(c: Contexto, titulo: string): string[] {
-  return partirEnLineas(c.medidor, titulo, "italica", c.t.grupo.tamano, c.marcos[0].x1 - c.marcos[0].x0);
+  return partirEnLineas(c.medidor, titulo, "italica", c.t.grupo.tamano, c.marco.x1 - c.marco.x0);
 }
 
 const altoGrupo = (c: Contexto, lineas: readonly string[]) => c.t.grupo.alto + (lineas.length - 1) * c.t.grupo.interlineado;
 
+/** Cabecera de denominación con un filete fino: detrás (izquierda), delante (derecha) o a los dos lados (centro). */
 function dibujarGrupo(c: Contexto, lienzo: Lienzo, marco: Marco, lineas: readonly string[], y: number) {
   const g = c.t.grupo;
+  const anchoDe = (linea: string) => c.medidor.ancho(linea, "italica", g.tamano);
   let base = y + g.base;
+  let x = marco.x0;
   lineas.forEach((linea, i) => {
     if (i > 0) base += g.interlineado;
-    lienzo.texto(linea, marco.x0, base, "italica", g.tamano, COLORES.oro);
+    x = inicioAlineado(marco, anchoDe(linea), c.h);
+    lienzo.texto(linea, x, base, "italica", g.tamano, COLORES.oro);
   });
-  // Filete fino detrás de la última línea, si queda sitio.
-  const fin = marco.x0 + c.medidor.ancho(lineas[lineas.length - 1] ?? "", "italica", g.tamano) + 8 * c.e;
-  if (marco.x1 - fin > 20) lienzo.linea(fin, base - 3.4 * c.e, marco.x1, base - 3.4 * c.e, 0.4, COLORES.oro);
+  const fin = x + anchoDe(lineas[lineas.length - 1] ?? "");
+  const hueco = 8 * c.e;
+  const yFilete = base - 3.4 * c.e;
+  const filete = (desde: number, hasta: number) => {
+    if (hasta - desde > 20) lienzo.linea(desde, yFilete, hasta, yFilete, 0.4, COLORES.oro);
+  };
+  if (c.h === "izquierda") filete(fin + hueco, marco.x1);
+  else if (c.h === "derecha") filete(marco.x0, x - hueco);
+  else {
+    const largo = Math.min(40 * c.e, x - hueco - marco.x0);
+    filete(x - hueco - largo, x - hueco);
+    filete(fin + hueco, fin + hueco + largo);
+  }
 }
 
-// ─── Composición de una sección en su cara ──────────────────────────────────
+// ─── Composición de una sección en sus páginas ──────────────────────────────
 
-/** Lo que fluye por las columnas: cabeceras de denominación y elementos. */
+/** Lo que va pasando de una página a otra: cabeceras de denominación y elementos. */
 type Bloque =
   | { tipo: "grupo"; lineas: string[]; alto: number; tamanoGrupo: number }
   | { tipo: "elemento"; medido: ElementoMedido; grupo: number; posicion: number; tamanoGrupo: number; tituloGrupo: string | null };
 
-/** Una pieza ya colocada en su columna, con `y` desde arriba del contenido. */
+/** Una pieza ya colocada en su página, con `y` desde arriba del contenido. */
 type Pieza = { tipo: "grupo"; lineas: string[]; y: number; alto: number } | { tipo: "elemento"; medido: ElementoMedido; y: number; alto: number };
 
-interface Columna {
-  piezas: Pieza[];
-  alto: number;
-}
-
 interface Cara {
-  columnas: Columna[];
-  /** Cara siguiente de una sección repartida. */
+  piezas: Pieza[];
+  /** Alto del contenido (sin el título). */
+  alto: number;
+  /** Página siguiente de una sección que no cabe en una. */
   continuacion: boolean;
   altoTitulo: number;
+  /** Un elemento no cabe ni solo en la página. */
   desborda: boolean;
 }
 
 interface Composicion {
   c: Contexto;
   caras: Cara[];
-  /** Todos los elementos colocados sin pasarse de ninguna cara y sin cortar palabras. */
+  /** Todos los elementos colocados sin pasarse de ninguna página y sin cortar palabras. */
   cabe: boolean;
   /** Con esta composición alguna palabra se cortaría por letras. */
   partido: boolean;
-  colocados: number;
 }
 
 /** Holgura numérica para comparar alturas. */
 const EPS = 0.01;
-/** Tope de caras de una sección repartida. */
-const MAX_CARAS = 24;
+/** Tope de páginas de una sección (una carta de verdad no llega). */
+const MAX_CARAS = 40;
 
 function bloquesSeccion(c: Contexto, seccion: SeccionCarta): Bloque[] {
   const bloques: Bloque[] = [];
@@ -706,9 +725,6 @@ function bloquesSeccion(c: Contexto, seccion: SeccionCarta): Bloque[] {
   return bloques;
 }
 
-const contarElementos = (bloques: readonly Bloque[], desde: number, hasta: number) =>
-  bloques.slice(desde, hasta).filter((b) => b.tipo === "elemento").length;
-
 /** Alto de los `n` elementos que siguen a `desde`, con sus separaciones. */
 function altoSiguientes(bloques: readonly Bloque[], desde: number, n: number, entre: number): number {
   let alto = 0;
@@ -723,17 +739,17 @@ function altoSiguientes(bloques: readonly Bloque[], desde: number, n: number, en
 }
 
 /**
- * Llena una columna de alto `alto` desde el bloque `desde`. Si la columna está
- * vacía, el primer elemento entra aunque no quepa (y se marca `desborda`), para
- * avanzar siempre.
+ * Llena una página con contenido de alto `alto` desde el bloque `desde`. Si la
+ * página está vacía, el primer elemento entra aunque no quepa (y se marca
+ * `desborda`), para avanzar siempre.
  */
-function llenarColumna(
+function llenarPagina(
   c: Contexto,
   bloques: readonly Bloque[],
   desde: number,
   alto: number,
   continuacion: string,
-): { columna: Columna; hasta: number; desborda: boolean } {
+): { piezas: Pieza[]; alto: number; hasta: number; desborda: boolean } {
   const { t } = c;
   const m = medidasElemento(c);
   const piezas: Pieza[] = [];
@@ -792,46 +808,10 @@ function llenarColumna(
     delGrupo += 1;
   }
   const altoUsado = piezas.reduce((maximo, p) => Math.max(maximo, p.y + p.alto), 0);
-  return { columna: { piezas, alto: altoUsado }, hasta: i, desborda };
+  return { piezas, alto: altoUsado, hasta: i, desborda };
 }
 
-function llenarColumnas(c: Contexto, bloques: readonly Bloque[], desde: number, alto: number, continuacion: string) {
-  const columnas: Columna[] = [];
-  let hasta = desde;
-  let desborda = false;
-  for (let k = 0; k < c.marcos.length && hasta < bloques.length; k++) {
-    const r = llenarColumna(c, bloques, hasta, alto, continuacion);
-    columnas.push(r.columna);
-    hasta = r.hasta;
-    desborda ||= r.desborda;
-  }
-  return { columnas, hasta, desborda };
-}
-
-/**
- * Una cara: llena sus columnas con el alto disponible y, si todo lo que queda
- * cabe, busca el menor alto con el que sigue cabiendo, para equilibrarlas.
- */
-function colocarCara(c: Contexto, bloques: readonly Bloque[], desde: number, alto: number, continuacion: string) {
-  const llena = llenarColumnas(c, bloques, desde, alto, continuacion);
-  if (c.marcos.length === 1 || llena.hasta < bloques.length || llena.desborda) return llena;
-  let mejor = llena;
-  let bajo = 0;
-  let altoMaximo = alto;
-  while (altoMaximo - bajo > 0.5) {
-    const medio = (bajo + altoMaximo) / 2;
-    const prueba = llenarColumnas(c, bloques, desde, medio, continuacion);
-    if (prueba.hasta >= bloques.length && !prueba.desborda) {
-      mejor = prueba;
-      altoMaximo = medio;
-    } else {
-      bajo = medio;
-    }
-  }
-  return mejor;
-}
-
-/** `limite`: alto máximo del contenido en cada cara (para equilibrar las caras de una repartida). */
+/** `limite`: alto máximo del contenido en cada página (para equilibrar las de una sección larga). */
 function componerSeccion(
   c: Contexto,
   seccion: SeccionCarta,
@@ -845,9 +825,9 @@ function componerSeccion(
   let desde = 0;
   while (desde < bloques.length && caras.length < maxCaras) {
     const esContinuacion = caras.length > 0;
-    const altoTitulo = altoSeccion(c, c.util, titulo, esContinuacion);
-    const r = colocarCara(c, bloques, desde, Math.min(limite, c.y1 - c.y0 - altoTitulo), continuacion);
-    caras.push({ columnas: r.columnas, continuacion: esContinuacion, altoTitulo, desborda: r.desborda });
+    const altoTitulo = altoSeccion(c, c.marco, titulo, esContinuacion);
+    const r = llenarPagina(c, bloques, desde, Math.min(limite, c.y1 - c.y0 - altoTitulo), continuacion);
+    caras.push({ piezas: r.piezas, alto: r.alto, continuacion: esContinuacion, altoTitulo, desborda: r.desborda });
     desde = r.hasta;
   }
   // Una composición que corta palabras por letras no vale aunque quepa: se prueba la siguiente.
@@ -857,58 +837,13 @@ function componerSeccion(
     caras,
     cabe: desde >= bloques.length && caras.every((cara) => !cara.desborda) && sinPartir,
     partido: !sinPartir,
-    colocados: contarElementos(bloques, 0, desde),
   };
 }
 
-interface Eleccion {
-  composicion: Composicion;
-  carasNecesarias: number;
-  caben: number;
-}
-
 /**
- * La composición de una sección: la más holgada con la que cabe en una cara.
- * Si no cabe con ninguna y se ha pedido repartirla, el menor número de caras
- * y, con él, la más holgada. Si no, la más compacta en una cara, marcada.
- */
-function elegirComposicion(
-  medidor: Medidor,
-  formato: Formato,
-  tipo: TipoCartaImpresa,
-  seccion: SeccionCarta,
-  titulo: string,
-  continuacion: string,
-  repartir: boolean,
-): Eleccion {
-  const contextos = formato.variantes[tipo].map((variante) => crearContexto(medidor, formato, tipo, variante));
-  const total = seccion.grupos.reduce((suma, g) => suma + g.elementos.length, 0);
-  // La que más elementos mete en una cara: la que se enseña, marcada, si ninguna cabe.
-  let mejor: Composicion | null = null;
-  // La más compacta que no corta palabras (para contar las caras necesarias).
-  let compacta = contextos[contextos.length - 1];
-  for (const c of contextos) {
-    const composicion = componerSeccion(c, seccion, titulo, continuacion, 1);
-    if (composicion.cabe) return { composicion, carasNecesarias: 1, caben: total };
-    if (composicion.partido) continue;
-    compacta = c;
-    if (!mejor || composicion.colocados > mejor.colocados) mejor = composicion;
-  }
-  const enUna = mejor ?? componerSeccion(compacta, seccion, titulo, continuacion, 1);
-  const todas = componerSeccion(compacta, seccion, titulo, continuacion, MAX_CARAS);
-  const carasNecesarias = todas.caras.length;
-  if (!repartir) return { composicion: enUna, carasNecesarias, caben: enUna.colocados };
-  for (const c of contextos) {
-    const composicion = componerSeccion(c, seccion, titulo, continuacion, carasNecesarias);
-    if (composicion.cabe) return { composicion: equilibrarCaras(composicion, seccion, titulo, continuacion), carasNecesarias, caben: enUna.colocados };
-  }
-  return { composicion: todas, carasNecesarias, caben: enUna.colocados };
-}
-
-/**
- * Una sección repartida no llena la primera cara y deja la última casi vacía:
+ * Las páginas de una sección larga no quedan una llena y la última casi vacía:
  * busca el menor alto de contenido con el que sigue cabiendo en las mismas
- * caras, para que todas queden parecidas.
+ * páginas, para que todas queden parecidas.
  */
 function equilibrarCaras(composicion: Composicion, seccion: SeccionCarta, titulo: string, continuacion: string): Composicion {
   const { c, caras } = composicion;
@@ -929,16 +864,27 @@ function equilibrarCaras(composicion: Composicion, seccion: SeccionCarta, titulo
   return mejor;
 }
 
-/** Parte del alto libre que queda encima de una sección corta: algo menos de la mitad (centro óptico). */
-const CENTRO_OPTICO = 0.42;
+/**
+ * La composición de una sección: la más holgada con la que cabe en una página.
+ * Si no cabe en una con ninguna, no se aprieta: va con la de diseño (la
+ * primera que no corta palabras) en las páginas que haga falta, equilibradas.
+ */
+function elegirComposicion(medidor: Medidor, formato: Formato, tipo: TipoCartaImpresa, h: AlineacionHorizontal, seccion: SeccionCarta, titulo: string, continuacion: string): Composicion {
+  const contextos = formato.variantes[tipo].map((variante) => crearContexto(medidor, formato, tipo, variante, h));
+  let holgada: Contexto | null = null;
+  for (const c of contextos) {
+    const composicion = componerSeccion(c, seccion, titulo, continuacion, 1);
+    if (composicion.cabe) return composicion;
+    if (!composicion.partido) holgada ??= c;
+  }
+  const todas = componerSeccion(holgada ?? contextos[contextos.length - 1], seccion, titulo, continuacion, MAX_CARAS);
+  return todas.cabe ? equilibrarCaras(todas, seccion, titulo, continuacion) : todas;
+}
 
-function paginasInteriores(
-  medidor: Medidor,
-  formato: Formato,
-  contenido: ContenidoCarta,
-  primerNumero: number,
-  repartir: (clave: string) => boolean,
-): MaquetaCarta {
+/** Parte del alto libre que queda encima del bloque, según la alineación vertical (centro: algo por encima de la mitad, el centro óptico). */
+const HUECO_ARRIBA: Record<AlineacionVertical, number> = { arriba: 0, centro: 0.42, abajo: 1 };
+
+function paginasInteriores(medidor: Medidor, formato: Formato, contenido: ContenidoCarta, primerNumero: number, alineacion: Alineacion): MaquetaCarta {
   const textos = TEXTOS[contenido.idioma];
   const idioma = contenido.idioma;
   const diseno = contextoDiseno(medidor, formato, contenido.tipo);
@@ -964,23 +910,19 @@ function paginasInteriores(
     // Sección vacía: sin página.
     if (!total) continue;
     const titulo = medidor.limpiar(mayusculas(seccion.titulo, idioma));
-    const eleccion = elegirComposicion(medidor, formato, contenido.tipo, seccion, titulo, textos.continuacion, repartir(seccion.clave));
-    const { c, caras, cabe } = eleccion.composicion;
+    const { c, caras, cabe } = elegirComposicion(medidor, formato, contenido.tipo, alineacion.horizontal, seccion, titulo, textos.continuacion);
     const primeraPagina = paginas.length;
     for (const cara of caras) {
       const lienzo = nuevaPagina(seccion.clave, cara.desborda || !cabe);
-      const altoContenido = Math.max(0, ...cara.columnas.map((columna) => columna.alto));
-      const libre = c.y1 - c.y0 - cara.altoTitulo - altoContenido;
-      // Una sección corta no se estira: el bloque se centra ópticamente. Las repartidas, arriba.
-      const y = c.y0 + (caras.length === 1 ? Math.max(0, libre) * CENTRO_OPTICO : 0);
-      dibujarSeccion(c, lienzo, c.util, titulo, y, cara.continuacion ? textos.continuacion : undefined);
+      const libre = c.y1 - c.y0 - cara.altoTitulo - cara.alto;
+      // Una sección corta no se estira: el bloque se coloca arriba, en el centro o abajo.
+      const y = c.y0 + Math.max(0, libre) * HUECO_ARRIBA[alineacion.vertical];
+      dibujarSeccion(c, lienzo, c.marco, titulo, y, cara.continuacion ? textos.continuacion : undefined);
       const yContenido = y + cara.altoTitulo;
-      cara.columnas.forEach((columna, k) => {
-        for (const pieza of columna.piezas) {
-          if (pieza.tipo === "grupo") dibujarGrupo(c, lienzo, c.marcos[k], pieza.lineas, yContenido + pieza.y);
-          else dibujarElemento(c, lienzo, c.marcos[k], pieza.medido, yContenido + pieza.y);
-        }
-      });
+      for (const pieza of cara.piezas) {
+        if (pieza.tipo === "grupo") dibujarGrupo(c, lienzo, c.marco, pieza.lineas, yContenido + pieza.y);
+        else dibujarElemento(c, lienzo, c.marco, pieza.medido, yContenido + pieza.y);
+      }
     }
     secciones.push({
       clave: seccion.clave,
@@ -988,10 +930,6 @@ function paginasInteriores(
       elementos: total,
       caras: caras.length,
       cabe,
-      repartida: caras.length > 1,
-      carasNecesarias: eleccion.carasNecesarias,
-      caben: eleccion.caben,
-      columnas: c.marcos.length,
       cuerpo: Math.round(medidasElemento(c).tamano * 10) / 10,
       // Índice en la carta completa (la portada va delante).
       pagina: primerNumero - 1 + primeraPagina,
@@ -1116,8 +1054,8 @@ function contraportada(c: Contexto, contenido: ContenidoCarta, numero: number): 
 }
 
 /**
- * La carta entera: portada, una cara por sección (o las pedidas, si se ha
- * elegido repartirla) y contraportada, con el informe de cada sección.
+ * La carta entera: portada, cada sección en sus páginas (nunca dos en la
+ * misma) y contraportada, con el informe de cada sección.
  */
 export function maquetarCarta(
   medidor: Medidor,
@@ -1126,14 +1064,14 @@ export function maquetarCarta(
   opciones: OpcionesMaquetacion = {},
 ): MaquetaCarta {
   const formato = FORMATOS[tamano];
-  const repartir = new Set(opciones.repartir ?? []);
+  const alineacion: Alineacion = { ...ALINEACION_POR_DEFECTO, ...opciones.alineacion };
   const diseno = contextoDiseno(medidor, formato, contenido.tipo);
-  const interiores = paginasInteriores(medidor, formato, contenido, 2, (clave) => repartir.has(clave));
+  const interiores = paginasInteriores(medidor, formato, contenido, 2, alineacion);
   return {
     paginas: [portada(diseno, contenido), ...interiores.paginas, contraportada(diseno, contenido, interiores.paginas.length + 2)],
     secciones: interiores.secciones,
   };
 }
 
-/** Secciones que no caben en su cara (o en las caras pedidas): el PDF no se genera con ellas. */
+/** Secciones con algún elemento que no cabe ni en una página entera: el PDF no se genera con ellas. */
 export const seccionesQueNoCaben = (maqueta: MaquetaCarta) => maqueta.secciones.filter((s) => !s.cabe);
