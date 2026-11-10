@@ -24,7 +24,7 @@
  * de src/); src/lib/rrss/__tests__/copias.test.ts comprueba que son iguales.
  */
 import { esEstilo, limitarTratamiento, TRANSICIONES, type EstiloId, type Transicion, type Tratamiento } from "./estilos.js";
-import type { FormatoSalida, Medio } from "./formatos";
+import type { FormatoSalida, Medio } from "./formatos.js";
 
 export const VERSION_PLAN = 1;
 
