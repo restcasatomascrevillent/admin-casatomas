@@ -26,6 +26,7 @@ import { useMesas } from "@/hooks/useMesas";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import { useAjustesMesaDia } from "@/hooks/useAjustesMesaServicio";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { useHorasFijasDelDia } from "@/hooks/useConfiguracionTurnos";
 import { useHoyLocal } from "@/hooks/useHoyLocal";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { deshacerSinReserva, useSentarSinReserva, type EntradaSinReserva } from "@/hooks/useSentarSinReserva";
@@ -114,7 +115,8 @@ function ContenidoSinReserva({ salaPreferida, onCerrar }: { salaPreferida: strin
   const reparto = useMemo(() => configAsignacionDesde(config), [config]);
   const excluidas = useMemo(() => new Set(reparto.mesasExcluidas), [reparto]);
   const alFinal = useMemo(() => new Set(reparto.mesasAlFinal), [reparto]);
-  const configOcupacion = useMemo(() => configServicioSalaDesde(config), [config]);
+  const horasFijas = useHorasFijasDelDia(hoy);
+  const configOcupacion = useMemo(() => configServicioSalaDesde(config, horasFijas), [config, horasFijas]);
   // Todas las mesas del servicio de ahora (con las piezas del día), como en la ficha de una reserva.
   const opciones = useMemo(
     () => opcionesMesasServicio({ salas, mesas: mesas ?? [], ajustesDia: ajustesDia ?? [], turno: turnoDeHora(hora) }),
