@@ -44,6 +44,10 @@ export interface CambiosReserva {
   /** Solo existe si la migración 20260923_reservas_llegada.sql está aplicada. */
   llegada_at?: string | null;
   importante?: boolean;
+  /** «Sentar fuera» (20261122171500): dónde, mesa o nota, y la sala de antes (ver `sentarFuera.ts`). */
+  fuera_lugar?: string | null;
+  fuera_mesa?: string | null;
+  fuera_espacio_previo_id?: string | null;
 }
 
 // null = aún no se sabe; se descubre en el primer UPDATE que la incluya.

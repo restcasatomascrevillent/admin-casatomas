@@ -41,6 +41,9 @@ import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
 import { OPCIONES_FILTRO_ESTADO } from "@/lib/reservas/vistaUnificada";
 import type { ReservaEditable } from "@/lib/reservas/edicionReserva";
 import { FormularioReserva } from "./FormularioReserva";
+import { BotonSentarFuera, EtiquetaFuera } from "./SentarFuera";
+import { estaSentadaFuera } from "@/lib/reservas/sentarFuera";
+import type { ReservaServicio } from "@/lib/reservas/servicioSala";
 import { ComoSeHizoReserva, type ReservaConOrigen } from "./ComoSeHizoReserva";
 
 /** Clave de caché de la fila en edición. `FormularioReserva` la invalida al guardar (prefijo "reserva-edicion"). */
@@ -166,6 +169,8 @@ export function EditarReservaDialog({ reservaId, onClose }: EditarReservaDialogP
   } else {
     cuerpo = (
       <>
+        {/* «Sentar fuera» (10/11/2026): dónde está sentada, fuera de las salas; cambiar o volver dentro. */}
+        <AvisoSentadaFuera reserva={reserva.data as never} />
         <FormularioReserva
           // `key`: si cambia de reserva, el formulario arranca de cero con sus datos.
           key={reserva.data.id}
@@ -218,6 +223,19 @@ function Cargando({ texto }: { texto: string }) {
     <div role="status" className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
       <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
       {texto}
+    </div>
+  );
+}
+
+/** En el editor: «Fuera · Touza · Mesa 4» y, con «Editar», cambiar el sitio o volver dentro (diálogo de Hoy). */
+function AvisoSentadaFuera({ reserva }: { reserva: ReservaServicio & { salida_at?: string | null } }) {
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  if (!estaSentadaFuera(reserva)) return null;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-[#0050FF]/40 bg-[#0050FF]/5 p-3 text-sm">
+      <EtiquetaFuera reserva={reserva} className="text-sm" />
+      <span className="text-muted-foreground">Sentada fuera de las salas: no ocupa mesa ni cuenta en ningún espacio.</span>
+      {puedeEditar && <BotonSentarFuera reserva={reserva} className="ml-auto h-11 w-auto px-4 text-sm" />}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ExternalLink, Loader2, Send } from "lucide-react";
+import { Copy, ExternalLink, Lightbulb, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,15 @@ import {
   useContextoEvento,
   useEnviosPrueba,
   useIncidencia,
+  useMuestrasIncidencia,
   useOcurrencias,
   usePedirTicket,
   type EstadoIncidencia,
+  type EventoWeb,
   type IncidenciaWeb,
 } from "@/hooks/useLogsWeb";
-import { fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO } from "./calculos";
+import { causaDeFila, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO, repartoTexto, textoParaCopiar } from "./calculos";
+import { datosClave, objetivosAfectados } from "../../../supabase/functions/procesar-logs-web/ticket";
 import { LineaTiempo } from "./LineaTiempo";
 import { Paginacion } from "./Controles";
 
@@ -95,6 +98,75 @@ function Analisis({ i }: { i: IncidenciaWeb }) {
   );
 }
 
+function CausaConocidaAviso({ i }: { i: IncidenciaWeb }) {
+  const causa = causaDeFila(i);
+  if (!causa) return null;
+  return (
+    <section className="space-y-1 rounded-md border border-sky-500/40 bg-sky-50 p-3 text-sm text-sky-950 dark:bg-sky-950/30 dark:text-sky-100" data-testid="causa-conocida">
+      <h3 className="flex items-start gap-1.5 text-sm font-semibold"><Lightbulb className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> Causa conocida: {causa.titulo}</h3>
+      <p>{causa.explicacion}</p>
+      <ul className="list-disc pl-5">{causa.acciones.map((a) => <li key={a}>{a}</li>)}</ul>
+      {causa.ruidoSiAislado && <p className="text-xs opacity-80">Si se queda en pocas sesiones, se puede ignorar.</p>}
+    </section>
+  );
+}
+
+/** Qué falla y dónde: objetivos, datos técnicos y repartos de las últimas ocurrencias reales (sin bots). */
+function Contexto({ i, muestras }: { i: IncidenciaWeb; muestras: EventoWeb[] }) {
+  if (!muestras.length) {
+    return <p className="text-xs text-muted-foreground">Sin ocurrencias de visitantes reales: solo bots o pruebas automáticas.</p>;
+  }
+  // Las funciones de ticket.ts esperan el mismo formato que las muestras del proceso.
+  const filas = muestras as unknown as Parameters<typeof objetivosAfectados>[0];
+  const objetivos = objetivosAfectados(filas);
+  const datos = datosClave(filas);
+  const navegador = i.fuente === "navegador";
+  const filasCtx: Array<[string, string]> = [];
+  if (objetivos.length) filasCtx.push(["Afecta a", objetivos.slice(0, 8).map((o) => `${o.objetivo} (${o.n})`).join(" · ")]);
+  for (const d of datos) filasCtx.push([d.clave, d.valores.join(" · ")]);
+  if (navegador) {
+    filasCtx.push(["Navegador", repartoTexto(muestras, (e) => e.navegador)]);
+    filasCtx.push(["Sistema", repartoTexto(muestras, (e) => e.so)]);
+    filasCtx.push(["Dispositivo", repartoTexto(muestras, (e) => e.dispositivo)]);
+  }
+  filasCtx.push(["Versión", repartoTexto(muestras, (e) => e.version)]);
+  const pruebas = muestras.filter((e) => e.es_prueba).length;
+  return (
+    <section className="space-y-1" data-testid="contexto-incidencia">
+      <h3 className="text-sm font-semibold">Qué falla y dónde</h3>
+      <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-xs">
+        {filasCtx.map(([k, v]) => (
+          <div key={k} className="contents"><dt className="text-muted-foreground">{k}</dt><dd className="break-words">{v}</dd></div>
+        ))}
+      </dl>
+      <p className="text-[11px] text-muted-foreground">
+        Sobre las últimas {muestras.length} ocurrencias de visitantes (sin bots){pruebas ? `; ${pruebas} de pruebas automáticas` : ""}.
+      </p>
+    </section>
+  );
+}
+
+function copiar(texto: string) {
+  navigator.clipboard?.writeText(texto).then(() => toast.success("Copiado"), () => toast.error("No se pudo copiar"));
+}
+
+/** Una ocurrencia desplegable: error completo, pila y datos técnicos de ESA vez. */
+function DetalleOcurrencia({ i, e }: { i: IncidenciaWeb; e: EventoWeb }) {
+  const datos = Object.entries(e.propiedades ?? {});
+  return (
+    <details className="w-full rounded bg-muted/40 px-2 py-1 text-xs" data-testid="detalle-ocurrencia">
+      <summary className="cursor-pointer select-none text-muted-foreground">error completo{e.es_prueba ? " · prueba automática" : ""}{e.es_bot ? " · bot" : ""}</summary>
+      <div className="mt-1 space-y-1">
+        {e.objetivo && <p><span className="text-muted-foreground">Objetivo:</span> {e.objetivo}</p>}
+        {datos.length > 0 && <p className="break-words"><span className="text-muted-foreground">Datos:</span> {datos.map(([k, v]) => `${k}=${String(v)}`).join(" · ")}</p>}
+        {(e.despliegue || e.version) && <p><span className="text-muted-foreground">Versión:</span> {e.version ?? "?"}{e.despliegue ? ` · despliegue ${e.despliegue}` : ""}</p>}
+        <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words rounded bg-background/60 p-1.5">{[e.mensaje, e.pila].filter(Boolean).join("\n\n") || "(sin mensaje ni pila en esta ocurrencia)"}</pre>
+        <Button variant="ghost" className="h-9 gap-1 px-2 text-xs" onClick={() => copiar(textoParaCopiar(i, e))}><Copy className="h-3.5 w-3.5" /> Copiar esta ocurrencia</Button>
+      </div>
+    </details>
+  );
+}
+
 interface DetalleIncidenciaProps {
   id: number | null;
   onCerrar: () => void;
@@ -106,6 +178,7 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
   const q = useIncidencia(id);
   const [pagina, setPagina] = useState(0);
   const ocurrencias = useOcurrencias(id, pagina);
+  const muestras = useMuestrasIncidencia(id);
   const [eventoContexto, setEventoContexto] = useState<number | null>(null);
   const contexto = useContextoEvento(eventoContexto);
   const cambiar = useCambiarIncidencia();
@@ -164,10 +237,17 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
               ]}
             />
             {i.rutas.length > 0 && <p className="text-xs text-muted-foreground">Páginas: {i.rutas.map((r) => `${r.ruta} (${r.n})`).join(" · ")}</p>}
+            <CausaConocidaAviso i={i} />
+            {muestras.data && <Contexto i={i} muestras={muestras.data} />}
             <Ticket i={i} />
             <Analisis i={i} />
             <section>
-              <h3 className="mb-1 text-sm font-semibold">Evidencias (depuradas)</h3>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">Evidencias (depuradas)</h3>
+                <Button variant="ghost" className="h-9 gap-1 px-2 text-xs" onClick={() => copiar(textoParaCopiar(i, ocurrencias.data?.filas[0]))} data-testid="copiar-incidencia">
+                  <Copy className="h-3.5 w-3.5" /> Copiar para el informe
+                </Button>
+              </div>
               <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/60 p-2 text-xs">{[i.mensaje, i.pila].filter(Boolean).join("\n\n") || "(sin mensaje)"}</pre>
             </section>
             <section className="space-y-2">
@@ -176,13 +256,18 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
                 {ocurrencias.data?.filas.map((e) => (
                   <li key={e.id} className="flex flex-wrap items-center gap-2">
                     <span className="tabular-nums text-xs">{fmtFechaHora(e.ocurrido_en)}</span>
-                    <span className="text-xs text-muted-foreground">{e.ruta ?? ""} · {e.navegador ?? "?"} {e.so ?? ""} · v{e.version ?? "?"}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {i.fuente === "navegador" ? `${e.ruta ?? ""} · ${e.navegador ?? "?"} ${e.so ?? ""} · v${e.version ?? "?"}` : (e.objetivo ?? e.tipo)}
+                      {e.propiedades?.status !== undefined ? ` · estado ${String(e.propiedades.status)}` : ""}
+                    </span>
+                    {(e.es_bot || e.es_prueba) && <Badge variant="outline" className="text-[10px] font-normal">{e.es_bot ? "bot" : "prueba"}</Badge>}
                     {e.sesion_id ? (
                       <>
                         <Button variant={eventoContexto === e.id ? "secondary" : "ghost"} className="h-9 px-2 text-xs" onClick={() => setEventoContexto(e.id)}>contexto</Button>
                         <Button variant="ghost" className="h-9 px-2 text-xs" onClick={() => onAbrirSesion(e.sesion_id!)}>sesión completa</Button>
                       </>
-                    ) : <span className="text-xs italic text-muted-foreground">sin sesión (sin consentimiento o servidor)</span>}
+                    ) : <span className="text-xs italic text-muted-foreground">{i.fuente === "navegador" ? "sin sesión (sin consentimiento)" : "del servidor (sin sesión)"}</span>}
+                    <DetalleOcurrencia i={i} e={e} />
                   </li>
                 ))}
               </ul>

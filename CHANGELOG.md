@@ -2,6 +2,32 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.16.0] - 2026-11-10
+
+Objetivo: Publicar todo lo que quedaba en staging (lo que chocaba con producción en la 1.15.0), alineando producción con la demo
+
+### Añadido
+- Super Admin: módulo «Informes» con todos los informes del panel ([#78](https://github.com/restcasatomascrevillent/admin-casatomas/pull/78))
+- Informes: el módulo reúne también Servicios y Cheques regalo ([#80](https://github.com/restcasatomascrevillent/admin-casatomas/pull/80))
+- Logs: agrupación de errores repetidos, causas conocidas y tickets con contexto ([#71](https://github.com/restcasatomascrevillent/admin-casatomas/pull/71))
+- Vinos: añadas y puntuación Parker ([#75](https://github.com/restcasatomascrevillent/admin-casatomas/pull/75))
+- Reservas: «Sentar fuera» en Hoy (Touza, Terraza Touza u otro) sin contar en las salas ([#90](https://github.com/restcasatomascrevillent/admin-casatomas/pull/90))
+- Reservas: botones Cerrar comida / Cerrar noche con confirmación ([c989662](https://github.com/restcasatomascrevillent/admin-casatomas/commit/c989662))
+- RRSS: motor real de edición de fotos (sharp) y vídeos (ffmpeg) en Vercel ([5493010](https://github.com/restcasatomascrevillent/admin-casatomas/commit/5493010))
+
+### Cambiado
+- Tienda: repaso de estética del panel y sin botón de abrir la web ([#66](https://github.com/restcasatomascrevillent/admin-casatomas/pull/66))
+- Carta PDF: interlineado a elegir y sin aviso de «varias páginas» ([#67](https://github.com/restcasatomascrevillent/admin-casatomas/pull/67))
+- Permisos: Stripe de Cheques y «PDF Carta» solo con «Editar» ([#83](https://github.com/restcasatomascrevillent/admin-casatomas/pull/83))
+- Facturas: la migración de «Comparar facturas» pasa a la versión 20261122100100 ([#91](https://github.com/restcasatomascrevillent/admin-casatomas/pull/91))
+
+### Arreglado
+- Vercel: errores de tipos de api/ en el build ([#84](https://github.com/restcasatomascrevillent/admin-casatomas/pull/84))
+- Release: la rama capturas-release lleva siempre su vercel.json sin despliegue ([#77](https://github.com/restcasatomascrevillent/admin-casatomas/pull/77))
+- CI: tests solo de lo cambiado en staging; suite completa solo en release ([71a18f0](https://github.com/restcasatomascrevillent/admin-casatomas/commit/71a18f0))
+
+Nota: esta release se montó igualando producción con staging (los cambios chocaban al copiarlos uno a uno); entradas escritas a mano, no por scripts/release.mjs.
+
 ## [1.15.0] - 2026-11-10
 
 Objetivo: Libro de reservas con lápiz, avisos de reservas nuevas y canceladas, facturas (comparar y gráficas), newsletter, cheques, reseñas, servicios, usuarios y más

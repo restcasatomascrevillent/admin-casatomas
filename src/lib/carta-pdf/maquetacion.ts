@@ -29,6 +29,14 @@
  * en el centro o abajo de la página (`Alineacion`). Una sección corta no se
  * estira: se coloca, con su medida de diseño, donde diga la alineación.
  *
+ * Interlineado a elegir (10/11/2026, dueño: «añadir opción de interlineado a
+ * la carta PDF de vinos y platos»): compacto, normal o amplio
+ * (`Interlineado`). Cambia la distancia entre las líneas de un mismo plato o
+ * vino (nombre, descripción) y, algo más, el aire entre un plato y el
+ * siguiente. Se aplica sobre la composición que toque, así que «amplio» siempre
+ * es más aireado que «normal»; con «amplio» una sección puede necesitar más
+ * páginas y con «compacto», menos.
+ *
  * Reglas al pasar de página:
  *  · Un plato o un vino nunca se parte.
  *  · Una denominación nunca se queda sola al pie: va con, al menos, sus dos
@@ -132,6 +140,21 @@ export interface Alineacion {
   horizontal: AlineacionHorizontal;
   vertical: AlineacionVertical;
 }
+
+export const INTERLINEADOS = ["compacto", "normal", "amplio"] as const;
+export type Interlineado = (typeof INTERLINEADOS)[number];
+export const INTERLINEADO_POR_DEFECTO: Interlineado = "normal";
+/**
+ * Multiplicadores de cada interlineado: `lineas`, para la distancia entre
+ * líneas de un mismo elemento (o de un título partido); `aire`, para el blanco
+ * entre elementos y antes de cada denominación. Con «compacto» y la letra más
+ * pequeña las líneas siguen separadas más que su cuerpo: no se montan.
+ */
+export const FACTORES_INTERLINEADO: Record<Interlineado, { lineas: number; aire: number }> = {
+  compacto: { lineas: 0.9, aire: 0.75 },
+  normal: { lineas: 1, aire: 1 },
+  amplio: { lineas: 1.15, aire: 1.6 },
+};
 
 /** La de siempre: platos a la izquierda con puntos guía hasta el precio, y el bloque centrado en la página. */
 export const ALINEACION_POR_DEFECTO: Alineacion = { horizontal: "izquierda", vertical: "centro" };
@@ -244,6 +267,8 @@ export interface MaquetaCarta {
 export interface OpcionesMaquetacion {
   /** Dónde va el texto de cada sección (por defecto, `ALINEACION_POR_DEFECTO`). */
   alineacion?: Partial<Alineacion>;
+  /** Separación entre líneas y entre platos (por defecto, `INTERLINEADO_POR_DEFECTO`). */
+  interlineado?: Interlineado;
 }
 /** Proporciones (ancho / alto) de los logos de logos.ts, para no cargar las rutas aquí. */
 export const PROPORCION_LOGO: Record<LogoCarta, number> = {
@@ -280,16 +305,34 @@ function escalar<T>(valor: T, escala: number): T {
   return valor;
 }
 
-/** Tipografía a una escala y con menos aire (holgura < 1): solo encoge los blancos, no el interlineado. */
-function tipografia(escala: number, holgura: number): Tipografia {
+/**
+ * Tipografía a una escala y con menos aire (holgura < 1): la holgura solo
+ * encoge los blancos. El interlineado elegido multiplica además la distancia
+ * entre líneas (`lineas`) y los blancos entre elementos (`aire`).
+ */
+function tipografia(escala: number, holgura: number, interlineado: Interlineado = INTERLINEADO_POR_DEFECTO): Tipografia {
   const t = escalar(TIPOGRAFIA_A5, escala);
   const h = holgura;
+  const { lineas: l, aire: a } = FACTORES_INTERLINEADO[interlineado];
+  const elemento = <M extends Tipografia["plato"] | Tipografia["vino"]>(m: M): M => ({
+    ...m,
+    interlineado: m.interlineado * l,
+    interDetalle: m.interDetalle * l,
+    primerDetalle: m.primerDetalle * l,
+    entre: m.entre * h * a,
+    bajo: m.bajo * (0.5 + 0.5 * h) * a,
+  });
   return {
     ...t,
-    seccion: { ...t.seccion, despues: t.seccion.despues * (0.4 + 0.6 * h) },
-    grupo: { ...t.grupo, alto: t.grupo.base + (t.grupo.alto - t.grupo.base) * (0.5 + 0.5 * h), antes: t.grupo.antes * h },
-    plato: { ...t.plato, entre: t.plato.entre * h, bajo: t.plato.bajo * (0.5 + 0.5 * h) },
-    vino: { ...t.vino, entre: t.vino.entre * h, bajo: t.vino.bajo * (0.5 + 0.5 * h) },
+    seccion: { ...t.seccion, interlineado: t.seccion.interlineado * l, despues: t.seccion.despues * (0.4 + 0.6 * h) },
+    grupo: {
+      ...t.grupo,
+      interlineado: t.grupo.interlineado * l,
+      alto: t.grupo.base + (t.grupo.alto - t.grupo.base) * (0.5 + 0.5 * h) * a,
+      antes: t.grupo.antes * h * a,
+    },
+    plato: elemento(t.plato),
+    vino: elemento(t.vino),
   };
 }
 
@@ -396,14 +439,21 @@ interface Contexto {
   y1: number;
 }
 
-function crearContexto(medidor: Medidor, formato: Formato, tipo: TipoCartaImpresa, variante: Variante, h: AlineacionHorizontal): Contexto {
+function crearContexto(
+  medidor: Medidor,
+  formato: Formato,
+  tipo: TipoCartaImpresa,
+  variante: Variante,
+  h: AlineacionHorizontal,
+  interlineado: Interlineado = INTERLINEADO_POR_DEFECTO,
+): Contexto {
   const { lateral } = variante;
   return {
     medidor,
     formato,
     tipo,
     e: variante.escala,
-    t: tipografia(variante.escala, variante.holgura),
+    t: tipografia(variante.escala, variante.holgura, interlineado),
     margenLateral: lateral,
     marco: { x0: lateral, x1: formato.ancho - lateral },
     h,
@@ -869,8 +919,17 @@ function equilibrarCaras(composicion: Composicion, seccion: SeccionCarta, titulo
  * Si no cabe en una con ninguna, no se aprieta: va con la de diseño (la
  * primera que no corta palabras) en las páginas que haga falta, equilibradas.
  */
-function elegirComposicion(medidor: Medidor, formato: Formato, tipo: TipoCartaImpresa, h: AlineacionHorizontal, seccion: SeccionCarta, titulo: string, continuacion: string): Composicion {
-  const contextos = formato.variantes[tipo].map((variante) => crearContexto(medidor, formato, tipo, variante, h));
+function elegirComposicion(
+  medidor: Medidor,
+  formato: Formato,
+  tipo: TipoCartaImpresa,
+  h: AlineacionHorizontal,
+  interlineado: Interlineado,
+  seccion: SeccionCarta,
+  titulo: string,
+  continuacion: string,
+): Composicion {
+  const contextos = formato.variantes[tipo].map((variante) => crearContexto(medidor, formato, tipo, variante, h, interlineado));
   let holgada: Contexto | null = null;
   for (const c of contextos) {
     const composicion = componerSeccion(c, seccion, titulo, continuacion, 1);
@@ -884,7 +943,14 @@ function elegirComposicion(medidor: Medidor, formato: Formato, tipo: TipoCartaIm
 /** Parte del alto libre que queda encima del bloque, según la alineación vertical (centro: algo por encima de la mitad, el centro óptico). */
 const HUECO_ARRIBA: Record<AlineacionVertical, number> = { arriba: 0, centro: 0.42, abajo: 1 };
 
-function paginasInteriores(medidor: Medidor, formato: Formato, contenido: ContenidoCarta, primerNumero: number, alineacion: Alineacion): MaquetaCarta {
+function paginasInteriores(
+  medidor: Medidor,
+  formato: Formato,
+  contenido: ContenidoCarta,
+  primerNumero: number,
+  alineacion: Alineacion,
+  interlineado: Interlineado,
+): MaquetaCarta {
   const textos = TEXTOS[contenido.idioma];
   const idioma = contenido.idioma;
   const diseno = contextoDiseno(medidor, formato, contenido.tipo);
@@ -910,7 +976,7 @@ function paginasInteriores(medidor: Medidor, formato: Formato, contenido: Conten
     // Sección vacía: sin página.
     if (!total) continue;
     const titulo = medidor.limpiar(mayusculas(seccion.titulo, idioma));
-    const { c, caras, cabe } = elegirComposicion(medidor, formato, contenido.tipo, alineacion.horizontal, seccion, titulo, textos.continuacion);
+    const { c, caras, cabe } = elegirComposicion(medidor, formato, contenido.tipo, alineacion.horizontal, interlineado, seccion, titulo, textos.continuacion);
     const primeraPagina = paginas.length;
     for (const cara of caras) {
       const lienzo = nuevaPagina(seccion.clave, cara.desborda || !cabe);
@@ -1066,7 +1132,8 @@ export function maquetarCarta(
   const formato = FORMATOS[tamano];
   const alineacion: Alineacion = { ...ALINEACION_POR_DEFECTO, ...opciones.alineacion };
   const diseno = contextoDiseno(medidor, formato, contenido.tipo);
-  const interiores = paginasInteriores(medidor, formato, contenido, 2, alineacion);
+  const interlineado = opciones.interlineado ?? INTERLINEADO_POR_DEFECTO;
+  const interiores = paginasInteriores(medidor, formato, contenido, 2, alineacion, interlineado);
   return {
     paginas: [portada(diseno, contenido), ...interiores.paginas, contraportada(diseno, contenido, interiores.paginas.length + 2)],
     secciones: interiores.secciones,

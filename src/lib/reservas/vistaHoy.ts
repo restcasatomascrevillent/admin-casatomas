@@ -14,6 +14,7 @@
 // ============================================================================
 
 import { turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
+import { COLUMNAS_FUERA } from "./sentarFuera";
 
 /**
  * Columnas de `reservas` que pide «Hoy» (kanban, plano y vista de móvil), en vez de `select("*")`
@@ -25,6 +26,13 @@ import { turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad"
  */
 export const COLUMNAS_RESERVAS_HOY =
   "id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, importante, en_blacklist, notas_cliente, marca, llegada_at, salida_at, mesa_fijada, menu_del_dia";
+
+/**
+ * Las de arriba MÁS las de «Sentar fuera» (`fuera_lugar`, `fuera_mesa`, `fuera_espacio_previo_id`; migración
+ * 20261122171500). Solo las pide la consulta principal de Hoy (`consultaReservasHoy`), que si aún no existen
+ * relee con `COLUMNAS_RESERVAS_HOY` (así publicar el panel antes que la migración no tumba Hoy).
+ */
+export const COLUMNAS_RESERVAS_HOY_CON_FUERA = `${COLUMNAS_RESERVAS_HOY}, ${COLUMNAS_FUERA}`;
 
 /** Las dos vistas de «Hoy». Por defecto, el kanban (la de siempre). */
 export type ModoVistaHoy = "kanban" | "plano";

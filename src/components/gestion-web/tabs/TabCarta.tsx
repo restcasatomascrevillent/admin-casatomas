@@ -73,9 +73,9 @@ type ItemCarta = {
 
 export default function TabCarta() {
   // «Editar» en la carta (decisión del dueño, 06/11/2026). Con solo «Ver» se consulta (lista, buscador,
-  // filtros y tarjetas en lectura) y se descarga el «PDF Carta»; todo lo que escribe o gasta IA se OCULTA
-  // (añadir, «Varias botellas», ajustar precios, ordenar, interruptores, fotos, editar, borrar, la
-  // votación) y arriba sale «Solo lectura». La base de datos y las funciones exigen lo mismo
+  // filtros y tarjetas en lectura); todo lo que escribe o gasta IA se OCULTA (añadir, «Varias
+  // botellas», ajustar precios, ordenar, interruptores, fotos, editar, borrar, la votación y, desde el
+  // 10/11/2026, el «PDF Carta») y arriba sale «Solo lectura». La base de datos y las funciones exigen lo mismo
   // (migración 20261106500000_permisos_carta_newsletter). El super admin siempre edita.
   const { canAccess: puedeEditar } = useCanAccessSection("gestor_carta", "edit");
   const soloLectura = !puedeEditar;
@@ -237,9 +237,9 @@ export default function TabCarta() {
   }, [ordenando, puedeOrdenar]);
 
   // Herramientas de la barra (botones secundarios), en el orden en que se ven. El «PDF Carta» solo
-  // lee: también con solo «Ver».
+  // con «Editar» en la carta o super admin (10/11/2026, petición del dueño; antes también con «Ver»).
   const herramientas = [
-    (seccionActiva === "platos" || seccionActiva === "vinos") && (
+    puedeEditar && (seccionActiva === "platos" || seccionActiva === "vinos") && (
       <BotonCartaImprimir key="pdf" tipo={seccionActiva} platos={platos} vinos={vinos} />
     ),
     puedeEditar && (

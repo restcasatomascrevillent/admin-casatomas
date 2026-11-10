@@ -1,7 +1,7 @@
 /**
  * Gestor Web › Carta con solo «Ver» (decisión del dueño, 06/11/2026): se consulta (lista, buscador,
- * filtros y tarjetas en lectura) y se descarga el «PDF Carta»; todo lo demás se OCULTA (no se
- * desactiva) y arriba sale la etiqueta común «Solo lectura». Con «Editar», o siendo super admin,
+ * filtros y tarjetas en lectura); todo lo demás se OCULTA (no se desactiva), también el
+ * «PDF Carta» desde el 10/11/2026 (antes se podía descargar con «Ver»), y arriba sale la etiqueta común «Solo lectura». Con «Editar», o siendo super admin,
  * todo sigue como siempre.
  *
  * Se usan el `UserRoleProvider` y el `useCanAccessSection` REALES (solo se simulan Supabase, la
@@ -152,12 +152,12 @@ const botonesDeEscritura = () =>
   });
 
 describe("Gestor Web › Carta · solo «Ver»", () => {
-  it("etiqueta «Solo lectura», sin botones que escriban ni interruptores, y con el «PDF Carta»", async () => {
+  it("etiqueta «Solo lectura», sin botones que escriban ni interruptores, y sin el «PDF Carta» (10/11/2026)", async () => {
     h.permisos = SOLO_VER;
     await montar();
 
     expect(screen.getByTestId("etiqueta-solo-lectura")).toHaveTextContent("Solo lectura");
-    expect(screen.getByRole("button", { name: "PDF Carta" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "PDF Carta" })).not.toBeInTheDocument();
     expect(botonesDeEscritura()).toEqual([]);
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
     expect(screen.queryAllByTestId(/^form-/)).toEqual([]);
@@ -178,12 +178,12 @@ describe("Gestor Web › Carta · solo «Ver»", () => {
     expect(screen.getByRole("combobox", { name: "Filtrar visibilidad" })).toBeInTheDocument();
   });
 
-  it("Vinos: «PDF Carta» sí; «Añadir vino», «Varias botellas» y los interruptores de carta, no; la votación solo se lee", async () => {
+  it("Vinos: ni «PDF Carta», ni «Añadir vino», ni «Varias botellas», ni los interruptores de carta; la votación solo se lee", async () => {
     h.permisos = SOLO_VER;
     await montar();
     irA(/Vinos/);
     await screen.findByRole("heading", { name: "Albariño" });
-    expect(screen.getByRole("button", { name: "PDF Carta" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "PDF Carta" })).not.toBeInTheDocument();
     expect(botonesDeEscritura()).toEqual([]);
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
     expect(screen.getByTestId("estado-lectura")).toHaveTextContent("Sale solo en la carta de la web de Casa Tomás.");
@@ -203,14 +203,6 @@ describe("Gestor Web › Carta · solo «Ver»", () => {
     expect(screen.getByTestId("etiqueta-solo-lectura")).toBeInTheDocument();
   });
 
-  it("el «PDF Carta» se abre y se puede descargar con solo «Ver»", async () => {
-    h.permisos = SOLO_VER;
-    await montar();
-    fireEvent.click(screen.getByRole("button", { name: "PDF Carta" }));
-    const dialogo = await screen.findByRole("dialog");
-    expect(await within(dialogo).findByRole("button", { name: "Descargar PDF" })).toBeInTheDocument();
-    expect(h.mutaciones).toEqual([]);
-  });
 });
 
 describe.each([
@@ -241,5 +233,14 @@ describe.each([
     expect(screen.getByRole("button", { name: /Varias botellas/ })).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: /Vota tu vino favorito/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Resultados" })).toBeInTheDocument();
+  });
+
+  it("el «PDF Carta» se abre y se puede descargar sin escribir nada", async () => {
+    preparar();
+    await montar();
+    fireEvent.click(screen.getByRole("button", { name: "PDF Carta" }));
+    const dialogo = await screen.findByRole("dialog");
+    expect(await within(dialogo).findByRole("button", { name: "Descargar PDF" })).toBeInTheDocument();
+    expect(h.mutaciones).toEqual([]);
   });
 });

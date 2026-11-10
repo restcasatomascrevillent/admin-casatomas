@@ -5,7 +5,10 @@
 // una rama release/X.Y.Z (el merge commit que crea GitHub al pulsar «Merge pull request»:
 // "Merge pull request #N from <org>/release/X.Y.Z") y versionado.json dice esa misma versión.
 // Un push directo a main, un squash, un rebase o un PR desde staging no llegan a producción.
-// La demo (staging) y las previews (release/*) se construyen siempre.
+// Las previews (release/*) se construyen siempre. La demo (staging) también, SALVO si todo lo que
+// cambia desde el último despliegue de staging (VERCEL_GIT_PREVIOUS_SHA) son docs, Markdown o tests:
+// así no gastamos despliegues de Vercel en commits que no cambian la web. Ante cualquier duda
+// (sin SHA anterior, git sin historia suficiente, lista vacía) se construye.
 // Ver docs/PROCESO-DE-CAMBIOS.md.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -26,6 +29,27 @@ export function debeConstruir(env, mensaje, versionFichero) {
   return version !== null && version === versionFichero;
 }
 
+// Rutas que no cambian lo que se despliega. Ojo: nada de vercel.json, public/, api/ ni scripts/.
+const SIN_DESPLIEGUE = [
+  /^docs\//,
+  /\.md$/i,
+  /(^|\/)__tests__\//,
+  /\.(test|spec)\.[mc]?[jt]sx?$/,
+  /^e2e\//,
+  /^\.github\//,
+];
+
+/** true si TODOS los ficheros son docs/Markdown/tests (y hay al menos uno). */
+export function soloDocsOTests(ficheros) {
+  const lista = (ficheros ?? []).map((f) => f.trim()).filter(Boolean);
+  return lista.length > 0 && lista.every((f) => SIN_DESPLIEGUE.some((re) => re.test(f)));
+}
+
+/** true si es la demo (staging) y lo cambiado desde su último despliegue no afecta a la web. */
+export function saltarDemo(env, ficheros) {
+  return env.VERCEL_ENV !== "production" && env.VERCEL_GIT_COMMIT_REF === "staging" && soloDocsOTests(ficheros);
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let mensaje = process.env.VERCEL_GIT_COMMIT_MESSAGE ?? "";
   if (!mensaje) {
@@ -33,6 +57,15 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   let versionFichero = null;
   try { versionFichero = JSON.parse(readFileSync("versionado.json", "utf8")).version ?? null; } catch { /* sin fichero: no se publica */ }
+  const anterior = process.env.VERCEL_GIT_PREVIOUS_SHA;
+  if (process.env.VERCEL_ENV !== "production" && process.env.VERCEL_GIT_COMMIT_REF === "staging" && anterior) {
+    let ficheros = null;
+    try { ficheros = execFileSync("git", ["diff", "--name-only", anterior, "HEAD"], { encoding: "utf8" }).split(/\r?\n/); } catch { /* sin historia: se construye */ }
+    if (ficheros && saltarDemo(process.env, ficheros)) {
+      console.log("Demo NO se construye: desde el último despliegue de staging solo cambian docs, Markdown o tests.");
+      process.exit(0);
+    }
+  }
   if (debeConstruir(process.env, mensaje, versionFichero)) {
     if (process.env.VERCEL_ENV === "production") console.log(`Producción: release v${versionFichero} aceptada, se publica.`);
     process.exit(1);

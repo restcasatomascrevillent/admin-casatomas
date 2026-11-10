@@ -8,12 +8,25 @@
 # (cifras del 30/10/2026, CT-REM-OPS-09). Es un "trinquete": el job falla si el
 # recuento SUBE; si baja, hay que bajar también el tope en este fichero (los dos
 # valores TOPE_* de abajo). Cuando lleguen a cero, sustituir por el check normal.
+#
+# DOS MODOS (pedido del dueño 10/11/2026: menos tests, que solo se revise lo que se modifica,
+# para no agotar los minutos de GitHub Actions):
+#   - LIGERO (push a staging y PR a staging o a ramas de trabajo): typecheck, ESLint de lo
+#     cambiado (scripts/lint-cambios.mjs) y `npm run test:cambios` (solo los tests afectados y las pruebas PGlite si cambian migraciones).
+#   - COMPLETO (PR o push hacia main, ramas release/*, y el lanzamiento a mano de «Release ·
+#     preparar»): todo lo de siempre, suite completa, todas las PGlite y build.
+# Los jobs que protegen producción (tests-y-build, calidad-tope-deuda, control-release) siguen existiendo con el
+# mismo nombre; en modo ligero el job de calidad se salta (un check saltado cuenta como superado).
+# Un push que solo toca docs/Markdown no lanza CI (paths-ignore); los PR siempre lo lanzan.
 name: CI
 
 on:
   pull_request:
   push:
     branches: [staging, main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   # Lo lanza «Release · preparar» sobre la rama release/X.Y.Z: los PR que abre Actions con su
   # token no disparan otros workflows (docs/PROCESO-DE-CAMBIOS.md).
   workflow_dispatch:
@@ -21,6 +34,13 @@ on:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  # "true" → modo COMPLETO (camino a producción). "false" → modo LIGERO (staging y ramas de trabajo).
+  COMPLETA: ${{ github.base_ref == 'main' || github.ref_name == 'main' || startsWith(github.ref_name, 'release/') || startsWith(github.head_ref, 'release/') }}
+  # Base contra la que se mira «lo cambiado» en modo ligero: la rama destino del PR o el commit
+  # anterior del push (si es rama nueva, los scripts usan origin/staging).
+  BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before || 'origin/staging' }}
 
 jobs:
   tests-y-build:
@@ -30,124 +50,205 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          # Modo ligero: historia completa para comparar con la base. Modo completo: basta 1.
+          fetch-depth: ${{ env.COMPLETA == 'true' && 1 || 0 }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      # ---- Modo LIGERO (staging y ramas de trabajo) ----
+      - name: Typecheck (no puede superar el tope)
+        if: env.COMPLETA != 'true'
+        env:
+          TOPE_TSC: "20"
+        run: |
+          npx tsc --noEmit -p tsconfig.app.json > tsc.log || true
+          n=$(grep -c "error TS" tsc.log || true)
+          echo "Errores de tipos: $n (tope $TOPE_TSC)"
+          if [ "$n" -gt "$TOPE_TSC" ]; then
+            grep "error TS" tsc.log | head -50
+            echo "::error::Typecheck: $n errores, el tope es $TOPE_TSC. No se puede aumentar la deuda."
+            exit 1
+          fi
+      - name: ESLint de lo cambiado (ningún fichero puede empeorar)
+        if: env.COMPLETA != 'true'
+        run: npm run lint:cambios
+      - name: Tests afectados por lo cambiado (y PGlite si cambian migraciones)
+        if: env.COMPLETA != 'true'
+        run: npm run test:cambios
+      # ---- Modo COMPLETO (camino a producción) ----
       - name: Tests unitarios y de componentes
+        if: env.COMPLETA == 'true'
         run: npm test
       - name: Ciclo de vida de cheques regalo (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:cheques:db
       - name: Auditoría (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:auditoria:db
       - name: Botones y menú de las novedades (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:novedades:db
       - name: Mínimo privilegio y RLS de tablas núcleo (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:minimo-privilegio:db
       - name: Limitadores de abuso, superadmin mínimo y secreto de fotos (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:abuso:db
       - name: RLS de espacios_reserva por sección (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:espacios:db
       - name: Trabajos de vídeo para dispositivo potente (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:trabajos-video:db
       - name: Trabajos de recorte de fotos en un ordenador (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:trabajos-recorte:db
       - name: Límites de los cubos de fotos (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:cubos-fotos:db
       - name: Restricciones de Platos y Vinos (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:restricciones-carta:db
       - name: Restricciones de novedades y espacios_reserva (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:restricciones:db
       - name: Restricciones de Bebidas y Cocteles (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:restricciones-bebidas:db
       - name: Platos.updated_at cambia al editar (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:platos-updated-at:db
       - name: Platos «Apto para» a mano (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:platos-aptitudes:db
       - name: Alertas de un documento al añadir o borrar líneas (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:alertas-lineas:db
       - name: Indicaciones para la IA por proveedor (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:proveedores-notas-ia:db
       - name: Servicios contratados y su consumo, solo super admin (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:servicios:db
       - name: Cambio de la propia contraseña, límite de intentos (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:cambio-contrasena:db
       - name: Tienda de vinos, escaparate (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:tienda:db
       - name: Recorte en el servidor, constancia y topes de gasto (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:recorte-servidor:db
       - name: Vinos, un interruptor por carta y sin publicar sin origen (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:vinos-publicacion:db
       - name: Permiso propio de Reservas › Configuración (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:reservas-configuracion:db
       - name: Solo «Ver» canjea cheques; migración y rollback (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:permisos-solo-ver:db
       - name: Logs web, incidencias y estadísticas de comportamiento (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:logs-web:db
       - name: Facturas, «Ver» solo consulta y permiso «Facturas · Subida» (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:permisos-facturas-subida:db
       - name: Tipos de usuario «Reservas» (ver y crear) y «Albaranes» (solo fotos) (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:usuarios-reservas-albaranes:db
       - name: Vino por copas, Parker, votación del vino favorito, horario de menú y tapas y platos vegetarianos (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:vinos-copeo-encuesta:db
       - name: Puntuaciones Parker con fuente, solo verificadas en la web (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:vinos-parker:db
+      - name: "Añadas en el nombre y Parker aplicado, scripts de datos idempotentes y vuelta atrás (PGlite)"
+        if: env.COMPLETA == 'true'
+        run: npm run test:vinos-anadas:db
       - name: Instagram, bucket y piezas por la sección marketing (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:instagram:db
       - name: Originales de las fotos de la carta en Drive (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:carta-originales:db
       - name: Instagram, publicaciones programadas, RPC y cron del programador (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:instagram-programar:db
       - name: Métricas de Instagram, tablas, RLS y cron (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:instagram-metricas:db
       - name: Instagram, estado de publicación solo por el servidor, cerrojo, texto alternativo y limpieza del bucket (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:instagram-servidor:db
       - name: IA de textos de Instagram, guías de marca y sugerencias (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:instagram-ia:db
       - name: Fechas y campañas de Instagram, borradores con fecha prevista (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:instagram-campanas:db
       - name: Reels en MP4, cola de render, cubo de vídeo y reels «procesando» (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:instagram-video:db
       - name: Métricas para aprender de Instagram, «Qué funciona» (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:instagram-aprender:db
       - name: Encargos de Instagram, estados por RPC, agencia, rondas y pieza al aprobar (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:instagram-encargos:db
       - name: Seguridad de Instagram, «Editar» para escribir, agencia y trabajador de render limitados, limpieza de vídeo y cupo de IA (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:instagram-seguridad:db
       - name: Carruseles de Instagram, diapositivas, programar con el texto y limpieza de todas las imágenes (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:instagram-carrusel:db
       - name: RRSS, editor IA, generación única por trabajo, topes diarios, cubo privado y rollback (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:rrss:db
       - name: Reseñas, contestador con IA, ajustes solo super admin, token de Google solo servidor y cron (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:resenas:db
       - name: «Editar» para escribir en la carta y en el newsletter; con solo «Ver», consulta (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:permisos-carta-newsletter:db
       - name: Plantillas de newsletter guardadas y tope diario de «Crear con IA» (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:newsletter-plantillas:db
       - name: Mesa fijada de una reserva, migración y rollback (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:mesa-fijada:db
       - name: Evento con la sala entera, aforo y cierre que sigue a la reserva (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:sala-evento:db
       - name: Servicios bloqueados a la web y menú del día, migración y rollback (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:servicios-bloqueados:db
       - name: Jueves de tapas, abierto en el panel y sin reservas web; canales sin cambios y rollback (PGlite)
+        if: env.COMPLETA == 'true'
         run: npm run test:jueves-abiertos:db
       - name: Versiones de migración sin repetir (salvo las históricas)
+        if: env.COMPLETA == 'true'
         run: npm run test:migraciones
       - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)
+        if: env.COMPLETA == 'true'
         run: npx vitest run api/
         env:
           RECORTE_INFERENCIA: "1"
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
+        if: env.COMPLETA == 'true'
         run: |
           node scripts/verificar-auditoria.mjs
           node scripts/verificar-bloqueo-usuarios.mjs
           node scripts/verificar-gestion-superadmin.mjs
       - name: Build de producción
+        if: env.COMPLETA == 'true'
         run: npm run build
 
   calidad-tope-deuda:
+    # Solo en modo completo; en modo ligero el typecheck y el ESLint de lo cambiado van en tests-y-build.
+    if: ${{ github.base_ref == 'main' || github.ref_name == 'main' || startsWith(github.ref_name, 'release/') || startsWith(github.head_ref, 'release/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

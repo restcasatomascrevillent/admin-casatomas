@@ -64,7 +64,7 @@ export default function SuperAdminLogs() {
   const autoRefresco = auto ? AUTO_MS : false;
 
   const estado = useEstadoRecogida(entorno, autoRefresco);
-  const activas = useIncidencias({ entorno, estado: "activas", gravedad: null, fuente: null, texto: "" }, 0, autoRefresco);
+  const activas = useIncidencias({ entorno, estado: "activas", gravedad: null, fuente: null, texto: "", ocultarRuido: true }, 0, autoRefresco);
 
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA);

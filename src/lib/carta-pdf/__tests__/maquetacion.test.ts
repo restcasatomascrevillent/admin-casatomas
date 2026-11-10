@@ -5,8 +5,9 @@
  * sección vuelve a empezar en página nueva. Nada se sale de los márgenes,
  * ningún plato se parte, se pierde ni se repite; las secciones vacías no
  * tienen página; las cortas no se estiran; el texto se alinea a la izquierda,
- * al centro o a la derecha, y arriba, en el centro o abajo. El A4 es A4 y no
- * un A5 ampliado.
+ * al centro o a la derecha, y arriba, en el centro o abajo; el interlineado
+ * (compacto, normal o amplio) separa más o menos las líneas sin que se monten.
+ * El A4 es A4 y no un A5 ampliado.
  */
 import { describe, expect, it } from "vitest";
 import type { ContenidoCarta, ElementoCarta, SeccionCarta } from "../datos";
@@ -15,10 +16,12 @@ import {
   COLORES,
   CUERPO_MINIMO,
   FORMATOS,
+  INTERLINEADOS,
   maquetarCarta,
   mm,
   seccionesQueNoCaben,
   type Alineacion,
+  type Interlineado,
   type Medidor,
   type PaginaCarta,
   type TamanoCarta,
@@ -150,7 +153,7 @@ describe("maquetarCarta: nunca dos secciones en la misma página", () => {
   });
 
   for (const horizontal of ALINEACIONES_HORIZONTALES) {
-    it.each(TAMANOS)(`alineado a la ${horizontal}, en %s todo cabe dentro de los márgenes (≥ 12 mm) y no se pisa nada, también con nombres y descripciones largos`, (tamano) => {
+    it.each(TAMANOS)(`alineado a la ${horizontal}, en %s y con cada interlineado todo cabe dentro de los márgenes (≥ 12 mm) y no se pisa nada, también con nombres y descripciones largos`, (tamano) => {
       const entrantes = seccion("ENTRANTES", 30);
       entrantes.grupos[0].elementos.splice(3, 0, {
         ...elemento(
@@ -161,8 +164,12 @@ describe("maquetarCarta: nunca dos secciones en la misma página", () => {
       });
       const vinos = tipoVino("TINTOS", 10, 6);
       vinos.grupos[0].elementos[0] = { ...vinos.grupos[0].elementos[0], copa: "Copa 6,50 €", precio: "Consultar precio" };
-      for (const datos of [contenido([seccion("NOVEDADES", 9), entrantes, seccion("CARNES", 2)]), contenido([vinos], "vinos")]) {
-        const { paginas } = maquetarCarta(medidor, datos, tamano, { alineacion: { horizontal } });
+      const casos = INTERLINEADOS.flatMap((interlineado) =>
+        [contenido([seccion("NOVEDADES", 9), entrantes, seccion("CARNES", 2)]), contenido([vinos], "vinos")].map((datos) => ({ datos, interlineado })),
+      );
+      for (const { datos, interlineado } of casos) {
+        const { paginas, secciones } = maquetarCarta(medidor, datos, tamano, { alineacion: { horizontal }, interlineado });
+        expect(secciones.every((s) => s.cabe), interlineado).toBe(true);
         const formato = FORMATOS[tamano];
         for (const pagina of interiores(paginas)) {
           // La cabecera y el número de página van, a propósito, en el margen.
@@ -180,7 +187,7 @@ describe("maquetarCarta: nunca dos secciones en la misma página", () => {
             for (let j = i + 1; j < grandes.length; j++) {
               const [a, b] = [grandes[i], grandes[j]];
               const pisan = a.x0 < b.x1 - 0.3 && b.x0 < a.x1 - 0.3 && a.y0 < b.y1 - 0.3 && b.y0 < a.y1 - 0.3;
-              expect(pisan, `«${a.t.texto}» y «${b.t.texto}» en la página ${pagina.numero}`).toBe(false);
+              expect(pisan, `«${a.t.texto}» y «${b.t.texto}» en la página ${pagina.numero} (${interlineado})`).toBe(false);
             }
         }
       }
@@ -320,5 +327,63 @@ describe("maquetarCarta: nunca dos secciones en la misma página", () => {
       expect(Math.min(...cuerpo.filter((t) => t.fuente === "seminegrita" && t.texto.length > 3).map((t) => t.tamano))).toBeGreaterThanOrEqual(CUERPO_MINIMO.nombre - 1e-9);
       expect(Math.min(...cuerpo.filter((t) => t.fuente === "italica" && t.texto.length > 3).map((t) => t.tamano))).toBeGreaterThanOrEqual(CUERPO_MINIMO.detalle - 1e-9);
     }
+  });
+});
+
+describe("maquetarCarta: interlineado", () => {
+  const maquetar = (datos: ContenidoCarta, interlineado?: Interlineado, tamano: TamanoCarta = "A5") =>
+    maquetarCarta(medidor, datos, tamano, interlineado ? { interlineado } : {});
+  /** Distancia entre las líneas de base del primer y el segundo plato, y entre el nombre y su descripción. */
+  const medidas = (pagina: PaginaCarta) => {
+    const nombres = lineasNombre(pagina);
+    const detalle = textos(pagina).find((t) => t.fuente === "italica" && t.y > nombres[0].y)!;
+    return { entrePlatos: nombres[1].y - nombres[0].y, nombreDetalle: detalle.y - nombres[0].y };
+  };
+
+  it("por defecto, normal: igual que sin elegir", () => {
+    const datos = contenido([seccion("CARNES", 5), seccion("MARISCOS", 40)]);
+    expect(maquetar(datos, "normal")).toEqual(maquetar(datos));
+  });
+
+  for (const tamano of TAMANOS) {
+    for (const tipo of ["platos", "vinos"] as const) {
+      it(`en ${tamano}, en ${tipo}: compacto junta y amplio separa las líneas y los ${tipo}, con la misma letra`, () => {
+        const datos = tipo === "vinos" ? contenido([tipoVino("TINTOS", 1, 4)], "vinos") : contenido([seccion("CARNES", 4)]);
+        const [compacto, normal, amplio] = INTERLINEADOS.map((i) => interiores(maquetar(datos, i, tamano).paginas)[0]);
+        const [c, n, a] = [compacto, normal, amplio].map(medidas);
+        expect(c.entrePlatos).toBeLessThan(n.entrePlatos - 1);
+        expect(a.entrePlatos).toBeGreaterThan(n.entrePlatos + 1);
+        expect(c.nombreDetalle).toBeLessThan(n.nombreDetalle);
+        expect(a.nombreDetalle).toBeGreaterThan(n.nombreDetalle);
+        // Una sección corta no cambia de letra: solo el aire.
+        expect(new Set([compacto, normal, amplio].map((p) => lineasNombre(p)[0].tamano)).size).toBe(1);
+        // Ni en compacto se montan las líneas: el nombre y su descripción, separados más que su cuerpo.
+        expect(c.nombreDetalle).toBeGreaterThan(lineasNombre(compacto)[0].tamano);
+      });
+    }
+  }
+
+  it("una sección larga: con amplio ocupa las mismas páginas o más y con compacto, las mismas o menos", () => {
+    for (const tamano of TAMANOS) {
+      for (const datos of [contenido([seccion("MARISCOS", 60)]), contenido([tipoVino("TINTOS", 14, 7)], "vinos")]) {
+        const [compacto, normal, amplio] = INTERLINEADOS.map((i) => maquetar(datos, i, tamano).secciones[0].caras);
+        expect(compacto).toBeLessThanOrEqual(normal);
+        expect(amplio).toBeGreaterThanOrEqual(normal);
+        expect(amplio).toBeGreaterThan(compacto);
+      }
+    }
+  });
+
+  it("el interlineado de un nombre partido en dos líneas también cambia, y nunca baja de su cuerpo", () => {
+    const largo = "Tataki de chuleta de vaca madurada sesenta días con pimiento caramelizado";
+    const datos = contenido([{ clave: "E", titulo: "ENTRANTES", grupos: [{ titulo: null, elementos: [elemento(largo), elemento("Otro")] }] }]);
+    const salto = (i: Interlineado) => {
+      const nombres = lineasNombre(interiores(maquetar(datos, i).paginas)[0]);
+      return { salto: nombres[1].y - nombres[0].y, cuerpo: nombres[0].tamano };
+    };
+    const [c, n, a] = INTERLINEADOS.map(salto);
+    expect(c.salto).toBeLessThan(n.salto);
+    expect(a.salto).toBeGreaterThan(n.salto);
+    expect(c.salto).toBeGreaterThan(c.cuerpo);
   });
 });
