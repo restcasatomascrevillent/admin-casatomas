@@ -131,6 +131,15 @@ export function turnoDelPlano(filtroTurno: FiltroTurnoHoy, ahora: Date): "comida
 }
 
 /**
+ * ¿Ese turno de HOY ya ha terminado? (10/11/2026, «tocar una mesa en turno es para sentar»). Solo la comida
+ * puede estar cerrada: a partir de la hora de la cena (`turnoDelPlano("todo")`) ya no se sienta a nadie en
+ * la comida. La cena no se cierra en el día (la tablet sigue en «Hoy» hasta medianoche).
+ */
+export function turnoYaCerrado(turno: "comida" | "cena", ahora: Date): boolean {
+  return turno === "comida" && turnoDelPlano("todo", ahora) === "cena";
+}
+
+/**
  * Tiempo corto para dentro de una mesa del plano: «14:00» (por llegar), «+12 min»
  * (retraso) o «45 min» / «1 h 50» (sentada). `null` si no hay nada que contar.
  */

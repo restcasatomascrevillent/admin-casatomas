@@ -202,6 +202,16 @@ function montar(props: Parameters<typeof Plano>[0] = {}) {
 
 const mesaBoton = (nombre: string) => screen.getByRole("button", { name: new RegExp(`^Mesa ${nombre},`) });
 const estadoDe = (nombre: string) => mesaBoton(nombre).getAttribute("data-estado");
+/**
+ * En turno, una mesa libre o prevista abre primero la hoja para SENTAR (10/11/2026); el detalle de siempre sigue
+ * con «Ver detalle de la mesa». Abre ese detalle.
+ */
+function abrirDetalle(nombre: string): HTMLElement {
+  fireEvent.click(mesaBoton(nombre));
+  const ver = screen.queryByRole("button", { name: "Ver detalle de la mesa" });
+  if (ver) fireEvent.click(ver);
+  return screen.getByTestId("detalle-mesa");
+}
 
 const anchoOriginal = window.innerWidth;
 /** Ancho de la ventana: desde 1280 px la lista va al lado; por debajo, en hojas. */
@@ -323,9 +333,8 @@ describe("Plano de Hoy · las mesas, con la lógica y los umbrales del modo serv
 
   it("tocar una mesa enseña su número y la MISMA tarjeta del kanban, con sus acciones", () => {
     montar();
-    fireEvent.click(mesaBoton("2"));
+    const detalle = abrirDetalle("2");
     expect(mesaBoton("2")).toHaveAttribute("aria-pressed", "true");
-    const detalle = screen.getByTestId("detalle-mesa");
     expect(within(detalle).getByRole("heading", { name: "Mesa 2" })).toBeInTheDocument();
     expect(within(detalle).getByRole("button", { name: /^Rosa Reservada, 14:45/ })).toHaveAttribute("aria-haspopup", "menu");
     expect(within(detalle).getByRole("button", { name: "Acciones de la reserva de Rosa Reservada" })).toBeInTheDocument();
@@ -348,8 +357,7 @@ describe("Plano de Hoy · las mesas, con la lógica y los umbrales del modo serv
 
   it("mesa libre: «Sentar aquí» a una reserva de la sala sin mesa, del turno que se ve", async () => {
     montar();
-    fireEvent.click(mesaBoton("5"));
-    const detalle = screen.getByTestId("detalle-mesa");
+    const detalle = abrirDetalle("5");
     // Diana es de la cena: con la comida en pantalla no se ofrece aquí.
     expect(within(detalle).queryByRole("button", { name: /Diana Cena/ })).toBeNull();
     fireEvent.click(within(detalle).getByRole("button", { name: /^Sentar en la mesa 5 a Berta Sinmesa/ }));
@@ -567,8 +575,7 @@ describe("Plano de Hoy · «Sentar aquí» marca también la llegada", () => {
 
   it("da la mesa Y marca «Ha llegado» (como el kanban): no se queda «Reservada» camino de un «No vino» falso", async () => {
     montar();
-    fireEvent.click(mesaBoton("5"));
-    const detalle = screen.getByTestId("detalle-mesa");
+    const detalle = abrirDetalle("5");
     fireEvent.click(within(detalle).getByRole("button", { name: /^Sentar en la mesa 5 a Berta Sinmesa.*marca que ha llegado/ }));
     await waitFor(() => expect(h.acciones.marcarLlegada).toHaveBeenCalledWith(expect.objectContaining({ id: "r-berta" })));
     expect(h.asignar).toHaveBeenCalledWith({ reserva_id: "r-berta", mesa_ids: ["m5"] });
@@ -578,8 +585,7 @@ describe("Plano de Hoy · «Sentar aquí» marca también la llegada", () => {
 
   it("si falta más de media hora se ofrece además «Solo dar la mesa», que NO marca la llegada", async () => {
     montar({ reservas: conTardia() });
-    fireEvent.click(mesaBoton("5"));
-    const detalle = screen.getByTestId("detalle-mesa");
+    const detalle = abrirDetalle("5");
     fireEvent.click(within(detalle).getByRole("button", { name: /^Solo dar la mesa 5 a Hugo Tarde/ }));
     await waitFor(() => expect(h.asignar).toHaveBeenCalledWith({ reserva_id: "r-hugo", mesa_ids: ["m5"] }));
     expect(h.acciones.marcarLlegada).not.toHaveBeenCalled();
@@ -590,8 +596,7 @@ describe("Plano de Hoy · «Sentar aquí» marca también la llegada", () => {
       throw new Error("MESA_OCUPADA");
     });
     montar();
-    fireEvent.click(mesaBoton("5"));
-    fireEvent.click(within(screen.getByTestId("detalle-mesa")).getByRole("button", { name: /^Sentar en la mesa 5 a Berta/ }));
+    fireEvent.click(within(abrirDetalle("5")).getByRole("button", { name: /^Sentar en la mesa 5 a Berta/ }));
     await waitFor(() => expect(h.asignar).toHaveBeenCalled());
     expect(h.acciones.marcarLlegada).not.toHaveBeenCalled();
   });
@@ -616,7 +621,8 @@ describe("Plano de Hoy · un toque en una mesa abre ESA mesa", () => {
   it("tocar el halo (fuera de cualquier mesa) también abre su mesa", () => {
     montar();
     fireEvent.click(document.querySelector('[data-halo-mesa="m2"]')!);
-    expect(screen.getByTestId("detalle-mesa")).toHaveTextContent("Mesa 2");
+    // Mesa 2 está prevista (Rosa, 14:45): en turno abre la hoja para sentar, con su número.
+    expect(screen.getByRole("dialog", { name: "Mesa 2 · Comedor" })).toBeInTheDocument();
   });
 });
 
@@ -665,8 +671,7 @@ describe("Plano de Hoy · notas del cliente e «importante», a la vista", () =>
     const rotulo = mesaBoton("2").nextElementSibling!;
     expect(rotulo.querySelector('[data-marca="importante"]')).not.toBeNull();
     expect(rotulo.querySelector('[data-marca="nota"]')).not.toBeNull();
-    fireEvent.click(mesaBoton("2"));
-    const detalle = screen.getByTestId("detalle-mesa");
+    const detalle = abrirDetalle("2");
     const aviso = within(detalle).getByTestId("aviso-reserva-mesa");
     expect(aviso).toHaveTextContent("Reserva importante");
     expect(aviso).toHaveTextContent("Nota: Celíaca, trae tarta");
@@ -885,5 +890,52 @@ describe("Plano de Hoy · fijo (escritorio): una sala a la vez con flechas", () 
     expect(screen.queryByTestId("plano-fijo")).toBeNull();
     await screen.findByTestId("mapa-sala");
     expect(screen.getByRole("button", { name: "Acercar el plano" })).toBeInTheDocument();
+  });
+});
+
+// 10/11/2026 (petición del dueño): «cuando estamos en turno, al hacer clic en la mesa tiene que ser para sentar a
+// alguien, con o sin reserva».
+describe("Plano de Hoy · en turno, tocar una mesa libre o prevista es para SENTAR", () => {
+  it("libre: hoja «Mesa 5 · Comedor» con «Sentar sin reserva» y las reservas por llegar; el detalle, con un botón", async () => {
+    montar({ fijo: true });
+    fireEvent.click(mesaBoton("5"));
+    const hoja = await screen.findByRole("dialog", { name: "Mesa 5 · Comedor" });
+    expect(within(hoja).getByRole("button", { name: "Sentar sin reserva" })).toBeInTheDocument();
+    expect(within(hoja).getByRole("region", { name: "Sentar una reserva" })).toHaveTextContent("Berta Sinmesa");
+    fireEvent.click(within(hoja).getByRole("button", { name: "Ver detalle de la mesa" }));
+    expect(await screen.findByRole("dialog", { name: "Mesa 5" })).toBeInTheDocument();
+  });
+
+  it("prevista (Rosa, 14:45): lo primero «Sentar a Rosa Reservada»", async () => {
+    montar({ fijo: true });
+    fireEvent.click(mesaBoton("2"));
+    const hoja = await screen.findByRole("dialog", { name: "Mesa 2 · Comedor" });
+    expect(within(hoja).getByTestId("sentar-prevista")).toHaveTextContent("Sentar a Rosa Reservada");
+  });
+
+  it("ocupada: lo de siempre (quién está y «Liberar mesa»)", async () => {
+    montar({ fijo: true });
+    fireEvent.click(mesaBoton("4"));
+    const hoja = await screen.findByRole("dialog", { name: "Mesa 4" });
+    expect(within(hoja).getByRole("button", { name: /Liberar mesa/ })).toBeInTheDocument();
+  });
+
+  it("con la comida ya cerrada (21:00 mirando la comida): lo de siempre, sin hoja de sentar", async () => {
+    vi.setSystemTime(a(21, 0));
+    montar({ fijo: true, filtroTurno: "comida" });
+    fireEvent.click(mesaBoton("5"));
+    expect(await screen.findByRole("dialog", { name: "Mesa 5" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sentar sin reserva" })).toBeNull();
+  });
+
+  it("con solo «Ver»: lo de siempre", async () => {
+    h.puedeEditar = false;
+    try {
+      montar({ fijo: true });
+      fireEvent.click(mesaBoton("5"));
+      expect(await screen.findByRole("dialog", { name: "Mesa 5" })).toBeInTheDocument();
+    } finally {
+      h.puedeEditar = true;
+    }
   });
 });
