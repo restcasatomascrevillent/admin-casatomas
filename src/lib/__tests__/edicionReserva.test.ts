@@ -254,7 +254,7 @@ describe("edicionReserva · validar solo lo que se toca", () => {
     expect(errorNombreEdicion("J", "Juan")).toBe("El nombre es obligatorio");
     expect(errorNombreEdicion("  ", "Juan")).toBe("El nombre es obligatorio");
     expect(errorNombreEdicion("Juan Pérez", "Juan")).toBeNull();
-    expect(errorTelefonoEdicion("", "+34612345678")).toBe("El teléfono es obligatorio");
+    expect(errorTelefonoEdicion("", "+34612345678")).toBeNull(); // el teléfono ya es opcional en el panel
     expect(errorTelefonoEdicion("12345", "+34612345678")).toBe("Teléfono no válido (mínimo 9 cifras)");
     expect(errorTelefonoEdicion("611 222 333", "+34612345678")).toBeNull();
   });
