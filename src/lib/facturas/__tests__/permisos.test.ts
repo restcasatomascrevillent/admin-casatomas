@@ -21,10 +21,10 @@ describe("permisosFacturas", () => {
 
 describe("pestañas", () => {
   it("se ven según el perfil, en el orden de la barra", () => {
-    expect(pestanasFacturas(soloVer)).toEqual(["chat", "compras"]);
+    expect(pestanasFacturas(soloVer)).toEqual(["chat", "margenes", "compras"]);
     expect(pestanasFacturas(soloSubida)).toEqual(["cargar"]);
-    expect(pestanasFacturas(subidaVer)).toEqual(["chat", "compras", "cargar"]);
-    expect(pestanasFacturas(editar)).toEqual(["chat", "compras", "cargar"]);
+    expect(pestanasFacturas(subidaVer)).toEqual(["chat", "margenes", "compras", "cargar"]);
+    expect(pestanasFacturas(editar)).toEqual(["chat", "margenes", "compras", "cargar"]);
     expect(pestanasFacturas(nada)).toEqual([]);
   });
 

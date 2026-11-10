@@ -32,12 +32,17 @@ export function permisosFacturas(p: { ver: boolean; editar: boolean; subida: boo
   return { consultar: p.ver || p.editar, editar: p.editar, subir: p.subida || p.editar };
 }
 
-/** Valor de las pestañas de /facturas (`chat` = Análisis). */
-export type PestanaFacturas = "chat" | "compras" | "cargar";
+/**
+ * Valor de las pestañas de /facturas (`chat` = Análisis). «Márgenes» (10/11/2026,
+ * petición del dueño: antes era la sección «Análisis general» del menú) va con
+ * los mismos permisos que Análisis: consultar (editar escandallos y umbrales,
+ * con «Editar»; lo comprueba el servidor).
+ */
+export type PestanaFacturas = "chat" | "margenes" | "compras" | "cargar";
 
 /** Pestañas que se ven, en el orden de la barra. */
 export function pestanasFacturas(p: PermisosFacturas): PestanaFacturas[] {
-  return [...(p.consultar ? (["chat", "compras"] as const) : []), ...(p.subir ? (["cargar"] as const) : [])];
+  return [...(p.consultar ? (["chat", "margenes", "compras"] as const) : []), ...(p.subir ? (["cargar"] as const) : [])];
 }
 
 /**

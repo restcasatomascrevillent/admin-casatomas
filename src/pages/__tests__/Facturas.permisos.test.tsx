@@ -27,6 +27,14 @@ vi.mock("@/components/facturas/ChatFacturas", () => ({
     <p data-testid="analisis">Análisis · IA: {conIa ? "sí" : "no"} · editar: {puedeEditar ? "sí" : "no"}</p>
   )),
 }));
+vi.mock("@/components/analisis/margenes/MargenesCarta", () => ({
+  MargenesCarta: ({ puedeEditar, articuloInicial }: { puedeEditar: boolean; articuloInicial?: { tipo: string; id: string } | null }) => (
+    <p data-testid="margenes">
+      Márgenes · editar: {puedeEditar ? "sí" : "no"}
+      {articuloInicial ? ` · ficha ${articuloInicial.tipo} ${articuloInicial.id}` : ""}
+    </p>
+  ),
+}));
 vi.mock("@/components/facturas/SubidaFacturas", () => ({ SubidaFacturas: () => <p data-testid="subida">Subida</p> }));
 vi.mock("@/components/facturas/GastoIaPestana", () => ({ GastoIaPestana: () => <span data-testid="gasto-ia-pestana">gasto IA</span> }));
 vi.mock("@/components/facturas/MonitorGastoIA", () => ({ MonitorGastoIA: () => <span data-testid="monitor-ocr">gasto lectura</span> }));
@@ -90,9 +98,9 @@ afterEach(() => {
 });
 
 describe("Facturas con solo «Ver»: consultar", () => {
-  it("Análisis y Compras, sin Cargar; etiqueta «Solo lectura» y sin IA", () => {
+  it("Análisis, Márgenes y Compras, sin Cargar; etiqueta «Solo lectura» y sin IA", () => {
     montar("soloVer");
-    expect(pestanas()).toEqual(["Análisis", "Compras"]);
+    expect(pestanas()).toEqual(["Análisis", "Márgenes", "Compras"]);
     expect(screen.getByTestId("etiqueta-solo-lectura")).toHaveTextContent("Solo lectura");
     expect(screen.getByTestId("analisis")).toHaveTextContent("IA: no · editar: no");
     expect(screen.queryByTestId("gasto-ia-pestana")).toBeNull();
@@ -122,6 +130,37 @@ describe("Facturas con solo «Ver»: consultar", () => {
   it("un administrador con solo «Ver» tampoco ve la importación histórica", () => {
     montar("soloVer", "/facturas?tab=cargar", { admin: true });
     expect(screen.queryByRole("button", { name: /Importación histórica/ })).toBeNull();
+  });
+});
+
+describe("Facturas › Márgenes (antes «Análisis general», 10/11/2026)", () => {
+  it("con solo «Ver»: la pestaña Márgenes en lectura", () => {
+    montar("soloVer", "/facturas?tab=margenes");
+    expect(screen.getByRole("tab", { name: /^Márgenes/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("margenes")).toHaveTextContent("Márgenes · editar: no");
+    expect(screen.getByTestId("etiqueta-solo-lectura")).toBeInTheDocument();
+  });
+
+  it("con «Editar»: puede corregir escandallos y umbrales", () => {
+    montar("editar", "/facturas?tab=margenes");
+    expect(screen.getByTestId("margenes")).toHaveTextContent("Márgenes · editar: sí");
+    expect(screen.queryByTestId("etiqueta-solo-lectura")).toBeNull();
+  });
+
+  it("el enlace del Dashboard (?articulo=plato:<id>) abre esa ficha", () => {
+    montar("soloVer", "/facturas?tab=margenes&articulo=plato:p-42");
+    expect(screen.getByTestId("margenes")).toHaveTextContent("ficha plato p-42");
+  });
+
+  it("solo se monta al verla (su consulta es aparte de Análisis)", () => {
+    montar("editar");
+    expect(screen.queryByTestId("margenes")).toBeNull();
+  });
+
+  it("con solo Subida, ?tab=margenes lleva a Cargar", () => {
+    montar("soloSubida", "/facturas?tab=margenes");
+    expect(screen.getByRole("tab", { name: /^Cargar/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("margenes")).toBeNull();
   });
 });
 
@@ -162,9 +201,9 @@ describe("Facturas con solo «Facturas · Subida»: solo Cargar", () => {
 });
 
 describe("Facturas con «Facturas · Subida» + «Ver»", () => {
-  it("Análisis · Compras · Cargar; Análisis en lectura y sin IA", () => {
+  it("Análisis · Márgenes · Compras · Cargar; Análisis en lectura y sin IA", () => {
     montar("subidaVer");
-    expect(pestanas()).toEqual(["Análisis", "Compras", "Cargar"]);
+    expect(pestanas()).toEqual(["Análisis", "Márgenes", "Compras", "Cargar"]);
     expect(screen.getByTestId("etiqueta-solo-lectura")).toBeInTheDocument();
     expect(screen.getByTestId("analisis")).toHaveTextContent("IA: no · editar: no");
     expect(screen.queryByTestId("gasto-ia-pestana")).toBeNull();
@@ -181,7 +220,7 @@ describe("Facturas con «Facturas · Subida» + «Ver»", () => {
 describe("Facturas con «Editar» o super admin: todo, como siempre", () => {
   it.each(["editar", "superAdmin"] as const)("%s: las tres pestañas, la IA y su gasto, sin «Solo lectura»", (perfil) => {
     montar(perfil);
-    expect(pestanas()).toEqual(["Análisis", "Compras", "Cargar"]);
+    expect(pestanas()).toEqual(["Análisis", "Márgenes", "Compras", "Cargar"]);
     expect(screen.getByTestId("analisis")).toHaveTextContent("IA: sí · editar: sí");
     expect(screen.getByTestId("gasto-ia-pestana")).toBeInTheDocument();
     expect(screen.queryByTestId("etiqueta-solo-lectura")).toBeNull();
