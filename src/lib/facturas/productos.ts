@@ -218,11 +218,16 @@ const unidadSerie = (u: string | null | undefined) => (u ?? "").trim().toLowerCa
  * por fecha y proveedor (media ponderada por cantidad, sin IVA), una sola
  * unidad (la más comprada), sin precios a 0 ni albaranes ya facturados, máx.
  * 60 puntos. `nombreProveedor` unifica el texto del proveedor (opcional).
+ *
+ * Con varias unidades (kg, ud, caja…) ya no se descartan en silencio: devuelve
+ * `unidades` (cada una con sus compras = puntos) para que la ficha pinte un
+ * selector; `unidadElegida` cambia la que se dibuja (si no existe, la más comprada).
  */
 export function serieDesdeLineas(
   producto: string,
   lineas: LineaSerie[],
   nombreProveedor: (texto: string | null) => string = (t) => (t ?? "").trim() || "Sin proveedor",
+  unidadElegida?: string | null,
 ): DatosSerieProducto {
   const validas = lineas
     .map((l) => {
@@ -243,7 +248,19 @@ export function serieDesdeLineas(
   // La unidad más comprada (a igualdad, la primera por orden alfabético).
   const cuentaUnidad = new Map<string, number>();
   for (const { l } of validas) cuentaUnidad.set(unidadSerie(l.unidad), (cuentaUnidad.get(unidadSerie(l.unidad)) ?? 0) + 1);
-  const unidad = [...cuentaUnidad].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+  const orden = [...cuentaUnidad].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([u]) => u);
+  const elegida = unidadElegida ? unidadSerie(unidadElegida) : null;
+  const unidad = elegida && cuentaUnidad.has(elegida) ? elegida : orden[0];
+
+  // Compras (puntos: fecha + proveedor distintos) de cada unidad, para el selector.
+  const clavesUnidad = new Map<string, Set<string>>();
+  for (const { l } of validas) {
+    const u = unidadSerie(l.unidad);
+    const claves = clavesUnidad.get(u) ?? new Set<string>();
+    claves.add(`${(l.fecha as string).slice(0, 10)}\u0000${nombreProveedor(l.proveedor)}`);
+    clavesUnidad.set(u, claves);
+  }
+  const unidades: UnidadSerie[] = orden.map((u) => ({ unidad: u, n: clavesUnidad.get(u)?.size ?? 0 }));
 
   // Un punto por fecha y proveedor.
   const grupos = new Map<string, { fecha: string; prov: string; suma: number; cant: number; precios: number[] }>();
@@ -283,6 +300,7 @@ export function serieDesdeLineas(
     ultimo,
     // Solo con un proveedor: entre proveedores es una comparativa, no una evolución.
     variacion_pct: puntos.length >= 2 && proveedores.length === 1 && primero > 0 ? Math.round((ultimo / primero - 1) * 1000) / 10 : null,
+    unidades,
   };
 }
 
@@ -298,8 +316,16 @@ export type DatosSerieProducto =
       max: number | null;
       ultimo: number | null;
       variacion_pct: number | null;
+      /** Todas las unidades con precio (la más comprada primero) y sus compras. */
+      unidades: UnidadSerie[];
     }
   | { sin_datos: true; buscado: string };
+
+/** Una unidad de compra de un producto y cuántas compras (puntos) tiene. */
+export interface UnidadSerie {
+  unidad: string;
+  n: number;
+}
 
 export interface TotalCategoria {
   /** id de la categoría raíz; "sin" = productos sin categoría; "pendiente" = líneas sin producto. */

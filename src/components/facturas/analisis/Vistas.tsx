@@ -452,6 +452,9 @@ function DetallePrecio({
     subtitulo = `${a.datos.proveedor ? `${a.datos.proveedor} · ` : ""}${resumenCortoAlerta(a)}`;
   }
   const g = geometriaPrecio(serie, referencia);
+  // Un solo mes con precio: una frase en vez de un punto suelto sobre unos ejes vacíos.
+  const solo = g && g.puntos.length === 1 ? g.puntos[0] : null;
+  const proveedorSolo = e.top ? e.top.proveedor : e.cambio.alerta.datos.proveedor;
   const cargando = !!e.cambio && q.isLoading;
   // Marcar precio pactado: hace falta saber proveedor, línea y precio.
   const pacto = e.top
@@ -469,6 +472,15 @@ function DetallePrecio({
           <div className="h-full animate-pulse rounded-lg bg-muted/50" role="status" aria-label="Cargando la gráfica" />
         ) : !g ? (
           <SinDatos>Sin compras con precio en estos meses.</SinDatos>
+        ) : solo ? (
+          <SinDatos>
+            <span data-testid="precio-un-solo-mes">
+              Solo 1 mes con compras: <span className="font-semibold tabular-nums text-foreground">{precio2(solo.precio)} €/{unidad}</span> en {nombreMes(solo.mes)}{" "}
+              {solo.mes.slice(0, 4)}
+              {proveedorSolo ? ` en ${proveedorSolo}` : ""}. Sin IVA
+              {g.referencia !== null ? ` · ${textoRef}: ${precio2(g.referencia)} €` : ""}.
+            </span>
+          </SinDatos>
         ) : (
           <svg viewBox="0 0 400 180" preserveAspectRatio="none" className="block h-full w-full" role="img" aria-label={`Precio de ${titulo} por mes: ${g.puntos.map((p) => `${mesCorto(p.mes)} ${precio2(p.precio)} €`).join(", ")}${g.referencia !== null ? `. Raya: ${textoRef}, ${precio2(g.referencia)} €` : ""}`}>
             <line x1="12" x2="388" y1="168" y2="168" className="stroke-border" strokeWidth="1" vectorEffect="non-scaling-stroke" />
@@ -482,14 +494,14 @@ function DetallePrecio({
           </svg>
         )}
       </div>
-      {g && (
+      {g && !solo && (
         <div className="mt-1 flex shrink-0 justify-between text-[0.6875rem] tabular-nums text-muted-foreground" aria-hidden>
           {g.meses.map((m) => (
             <span key={m.mes}>{mesCorto(m.mes)}</span>
           ))}
         </div>
       )}
-      {g && (
+      {g && !solo && (
         <p className="mt-1 shrink-0 text-xs text-muted-foreground">
           € por {unidad}, sin IVA
           {g.referencia !== null && (

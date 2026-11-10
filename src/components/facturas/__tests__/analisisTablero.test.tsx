@@ -883,6 +883,21 @@ describe("Análisis en una pantalla: vistas con las gráficas de decisión", () 
     expect(within(det).getByRole("button", { name: "Quitar precio pactado" })).toBeInTheDocument();
   });
 
+  it("«Precios» con un solo mes de compras: una frase con el precio, sin ejes vacíos", async () => {
+    doble.rpcs.facturas_decision = () => ({
+      ...RESPUESTA,
+      top: [{ ...RESPUESTA.top[0], meses: [{ mes: "2026-08", precio: null }, { mes: "2026-09", precio: 203.98 }], pactado: null }],
+    });
+    montar();
+    const lista5 = await screen.findByRole("list", { name: "Decisiones, de más a menos dinero" });
+    fireEvent.click(within(within(lista5).getAllByRole("listitem")[1]).getByRole("button", { name: "Ver precio" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lo más comprado" }));
+    const det = screen.getByTestId("caja-precio-detalle");
+    expect(within(det).getByTestId("precio-un-solo-mes")).toHaveTextContent(/Solo 1 mes con compras: 203,98 €\/barril en septiembre 2026 en Catral\. Sin IVA/);
+    expect(within(det).queryByRole("img")).not.toBeInTheDocument();
+    expect(within(det).queryByText(/€ por barril, sin IVA/)).not.toBeInTheDocument();
+  });
+
   it("«Puedes ahorrar» abre «Ahorro»: dos barras (ahora / más barato), el −18 % y la frase con lo que compraste", async () => {
     montar();
     await screen.findByText("1.362.491,57 €");
