@@ -2,9 +2,9 @@
  * «Carta para imprimir»: el diálogo ofrece tamaño, carta (si hay Touza),
  * idioma, categorías y sangrado; la vista previa cuenta las páginas y
  * «Descargar PDF» genera el fichero con su nombre. Cada sección empieza en
- * página nueva y, si no cabe, sigue en las siguientes (el diálogo lo dice); el
- * texto se alinea a la izquierda, al centro o a la derecha, y arriba, en el
- * centro o abajo.
+ * página nueva y, si no cabe, sigue en las siguientes (sin aviso: es lo
+ * normal); el texto se alinea a la izquierda, al centro o a la derecha, y
+ * arriba, en el centro o abajo, y el interlineado es compacto, normal o amplio.
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -134,6 +134,30 @@ describe("BotonCartaImprimir", () => {
     expect(despues.y).toBeGreaterThan(antes.y + 20);
   });
 
+  it("se elige el interlineado: normal por defecto; amplio separa más los platos en el PDF y compacto, menos", async () => {
+    type Pagina = { tipo: string; seccion?: string; trazos: { tipo: string; texto?: string; y?: number }[] };
+    const paso = (paginas: Pagina[]) => {
+      const carnes = paginas.find((p) => p.seccion === "CARNES")!;
+      const [a, b] = ["Plato 1", "Plato 2"].map((nombre) => carnes.trazos.find((t) => t.texto === nombre)!.y!);
+      return b - a;
+    };
+    const dialogo = await abrir({ tipo: "platos", platos: PLATOS });
+    expect(within(dialogo).getByRole("radio", { name: "Interlineado normal" })).toHaveAttribute("data-state", "on");
+    const descargar = async (veces: number) => {
+      fireEvent.click(within(dialogo).getByRole("button", { name: "Descargar PDF" }));
+      await waitFor(() => expect(m.crearPdf).toHaveBeenCalledTimes(veces));
+      return paso((m.crearPdf.mock.calls[veces - 1] as unknown as [Pagina[]])[0]);
+    };
+    const normal = await descargar(1);
+    fireEvent.click(within(dialogo).getByRole("radio", { name: "Interlineado amplio" }));
+    expect(within(dialogo).getByRole("radio", { name: "Interlineado amplio" })).toHaveAttribute("data-state", "on");
+    const amplio = await descargar(2);
+    fireEvent.click(within(dialogo).getByRole("radio", { name: "Interlineado compacto" }));
+    const compacto = await descargar(3);
+    expect(amplio).toBeGreaterThan(normal + 1);
+    expect(compacto).toBeLessThan(normal - 1);
+  });
+
   describe("una sección que no cabe en una página", () => {
     // 24 mariscos con descripción de dos líneas: en A5 no caben en una página.
     const MARISCOS = [
@@ -146,10 +170,11 @@ describe("BotonCartaImprimir", () => {
       plato("1", "CARNES"),
     ];
 
-    it("sigue en páginas nuevas, sin compartirlas con otra sección, lo dice y se descarga", async () => {
+    it("sigue en páginas nuevas, sin compartirlas con otra sección, sin avisar de que ocupa varias páginas, y se descarga", async () => {
       const dialogo = await abrir({ tipo: "platos", platos: MARISCOS });
       expect(within(dialogo).queryByRole("alert")).toBeNull();
-      expect(within(dialogo).getByText(/ocupa \d+ páginas A5 \(24 platos\), sin compartir página con otra sección/)).toBeInTheDocument();
+      expect(within(dialogo).queryByText(/ocupa \d+ páginas/)).toBeNull();
+      expect(within(dialogo).queryByText(/sin compartir página/)).toBeNull();
       const boton = within(dialogo).getByRole("button", { name: "Descargar PDF" });
       expect(boton).toBeEnabled();
       fireEvent.click(boton);
@@ -161,14 +186,20 @@ describe("BotonCartaImprimir", () => {
       expect(secciones.indexOf("CARNES")).toBe(secciones.lastIndexOf("MARISCOS") + 1);
     });
 
-    it("se pueden quitar platos solo de la carta impresa y recuperarlos", async () => {
+    /** Abre en grande la primera página de Mariscos y su lista de platos. */
+    const elegirMariscos = async (dialogo: HTMLElement) => {
+      fireEvent.click(within(dialogo).getByRole("button", { name: /^Ver en grande: Página 2 de/ }));
+      fireEvent.click(await within(dialogo).findByRole("button", { name: /Elegir platos de esta sección/ }));
+    };
+
+    it("se pueden quitar platos solo de la carta impresa desde la página en grande y recuperarlos", async () => {
       const dialogo = await abrir({ tipo: "platos", platos: MARISCOS });
-      fireEvent.click(within(dialogo).getByRole("button", { name: /Elegir platos/ }));
+      await elegirMariscos(dialogo);
       expect(within(dialogo).getByText("Marcados 24 de 24")).toBeInTheDocument();
       fireEvent.click(within(dialogo).getByRole("checkbox", { name: /^Marisco 24\s*·/ }));
       expect(await within(dialogo).findByText("Marcados 23 de 24")).toBeInTheDocument();
       expect(within(dialogo).getByText(/· 24 platos/)).toBeInTheDocument();
-      expect(within(dialogo).getByText(/1 plato quitado\./)).toBeInTheDocument();
+      expect(within(dialogo).getByText(/1 plato quitado de la carta impresa/)).toBeInTheDocument();
       fireEvent.click(within(dialogo).getByRole("button", { name: /Recuperarlos/ }));
       expect(await within(dialogo).findByText(/· 25 platos/)).toBeInTheDocument();
     });
@@ -176,7 +207,8 @@ describe("BotonCartaImprimir", () => {
     it("si se quitan todos, lo dice y deja recuperarlos", async () => {
       const dialogo = await abrir({ tipo: "platos", platos: MARISCOS });
       fireEvent.click(within(dialogo).getByRole("checkbox", { name: /^Carnes/ }));
-      fireEvent.click(await within(dialogo).findByRole("button", { name: /Elegir platos/ }));
+      await within(dialogo).findByText(/· 24 platos/);
+      await elegirMariscos(dialogo);
       // Al quitar unos, la sección pasa a caber en una página y la lista sigue abierta en lo quitado.
       for (let i = 0; i < 24; i++) {
         const [marcada] = within(dialogo).queryAllByRole("checkbox", { name: /^Marisco \d+/, checked: true });
