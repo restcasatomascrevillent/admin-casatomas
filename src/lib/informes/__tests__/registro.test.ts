@@ -14,6 +14,7 @@ vi.mock("@/hooks/useExplorarCompras", () => ({
 import { INFORMES, SECCIONES_INFORME, buscarInforme, informesPorSeccion, puedeVerInforme, type DefinicionInforme } from "../registro";
 import { obtenerInformeFacturas } from "../fuentes/facturas";
 import { informeVinoFavorito } from "../fuentes/vinoFavorito";
+import type { InformeTabla } from "../tabla";
 
 const sinPermisos = { esSuperAdmin: false, permisos: [] };
 const permiso = (section_key: string, can_view: boolean, can_edit = false) => ({ section_key, can_view, can_edit });
@@ -87,7 +88,8 @@ describe("informes de Facturas", () => {
 
   it("pide explorar_compras sin filtros (los dos locales) en el periodo y devuelve la tabla con su total", async () => {
     estado.respuesta = exploracion();
-    const r = await obtenerInformeFacturas("proveedores", { tipo: "rango", desde: "2026-10-01", hasta: "2026-10-31" }, "Gasto por proveedor");
+    // `as InformeTabla`: sin strictNullChecks, `if (r.vacio)` no estrecha el tipo (lo comprueba el expect de abajo).
+    const r = (await obtenerInformeFacturas("proveedores", { tipo: "rango", desde: "2026-10-01", hasta: "2026-10-31" }, "Gasto por proveedor")) as InformeTabla;
     const p = estado.llamadas[0] as ParametrosExplorar;
     expect(p).toMatchObject({ p_desde: "2026-10-01", p_hasta: "2026-10-31", p_medida: "gasto", p_agrupar: "proveedor", p_filtros: {} });
     expect(r.vacio).toBe(false);
@@ -103,7 +105,7 @@ describe("informes de Facturas", () => {
 
   it("avisa de lo que no sale en la tabla y no inventa el 100 %", async () => {
     estado.respuesta = exploracion({ resto: { entidades: 12, valor: 50, documentos: 5 } });
-    const r = await obtenerInformeFacturas("proveedores", { tipo: "mes", mes: "2026-02" }, "Gasto por proveedor");
+    const r = (await obtenerInformeFacturas("proveedores", { tipo: "mes", mes: "2026-02" }, "Gasto por proveedor")) as InformeTabla;
     expect((estado.llamadas[0] as ParametrosExplorar).p_hasta).toBe("2026-02-28");
     if (r.vacio) throw new Error("no debería estar vacío");
     expect(r.tablas[0].nota).toMatch(/^Y 12 más que no salen en la tabla: 50,00\s€ en total\.$/);
@@ -123,7 +125,7 @@ describe("informe de la votación del vino favorito", () => {
   const voto = (vino: string, nombre: string) => ({ id: nombre, vino_id: null, vino_nombre: vino, nombre, contacto: `${nombre}@x.es`, idioma: "es", created_at: "2026-11-05T10:00:00Z" });
 
   it("recuento por vino (con total) y participantes", () => {
-    const r = informeVinoFavorito([voto("Alfa", "Ana"), voto("Beta", "Bea"), voto("Alfa", "Carlos")] as never, { hoy: "2026-11-10" });
+    const r = informeVinoFavorito([voto("Alfa", "Ana"), voto("Beta", "Bea"), voto("Alfa", "Carlos")] as never, { hoy: "2026-11-10" }) as InformeTabla;
     if (r.vacio) throw new Error("no debería estar vacío");
     expect(r.tablas.map((t) => t.titulo)).toEqual(["Votos por vino", "Participantes"]);
     expect(r.tablas[0].filas.map((f) => [f.vino, f.votos])).toEqual([
