@@ -2,6 +2,14 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.9.0] - 2026-11-10
+
+Objetivo: Gestor Web › Tienda con su interruptor y menú del panel sin «Instalar app»
+
+### Añadido
+- Panel: quita el botón «Instalar app» del menú lateral ([#54](https://github.com/restcasatomascrevillent/admin-casatomas/pull/54))
+- Gestor-web: pestaña «Tienda» con el interruptor de la tienda en la web ([#55](https://github.com/restcasatomascrevillent/admin-casatomas/pull/55))
+
 ## [1.8.0] - 2026-11-10
 
 Objetivo: Reservas web más resistente (límite en disponibilidad y sin arranque en frío) y retoques de Facturas
