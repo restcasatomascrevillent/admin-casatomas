@@ -53,21 +53,50 @@ describe("GraficoSeriePrecio", () => {
     expect(flope).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("una sola compra: avisa y no inventa variación", () => {
+  it("una sola compra: una frase con precio, fecha y proveedor, sin ejes ni variación", () => {
     render(
       <GraficoSeriePrecio
-        datos={{ ...SERIE, puntos: [["2026-10-02", 12.9, 0]], n: 1, min: 12.9, max: 12.9, ultimo: 12.9, variacion_pct: 0 }}
+        datos={{ ...SERIE, puntos: [["2026-10-03", 12.5, 0]], n: 1, min: 12.5, max: 12.5, ultimo: 12.5, variacion_pct: 0 }}
+        compacto
       />,
     );
-    expect(screen.getByText(/solo una compra/i)).toHaveTextContent("02/10/2026");
-    expect(screen.getByText(/solo una compra/i)).toHaveTextContent("Flope");
+    const estado = screen.getByTestId("serie-sin-evolucion");
+    expect(estado).toHaveTextContent(/Solo 1 compra:\s*12,50\s€\/kg el 03\/10\/2026 en Flope/);
+    expect(screen.queryByTestId("grafico-serie-precio")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("cifras-serie-precio")).not.toBeInTheDocument();
     expect(screen.queryByText(/\+0|−0/)).not.toBeInTheDocument();
   });
 
-  it("sin datos y datos ilegibles: mensaje, sin romper", () => {
+  it("sin datos y datos ilegibles: mensaje, sin romper ni ejes vacíos", () => {
     const { rerender } = render(<GraficoSeriePrecio datos={{ sin_datos: true, buscado: "pulpo" }} />);
-    expect(screen.getByText(/no hay compras registradas de «pulpo»/i)).toBeInTheDocument();
+    expect(screen.getByText(/sin compras con precio de «pulpo»/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("grafico-serie-precio")).not.toBeInTheDocument();
     rerender(<GraficoSeriePrecio datos={42} />);
     expect(screen.getByText(/no se ha podido leer/i)).toBeInTheDocument();
+  });
+
+  it("varias unidades: chips «kg · 37», la actual marcada, y al tocar otra avisa", () => {
+    const elegidas: string[] = [];
+    render(
+      <GraficoSeriePrecio
+        datos={SERIE}
+        compacto
+        unidades={[{ unidad: "kg", n: 1037 }, { unidad: "ud", n: 12 }]}
+        onElegirUnidad={(u) => elegidas.push(u)}
+      />,
+    );
+    const grupo = screen.getByRole("group", { name: /unidad de la gráfica/i });
+    const kg = within(grupo).getByRole("button", { name: /precio por kg/i });
+    expect(kg).toHaveTextContent("kg · 1.037");
+    expect(kg).toHaveAttribute("aria-pressed", "true");
+    const ud = within(grupo).getByRole("button", { name: /precio por ud/i });
+    expect(ud).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(ud);
+    expect(elegidas).toEqual(["ud"]);
+  });
+
+  it("una sola unidad: sin selector", () => {
+    render(<GraficoSeriePrecio datos={SERIE} unidades={[{ unidad: "kg", n: 3 }]} onElegirUnidad={() => {}} />);
+    expect(screen.queryByTestId("selector-unidad-serie")).not.toBeInTheDocument();
   });
 });
