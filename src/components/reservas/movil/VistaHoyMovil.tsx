@@ -81,6 +81,7 @@ import {
   type TurnoServicio,
 } from "@/hooks/useAjustesMesaServicio";
 import { BotonSentarSinReserva } from "@/components/reservas/SentarSinReserva";
+import { InterruptoresServiciosOnline, InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { configServicioSalaDesde, type ReservaMesaServicio } from "@/lib/reservas/servicioSala";
 import { turnoDeHora } from "@/lib/reservas/asignacionMesas";
@@ -390,6 +391,7 @@ export function VistaHoyMovil({
         <BotonSentarSinReserva soloIcono className="shrink-0" />
       </div>
       )}
+      {!columna && <InterruptoresServiciosOnline fecha={fecha} className="shrink-0 px-1" />}
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border bg-card" data-testid="hoy-movil-lista">
         {reservas === undefined ? (
@@ -618,6 +620,7 @@ export function FilaReservaMovil({
             ) : (
               info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
             )}
+            <InsigniaMenuDelDia reserva={reserva} />
           </span>
           {/* La protagonista es la MESA (07/11/2026, petición del dueño): «Sentar» pequeño encima y debajo, en
               grande, sala y mesa. Un toque = sentar en ella (con `decidirSentarPrevista`). Sin mesa (o con la
@@ -1703,6 +1706,7 @@ export function PanelReservaMovil({
         <SheetTitle className="flex items-center gap-2">
           <span className="truncate">{reserva.nombre || "Sin nombre"}</span>
           {info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>}
+          <InsigniaMenuDelDia reserva={reserva} />
         </SheetTitle>
         <SheetDescription asChild>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">

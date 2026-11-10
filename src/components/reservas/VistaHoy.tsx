@@ -20,6 +20,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { VistaHoyMovil } from "./movil/VistaHoyMovil";
 import { BotonSentarSinReserva } from "./SentarSinReserva";
+import { InterruptoresServiciosOnline } from "./InterruptoresServiciosOnline";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -227,6 +228,8 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             ) : undefined
           }
         />
+        {/* Bloqueo de comida / cena online del día (10/11/2026). */}
+        <InterruptoresServiciosOnline fecha={hoy} />
 
         {/* 07/11/2026: a la izquierda la lista completa del turno, por estados, en filas de una línea (con su
             scroll); a la derecha el plano de mesas grandes, una sala a la vez. Cada columna mide lo que queda de

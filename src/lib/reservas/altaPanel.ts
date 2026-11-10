@@ -50,6 +50,17 @@ export function errorTelefono(telefono: string | null | undefined): string | nul
   return null;
 }
 
+/**
+ * Mensaje de error del teléfono en el alta/edición del PANEL, donde es OPCIONAL
+ * (cambio 2026-11-10: el restaurante apunta reservas sin teléfono): vacío o solo
+ * espacios no es un error; si se rellena, tiene que ser válido.
+ * (`errorTelefono` es la versión obligatoria, la de los flujos de solicitud.)
+ */
+export function errorTelefonoOpcional(telefono: string | null | undefined): string | null {
+  if (!(telefono ?? "").trim()) return null;
+  return telefonoValido(telefono) ? null : MENSAJES_CONTACTO.telefonoInvalido;
+}
+
 /** Mensaje de error del email (obligatorio), o null si vale. */
 export function errorEmail(email: string | null | undefined): string | null {
   if (!(email ?? "").trim()) return MENSAJES_CONTACTO.emailObligatorio;
