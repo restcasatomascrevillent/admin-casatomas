@@ -277,6 +277,43 @@ describe("useNotificacionesDashboard", () => {
     expect(result.current.countNoLeidas).toBe(0);
   });
 
+  it("eliminar una alerta diaria de Facturas NO la borra (sus € siguen en «Puedes ahorrar»): se quita de la campana", async () => {
+    const alerta = makeNotif({
+      id: "a-1",
+      tipo: "facturas_precio_mejor",
+      referencia_tipo: "facturas_alerta",
+      clave: "precio_mejor:1:kg:2:3",
+      datos: { ahorro: 117, campana: true, enlace: "?tab=compras" },
+    });
+    const llamadas: { op: string; valor?: unknown; id?: unknown }[] = [];
+    let callCount = 0;
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callCount++;
+      const lectura = callCount === 1;
+      const b: Record<string, unknown> = {
+        select: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        delete: vi.fn(() => (llamadas.push({ op: "delete" }), b)),
+        update: vi.fn((valor: unknown) => (llamadas.push({ op: "update", valor }), b)),
+        eq: vi.fn((_c: string, id: unknown) => (llamadas.push({ op: "eq", id }), b)),
+        then: (onfulfilled: (v: unknown) => unknown) => Promise.resolve({ data: lectura ? [alerta] : null, error: null }).then(onfulfilled),
+      };
+      return b;
+    });
+
+    const { result } = renderHook(() => useNotificacionesDashboard());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.eliminarNotificacion("a-1");
+    });
+
+    expect(result.current.notificaciones).toHaveLength(0);
+    expect(llamadas.some((l) => l.op === "delete")).toBe(false);
+    expect(llamadas).toContainEqual({ op: "update", valor: { leida: true, datos: { ahorro: 117, campana: false, enlace: "?tab=compras" } } });
+    expect(llamadas).toContainEqual({ op: "eq", id: "a-1" });
+  });
+
   it("eliminarNotificacion no cambia countNoLeidas si la notificación ya estaba leída", async () => {
     const items = [makeNotif({ id: "n-1", leida: true })];
 

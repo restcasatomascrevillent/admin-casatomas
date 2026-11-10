@@ -4,10 +4,13 @@
  *
  * Mismo mecanismo que Hoy, Calendario, «Próximas reservas» y la Newsletter (`useAlturaDisponible`): el bloque del
  * Dashboard mide el alto visible menos su posición y el relleno inferior del <main>, y lo reparte con flex:
- * «Reservas de Hoy» arriba con su alto natural (o hasta abajo si va sola) y las dos gráficas se quedan con el resto.
+ * «Reservas de Hoy» arriba con su alto natural (o hasta abajo si va sola) y los módulos se quedan con el resto.
  * Antes la página usaba `fixedHeight` (el <main> hacía scroll) y a 1280×711 las gráficas se salían 147 px.
+ * Módulos desde el 10/11/2026 (dueño): la curva por hora, «Márgenes de precio» (solo con Facturas) y «Avisos»;
+ * «Reservas por día» ya no está.
  *
- * Se monta el Dashboard con sus tres widgets DE VERDAD (datos de mentira). jsdom no calcula layout: las medidas se
+ * Se monta el Dashboard con «Reservas de Hoy» y la curva DE VERDAD (datos de mentira); los dos módulos nuevos, con
+ * marcadores (tienen sus propios tests). jsdom no calcula layout: las medidas se
  * dan a mano (el bloque empieza en y = 24, el relleno superior del <main>); lo demás se comprueba por estructura,
  * como en `VistaHoy.altura.test.tsx`. Los píxeles reales, con el arnés de capturas.
  */
@@ -20,6 +23,7 @@ import { MemoryRouter } from "react-router-dom";
 const h = vi.hoisted(() => ({
   reservas: [] as Array<Record<string, unknown>>,
   layout: [] as Array<{ fixedHeight?: boolean }>,
+  facturas: true,
 }));
 
 // El layout de verdad monta el menú lateral (sesión, permisos…): aquí basta un <main> con su relleno inferior
@@ -51,13 +55,25 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 vi.mock("@/components/notificaciones/CentroNotificaciones", () => ({ CentroNotificaciones: () => null }));
 vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
+vi.mock("@/hooks/usePermisosFacturas", () => ({
+  usePermisosFacturas: () => ({ consultar: h.facturas, editar: false, subir: false, cargando: false }),
+}));
+vi.mock("@/components/dashboard/widgets/MargenesPrecio", () => ({
+  MargenesPrecio: () => <div className="rounded-lg h-full">Márgenes de precio</div>,
+}));
+vi.mock("@/components/dashboard/widgets/AvisosDashboard", () => ({
+  AvisosDashboard: () => <div className="rounded-lg h-full">Avisos</div>,
+}));
 vi.mock("@/hooks/useEdicionReserva", () => ({ useEdicionReserva: () => ({ editarReserva: vi.fn(), dialogoEdicion: null }) }));
 
 import Dashboard from "@/pages/Dashboard";
 
-const original = { innerHeight: window.innerHeight };
+const original = { innerHeight: window.innerHeight, innerWidth: window.innerWidth };
 function altoVentana(px: number) {
   Object.defineProperty(window, "innerHeight", { configurable: true, value: px });
+}
+function anchoVentana(px: number) {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: px });
 }
 /** Layout simulado: el bloque del Dashboard empieza en y = 24 (relleno superior del <main>). */
 function conLayout(alto: number) {
@@ -69,8 +85,11 @@ function conLayout(alto: number) {
 }
 
 async function montar() {
+  await montarConRetorno();
+}
+async function montarConRetorno() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  render(
+  const r = render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <Dashboard />
@@ -78,11 +97,14 @@ async function montar() {
     </QueryClientProvider>,
   );
   await screen.findByText("Reservas de Hoy");
+  return r;
 }
 const bloque = () => screen.getByTestId("dashboard");
 
 beforeEach(() => {
   h.layout = [];
+  h.facturas = true;
+  anchoVentana(1280);
   const hoy = new Date();
   const dia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
   h.reservas = [
@@ -93,6 +115,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   altoVentana(original.innerHeight);
+  anchoVentana(original.innerWidth);
 });
 
 describe("Dashboard · ocupa el alto de la pantalla, sin scroll", () => {
@@ -108,28 +131,62 @@ describe("Dashboard · ocupa el alto de la pantalla, sin scroll", () => {
     expect(bloque().className).not.toMatch(/overflow-(y-)?(auto|scroll)/);
   });
 
-  it("lo reparte: «Reservas de Hoy» arriba con su alto natural (hasta abajo si va sola) y las gráficas con el resto", async () => {
+  it("lo reparte: «Reservas de Hoy» arriba con su alto natural (hasta abajo si va sola) y los módulos con el resto", async () => {
     conLayout(800);
     await montar();
     const reservas = screen.getByTestId("dashboard-reservas");
-    const graficas = screen.getByTestId("dashboard-graficas");
+    const modulos = screen.getByTestId("dashboard-modulos");
 
-    expect([...bloque().children]).toEqual([reservas, graficas]);
+    expect([...bloque().children]).toEqual([reservas, modulos]);
     expect(within(reservas).getByText("Reservas de Hoy")).toBeInTheDocument();
     // Su alto natural (`flex-none`); si fuera el único widget, ocuparía todo (`only:flex-1`).
     expect(reservas).toHaveClass("flex-none", "only:flex-1", "min-h-0");
-    // Las gráficas se quedan con lo que sobra y pueden encoger: una encima de otra y, desde `lg`, lado a lado.
-    expect(graficas).toHaveClass("flex", "flex-1", "min-h-0", "flex-col", "lg:flex-row");
-    const huecos = [...graficas.children] as HTMLElement[];
-    expect(huecos).toHaveLength(2);
-    ["Reservas por Día", "Curva de Reservas por Hora"].forEach((titulo, i) => {
-      // Cada gráfica en su hueco, que se reparte el sitio a partes iguales con el otro…
+    // Los módulos se quedan con lo que sobra y pueden encoger: uno encima de otro en el móvil, la curva arriba y
+    // los otros dos debajo en la tablet vertical y, desde `lg`, los tres lado a lado.
+    expect(modulos).toHaveClass("flex", "flex-1", "min-h-0", "flex-col", "md:flex-row", "md:flex-wrap", "lg:flex-nowrap");
+    const huecos = [...modulos.children] as HTMLElement[];
+    expect(huecos).toHaveLength(3);
+    expect(huecos[0]).toHaveClass("md:basis-full", "lg:basis-0");
+    ["Curva de Reservas por Hora", "Márgenes de precio", "Avisos"].forEach((titulo, i) => {
+      // Cada módulo en su hueco, que se reparte el sitio con los otros…
       expect(huecos[i]).toHaveClass("flex-1", "min-h-0", "min-w-0");
       // …y su tarjeta lo llena entero.
       const tarjeta = within(huecos[i]).getByText(titulo).closest(".rounded-lg") as HTMLElement;
       expect(tarjeta.parentElement).toBe(huecos[i]);
       expect(tarjeta).toHaveClass("h-full");
     });
+    // «Reservas por día» ya no está (10/11/2026, decisión del dueño).
+    expect(screen.queryByText("Reservas por Día")).toBeNull();
+  });
+
+  it("sin permiso de Facturas no sale «Márgenes de precio» (enseña precios de compra); la curva y los avisos sí", async () => {
+    h.facturas = false;
+    conLayout(800);
+    await montar();
+    expect(screen.queryByTestId("modulo-margenes")).toBeNull();
+    expect(screen.queryByText("Márgenes de precio")).toBeNull();
+    expect(screen.getByTestId("modulo-curva")).toBeInTheDocument();
+    expect(screen.getByTestId("modulo-avisos")).toBeInTheDocument();
+  });
+
+  it("con los módulos apilados el suelo sube (tablet vertical 820 px, móvil 1100 px) y la página hace scroll", async () => {
+    anchoVentana(800);
+    conLayout(1024);
+    const { unmount } = await montarConRetorno();
+    expect(bloque()).toHaveAttribute("data-altura-fija", "976");
+    unmount();
+
+    anchoVentana(800);
+    conLayout(800);
+    const segundo = await montarConRetorno();
+    // 800 − 48 = 752 < 820
+    expect(bloque()).toHaveAttribute("data-altura-fija", "820");
+    segundo.unmount();
+
+    anchoVentana(375);
+    conLayout(812);
+    await montarConRetorno();
+    expect(bloque()).toHaveAttribute("data-altura-fija", "1100");
   });
 
   it("se recalcula al redimensionar la ventana y al girar la tablet", async () => {
