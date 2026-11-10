@@ -31,6 +31,7 @@ vi.mock("@/components/reservas/EditarReservaDialog", () => ({
 }));
 
 import { ListaComoLibro } from "@/components/reservas/libro/ListaComoLibro";
+import { ReservasDeLaHoja } from "@/components/reservas/libro/ReservasDeLaHoja";
 
 const hoy = claveDia(new Date());
 const titulo = () => screen.getByRole("button", { name: "Elegir día" });
@@ -111,6 +112,43 @@ describe("ListaComoLibro · las reservas de la hoja", () => {
   it("hoja sin reservas: «Hoja en blanco»", () => {
     render(<ListaComoLibro />);
     expect(within(hojas()[0]).getByText(/Hoja en blanco/)).toBeInTheDocument();
+  });
+});
+
+describe("ReservasDeLaHoja · la comida de martes a jueves en bloques", () => {
+  const dia = (fecha: string) => {
+    h.porDia[fecha] = [
+      { id: "m1", nombre: "Menú Uno", hora: "14:00:00", numero_comensales: 2, estado: "confirmada", espacio_id: null, menu_del_dia: true },
+      { id: "c1", nombre: "Carta Uno", hora: "13:30:00", numero_comensales: 4, estado: "confirmada", espacio_id: null, menu_del_dia: false },
+      { id: "m2", nombre: "Menú Dos", hora: "13:15:00", numero_comensales: 3, estado: "pendiente", espacio_id: null, menu_del_dia: true },
+      { id: "x1", nombre: "Antigua", hora: "14:30:00", numero_comensales: 5, estado: "confirmada", espacio_id: null, menu_del_dia: null },
+      { id: "n1", nombre: "Cena Una", hora: "21:00:00", numero_comensales: 2, estado: "confirmada", espacio_id: null, menu_del_dia: null },
+    ];
+  };
+
+  it("martes: «Menú del día», «Carta» y «Resto», cada uno por hora y con su total; la cena como siempre", () => {
+    dia("2026-11-10");
+    render(<ReservasDeLaHoja fecha="2026-11-10" />);
+    const comida = screen.getByRole("region", { name: "Comida" });
+    const bloques = within(comida).getAllByRole("region");
+    expect(bloques.map((b) => b.getAttribute("aria-label"))).toEqual(["Menú del día", "Carta", "Resto"]);
+    expect(within(bloques[0]).getByRole("heading")).toHaveTextContent("Menú del día · 2 reservas · 5 pax");
+    expect(within(bloques[1]).getByRole("heading")).toHaveTextContent("Carta · 1 reserva · 4 pax");
+    expect(within(bloques[2]).getByRole("heading")).toHaveTextContent("Resto · 1 reserva · 5 pax");
+    // Por hora dentro del bloque: 13:15 antes que 14:00.
+    expect(within(bloques[0]).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      expect.stringContaining("Menú Dos"),
+      expect.stringContaining("Menú Uno"),
+    ]);
+    const cena = screen.getByRole("region", { name: "Cena" });
+    expect(within(cena).queryAllByRole("region")).toHaveLength(0);
+    expect(cena).toHaveTextContent("Cena Una");
+  });
+
+  it("un viernes la comida va como siempre, sin bloques", () => {
+    dia("2026-11-13");
+    render(<ReservasDeLaHoja fecha="2026-11-13" />);
+    expect(within(screen.getByRole("region", { name: "Comida" })).queryAllByRole("region")).toHaveLength(0);
   });
 });
 

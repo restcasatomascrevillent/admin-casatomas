@@ -2175,3 +2175,31 @@ describe("ListaReservasAvanzada · filtros en el móvil (07/11/2026)", () => {
     expect(screen.queryByLabelText("Filtros activos")).toBeNull();
   });
 });
+
+// 10/11/2026 (petición del dueño): filtro rápido «Menú del día / Carta» en la Tabla. Volver a pulsar el puesto lo quita.
+describe("ListaReservasAvanzada · filtro rápido «Menú del día / Carta»", () => {
+  it("«Menú del día» deja solo las de menú, «Carta» solo las de carta, y volver a pulsar lo quita", async () => {
+    supa.filas = [
+      { ...reserva("res-menu", "confirmada", "Mara Menú"), menu_del_dia: true },
+      { ...reserva("res-carta", "confirmada", "Carla Carta"), menu_del_dia: false },
+    ];
+    const { tabla } = await montar();
+    const grupo = screen.getAllByRole("group", { name: "Menú del día o carta" })[0];
+    const menu = within(grupo).getByRole("button", { name: "Menú del día" });
+    const carta = within(grupo).getByRole("button", { name: "Carta" });
+
+    fireEvent.click(menu);
+    await waitFor(() => expect(within(tabla).queryByText("Carla Carta")).toBeNull());
+    expect(within(tabla).getByText("Mara Menú")).toBeInTheDocument();
+    expect(within(tabla).queryByText("Familia Ballester")).toBeNull();
+    expect(menu).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(carta);
+    await waitFor(() => expect(within(tabla).queryByText("Mara Menú")).toBeNull());
+    expect(within(tabla).getByText("Carla Carta")).toBeInTheDocument();
+
+    fireEvent.click(carta);
+    await waitFor(() => expect(within(tabla).getByText("Mara Menú")).toBeInTheDocument());
+    expect(within(tabla).getByText("Carla Carta")).toBeInTheDocument();
+  });
+});

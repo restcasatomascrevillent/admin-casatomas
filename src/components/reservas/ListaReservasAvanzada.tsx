@@ -492,6 +492,8 @@ export function ListaReservasAvanzada({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter || "all");
   const [canalFilter, setCanalFilter] = useState<string>("all");
+  // «Menú del día / Carta» (10/11/2026): filtro rápido de dos botones; volver a pulsar el puesto lo quita.
+  const [servicioFilter, setServicioFilter] = useState<"all" | "menu" | "carta">("all");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(initialDateFilter);
   // Móvil (< 768 px, 07/11/2026): los filtros (fecha, estado, canal, «Por atender») viven en una hoja inferior.
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
@@ -771,8 +773,9 @@ export function ListaReservasAvanzada({
       estado: statusFilter,
       canal: canalFilter,
       fecha: dateFilter ? format(dateFilter, "yyyy-MM-dd") : null,
+      servicio: servicioFilter,
     }),
-    [searchQuery, statusFilter, canalFilter, dateFilter],
+    [searchQuery, statusFilter, canalFilter, dateFilter, servicioFilter],
   );
   const filas = useMemo(
     () => filtrarFilasUnificadas(unificarReservasYSolicitudes(reservations, solicitudes), filtrosLista),
@@ -794,7 +797,7 @@ export function ListaReservasAvanzada({
   const textoEstado = textoFiltroCerrado("Estado", statusFilter, OPCIONES_FILTRO_ESTADO);
   const textoCanal = textoFiltroCerrado("Canal", canalFilter, OPCIONES_FILTRO_CANAL);
   // Lista vacía: con «Por atender» se dice que no queda nada por atender (con los demás filtros, si los hay).
-  const hayOtrosFiltros = searchQuery.trim() !== "" || !!dateFilter || canalFilter !== "all";
+  const hayOtrosFiltros = searchQuery.trim() !== "" || !!dateFilter || canalFilter !== "all" || servicioFilter !== "all";
   const textoListaVacia = soloPorAtender
     ? `No hay nada por atender${hayOtrosFiltros ? " con los filtros aplicados" : ""}: ninguna reserva pendiente ni solicitud sin resolver`
     : "No se encontraron reservas con los filtros aplicados";
@@ -824,7 +827,7 @@ export function ListaReservasAvanzada({
   useEffect(() => {
     setPagina(1);
     subirArriba(contenedorTablaRef.current?.firstElementChild, tarjetasRef.current);
-  }, [searchQuery, statusFilter, canalFilter, dateFilter]);
+  }, [searchQuery, statusFilter, canalFilter, dateFilter, servicioFilter]);
 
   const irAPagina = (destino: number) => {
     setPagina(Math.min(Math.max(1, destino), totalPaginas));
@@ -835,7 +838,9 @@ export function ListaReservasAvanzada({
   };
 
   // Cuántos filtros hay puestos (el buscador aparte): la cifra del botón «Filtros» del móvil.
-  const filtrosActivos = Number(!!dateFilter) + Number(statusFilter !== "all") + Number(canalFilter !== "all");
+  const filtrosActivos =
+    Number(!!dateFilter) + Number(statusFilter !== "all") + Number(canalFilter !== "all") + Number(servicioFilter !== "all");
+  const textoServicio = servicioFilter === "menu" ? "Menú del día" : servicioFilter === "carta" ? "Carta" : "";
 
   // Los controles de filtro: en la fila de la tarjeta desde `md` y en la hoja «Filtros» en el móvil.
   const controlesFiltro = (
@@ -965,6 +970,21 @@ export function ListaReservasAvanzada({
           ))}
         </SelectContent>
       </Select>
+
+      {/* «Menú del día / Carta» (10/11/2026, petición del dueño): dos botones; el puesto se quita al volver a pulsarlo. */}
+      <div role="group" aria-label="Menú del día o carta" className="flex gap-1">
+        {(["menu", "carta"] as const).map((v) => (
+          <Button
+            key={v}
+            type="button"
+            variant={servicioFilter === v ? "default" : "outline"}
+            aria-pressed={servicioFilter === v}
+            onClick={() => setServicioFilter((actual) => (actual === v ? "all" : v))}
+          >
+            {v === "menu" ? "Menú del día" : "Carta"}
+          </Button>
+        ))}
+      </div>
     </>
   );
 
@@ -1053,6 +1073,7 @@ export function ListaReservasAvanzada({
           )}
           {statusFilter !== "all" && <ChipFiltro onQuitar={() => setStatusFilter("all")}>{textoEstado}</ChipFiltro>}
           {canalFilter !== "all" && <ChipFiltro onQuitar={() => setCanalFilter("all")}>{textoCanal}</ChipFiltro>}
+          {servicioFilter !== "all" && <ChipFiltro onQuitar={() => setServicioFilter("all")}>{textoServicio}</ChipFiltro>}
         </div>
       )}
 
