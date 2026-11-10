@@ -182,7 +182,7 @@ const ALTURA_MINIMA_LISTA = 280;
 /**
  * Tocar la fila (o la tarjeta) fuera de sus botones abre la ficha (10/11/2026, petición del dueño): el editor
  * en una reserva y «Gestionar» en una solicitud. Lo que se toque dentro de un control (botones, casillas,
- * enlaces, el menú «Más», que va en un portal pero sus eventos suben por React hasta la fila) no cuenta.
+ * enlaces) no cuenta.
  */
 function alTocarFila(abrir?: () => void) {
   return (e: MouseEvent<HTMLElement>) => {
@@ -242,14 +242,11 @@ function etiquetaPropuestaCorta(vista: EstadoPropuestaVista, enviadaAt: string |
 // 703 px: a Cliente le quedan 167. Con dedo y el menú desplegado a mano (718 px),
 // solo 38: el nombre se ve con «…», pero sin scroll horizontal (el menú, en esa
 // anchura, arranca plegado a iconos).
-// 10/11/2026: casilla 24 + principal 136 + «Más» ~82 + huecos 2×8 + relleno 16 + borde 1 = 275 → 280.
-// Acciones al ancho JUSTO (10/11/2026, petición del dueño: la columna era enorme y vacía con «Más» tras un hueco):
-//   · con alguna acción principal en la página: relleno 32 + casilla 24 + principal 152 + «Más» ~100 + huecos 2×12
-//     + borde 1 = 333 → 336;
-//   · sin ninguna (todas confirmadas, p. ej.): relleno 32 + casilla 24 + «Más» ~100 + hueco 12 + borde 1 = 169 → 176.
-// Sin hueco reservado: en una fila sin acción principal, «Más» va justo detrás de la casilla. Lo que sobra es de Cliente.
-const ANCHO_ACCIONES_CON_PRINCIPAL = "w-[336px]";
-const ANCHO_ACCIONES_SOLO_MAS = "w-[176px]";
+// 10/11/2026 (dueño: «no pongas el Más, que se vean los botones»): las acciones van como BOTONES con texto
+// DEBAJO del nombre y el teléfono, en la celda Cliente, y pasan a otra línea si no caben (`flex-wrap`): así se ven
+// todas, el nombre y el teléfono siguen enteros y no hay columna con hueco. La primera columna solo lleva la
+// casilla de «aceptar en bloque»: relleno 32 + casilla 24 + borde 1 = 57 → 64.
+const ANCHO_SELECCION = "w-[64px]";
 // «Fecha y hora» en una línea en la cabecera: 92 px de texto + 32 de relleno.
 const ANCHO_FECHA = "w-[136px]";
 /** Envoltorio del nombre: ocupa lo que le deje la celda, ni más ni menos. */
@@ -294,7 +291,7 @@ function CeldaAcciones({
   children,
 }: {
   fondo: string;
-  /** `ANCHO_ACCIONES_CON_PRINCIPAL` o `ANCHO_ACCIONES_SOLO_MAS`, el mismo que la cabecera. */
+  /** El de la cabecera (`ANCHO_SELECCION`). */
   ancho: string;
   /** Franja ámbar de "esto es una solicitud, no una reserva". */
   franja?: boolean;
@@ -846,11 +843,7 @@ export function ListaReservasAvanzada({
   // La barra de "N solicitudes seleccionadas" va DENTRO del bloque de la lista, encima de la tabla: al
   // aparecer, la tabla encoge por dentro y el alto del bloque no cambia (nada que volver a medir).
   const barraSeleccionVisible = canEdit && seleccionadas.size > 0;
-  // ¿Alguna fila de la página tiene acción principal? Si no, la columna de acciones se queda al ancho de «Más».
-  const hayAccionPrincipal = filasPagina.some((f) =>
-    f.tipo === "solicitud" ? esSolicitudAbierta(f.solicitud.estado) : f.reserva.estado === "pendiente" || f.reserva.estado === "verificada",
-  );
-  const anchoAcciones = hayAccionPrincipal ? ANCHO_ACCIONES_CON_PRINCIPAL : ANCHO_ACCIONES_SOLO_MAS;
+const anchoAcciones = ANCHO_SELECCION;
 
   // Al cambiar cualquier filtro se vuelve a la primera página (si no, filtrar desde la página 7 dejaba la
   // lista en blanco) y las filas vuelven arriba: los resultados nuevos se ven desde el principio. SOLO al
@@ -1350,17 +1343,14 @@ export function ListaReservasAvanzada({
                           permiso de edición no hay columna (06/11/2026). */}
                       {canEdit && (
                         <CeldaAcciones fondo={fondo.acciones} ancho={anchoAcciones}>
-                          <AccionesReserva
-                            variante="fila"
-                            reserva={reservation}
-                            canEdit={canEdit}
-                            al={al}
-                            ocupada={acciones.estaEnCurso(reservation.id)}
-                            bloqueEnCurso={aceptandoBloque}
-                            seleccionada={seleccionadas.has(reservation.id)}
-                            nombreSala={nombreSalaDe(reservation)}
-                            onAsignarMesa={onAsignarMesa}
-                          />
+                          <RanuraSeleccion>
+                            <CasillaAceptarEnBloque
+                              reserva={reservation}
+                              canEdit={canEdit}
+                              marcada={seleccionadas.has(reservation.id)}
+                              onCambiar={al.seleccionar}
+                            />
+                          </RanuraSeleccion>
                         </CeldaAcciones>
                       )}
                       {/* Fecha y hora juntas: dos columnas para esto gastaban
@@ -1383,6 +1373,18 @@ export function ListaReservasAvanzada({
                             )}
                           </div>
                         </div>
+                        {canEdit && (
+                          <AccionesReserva
+                            variante="fila"
+                            reserva={reservation}
+                            canEdit={canEdit}
+                            al={al}
+                            ocupada={acciones.estaEnCurso(reservation.id)}
+                            bloqueEnCurso={aceptandoBloque}
+                            nombreSala={nombreSalaDe(reservation)}
+                            onAsignarMesa={onAsignarMesa}
+                          />
+                        )}
                       </TableCell>
                       <TableCell className={cn(CELDA, ANCHO_PAX)}>
                         <div className="flex items-center gap-1.5 font-semibold tabular-nums" title={`${reservation.numero_comensales} comensales`}>
@@ -1661,26 +1663,7 @@ function FilaSolicitud({
           (06/11/2026: solo «Ver» no gestiona solicitudes). */}
       {canEdit && (
         <CeldaAcciones franja fondo={FONDOS.destacada.acciones} ancho={anchoAcciones}>
-          <RanurasDeAcciones
-            seleccion={null}
-            principal={{
-              etiqueta: "Convertir",
-              titulo: abierta
-                ? "Convertir la solicitud en una reserva"
-                : `La solicitud ya está ${estadoLabel.toLowerCase()}`,
-              icono: <CalendarPlus />,
-              onClick: abierta ? onConvertir : undefined,
-            }}
-            darMesa={DAR_MESA_SOLICITUD}
-            verificar={{ titulo: "Verificar: solo para reservas" }}
-            gestionar={{
-              titulo: "Gestionar: propuesta al cliente, salas y notas",
-              onClick: onGestionar,
-            }}
-            cancelar={{ titulo: "Descartar la solicitud: se hace desde «Gestionar»" }}
-            listaNegra={{ titulo: "Lista negra: solo para reservas" }}
-            nombre={nombre}
-          />
+          <RanuraSeleccion />
         </CeldaAcciones>
       )}
       <CeldaFechaHora
@@ -1702,6 +1685,27 @@ function FilaSolicitud({
             </a>
           )}
         </div>
+        {canEdit && (
+          <RanurasDeAcciones
+            className="mt-3"
+            principal={{
+              etiqueta: "Convertir",
+              titulo: abierta
+                ? "Convertir la solicitud en una reserva"
+                : `La solicitud ya está ${estadoLabel.toLowerCase()}`,
+              icono: <CalendarPlus />,
+              onClick: abierta ? onConvertir : undefined,
+            }}
+            darMesa={DAR_MESA_SOLICITUD}
+            verificar={{ titulo: "Verificar: solo para reservas" }}
+            gestionar={{
+              titulo: "Gestionar: propuesta al cliente, salas y notas",
+              onClick: onGestionar,
+            }}
+            cancelar={{ titulo: "Descartar la solicitud: se hace desde «Gestionar»" }}
+            listaNegra={{ titulo: "Lista negra: solo para reservas" }}
+          />
+        )}
       </TableCell>
       <TableCell className={cn(CELDA, ANCHO_PAX)}>
         {solicitud.numero_comensales ? (

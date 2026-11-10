@@ -15,8 +15,8 @@ import { ComoSeHizoReserva, type ReservaConOrigen } from "./ComoSeHizoReserva";
 // para ver el día, lo que hay ese día y ver si se puede. Y se ven los datos de
 // la persona completos»).
 //
-// La acción principal de la fila de la Lista («Aceptar», «Confirmar») y
-// «Verificar» de «Más» ya no actúan directamente: abren este diálogo con
+// La acción principal de la fila de la Lista («Verificar», «Confirmar») ya no
+// actúa directamente: abre este diálogo con
 //   · arriba, los DATOS completos de la persona y la reserva, grandes;
 //   · debajo, EL DÍA (`ElDiaDeLaReserva`): aforo por servicio, avisos de
 //     cierre/bloqueo/aforo y las reservas del día con esta resaltada;
