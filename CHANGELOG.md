@@ -2,6 +2,17 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.8.0] - 2026-11-10
+
+Objetivo: Reservas web más resistente (límite en disponibilidad y sin arranque en frío) y retoques de Facturas
+
+### Añadido
+- Reservas-web: rate-limit de /disponibilidad y keep-warm (anti cold-start) ([#52](https://github.com/restcasatomascrevillent/admin-casatomas/pull/52))
+
+### Cambiado
+- Facturas: la barra de Análisis va en su propia fila bajo las pestañas ([#45](https://github.com/restcasatomascrevillent/admin-casatomas/pull/45))
+- Facturas: «proveedor nuevo» ya no suena en la campana ([#49](https://github.com/restcasatomascrevillent/admin-casatomas/pull/49))
+
 ## [1.7.0] - 2026-11-10
 
 Objetivo: Tráfico web más limpio, Servicios con más datos, «Hoy» de Reservas al momento con mala cobertura
