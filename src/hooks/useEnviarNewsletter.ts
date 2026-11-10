@@ -2,12 +2,18 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { textoErrorCliente, textoSuscriptores } from "@/lib/newsletter/textos";
+import type { Bloque, TipoNewsletter } from "@/lib/newsletter/diseno";
 
 export interface NewsletterPayload {
-  tipo: 'anuncio' | 'nuevo_menu' | 'oferta';
+  tipo: TipoNewsletter;
   titulo: string;
+  /** Versión de texto (historial y respaldo si la función desplegada no entiende los bloques). */
   mensaje: string;
   imagen_url?: string;
+  /** Diseño por bloques (plantillas nuevas y «Crear con IA»). */
+  bloques?: Bloque[];
+  insignia?: string;
+  preheader?: string;
 }
 
 interface RespuestaEnvio {

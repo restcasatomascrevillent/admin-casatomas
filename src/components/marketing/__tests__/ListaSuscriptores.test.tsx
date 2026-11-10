@@ -49,7 +49,9 @@ describe("ListaSuscriptores", () => {
 describe("PreviewNewsletter", () => {
   it("la vista previa lleva el pie de baja y escapa lo que escribe el personal", () => {
     const { container } = render(
-      <PreviewNewsletter tipo="anuncio" titulo="<b>Hola</b>" mensaje="<style>.footer{display:none}</style>" />,
+      <PreviewNewsletter
+        diseno={{ tipo: "anuncio", titulo: "<b>Hola</b>", insignia: "", preheader: "", bloques: [{ tipo: "texto", texto: "<style>.footer{display:none}</style>" }] }}
+      />,
     );
     const iframe = container.querySelector("iframe");
     const html = iframe?.getAttribute("srcdoc") ?? "";
