@@ -33,6 +33,9 @@ describe("AYUDA_EDICION de Reservas, Configuración, Cheques y Tienda", () => {
     expect(AYUDA_EDICION.cheques).toMatch(/Con solo «Ver» se consultan y se canjean/);
     expect(AYUDA_EDICION.cheques).toMatch(/plantilla de factura/);
     expect(AYUDA_EDICION.cheques).toMatch(/compra manual/);
+    // Stripe y su informe, solo con «Editar» (10/11/2026).
+    expect(AYUDA_EDICION.cheques).toMatch(/pestaña Stripe/);
+    expect(AYUDA_EDICION.cheques).toMatch(/sin ver Stripe/);
   });
   it("Tienda: Ajustes y poner/quitar vinos piden «Editar»; con «Ver», la lista", () => {
     expect(AYUDA_EDICION.tienda).toMatch(/pestaña Ajustes/);

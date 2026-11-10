@@ -1,3 +1,4 @@
+import { EtiquetaFuera } from "./SentarFuera";
 import { useState, useMemo, useRef, useEffect, type ReactNode } from "react";
 import { InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1151,6 +1152,7 @@ export function ListaReservasAvanzada({
                       <span className="text-base font-semibold">{reservation.nombre || "Sin nombre"}</span>
                     </div>
                     <InsigniaEstado estado={reservation.estado} />
+                    <EtiquetaFuera reserva={reservation as never} compacta />
                     <InsigniaMenuDelDia reserva={reservation as { menu_del_dia?: boolean | null }} />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -1313,6 +1315,8 @@ export function ListaReservasAvanzada({
                       <TableCell className={cn(CELDA, ANCHO_CANAL)}>{getCanalBadge(reservation.canal)}</TableCell>
                       <TableCell className={cn(CELDA, ANCHO_ESTADO)}>
                         <InsigniaEstado estado={reservation.estado} />
+                        {/* «Sentar fuera» (10/11/2026): dónde se sentó, fuera de las salas (nada si está dentro). */}
+                        <EtiquetaFuera reserva={reservation as never} compacta className="mt-0.5 flex w-fit" />
                       </TableCell>
                     </TableRow>
                   ); })())

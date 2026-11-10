@@ -2,7 +2,7 @@
  * RRSS · cuentas de encuadre compartidas por el motor (fotos y vídeo) y la
  * vista previa del panel, para que el recorte que se ve sea el que sale.
  */
-import type { Encuadre } from "./plan";
+import type { Encuadre } from "./plan.js";
 
 export interface Rect {
   left: number;

@@ -77,12 +77,17 @@ const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", 
 
 /**
  * Cheques regalo. Permisos (06/11/2026, decisión del dueño):
- *   · «Ver»: consultar la expedición de tickets y Stripe, verificar un código y CANJEARLO (la RPC
+ *   · «Ver»: consultar la expedición de tickets, verificar un código y CANJEARLO (la RPC
  *     `canjear_cheque_regalo` lo permite con «Ver» desde la migración 20261106520000).
  *   · «Editar»: además, compra manual, configuración del cheque (correo, PDF, validez y gastos de
- *     gestión) y plantilla de factura. Sin «Editar» esas pestañas NO salen (se ocultan, no se
- *     desactivan) y junto a las pestañas aparece la etiqueta común «Solo lectura».
+ *     gestión), plantilla de factura y la pestaña Stripe con su «Generar informe» (10/11/2026; el
+ *     servidor lo exige también: migración 20261122164100 y `stripe-estado-cuenta`). Sin «Editar»
+ *     esas pestañas NO salen (se ocultan, no se desactivan) y junto a las pestañas aparece la
+ *     etiqueta común «Solo lectura».
  */
+/** Pestañas que solo existen con «Editar» en Cheques. */
+const PESTANAS_EDITOR = ["manual", "regalo", "plantilla", "stripe"];
+
 export default function Cheques() {
   const hoy = useHoyCheques();
   const { canAccess: puedeEditar, loading: cargandoPermisos } = useCanAccessSection("cheques", "edit");
@@ -118,6 +123,11 @@ export default function Cheques() {
   }
 
   useEffect(() => { void cargar(); }, []);
+  // Si se pierde «Editar» (o la pestaña elegida es de editor), vuelve a Expedición: nunca se
+  // queda abierta una pestaña que ya no sale en la barra.
+  useEffect(() => {
+    if (!cargandoPermisos && !puedeEditar && PESTANAS_EDITOR.includes(pestana)) setPestana("expedicion");
+  }, [cargandoPermisos, puedeEditar, pestana]);
 
   async function verificar(e: FormEvent) {
     e.preventDefault();
@@ -189,16 +199,16 @@ export default function Cheques() {
                   { valor: "manual", etiqueta: "Compra manual", icono: <HandCoins /> },
                   { valor: "regalo", etiqueta: "Configuración", icono: <Palette /> },
                   { valor: "plantilla", etiqueta: "Plantilla de factura", icono: <FileText /> },
+                  { valor: "stripe", etiqueta: "Stripe", icono: <CreditCard /> },
                 ]
               : []),
-            { valor: "stripe", etiqueta: "Stripe", icono: <CreditCard /> },
           ]}
           acciones={soloLectura ? <EtiquetaSoloLectura /> : undefined}
         />
         <TabsContent value="expedicion" className="mt-0 min-w-0 data-[state=inactive]:hidden"><ListaTickets /></TabsContent>
         {puedeEditar && <TabsContent value="manual" forceMount className={CONTENIDO_PESTANA}><CompraManual /></TabsContent>}
         {puedeEditar && <TabsContent value="regalo" className={CONTENIDO_PESTANA}><PlantillaChequeRegalo extra={{ valor: "gastos", etiqueta: "Gastos de gestión", icono: <Receipt />, contenido: <GastosGestionCheques /> }} /></TabsContent>}
-        <TabsContent value="stripe" className={CONTENIDO_PESTANA}><PanelStripe /></TabsContent>
+        {puedeEditar && <TabsContent value="stripe" className={CONTENIDO_PESTANA}><PanelStripe /></TabsContent>}
         <TabsContent value="verificar" className={`${CONTENIDO_PESTANA} space-y-5 max-w-4xl`}>
           <Card className="rounded-2xl border-[#e5ddd0] shadow-sm overflow-hidden"><CardHeader className="bg-[#faf7f1] border-b border-[#eee7dc] p-5 sm:p-6"><div className="flex items-center gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e5ddd0] text-[#795440]"><ShieldCheck className="h-6 w-6" /></div><div><CardTitle className="text-xl sm:text-2xl">Comprobar cheque regalo</CardTitle><p className="text-sm text-muted-foreground mt-1">Introduce el código del email para consultar su importe y disponibilidad.</p></div></div></CardHeader><CardContent className="p-5 sm:p-6">
             <form onSubmit={verificar} className="flex flex-col sm:flex-row sm:items-end gap-3">

@@ -130,6 +130,8 @@ import type { ConfigOcupacionMesa } from "@/lib/reservas/ocupacionMesa";
 import { proponerRecalculo, recolocarDesplazadas, textoSinSitio } from "@/lib/reservas/recalcularMesas";
 import { useFijarMesa } from "@/hooks/useMesaFijada";
 import { ListaHoyEscritorio } from "@/components/reservas/servicio/ListaHoyEscritorio";
+import { BotonSentarFuera, EtiquetaFuera } from "@/components/reservas/SentarFuera";
+import { estaSentadaFuera, puedeSentarseFuera } from "@/lib/reservas/sentarFuera";
 import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
 import { cn } from "@/lib/utils";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
@@ -261,7 +263,7 @@ export function VistaHoyMovil({
   const [señaladaRaton, setSeñaladaRaton] = useState<string | null>(null);
   // Solo lo que está POR LLEGAR (07/11/2026, petición del dueño): las ya sentadas no salen en la lista; liberar o
   // cambiar su mesa sigue en «Mesas».
-  const vacia = lista.llegan.length + lista.porLlegar.length === 0;
+  const vacia = lista.llegan.length + lista.porLlegar.length + lista.fuera.length === 0;
   // El menú lateral: en Reservas › móvil no hay barra superior (DashboardLayout `sinCabeceraMovil`), así que su
   // botón va aquí, el primero de la fila. Fuera de un SidebarProvider (tests sueltos) no se pinta.
   const hayMenu = useSidebarOpcional() !== null;
@@ -308,6 +310,10 @@ export function VistaHoyMovil({
         onSentar={puedeEditar && !extra.sentada ? () => void sentarDesdeFila(reserva, decision) : undefined}
         mesaPrevistaOcupada={nombresMesa.length > 0 && decision.tipo === "elegir"}
         sentando={sentandoId === reserva.id}
+        // «Sentar fuera» (10/11/2026): el botón azul, junto a «Sentar». Solo con «Editar».
+        sentarFuera={
+          puedeEditar && !extra.sentada ? <BotonSentarFuera reserva={reserva} variante="fila" disabled={sentandoId === reserva.id} /> : undefined
+        }
       />
     );
   };
@@ -434,6 +440,7 @@ export function VistaHoyMovil({
             onAbrir={(r) => abrirFicha(r.id)}
             onSentar={puedeEditar ? (r) => void sentarDesdeFila(r, decidirSentarPrevista(asignacionesDia, r, configOcupacion)) : undefined}
             onLiberar={puedeEditar ? (r) => void liberarMesa(r) : undefined}
+            sentarFuera={puedeEditar ? (r) => <BotonSentarFuera reserva={r} variante="compacto" disabled={sentandoId === r.id} /> : undefined}
             mesaPrevistaOcupada={(r) => decidirSentarPrevista(asignacionesDia, r, configOcupacion).tipo === "elegir"}
             ocupadaId={sentandoId ?? (señalada && liberando?.(señalada) ? señalada : null)}
             señalada={señalada}
@@ -463,6 +470,19 @@ export function VistaHoyMovil({
                   </span>
                 </h3>
                 <ul className="divide-y">{lista.porLlegar.map((f) => fila(f.reserva, f.mesas, { tarde: f.tarde }))}</ul>
+              </section>
+            )}
+            {/* Sentadas fuera (Touza, Terraza Touza…): no están en ninguna mesa de «Mesas», así que se ven aquí,
+                al final, para cambiar el sitio o deshacer (10/11/2026). */}
+            {lista.fuera.length > 0 && (
+              <section aria-label="Sentadas fuera">
+                <h3 className="sticky top-0 z-10 flex items-center justify-between border-b bg-[#0050FF] px-3 py-2 text-base font-semibold text-white">
+                  <span>Fuera</span>
+                  <span className="text-xs font-normal tabular-nums">
+                    {lista.fuera.length} · {pax(lista.fuera)} pax · no cuentan en las salas
+                  </span>
+                </h3>
+                <ul className="divide-y">{lista.fuera.map((f) => fila(f.reserva, f.mesas, { sentada: true }))}</ul>
               </section>
             )}
           </>
@@ -545,6 +565,7 @@ export function FilaReservaMovil({
   onSentar,
   mesaPrevistaOcupada = false,
   sentando = false,
+  sentarFuera,
 }: {
   reserva: ReservaMovil;
   nombresMesa: string[];
@@ -559,8 +580,11 @@ export function FilaReservaMovil({
   /** Su mesa prevista la ocupa alguien sentado: el botón dice «Sentar» (abre el selector). */
   mesaPrevistaOcupada?: boolean;
   sentando?: boolean;
+  /** El botón azul «Sentar fuera» (10/11/2026), a la derecha de «Sentar». Sin él, no sale. */
+  sentarFuera?: ReactNode;
 }) {
   const info = infoEstado(reserva.estado);
+  const fuera = estaSentadaFuera(reserva);
   const tel = enlaceTelefono(reserva.telefono);
   const directo = nombresMesa.length > 0 && !mesaPrevistaOcupada;
   const botonDirecto = !!onSentar && directo;
@@ -598,7 +622,9 @@ export function FilaReservaMovil({
         <div className="flex items-center gap-2">
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             {/* Sala y mesa, en grande y con el mismo peso (07/11/2026). Con el botón directo ya van en él. */}
-            {!botonDirecto && (
+            {fuera ? (
+              <EtiquetaFuera reserva={reserva} className="px-2 py-1 text-base" />
+            ) : !botonDirecto && (
               <span className="flex min-w-0 flex-wrap items-center gap-1.5 text-lg font-semibold leading-tight">
                 {sala && <span>{sala}</span>}
                 <span
@@ -629,7 +655,10 @@ export function FilaReservaMovil({
           {onSentar && (
             <Button
               type="button"
-              className="pointer-events-auto h-auto min-h-14 max-w-[72%] shrink-0 flex-col items-start justify-center gap-0 px-3 py-1.5 text-left pointer-coarse:px-3"
+              className={cn(
+                "pointer-events-auto h-auto min-h-14 shrink-0 flex-col items-start justify-center gap-0 px-3 py-1.5 text-left pointer-coarse:px-3",
+                sentarFuera ? "max-w-[58%]" : "max-w-[72%]",
+              )}
               disabled={sentando}
               onClick={onSentar}
               aria-label={directo ? `Sentar a ${reserva.nombre || "la reserva"} en ${textoMesas(nombresMesa).toLowerCase()}` : `Sentar a ${reserva.nombre || "la reserva"}: elegir mesa`}
@@ -644,6 +673,7 @@ export function FilaReservaMovil({
               </span>
             </Button>
           )}
+          {sentarFuera}
         </div>
         {notas && (
           <p className="flex min-w-0 items-center gap-1.5 text-sm text-amber-800 dark:text-amber-300">
@@ -1706,7 +1736,7 @@ export function PanelReservaMovil({
   onCerrar: () => void;
 }) {
   const qc = useQueryClient();
-  const { marcarLlegada, marcarNoShow, deshacerLlegadaONoShow } = useAccionesServicioReserva();
+  const { marcarLlegada, marcarNoShow, deshacerLlegadaONoShow, quitarFuera } = useAccionesServicioReserva();
   const { liberarMesa } = useAccionesModoServicio();
   const sentarReserva = useSentarReservaEnMesa(fecha, mesas);
   const turno: TurnoServicio = turnoDeHora(reserva.hora);
@@ -1723,6 +1753,8 @@ export function PanelReservaMovil({
   const salaNombre = (id: string | null) => salas.find((s) => s.id === id)?.nombre ?? "Sin sala";
   const terminada = estaTerminada(reserva.estado);
   const sentada = reserva.estado === "completada";
+  /** Sentada fuera de las salas (Touza, Terraza Touza…): sin sala ni mesa (10/11/2026). */
+  const fuera = estaSentadaFuera(reserva);
   const puedeLiberar = sentada && nombresMesa.length > 0 && !reserva.salida_at;
   const excluidas = useMemo(() => new Set(mesasExcluidas), [mesasExcluidas]);
   const alFinal = useMemo(() => new Set(mesasAlFinal), [mesasAlFinal]);
@@ -1864,6 +1896,9 @@ export function PanelReservaMovil({
               <BotonPersonas reserva={reserva} className="text-base font-semibold" icono="h-4 w-4" />
               pax
             </span>
+            {fuera ? (
+              <EtiquetaFuera reserva={reserva} className="text-sm" />
+            ) : (
             <span className="flex items-center gap-1">
               <MapPin className="h-4 w-4" aria-hidden />
               {salaNombre(reserva.espacio_id)} · {textoMesaConfirmada(nombresMesa, sentada)}
@@ -1873,6 +1908,7 @@ export function PanelReservaMovil({
                 </span>
               )}
             </span>
+            )}
           </div>
         </SheetDescription>
       </SheetHeader>
@@ -1905,7 +1941,15 @@ export function PanelReservaMovil({
                   <DoorOpen className="mr-2 h-5 w-5" /> Liberar {textoMesas(nombresMesa).toLowerCase()}
                 </Button>
               )}
-              {sentada && !reserva.salida_at && (
+              {sentada && !reserva.salida_at && fuera && (
+                <>
+                  <BotonSentarFuera reserva={reserva} disabled={ocupado} onHecho={onCerrar} />
+                  <Button variant="outline" className="h-14 text-base" disabled={ocupado} onClick={() => ejecutar(() => quitarFuera(reserva))}>
+                    Sentar dentro (sin mesa)
+                  </Button>
+                </>
+              )}
+              {sentada && !reserva.salida_at && !fuera && (
                 <Button
                   variant="outline"
                   className="h-14 text-base"
@@ -1915,6 +1959,9 @@ export function PanelReservaMovil({
                 >
                   Cambiar mesa
                 </Button>
+              )}
+              {sentada && !reserva.salida_at && !fuera && puedeSentarseFuera(reserva) && (
+                <BotonSentarFuera reserva={reserva} disabled={ocupado} onHecho={onCerrar} />
               )}
               <Button
                 variant="outline"
@@ -1950,10 +1997,12 @@ export function PanelReservaMovil({
               >
                 {nombresMesa.length > 0 ? "Cambiar mesa" : "Elegir mesa"}
               </Button>
+              {/* «Sentar fuera» (10/11/2026): fuera de las salas, sin mesa; queda apuntado dónde. */}
+              <BotonSentarFuera reserva={reserva} disabled={ocupado} onHecho={onCerrar} />
             </div>
           )}
 
-          {puedeEditar && eligiendo && (!terminada || sentada) && (
+          {puedeEditar && eligiendo && (!terminada || (sentada && !fuera)) && (
             <div className="space-y-3">
               {propuesta && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:bg-amber-950/40">

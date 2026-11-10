@@ -1,6 +1,6 @@
 /**
  * Panel › Tienda (escaparate: se compra en el restaurante): Vinos (precios de
- * carta y tienda, interruptor «A la venta», filtros, contador, enlace a la web;
+ * carta y tienda, interruptor «A la venta», filtros, contador, tira de cifras;
  * tabla en escritorio y tarjetas en el móvil) y Ajustes (validación, vista
  * previa y guardado), con un Supabase falso en memoria que imita la RLS y la
  * RPC de la migración 20261103150000.
@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   puedeEditar: true,
   bdDejaEditar: true,
   sinMigracion: false,
+  vinosFallan: false,
   config: {} as Fila,
   vinos: [] as Fila[],
   updates: [] as Fila[],
@@ -43,6 +44,7 @@ vi.mock("@/integrations/supabase/client", () => {
       }
       return { data: h.config, error: null };
     }
+    if (h.vinosFallan) return { data: null, error: { message: "sin red" } };
     return { data: h.vinos, error: null };
   };
   const desde = (tabla: string) => {
@@ -95,6 +97,7 @@ beforeEach(() => {
   h.puedeEditar = true;
   h.bdDejaEditar = true;
   h.sinMigracion = false;
+  h.vinosFallan = false;
   h.config = { id: true, activa: true, descuento_pct: "30.00", vinos_excluidos: ["albarino"], aviso: null, recogida: "Pregunta en la barra", updated_at: "2026-11-03T10:00:00Z", updated_by: null };
   h.vinos = [
     { id: "rioja", nombre: "Rioja Crianza", categoria: "Tintos", precio_eur: 24, activado: true, restaurante: true },
@@ -122,7 +125,10 @@ describe("Tienda › Vinos", () => {
   it("precio de carta y de tienda, interruptor «A la venta» y vinos que no pueden salir", async () => {
     pintar();
     const lista = await tablaVinos();
-    expect(screen.getByText(/1 de 3/)).toBeInTheDocument();
+    const resumen = screen.getByTestId("resumen-tienda");
+    expect(within(resumen).getAllByRole("listitem").map((c) => c.textContent)).toEqual([
+      "A la venta1de 3 vinos", "Quitados1", "No pueden salir1", "Descuento30 %",
+    ]);
     const rioja = filaDe(lista, "Rioja Crianza");
     expect(rioja).toHaveTextContent(/24,00\s€/);
     expect(rioja).toHaveTextContent(/16,80\s€/);
@@ -139,12 +145,38 @@ describe("Tienda › Vinos", () => {
     expect(h.toast.success).toHaveBeenCalledWith("«Albariño» a la venta en la tienda");
   });
 
-  it("enlaza a la tienda de la web del entorno, en otra pestaña", async () => {
+  // 10/11/2026 (petición del dueño): «quitar botón de abrir tienda web».
+  it("sin botón ni enlace para abrir la tienda de la web", async () => {
     pintar();
-    const enlace = await screen.findByRole("link", { name: /Ver la tienda en la web/ }, ESPERA);
-    expect(enlace).toHaveAttribute("href", "https://web-casatomas-git-staging-casa-tomas.vercel.app/tienda");
-    expect(enlace).toHaveAttribute("target", "_blank");
-    expect(enlace).toHaveAttribute("rel", expect.stringContaining("noopener"));
+    await tablaVinos();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByText(/Ver la tienda en la web/)).toBeNull();
+  });
+
+  it("con la tienda apagada, aviso arriba que manda al interruptor (no a Ajustes)", async () => {
+    h.config.activa = false;
+    pintar();
+    await tablaVinos();
+    const aviso = screen.getByTestId("aviso-tienda-oculta");
+    expect(aviso).toHaveTextContent("La tienda está oculta en la web.");
+    expect(aviso).toHaveTextContent("enciéndela arriba con «Visible en la web»");
+    expect(aviso).not.toHaveTextContent(/Ajustes/);
+  });
+
+  it("encendida, sin aviso de tienda oculta", async () => {
+    pintar();
+    await tablaVinos();
+    expect(screen.queryByTestId("aviso-tienda-oculta")).toBeNull();
+  });
+
+  it("si fallan los vinos, error con «Reintentar» que vuelve a cargarlos", async () => {
+    h.vinosFallan = true;
+    pintar();
+    const alerta = await screen.findByRole("alert", {}, ESPERA);
+    expect(alerta).toHaveTextContent("No se pudieron cargar los vinos");
+    h.vinosFallan = false;
+    fireEvent.click(within(alerta).getByRole("button", { name: "Reintentar" }));
+    await tablaVinos();
   });
 
   it("el buscador filtra y permite quitar de la venta todos los mostrados (con confirmación)", async () => {
@@ -281,6 +313,21 @@ describe("Tienda › Ajustes", () => {
     expect(screen.getByText("· 25 %")).toBeInTheDocument();
   });
 
+  it("dos tarjetas (precio y textos) y la barra de guardar solo se pega abajo con cambios", async () => {
+    pintar("/tienda?tab=ajustes");
+    const descuento = await campoDescuento();
+    expect(screen.getByRole("heading", { name: "Precio de tienda" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Textos de la web" })).toBeInTheDocument();
+    const barra = screen.getByTestId("barra-guardar-tienda");
+    expect(barra.className).not.toMatch(/\bsticky\b/);
+    fireEvent.change(descuento, { target: { value: "20" } });
+    expect(barra.className).toMatch(/\bsticky\b/);
+    expect(screen.getAllByText(/Hay cambios sin guardar/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Descartar cambios" }));
+    expect(descuento).toHaveValue("30");
+    expect(barra.className).not.toMatch(/\bsticky\b/);
+  });
+
   it("guardar Ajustes con cambios a medias no vuelve a encender la tienda apagada arriba", async () => {
     pintar("/tienda?tab=ajustes");
     fireEvent.change(await campoDescuento(), { target: { value: "20" } });
@@ -362,6 +409,7 @@ describe("Tienda › interruptor «Visible en la web»", () => {
     await tablaVinos();
     expect(screen.getByText("Oculta en la web")).toBeInTheDocument();
     expect(screen.queryByRole("switch", { name: "Visible en la web" })).toBeNull();
+    expect(screen.getByTestId("aviso-tienda-oculta")).toHaveTextContent("Los clientes no la ven ahora mismo.");
   });
 });
 

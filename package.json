@@ -41,6 +41,7 @@
     "test:usuarios-reservas-albaranes:db": "node scripts/test-usuarios-reservas-albaranes.mjs",
     "test:vinos-copeo-encuesta:db": "node scripts/test-vinos-copeo-encuesta.mjs",
     "test:vinos-parker:db": "node scripts/test-vinos-parker.mjs",
+    "test:vinos-anadas:db": "node scripts/test-vinos-anadas-parker.mjs",
     "test:instagram:db": "node scripts/test-instagram.mjs",
     "test:carta-originales:db": "node scripts/test-carta-originales.mjs",
     "test:instagram-programar:db": "node scripts/test-instagram-programar.mjs",
@@ -58,13 +59,16 @@
     "test:permisos-carta-newsletter:db": "node scripts/test-permisos-carta-newsletter.mjs",
     "test:newsletter-plantillas:db": "node scripts/test-newsletter-plantillas.mjs",
     "test:mesa-fijada:db": "node scripts/test-reservas-mesa-fijada.mjs",
+    "test:sentar-fuera:db": "node scripts/test-reservas-sentar-fuera.mjs",
     "test:sala-evento:db": "node scripts/test-sala-entera-evento.mjs",
     "test:servicios-bloqueados:db": "node scripts/test-servicios-bloqueados.mjs",
     "test:jueves-abiertos:db": "node scripts/test-jueves-abiertos.mjs",
     "test:logs-web:db": "node scripts/test-logs-web.mjs",
     "test:migraciones": "node scripts/comprobar-versiones-migraciones.mjs",
     "instagram:recursos": "node scripts/instagram/subir-recursos.mjs",
-    "instagram:render-reels": "node scripts/instagram/render-reels.mjs"
+    "instagram:render-reels": "node scripts/instagram/render-reels.mjs",
+    "test:cambios": "node scripts/tests-cambios.mjs",
+    "lint:cambios": "node scripts/lint-cambios.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",

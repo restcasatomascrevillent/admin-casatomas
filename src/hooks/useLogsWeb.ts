@@ -226,13 +226,46 @@ export interface FiltrosActividad {
   incluirBots: boolean;
 }
 
+export type OrdenIncidencias = "recientes" | "ocurrencias" | "sesiones";
+
 export interface FiltrosIncidencias {
   entorno: Entorno | null;
   estado: EstadoIncidencia | "activas" | null;
   gravedad: Gravedad | null;
   fuente: string | null;
   texto: string;
+  /** Tipo de error (error_js, error_peticion…). */
+  tipo?: string | null;
+  /**
+   * Oculta las incidencias sin ninguna ocurrencia de visitantes reales (solo
+   * bots o pruebas automáticas: en producción eran la mitad de la lista el 10/11/2026).
+   */
+  ocultarRuido?: boolean;
+  orden?: OrdenIncidencias;
 }
+
+/** Filtros de la consulta de incidencias (exportado para las pruebas). */
+export interface ConsultaFiltrable {
+  eq(c: string, v: unknown): ConsultaFiltrable;
+  in(c: string, v: unknown[]): ConsultaFiltrable;
+  gt(c: string, v: unknown): ConsultaFiltrable;
+  or(f: string): ConsultaFiltrable;
+}
+
+export function aplicarFiltrosIncidencias(q: ConsultaFiltrable, f: FiltrosIncidencias): ConsultaFiltrable {
+  if (f.entorno) q = q.eq("entorno", f.entorno);
+  if (f.estado === "activas") q = q.in("estado", ["nueva", "abierta", "reabierta"]);
+  else if (f.estado) q = q.eq("estado", f.estado);
+  if (f.gravedad) q = q.eq("gravedad", f.gravedad);
+  if (f.fuente) q = q.eq("fuente", f.fuente);
+  if (f.tipo) q = q.eq("tipo", f.tipo);
+  if (f.ocultarRuido) q = q.gt("ocurrencias", 0);
+  const texto = f.texto.trim().replace(/[%,()*]/g, " ").trim();
+  if (texto) q = q.or(`titulo.ilike.%${texto}%,mensaje.ilike.%${texto}%,linear_identificador.ilike.%${texto}%,pila.ilike.%${texto}%`);
+  return q;
+}
+
+const COLUMNA_ORDEN: Record<OrdenIncidencias, string> = { recientes: "ultima_vez", ocurrencias: "ocurrencias", sesiones: "sesiones_afectadas" };
 
 export const TAM_PAGINA = 25;
 
@@ -369,15 +402,12 @@ export function useIncidencias(f: FiltrosIncidencias, pagina: number, autoRefres
     refetchIntervalInBackground: false,
     staleTime: 10_000,
     queryFn: async (): Promise<{ filas: IncidenciaWeb[]; total: number }> => {
-      let q = sb.from("web_incidencias").select("*", { count: "exact" });
-      if (f.entorno) q = q.eq("entorno", f.entorno);
-      if (f.estado === "activas") q = q.in("estado", ["nueva", "abierta", "reabierta"]);
-      else if (f.estado) q = q.eq("estado", f.estado);
-      if (f.gravedad) q = q.eq("gravedad", f.gravedad);
-      if (f.fuente) q = q.eq("fuente", f.fuente);
-      const texto = f.texto.trim().replace(/[%,()]/g, " ");
-      if (texto) q = q.or(`titulo.ilike.%${texto}%,mensaje.ilike.%${texto}%,linear_identificador.ilike.%${texto}%`);
-      const { data, error, count } = await q.order("ultima_vez", { ascending: false }).range(pagina * TAM_PAGINA, pagina * TAM_PAGINA + TAM_PAGINA - 1);
+      const base = sb.from("web_incidencias").select("*", { count: "exact" });
+      const q = aplicarFiltrosIncidencias(base as unknown as ConsultaFiltrable, f) as unknown as typeof base;
+      const columna = COLUMNA_ORDEN[f.orden ?? "recientes"];
+      let ordenada = q.order(columna, { ascending: false });
+      if (columna !== "ultima_vez") ordenada = ordenada.order("ultima_vez", { ascending: false });
+      const { data, error, count } = await ordenada.range(pagina * TAM_PAGINA, pagina * TAM_PAGINA + TAM_PAGINA - 1);
       lanzar(error);
       return { filas: (data ?? []) as IncidenciaWeb[], total: count ?? 0 };
     },
@@ -393,6 +423,22 @@ export function useIncidencia(id: number | null) {
       const { data, error } = await sb.from("web_incidencias").select("*").eq("id", id).maybeSingle();
       lanzar(error);
       return (data ?? null) as IncidenciaWeb | null;
+    },
+  });
+}
+
+/** Últimas 50 ocurrencias de visitantes reales (sin bots): para los repartos del detalle (navegador, versión, qué falla). */
+export function useMuestrasIncidencia(incidenciaId: number | null) {
+  return useQuery({
+    queryKey: [...CLAVE_LOGS, "muestras", incidenciaId],
+    enabled: incidenciaId !== null,
+    staleTime: 30_000,
+    queryFn: async (): Promise<EventoWeb[]> => {
+      const { data, error } = await sb.from("web_eventos")
+        .select("id, tipo, categoria, accion, ruta, objetivo, valor, ocurrido_en, secuencia, navegador, so, dispositivo, version, despliegue, propiedades, mensaje, es_prueba")
+        .eq("incidencia_id", incidenciaId).eq("es_bot", false).order("ocurrido_en", { ascending: false }).limit(50);
+      lanzar(error);
+      return (data ?? []) as EventoWeb[];
     },
   });
 }
