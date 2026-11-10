@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { tituloHoja } from "@/lib/reservas/libroReservas";
 import { etiquetaCanal } from "@/lib/reservas/etiquetaCanal";
 import { textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
+import { textoZona } from "@/lib/reservas/zonaPreferida";
 import { ElDiaDeLaReserva } from "./ElDiaDeLaReserva";
 import { ComoSeHizoReserva, type ReservaConOrigen } from "./ComoSeHizoReserva";
 
@@ -51,6 +52,8 @@ export interface ReservaDelDialogo {
   menu_del_dia?: boolean | null;
   menu_cerrado?: boolean | null;
   menu_precio?: number | string | null;
+  /** «Dentro» / «Fuera (Terraza)» que pidió el cliente. */
+  zona_preferida?: string | null;
   origen?: unknown;
   created_at?: string | null;
 }
@@ -134,6 +137,7 @@ export function DialogoAccionReserva({
               </Dato>
               <Dato etiqueta="Personas">{reserva.numero_comensales}</Dato>
               <Dato etiqueta="Sala">{nombreSala || "Sin sala asignada"}</Dato>
+              <Dato etiqueta="Zona">{textoZona(reserva.zona_preferida)}</Dato>
               <Dato etiqueta="Servicio">{servicio}</Dato>
               <Dato etiqueta="Menú cerrado">{reserva.menu_cerrado ? textoInsigniaMenu(reserva.menu_precio) : null}</Dato>
               <Dato etiqueta="Notas">{reserva.notas_cliente?.trim() || null}</Dato>
