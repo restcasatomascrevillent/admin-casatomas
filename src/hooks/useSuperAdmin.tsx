@@ -2,10 +2,13 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { alRevalidarSesion } from "@/lib/revalidacion-sesion";
+import { guardarPermisosRecordados, leerPermisosRecordados } from "@/lib/cachePermisos";
 
 interface SuperAdminData {
   isSuperAdmin: boolean;
   loading: boolean;
+  /** Ya se ha leído del servidor para este usuario (si no, puede ser lo recordado: `lib/cachePermisos.ts`). */
+  verificado?: boolean;
 }
 
 const SuperAdminContext = createContext<SuperAdminData | null>(null);
@@ -27,6 +30,7 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
   const userId = user?.id ?? null;
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [verificado, setVerificado] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -36,10 +40,19 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
     if (!userId) {
       setIsSuperAdmin(false);
       setLoading(false);
+      setVerificado(true);
       return;
     }
+    setVerificado(false);
 
-    setLoading(true);
+    // Lo recordado para ESTE usuario se usa ya y se vuelve a leer igualmente (09/11/2026, `lib/cachePermisos.ts`).
+    const recordado = leerPermisosRecordados(userId)?.superAdmin;
+    if (recordado !== undefined) {
+      setIsSuperAdmin(recordado);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     supabase
       .from("super_admins")
       .select("id")
@@ -47,6 +60,10 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
       .maybeSingle()
       .then(({ data, error }) => {
         if (!isMounted) return;
+        setVerificado(true);
+        if (!error) guardarPermisosRecordados(userId, { superAdmin: !!data });
+        // Con algo recordado, un fallo de red no cambia lo conocido (como la relectura de abajo).
+        if (error && recordado !== undefined) return;
         setIsSuperAdmin(!error && !!data);
         setLoading(false);
       });
@@ -68,6 +85,7 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
         .maybeSingle()
         .then(({ data, error }) => {
           if (!vivo || error) return; // un fallo no cambia el estado conocido
+          guardarPermisosRecordados(userId, { superAdmin: !!data });
           setIsSuperAdmin(!!data);
         });
     });
@@ -77,7 +95,7 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
     };
   }, [userId, authLoading]);
 
-  const value: SuperAdminData = { isSuperAdmin, loading: authLoading || loading };
+  const value: SuperAdminData = { isSuperAdmin, loading: authLoading || loading, verificado };
 
   return <SuperAdminContext.Provider value={value}>{children}</SuperAdminContext.Provider>;
 }

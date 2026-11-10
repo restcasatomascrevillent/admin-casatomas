@@ -29,3 +29,50 @@ export function precargarSeccion(url: string) {
   yaPedidas.add(ruta);
   cargar().catch(() => yaPedidas.delete(ruta));
 }
+
+// ── Abrir el panel directamente en «Reservas › Hoy» (09/11/2026, mala cobertura) ──────────────────────
+// Lo que va a hacer falta se pide en paralelo a la validación de la sesión, en vez de después:
+//   1. al arrancar (`App.tsx`, antes de pintar): el fichero de Reservas y el de la precarga de «Hoy»;
+//   2. con la sesión confirmada (`App.tsx` › `PrecargaHoy`): las lecturas de «Hoy», todas a la vez
+//      (`lib/reservas/precargaHoy.ts`), sin esperar a rol y permisos ni al fichero de la página.
+
+/** ¿La URL es la de «Hoy»? (`/reservas` sin pestaña, o con `?tab=hoy`). */
+export function esRutaHoy(pathname: string, search: string): boolean {
+  if (pathname.replace(/\/+$/, "") !== "/reservas") return false;
+  const tab = new URLSearchParams(search).get("tab");
+  return !tab || tab === "hoy";
+}
+
+type ModuloPrecargaHoy = typeof import("@/lib/reservas/precargaHoy");
+let moduloPrecargaHoy: Promise<ModuloPrecargaHoy> | null = null;
+
+/** Paso 1. Llamar al arrancar: si la URL es «Hoy», empieza a bajar los ficheros. Devuelve si lo es. */
+export function prepararArranqueEnHoy(ubicacion: Pick<Location, "pathname" | "search"> = window.location): boolean {
+  if (!esRutaHoy(ubicacion.pathname, ubicacion.search)) return false;
+  // Primero el fichero pequeño de la precarga (las lecturas salen en cuanto haya sesión) y después el de la
+  // página, que es grande: con poca cobertura, si van a la vez, el pequeño queda a la cola del grande.
+  const modulo = import("@/lib/reservas/precargaHoy");
+  moduloPrecargaHoy = modulo;
+  modulo.then(
+    () => precargarSeccion("/reservas"),
+    () => {
+      if (moduloPrecargaHoy === modulo) moduloPrecargaHoy = null;
+      precargarSeccion("/reservas");
+    },
+  );
+  return true;
+}
+
+/**
+ * Paso 2. Con la sesión confirmada: lanza las lecturas de «Hoy» UNA vez (solo si se arrancó en «Hoy» y
+ * se sigue ahí). `escritorio`: también los planos de las salas (el móvil no los pinta).
+ */
+export function lanzarPrecargaHoy(
+  qc: import("@tanstack/react-query").QueryClient,
+  { escritorio, ubicacion = window.location }: { escritorio: boolean; ubicacion?: Pick<Location, "pathname" | "search"> },
+): void {
+  const modulo = moduloPrecargaHoy;
+  moduloPrecargaHoy = null;
+  if (!modulo || !esRutaHoy(ubicacion.pathname, ubicacion.search)) return;
+  modulo.then((m) => m.precargarHoy(qc, { escritorio })).catch(() => undefined);
+}

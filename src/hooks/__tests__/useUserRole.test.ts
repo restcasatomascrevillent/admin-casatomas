@@ -87,6 +87,8 @@ function mockRoleQuery(role: string | null, permissions: unknown[] = []) {
 describe("useUserRole", () => {
   beforeEach(() => {
     resetSupabaseMocks();
+    // Rol y permisos recordados en el dispositivo (09/11/2026, `lib/cachePermisos.ts`): cada test parte de cero.
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -235,6 +237,8 @@ describe("useUserRole", () => {
 describe("useCanAccessSection", () => {
   beforeEach(() => {
     resetSupabaseMocks();
+    // Rol y permisos recordados en el dispositivo (09/11/2026, `lib/cachePermisos.ts`): cada test parte de cero.
+    localStorage.clear();
     // Por defecto, nadie es super admin; los tests que lo necesiten lo sobrescriben.
     vi.mocked(useSuperAdmin).mockReturnValue({ isSuperAdmin: false, loading: false });
   });

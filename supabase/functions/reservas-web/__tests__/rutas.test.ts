@@ -51,8 +51,15 @@ describe("rutas públicas — sin cambios", () => {
     ["GET", "confirmar"],
     ["GET", "cancelar"],
     ["GET", "cancelar/ejecutar"],
+    ["GET", "salud"],
   ] as const)("%s /%s resuelve con el path completo de Supabase", (metodo, ruta) => {
     expect(resolverRuta(metodo, `${BASE}/${ruta}`)).toBe(ruta);
+  });
+
+  it("GET /salud resuelve (sonda de keep-warm) y POST /salud es 404", () => {
+    expect(resolverRuta("GET", `${BASE}/salud`)).toBe("salud");
+    expect(resolverRuta("GET", "/reservas-web/salud")).toBe("salud");
+    expect(resolverRuta("POST", `${BASE}/salud`)).toBeNull();
   });
 
   it("resuelve igual sin el prefijo /functions/v1 (lo que ve la función en local)", () => {
@@ -67,7 +74,7 @@ describe("rutas públicas — sin cambios", () => {
     expect(resolverRuta("POST", `${BASE}/cancelar/ejecutar`)).toBeNull();
   });
 
-  it("las 5 rutas de antes menos /notificar-estado, más /cierres (2026-10-13)", () => {
+  it("la tabla de rutas: las POST públicas, los GET de correo y GET /salud (keep-warm, CT-REM-FN-07c)", () => {
     expect(RUTAS_RESERVAS_WEB).toEqual([
       { metodo: "POST", ruta: "disponibilidad" },
       { metodo: "POST", ruta: "crear" },
@@ -75,6 +82,7 @@ describe("rutas públicas — sin cambios", () => {
       { metodo: "GET", ruta: "confirmar" },
       { metodo: "GET", ruta: "cancelar" },
       { metodo: "GET", ruta: "cancelar/ejecutar" },
+      { metodo: "GET", ruta: "salud" },
     ]);
   });
 

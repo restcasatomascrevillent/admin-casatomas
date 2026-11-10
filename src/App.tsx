@@ -16,7 +16,7 @@ import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
 import { ColaVideosProvider } from "@/components/carta/video/ColaVideosProvider";
 import { rutaServicios } from "@/components/servicios/pestanas";
 import { PanelLayout, CargandoContenido } from "@/components/PanelLayout";
-import { CARGADORES_SECCION } from "@/lib/precargaSecciones";
+import { CARGADORES_SECCION, prepararArranqueEnHoy } from "@/lib/precargaSecciones";
 import Auth from "./pages/Auth";
 const Dashboard = lazy(CARGADORES_SECCION["/dashboard"]);
 const Reservas = lazy(CARGADORES_SECCION["/reservas"]);
@@ -87,6 +87,13 @@ function CargandoPagina() {
     </div>
   );
 }
+
+/**
+ * «Reservas › Hoy» con mala cobertura (09/11/2026): si el panel se abre en «Hoy», el fichero de Reservas y
+ * el de la precarga empiezan a bajar YA, a la vez que se valida la sesión (`lib/precargaSecciones.ts`); con la
+ * sesión confirmada, `AuthProvider` lanza las lecturas de «Hoy».
+ */
+if (typeof window !== "undefined") prepararArranqueEnHoy();
 
 const bajoDemanda = (contenido: ReactNode) => <Suspense fallback={<CargandoPagina />}>{contenido}</Suspense>;
 

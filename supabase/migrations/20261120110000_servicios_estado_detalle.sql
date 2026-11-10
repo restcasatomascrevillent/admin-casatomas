@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- 20261120100000_servicios_estado_detalle — Super Admin › Servicios: más datos
+-- 20261120110000_servicios_estado_detalle — Super Admin › Servicios: más datos
 -- de Supabase y Vercel, y GitHub sin el aviso repetido (09/11/2026)
 -- ===========================================================================
 -- Dueño (09/11/2026): «Arregla servicios, no funciona bien del todo […] añade
@@ -26,7 +26,7 @@ set client_encoding = 'UTF8';
 -- APLICAR (una a una, nunca `db push`): demo primero (sfonaclosuafvlhutkon),
 -- producción (haqmmdfdzzatdnrrcgez) solo tras aceptar el PR de la release y
 -- con el «sí» del dueño. Idempotente.
--- Deshacer: supabase/rollbacks/20261120100000_servicios_estado_detalle_ROLLBACK.sql
+-- Deshacer: supabase/rollbacks/20261120110000_servicios_estado_detalle_ROLLBACK.sql
 -- Pruebas: npm run test:servicios:db (PGlite).
 -- ===========================================================================
 
