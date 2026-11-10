@@ -82,6 +82,7 @@ import {
   type TurnoServicio,
 } from "@/hooks/useAjustesMesaServicio";
 import { BotonSentarSinReserva } from "@/components/reservas/SentarSinReserva";
+import { BotonPersonas } from "@/components/reservas/CambiarPersonas";
 import { InterruptoresServiciosOnline, InsigniaMenuDelDia } from "@/components/reservas/InterruptoresServiciosOnline";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { COLORES_MESA, estadoColorMovil } from "@/lib/reservas/coloresMesa";
@@ -579,10 +580,8 @@ export function FilaReservaMovil({
         <div className="flex items-center gap-2">
           <span className="w-14 shrink-0 text-lg font-semibold leading-tight tabular-nums">{horaCorta(reserva.hora)}</span>
           <span className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight">{reserva.nombre || "Sin nombre"}</span>
-          <span className="flex shrink-0 items-center gap-1 text-xl font-bold leading-none tabular-nums" aria-hidden="true">
-            <Users className="h-5 w-5 text-muted-foreground" />
-            {reserva.numero_comensales}
-          </span>
+          {/* Tocar el número cambia las personas (10/11/2026). */}
+          <BotonPersonas reserva={reserva} className="text-xl font-bold leading-none" />
           {/* Teléfono (15/10/2026, petición del dueño): icono de 44 px con márgenes negativos para no
               hacer la fila más alta. Desde 375 px: a 320 px dejaba el nombre en ~100 px. */}
           {tel && (
@@ -1349,6 +1348,12 @@ export function PanelMesaLibre({
               </span>
             </Button>
           )}
+          {puedeEditar && reservaPrevista && (
+            <p className="-mt-2 flex items-center justify-end gap-2 text-sm text-muted-foreground">
+              ¿Vienen más o menos?
+              <BotonPersonas reserva={reservaPrevista} className="text-base font-semibold text-foreground" icono="h-4 w-4" />
+            </p>
+          )}
 
           {puedeEditar && !ocupadaAhora && (
             <section aria-label="Sentar sin reserva" className="space-y-3">
@@ -1855,7 +1860,10 @@ export function PanelReservaMovil({
         <SheetDescription asChild>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-1"><Clock className="h-4 w-4" aria-hidden />{horaCorta(reserva.hora)}</span>
-            <span className="flex items-center gap-1"><Users className="h-4 w-4" aria-hidden />{reserva.numero_comensales} pax</span>
+            <span className="flex items-center gap-1">
+              <BotonPersonas reserva={reserva} className="text-base font-semibold" icono="h-4 w-4" />
+              pax
+            </span>
             <span className="flex items-center gap-1">
               <MapPin className="h-4 w-4" aria-hidden />
               {salaNombre(reserva.espacio_id)} · {textoMesaConfirmada(nombresMesa, sentada)}

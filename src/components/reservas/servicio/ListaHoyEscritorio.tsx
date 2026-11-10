@@ -18,6 +18,7 @@
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, Lock, Phone, StickyNote, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BotonPersonas } from "@/components/reservas/CambiarPersonas";
 import { cn } from "@/lib/utils";
 import { ESTADOS_RESERVA, type EstadoReserva } from "@/lib/reservas/estadosReserva";
 import { textoMesas, tieneAlergia, type FilaHoyMovil, type ListaHoyEscritorio as Lista } from "@/lib/reservas/hoyMovil";
@@ -222,10 +223,8 @@ function FilaEscritorio({
         <span className="min-w-0 flex-1 truncate text-sm font-semibold" title={nombre}>
           {nombre}
         </span>
-        <span className="flex shrink-0 items-center justify-end gap-0.5 text-sm font-bold tabular-nums" aria-hidden="true">
-          <Users className="hidden h-3.5 w-3.5 text-muted-foreground xl:inline" />
-          {reserva.numero_comensales}
-        </span>
+        {/* Tocar el número cambia las personas (10/11/2026). */}
+        <BotonPersonas reserva={reserva} className="gap-0.5 text-sm font-bold" icono="hidden h-3.5 w-3.5 xl:inline" />
         <span
           className={cn(
             "inline-flex max-w-[5rem] shrink-0 items-center gap-0.5 truncate rounded-md px-1.5 py-0.5 text-xs font-semibold",
