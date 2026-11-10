@@ -10,7 +10,7 @@
 //  duplica nada (ON CONFLICT en la RPC).
 // ============================================================================
 
-import { calcularHuella, uuidDeTexto } from "../_shared/logs-web/huella.ts";
+import { calcularHuella, PATRON_CRON_PLATAFORMA, uuidDeTexto } from "../_shared/logs-web/huella.ts";
 import { sanearTexto } from "../_shared/logs-web/saneado.ts";
 import type { EventoNormalizado } from "../_shared/logs-web/eventos.ts";
 
@@ -70,7 +70,9 @@ export async function eventosDeCron(fallos: FalloCron[]): Promise<EventoNormaliz
   const salida: EventoNormalizado[] = [];
   for (const f of fallos) {
     const mensaje = sanearTexto(f.return_message, 500) ?? "La tarea programada terminó con error";
-    const objetivo = sanearTexto(`cron:${f.jobname}`, 120);
+    // Fallo de la base de datos (no de la tarea): objetivo común «cron:*» para que la
+    // incidencia no lleve el nombre de una tarea cualquiera; la tarea va en propiedades.
+    const objetivo = PATRON_CRON_PLATAFORMA.test(mensaje) ? "cron:*" : sanearTexto(`cron:${f.jobname}`, 120);
     salida.push({
       ...baseServidor({ objetivo, mensaje, propiedades: { tarea: f.jobname } }),
       evento_id: await uuidDeTexto(`cron:${f.runid}`),

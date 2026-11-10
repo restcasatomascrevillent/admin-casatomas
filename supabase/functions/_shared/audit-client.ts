@@ -141,10 +141,12 @@ export function conAuditoriaDePeticion(
       const preguntaChat = fuente === "chat-facturas" ? await req.clone().json().catch(() => null) : null;
       let response: Response;
       let excepcion: string | null = null;
+      let pila: string | null = null;
       try { response = await handler(req); }
       catch (error) {
         console.error(`Error ejecutando ${fuente}:`, error);
         excepcion = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        pila = error instanceof Error ? error.stack ?? null : null;
         response = new Response(JSON.stringify({ success: false, error: "Error interno del servidor" }), {
           status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
@@ -154,7 +156,7 @@ export function conAuditoriaDePeticion(
       if (response.status >= 500) {
         const subruta = new URL(req.url).pathname.split(fuente).slice(1).join(fuente);
         const mensaje = excepcion ?? await mensajeDeRespuesta(response);
-        await enSegundoPlano(registrarErrorServidor({ fuente, subruta, status: response.status, mensaje, duracionMs: Date.now() - inicio }));
+        await enSegundoPlano(registrarErrorServidor({ fuente, subruta, status: response.status, mensaje, duracionMs: Date.now() - inicio, metodo: req.method, pila, excepcion: excepcion !== null }));
       }
       // Efectos externos (envíos, sincronizaciones, OCR, publicación...) también
       // tienen un evento propio. Las mutaciones SQL se registran atómicamente

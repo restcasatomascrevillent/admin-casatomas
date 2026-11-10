@@ -1,13 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SelectorSubrayado } from "@/components/panel/SelectorSubrayado";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { TAM_PAGINA, useIncidencias, type Entorno, type FiltrosIncidencias, type Gravedad } from "@/hooks/useLogsWeb";
-import { fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO } from "./calculos";
-import { Buscador, FiltroSelect, Paginacion } from "./Controles";
+import { TAM_PAGINA, useIncidencias, type Entorno, type FiltrosIncidencias, type Gravedad, type OrdenIncidencias } from "@/hooks/useLogsWeb";
+import { causaDeFila, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO } from "./calculos";
+import { Buscador, FiltroSelect, Interruptor, Paginacion } from "./Controles";
+
+const TIPOS_ERROR = Object.entries(NOMBRE_TIPO).filter(([t]) => t.startsWith("error_")).map(([valor, etiqueta]) => ({ valor, etiqueta }));
+const ORDENES: Array<{ valor: OrdenIncidencias; etiqueta: string }> = [
+  { valor: "recientes", etiqueta: "Más recientes" },
+  { valor: "ocurrencias", etiqueta: "Más ocurrencias" },
+  { valor: "sesiones", etiqueta: "Más sesiones" },
+];
 import { PestanaActividad } from "./PestanaActividad";
 
 interface PestanaIncidenciasProps {
@@ -27,8 +35,14 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
   const [estado, setEstado] = useState<FiltrosIncidencias["estado"]>("activas");
   const [gravedad, setGravedad] = useState<Gravedad | null>(null);
   const [fuente, setFuente] = useState<string | null>(null);
+  const [tipo, setTipo] = useState<string | null>(null);
+  const [ocultarRuido, setOcultarRuido] = useState(true);
+  const [orden, setOrden] = useState<OrdenIncidencias>("recientes");
   const [pagina, setPagina] = useState(0);
-  const filtros = useMemo<FiltrosIncidencias>(() => ({ entorno, estado, gravedad, fuente, texto: textoFiltro }), [entorno, estado, gravedad, fuente, textoFiltro]);
+  const filtros = useMemo<FiltrosIncidencias>(
+    () => ({ entorno, estado, gravedad, fuente, tipo, ocultarRuido, orden, texto: textoFiltro }),
+    [entorno, estado, gravedad, fuente, tipo, ocultarRuido, orden, textoFiltro],
+  );
   useEffect(() => setPagina(0), [filtros]);
   const q = useIncidencias(filtros, pagina, vista === "incidencias" ? autoRefresco : false);
 
@@ -41,13 +55,19 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <Buscador valor={texto} onCambio={setTexto} placeholder="Buscar título, mensaje o ticket" />
+            <Buscador valor={texto} onCambio={setTexto} placeholder="Buscar mensaje, pila o ticket" />
             <FiltroSelect etiqueta="Estado" valor={estado} onCambio={(v) => setEstado(v as FiltrosIncidencias["estado"])}
               opciones={[{ valor: "activas", etiqueta: "Activas (nuevas, abiertas, reabiertas)" }, ...Object.entries(NOMBRE_ESTADO).map(([valor, etiqueta]) => ({ valor, etiqueta }))]} ancho="sm:w-[230px]" />
             <FiltroSelect etiqueta="Gravedad" valor={gravedad} onCambio={(v) => setGravedad(v as Gravedad | null)}
               opciones={Object.entries(NOMBRE_GRAVEDAD).map(([valor, etiqueta]) => ({ valor, etiqueta }))} ancho="sm:w-[150px]" />
             <FiltroSelect etiqueta="Fuente" valor={fuente} onCambio={setFuente}
               opciones={["navegador", "servidor", "integracion", "hosting"].map((f) => ({ valor: f, etiqueta: f }))} ancho="sm:w-[150px]" />
+            <FiltroSelect etiqueta="Tipo" valor={tipo} onCambio={setTipo} opciones={TIPOS_ERROR} ancho="sm:w-[190px]" />
+            <Select value={orden} onValueChange={(v) => setOrden(v as OrdenIncidencias)}>
+              <SelectTrigger aria-label="Orden" className="h-11 w-full sm:w-[170px]"><SelectValue /></SelectTrigger>
+              <SelectContent>{ORDENES.map((o) => <SelectItem key={o.valor} value={o.valor}>{o.etiqueta}</SelectItem>)}</SelectContent>
+            </Select>
+            <Interruptor id="logs-ocultar-ruido" etiqueta="Ocultar las de solo bots y pruebas" valor={ocultarRuido} onCambio={setOcultarRuido} />
           </div>
           <p className="text-xs text-muted-foreground">
             Cada incidencia agrupa las repeticiones de un mismo fallo (huella estable). El estado y los tickets se actualizan en segundo plano cada 5 minutos, aunque esta pantalla esté cerrada.
@@ -68,7 +88,7 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {q.data.filas.map((i) => (
+                {q.data.filas.map((i) => { const causa = causaDeFila(i); return (
                   <TableRow key={i.id} className="cursor-pointer" tabIndex={0} onClick={() => onAbrirIncidencia(i.id)}
                     onKeyDown={(e) => e.key === "Enter" && onAbrirIncidencia(i.id)} data-testid="fila-incidencia">
                     <TableCell>
@@ -77,6 +97,12 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
                         <span className="line-clamp-2 break-words">{i.titulo}</span>
                       </span>
                       <span className="text-xs text-muted-foreground">{NOMBRE_TIPO[i.tipo] ?? i.tipo} · {i.fuente}{i.rutas[0] ? ` · ${i.rutas[0].ruta}` : ""}</span>
+                      {(causa || i.ocurrencias === 0) && (
+                        <span className="mt-1 flex flex-wrap gap-1">
+                          {causa && <Badge variant="outline" className="rounded-md whitespace-normal border-sky-500/50 text-left text-[11px] font-normal text-sky-800 dark:text-sky-300" data-testid="causa-conocida-fila">Causa conocida: {causa.titulo}</Badge>}
+                          {i.ocurrencias === 0 && <Badge variant="outline" className="text-[11px] font-normal text-muted-foreground">solo bots o pruebas</Badge>}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{i.ocurrencias}<span className="block text-xs text-muted-foreground">{i.ocurrencias_24h} en 24 h</span></TableCell>
                     <TableCell className="hidden text-right tabular-nums sm:table-cell">{i.sesiones_afectadas}</TableCell>
@@ -88,7 +114,7 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
                       </span>
                     </TableCell>
                   </TableRow>
-                ))}
+                ); })}
               </TableBody>
             </Table>
           ) : (
