@@ -1315,6 +1315,7 @@ export type Database = {
           espacio_id: string | null
           hora_fin: string
           hora_inicio: string
+          horas_fijas: string[] | null
           id: string
           intervalo_base_minutos: number
           nombre_periodo: string
@@ -1329,6 +1330,7 @@ export type Database = {
           espacio_id?: string | null
           hora_fin: string
           hora_inicio: string
+          horas_fijas?: string[] | null
           id?: string
           intervalo_base_minutos?: number
           nombre_periodo: string
@@ -1343,6 +1345,7 @@ export type Database = {
           espacio_id?: string | null
           hora_fin?: string
           hora_inicio?: string
+          horas_fijas?: string[] | null
           id?: string
           intervalo_base_minutos?: number
           nombre_periodo?: string

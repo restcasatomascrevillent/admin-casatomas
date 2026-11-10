@@ -69,6 +69,7 @@ import { useAsignacionesMesa, type AsignacionConDetalles } from "@/hooks/useAsig
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAccionesModoServicio } from "@/hooks/useAccionesModoServicio";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { useHorasFijasDelDia } from "@/hooks/useConfiguracionTurnos";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useAlDiaMovil } from "@/hooks/useAlDiaMovil";
 import { useSalaCerradaServicio } from "@/hooks/useSalaCerradaServicio";
@@ -212,6 +213,7 @@ export function VistaHoyMovil({
   const { data: asignaciones } = useAsignacionesMesa(fecha);
   const { data: ajustesDia } = useAjustesMesaDia(fecha);
   const { data: config } = useConfiguracionReservas();
+  const horasFijas = useHorasFijasDelDia(fecha);
 
   const salas = useMemo(
     () => ((espacios ?? []) as Array<{ id: string; nombre: string }>).map((e) => ({ id: e.id, nombre: e.nombre })),
@@ -220,7 +222,7 @@ export function VistaHoyMovil({
   const salaPorId = useMemo(() => new Map(salas.map((s) => [s.id, s.nombre])), [salas]);
   const asignacionesDia = useMemo(() => asignaciones ?? [], [asignaciones]);
   const mesaPorId = useMemo(() => new Map((mesas ?? []).map((m) => [m.id, m])), [mesas]);
-  const configOcupacion = useMemo(() => configServicioSalaDesde(config), [config]);
+  const configOcupacion = useMemo(() => configServicioSalaDesde(config, horasFijas), [config, horasFijas]);
 
   // Turno que pintan las mesas: el del filtro o, con «Todo el día», el del reloj.
   const turno: TurnoServicio =
@@ -1434,6 +1436,7 @@ export function HojaMesaSentar({
   const { data: asignaciones } = useAsignacionesMesa(fecha);
   const { data: ajustesDia } = useAjustesMesaDia(fecha);
   const { data: config } = useConfiguracionReservas();
+  const horasFijas = useHorasFijasDelDia(fecha);
   const salas = useMemo(
     () => ((espacios ?? []) as Array<{ id: string; nombre: string }>).map((e) => ({ id: e.id, nombre: e.nombre })),
     [espacios],
@@ -1448,7 +1451,7 @@ export function HojaMesaSentar({
       reservas={reservas}
       mesas={mesas ?? []}
       asignaciones={asignaciones ?? []}
-      configOcupacion={configServicioSalaDesde(config)}
+      configOcupacion={configServicioSalaDesde(config, horasFijas)}
       minutoAhora={minutoAhora}
       salas={salas}
       ajustesDia={ajustesDia ?? []}

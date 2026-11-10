@@ -28,7 +28,7 @@
 // Import directo del motor compartido (el mismo que reexporta
 // useDisponibilidad.ts) para no arrastrar el cliente de Supabase a un módulo
 // puro — así se testea sin mocks.
-import { turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
+import { minutosHastaSiguienteTurnoFijo, turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
 // Los estados (constantes y predicados) viven en `estadosReserva.ts`, la fuente
 // única. Aquí se reexportan solo los dos que aún se importan desde este módulo
 // (`ESTADO_LLEGADA`, `ocupaEspacio`); los alias de otros nombres
@@ -81,6 +81,12 @@ export interface ConfigServicioSala {
   estanciaComidaMinutos: number;
   estanciaCenaMinutos: number;
   retrasoGraciaMinutos: number;
+  /**
+   * Turnos de hora fija del día que se pinta ("HH:MM"; jueves de tapas: 20:30 y
+   * 22:00, `configuracion_turnos.horas_fijas`). La reserva de un turno deja la
+   * mesa a la hora del siguiente. Vacío o ausente = día normal.
+   */
+  horasFijas?: readonly string[];
 }
 
 /** Defaults del producto (dueño, 2026-09-26) si la config no ha cargado aún. */
@@ -100,7 +106,7 @@ export function configServicioSalaDesde(config: {
   estancia_comida_minutos?: number | null;
   estancia_cena_minutos?: number | null;
   retraso_gracia_minutos?: number | null;
-} | null | undefined): ConfigServicioSala {
+} | null | undefined, horasFijas?: readonly string[] | null): ConfigServicioSala {
   const num = (valor: number | null | undefined, porDefecto: number): number => {
     if (valor == null) return porDefecto;
     const n = Number(valor);
@@ -110,12 +116,23 @@ export function configServicioSalaDesde(config: {
     estanciaComidaMinutos: num(config?.estancia_comida_minutos, CONFIG_SERVICIO_SALA_POR_DEFECTO.estanciaComidaMinutos),
     estanciaCenaMinutos: num(config?.estancia_cena_minutos, CONFIG_SERVICIO_SALA_POR_DEFECTO.estanciaCenaMinutos),
     retrasoGraciaMinutos: num(config?.retraso_gracia_minutos, CONFIG_SERVICIO_SALA_POR_DEFECTO.retrasoGraciaMinutos),
+    ...(horasFijas && horasFijas.length > 0 ? { horasFijas: [...horasFijas] } : {}),
   };
 }
 
 /** Minutos de estancia estimada para el turno dado. */
 export function estanciaMinutosDelTurno(turno: "comida" | "cena", config: ConfigServicioSala): number {
   return turno === "comida" ? config.estanciaComidaMinutos : config.estanciaCenaMinutos;
+}
+
+/**
+ * Estancia de UNA reserva: la de su turno, recortada en el turno fijo siguiente
+ * si el día los tiene (jueves de tapas: la de las 20:30 tiene hasta las 22:00).
+ */
+export function estanciaMinutosDeReserva(hora: string, turno: "comida" | "cena", config: ConfigServicioSala): number {
+  const base = estanciaMinutosDelTurno(turno, config);
+  const hastaSiguiente = minutosHastaSiguienteTurnoFijo(hora, config.horasFijas);
+  return hastaSiguiente === null ? base : Math.min(base, hastaSiguiente);
 }
 
 /** "HH:MM" o "HH:MM:SS" → minutos desde medianoche. Basura → 0 (medianoche). */
@@ -214,7 +231,7 @@ export function estadoMesaServicio(
       return { estado: "ocupada", reserva, minutos: null };
     }
     const transcurrido = Math.round((ahora.getTime() - llegadaAt.getTime()) / 60000);
-    const estancia = estanciaMinutosDelTurno(turno, config);
+    const estancia = estanciaMinutosDeReserva(reserva.hora, turno, config);
     return {
       estado: transcurrido >= estancia ? "por_liberar" : "ocupada",
       reserva,

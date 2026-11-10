@@ -112,6 +112,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useMesas, useCrearMesa, useActualizarMesasSilent, useEliminarMesa, Mesa } from "@/hooks/useMesas";
 import { usePlanoEspacio } from "@/hooks/usePlanosEspacio";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { useHorasFijasDelDia } from "@/hooks/useConfiguracionTurnos";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
@@ -1096,7 +1097,8 @@ export function PlanoEspacio2D({
   );
   // «Tiempo de ocupación de mesa» (Configuración): cuánto ocupa la mesa cada
   // reserva según su turno. Decide si una mesa está libre PARA una reserva.
-  const configOcupacion = useMemo(() => configServicioSalaDesde(configReservas), [configReservas]);
+  const horasFijas = useHorasFijasDelDia(fechaSel);
+  const configOcupacion = useMemo(() => configServicioSalaDesde(configReservas, horasFijas), [configReservas, horasFijas]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
