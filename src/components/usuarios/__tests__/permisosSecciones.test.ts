@@ -35,7 +35,7 @@ describe("SECCIONES_CONFIGURABLES", () => {
   it("son todas las secciones del panel, «usuarios» incluida (configurable desde el 06/11/2026)", () => {
     const claves = SECCIONES_CONFIGURABLES.map((s) => s.key);
     expect(claves).toEqual([
-      "dashboard", "reservas", "reservas_configuracion", "gestor_carta", "gestion_web", "marketing", "instagram_agencia", "instagram_render", "cheques", "tienda", "facturas", "facturas_subida", "usuarios",
+      "dashboard", "reservas", "reservas_configuracion", "reservas_crear", "gestor_carta", "gestion_web", "marketing", "instagram_agencia", "instagram_render", "cheques", "tienda", "facturas", "facturas_subida", "facturas_albaranes", "usuarios",
     ]);
   });
 
@@ -112,10 +112,13 @@ describe("permisosParaEditar", () => {
 });
 
 describe("«Facturas · Subida»: un solo interruptor («Puede subir», en can_view)", () => {
-  it("solo esa sección y «Usuarios» lo tienen", () => {
+  it("solo esa sección, «Usuarios» y las de los tipos «Reservas» y «Albaranes» (10/11/2026) lo tienen", () => {
     expect(interruptorUnico("facturas_subida")).toBe("Puede subir");
     expect(interruptorUnico("usuarios")).toBe("Puede ver");
-    for (const s of SECCIONES_CONFIGURABLES.filter((x) => x.key !== "facturas_subida" && x.key !== "usuarios")) expect(interruptorUnico(s.key), s.key).toBeNull();
+    expect(interruptorUnico("reservas_crear")).toBe("Puede crear");
+    expect(interruptorUnico("facturas_albaranes")).toBe("Puede subir fotos");
+    const unicos = ["facturas_subida", "usuarios", "reservas_crear", "facturas_albaranes"];
+    for (const s of SECCIONES_CONFIGURABLES.filter((x) => !unicos.includes(x.key))) expect(interruptorUnico(s.key), s.key).toBeNull();
   });
 
   it("lo guardado en can_view o en can_edit (por SQL) es «sí», y se guarda en can_view sin edición", () => {

@@ -8,7 +8,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -27,6 +30,7 @@ import {
   sinEdicion,
   type PermisoSeccion,
 } from "@/components/usuarios/permisosSecciones";
+import { TIPOS_USUARIO, tipoDeValor, valorTipo } from "@/components/usuarios/tiposUsuario";
 
 const MANUAL_OPTION = "manual";
 const PRESET_OPTION_PREFIX = "preset:";
@@ -64,7 +68,8 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
   };
 
   const handleVerChange = (sectionKey: string, value: boolean) => {
-    if (selectedAccessConfig.startsWith(PRESET_OPTION_PREFIX)) {
+    // Tocar un permiso a mano deja de ser el preconfigurado o el tipo elegido.
+    if (selectedAccessConfig !== MANUAL_OPTION) {
       setSelectedAccessConfig(MANUAL_OPTION);
     }
     // Quitar «Ver» quita también «Puede editar».
@@ -73,7 +78,7 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
 
   const handleEditarChange = (sectionKey: string, value: boolean) => {
     if (!isSuperAdmin) return;
-    if (selectedAccessConfig.startsWith(PRESET_OPTION_PREFIX)) {
+    if (selectedAccessConfig !== MANUAL_OPTION) {
       setSelectedAccessConfig(MANUAL_OPTION);
     }
     setPermissions((prev) => cambiarEditar(prev, sectionKey, value));
@@ -132,6 +137,13 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
     if (value === MANUAL_OPTION) {
       setRole("staff");
       setPermissions(DEFAULT_STAFF_PERMISSIONS);
+      return;
+    }
+    // Tipo de usuario fijo («Reservas», «Albaranes»; 10/11/2026): sus permisos, rol Staff.
+    const tipo = tipoDeValor(value);
+    if (tipo) {
+      setRole("staff");
+      applyPermissions(tipo.permisos);
       return;
     }
     if (!value.startsWith(PRESET_OPTION_PREFIX)) return;
@@ -313,15 +325,33 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={MANUAL_OPTION}>Configuración manual</SelectItem>
-            {presets.map((preset) => (
-              <SelectItem key={preset.id} value={`${PRESET_OPTION_PREFIX}${preset.id}`}>
-                {preset.name}
-              </SelectItem>
-            ))}
+            <SelectSeparator />
+            <SelectGroup>
+              <SelectLabel>Tipos de usuario</SelectLabel>
+              {TIPOS_USUARIO.map((tipo) => (
+                <SelectItem key={tipo.id} value={valorTipo(tipo)}>
+                  {tipo.nombre}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+            {presets.length > 0 && (
+              <>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel>Roles preconfigurados</SelectLabel>
+                  {presets.map((preset) => (
+                    <SelectItem key={preset.id} value={`${PRESET_OPTION_PREFIX}${preset.id}`}>
+                      {preset.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </>
+            )}
           </SelectContent>
         </Select>
-        <p className="text-sm text-muted-foreground">
-          Usa una opción manual o una preconfiguración en un único desplegable.
+        <p className="text-sm text-muted-foreground" data-testid="ayuda-configuracion-acceso">
+          {tipoDeValor(selectedAccessConfig)?.descripcion ??
+            "Usa una opción manual, un tipo de usuario (Reservas, Albaranes) o una preconfiguración en un único desplegable."}
         </p>
       </div>
 

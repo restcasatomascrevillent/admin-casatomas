@@ -27,6 +27,8 @@ const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   "/tienda": "tienda",
   // «Facturas · Subida» (06/11/2026) entra también, solo a la pestaña Cargar.
   "/facturas": ["facturas", "facturas_subida"],
+  // «Subir albaranes» (10/11/2026): solo «Facturas · Solo fotos (albaranes)».
+  "/albaranes": "facturas_albaranes",
   "/usuarios": "usuarios",
 };
 // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web y
@@ -47,7 +49,16 @@ const DESTINOS_RECHAZO: { ruta: string; secciones: SectionKey[] }[] = [
   { ruta: "/tienda", secciones: ["tienda"] },
   { ruta: "/facturas", secciones: ["facturas", "facturas_subida"] },
   { ruta: "/rrss", secciones: ["instagram_agencia"] },
+  // Tipo de usuario «Albaranes» (10/11/2026): sin otras secciones, entra directo a subir fotos.
+  { ruta: "/albaranes", secciones: ["facturas_albaranes"] },
 ];
+
+/**
+ * Pantallas por las que se entra al panel (Auth lleva a /dashboard). Quien no tiene Dashboard —el tipo
+ * «Reservas» o «Albaranes», 10/11/2026— pasa a su sección sin que cuente como acceso denegado: no lo ha
+ * intentado, es la puerta de entrada.
+ */
+const RUTAS_ENTRADA = new Set(["/", "/dashboard"]);
 
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
@@ -85,7 +96,7 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
 
     const rechazar = () => {
       const key = `${user.id}:${location.key}`;
-      if (denegado.current !== key) {
+      if (denegado.current !== key && !RUTAS_ENTRADA.has(location.pathname)) {
         denegado.current = key;
         void auditDeniedAccess(location.pathname);
       }

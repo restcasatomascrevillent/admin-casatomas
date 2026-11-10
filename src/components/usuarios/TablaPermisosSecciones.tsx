@@ -136,7 +136,8 @@ export function TablaPermisosSecciones({
       <p className="text-xs text-muted-foreground">
         «Puede editar» solo se activa si la sección tiene «Ver»; al quitar «Ver» se quita también. Donde no hay
         «Ver» (—), «Puede editar» da los dos. «Facturas · Subida» lleva un solo interruptor («Puede subir») y no
-        necesita «Ver» en Facturas.
+        necesita «Ver» en Facturas. «Reservas · Crear» («Puede crear») activa también «Ver» en Reservas y
+        «Facturas · Solo fotos» («Puede subir fotos») no deja ver nada más.
       </p>
     </div>
   );
