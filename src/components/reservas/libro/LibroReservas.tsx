@@ -395,6 +395,7 @@ export function LibroReservas({ soloCrear = false }: Props) {
             <FormularioReserva
               datosPreseleccionados={datosAlta}
               soloCrear={soloCrear}
+              confirmarAntesDeGuardar={false}
               onSuccess={(creada) => {
                 void queryClient.invalidateQueries({ queryKey: [CLAVE_RESERVAS_SERVICIO_DIA] });
                 if (borradorActivo) {

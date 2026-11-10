@@ -21,6 +21,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -307,6 +317,11 @@ interface FormularioReservaProps {
    * (la BD tampoco le deja escribir en salas_cerradas_servicio). Lo decide Reservas con usePuedeCrearReservas.
    */
   soloCrear?: boolean;
+  /**
+   * Resumen antes de guardar (10/11/2026, petición del dueño): en el alta del panel, «Guardar» abre
+   * un resumen con «Confirmar» / «Corregir». El libro de reservas lo apaga: ya enseña lo leído al lado.
+   */
+  confirmarAntesDeGuardar?: boolean;
 }
 
 export const FormularioReserva = ({
@@ -317,7 +332,9 @@ export const FormularioReserva = ({
   mesasAsignadas = [],
   onCambiosSinGuardar,
   soloCrear: soloCrearReservas = false,
+  confirmarAntesDeGuardar = true,
 }: FormularioReservaProps) => {
+  const [resumen, setResumen] = useState<FormValues | null>(null);
   const editando = !!reservaAEditar;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -1095,7 +1112,14 @@ export const FormularioReserva = ({
   // alta conserva la validación nativa.
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} noValidate={editando} className="space-y-6">
+      <form
+        onSubmit={form.handleSubmit((v) => {
+          if (confirmarAntesDeGuardar && !reservaAEditar && !isPublic) setResumen(v);
+          else return onSubmit(v);
+        })}
+        noValidate={editando}
+        className="space-y-6"
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -1723,6 +1747,61 @@ export const FormularioReserva = ({
         </Button>
         </div>
       </form>
+      <AlertDialog open={!!resumen} onOpenChange={(abierto) => !abierto && setResumen(null)}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Guardamos esta reserva?</AlertDialogTitle>
+            <AlertDialogDescription>Revisa los datos antes de crearla.</AlertDialogDescription>
+          </AlertDialogHeader>
+          {resumen && (
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg border bg-muted/40 p-4 text-base" data-testid="resumen-reserva">
+              <dt className="text-muted-foreground">Nombre</dt>
+              <dd className="font-semibold">{resumen.nombre?.trim() || "—"}</dd>
+              <dt className="text-muted-foreground">Día</dt>
+              <dd className="font-semibold">{resumen.fecha ? format(resumen.fecha, "EEEE d 'de' MMMM", { locale: es }) : "—"}</dd>
+              <dt className="text-muted-foreground">Hora</dt>
+              <dd className="font-semibold">{resumen.hora || "—"}</dd>
+              <dt className="text-muted-foreground">Personas</dt>
+              <dd className="font-semibold">{resumen.numero_comensales}</dd>
+              <dt className="text-muted-foreground">Sala</dt>
+              <dd>{salas.find((s) => s.id === resumen.espacio_id)?.nombre ?? "Sin asignar"}</dd>
+              <dt className="text-muted-foreground">Teléfono</dt>
+              <dd>{resumen.telefono?.trim() || "—"}</dd>
+              {resumen.email?.trim() ? (
+                <>
+                  <dt className="text-muted-foreground">Email</dt>
+                  <dd className="break-all">{resumen.email.trim()}</dd>
+                </>
+              ) : null}
+              {resumen.notas_cliente?.trim() ? (
+                <>
+                  <dt className="text-muted-foreground">Notas</dt>
+                  <dd>{resumen.notas_cliente.trim()}</dd>
+                </>
+              ) : null}
+              {resumen.importante ? (
+                <>
+                  <dt className="text-muted-foreground">Importante</dt>
+                  <dd>★ Sí</dd>
+                </>
+              ) : null}
+            </dl>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel className="h-11">Corregir</AlertDialogCancel>
+            <AlertDialogAction
+              className="h-11 bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={() => {
+                const v = resumen;
+                setResumen(null);
+                if (v) void onSubmit(v);
+              }}
+            >
+              Confirmar y guardar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Form>
   );
 };

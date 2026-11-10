@@ -126,7 +126,7 @@ function espiarCadenas() {
   return { cadenas, insert };
 }
 
-function montar(datos: Record<string, unknown>, soloCrear = false) {
+function montar(datos: Record<string, unknown>, soloCrear = false, confirmar = false) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const invalidar = vi.spyOn(qc, "invalidateQueries");
   const onSuccess = vi.fn();
@@ -135,6 +135,7 @@ function montar(datos: Record<string, unknown>, soloCrear = false) {
       <MemoryRouter>
         <FormularioReserva
           onSuccess={onSuccess}
+          confirmarAntesDeGuardar={confirmar}
           soloCrear={soloCrear}
           datosPreseleccionados={{
             fecha: addDays(new Date(), 3),
@@ -168,6 +169,23 @@ describe("FormularioReserva · siempre Casa Tomás, sala interna", () => {
 
     expect(screen.queryByText("Negocio")).not.toBeInTheDocument();
     expect(screen.queryByText(/Elige el negocio|Touza|Casa Tomás/)).not.toBeInTheDocument();
+  });
+
+  it("resumen antes de guardar: «Corregir» no crea nada y «Confirmar y guardar» la crea", async () => {
+    const insert = espiarInsert();
+    const { onSuccess } = montar({ espacio_id: null }, false, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    const resumen = await screen.findByTestId("resumen-reserva");
+    expect(resumen).toHaveTextContent("Ana López");
+    expect(resumen).toHaveTextContent("21:00");
+    expect(insert).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Corregir" }));
+    await waitFor(() => expect(screen.queryByTestId("resumen-reserva")).not.toBeInTheDocument());
+    expect(insert).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirmar y guardar" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
   });
 
   it("sin sala se guarda con la marca de Casa Tomás y sin espacio", async () => {
