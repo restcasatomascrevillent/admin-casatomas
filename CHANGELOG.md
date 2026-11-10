@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.10.0] - 2026-11-10
+
+Objetivo: El interruptor de la tienda en la web pasa a Panel › Tienda
+
+### Añadido
+- Tienda: el interruptor de la tienda en la web va en Panel › Tienda ([#59](https://github.com/restcasatomascrevillent/admin-casatomas/pull/59))
+
 ## [1.9.0] - 2026-11-10
 
 Objetivo: Gestor Web › Tienda con su interruptor y menú del panel sin «Instalar app»
