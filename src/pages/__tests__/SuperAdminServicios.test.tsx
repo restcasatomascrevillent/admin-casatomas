@@ -100,6 +100,8 @@ vi.mock("@/components/SuperAdminLayout", () => ({
   SuperAdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("@/hooks/useAlturaDisponible", () => ({ useAlturaDisponible: () => undefined }));
+// La tarjeta de Telegram tiene su propio test (TarjetaTelegram.test.tsx).
+vi.mock("@/components/servicios/TarjetaTelegram", () => ({ TarjetaTelegram: () => null }));
 vi.mock("sonner", () => ({ toast: h.toast }));
 vi.mock("@/components/trafico-web/informe/pdf", () => ({
   descargarBlob: (blob: Blob, nombre: string) => { h.descargas.push({ nombre, tipo: blob.type }); },
