@@ -58,6 +58,7 @@ export const supabase = {
     signInWithPassword: vi.fn().mockResolvedValue({ data: null, error: null }),
     signOut: vi.fn().mockResolvedValue({ error: null }),
   },
+  rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
   channel: vi.fn().mockReturnValue(channelMock),
   removeChannel: vi.fn().mockResolvedValue(undefined),
   functions: {
@@ -85,6 +86,7 @@ export function resetSupabaseMocks(): void {
   vi.clearAllMocks();
   (supabase.from as ReturnType<typeof vi.fn>).mockReturnValue(makeQueryBuilder());
   (supabase.channel as ReturnType<typeof vi.fn>).mockReturnValue(channelMock);
+  (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({ data: null, error: null });
   channelMock.on.mockReturnThis();
   channelMock.subscribe.mockReturnThis();
 }
