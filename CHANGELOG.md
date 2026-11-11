@@ -2,6 +2,18 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.25.0] - 2026-11-11
+
+Objetivo: Fase 1: avisos de reservas que se pueden revisar, filtro de visibilidad del Gestor web, menú lateral cerrado en tablets e interruptor de la carta de Bebidas
+
+### Añadido
+- Carta: interruptor «Carta de bebidas en la web», apagado por defecto ([#133](https://github.com/restcasatomascrevillent/admin-casatomas/pull/133))
+
+### Cambiado
+- Avisos: «Revisado» funciona y fuera el aviso «sin mesa» ([#129](https://github.com/restcasatomascrevillent/admin-casatomas/pull/129))
+- Gestor-web: el filtro de visibilidad funciona y «Todos» va al final ([#130](https://github.com/restcasatomascrevillent/admin-casatomas/pull/130))
+- Panel: menú lateral cerrado al entrar en móviles y tablets ([#131](https://github.com/restcasatomascrevillent/admin-casatomas/pull/131))
+
 ## [1.24.0] - 2026-11-11
 
 Objetivo: Chatbot de facturas: hilo de conversación, 👍/👎, fallos de búsqueda y litros de cerveza

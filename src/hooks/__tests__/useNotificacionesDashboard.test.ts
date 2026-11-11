@@ -160,6 +160,39 @@ describe("useNotificacionesDashboard", () => {
     expect(result.current.countNoLeidas).toBe(1);
     const n1 = result.current.notificaciones.find((n) => n.id === "n-1");
     expect(n1?.leida).toBe(true);
+    // 11/11/2026: con la RPC (exige VER la sección del aviso), no con un UPDATE que solo deja a quien edita el panel.
+    expect(supabase.rpc).toHaveBeenCalledWith("marcar_avisos_revisados", { p_ids: ["n-1"], p_tipos: null });
+  });
+
+  it("marcarLeida: si la RPC falla, avisa y vuelve a leer la lista", async () => {
+    const items = [makeNotif({ id: "n-1", leida: false })];
+    mockSelectNotifs(items);
+    (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ data: null, error: { message: "sin permiso" } });
+
+    const { result } = renderHook(() => useNotificacionesDashboard());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.marcarLeida("n-1");
+    });
+
+    const { toast } = await import("sonner");
+    expect(toast.error).toHaveBeenCalledWith("No se pudo marcar la notificación como leída");
+    await waitFor(() => expect(result.current.countNoLeidas).toBe(1));
+  });
+
+  it("no enseña los avisos retirados («Reserva sin sala / sin mesas», 11/11/2026) ni los cuenta", async () => {
+    mockSelectNotifs([
+      makeNotif({ id: "n-1", tipo: "reserva_nueva", leida: false }),
+      makeNotif({ id: "n-2", tipo: "reserva_sin_asignar", leida: false }),
+      makeNotif({ id: "n-3", tipo: "reserva_cancelada", leida: false }),
+    ]);
+
+    const { result } = renderHook(() => useNotificacionesDashboard());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.notificaciones.map((n) => n.id)).toEqual(["n-1", "n-3"]);
+    expect(result.current.countNoLeidas).toBe(2);
   });
 
   it("no decrementa countNoLeidas por debajo de 0", async () => {
@@ -235,6 +268,8 @@ describe("useNotificacionesDashboard", () => {
     result.current.notificaciones.forEach((n) => {
       expect(n.leida).toBe(true);
     });
+    // Sin filtros: la RPC marca todo lo que el usuario puede ver.
+    expect(supabase.rpc).toHaveBeenCalledWith("marcar_avisos_revisados", { p_ids: null, p_tipos: null });
   });
 
   // ── eliminarNotificacion ───────────────────────────────────────────────────

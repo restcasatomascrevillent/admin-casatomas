@@ -65,7 +65,6 @@ const DE_SERVICIO = [
   "Tiempo de ocupación de mesa",
   "Modo servicio (plano en vivo)",
   "Asignación interna de salas y mesas",
-  "Avisar en la campana",
 ];
 
 beforeEach(() => {
@@ -96,6 +95,11 @@ describe("Configuración · cada chip enseña solo su parte", () => {
     for (const texto of DE_SERVICIO) expect(screen.getByText(texto)).toBeInTheDocument();
     for (const texto of DE_REGLAS) expect(screen.queryByText(texto)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/Margen antes de marcar retraso/)).toHaveValue(15);
+  });
+
+  it("ya no está «Avisar en la campana»: el aviso «sin sala o sin mesa» se quitó (11/11/2026)", () => {
+    render(<ConfiguracionGeneralReservas parte="servicio" />);
+    expect(screen.queryByText("Avisar en la campana")).not.toBeInTheDocument();
   });
 
   it("las mesas por espacio ya no van aquí: tienen su chip «Mesas»", () => {

@@ -1371,6 +1371,7 @@ export type Database = {
           horario_menu_dia_casa_tomas: Json | null
           horario_tapas_casa_tomas: Json | null
           id: boolean
+          mostrar_carta_bebidas_casa_tomas: boolean
           mostrar_fotos_platos_casa_tomas: boolean
           mostrar_fotos_platos_touza: boolean
           mostrar_menu_dia_casa_tomas: boolean
@@ -1385,6 +1386,7 @@ export type Database = {
           horario_menu_dia_casa_tomas?: Json | null
           horario_tapas_casa_tomas?: Json | null
           id?: boolean
+          mostrar_carta_bebidas_casa_tomas?: boolean
           mostrar_fotos_platos_casa_tomas?: boolean
           mostrar_fotos_platos_touza?: boolean
           mostrar_menu_dia_casa_tomas?: boolean
@@ -1399,6 +1401,7 @@ export type Database = {
           horario_menu_dia_casa_tomas?: Json | null
           horario_tapas_casa_tomas?: Json | null
           id?: boolean
+          mostrar_carta_bebidas_casa_tomas?: boolean
           mostrar_fotos_platos_casa_tomas?: boolean
           mostrar_fotos_platos_touza?: boolean
           mostrar_menu_dia_casa_tomas?: boolean

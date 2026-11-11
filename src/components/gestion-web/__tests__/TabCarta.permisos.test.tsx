@@ -16,6 +16,20 @@ const h = vi.hoisted(() => ({
   permisos: [] as Array<{ section_key: string; can_view: boolean; can_edit: boolean }>,
   superAdmin: false,
   mutaciones: [] as string[],
+  /** Carta de Bebidas en la web (configuracion_web.mostrar_carta_bebidas_casa_tomas). */
+  cartaBebidas: false,
+}));
+
+// Interruptor de la carta de Bebidas en la web (11/11/2026): se simula la configuración de la web.
+vi.mock("@/hooks/useConfiguracionWeb", () => ({
+  useConfiguracionWeb: () => ({
+    mostrarCartaBebidas: h.cartaBebidas,
+    cartaBebidasDisponible: true,
+    noDisponible: false,
+    isLoading: false,
+    isError: false,
+    cambiarCartaBebidas: { mutate: (mostrar: boolean) => h.mutaciones.push(`cartaBebidas:${mostrar}`), isPending: false },
+  }),
 }));
 
 const mutacion = (nombre: string) => ({
@@ -52,8 +66,9 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u-1", email: 
 vi.mock("@/hooks/useSuperAdmin", () => ({ useSuperAdmin: () => ({ isSuperAdmin: h.superAdmin, loading: false }) }));
 
 const PLATOS = [
-  { id: "p1", nombre: "Croquetas", categoria: "ENTRANTES", precio_eur: 9, activado: true, expanded: false, imagen_url: null, orden: 1, alergenos_oficiales: [] },
-  { id: "p2", nombre: "Pulpo", categoria: "ENTRANTES", precio_eur: 18, activado: false, expanded: false, imagen_url: null, orden: 2, alergenos_oficiales: [] },
+  // `restaurante: true` en todos, como en la base de datos: lo que oculta un plato es `activado`.
+  { id: "p1", nombre: "Croquetas", categoria: "ENTRANTES", precio_eur: 9, activado: true, restaurante: true, expanded: false, imagen_url: null, orden: 1, alergenos_oficiales: [] },
+  { id: "p2", nombre: "Pulpo", categoria: "ENTRANTES", precio_eur: 18, activado: false, restaurante: true, expanded: false, imagen_url: null, orden: 2, alergenos_oficiales: [] },
 ];
 const VINOS = [
   { id: "v1", nombre: "Albariño", categoria: "VINOS BLANCOS — RÍAS BAIXAS", precio_eur: 24, activado: true, restaurante: true, touza: false, expanded: false, imagen_url: null, orden: 1, alergenos_oficiales: [], ubicacion_pais: "España", ubicacion_region: "Cambados, Pontevedra" },
@@ -120,6 +135,7 @@ beforeEach(() => {
   h.permisos = [];
   h.superAdmin = false;
   h.mutaciones = [];
+  h.cartaBebidas = false;
 });
 
 const SOLO_VER = [{ section_key: "gestor_carta", can_view: true, can_edit: false }];
@@ -178,6 +194,35 @@ describe("Gestor Web › Carta · solo «Ver»", () => {
     expect(screen.getByRole("combobox", { name: "Filtrar visibilidad" })).toBeInTheDocument();
   });
 
+  it("Visibilidad (11/11/2026): «Visibles» deja solo lo que sale en la web, «Ocultos» lo contrario y «Todos» va al final", async () => {
+    h.permisos = SOLO_VER;
+    await montar();
+    const elegir = async (opcion: string, grupo?: string) => {
+      fireEvent.keyDown(screen.getByRole("combobox", { name: "Filtrar visibilidad" }), { key: "Enter" });
+      const lista = await screen.findByRole("listbox");
+      const opciones = within(lista).getAllByRole("option");
+      // «Todos» es la última opción del desplegable.
+      expect(opciones.at(-1)).toHaveTextContent("Todos");
+      const candidata = grupo
+        ? within(within(lista).getByRole("group", { name: grupo })).getByRole("option", { name: opcion })
+        : within(lista).getByRole("option", { name: opcion });
+      fireEvent.keyDown(candidata, { key: "Enter" });
+      await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
+    };
+
+    await elegir("Visibles", "Casa Tomás");
+    expect(screen.getByRole("heading", { name: "Croquetas" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Pulpo" })).not.toBeInTheDocument();
+
+    await elegir("Ocultos", "Casa Tomás");
+    expect(screen.queryByRole("heading", { name: "Croquetas" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Pulpo" })).toBeInTheDocument();
+
+    await elegir("Todos");
+    expect(screen.getByRole("heading", { name: "Croquetas" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Pulpo" })).toBeInTheDocument();
+  });
+
   it("Vinos: ni «PDF Carta», ni «Añadir vino», ni «Varias botellas», ni los interruptores de carta; la votación solo se lee", async () => {
     h.permisos = SOLO_VER;
     await montar();
@@ -201,6 +246,20 @@ describe("Gestor Web › Carta · solo «Ver»", () => {
     expect(botonesDeEscritura()).toEqual([]);
     expect(screen.getByTestId("estado-lectura")).toHaveTextContent("Casa Tomás: sí · Touza: sí");
     expect(screen.getByTestId("etiqueta-solo-lectura")).toBeInTheDocument();
+    // La carta de Bebidas en la web se lee, sin interruptor (11/11/2026).
+    expect(screen.getByTestId("interruptor-carta-bebidas")).toHaveTextContent("Apagada: la web no enseña la carta de bebidas");
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+  });
+
+  it("Bebidas con «Editar»: el interruptor «Carta de bebidas en la web» sale apagado y al pulsarlo la enciende", async () => {
+    h.permisos = EDITAR;
+    await montar();
+    irA(/Bebidas/);
+    await screen.findByRole("heading", { name: "Agua" });
+    const interruptor = screen.getByRole("switch", { name: "Carta de bebidas en la web" });
+    expect(interruptor).not.toBeChecked();
+    fireEvent.click(interruptor);
+    expect(h.mutaciones).toContain("cartaBebidas:true");
   });
 
 });
