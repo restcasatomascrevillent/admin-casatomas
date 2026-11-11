@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { toast } from "sonner";
 import { BellRing, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,9 @@ export function AvisosEnVivo() {
   const { canAccess: veReservas } = useCanAccessSection("reservas");
   const navigate = useNavigate();
   const { sinVer } = useEstadoAvisosEnVivo();
+  // «Ver» en el aviso de UNA reserva (nueva o cancelada) abre su ficha en un modal (11/11/2026).
+  const { canAccess: editaReservas } = useCanAccessSection("reservas", "edit");
+  const { editarReserva, dialogoEdicion } = useEdicionReserva();
 
   useEffect(() => prepararDesbloqueoAudio(), []);
 
@@ -71,11 +75,22 @@ export function AvisosEnVivo() {
         return;
       }
       for (const alerta of nuevas) {
-        toast(alerta.titulo, { ...opciones(alerta.ruta), id: `aviso-${alerta.clave}`, description: alerta.texto });
-        notificarSistema(alerta.titulo, alerta.texto, () => ir(alerta.ruta));
+        const conFicha = editaReservas && (alerta.tipo === "reserva" || alerta.tipo === "cancelacion");
+        const ver = () => {
+          if (!conFicha) return ir(alerta.ruta);
+          avisosEnVivo.marcarVistos();
+          editarReserva(alerta.id);
+        };
+        toast(alerta.titulo, {
+          ...opciones(alerta.ruta),
+          action: { label: "Ver", onClick: ver },
+          id: `aviso-${alerta.clave}`,
+          description: alerta.texto,
+        });
+        notificarSistema(alerta.titulo, alerta.texto, ver);
       }
     },
-    [navigate],
+    [navigate, editaReservas, editarReserva],
   );
 
   const { cuantasPorGestionar } = useAvisosEnVivo(veReservas, alAvisar);
@@ -104,7 +119,7 @@ export function AvisosEnVivo() {
     };
   }, [cifra]);
 
-  return null;
+  return dialogoEdicion;
 }
 
 /** Interruptor de sonido y botón «Activar avisos en este ordenador» (campana y modal de Avisos). */

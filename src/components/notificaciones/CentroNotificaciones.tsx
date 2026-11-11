@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { rutaDeAviso, TIPO_ICON } from "@/lib/avisos";
+import { reservaDeAviso, rutaDeAviso, TIPO_ICON } from "@/lib/avisos";
+import { useAbrirAviso } from "@/hooks/useAbrirAviso";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -53,16 +54,16 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
     if (valor) avisosEnVivo.marcarVistos();
   };
 
+  // «Ver» en una reserva abre su ficha en un modal (11/11/2026); lo demás, su origen. La campana se cierra antes.
+  const { abrirAviso, dialogoAviso } = useAbrirAviso();
   const handleClick = (notif: (typeof notificaciones)[0]) => {
     marcarLeida(notif.id);
-    const ruta = rutaDeAviso(notif);
-    if (ruta) {
-      setAbierto(false);
-      navigate(ruta);
-    }
+    if (rutaDeAviso(notif) || reservaDeAviso(notif)) setAbierto(false);
+    abrirAviso(notif);
   };
 
   return (
+    <>
     <Popover open={abierto} onOpenChange={cambiarAbierto}>
       <PopoverTrigger asChild>
         <Button
@@ -254,5 +255,7 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
         </div>
       </PopoverContent>
     </Popover>
+    {dialogoAviso}
+    </>
   );
 }

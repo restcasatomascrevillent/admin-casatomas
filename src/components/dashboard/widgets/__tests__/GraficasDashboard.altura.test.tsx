@@ -14,6 +14,7 @@
 import type { ComponentType } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 
 const h = vi.hoisted(() => ({ reservas: [] as Array<Record<string, unknown>>, error: false }));
@@ -59,11 +60,13 @@ const GRAFICAS: Array<[string, ComponentType]> = [
 
 function montar(Grafica: ComponentType) {
   return render(
-    <DashboardProvider>
-      <div data-testid="hueco" style={{ height: 400 }}>
-        <Grafica />
-      </div>
-    </DashboardProvider>,
+    <MemoryRouter>
+      <DashboardProvider>
+        <div data-testid="hueco" style={{ height: 400 }}>
+          <Grafica />
+        </div>
+      </DashboardProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -90,7 +93,8 @@ describe("Gráficas del Dashboard · llenan el hueco que les toca", () => {
   it("la curva lleva su leyenda (Reservas y Comensales) en la misma fila que el título, no debajo", () => {
     montar(GRAFICAS[0][1]);
     const titulo = screen.getByText("Curva de Reservas por Hora");
-    const cabecera = titulo.parentElement as HTMLElement;
+    // 11/11/2026: el título va con su resumen (hora punta) en un bloque; la cabecera es el padre de ese bloque.
+    const cabecera = titulo.parentElement!.parentElement as HTMLElement;
 
     const leyenda = within(cabecera).getByRole("list", { name: "Leyenda" });
     expect(within(leyenda).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Reservas", "Comensales"]);

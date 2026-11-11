@@ -155,6 +155,14 @@ export function ReservasHoy() {
     .filter(r => r.hora >= horaActualStr)
     .sort((a, b) => a.hora.localeCompare(b.hora))[0];
 
+  // «Próximas» (11/11/2026, dueño: «añade algo más de información y que se pueda clicar para hacer cosas»): las
+  // siguientes reservas vivas de hoy, cada una abre su ficha (verificar, confirmar, editar).
+  const proximas = reservasActivas
+    .filter(r => r.hora >= horaActualStr.slice(0, 5))
+    .sort((a, b) => a.hora.localeCompare(b.hora))
+    .slice(0, 4);
+  const irAReservasHoy = () => navigate('/reservas');
+
   // Antes era una línea fija bajo la barra de ocupación; ahora vive en la ayuda «ⓘ» de la franja (se abre con un
   // toque) y en el nombre accesible de ese botón, para que la tarjeta quepa con las gráficas sin scroll.
   const desgloseActivas = `${reservasActivas.length} reservas activas (${comensalesActivos} pax, sin canceladas) = ${numConfirmadas} confirmadas + ${reservasVerificadas} verificadas + ${reservasPendientes} pendientes`;
@@ -287,19 +295,43 @@ export function ReservasHoy() {
         <TiraCifras
           data-testid="cifras-hoy"
           cifras={[
-            { etiqueta: "Activas", valor: reservasActivas.length },
-            { etiqueta: "Confirmadas", valor: numConfirmadas },
+            // 11/11/2026: todas se pueden tocar (el día en Reservas, «Pendientes» en la Lista, la próxima abre su ficha).
+            { etiqueta: "Activas", valor: reservasActivas.length, onClick: irAReservasHoy },
+            { etiqueta: "Confirmadas", valor: numConfirmadas, onClick: irAReservasHoy },
             {
               etiqueta: "Pendientes",
               valor: reservasPendientes,
               tono: reservasPendientes > 0 ? "ambar" : undefined,
-              onClick: () => navigate('/reservas?tab=reservas&status=pendiente&date=today'),
+              onClick: () => navigate('/reservas?tab=reservas&status=pendiente'),
             },
-            { etiqueta: "Próxima", valor: proximaReserva ? proximaReserva.hora.slice(0, 5) : "—" },
-            { etiqueta: horaActual < 17 ? "Comida · ahora" : "Comida", valor: reservasComida.length, detalle: `res. · ${comensalesComida} pax` },
-            { etiqueta: horaActual >= 17 ? "Cena · ahora" : "Cena", valor: reservasCena.length, detalle: `res. · ${comensalesCena} pax` },
+            {
+              etiqueta: "Próxima",
+              valor: proximaReserva ? proximaReserva.hora.slice(0, 5) : "—",
+              onClick: proximaReserva && puedeEditar ? () => editarReserva(proximaReserva.id) : undefined,
+            },
+            { etiqueta: horaActual < 17 ? "Comida · ahora" : "Comida", valor: reservasComida.length, detalle: `res. · ${comensalesComida} pax`, onClick: irAReservasHoy },
+            { etiqueta: horaActual >= 17 ? "Cena · ahora" : "Cena", valor: reservasCena.length, detalle: `res. · ${comensalesCena} pax`, onClick: irAReservasHoy },
           ]}
         />
+        {proximas.length > 0 && (
+          <ul aria-label="Próximas reservas de hoy" className="flex flex-wrap gap-1.5" data-testid="proximas-hoy">
+            {proximas.map(r => (
+              <li key={r.id} className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => (puedeEditar ? editarReserva(r.id) : irAReservasHoy())}
+                  className="flex min-h-9 max-w-[16rem] items-center gap-1.5 rounded-full border bg-background px-3 text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Abrir la reserva de ${r.nombre || "Sin nombre"}, ${r.hora.slice(0, 5)}, ${r.numero_comensales} personas`}
+                >
+                  <span className="font-semibold tabular-nums">{r.hora.slice(0, 5)}</span>
+                  <span className="truncate">{r.nombre || "Sin nombre"}</span>
+                  <span className="tabular-nums text-muted-foreground">· {r.numero_comensales}</span>
+                  {r.estado === "pendiente" && <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-label="pendiente" />}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </CardContent>
       {/* Editor de la reserva elegida en el popup de notas. `null` hasta que se pide. */}
       {dialogoEdicion}
