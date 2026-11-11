@@ -143,7 +143,7 @@ describe("ListaComoLibro · añadir y arrastrar sin abrir (10/11/2026)", () => {
     render(<ListaComoLibro onAnadirReserva={onAnadirReserva} />);
     fireEvent.click(screen.getByRole("button", { name: "Hoja siguiente" }));
     const boton = screen.getByRole("button", { name: "Añadir reserva a este día" });
-    expect(boton).toHaveClass("bg-emerald-600", "h-11");
+    expect(boton).toHaveClass("bg-sky-100", "text-sky-900", "h-11");
     fireEvent.click(boton);
     expect(onAnadirReserva).toHaveBeenCalledWith(pasarHoja(hoy, 1));
   });
