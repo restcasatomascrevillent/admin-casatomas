@@ -39,7 +39,7 @@ import { toast } from "sonner";
 // Si tras un despliegue falta un fichero viejo, la barrera de errores recarga
 // sola (ErrorBoundary › PATRON_CHUNK_OBSOLETO), como con las páginas (App.tsx).
 // ============================================================================
-// «Escribir reserva» (10/11/2026): libro de reservas con lápiz, también bajo demanda.
+// «Nueva reserva» (10/11/2026): la hoja del día y el formulario, también bajo demanda.
 const LibroReservas = lazy(() =>
   import("@/components/reservas/libro/LibroReservas").then((m) => ({ default: m.LibroReservas })),
 );
@@ -68,9 +68,6 @@ const ConfiguracionGeneralReservas = lazy(() =>
 );
 const GestionMesasEspacios = lazy(() =>
   import("@/components/reservas/GestionMesasEspacios").then((m) => ({ default: m.GestionMesasEspacios })),
-);
-const PanelAsignacion = lazy(() =>
-  import("@/components/reservas/PanelAsignacion").then((m) => ({ default: m.PanelAsignacion })),
 );
 const EditorPlantillasEmail = lazy(() =>
   import("@/components/emails/EditorPlantillasEmail").then((m) => ({ default: m.EditorPlantillasEmail })),
@@ -466,7 +463,6 @@ export default function Reservas() {
             { valor: "hoy", etiqueta: "Hoy" },
             { valor: "reservas", etiqueta: "Lista" },
             { valor: "calendario", etiqueta: "Calendario" },
-            { valor: "asignacion", etiqueta: "Próximas reservas" },
             { valor: "blacklist", etiqueta: "Blacklist" },
             ...(puedeVerConfiguracion ? [{ valor: "configuracion", etiqueta: "Configuración", icono: <Settings /> }] : []),
           ]}
@@ -483,9 +479,8 @@ export default function Reservas() {
                   detalle="Puedes ver las reservas y crear reservas nuevas, pero no modificarlas, cambiar su estado ni configurar. Si necesitas más, pídeselo a un administrador."
                 /> : <EtiquetaSoloLectura />)}
             {/* «Nueva Reserva» única (10/11/2026, petición del dueño: «un solo botón y dentro formulario o
-                libro»). Dentro, arriba la lista del día en grande y debajo
-                «Escribir con lápiz» o «Formulario» (LibroReservas; se recuerda la elección en este dispositivo). Ocupa casi toda la pantalla y hace scroll por
-                dentro: la página sigue sin desplazar. */}
+                libro»). Dentro, la lista del día y el formulario (LibroReservas; sin lápiz desde el 11/11/2026). Ocupa
+                casi toda la pantalla y hace scroll por dentro: la página sigue sin desplazar. */}
             {puedeCrearReservas && (
               <Dialog open={openDialog} onOpenChange={cambiarDialogoNueva}>
                 <DialogTrigger asChild>
@@ -500,7 +495,7 @@ export default function Reservas() {
                       Nueva reserva
                       {fechaNuevaReserva && fechaHojaNueva ? ` · ${diaLargo(fechaHojaNueva)}` : ""}
                     </DialogTitle>
-                    <DialogDescription className="sr-only">Las reservas del día y, debajo, apuntar una nueva con el lápiz o con el formulario.</DialogDescription>
+                    <DialogDescription className="sr-only">Las reservas del día y, al lado, el formulario para apuntar una nueva.</DialogDescription>
                   </DialogHeader>
                   {bajoDemanda(
                     <LibroReservas
@@ -570,12 +565,8 @@ export default function Reservas() {
           {bajoDemanda(<CalendarioOcupacion />)}
         </TabsContent>
 
-        {/* "Asignación" (reservas-sin-salas, Fase B): el cliente solo reserva
-            una hora; aquí se reparten salas y mesas, con las próximas N horas
-            arriba. "Mesas" usa el mismo salto al plano que Lista y Hoy. */}
-        <TabsContent value="asignacion" className="mt-6">
-          {bajoDemanda(<PanelAsignacion onAsignarMesa={handleAsignarMesa} />)}
-        </TabsContent>
+        {/* «Próximas reservas» (reparto de salas y mesas de los próximos días) se unificó con la Lista el
+            11/11/2026, petición del dueño: la tabla de la Lista tiene el mismo «Dar mesa» por reserva. */}
 
         <TabsContent value="blacklist" className="space-y-6 mt-6">
           <RegionPestanaLarga>
