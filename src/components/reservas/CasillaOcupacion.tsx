@@ -41,7 +41,6 @@ import type { ServicioCerrado } from "../../../supabase/functions/_shared/cierre
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
-  CLASES_PUNTO_SIN_SALA,
   describirDia,
   estiloNivel,
   type ResumenDiaCalendario,
@@ -148,17 +147,8 @@ export function CasillaOcupacion({
       : null;
 
   // El punto de «sin sala»: mismo en todas las densidades.
-  const indicadores = (
-    <>
-      {conReservas && resumen.sinSalaEnVentana > 0 && (
-        <span
-          aria-hidden="true"
-          data-testid="punto-sin-sala"
-          className={cn("mr-0.5 mt-0.5 h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3", CLASES_PUNTO_SIN_SALA)}
-        />
-      )}
-    </>
-  );
+  // Sin el punto amarillo de «reserva sin sala» (11/11/2026, petición del dueño: «quítalo»).
+
 
   // La cifra protagonista. Sin `tabular-nums`: en un número grande suelto las
   // cifras de ancho fijo lo abren (121 se ve suelto). Con altura fija su tamaño
@@ -233,7 +223,12 @@ export function CasillaOcupacion({
               // Sin recortar (dueño, 10/11/2026: «la palabra cerrado se ve cortada»): palabras cortas en una línea.
               "shrink-0 whitespace-nowrap rounded px-1 text-[11px] leading-5 sm:text-xs",
               textoCierre ? "font-semibold uppercase" : "font-medium",
-              cierraComida && cierraCena ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground",
+              // En color (11/11/2026, petición del dueño): cerrado en rojo, medio servicio en ámbar y «Sin web» en azul.
+              cierraComida && cierraCena
+                ? "bg-destructive/10 text-destructive"
+                : textoCierre
+                  ? "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
+                  : "bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-100",
             )}
             title={textoCierre ?? textoSinWeb ?? undefined}
           >
@@ -245,7 +240,6 @@ export function CasillaOcupacion({
             )}
           </span>
         )}
-        <span className="ml-auto flex shrink-0 items-center gap-0.5">{indicadores}</span>
       </span>
       {eventos && eventos.length > 0 && (
         <span
