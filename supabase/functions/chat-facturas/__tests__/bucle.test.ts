@@ -76,8 +76,11 @@ describe("chat-facturas · bucle compartido (ejecutarConversacion)", () => {
     const primero = ai.cuerpos[0] as { model: string; messages: { role: string; content: string }[]; tools?: unknown[]; temperature?: number };
     expect(primero.model).toBe("gpt-4.1-mini");
     expect(primero.messages[0].role).toBe("system");
-    expect(primero.messages[0].content).toContain("2026-11-07");
+    // Prompt caching: el prefijo (sistema) no lleva la fecha; va en el aviso FECHA, justo antes de la pregunta.
+    expect(primero.messages[0].content).not.toContain("2026-11-07");
+    expect(primero.messages.at(-2)).toMatchObject({ role: "system", content: expect.stringContaining("FECHA: hoy es 2026-11-07") });
     expect(primero.messages.at(-1)).toEqual({ role: "user", content: "¿cuánto he gastado?" });
+    expect((primero as { prompt_cache_key?: string }).prompt_cache_key).toBe("chat-facturas");
     expect(Array.isArray(primero.tools)).toBe(true);
     expect(sb.rpcs.some((x) => x.fn === "estadisticas_globales_agente")).toBe(true);
   });
