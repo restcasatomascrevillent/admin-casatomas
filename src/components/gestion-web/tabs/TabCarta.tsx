@@ -46,9 +46,10 @@ import {
 } from "@/components/carta/filtroVinos";
 import { esCategoriaOrigenPendiente } from "@/lib/tipos-vino";
 import { categoriasConOrigen } from "@/lib/origen-vino";
+import { filtrarPorVisibilidad, type FiltroVisibilidad } from "@/lib/visibilidad-carta";
 
 type Seccion = "platos" | "bebidas" | "vinos" | "cocteles";
-type FiltroEstado = "todos" | "activos" | "inactivos_rest" | "activos_touza" | "inactivos_touza";
+type FiltroEstado = FiltroVisibilidad;
 
 // Cerrado, el desplegable dice qué filtra (como en Reservas, «Estado»): en Vinos
 // tenía al lado la píldora «Todos» del tipo y se confundían.
@@ -121,11 +122,8 @@ export default function TabCarta() {
 
   // Estado + búsqueda (sin categoría).
   const filtrarEstadoYBusqueda = <T extends ItemCarta>(items: T[] | undefined): T[] => {
-    let resultado = items || [];
-    if (filtroEstado === "activos") resultado = resultado.filter((i) => i.restaurante === true);
-    else if (filtroEstado === "inactivos_rest") resultado = resultado.filter((i) => i.restaurante !== true);
-    else if (filtroEstado === "activos_touza") resultado = resultado.filter((i) => i.touza === true);
-    else if (filtroEstado === "inactivos_touza") resultado = resultado.filter((i) => i.touza !== true);
+    // Visible = activado Y en esa carta, como la web (antes solo miraba la carta y en Platos no filtraba nada).
+    const resultado = filtrarPorVisibilidad(items || [], filtroEstado);
 
     if (hayBusqueda) {
       return resultado.filter(
@@ -429,8 +427,6 @@ export default function TabCarta() {
                   <SelectValue>{ETIQUETAS_FILTRO_ESTADO[filtroEstado]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos">Visibles y ocultos</SelectItem>
-                  <SelectSeparator />
                   <SelectGroup>
                     <SelectLabel>Casa Tomás</SelectLabel>
                     <SelectItem value="activos">Visibles</SelectItem>
@@ -446,6 +442,9 @@ export default function TabCarta() {
                       </SelectGroup>
                     </>
                   )}
+                  {/* «Todos» al final (11/11/2026, petición del dueño), en Platos y en Vinos (y en el resto). */}
+                  <SelectSeparator />
+                  <SelectItem value="todos">Todos</SelectItem>
                 </SelectContent>
               </Select>
 
