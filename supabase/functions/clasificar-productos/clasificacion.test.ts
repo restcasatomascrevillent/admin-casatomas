@@ -144,6 +144,25 @@ describe("validarAsignaciones", () => {
       expect(items[0].nombre).toBe("Pago de Carraovejas 2020");
     });
 
+    it("si el vino con la añada de la línea ya está en el catálogo, se usa ese producto (no se duplica)", () => {
+      const conOtra: ProductoCatalogo[] = [...cat, { id: 22, nombre: "Pago de Carraovejas 2020", categoria_id: 2 }];
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "pago de carraovejas 2020 75cl", producto_id: 20, nombre_nuevo: null, categoria_id: null }] },
+        lineas, conOtra, categorias,
+      );
+      expect(items).toEqual([{ textos: ["pago de carraovejas 2020 75cl"], producto_id: 22, nombre: null, categoria_id: null, unidad: null }]);
+    });
+
+    it("fuera de vinos un año en el nombre no separa productos", () => {
+      const turron: ProductoCatalogo[] = [{ id: 30, nombre: "Turrón campaña 2025", categoria_id: 3 }];
+      const lineasT = agruparPendientes([linea(9, "TURRON CAMPAÑA 2026", "turron campaña 2026")]);
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "turron campaña 2026", producto_id: 30, nombre_nuevo: null, categoria_id: null }] },
+        lineasT, turron, categorias,
+      );
+      expect(items[0].producto_id).toBe(30);
+    });
+
     it("el prompt pide la añada en el nombre de los vinos y trata otra añada como otro producto", () => {
       const sistema = construirMensajes([], cat, categorias)[0].content;
       expect(sistema).toContain("CON la añada");
