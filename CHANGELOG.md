@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.24.0] - 2026-11-11
+
+Objetivo: Chatbot de facturas: hilo de conversación, 👍/👎, fallos de búsqueda y litros de cerveza
+
+### Añadido
+- Chatbot de facturas: hilo, 👍/👎, fallos de búsqueda y litros de cerveza ([#127](https://github.com/restcasatomascrevillent/admin-casatomas/pull/127))
+
 ## [1.23.0] - 2026-11-10
 
 Objetivo: Arreglar el scroll horizontal de la Lista como libro
