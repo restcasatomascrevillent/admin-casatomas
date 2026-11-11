@@ -6,10 +6,11 @@ import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
 // Supabase falso: cuenta y lista de notificaciones_dashboard con los filtros que use el hook.
 const bd = vi.hoisted(() => ({
   filas: [] as Record<string, unknown>[],
-  updates: [] as { cambios: unknown; filtros: [string, string, unknown][] }[],
+  /** Llamadas a la RPC marcar_avisos_revisados (11/11/2026: «Revisado» ya no es un UPDATE directo). */
+  revisados: [] as { p_ids: string[] | null; p_tipos: string[] | null }[],
 }));
 vi.mock("@/integrations/supabase/client", () => {
-  const consulta = (modo: "select" | "update", cambios?: unknown, head = false) => {
+  const consulta = (head = false) => {
     const filtros: [string, string, unknown][] = [];
     let rango: [number, number] | null = null;
     const api: Record<string, unknown> = {
@@ -18,7 +19,6 @@ vi.mock("@/integrations/supabase/client", () => {
       order: () => api,
       range: (a: number, b: number) => { rango = [a, b]; return api; },
       then: (ok: (r: unknown) => unknown) => {
-        if (modo === "update") { bd.updates.push({ cambios, filtros }); return Promise.resolve({ error: null }).then(ok); }
         let filas = bd.filas.filter((f) => filtros.every(([op, c, v]) => (op === "eq" ? f[c] === v : (v as unknown[]).includes(f[c]))));
         if (rango) filas = filas.slice(rango[0], rango[1] + 1);
         return Promise.resolve(head ? { count: filas.length, error: null } : { data: filas, error: null }).then(ok);
@@ -29,9 +29,17 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: () => ({
-        select: (_c: string, opts?: { head?: boolean }) => consulta("select", undefined, opts?.head),
-        update: (cambios: unknown) => consulta("update", cambios),
+        select: (_c: string, opts?: { head?: boolean }) => consulta(opts?.head),
       }),
+      rpc: (fn: string, args: { p_ids: string[] | null; p_tipos: string[] | null }) => {
+        if (fn !== "marcar_avisos_revisados") throw new Error(`RPC inesperada: ${fn}`);
+        bd.revisados.push(args);
+        const marcadas = bd.filas.filter(
+          (f) => !f.leida && (!args.p_ids || args.p_ids.includes(f.id as string)) && (!args.p_tipos || args.p_tipos.includes(f.tipo as string)),
+        );
+        for (const f of marcadas) f.leida = true;
+        return Promise.resolve({ data: marcadas.length, error: null });
+      },
     },
   };
 });
@@ -50,7 +58,7 @@ const pintar = (seccion: "reservas" | "facturas") =>
   );
 
 beforeEach(() => {
-  bd.updates = [];
+  bd.revisados = [];
   bd.filas = [
     aviso("r1", "reserva_nueva", false, { referencia_tipo: "reserva" }),
     aviso("r2", "reserva_cancelada", false, { referencia_tipo: "reserva" }),
@@ -89,11 +97,44 @@ describe("Botón «Avisos» de cada sección", () => {
     await waitFor(() => expect(within(modal).getAllByRole("listitem")).toHaveLength(1));
     expect(within(modal).getByText("Aviso r2")).toBeInTheDocument();
     fireEvent.click(within(modal).getByRole("button", { name: "Marcar todos como revisados" }));
-    await waitFor(() => expect(bd.updates).toHaveLength(1));
-    expect(bd.updates[0].filtros).toEqual([
-      ["eq", "leida", false],
-      ["in", "tipo", ["reserva_nueva", "reserva_cancelada"]],
-    ]);
+    await waitFor(() => expect(bd.revisados).toHaveLength(1));
+    expect(bd.revisados[0]).toEqual({ p_ids: null, p_tipos: ["reserva_nueva", "reserva_cancelada"] });
+    // Los de otras secciones (y los retirados) no se tocan.
+    expect(bd.filas.filter((f) => !f.leida).map((f) => f.id)).toEqual(["s1", "s2", "f1", "o1"]);
+    // El botón queda detrás del modal (aria-hidden): `hidden: true`.
+    expect(await screen.findByRole("button", { name: "Avisos: ninguno sin revisar", hidden: true })).toBeInTheDocument();
+  });
+
+  it("«Revisado» marca el aviso con la RPC, lo quita de «Sin revisar» y baja el número", async () => {
+    pintar("reservas");
+    fireEvent.click(await screen.findByRole("button", { name: "Avisos: 2 sin revisar" }));
+    const modal = await screen.findByRole("dialog", { name: /Avisos de reservas/ });
+    fireEvent.click(await within(modal).findByRole("button", { name: "Marcar como revisado: Aviso r1" }));
+    await waitFor(() => expect(within(modal).getAllByRole("listitem")).toHaveLength(1));
+    expect(within(modal).queryByText("Aviso r1")).not.toBeInTheDocument();
+    expect(bd.revisados).toEqual([{ p_ids: ["r1"], p_tipos: null }]);
+    expect(await screen.findByRole("button", { name: "Avisos: 1 sin revisar", hidden: true })).toBeInTheDocument();
+    // En «Todos» sigue saliendo, marcado como revisado.
+    fireEvent.click(within(modal).getByRole("button", { name: "Todos" }));
+    await waitFor(() => expect(within(modal).getAllByRole("listitem")).toHaveLength(3));
+    expect(within(modal).getByText("Aviso r1").closest("li")).toHaveTextContent("Revisado");
+    expect(within(modal).queryByRole("button", { name: "Marcar como revisado: Aviso r1" })).not.toBeInTheDocument();
+  });
+
+  it("si la RPC falla, el aviso vuelve a «sin revisar» y se avisa", async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const original = supabase.rpc;
+    (supabase as unknown as { rpc: unknown }).rpc = () => Promise.resolve({ data: null, error: { message: "caída" } });
+    try {
+      pintar("reservas");
+      fireEvent.click(await screen.findByRole("button", { name: "Avisos: 2 sin revisar" }));
+      const modal = await screen.findByRole("dialog", { name: /Avisos de reservas/ });
+      fireEvent.click(await within(modal).findByRole("button", { name: "Marcar como revisado: Aviso r1" }));
+      expect(await within(modal).findByRole("button", { name: "Marcar como revisado: Aviso r1" })).toBeInTheDocument();
+      expect(within(modal).getAllByRole("listitem")).toHaveLength(2);
+    } finally {
+      (supabase as unknown as { rpc: unknown }).rpc = original;
+    }
   });
 
   it("«Ver» lleva al origen del aviso, lo marca revisado y cierra el modal", async () => {
@@ -103,6 +144,6 @@ describe("Botón «Avisos» de cada sección", () => {
     fireEvent.click(await within(modal).findByRole("button", { name: "Ver: Aviso r1" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByTestId("ruta")).toHaveTextContent("/reservas?tab=reservas");
-    expect(bd.updates[0]).toMatchObject({ cambios: { leida: true }, filtros: [["eq", "id", "r1"]] });
+    expect(bd.revisados[0]).toEqual({ p_ids: ["r1"], p_tipos: null });
   });
 });

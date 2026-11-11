@@ -27,6 +27,11 @@ vi.mock("@/integrations/supabase/client", () => ({
       b.then = (ok: (v: unknown) => unknown) => Promise.resolve({ error: null }).then(ok);
       return b;
     },
+    // 11/11/2026: marcar como leído va por la RPC marcar_avisos_revisados.
+    rpc: (fn: string, args: unknown) => {
+      h.llamadas.push({ op: "rpc", args: [fn, args] });
+      return Promise.resolve({ data: 1, error: null });
+    },
   },
 }));
 
@@ -73,7 +78,9 @@ describe("Avisos", () => {
     expect(await screen.findByText("Aviso 1")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Hoy" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Marcar como leído: Aviso 1" }));
-    await waitFor(() => expect(h.llamadas.some((c) => c.op === "update")).toBe(true));
+    await waitFor(() =>
+      expect(h.llamadas).toContainEqual({ op: "rpc", args: ["marcar_avisos_revisados", { p_ids: ["n1"], p_tipos: null }] }),
+    );
     expect(screen.queryByRole("button", { name: "Marcar como leído: Aviso 1" })).toBeNull();
   });
 
@@ -83,7 +90,8 @@ describe("Avisos", () => {
     await screen.findByText("Aviso 1");
     fireEvent.click(screen.getByRole("button", { name: /Marcar todos como leídos/ }));
     await waitFor(() => expect(screen.getByRole("button", { name: /Marcar todos como leídos/ })).toBeDisabled());
-    expect(h.llamadas).toContainEqual({ op: "eq", args: ["leida", false] });
+    // Sin filtros: todos los que el usuario puede ver (la RPC filtra por sección).
+    expect(h.llamadas).toContainEqual({ op: "rpc", args: ["marcar_avisos_revisados", { p_ids: null, p_tipos: null }] });
   });
 
   it("filtra por tipo con chips y pagina con «Cargar más»", async () => {
@@ -103,6 +111,13 @@ describe("Avisos", () => {
         args: ["tipo", TIPOS_POR_FILTRO.facturas],
       }),
     );
+  });
+
+  it("no pide los avisos retirados («Reserva sin sala / sin mesas», 11/11/2026)", async () => {
+    h.filas = [aviso(1)];
+    montar();
+    await screen.findByText("Aviso 1");
+    expect(h.llamadas).toContainEqual({ op: "not", args: ["tipo", "in", "(reserva_sin_asignar)"] });
   });
 
   it("al abrir un aviso con origen navega a él", async () => {

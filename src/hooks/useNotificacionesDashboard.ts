@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { nombreCanalUnico, programarSondeo, vigilarCanal } from "@/lib/realtimeCanal";
+import { avisoRetirado, marcarAvisosRevisados } from "@/lib/avisosRevisados";
 
 export interface NotificacionDashboard {
   id: string;
@@ -27,9 +28,11 @@ export interface NotificacionDashboard {
  */
 /**
  * ¿Va a la campana? Las alertas de precio pequeñas (datos.campana = false, < 10 €
- * al mes: 20261115100000_facturas_decision) solo se ven en Facturas › Análisis.
+ * al mes: 20261115100000_facturas_decision) solo se ven en Facturas › Análisis. Los tipos retirados
+ * («Reserva sin sala / sin mesas», 11/11/2026) no salen en ningún sitio.
  */
-export const vaALaCampana = (n: Pick<NotificacionDashboard, "datos">): boolean => n.datos?.campana !== false;
+export const vaALaCampana = (n: Pick<NotificacionDashboard, "datos"> & { tipo?: string }): boolean =>
+  n.datos?.campana !== false && !avisoRetirado(n.tipo);
 
 /**
  * ¿Es una alerta diaria de Facturas (cron facturas-alertas, 20261107300000)? Se reconocen por su
@@ -102,10 +105,7 @@ export function useNotificacionesDashboard() {
     );
     setCountNoLeidas((prev) => Math.max(0, prev - 1));
 
-    const { error } = await supabase
-      .from("notificaciones_dashboard")
-      .update({ leida: true })
-      .eq("id", id);
+    const { error } = await marcarAvisosRevisados({ ids: [id] });
 
     if (error) {
       console.error("Error marcando notificación como leída:", error);
@@ -120,10 +120,8 @@ export function useNotificacionesDashboard() {
     setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })));
     setCountNoLeidas(0);
 
-    const { error } = await supabase
-      .from("notificaciones_dashboard")
-      .update({ leida: true })
-      .eq("leida", false);
+    // Todos los que el usuario puede ver (la RPC filtra por las secciones que ve).
+    const { error } = await marcarAvisosRevisados();
 
     if (error) {
       console.error("Error marcando todas las notificaciones como leídas:", error);

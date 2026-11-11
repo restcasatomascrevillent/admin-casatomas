@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { vaALaCampana, type NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { tiposDeSeccion, type SeccionAvisos } from "@/lib/avisos";
 import { programarSondeo } from "@/lib/realtimeCanal";
+import { marcarAvisosRevisados } from "@/lib/avisosRevisados";
 
 export const TAMANO_PAGINA_AVISOS_SECCION = 30;
 /** Evento para que los contadores se relean al marcar avisos (en el modal o donde sea). */
@@ -118,14 +119,26 @@ export function useAvisosSeccion(seccion: SeccionAvisos, filtros: FiltrosAvisosS
     setHayMas(filas.length === TAMANO_PAGINA_AVISOS_SECCION);
   };
 
+  // «Sin revisar»: lo que se revisa sale de la lista (si se quedara, con «· Revisado», parecía que el
+  // botón no había hecho nada). En «Todos» se queda, marcado como revisado.
+  const quitarSiSinRevisar = (ids: Set<string>) => {
+    if (estado !== "sin_revisar") return;
+    setAvisos((prev) => prev.filter((n) => !ids.has(n.id)));
+    // En el servidor ya no cumplen `leida = false`: la siguiente página empieza antes.
+    crudas.current = Math.max(0, crudas.current - ids.size);
+  };
+
   const marcarRevisado = async (id: string) => {
     const aviso = avisos.find((n) => n.id === id);
     if (!aviso || aviso.leida) return;
     setAvisos((prev) => prev.map((n) => (n.id === id ? { ...n, leida: true } : n)));
-    const { error: err } = await supabase.from("notificaciones_dashboard").update({ leida: true }).eq("id", id);
+    const { error: err } = await marcarAvisosRevisados({ ids: [id] });
     if (err) {
+      console.error("Error marcando el aviso como revisado:", err);
       toast.error("No se pudo marcar el aviso como revisado");
       setAvisos((prev) => prev.map((n) => (n.id === id ? { ...n, leida: false } : n)));
+    } else {
+      quitarSiSinRevisar(new Set([id]));
     }
     void actualizarContador();
   };
@@ -134,14 +147,15 @@ export function useAvisosSeccion(seccion: SeccionAvisos, filtros: FiltrosAvisosS
   const marcarTodosRevisados = async () => {
     const previos = avisos;
     setAvisos((prev) => prev.map((n) => ({ ...n, leida: true })));
-    const { error: err } = await supabase
-      .from("notificaciones_dashboard")
-      .update({ leida: true })
-      .eq("leida", false)
-      .in("tipo", tiposDeSeccion(seccion));
+    const { error: err } = await marcarAvisosRevisados({ tipos: tiposDeSeccion(seccion) });
     if (err) {
+      console.error("Error marcando los avisos como revisados:", err);
       toast.error("No se pudieron marcar los avisos como revisados");
       setAvisos(previos);
+    } else if (estado === "sin_revisar") {
+      setAvisos([]);
+      crudas.current = 0;
+      setHayMas(false);
     }
     void actualizarContador();
   };
