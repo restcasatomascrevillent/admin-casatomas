@@ -1,14 +1,18 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { CalendarIcon, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarIcon, ChevronLeft, ChevronRight, Clock, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { useArrastrarHoja } from "@/hooks/useArrastrarHoja";
 import { claveDia, diaDeClave, pasarHoja, tituloHoja } from "@/lib/reservas/libroReservas";
+import { etiquetaEstadoReserva } from "@/lib/reservas/estadosReserva";
+import { MIN_LETRAS_BUSQUEDA, useBuscarReservas, useReservasPorEstado } from "@/hooks/useBusquedaReservas";
 import { ReservasDeLaHoja } from "./ReservasDeLaHoja";
+import { ResultadosLista } from "./ResultadosLista";
 
 // ============================================================================
 // LA LISTA COMO EL LIBRO (10/11/2026, petición del dueño: «hacer o simular como
@@ -28,8 +32,11 @@ import { ReservasDeLaHoja } from "./ReservasDeLaHoja";
 /** Suelo del bloque del libro (px): por debajo vuelve el scroll de página. */
 const ALTURA_MINIMA_LIBRO = 360;
 interface Props {
-  /** Algo más para la barra de arriba (el conmutador «Libro | Tabla»). */
-  extra?: ReactNode;
+  /**
+   * Un estado que llega de un aviso o de un enlace (`?status=`): la Lista abre esas reservas de hoy en
+   * adelante en vez de la hoja del día. «pendiente» es el botón «Pendientes».
+   */
+  estadoInicial?: string | null;
   /**
    * «+ Añadir reserva a este día» (10/11/2026, petición del dueño): abre el diálogo «Nueva Reserva» de la
    * página ya puesto en el día de la hoja. Sin él (sin permiso de crear) el botón no sale.
@@ -43,13 +50,11 @@ function Hoja({
   fecha,
   lado,
   onAbrir,
-  onAnadir,
   resaltada,
 }: {
   fecha: string;
   lado: "izquierda" | "derecha" | "sola";
   onAbrir: (id: string) => void;
-  onAnadir?: (fecha: string) => void;
   resaltada?: string | null;
 }) {
   return (
@@ -64,18 +69,8 @@ function Hoja({
         lado === "sola" && "rounded-xl",
       )}
     >
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-5 py-3">
-        <h2 className="mr-auto text-xl font-semibold sm:text-2xl">{tituloHoja(fecha)}</h2>
-        {onAnadir && (
-          <Button
-            type="button"
-            className="h-12 gap-2 bg-emerald-600 px-5 text-base font-semibold text-white shadow-sm hover:bg-emerald-700 [&_svg]:size-5"
-            onClick={() => onAnadir(fecha)}
-          >
-            <Plus /> Añadir reserva a este día
-          </Button>
-        )}
-      </div>
+      {/* 11/11/2026 («ajusta la estética»): el día ya está en la barra; aquí solo para el lector de pantalla. */}
+      <h2 className="sr-only">{tituloHoja(fecha)}</h2>
       {/* `touch-pan-y` y `overflow-x-hidden` AQUÍ, en el contenedor con scroll: si no, el navegador se queda el
           gesto lateral y arrastrar no pasa la hoja (ver `useArrastrarHoja`). */}
       <div
@@ -88,7 +83,7 @@ function Hoja({
   );
 }
 
-export function ListaComoLibro({ extra, onAnadirReserva, resaltar = null }: Props) {
+export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar = null }: Props) {
   const [fecha, setFecha] = useState(() => claveDia(new Date()));
   // Hacia dónde se pasó la última hoja: decide de qué lado entra la nueva.
   const [sentido, setSentido] = useState<1 | -1>(1);
@@ -99,8 +94,20 @@ export function ListaComoLibro({ extra, onAnadirReserva, resaltar = null }: Prop
   const [bloque, setBloque] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(bloque, ALTURA_MINIMA_LIBRO);
   const [resaltada, setResaltada] = useState<string | null>(null);
+  // Buscador (todo el histórico) y «Pendientes» / estado del aviso. Con cualquiera de los dos se ven
+  // los resultados en lugar de la hoja; «Ver el día» o quitarlos vuelve a la hoja.
+  const [texto, setTexto] = useState("");
+  const [estado, setEstado] = useState<string | null>(estadoInicial);
+  const busqueda = useBuscarReservas(texto);
+  const pendientes = useReservasPorEstado("pendiente");
+  const otroEstado = useReservasPorEstado(estado && estado !== "pendiente" ? estado : null);
+  const porEstado = estado === "pendiente" ? pendientes : otroEstado;
+  const buscando = texto.trim().length >= MIN_LETRAS_BUSQUEDA;
+  const numPendientes = pendientes.data?.length ?? 0;
 
   const irA = (clave: string) => {
+    setTexto("");
+    setEstado(null);
     if (clave === fecha) return;
     setSentido(clave > fecha ? 1 : -1);
     setFecha(clave);
@@ -123,37 +130,92 @@ export function ListaComoLibro({ extra, onAnadirReserva, resaltar = null }: Prop
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      {/* Barra: pasar hojas */}
+      {/* Barra: pasar hojas, «Hoy», el buscador y «Pendientes». */}
+      {/* 11/11/2026 («ajusta la estética»): en tablet, arriba el día y «Añadir reserva»; debajo, el buscador a todo
+          lo ancho (que se lea entero) y «Pendientes». Desde 1280 px, todo en una línea. */}
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label="Hoja anterior" onClick={() => pasar(-1)}>
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <Popover open={calendarioAbierto} onOpenChange={setCalendarioAbierto}>
-          <PopoverTrigger asChild>
-            <Button type="button" variant="outline" className="h-11 min-w-[16rem] justify-start text-base font-semibold" aria-label="Elegir día">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {tituloHoja(fecha)}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-auto p-0">
-            <Calendar
-              mode="single"
-              selected={diaDeClave(fecha)}
-              defaultMonth={diaDeClave(fecha)}
-              onSelect={(d) => {
-                if (d) irA(claveDia(d));
-                setCalendarioAbierto(false);
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-        <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label="Hoja siguiente" onClick={() => pasar(1)}>
-          <ChevronRight className="h-5 w-5" />
-        </Button>
-        <Button type="button" variant="ghost" className="h-11 text-base" onClick={() => irA(hoy)} disabled={fecha === hoy}>
+        <div className="order-1 flex items-center gap-1">
+          <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label="Hoja anterior" onClick={() => pasar(-1)}>
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <Popover open={calendarioAbierto} onOpenChange={setCalendarioAbierto}>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="outline" className="h-11 justify-start px-3 text-base font-semibold" aria-label="Elegir día">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {tituloHoja(fecha)}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={diaDeClave(fecha)}
+                defaultMonth={diaDeClave(fecha)}
+                onSelect={(d) => {
+                  if (d) irA(claveDia(d));
+                  setCalendarioAbierto(false);
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label="Hoja siguiente" onClick={() => pasar(1)}>
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
+        <Button type="button" variant="outline" className="order-1 h-11 px-4 text-base" onClick={() => irA(hoy)} disabled={fecha === hoy && !buscando && !estado}>
           Hoy
         </Button>
-        {extra && <div className="ml-auto">{extra}</div>}
+        {onAnadirReserva && !buscando && !estado && (
+          <Button
+            type="button"
+            className="order-2 ml-auto h-11 gap-2 bg-emerald-600 px-4 text-base font-semibold text-white shadow-sm hover:bg-emerald-700 xl:order-3"
+            onClick={() => onAnadirReserva(fecha)}
+          >
+            <Plus className="h-5 w-5" /> Añadir reserva a este día
+          </Button>
+        )}
+        <div className="order-3 flex w-full items-center gap-2 xl:order-2 xl:w-auto xl:flex-1">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input
+              type="search"
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              placeholder="Buscar nombre, teléfono o email"
+              aria-label="Buscar en todas las reservas"
+              className="h-11 pl-9 pr-10 text-base"
+            />
+            {texto && (
+              <button
+                type="button"
+                className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground"
+                aria-label="Borrar la búsqueda"
+                onClick={() => setTexto("")}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant={estado === "pendiente" ? "default" : "outline"}
+            className="h-11 gap-2 text-base"
+            aria-pressed={estado === "pendiente"}
+            onClick={() => {
+              setTexto("");
+              setEstado((e) => (e === "pendiente" ? null : "pendiente"));
+            }}
+          >
+            <Clock className="h-4 w-4" /> Pendientes
+            <span
+              className={cn(
+                "min-w-6 rounded-full px-1.5 text-sm font-semibold tabular-nums",
+                estado === "pendiente" ? "bg-primary-foreground/20" : numPendientes ? "bg-status-pending text-status-pending-foreground" : "bg-muted text-muted-foreground",
+              )}
+            >
+              {numPendientes}
+            </span>
+          </Button>
+        </div>
       </div>
 
       {/* El libro */}
@@ -178,7 +240,37 @@ export function ListaComoLibro({ extra, onAnadirReserva, resaltar = null }: Prop
           )}
           data-sentido={sentido === 1 ? "siguiente" : "anterior"}
         >
-          {dosHojas ? (
+          {buscando ? (
+            <ResultadosLista
+              titulo={<>Resultados de «{texto.trim()}»</>}
+              reservas={busqueda.data}
+              cargando={busqueda.isLoading || busqueda.escribiendo}
+              error={busqueda.isError}
+              onReintentar={() => void busqueda.refetch()}
+              vacio="No hay ninguna reserva con ese nombre, teléfono o email."
+              nota={busqueda.data && busqueda.data.length >= busqueda.limite ? `Se enseñan las ${busqueda.limite} más recientes: escribe algo más para afinar.` : null}
+              conTelefono
+              onAbrir={editarReserva}
+              onVerDia={irA}
+            />
+          ) : estado ? (
+            <ResultadosLista
+              titulo={
+                <span className="flex flex-wrap items-center gap-2">
+                  {estado === "pendiente" ? "Pendientes de verificar" : `${etiquetaEstadoReserva(estado)}s`}
+                  <span className="text-base font-normal text-muted-foreground">desde hoy</span>
+                </span>
+              }
+              reservas={porEstado.data}
+              cargando={porEstado.isLoading}
+              error={porEstado.isError}
+              onReintentar={() => void porEstado.refetch()}
+              vacio={estado === "pendiente" ? "No hay reservas pendientes de verificar." : "No hay reservas en este estado desde hoy."}
+              conTelefono
+              onAbrir={editarReserva}
+              onVerDia={irA}
+            />
+          ) : dosHojas ? (
             <>
               <Hoja fecha={fecha} lado="izquierda" onAbrir={editarReserva} />
               {/* El lomo del libro */}
@@ -186,7 +278,7 @@ export function ListaComoLibro({ extra, onAnadirReserva, resaltar = null }: Prop
               <Hoja fecha={pasarHoja(fecha, 1)} lado="derecha" onAbrir={editarReserva} />
             </>
           ) : (
-            <Hoja fecha={fecha} lado="sola" onAbrir={editarReserva} onAnadir={onAnadirReserva} resaltada={resaltada} />
+            <Hoja fecha={fecha} lado="sola" onAbrir={editarReserva} resaltada={resaltada} />
           )}
         </div>
         </div>

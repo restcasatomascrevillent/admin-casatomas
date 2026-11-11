@@ -17,22 +17,32 @@ describe("«Ordenadas»", () => {
     expect(["10", "2", "1", "9", "14"].sort(compararNombreMesa)).toEqual(["1", "2", "9", "10", "14"]);
   });
 
-  it("rejillaOrdenadas: todas caben sin scroll y las tarjetas no son más altas que anchas", () => {
+  it("rejillaOrdenadas: todas caben sin scroll y las tarjetas no pasan de 1,5 veces su ancho de alto", () => {
     for (const [n, ancho, alto] of [[13, 760, 520], [16, 520, 470], [3, 900, 560], [1, 300, 200]]) {
       const r = rejillaOrdenadas(n, ancho, alto);
       expect(r.filas * r.columnas).toBeGreaterThanOrEqual(n);
       expect(r.columnas * r.tarjetaAncho + (r.columnas - 1) * r.hueco + 16).toBeLessThanOrEqual(ancho);
       expect(r.filas * r.tarjetaAlto + (r.filas - 1) * r.hueco + 16).toBeLessThanOrEqual(alto);
-      expect(r.tarjetaAlto).toBeLessThanOrEqual(r.tarjetaAncho);
+      expect(r.tarjetaAlto).toBeLessThanOrEqual(Math.floor(r.tarjetaAncho * 1.5));
       expect(r.tarjetaAlto).toBeGreaterThanOrEqual(44);
     }
   });
 
-  it("tarjetas pequeñas (10/11/2026): como mucho 144 × 100 aunque sobre sitio", () => {
+  it("tarjetas pequeñas de ancho (10/11/2026): como mucho 144; de alto, 150 aunque sobre sitio", () => {
     const r = rejillaOrdenadas(3, 1200, 800);
     expect(r.tarjetaAncho).toBeLessThanOrEqual(144);
-    expect(r.tarjetaAlto).toBeLessThanOrEqual(100);
+    expect(r.tarjetaAlto).toBeLessThanOrEqual(150);
     expect(r.tarjetaAlto).toBeGreaterThanOrEqual(92); // con el nombre de la reserva dentro
+  });
+
+  it("si sobra alto, las tarjetas se estiran hacia abajo hasta llenar el hueco (11/11/2026, iPad mini)", () => {
+    // 16 mesas en un hueco estrecho y alto (la terraza junto a la lista en 1024 × 768).
+    const r = rejillaOrdenadas(16, 330, 400);
+    expect(r.columnas).toBe(4);
+    expect(r.tarjetaAlto).toBeGreaterThan(r.tarjetaAncho);
+    const usado = r.filas * r.tarjetaAlto + (r.filas - 1) * r.hueco + 16;
+    expect(usado).toBeLessThanOrEqual(400);
+    expect(usado).toBeGreaterThan(400 - r.filas);
   });
 
   it("medidasTarjetas nunca se pasa del hueco", () => {
