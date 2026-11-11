@@ -296,6 +296,7 @@ export default function TabCarta() {
               (02/11/2026: antes iban encima, apretados a la derecha, solo con iconos y con un hueco
               vacío). El número de cada sección se ve desde `sm`. */}
           <PestanasPagina
+            nivel={2}
             accionesDebajoEnMovil="xl"
             pestanas={(Object.keys(secciones) as Seccion[]).map((seccion) => ({
               valor: seccion,

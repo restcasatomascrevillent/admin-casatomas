@@ -51,7 +51,7 @@ export function ConversacionesList({
           size="sm"
           className="w-full justify-start gap-2 text-sm font-medium text-foreground hover:bg-muted/60 pointer-coarse:min-h-11"
         >
-          <Plus className="h-4 w-4 text-[hsl(38,59%,45%)]" aria-hidden />
+          <Plus className="h-4 w-4 text-gold" aria-hidden />
           Nueva
         </Button>
       </div>
@@ -97,7 +97,7 @@ export function ConversacionesList({
                       onClick={(e) => e.stopPropagation()}
                       className={cn(
                         "absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity",
-                        "hover:bg-background hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)]",
+                        "hover:bg-background hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold",
                         "group-hover:opacity-100 data-[state=open]:opacity-100",
                         "pointer-coarse:static pointer-coarse:-mr-2 pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:translate-y-0 pointer-coarse:opacity-100",
                       )}

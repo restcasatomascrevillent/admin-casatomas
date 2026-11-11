@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNovedades, type Novedad } from "@/hooks/useNovedades";
 import { indexarPlatos, usePlatosParaMenu, type PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
@@ -55,7 +56,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { MobilePreview, type NovedadPreview } from "./MobilePreview";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { camposSinTraducir, conSiglasRestauradas, normalizarTraduccionNovedad } from "@/lib/traduccion-novedad";
 import { ImagePositionSelector } from "./ImagePositionSelector";
 import { NOVEDAD_CARD_IMAGE_ASPECT_RATIO } from "./previewConstants";
@@ -1213,32 +1214,31 @@ export function EditorNovedadesWeb() {
 
             <CardContent className="p-4 pt-0 space-y-5">
               <Tabs value={pestanaForm} onValueChange={(v) => setPestanaForm(v as PestanaFormNovedad)}>
-                <TabsList className="w-full justify-start" aria-label="Partes de la novedad">
-                  {PESTANAS_FORM_NOVEDAD.map((p) => (
-                    <TabsTrigger
-                      key={p.id}
-                      value={p.id}
-                      data-tour={p.id === "publicacion" ? "gw-novedades-publicacion" : undefined}
-                      // Menos relleno en el móvil: con el de siempre «Publicación» quedaba
-                      // fuera a 390 px (F-47). Desde `sm`, el de siempre.
-                      className="gap-1.5 px-2 pointer-coarse:px-2 sm:px-3 sm:pointer-coarse:px-4"
-                    >
-                      {p.corta ? (
-                        <>
-                          <span className="sm:hidden" aria-hidden="true">
-                            {p.corta}
-                          </span>
-                          <span className="sr-only sm:not-sr-only">{p.label}</span>
-                        </>
-                      ) : (
-                        p.label
-                      )}
-                      {p.id === "botones" && erroresBotones.length > 0 && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-label="con errores" />
-                      )}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+                {/* Chips de segundo nivel, como el resto del panel (Fase 3, 11/11/2026). */}
+                <ChipsSubnivel
+                  aria-label="Partes de la novedad"
+                  chips={PESTANAS_FORM_NOVEDAD.map((p) => ({
+                    valor: p.id,
+                    tour: p.id === "publicacion" ? "gw-novedades-publicacion" : undefined,
+                    etiqueta: (
+                      <>
+                        {p.corta ? (
+                          <>
+                            <span className="sm:hidden" aria-hidden="true">
+                              {p.corta}
+                            </span>
+                            <span className="sr-only sm:not-sr-only">{p.label}</span>
+                          </>
+                        ) : (
+                          p.label
+                        )}
+                        {p.id === "botones" && erroresBotones.length > 0 && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-label="con errores" />
+                        )}
+                      </>
+                    ),
+                  }))}
+                />
 
               <TabsContent value="contenido" forceMount className={CLASE_PESTANA_FORM}>
               {/* Título y badge */}

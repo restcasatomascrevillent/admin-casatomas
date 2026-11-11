@@ -66,7 +66,7 @@ export function EditorPlantillasEmail() {
       )}
 
       <Tabs defaultValue={TIPOS_PLANTILLA[0]}>
-        <PestanasPagina pestanas={TIPOS_PLANTILLA.map((tipo) => ({ valor: tipo, etiqueta: ETIQUETA_TIPO[tipo] }))} />
+        <PestanasPagina nivel={2} pestanas={TIPOS_PLANTILLA.map((tipo) => ({ valor: tipo, etiqueta: ETIQUETA_TIPO[tipo] }))} />
         {TIPOS_PLANTILLA.map((tipo) => (
           <TabsContent key={tipo} value={tipo} className="mt-3">
             <PlantillaTipoEditor tipo={tipo} puedeEditar={puedeEditar} emailUsuario={user?.email ?? ""} />

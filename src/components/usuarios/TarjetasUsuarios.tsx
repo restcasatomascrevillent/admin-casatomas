@@ -63,7 +63,7 @@ function iniciales(nombre: string): string {
 /** Marca la fila o tarjeta de quien ha iniciado sesión. */
 export function MarcaTu() {
   return (
-    <Badge variant="outline" className="shrink-0 border-primary/30 bg-primary/5 px-2 py-0 text-[11px] font-semibold text-primary" title="Es tu cuenta">
+    <Badge variant="outline" className="shrink-0 border-primary/30 bg-primary/5 px-2 py-0 text-xs font-semibold text-primary" title="Es tu cuenta">
       Tú
     </Badge>
   );

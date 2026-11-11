@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useHistorialAjustes } from "@/hooks/useHistorialAjustes";
 import { usePlatos } from "@/hooks/usePlatos";
 import { useBebidas } from "@/hooks/useBebidas";
@@ -84,10 +85,13 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
         </DialogHeader>
 
         <Tabs defaultValue="historial" className="w-full">
-          <TabsList className="grid h-auto w-full grid-cols-2">
-            <TabsTrigger value="historial" className="min-h-11">Historial</TabsTrigger>
-            <TabsTrigger value="grafico" className="min-h-11">Evolución</TabsTrigger>
-          </TabsList>
+          <ChipsSubnivel
+            aria-label="Vista"
+            chips={[
+              { valor: "historial", etiqueta: "Historial" },
+              { valor: "grafico", etiqueta: "Evolución" },
+            ]}
+          />
 
           <TabsContent value="historial" className="mt-4">
             {isLoading ? (

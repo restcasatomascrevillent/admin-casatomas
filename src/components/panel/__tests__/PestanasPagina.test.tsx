@@ -21,12 +21,12 @@ function montar(props: Partial<React.ComponentProps<typeof PestanasPagina>> = {}
 }
 
 describe("PestanasPagina", () => {
-  it("pinta las pestañas, marca la activa con el subrayado dorado y cambia de contenido", () => {
+  it("pinta las pestañas, marca la activa rellena (Fase 3) y cambia de contenido", () => {
     montar();
     const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
     expect(tabs.map((t) => t.textContent)).toEqual(["Primera12", "Segunda", "Tercera3"]);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(tabs[0].className).toContain("data-[state=active]:border-[hsl(38,59%,45%)]");
+    expect(tabs[0].className).toContain("data-[state=active]:bg-primary");
     expect(screen.getByText("Contenido A")).toBeInTheDocument();
     fireEvent.mouseDown(tabs[1], { button: 0 });
     expect(tabs[1]).toHaveAttribute("aria-selected", "true");
@@ -41,13 +41,14 @@ describe("PestanasPagina", () => {
     expect(screen.getByRole("tablist").className).toContain("[&::-webkit-scrollbar]:hidden");
   });
 
-  it("contador: solo si es mayor que 0, oculto en móvil salvo que se pida, con nombre accesible", () => {
+  it("contador: solo si es mayor que 0, SIEMPRE visible (también en el móvil, Fase 3) y con nombre accesible", () => {
     montar();
     expect(screen.getByRole("tab", { name: /^Segunda$/ })).toBeInTheDocument(); // contador 0: no se pinta
-    expect(screen.getByText("12").className).toContain("hidden sm:inline");
+    expect(screen.getByText("12").className).not.toContain("hidden");
+    expect(screen.getByText("12").className).toContain("tabular-nums");
     const c = screen.getByLabelText("3 en curso");
     expect(c.className).not.toContain("hidden");
-    expect(c.className).toContain("text-[hsl(38,59%,34%)]");
+    expect(c.className).toContain("text-gold-strong");
   });
 
   it("icono: se pinta dentro de la pestaña y es decorativo", () => {
@@ -140,5 +141,32 @@ describe("PestanasPagina", () => {
     expect(screen.getByTestId("punto-a").className).toContain("sm:hidden");
     // Sin icono, la etiqueta se ve igual que siempre.
     expect(within(screen.getByRole("tab", { name: /^Segunda/ })).getByText("Segunda").className).not.toContain("sr-only");
+  });
+});
+
+describe("PestanasPagina · contadores grandes (Fase 3)", () => {
+  it("con separador de miles y en una píldora de ancho mínimo", async () => {
+    const { Tabs } = await import("@/components/ui/tabs");
+    render(
+      <Tabs value="a">
+        <PestanasPagina pestanas={[{ valor: "a", etiqueta: "Documentos", contador: 1903 }]} />
+      </Tabs>,
+    );
+    const c = screen.getByText("1.903");
+    expect(c).toHaveClass("min-w-5", "tabular-nums", "justify-center");
+  });
+});
+
+describe("PestanasPagina · segundo nivel (Fase 3)", () => {
+  it("nivel 2: píldoras claras como los chips, no la pestaña rellena", () => {
+    render(
+      <Tabs value="a">
+        <PestanasPagina nivel={2} pestanas={[{ valor: "a", etiqueta: "Platos", contador: 5 }, { valor: "b", etiqueta: "Vinos" }]} />
+      </Tabs>,
+    );
+    const tab = screen.getByRole("tab", { name: /Platos/ });
+    expect(tab.className).toContain("rounded-full");
+    expect(tab.className).not.toContain("data-[state=active]:bg-primary ");
+    expect(screen.getByText("5").className).not.toContain("group-data-[state=active]");
   });
 });

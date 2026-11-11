@@ -35,6 +35,12 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        // Dorado de marca (Fase 3, 11/11/2026): sustituye los `hsl(38,59%,45%)` escritos a mano.
+        gold: {
+          DEFAULT: "hsl(var(--gold))",
+          strong: "hsl(var(--gold-strong))",
+          deep: "hsl(var(--gold-deep))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
