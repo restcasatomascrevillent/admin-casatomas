@@ -213,6 +213,25 @@ categoría.
 33 cl 5,16 (4,38-10,51); botella 50 cl 7,84; botellín 25 cl 13,39. Cruzcampo: barril
 50 l 4,08, barril 20 l 4,62, tercio 4,97.
 
+## Precio tal como se compra (20261124120000, 11/11/2026)
+
+Petición del dueño: «que te dé la info del producto tal y como sale en la factura, a no ser
+que te diga que quiere el precio por litro o por kilo» (vino de 75 cl o magnum de 1,5 l,
+tercio, 500 g). Por defecto la IA de Facturas da el precio por unidad de compra y con su
+formato («Oreja de cerdo adobada 500 g a 4,17 € la bolsa», no 8,34 €/kg); el €/l o €/kg
+solo si la pregunta lo pide (`pidePrecioPorVolumen`) o si se compra a granel.
+
+- `compras_producto_agente`, `historial_precios_agente`, `serie_precios_agente` y
+  `variacion_precios_agente` llevan `p_base` (por defecto `true` = como antes, lo que usa el
+  panel). chat-facturas manda `false` salvo pregunta de litro/kilo (la gráfica, también con
+  unidad kg/l): sin conversión; `precio_comparable` solo si hay formatos distintos (para el
+  más barato) y la variación solo convierte el producto que mezcla formatos.
+- `volumen_comprado_agente`: `precio_envase` (€ por botella, tercio, barril o paquete) en
+  `por_producto`, `por_envase`, `por_proveedor_formato` y `comparables`, y el precio de cada
+  formato en `compra` («380 caja de 24 a 41.82 €»), solo con líneas con importe (las cajas
+  regaladas no bajan el precio; el `precio` €/l sí las cuenta, como antes). La nota de
+  respuesta cambia según la pregunta pida o no el litro/kilo.
+
 ## Cifras de la demo (06/11/2026, 2026 hasta octubre)
 
 Cerveza: **20.520,88 l**, 459 de 459 líneas convertidas.

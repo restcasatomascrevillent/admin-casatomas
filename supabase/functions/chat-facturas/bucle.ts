@@ -396,8 +396,10 @@ async function referenciasVariacion(data: any, supabase: Cliente): Promise<DocRe
       const { data: prods } = await supabase.from("productos_catalogo").select("id").eq("nombre", p.producto).limit(3);
       let mejor: number | null = null;
       for (const pr of prods ?? []) {
+        // Fila convertida (convertido_desde) = unidad base; si no, la unidad en que se compro
+        // (variacion_precios va con p_base = false desde 20261124120000, 11/11/2026).
         const { data: ls } = await supabase
-          .rpc("lineas_precio_agente", { p_producto_id: pr.id, p_base: true })
+          .rpc("lineas_precio_agente", { p_producto_id: pr.id, p_base: !!p.convertido_desde })
           .eq("fecha", p.fecha).eq("unidad", p.unidad ?? "ud")
           .order("factura_id", { ascending: false }).limit(1);
         const f = ls?.[0]?.factura_id;
