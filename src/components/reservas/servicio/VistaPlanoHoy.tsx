@@ -743,6 +743,39 @@ export function VistaPlanoHoy({
   const numAjustes = (ajustesQuery.data ?? []).length;
   const esTerraza = !!sala && /terraza/i.test(sala.title);
   const cierreSala = useSalaCerradaServicio(esTerraza ? (sala?.id ?? null) : null, hoy, turno);
+  /**
+   * Cerrar la terraza en este servicio (escribe: solo con «Editar», 06/11/2026). Con solo «Ver», si está cerrada se
+   * dice, sin interruptor. Píldora que dice el estado de verdad, «Abierta» / «Cerrada» (11/11/2026).
+   */
+  const interruptorTerraza = sala ? (
+    <>
+      {esTerraza && puedeEditar && (
+        // 11/11/2026 (dueño: «ajusta esto para que se vea mejor»): píldora compacta que dice el estado de verdad
+        // («Abierta» / «Cerrada», en rojo), a la altura del botón «…». Antes ponía siempre «Cerrada» junto al
+        // interruptor apagado y confundía.
+        <label
+          className={cn(
+            "flex h-11 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm font-medium",
+            cierreSala.cerrada ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-card text-foreground",
+          )}
+        >
+          <Switch
+            className="scale-90"
+            checked={cierreSala.cerrada}
+            onCheckedChange={(v) => void cierreSala.cambiar(v)}
+            aria-label={`${sala.title} cerrada en este servicio`}
+          />
+          {cierreSala.cerrada ? "Cerrada" : "Abierta"}
+        </label>
+      )}
+      {esTerraza && !puedeEditar && cierreSala.cerrada && (
+        <Badge variant="outline" className="h-10 px-2 text-[13px]">
+          Cerrada en este servicio
+        </Badge>
+      )}
+    </>
+  ) : null;
+
   // «Evento: sala entera» (20261119100000): la sala es de un evento en este turno.
   const { data: eventosHoy } = useSalasEvento(hoy);
   const eventosTurno = useMemo(() => eventosDelTurno(eventosHoy, hoy, turno), [eventosHoy, hoy, turno]);
@@ -1242,13 +1275,17 @@ export function VistaPlanoHoy({
                 {/* 11/11/2026 (dueño: «que se vea como en Comedor, cena y reservas bajo»): el nombre SIEMPRE en su
                     propia línea; debajo, a la izquierda, el turno y las reservas y, a la derecha, los botones. Igual en
                     todas las salas, quepa o no en una fila. */}
-                <h2 className="flex basis-full items-center gap-2 text-xl font-bold lg:text-2xl" data-testid="plano-fijo-sala" aria-live="polite">
-                  {sala.privada && <Lock className="h-5 w-5 shrink-0" aria-hidden="true" />}
-                  <span className="whitespace-nowrap" data-testid="plano-fijo-nombre">{sala.title}</span>
-                  <span className="shrink-0 text-lg font-semibold tabular-nums text-muted-foreground">
-                    {indiceSala + 1}/{salas.length}
-                  </span>
-                </h2>
+                <div className="flex basis-full items-center gap-3">
+                  <h2 className="flex items-center gap-2 text-xl font-bold lg:text-2xl" data-testid="plano-fijo-sala" aria-live="polite">
+                    {sala.privada && <Lock className="h-5 w-5 shrink-0" aria-hidden="true" />}
+                    <span className="whitespace-nowrap" data-testid="plano-fijo-nombre">{sala.title}</span>
+                    <span className="shrink-0 text-lg font-semibold tabular-nums text-muted-foreground">
+                      {indiceSala + 1}/{salas.length}
+                    </span>
+                  </h2>
+                  {/* En la terraza, «Abierta / Cerrada» al lado del nombre (11/11/2026, petición del dueño). */}
+                  {!proponiendo && esTerraza && interruptorTerraza}
+                </div>
                 <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
                   <span className="whitespace-nowrap rounded-md border px-2 py-0.5 text-[13px] font-medium text-foreground" data-testid="plano-fijo-turno">
                     {etiquetaTurno}
@@ -1322,32 +1359,8 @@ export function VistaPlanoHoy({
                     {textoEvento(eventoSala)}
                   </Badge>
                 )}
-                {/* Cerrar la terraza y volver al plano base escriben: solo con «Editar» (06/11/2026). Con
-                    solo «Ver», si la terraza está cerrada se dice, sin interruptor. */}
-                {esTerraza && puedeEditar && (
-                  // 11/11/2026 (dueño: «ajusta esto para que se vea mejor»): píldora compacta que dice el estado de verdad
-                  // («Abierta» / «Cerrada», en rojo), a la altura del botón «…». Antes ponía siempre «Cerrada» junto al
-                  // interruptor apagado y confundía.
-                  <label
-                    className={cn(
-                      "flex h-11 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm font-medium",
-                      cierreSala.cerrada ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-card text-foreground",
-                    )}
-                  >
-                    <Switch
-                      className="scale-90"
-                      checked={cierreSala.cerrada}
-                      onCheckedChange={(v) => void cierreSala.cambiar(v)}
-                      aria-label={`${sala.title} cerrada en este servicio`}
-                    />
-                    {cierreSala.cerrada ? "Cerrada" : "Abierta"}
-                  </label>
-                )}
-                {esTerraza && !puedeEditar && cierreSala.cerrada && (
-                  <Badge variant="outline" className="h-10 px-2 text-[13px]">
-                    Cerrada en este servicio
-                  </Badge>
-                )}
+                {/* Cerrar la terraza: en el plano fijo va junto al nombre (arriba); aquí, en el resto de vistas. */}
+                {!fijo && esTerraza && interruptorTerraza}
                 {puedeEditar && fijo && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
