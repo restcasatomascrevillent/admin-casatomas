@@ -49,8 +49,9 @@ export function SelectorPeriodo({
   };
   const listo = rango?.from && rango?.to;
 
+  // 11/11/2026 (dueño: móvil): una sola línea; antes se partía y el calendario caía a una segunda fila.
   return (
-    <div role="group" aria-label="Periodo" className={cn("inline-flex max-w-full shrink-0 flex-wrap rounded-lg bg-muted/40", compacto ? "gap-0.5 p-0.5" : "gap-1 p-1")}>
+    <div role="group" aria-label="Periodo" className={cn("inline-flex max-w-full shrink-0 rounded-lg bg-muted/40 [&>button]:shrink-0", compacto ? "gap-0.5 p-0.5" : "gap-1 p-1")}>
       {periodosAnalisis(hoy).map((o) => (
         <button
           key={o.valor}

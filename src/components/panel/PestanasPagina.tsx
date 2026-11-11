@@ -240,7 +240,7 @@ export function PestanasPagina({
         <div
           className={cn(
             "ml-auto flex shrink-0 items-center gap-2",
-            accionesAnchas && "min-w-0 flex-1 shrink",
+            accionesAnchas && "min-w-0 flex-1 shrink flex-wrap sm:flex-nowrap",
             debajo?.acciones,
           )}
         >

@@ -320,15 +320,21 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
   // Barra única (07/11/2026): periodo, local, «Personalizar» (icono) y la IA, en una
   // línea con las pestañas de la página. En tablet vertical o móvil puede partir en dos.
   const barra = (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 2xl:gap-2" data-tour="facturas-analisis-barra" data-testid="barra-analisis">
-      <SelectorPeriodo valor={seleccion} onCambio={elegirPeriodo} hoy={hoy} compacto />
-      <Segmentado<FiltroLocal> etiqueta="Local" opciones={FILTROS_LOCAL} valor={local} onCambio={setLocal} compacto />
+    // 11/11/2026 (dueño: móvil): en el móvil la barra «se disuelve» (`contents`) en la fila de acciones de la
+    // página y se reparte por `order`: local + avisos/ayuda arriba; periodo + personalizar + IA debajo.
+    <div className="contents min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:flex 2xl:gap-2" data-tour="facturas-analisis-barra" data-testid="barra-analisis">
+      <div className="order-3 max-w-full sm:order-none">
+        <SelectorPeriodo valor={seleccion} onCambio={elegirPeriodo} hoy={hoy} compacto />
+      </div>
+      <div className="order-1 max-w-full sm:order-none">
+        <Segmentado<FiltroLocal> etiqueta="Local" opciones={FILTROS_LOCAL} valor={local} onCambio={setLocal} compacto />
+      </div>
       {tablero.isFetching && !tablero.isLoading && (
         <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> <span className="sr-only">Actualizando…</span>
         </span>
       )}
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="order-4 ml-auto flex items-center gap-1.5 sm:order-none">
         <Button
           type="button"
           variant="outline"
@@ -371,7 +377,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     // derecha (QA 05/11/2026). En la tablet vertical no: quedarían ~440 px y las
     // tarjetas, a 2 columnas, se aplastaban; ahí el panel va por encima.
     <div className={cn("flex h-full min-h-0 w-full flex-col gap-2 transition-[padding] motion-reduce:transition-none", copilotoVisible && "lg:pr-[360px]")}>
-      {ranuraBarra === undefined ? !pantallaCompleta && <div className="flex shrink-0">{barra}</div> : barraEnRanura && createPortal(barra, ranuraBarra as HTMLElement)}
+      {ranuraBarra === undefined ? !pantallaCompleta && <div className="flex shrink-0 flex-wrap">{barra}</div> : barraEnRanura && createPortal(barra, ranuraBarra as HTMLElement)}
 
       {/* `relative`: los `sr-only` (absolute) de dentro se quedan en el tablero y no
           alargan la PÁGINA (scroll de 1063 px a 1180×820, QA 05/11/2026). */}

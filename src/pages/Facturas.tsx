@@ -201,15 +201,15 @@ const Facturas = () => {
           {/* Botonera de navegación superior (pieza común PestanasPagina). El gasto del chatbot este mes va aparte,
               a la derecha, para que no parezca una pestaña más; abre su desglose al tocarlo. */}
           <PestanasPagina
-            // En el móvil, solo iconos: a 390 px el gasto de IA tapaba «Cargar» (QA 05/11/2026).
-            soloIconosEnMovil
+            // 11/11/2026 (dueño: «no es intuitivo»): en el móvil, icono + nombre en cada pestaña; los botones
+            // (gasto de IA, avisos, ayuda) bajan a su propia fila para que las cuatro quepan con su texto.
             className={pantallaIa ? "hidden" : undefined}
             // En Análisis la barra de filtros va en una fila propia, bajo las pestañas, salvo en pantallas muy
             // anchas (≥ 1800 px), donde cabe todo junto: en la tablet y el portátil se partía en dos líneas y las
             // pestañas quedaban descolgadas (09/11/2026).
             accionesAnchas={barraUnica}
             iconosSoloMuyAncho={barraUnica}
-            accionesDebajoEnMovil={barraUnica ? "muyAncho" : undefined}
+            accionesDebajoEnMovil={barraUnica ? "muyAncho" : true}
             pestanas={[
               { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, tour: "facturas-pestana-ia" },
               { valor: "margenes", etiqueta: "Márgenes", icono: <Percent />, tour: "facturas-pestana-margenes" },
@@ -218,7 +218,7 @@ const Facturas = () => {
             ].filter((p) => visibles.includes(p.valor as PestanaFacturas))}
             acciones={
               <>
-                {barraUnica && <div ref={setRanuraAnalisis} className="flex min-w-0 flex-1" data-testid="ranura-analisis" />}
+                {barraUnica && <div ref={setRanuraAnalisis} className="contents sm:flex sm:min-w-0 sm:flex-1" data-testid="ranura-analisis" />}
                 {/* El gasto del chatbot es de la IA: solo con «Editar». Sin él, un hueco empuja lo demás a la derecha.
                     En Análisis, con la barra única, solo en pantallas muy anchas (no cabe en 1280). */}
                 {permisos.editar ? (
@@ -229,8 +229,10 @@ const Facturas = () => {
                 {soloLectura && <EtiquetaSoloLectura />}
                 {/* Avisos de facturas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral).
                     Son de lo comprado (precios, documentos): solo para quien consulta Facturas. */}
-                {permisos.consultar && <BotonAvisosSeccion seccion="facturas" compacto={barraUnica} />}
-                <BotonAyuda seccion="facturas" />
+                <div className="order-2 ml-auto flex items-center gap-2 sm:order-none sm:ml-0">
+                  {permisos.consultar && <BotonAvisosSeccion seccion="facturas" compacto={barraUnica} />}
+                  <BotonAyuda seccion="facturas" />
+                </div>
               </>
             }
           />
