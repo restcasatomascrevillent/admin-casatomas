@@ -37,6 +37,8 @@ interface Props<T extends CamposVinoValores> {
   bajoPrecio?: ReactNode;
   /** Aviso de origen sin completar (la IA no lo sacó claro, o «Origen pendiente»): no se guarda sin él. */
   avisoOrigen?: ReactNode;
+  /** Algo a mostrar bajo el nombre (11/11/2026: aviso de vino ya en la carta, vinoDuplicado.ts). */
+  bajoNombre?: ReactNode;
 }
 
 /**
@@ -54,6 +56,7 @@ export function CamposVino<T extends CamposVinoValores>({
   paises,
   bajoPrecio,
   avisoOrigen,
+  bajoNombre,
 }: Props<T>) {
   const n = (k: keyof CamposVinoValores) => k as Path<T>;
   return (
@@ -67,6 +70,7 @@ export function CamposVino<T extends CamposVinoValores>({
             <FormControl>
               <Input placeholder="Ej.: Pago de Carraovejas Crianza 2021" autoComplete="off" {...field} />
             </FormControl>
+            {bajoNombre}
             <FormMessage />
           </FormItem>
         )}

@@ -18,10 +18,12 @@ const m = vi.hoisted(() => ({
   toastWarning: vi.fn(),
   toastSuccess: vi.fn(),
   toastInfo: vi.fn(),
+  vinos: [] as Partial<Vino>[],
 }));
 
 vi.mock("@/hooks/useVinos", () => ({
   useVinos: () => ({
+    vinos: m.vinos,
     crearVino: { mutateAsync: m.crear, isPending: false },
     actualizarVino: { mutateAsync: m.actualizar, isPending: false },
     categorias: ["TINTOS", "BLANCOS", "VINOS TINTOS — ORIGEN PENDIENTE"],
@@ -114,6 +116,7 @@ const valor = (etiqueta: RegExp | string) => (screen.getByLabelText(etiqueta) as
 
 beforeEach(() => {
   vi.clearAllMocks();
+  m.vinos = [];
 });
 
 describe("camposVaciosARellenar", () => {
@@ -206,6 +209,20 @@ describe("VinoForm: lectura de la etiqueta con IA", () => {
     fireEvent.change(screen.getByLabelText("Nombre del vino"), { target: { value: "A mano" } });
     expect(valor("Nombre del vino")).toBe("A mano");
     expect(screen.getByRole("button", { name: /Leer etiqueta con IA/ })).toBeInTheDocument();
+  });
+
+  it("avisa de un vino ya en la carta solo con la misma añada, sin impedir guardar (11/11/2026)", async () => {
+    m.vinos = [{ id: "c", nombre: "Pago de Carraovejas 2023", anada: 2023, sin_anada: false, activado: true }];
+    envolver(<VinoForm open onOpenChange={vi.fn()} />);
+    const nombre = screen.getByLabelText("Nombre del vino");
+
+    fireEvent.change(nombre, { target: { value: "Pago de Carraovejas 2021" } });
+    expect(screen.queryByTestId("aviso-vino-duplicado")).not.toBeInTheDocument();
+
+    fireEvent.change(nombre, { target: { value: "Pago de Carraovejas" } });
+    fireEvent.change(screen.getByLabelText("Añada que se sirve"), { target: { value: "2023" } });
+    expect(await screen.findByTestId("aviso-vino-duplicado")).toHaveTextContent("de la misma añada (2023)");
+    expect(screen.getByRole("button", { name: "Guardar Vino" })).toBeEnabled();
   });
 });
 
