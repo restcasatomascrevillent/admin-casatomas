@@ -504,7 +504,7 @@ describe("CalendarioOcupacion · días pasados", () => {
 // ─── 5. «Sin sala»: punto discreto dentro de la ventana ──────────────────────
 
 describe("CalendarioOcupacion · «sin sala» como punto, solo dentro de la ventana de asignación", () => {
-  it("sale en los días con reservas sin sala dentro de las próximas 48 h", async () => {
+  it("ya no pinta el punto en los días con reservas sin sala (11/11/2026)", async () => {
     tablas.reservas = {
       data: [
         reserva(dia(14), "21:00:00", 4, { espacio_id: null }), // esta noche
@@ -514,8 +514,9 @@ describe("CalendarioOcupacion · «sin sala» como punto, solo dentro de la vent
     };
     montar();
     await mesPintado();
-    expect(within(casilla(14)).getByTestId("punto-sin-sala")).toBeInTheDocument();
-    expect(within(casilla(15)).getByTestId("punto-sin-sala")).toBeInTheDocument();
+    // Sin el punto amarillo (11/11/2026, petición del dueño): sigue dicho en el aria-label y en el tooltip.
+    expect(within(casilla(14)).queryByTestId("punto-sin-sala")).not.toBeInTheDocument();
+    expect(within(casilla(15)).queryByTestId("punto-sin-sala")).not.toBeInTheDocument();
   });
 
   it("NO sale más allá de la ventana, que es donde casi todo está sin sala y no hay nada que decir", async () => {
@@ -557,8 +558,8 @@ describe("CalendarioOcupacion · «sin sala» como punto, solo dentro de la vent
     tablas.reservas = { data: [reserva(dia(15), "21:00:00", 4, { espacio_id: null })] };
     montar();
     await mesPintado();
-    await waitFor(() => expect(screen.getByText(/Reservas sin sala en las próximas 24 h/)).toBeInTheDocument());
-    expect(within(casilla(15)).queryByTestId("punto-sin-sala")).not.toBeInTheDocument();
+    await waitFor(() => expect(casilla(15)).toBeInTheDocument());
+    expect(casilla(15).getAttribute("aria-label")).not.toMatch(/sin sala/);
   });
 });
 
@@ -629,14 +630,14 @@ describe("CalendarioOcupacion · leyenda", () => {
     expect(screen.queryByText(/se miden cada una/i)).not.toBeInTheDocument();
   });
 
-  it("explica el punto de «sin sala», el día pasado y cómo leer las cifras", async () => {
+  it("explica el día pasado y cómo leer las cifras (sin el punto de «sin sala» desde el 11/11/2026)", async () => {
     montar();
     await mesPintado();
-    expect(screen.getByText("Reservas sin sala en las próximas 48 h")).toBeInTheDocument();
+    expect(screen.queryByText("Reservas sin sala en las próximas 48 h")).not.toBeInTheDocument();
     expect(screen.getByText(/Día pasado: lo que se reservó, sin porcentaje/)).toBeInTheDocument();
     expect(screen.getByText(/Cifra grande: comensales del día/)).toBeInTheDocument();
     expect(screen.getByText(/Cuentan las reservas pendientes, verificadas y confirmadas/)).toBeInTheDocument();
-    expect(screen.getByTestId("muestra-sin-sala")).toBeInTheDocument();
+    expect(screen.queryByTestId("muestra-sin-sala")).not.toBeInTheDocument();
   });
 
   it("ya no habla de «reparto por sala» como si fuera el color del día", async () => {

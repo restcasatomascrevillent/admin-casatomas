@@ -138,9 +138,9 @@ describe("VistaHoyMovil · como columna de escritorio", () => {
     expect(screen.queryByText("Carla Cena")).toBeNull();
   });
 
-  it("cada fila conserva su botón «Sentar»", () => {
+  it("sin botón «Sentar» en las filas (11/11/2026): se sienta desde la ficha", () => {
     montarColumna("", "todo");
-    expect(screen.getAllByRole("button", { name: /Sentar/ }).length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole("button", { name: /^Sentar a/ })).toHaveLength(0);
   });
 
   // 07/11/2026 («eso era para el móvil»): en escritorio, TODAS las del turno por estados, en filas de una línea.
@@ -174,7 +174,7 @@ describe("VistaHoyMovil · como columna de escritorio", () => {
     expect(terminadas).toHaveTextContent("Ciro Cancela");
   });
 
-  it("sin «Sin mesa» ni «Tarde» (11/11/2026): el estado va junto al nombre, y la acción corta «Sentar»", () => {
+  it("sin «Sin mesa» ni «Tarde» (11/11/2026): el estado va junto al nombre", () => {
     montarEstados();
     const porLlegar = screen.getByRole("region", { name: "Por llegar" });
     expect(within(porLlegar).queryByTestId("mesa-fila")).toBeNull();
@@ -182,7 +182,6 @@ describe("VistaHoyMovil · como columna de escritorio", () => {
     expect(porLlegar).not.toHaveTextContent("Tarde");
     const nombre = within(porLlegar).getAllByTestId("nombre-fila")[0];
     expect(nombre.parentElement).toContainElement(within(porLlegar).getAllByTestId("estado-fila")[0]);
-    expect(within(porLlegar).getByRole("button", { name: /^Sentar a Ana Espera/ })).toHaveTextContent("Sentar");
   });
 
   it("se ven las observaciones, las personas llevan «px» y las sentadas no tienen «Liberar» (11/11/2026)", () => {
@@ -202,22 +201,19 @@ describe("VistaHoyMovil · como columna de escritorio", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("el nombre tiene su propia línea con todo el ancho (y entero en el title); mesa y estado van debajo", () => {
+  it("filas iguales (11/11/2026): misma altura y la línea de observaciones siempre presente", () => {
     montarEstados();
     const porLlegar = screen.getByRole("region", { name: "Por llegar" });
     const nombre = within(porLlegar).getAllByTestId("nombre-fila")[0];
     expect(nombre).toHaveTextContent("Ana Espera");
     expect(nombre).toHaveAttribute("title", "Ana Espera");
-    // El nombre va en la primera línea (con su estado) dentro de la columna que ocupa todo el ancho libre.
-    expect(nombre.closest(".flex-1")).not.toBeNull();
-    // Botones de la fila estrechos pero de 44 px de alto.
-    const sentar = within(porLlegar).getByRole("button", { name: /^Sentar a Ana Espera/ });
-    expect(sentar).toHaveClass("h-11", "w-[4.25rem]");
+    const fila = nombre.closest("li") as HTMLElement;
+    expect(fila.querySelector(".h-\\[3\\.75rem\\]")).not.toBeNull();
+    expect(within(fila).getByTestId("notas-fila")).toBeInTheDocument();
   });
 
-  it("objetivos táctiles de 44 px: «Sentar» y la cabecera del grupo plegado", () => {
+  it("objetivos táctiles de 44 px: la cabecera del grupo plegado", () => {
     montarEstados();
-    expect(screen.getByRole("button", { name: /^Sentar a Ana Espera/ })).toHaveClass("h-11");
     expect(screen.getByRole("button", { name: /Terminadas \/ No vino \/ Canceladas/ })).toHaveClass("min-h-11");
   });
 

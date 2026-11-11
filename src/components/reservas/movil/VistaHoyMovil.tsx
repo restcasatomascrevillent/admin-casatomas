@@ -259,7 +259,6 @@ export function VistaHoyMovil({
       columna ? listaHoyEscritorio([...(reservas ?? []), ...(canceladas ?? [])], mesasDe, minutoAhora, { busqueda, filtroTurno }) : null,
     [columna, reservas, canceladas, mesasDe, minutoAhora, busqueda, filtroTurno],
   );
-  const { estaEnCurso: liberando } = useAccionesModoServicio();
   const [señaladaRaton, setSeñaladaRaton] = useState<string | null>(null);
   // Solo lo que está POR LLEGAR (07/11/2026, petición del dueño): las ya sentadas no salen en la lista; liberar o
   // cambiar su mesa sigue en «Mesas».
@@ -441,10 +440,6 @@ export function VistaHoyMovil({
             lista={listaEscritorio}
             salaDe={(r) => (r.espacio_id ? salaPorId.get(r.espacio_id) : undefined)}
             onAbrir={(r) => abrirFicha(r.id)}
-            onSentar={puedeEditar ? (r) => void sentarDesdeFila(r, decidirSentarPrevista(asignacionesDia, r, configOcupacion)) : undefined}
-            sentarFuera={puedeEditar ? (r) => <BotonSentarFuera reserva={r} variante="compacto" disabled={sentandoId === r.id} /> : undefined}
-            mesaPrevistaOcupada={(r) => decidirSentarPrevista(asignacionesDia, r, configOcupacion).tipo === "elegir"}
-            ocupadaId={sentandoId ?? (señalada && liberando?.(señalada) ? señalada : null)}
             señalada={señalada}
             onSeñalar={setSeñaladaRaton}
             servicio={{ fecha, filtroTurno }}
@@ -1728,35 +1723,55 @@ export function PanelReservaMovil({
 
   return (
     <div className="space-y-4 pb-2">
-      <SheetHeader className="text-left">
-        <SheetTitle className="flex items-center gap-2">
-          <span className="truncate">{reserva.nombre || "Sin nombre"}</span>
+      {/* 11/11/2026 (dueño: «cuando se clique la fila que salga la info de la reserva… y que no se desfase nada de
+          info»): el nombre entero (salta de línea si es largo) con su estado, y debajo los datos en dos columnas
+          alineadas, cada uno en su fila. */}
+      <SheetHeader className="space-y-3 text-left">
+        <SheetTitle className="flex flex-wrap items-center gap-2 pr-8 text-xl leading-tight">
+          <span className="break-words">{reserva.nombre || "Sin nombre"}</span>
           {info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>}
           <InsigniaMenuDelDia reserva={reserva} />
           <InsigniaMenuCerrado reserva={reserva} />
-            <InsigniaZona reserva={reserva} />
+          <InsigniaZona reserva={reserva} />
         </SheetTitle>
         <SheetDescription asChild>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            <span className="flex items-center gap-1"><Clock className="h-4 w-4" aria-hidden />{horaCorta(reserva.hora)}</span>
-            <span className="flex items-center gap-1">
-              <BotonPersonas reserva={reserva} className="text-base font-semibold" icono="h-4 w-4" />
-              pax
-            </span>
-            {fuera ? (
-              <EtiquetaFuera reserva={reserva} className="text-sm" />
-            ) : (
-            <span className="flex items-center gap-1">
-              <MapPin className="h-4 w-4" aria-hidden />
-              {salaNombre(reserva.espacio_id)} · {textoMesaConfirmada(nombresMesa, sentada)}
-              {fijada && (
-                <span className="inline-flex items-center gap-0.5 font-medium text-foreground">
-                  <Lock className="h-3.5 w-3.5" aria-hidden /> fijada
+          <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 text-sm text-foreground" data-testid="ficha-datos">
+            <dt className="flex items-center gap-1.5 text-muted-foreground"><Clock className="h-4 w-4" aria-hidden />Hora</dt>
+            <dd className="font-semibold tabular-nums">{horaCorta(reserva.hora)}</dd>
+            <dt className="flex items-center gap-1.5 text-muted-foreground"><Users className="h-4 w-4" aria-hidden />Personas</dt>
+            <dd className="flex items-center gap-1">
+              <BotonPersonas reserva={reserva} className="text-base font-semibold" icono="hidden" sufijo="px" />
+            </dd>
+            <dt className="flex items-center gap-1.5 text-muted-foreground"><MapPin className="h-4 w-4" aria-hidden />Sitio</dt>
+            <dd className="min-w-0 break-words">
+              {fuera ? (
+                <EtiquetaFuera reserva={reserva} className="text-sm" />
+              ) : (
+                <span className="inline-flex flex-wrap items-center gap-1">
+                  {salaNombre(reserva.espacio_id)} · {textoMesaConfirmada(nombresMesa, sentada)}
+                  {fijada && (
+                    <span className="inline-flex items-center gap-0.5 font-medium">
+                      <Lock className="h-3.5 w-3.5" aria-hidden /> fijada
+                    </span>
+                  )}
                 </span>
               )}
-            </span>
+            </dd>
+            {(reserva as { email?: string | null }).email && (
+              <>
+                <dt className="text-muted-foreground">Email</dt>
+                <dd className="min-w-0 break-all">{(reserva as { email?: string | null }).email}</dd>
+              </>
             )}
-          </div>
+            {reserva.notas_cliente && (
+              <>
+                <dt className="flex items-center gap-1.5 self-start text-muted-foreground"><StickyNote className="h-4 w-4" aria-hidden />Notas</dt>
+                <dd className="min-w-0 whitespace-pre-wrap break-words rounded-md bg-amber-50 px-2 py-1 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                  {reserva.notas_cliente}
+                </dd>
+              </>
+            )}
+          </dl>
         </SheetDescription>
       </SheetHeader>
 
@@ -1788,9 +1803,6 @@ export function PanelReservaMovil({
         </Button>
       )}
 
-      {reserva.notas_cliente && (
-        <p className="rounded-md bg-amber-50 p-2 text-sm dark:bg-amber-950/40">{reserva.notas_cliente}</p>
-      )}
 
       {pendiente && puedeEditar ? (
         <ConfirmarDesplazamiento
