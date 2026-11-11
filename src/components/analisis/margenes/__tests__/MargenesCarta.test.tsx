@@ -35,7 +35,8 @@ const DATOS = normalizarMargenes({
   ],
   vinos: [
     { id: "v1", nombre: "Laurent‑Perrier Millésimé", categoria: "CHAMPAGNE", precio: 110, venta: 100, producto_id: 1785, producto: "LP Millésimé 75 cl",
-      coste: 80.4, multiplicador: 1.37, pct: 80.4, margen: 19.6, banderas: ["multiplicador_bajo"] },
+      coste: 80.4, multiplicador: 1.37, pct: 80.4, margen: 19.6, banderas: ["multiplicador_bajo", "tienda_bajo"],
+      en_tienda: true, precio_tienda: 77, venta_tienda: 63.64, multiplicador_tienda: 0.79, coste_iva: 97.28, iva_origen: "factura", iva_compra_pct: 21 },
   ],
   peso: [
     { id: "p1", nombre: "Percebes", categoria: "MARISCOS", precio: 19, unidad: "100 g", gramos_venta: 100, venta_kg_iva: 190, venta_kg: 172.73,
@@ -99,7 +100,19 @@ describe("MargenesCarta", () => {
   it("pestaña Vinos con el multiplicador", () => {
     pintar();
     fireEvent.click(screen.getByRole("radio", { name: /Vinos/ }));
-    expect(within(screen.getByTestId("margenes-lista")).getByText(/la botella cuesta 80,40 € y se vende a 110,00 € → 1,37×/)).toBeInTheDocument();
+    expect(within(screen.getByTestId("margenes-lista")).getByText(/la botella cuesta 80,40 € y se vende a .* sin IVA \(110,00 € en carta\) → 1,37×/)).toBeInTheDocument();
+  });
+
+  it("Vinos: margen de la tienda (desactivada) e interruptor «Con IVA»", () => {
+    pintar();
+    fireEvent.click(screen.getByRole("radio", { name: /Vinos/ }));
+    expect(screen.getByTestId("aviso-tienda")).toHaveTextContent("La tienda de vinos está desactivada");
+    const lista = screen.getByTestId("margenes-lista");
+    expect(within(lista).getByText(/Tienda: 0,79×/)).toHaveTextContent("tienda desactivada");
+    expect(within(lista).queryByTestId("linea-con-iva")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("switch", { name: "Ver costes y precios con IVA" }));
+    expect(within(lista).getByTestId("linea-con-iva")).toHaveTextContent("Con IVA: coste 97,28 € · carta 110,00 € · tienda 77,00 €");
+    expect(within(lista).getByText("IVA supuesto")).toBeInTheDocument();
   });
 
   it("el detalle deja cambiar los gramos y guardar el escandallo", () => {
