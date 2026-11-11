@@ -199,6 +199,21 @@ export function nombreConOtraAnada(nombreProducto: string, textoLinea: string, e
   return nombreProducto.replace(String(delProducto), String(deLinea));
 }
 
+/**
+ * Categorías donde la añada distingue productos: las de vino, cava, champán o
+ * espumoso y todas sus subcategorías (por nombre de la categoría o de un padre).
+ */
+export function categoriasConAnada(categorias: Categoria[]): Set<number> {
+  const porId = new Map(categorias.map((c) => [c.id, c]));
+  const res = new Set<number>();
+  for (const c of categorias) {
+    for (let x: Categoria | undefined = c, n = 0; x && n < 10; x = x.padre_id === null ? undefined : porId.get(x.padre_id), n++) {
+      if (/vino|cava|champ|espumos/i.test(x.nombre)) { res.add(c.id); break; }
+    }
+  }
+  return res;
+}
+
 const limpiarNombre = (s: unknown): string =>
   typeof s === "string" ? s.replace(/\s+/g, " ").trim() : "";
 const claveNombre = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -217,6 +232,8 @@ export function validarAsignaciones(
   const pedidos = new Map(textos.map((t) => [t.texto, t]));
   const productos = new Map(catalogo.map((p) => [p.id, p]));
   const categoriasActivas = new Set(categorias.filter((c) => c.activa).map((c) => c.id));
+  const porNombre = new Map(catalogo.map((p) => [claveNombre(limpiarNombre(p.nombre)), p]));
+  const conAnada = categoriasConAnada(categorias);
   const lista = (respuesta as { asignaciones?: unknown })?.asignaciones;
   if (!Array.isArray(lista)) return [];
 
@@ -229,18 +246,35 @@ export function validarAsignaciones(
     if (!pedido || vistos.has(texto)) continue;
     let clave: string;
     let elemento: ElementoClasificacion;
-    const delCatalogo = typeof a.producto_id === "number" ? productos.get(a.producto_id) : undefined;
-    // El mismo vino de OTRA añada que la del catálogo es un producto nuevo, con la añada de la línea.
-    const otraAnada = delCatalogo ? nombreConOtraAnada(delCatalogo.nombre, pedido.texto, pedido.ejemplo) : null;
-    if (delCatalogo && otraAnada === null) {
+    const elegido = typeof a.producto_id === "number" ? productos.get(a.producto_id) : undefined;
+    // Solo vinos, cavas y champanes: el mismo vino de OTRA añada que la del catálogo es
+    // otro producto, con la añada de la línea. En el resto un año en el nombre no cuenta.
+    const otraAnada = elegido && conAnada.has(elegido.categoria_id ?? -1)
+      ? nombreConOtraAnada(elegido.nombre, pedido.texto, pedido.ejemplo) : null;
+    // Si ese producto (con la añada de la línea) ya está en el catálogo, se usa: no se duplica.
+    const yaExiste = otraAnada ? porNombre.get(claveNombre(otraAnada)) : undefined;
+    const delCatalogo = yaExiste ?? (otraAnada === null ? elegido : undefined);
+    if (delCatalogo) {
       clave = `id:${delCatalogo.id}`;
       elemento = { textos: [], producto_id: delCatalogo.id, nombre: null, categoria_id: null, unidad: null };
     } else {
+      const categoriaPropia = otraAnada ? elegido?.categoria_id : a.categoria_id;
       const propuesto = otraAnada ?? limpiarNombre(a.nombre_nuevo).slice(0, 200);
-      const nombre = propuesto ? (nombreConOtraAnada(propuesto, pedido.texto, pedido.ejemplo) ?? propuesto) : "";
+      const corregido = propuesto && typeof categoriaPropia === "number" && conAnada.has(categoriaPropia)
+        ? nombreConOtraAnada(propuesto, pedido.texto, pedido.ejemplo) : null;
+      const nombre = corregido ?? propuesto;
       if (!nombre) continue;
+      const igual = porNombre.get(claveNombre(nombre));
+      if (igual) {
+        clave = `id:${igual.id}`;
+        elemento = { textos: [], producto_id: igual.id, nombre: null, categoria_id: null, unidad: null };
+        vistos.add(texto);
+        const ex = porClave.get(clave);
+        if (ex) ex.textos.push(texto); else { elemento.textos.push(texto); porClave.set(clave, elemento); }
+        continue;
+      }
       clave = `nuevo:${claveNombre(nombre)}`;
-      const categoriaPedida = otraAnada ? delCatalogo?.categoria_id : a.categoria_id;
+      const categoriaPedida = categoriaPropia;
       const categoria = typeof categoriaPedida === "number" && categoriasActivas.has(categoriaPedida) ? categoriaPedida : null;
       elemento = { textos: [], producto_id: null, nombre, categoria_id: categoria, unidad: pedido.unidad };
     }
