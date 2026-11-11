@@ -41,6 +41,8 @@ export interface ListaHoyEscritorioProps {
   /** Nombre de la sala de una reserva (para el texto de la mesa en el lector de pantalla). */
   salaDe: (r: Reserva) => string | undefined;
   onAbrir: (r: Reserva) => void;
+  /** El botón azul «Sentar fuera» de las que faltan por llegar (10/11/2026; se queda en la fila, 11/11/2026). */
+  sentarFuera?: (r: Reserva) => ReactNode;
   /** La reserva señalada (resaltada aquí y en el plano). */
   señalada?: string | null;
   onSeñalar?: (id: string | null) => void;
@@ -52,6 +54,7 @@ export function ListaHoyEscritorio({
   lista,
   salaDe,
   onAbrir,
+  sentarFuera,
   señalada = null,
   onSeñalar,
   servicio = null,
@@ -60,8 +63,9 @@ export function ListaHoyEscritorio({
   const pax = (filas: Array<{ reserva: Reserva }>) => filas.reduce((s, f) => s + (f.reserva.numero_comensales || 0), 0);
   const fila = (f: FilaHoyMovil<Reserva> & { tarde?: boolean }, grupo: "porLlegar" | "sentadas" | "terminadas") => {
     const r = f.reserva;
-    // Sin botones en la fila (11/11/2026, petición del dueño: «quita el botón de sentar»): al tocarla se abre la
-    // ficha, con la información, «Verificar» / «Confirmar» y el resto de acciones.
+    // Sin «Sentar» en la fila (11/11/2026, petición del dueño: «quita el botón de sentar»): al tocarla se abre la
+    // ficha, con la información, «Verificar» / «Confirmar» y el resto de acciones. «Sentar fuera» sí se queda.
+    const accion = grupo === "porLlegar" ? sentarFuera?.(r) : null;
     return (
       <FilaEscritorio
         key={r.id}
@@ -69,6 +73,7 @@ export function ListaHoyEscritorio({
         mesas={f.mesas}
         sala={salaDe(r)}
         grupo={grupo}
+        accion={accion}
         señalada={señalada === r.id}
         onAbrir={() => onAbrir(r)}
         onSeñalar={onSeñalar}
@@ -134,6 +139,7 @@ function FilaEscritorio({
   mesas,
   sala,
   grupo,
+  accion,
   señalada,
   onAbrir,
   onSeñalar,
@@ -142,6 +148,8 @@ function FilaEscritorio({
   mesas: string[];
   sala?: string;
   grupo: "porLlegar" | "sentadas" | "terminadas";
+  /** «Sentar fuera» (solo las que faltan por llegar). */
+  accion?: ReactNode;
   señalada: boolean;
   onAbrir: () => void;
   onSeñalar?: (id: string | null) => void;
@@ -226,15 +234,18 @@ function FilaEscritorio({
             )}
             <InsigniaZona reserva={reserva} className="px-1.5 py-0 leading-5" />
           </span>
-          <span className="flex h-5 min-w-0 items-center gap-1 text-sm text-amber-800 dark:text-amber-300" data-testid="notas-fila">
-            {notas && (
-              <>
-                <StickyNote className="h-4 w-4 shrink-0" aria-label={alergia ? "Alergia" : "Notas del cliente"} />
-                <span className="truncate" title={notas}>
-                  {notas}
-                </span>
-              </>
+          {/* Sin observaciones: el mismo icono y «Sin aviso», en gris (11/11/2026, petición del dueño). */}
+          <span
+            className={cn(
+              "flex h-5 min-w-0 items-center gap-1 text-sm",
+              notas ? "text-amber-800 dark:text-amber-300" : "text-muted-foreground",
             )}
+            data-testid="notas-fila"
+          >
+            <StickyNote className="h-4 w-4 shrink-0" aria-label={notas ? (alergia ? "Alergia" : "Notas del cliente") : undefined} aria-hidden={notas ? undefined : true} />
+            <span className="truncate" title={notas || undefined}>
+              {notas || "Sin aviso"}
+            </span>
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-1">
@@ -250,6 +261,7 @@ function FilaEscritorio({
           )}
           {/* Personas en su recuadro, con el icono y «px» (11/11/2026, petición del dueño). */}
           <BotonPersonas reserva={reserva} className="my-0 gap-0.5 rounded-md border px-1.5 text-base font-bold" icono="h-4 w-4" sufijo="px" />
+          {accion}
         </span>
       </div>
     </li>
