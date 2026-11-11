@@ -2,6 +2,30 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.26.0] - 2026-11-11
+
+Objetivo: Producción igualada con staging: Fase 2 de reservas, Fases 4 y 5 (vinos, márgenes sin IVA, tienda), dashboard, revisión móvil y avisos por Telegram
+
+### Añadido
+- Reservas: «Hoy» pasa a «Reservas» con días y turno automático, vista de tablet, Lista única con buscador en todo el histórico y «Pendientes», Verificar/Confirmar/Cancelar en la ficha, mesas estiradas en el plano y botón azul de «Nueva Reserva» ([#134](https://github.com/restcasatomascrevillent/admin-casatomas/pull/134), [#136](https://github.com/restcasatomascrevillent/admin-casatomas/pull/136), [#137](https://github.com/restcasatomascrevillent/admin-casatomas/pull/137), [#140](https://github.com/restcasatomascrevillent/admin-casatomas/pull/140), [#146](https://github.com/restcasatomascrevillent/admin-casatomas/pull/146), [#149](https://github.com/restcasatomascrevillent/admin-casatomas/pull/149), [#150](https://github.com/restcasatomascrevillent/admin-casatomas/pull/150), [#151](https://github.com/restcasatomascrevillent/admin-casatomas/pull/151), [#152](https://github.com/restcasatomascrevillent/admin-casatomas/pull/152), [#153](https://github.com/restcasatomascrevillent/admin-casatomas/pull/153), [#154](https://github.com/restcasatomascrevillent/admin-casatomas/pull/154), [#155](https://github.com/restcasatomascrevillent/admin-casatomas/pull/155), [#163](https://github.com/restcasatomascrevillent/admin-casatomas/pull/163))
+- Informes: «Vinos: facturas y carta» y «Platos: facturas y carta» en PDF ([#138](https://github.com/restcasatomascrevillent/admin-casatomas/pull/138))
+- Usuarios: sección que se abre al iniciar sesión, por usuario ([#142](https://github.com/restcasatomascrevillent/admin-casatomas/pull/142))
+- Márgenes: siempre sin IVA, margen de la tienda (21 % con el descuento), interruptor «Con IVA», coste del magnum según la carta y aviso «Margen bajo»; ficha de compra con base, IVA y total explicados ([#145](https://github.com/restcasatomascrevillent/admin-casatomas/pull/145))
+- Avisos por Telegram: al momento y en un resumen diario, configurables en Super Admin › Servicios ([#157](https://github.com/restcasatomascrevillent/admin-casatomas/pull/157))
+- Dashboard con más información y cifras que se pueden pulsar; «Ver» en un aviso abre la ficha de la reserva ([#158](https://github.com/restcasatomascrevillent/admin-casatomas/pull/158))
+
+### Cambiado
+- Chatbot de facturas: el precio como se compra (botella de 75 cl, magnum, bolsa de 500 g) salvo que se pida €/l o €/kg ([#143](https://github.com/restcasatomascrevillent/admin-casatomas/pull/143))
+- Carta: aviso de vino ya en la carta solo con la misma añada; al clasificar facturas, otra añada del mismo vino es otro producto ([#139](https://github.com/restcasatomascrevillent/admin-casatomas/pull/139), [#147](https://github.com/restcasatomascrevillent/admin-casatomas/pull/147), [#148](https://github.com/restcasatomascrevillent/admin-casatomas/pull/148))
+- Móvil y tablet: Facturas, Análisis, Márgenes, Compras y el resto del panel sin cortes; sin «ampliar» en el copiloto del móvil ([#159](https://github.com/restcasatomascrevillent/admin-casatomas/pull/159), [#160](https://github.com/restcasatomascrevillent/admin-casatomas/pull/160), [#161](https://github.com/restcasatomascrevillent/admin-casatomas/pull/161), [#162](https://github.com/restcasatomascrevillent/admin-casatomas/pull/162), [#165](https://github.com/restcasatomascrevillent/admin-casatomas/pull/165))
+- Documentación: evaluación de modelos del 11/11 ([#132](https://github.com/restcasatomascrevillent/admin-casatomas/pull/132))
+
+### Arreglado
+- Los desplegables dentro de ventanas (p. ej. «Añadir vino») vuelven a responder: una sola copia de las capas de Radix ([#156](https://github.com/restcasatomascrevillent/admin-casatomas/pull/156))
+- Prueba del diálogo de reserva con el color actual ([#166](https://github.com/restcasatomascrevillent/admin-casatomas/pull/166))
+
+Producción igualada con staging (como la 1.16.0): `release.mjs preparar` se bloqueaba por cambios ya publicados como copia (d1081d6, 682fc4d, 75d937a). Antes se comprobó que la versión de main de cada fichero distinto está en la historia de staging.
+
 ## [1.25.0] - 2026-11-11
 
 Objetivo: Fase 1: avisos de reservas que se pueden revisar, filtro de visibilidad del Gestor web, menú lateral cerrado en tablets e interruptor de la carta de Bebidas

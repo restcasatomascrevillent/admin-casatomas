@@ -33,6 +33,8 @@ export interface PermisosRecordados {
   permissions?: PermisoRecordado[];
   /** `undefined` = aún no se sabe. */
   superAdmin?: boolean;
+  /** Sección que se abre al iniciar sesión (11/11/2026, `lib/seccionInicio.ts`). `undefined` = aún no se sabe. */
+  seccionInicio?: string | null;
 }
 
 interface Copia extends PermisosRecordados {
@@ -68,7 +70,7 @@ export function leerPermisosRecordados(usuario: string | null, ahora: number = D
       ls.removeItem(CLAVE_PERMISOS);
       return null;
     }
-    return { role: c.role ?? null, permissions: c.permissions, superAdmin: c.superAdmin };
+    return { role: c.role ?? null, permissions: c.permissions, superAdmin: c.superAdmin, seccionInicio: c.seccionInicio };
   } catch {
     return null;
   }
@@ -87,6 +89,7 @@ export function guardarPermisosRecordados(usuario: string, parte: Partial<Permis
       role: parte.role !== undefined ? parte.role : (previo?.role ?? null),
       permissions: parte.permissions ?? previo?.permissions,
       superAdmin: parte.superAdmin !== undefined ? parte.superAdmin : previo?.superAdmin,
+      seccionInicio: parte.seccionInicio !== undefined ? parte.seccionInicio : previo?.seccionInicio,
     };
     ls.setItem(CLAVE_PERMISOS, JSON.stringify(copia));
   } catch {

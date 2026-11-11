@@ -19,7 +19,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
-  CLASES_PUNTO_SIN_SALA,
   NIVELES_ESCALA,
   estiloNivel,
   rangoNivel,
@@ -76,9 +75,11 @@ export function LeyendaOcupacion({
               <Muestra nivel="pasado" />
               <span>Día pasado</span>
             </li>
+            {/* Las etiquetas de cada día, en color (11/11/2026, petición del dueño). */}
             <li className="flex items-center gap-1.5">
-              <span aria-hidden="true" className={cn("mx-0.5 h-3.5 w-3.5 shrink-0", CLASES_PUNTO_SIN_SALA)} />
-              <span>Sin sala ({ventanaHoras} h)</span>
+              <span className="rounded bg-destructive/10 px-1 text-xs font-semibold uppercase leading-5 text-destructive">Cerrado</span>
+              <span className="rounded bg-amber-100 px-1 text-xs font-semibold uppercase leading-5 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">Sin cena</span>
+              <span className="rounded bg-sky-100 px-1 text-xs font-medium leading-5 text-sky-900 dark:bg-sky-900/40 dark:text-sky-100">Sin web</span>
             </li>
             {aforoNoDisponible && (
               <li role="status" className="font-medium text-muted-foreground">
@@ -144,14 +145,6 @@ export function LeyendaOcupacion({
           <li className="flex items-center gap-2">
             <Muestra nivel="pasado" />
             <span>Día pasado: lo que se reservó, sin porcentaje</span>
-          </li>
-          <li className="flex items-center gap-2">
-            <span
-              aria-hidden="true"
-              data-testid="muestra-sin-sala"
-              className={cn("mx-0.5 h-3 w-3 shrink-0", CLASES_PUNTO_SIN_SALA)}
-            />
-            <span>Reservas sin sala en las próximas {ventanaHoras} h</span>
           </li>
         </ul>
 

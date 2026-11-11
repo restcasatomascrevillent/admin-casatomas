@@ -15,7 +15,7 @@ import { _vaciarDuplicados, sinDuplicar, systemPrompt, TOOLS } from "../herramie
  * El prompt va en cache (≈5.600 de 8.200 tokens de entrada, 0,10 $/M en
  * gpt-4.1-mini): ~+90 tokens ≈ +0,00001 $ por ronda.
  */
-const LIMITE_PROMPT = 6_450; // + regla 19 «como_leer» (16/11/2026)
+const LIMITE_PROMPT = 6_650; // + regla 19 «como_leer» (16/11/2026) + precio tal como se compra en la 14 (11/11/2026)
 
 /** Simula el handler: una "ejecucion" = bucle de OpenAI (2 llamadas) + 1 registro de uso. */
 function handlerSimulado() {

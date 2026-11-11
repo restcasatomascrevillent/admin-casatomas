@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { nombreCarta, descripcionCarta } from "@/lib/limites-carta";
 import { categoriasConOrigen, categoriaVino, mensajeFaltaOrigen, origenVinoClaro, paisVino, regionVino } from "@/lib/origen-vino";
-import { Loader2, Camera, X, Sparkles, ImagePlus } from "lucide-react";
+import { Loader2, Camera, X, Sparkles, ImagePlus, Copy } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +38,7 @@ import { PanelParker } from "./parker/PanelParker";
 import { useBusquedaParker } from "./parker/useBusquedaParker";
 import { usePuntuacionesParker } from "./parker/usePuntuacionesParker";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
+import { avisoVinoDuplicado, buscarVinoDuplicado } from "./vinoDuplicado";
 
 // Origen obligatorio (04/11/2026): país, región y categoría con denominación
 // (no «… — ORIGEN PENDIENTE»). Sin él no se guarda, tampoco si lo rellena la IA.
@@ -71,7 +72,7 @@ interface VinoFormProps {
 }
 
 export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: VinoFormProps) {
-  const { crearVino, actualizarVino, categorias, denominaciones, regiones, paises } = useVinos();
+  const { vinos, crearVino, actualizarVino, categorias, denominaciones, regiones, paises } = useVinos();
   const queryClient = useQueryClient();
   // Foto: recorte gratis en el navegador → sticker → foto con fondo de carta.
   const recorte = useRecorteVino();
@@ -166,6 +167,16 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     datosEtiqueta && !origenVinoClaro(origenActual)
       ? `La IA no ha sacado claro el origen de este vino. ${mensajeFaltaOrigen(origenActual)} Complétalo para poder guardarlo.`
       : null;
+
+  // Vino ya en la carta (11/11/2026, petición del dueño: «Revisar si se suben
+  // botellas de la misma pero diferente añada no salta duplicada»): se avisa
+  // solo con la misma añada (o las dos sin ella); con otra añada, no. Solo
+  // avisa: se puede guardar igual (vinoDuplicado.ts).
+  const [nombreActual, anadaActual, sinAnadaActual] = useWatch({
+    control: form.control,
+    name: ["nombre", "anada", "sin_anada"],
+  });
+  const duplicado = buscarVinoDuplicado({ nombre: nombreActual, anada: anadaActual, sin_anada: sinAnadaActual }, vinos);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
 
@@ -378,6 +389,18 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                 />
               }
               avisoOrigen={avisoOrigen}
+              bajoNombre={
+                duplicado && (
+                  <p
+                    role="status"
+                    data-testid="aviso-vino-duplicado"
+                    className="flex items-start gap-2 rounded-md border border-amber-500/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+                  >
+                    <Copy className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="min-w-0">{avisoVinoDuplicado(duplicado)}</span>
+                  </p>
+                )
+              }
             />
 
             <CamposCopaParker

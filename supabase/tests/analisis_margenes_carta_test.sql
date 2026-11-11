@@ -168,7 +168,7 @@ begin
       raise exception 'FALLO T3: plato sin escandallo %', p;
     end if;
     select x into v from jsonb_array_elements(j->'vinos') x where x->>'id' = 'prueba-margenes-vino';
-    if (v->>'coste')::numeric <> 15 or (v->>'multiplicador')::numeric <> 2 or not (v->'banderas' ? 'multiplicador_bajo') then
+    if (v->>'coste')::numeric <> 15 or (v->>'multiplicador')::numeric <> 1.82 or not (v->'banderas' ? 'multiplicador_bajo') then
       raise exception 'FALLO T3: vino coste % multiplicador % banderas %', v->>'coste', v->>'multiplicador', v->'banderas';
     end if;
 

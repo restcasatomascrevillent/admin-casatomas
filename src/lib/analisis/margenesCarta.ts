@@ -11,7 +11,11 @@ export type Bandera =
   | "sin_datos"
   | "incompleto"
   | "sin_mapear"
-  | "sin_precio";
+  | "sin_precio"
+  /** Vino: el margen de la tienda (precio de tienda sin IVA ÷ coste) baja de su límite (20261125100000). */
+  | "tienda_bajo"
+  /** Vino: la carta y la compra son formatos distintos (magnum frente a 75 cl): coste estimado. */
+  | "formato_distinto";
 
 export const ETIQUETA_BANDERA: Record<Bandera, string> = {
   coste_alto: "Coste alto",
@@ -21,19 +25,30 @@ export const ETIQUETA_BANDERA: Record<Bandera, string> = {
   incompleto: "Faltan costes",
   sin_mapear: "Sin escandallo",
   sin_precio: "Sin precio",
+  tienda_bajo: "Tienda: margen bajo",
+  formato_distinto: "Coste estimado (otro formato)",
 };
 
 export type UnidadEscandallo = "g" | "ml" | "ud";
 
 export interface ConfigMargenes {
   costeMaxPlatoPct: number;
+  /** Vino (restaurante): venta SIN IVA ÷ coste sin IVA (20261125100000; antes, carta con IVA). */
   multiplicadorMinVino: number;
+  /** Vino (tienda): precio de tienda SIN IVA ÷ coste sin IVA. */
+  multiplicadorMinTienda: number;
   /** Artículos al peso: venta sin IVA €/kg / compra sin IVA €/kg (20261115410000). */
   multiplicadorMinPeso: number;
   subidaCostePct: number;
+  /** IVA del restaurante (carta). */
   ivaPct: number;
+  /** IVA de la tienda de vinos. */
+  ivaTiendaPct: number;
   diasReferencia: number;
 }
+
+/** De dónde sale el IVA de las compras: el de la línea, el general de su factura o un 10 % supuesto. */
+export type OrigenIva = "linea" | "factura" | "supuesto";
 
 export interface Ingrediente {
   id: number | null;
@@ -52,6 +67,10 @@ export interface Ingrediente {
   coste6m: number | null;
   lineas: number | null;
   ultima: string | null;
+  ivaPct: number | null;
+  ivaOrigen: OrigenIva | null;
+  eurIva: number | null;
+  costeIva: number | null;
 }
 
 export interface PlatoMargen {
@@ -65,6 +84,10 @@ export interface PlatoMargen {
   venta: number | null;
   coste: number | null;
   coste6m: number | null;
+  /** Coste con el IVA de cada compra (solo para enseñar; el margen va sin IVA). */
+  costeIva: number | null;
+  /** Algún ingrediente usa un IVA que no es el de su línea. */
+  ivaSupuesto: boolean;
   pct: number | null;
   margen: number | null;
   variacionPct: number | null;
@@ -87,12 +110,28 @@ export interface VinoMargen {
   venta: number | null;
   productoId: number | null;
   producto: string | null;
+  /** Litros del formato de la CARTA (Magnum = 1,5). */
   litros: number;
+  /** Litros del producto comprado (null si no se sabe). */
+  litrosProducto: number | null;
+  formatoDistinto: boolean;
   coste: number | null;
   coste6m: number | null;
+  costeIva: number | null;
+  ivaCompraPct: number | null;
+  ivaOrigen: OrigenIva | null;
+  /** Venta SIN IVA ÷ coste sin IVA. */
   multiplicador: number | null;
   pct: number | null;
   margen: number | null;
+  /** ¿Estaría a la venta en la tienda? (activado, restaurante, precio > 0, no excluido). */
+  enTienda: boolean;
+  /** Precio de tienda con IVA (carta − descuento). */
+  precioTienda: number | null;
+  ventaTienda: number | null;
+  multiplicadorTienda: number | null;
+  pctTienda: number | null;
+  margenTienda: number | null;
   variacionPct: number | null;
   lineas: number | null;
   ultima: string | null;
@@ -125,6 +164,10 @@ export interface PesoMargen {
   /** Coste de compra €/kg sin IVA (mediana 90 días o 3 últimas compras). */
   compraKg: number | null;
   compraKg6m: number | null;
+  /** Compra €/kg con el IVA de sus líneas (solo para enseñar). */
+  compraKgIva: number | null;
+  ivaCompraPct: number | null;
+  ivaOrigen: OrigenIva | null;
   lineas: number | null;
   ultimoProveedor: string | null;
   ultimaFecha: string | null;
@@ -142,12 +185,17 @@ export type ArticuloMargen = PlatoMargen | VinoMargen | PesoMargen;
 
 export interface ResumenMargenes {
   platos: { total: number; conDatos: number; foodCostMedio: number | null; foodCostMediana: number | null; enRojo: number; subeCoste: number; sinDatos: number; revisados: number };
-  vinos: { total: number; conDatos: number; multiplicadorMedio: number | null; multiplicadorMediana: number | null; enRojo: number; subeCoste: number; sinDatos: number; revisados: number };
+  vinos: {
+    total: number; conDatos: number; multiplicadorMedio: number | null; multiplicadorMediana: number | null; enRojo: number; subeCoste: number; sinDatos: number; revisados: number;
+    enTienda: number; multiplicadorTiendaMediana: number | null; tiendaEnRojo: number;
+  };
 }
 
 export interface MargenesCarta {
   hoy: string | null;
   config: ConfigMargenes;
+  /** Tienda de vinos (configuracion_tienda): el margen de tienda se calcula aunque esté desactivada. */
+  tienda: { activa: boolean; descuentoPct: number };
   resumen: ResumenMargenes;
   platos: PlatoMargen[];
   vinos: VinoMargen[];
@@ -168,13 +216,16 @@ const BANDERAS = new Set<string>(Object.keys(ETIQUETA_BANDERA));
 const banderas = (v: unknown): Bandera[] => arr(v).filter((b): b is Bandera => typeof b === "string" && BANDERAS.has(b));
 const origen = (v: unknown) => (v === "manual" ? "manual" : v === "estimado" ? "estimado" : null);
 const unidad = (v: unknown): UnidadEscandallo => (v === "ml" || v === "ud" ? v : "g");
+const origenIva = (v: unknown): OrigenIva | null => (v === "linea" || v === "factura" || v === "supuesto" ? v : null);
 
 export const CONFIG_POR_DEFECTO: ConfigMargenes = {
   costeMaxPlatoPct: 35,
-  multiplicadorMinVino: 2.5,
+  multiplicadorMinVino: 2.3,
+  multiplicadorMinTienda: 1.5,
   multiplicadorMinPeso: 2,
   subidaCostePct: 10,
   ivaPct: 10,
+  ivaTiendaPct: 21,
   diasReferencia: 90,
 };
 
@@ -184,6 +235,7 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
   const rs = obj(r.resumen);
   const rp = obj(rs.platos);
   const rv = obj(rs.vinos);
+  const ti = obj(r.tienda);
   const platos: PlatoMargen[] = arr(r.platos).map(obj).filter((p) => txt(p.id)).map((p) => ({
     tipo: "plato",
     id: String(p.id),
@@ -195,6 +247,8 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
     venta: num(p.venta),
     coste: num(p.coste),
     coste6m: num(p.coste_6m),
+    costeIva: num(p.coste_iva),
+    ivaSupuesto: p.iva_supuesto === true,
     pct: num(p.pct),
     margen: num(p.margen),
     variacionPct: num(p.variacion_pct),
@@ -220,6 +274,10 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
       coste6m: num(i.coste_6m),
       lineas: num(i.lineas),
       ultima: txt(i.ultima),
+      ivaPct: num(i.iva_pct),
+      ivaOrigen: origenIva(i.iva_origen),
+      eurIva: num(i.eur_iva),
+      costeIva: num(i.coste_iva),
     })),
   }));
   const vinos: VinoMargen[] = arr(r.vinos).map(obj).filter((v) => txt(v.id)).map((v) => ({
@@ -233,11 +291,22 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
     productoId: num(v.producto_id),
     producto: txt(v.producto),
     litros: num(v.litros) ?? 0.75,
+    litrosProducto: num(v.litros_producto),
+    formatoDistinto: v.formato_distinto === true,
     coste: num(v.coste),
     coste6m: num(v.coste_6m),
+    costeIva: num(v.coste_iva),
+    ivaCompraPct: num(v.iva_compra_pct),
+    ivaOrigen: origenIva(v.iva_origen),
     multiplicador: num(v.multiplicador),
     pct: num(v.pct),
     margen: num(v.margen),
+    enTienda: v.en_tienda === true,
+    precioTienda: num(v.precio_tienda),
+    ventaTienda: num(v.venta_tienda),
+    multiplicadorTienda: num(v.multiplicador_tienda),
+    pctTienda: num(v.pct_tienda),
+    margenTienda: num(v.margen_tienda),
     variacionPct: num(v.variacion_pct),
     lineas: num(v.lineas),
     ultima: txt(v.ultima),
@@ -261,6 +330,9 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
     producto: txt(x.producto),
     compraKg: num(x.compra_kg),
     compraKg6m: num(x.compra_kg_6m),
+    compraKgIva: num(x.compra_kg_iva),
+    ivaCompraPct: num(x.iva_compra_pct),
+    ivaOrigen: origenIva(x.iva_origen),
     lineas: num(x.lineas),
     ultimoProveedor: txt(x.ultimo_proveedor),
     ultimaFecha: txt(x.ultima_fecha),
@@ -277,11 +349,14 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
     config: {
       costeMaxPlatoPct: num(c.coste_max_plato_pct) ?? CONFIG_POR_DEFECTO.costeMaxPlatoPct,
       multiplicadorMinVino: num(c.multiplicador_min_vino) ?? CONFIG_POR_DEFECTO.multiplicadorMinVino,
+      multiplicadorMinTienda: num(c.multiplicador_min_tienda) ?? CONFIG_POR_DEFECTO.multiplicadorMinTienda,
       multiplicadorMinPeso: num(c.multiplicador_min_peso) ?? CONFIG_POR_DEFECTO.multiplicadorMinPeso,
       subidaCostePct: num(c.subida_coste_pct) ?? CONFIG_POR_DEFECTO.subidaCostePct,
       ivaPct: num(c.iva_pct) ?? CONFIG_POR_DEFECTO.ivaPct,
+      ivaTiendaPct: num(c.iva_tienda_pct) ?? CONFIG_POR_DEFECTO.ivaTiendaPct,
       diasReferencia: num(c.dias_referencia) ?? CONFIG_POR_DEFECTO.diasReferencia,
     },
+    tienda: { activa: ti.activa === true, descuentoPct: num(ti.descuento_pct) ?? 30 },
     resumen: {
       platos: {
         total: ent(rp.total), conDatos: ent(rp.con_datos), foodCostMedio: num(rp.food_cost_medio), foodCostMediana: num(rp.food_cost_mediana),
@@ -290,6 +365,7 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
       vinos: {
         total: ent(rv.total), conDatos: ent(rv.con_datos), multiplicadorMedio: num(rv.multiplicador_medio), multiplicadorMediana: num(rv.multiplicador_mediana),
         enRojo: ent(rv.en_rojo), subeCoste: ent(rv.sube_coste), sinDatos: ent(rv.sin_datos), revisados: ent(rv.revisados),
+        enTienda: ent(rv.en_tienda), multiplicadorTiendaMediana: num(rv.multiplicador_tienda_mediana), tiendaEnRojo: ent(rv.tienda_en_rojo),
       },
     },
     platos,
@@ -340,8 +416,14 @@ export function razon(a: ArticuloMargen, config: ConfigMargenes = CONFIG_POR_DEF
     );
   } else if (a.tipo === "vino") {
     partes.push(
-      `${a.nombre}: la botella cuesta ${euros(a.coste)} y se vende a ${euros(a.precio)} → ${veces(a.multiplicador)} (mínimo ${veces(config.multiplicadorMinVino)})`,
+      `${a.nombre}: la botella cuesta ${euros(a.coste)} y se vende a ${euros(a.venta)} sin IVA (${euros(a.precio)} en carta) → ${veces(a.multiplicador)} (mínimo ${veces(config.multiplicadorMinVino)})`,
     );
+    if (a.banderas.includes("tienda_bajo")) {
+      partes.push(
+        `en la tienda, a ${euros(a.precioTienda)} (${euros(a.ventaTienda)} sin IVA) → ${veces(a.multiplicadorTienda)} (mínimo ${veces(config.multiplicadorMinTienda)})`,
+      );
+    }
+    if (a.formatoDistinto) partes.push(`coste estimado desde la botella de ${litrosTexto(a.litrosProducto)}`);
   } else {
     const unico = a.ingredientes.length === 1 ? a.ingredientes[0] : null;
     if (unico && unico.unidad !== "ud" && a.gramosVenta && unico.eur !== null && a.venta !== null && unico.cantidad === a.gramosVenta) {
@@ -362,26 +444,39 @@ export function razon(a: ArticuloMargen, config: ConfigMargenes = CONFIG_POR_DEF
   return partes.join("; ") + ".";
 }
 
-/** ¿Está entre «donde no funciona el margen»? */
-export const fallaMargen = (a: ArticuloMargen) =>
-  a.banderas.includes("coste_alto") || a.banderas.includes("multiplicador_bajo") || a.banderas.includes("sube_coste");
+/** «75 cl», «1,5 l». */
+export const litrosTexto = (l: number | null) =>
+  l === null ? "otro formato" : l < 1 ? `${fmt(l * 100, Number.isInteger(l * 100) ? 0 : 1)} cl` : `${fmt(l, Number.isInteger(l) ? 0 : 1)} l`;
+
+/**
+ * ¿Está entre «donde no funciona el margen»? `tienda`: cuenta también el margen de la
+ * tienda de vinos (solo en la pestaña Vinos; el Dashboard sigue con el del restaurante).
+ */
+export const fallaMargen = (a: ArticuloMargen, tienda = false) =>
+  a.banderas.includes("coste_alto") || a.banderas.includes("multiplicador_bajo") || a.banderas.includes("sube_coste") ||
+  (tienda && a.banderas.includes("tienda_bajo"));
 
 /**
  * Orden de la lista de problemas: primero lo que más se aleja del umbral (en
  * platos, % de coste; en vinos, cuánto falta para el multiplicador mínimo,
  * en la misma escala de % de coste), y después «sube el coste».
  */
-export function gravedad(a: ArticuloMargen, config: ConfigMargenes): number {
+export function gravedad(a: ArticuloMargen, config: ConfigMargenes, tienda = false): number {
   if (a.tipo === "plato") return a.pct !== null ? a.pct - config.costeMaxPlatoPct : -Infinity;
   if (a.multiplicador === null) return -Infinity;
   const minimo = a.tipo === "peso" ? config.multiplicadorMinPeso : config.multiplicadorMinVino;
-  return (minimo / a.multiplicador - 1) * 100;
+  const g = (minimo / a.multiplicador - 1) * 100;
+  if (a.tipo === "vino" && tienda && a.multiplicadorTienda !== null) {
+    return Math.max(g, (config.multiplicadorMinTienda / a.multiplicadorTienda - 1) * 100);
+  }
+  return g;
 }
 
-export function problemas(lista: ArticuloMargen[], config: ConfigMargenes): ArticuloMargen[] {
-  return lista.filter(fallaMargen).sort((x, y) => {
-    const gx = gravedad(x, config);
-    const gy = gravedad(y, config);
+export function problemas(lista: ArticuloMargen[], config: ConfigMargenes, opciones: { tienda?: boolean } = {}): ArticuloMargen[] {
+  const tienda = opciones.tienda === true;
+  return lista.filter((a) => fallaMargen(a, tienda)).sort((x, y) => {
+    const gx = gravedad(x, config, tienda);
+    const gy = gravedad(y, config, tienda);
     const rx = gx > 0 ? 1 : 0;
     const ry = gy > 0 ? 1 : 0;
     if (rx !== ry) return ry - rx;
@@ -495,8 +590,30 @@ export function puntosDispersion(lista: ArticuloMargen[], umbralPct: number): Pu
 /** % de coste equivalente al multiplicador mínimo de peso (sin IVA / sin IVA): 2× → 50 %. */
 export const pctDeMultiplicadorPeso = (multiplicador: number) => 100 / multiplicador;
 
-/** % de coste equivalente al multiplicador mínimo de vinos (precio con IVA): 2,5× con IVA 10 % → 44 %. */
-export const pctDeMultiplicador = (multiplicador: number, ivaPct: number) => (100 * (1 + ivaPct / 100)) / multiplicador;
+/** % de coste equivalente al multiplicador mínimo de vinos (sin IVA / sin IVA, 20261125100000): 2,3× → 43,5 %. */
+export const pctDeMultiplicador = (multiplicador: number) => 100 / multiplicador;
+
+// ─── Con IVA (interruptor del panel; el margen siempre va sin IVA) ─────────
+/** Coste del artículo para enseñar: sin IVA o con el IVA de sus compras. */
+export function costeVisible(a: ArticuloMargen, conIva: boolean): number | null {
+  if (a.tipo === "peso") return conIva ? a.compraKgIva : a.compraKg;
+  return conIva ? a.costeIva : a.coste;
+}
+
+/** ¿Se ha usado un IVA supuesto (no el de la línea) para el coste con IVA? */
+export function ivaSupuesto(a: ArticuloMargen): boolean {
+  if (a.tipo === "plato") return a.ivaSupuesto;
+  return a.ivaOrigen !== null && a.ivaOrigen !== "linea";
+}
+
+/** Por qué el coste con IVA es aproximado: IVA general de la factura o un 10 % supuesto. */
+export function notaIva(a: ArticuloMargen): string | null {
+  if (!ivaSupuesto(a)) return null;
+  if (a.tipo === "plato") return "IVA supuesto en algún ingrediente (su línea no lo trae)";
+  return a.ivaOrigen === "factura"
+    ? `IVA general de la factura (${fmt(a.ivaCompraPct ?? 0, 1)} %): la línea no lo trae`
+    : "IVA supuesto del 10 %: ni la línea ni la factura lo traen";
+}
 
 // ─── Compras que forman el coste (RPC margenes_compras_producto) ──────────
 export interface CompraCoste extends DocumentoCifra {

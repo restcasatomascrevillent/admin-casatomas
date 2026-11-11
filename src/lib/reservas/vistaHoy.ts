@@ -43,6 +43,32 @@ export const VISTA_HOY_POR_DEFECTO: ModoVistaHoy = "kanban";
 /** El filtro de turno del bloque de arriba («Todo el día / Comida / Cena»). */
 export type FiltroTurnoHoy = "todo" | "comida" | "cena";
 
+/**
+ * Turno que sale elegido al entrar en Reservas (11/11/2026, petición del dueño: «que por defecto te aparezca
+ * la opción de comida enchufada y a partir de las 18 que se actualice por defecto a la cena»).
+ */
+export const HORA_CAMBIO_A_CENA = 18;
+export function turnoPorDefecto(ahora: Date = new Date()): "comida" | "cena" {
+  return ahora.getHours() < HORA_CAMBIO_A_CENA ? "comida" : "cena";
+}
+
+/** "2026-11-12" ± n días, en hora local. */
+export function sumarDias(clave: string, dias: number): string {
+  const [a, m, d] = clave.split("-").map(Number);
+  const f = new Date(a, m - 1, d + dias);
+  return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
+}
+
+/** Cómo se lee el día elegido: «Hoy · miércoles 11 nov», «Mañana · jueves 12 nov» o «viernes 13 nov». */
+export function etiquetaDiaReservas(clave: string, hoy: string): string {
+  const [a, m, d] = clave.split("-").map(Number);
+  const texto = new Date(a, m - 1, d).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "short" }).replace(",", "").replace(".", "");
+  if (clave === hoy) return `Hoy · ${texto}`;
+  if (clave === sumarDias(hoy, 1)) return `Mañana · ${texto}`;
+  if (clave === sumarDias(hoy, -1)) return `Ayer · ${texto}`;
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 /** Claves de este navegador (mismo estilo que `reservas:timeline-estados:abierto`). */
 export const CLAVE_VISTA_HOY = "reservas:hoy:vista";
 export const CLAVE_SALA_PLANO_HOY = "reservas:hoy:sala-plano";

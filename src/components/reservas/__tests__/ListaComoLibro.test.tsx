@@ -11,7 +11,27 @@ const h = vi.hoisted(() => ({
   pedidas: [] as string[],
   porDia: {} as Record<string, unknown[]>,
   editada: vi.fn(),
+  buscadas: [] as string[],
+  encontradas: [] as unknown[],
+  porEstado: {} as Record<string, unknown[]>,
 }));
+
+vi.mock("@/hooks/useBusquedaReservas", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/hooks/useBusquedaReservas")>();
+  return {
+    ...real,
+    useBuscarReservas: (texto: string) => {
+      h.buscadas.push(texto);
+      return { data: h.encontradas, isLoading: false, isError: false, refetch: vi.fn(), escribiendo: false, limite: 100, termino: texto };
+    },
+    useReservasPorEstado: (estado: string | null) => ({
+      data: estado ? h.porEstado[estado] ?? [] : undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    }),
+  };
+});
 
 vi.mock("@/hooks/useReservasServicioDia", () => ({
   CLAVE_RESERVAS_SERVICIO_DIA: "reservas-servicio-dia",
@@ -48,6 +68,9 @@ beforeEach(() => {
   h.pedidas = [];
   h.porDia = {};
   h.editada.mockClear();
+  h.buscadas = [];
+  h.encontradas = [];
+  h.porEstado = {};
 });
 
 describe("ListaComoLibro · pasar hojas", () => {
@@ -115,12 +138,12 @@ describe("ListaComoLibro · pasar hojas", () => {
 });
 
 describe("ListaComoLibro · añadir y arrastrar sin abrir (10/11/2026)", () => {
-  it("«Añadir reserva a este día» pasa la fecha de la HOJA que se ve", () => {
+  it("«Añadir reserva a este día» (en la barra, 11/11/2026) pasa la fecha de la HOJA que se ve", () => {
     const onAnadirReserva = vi.fn();
     render(<ListaComoLibro onAnadirReserva={onAnadirReserva} />);
     fireEvent.click(screen.getByRole("button", { name: "Hoja siguiente" }));
-    const boton = within(hojas()[0]).getByRole("button", { name: "Añadir reserva a este día" });
-    expect(boton).toHaveClass("bg-emerald-600", "h-12");
+    const boton = screen.getByRole("button", { name: "Añadir reserva a este día" });
+    expect(boton).toHaveClass("bg-sky-100", "text-sky-900", "h-11");
     fireEvent.click(boton);
     expect(onAnadirReserva).toHaveBeenCalledWith(pasarHoja(hoy, 1));
   });
@@ -152,7 +175,7 @@ describe("ListaComoLibro · añadir y arrastrar sin abrir (10/11/2026)", () => {
     const { rerender } = render(<ListaComoLibro resaltar={null} />);
     rerender(<ListaComoLibro resaltar={{ id: "nueva", fecha: dia }} />);
     expect(titulo()).toHaveTextContent(tituloHoja(dia));
-    expect(screen.getByText("Recién Creada").closest("li")).toHaveClass("bg-amber-200/50");
+    expect(screen.getByText("Recién Creada").closest("li")).toHaveClass("bg-amber-100");
   });
 });
 
@@ -174,9 +197,9 @@ describe("ListaComoLibro · las reservas de la hoja", () => {
     expect(h.editada).toHaveBeenCalledWith("r1");
   });
 
-  it("hoja sin reservas: «Hoja en blanco»", () => {
+  it("hoja sin reservas: «Aún no hay reservas este día»", () => {
     render(<ListaComoLibro />);
-    expect(within(hojas()[0]).getByText(/Hoja en blanco/)).toBeInTheDocument();
+    expect(within(hojas()[0]).getByText(/Aún no hay reservas este día/)).toBeInTheDocument();
   });
 });
 
@@ -227,5 +250,76 @@ describe("ListaComoLibro · libro abierto en pantallas anchas", () => {
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: antes });
     }
+  });
+});
+
+// 11/11/2026 (dueño: «que haya un buscador que busque en todo el histórico… quita el botón Por atender y pon
+// Pendientes»): con texto o con «Pendientes» se ven los resultados en lugar de la hoja.
+const reserva = (id: string, fecha: string, nombre: string, estado = "pendiente") => ({
+  id,
+  fecha,
+  hora: "21:00:00",
+  nombre,
+  telefono: "612345678",
+  email: null,
+  numero_comensales: 4,
+  estado,
+  espacio_id: "s1",
+  notas_cliente: null,
+});
+
+describe("ListaComoLibro · buscador y «Pendientes»", () => {
+  it("al escribir 2 letras busca en todo el histórico, agrupa por día y abre la reserva al tocarla", () => {
+    h.encontradas = [reserva("r1", "2026-12-01", "Lucía Pérez", "confirmada"), reserva("r2", "2025-03-14", "Lucía Gómez", "completada")];
+    render(<ListaComoLibro />);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar en todas las reservas" }), { target: { value: "lu" } });
+    expect(h.buscadas.at(-1)).toBe("lu");
+    expect(screen.getByRole("heading", { name: "Resultados de «lu»" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: tituloHoja("2025-03-14") })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: /^Hoja del/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Abrir la reserva de Lucía Gómez/ }));
+    expect(h.editada).toHaveBeenCalledWith("r2");
+  });
+
+  it("«Ver el día» vuelve a la hoja de ese día y borra la búsqueda", () => {
+    h.encontradas = [reserva("r2", "2025-03-14", "Lucía Gómez", "completada")];
+    render(<ListaComoLibro />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "lucía" } });
+    fireEvent.click(screen.getByRole("button", { name: /Ver el día/ }));
+    expect(titulo()).toHaveTextContent(tituloHoja("2025-03-14"));
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+  });
+
+  it("buscando no sale «Añadir reserva a este día» (no hay hoja a la vista)", () => {
+    render(<ListaComoLibro onAnadirReserva={vi.fn()} />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "zz" } });
+    expect(screen.queryByRole("button", { name: "Añadir reserva a este día" })).toBeNull();
+  });
+
+  it("sin resultados lo dice", () => {
+    render(<ListaComoLibro />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "zz" } });
+    expect(screen.getByText("No hay ninguna reserva con ese nombre, teléfono o email.")).toBeInTheDocument();
+  });
+
+  it("«Pendientes» cuenta las pendientes, las enseña al pulsarlo y vuelve a la hoja al quitarlo", () => {
+    h.porEstado.pendiente = [reserva("p1", hoy, "Ana"), reserva("p2", pasarHoja(hoy, 2), "Berta")];
+    render(<ListaComoLibro />);
+    const boton = screen.getByRole("button", { name: /Pendientes/ });
+    expect(boton).toHaveTextContent("2");
+    expect(boton).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(boton);
+    expect(boton).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: /Pendientes de verificar/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Abrir la reserva de Berta/ })).toBeInTheDocument();
+    fireEvent.click(boton);
+    expect(hojas()[0]).toHaveAccessibleName(`Hoja del ${tituloHoja(hoy)}`);
+  });
+
+  it("con un estado de un aviso («cancelada») abre esas reservas", () => {
+    h.porEstado.cancelada = [reserva("c1", hoy, "Carlos", "cancelada")];
+    render(<ListaComoLibro estadoInicial="cancelada" />);
+    expect(screen.getByRole("heading", { name: /Canceladas/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Abrir la reserva de Carlos/ })).toBeInTheDocument();
   });
 });

@@ -20,7 +20,9 @@ import {
   LIMITE_VOLUMEN_ENVASES,
   LIMITES,
   MAX_CHARS_VOLUMEN,
+  NOTA_RESPUESTA_PRECIO_COMPRA,
   NOTA_RESPUESTA_VOLUMEN,
+  NOTA_RESPUESTA_VOLUMEN_LITRO,
   marcarResultado,
   sinAvisosDeImporte,
   METRICAS_FLEX,
@@ -41,7 +43,7 @@ import {
  * El prompt va en cache (≈5.600 de 8.200 tokens de entrada, 0,10 $/M en
  * gpt-4.1-mini): ~+90 tokens ≈ +0,00001 $ por ronda.
  */
-const LIMITE_PROMPT = 6_450; // + regla 19 «como_leer» (margenes_carta y alertas_precio, 16/11/2026)
+const LIMITE_PROMPT = 6_650; // + regla 19 «como_leer» (16/11/2026) + precio tal como se compra en la 14 (11/11/2026)
 
 // deno-lint-ignore no-explicit-any
 type Esquema = any;
@@ -359,10 +361,11 @@ describe("prepararLlamada", () => {
       rpc: "compras_producto_agente",
       params: {
         p_texto: "centollo", p_desde: "2026-01-01", p_hasta: "2026-10-07", p_tipo: "albaran",
-        p_limite: LIMITES.compras_producto, p_orden: "precio", p_excluir: "caja",
+        p_limite: LIMITES.compras_producto, p_orden: "precio", p_excluir: "caja", p_base: false,
       },
       limite: null,
       respaldoSemantico: { consulta: "centollo", param: "p_embedding" },
+      notaRespuesta: NOTA_RESPUESTA_PRECIO_COMPRA,
     });
     // strict mode manda null en lo no indicado: ambos tipos, todo el historico.
     const min = prepararLlamada("compras_producto", { producto: "nata", desde: null, hasta: null, tipo: null, orden: null, excluir: null });
@@ -437,7 +440,7 @@ describe("prepararLlamada", () => {
       rpc: "variacion_precios_agente",
       params: {
         p_desde: null, p_hasta: "2026-10-07", p_umbral_pct: 5, p_categoria: "pescado", p_producto: null,
-        p_limite: LIMITES.variacion_precios, p_sentido: "bajadas",
+        p_limite: LIMITES.variacion_precios, p_sentido: "bajadas", p_base: false,
       },
       limite: null,
     });
@@ -685,7 +688,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     expect(prepararLlamada("grafico_precio", { producto: "jamon", desde: null, hasta: "2026-10-08", unidad: "kg" })).toEqual({
       tipo: "rpc",
       rpc: "serie_precios_agente",
-      params: { p_texto: "jamon", p_desde: null, p_hasta: "2026-10-08", p_unidad: "kg" },
+      params: { p_texto: "jamon", p_desde: null, p_hasta: "2026-10-08", p_unidad: "kg", p_base: true },
       limite: null,
     });
     expect(() => prepararLlamada("grafico_precio", { producto: "jamon", desde: "ayer" })).toThrow(/fecha/);
@@ -727,7 +730,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
   it("el prompt manda decir «te dejo la gráfica debajo» sin preguntar, y citar el precio convertido", () => {
     const p = systemPrompt("2026-10-08");
     expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
-    expect(p).toMatch(/Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg»/);
+    expect(p).toMatch(/Con convertido_desde di «convertido desde caja de 10 kg»/);
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
     expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(12_050); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
@@ -948,5 +951,48 @@ describe("compras_producto con proveedor (11/11/2026)", () => {
     expect((con as { params: Record<string, unknown> }).params).toMatchObject({ p_texto: "chuletero", p_proveedor: "Grupo Embajadores" });
     const sin = prepararLlamada("compras_producto", { producto: "chuletero", proveedor: null });
     expect(Object.keys((sin as { params: Record<string, unknown> }).params)).not.toContain("p_proveedor");
+  });
+});
+
+//  Precio tal como se compra (11/11/2026, migracion 20261124120000_chatbot_precio_unidad_compra).
+//  Peticion del dueño: «que te dé la info del producto tal y como sale en la factura, a no ser
+//  que te diga que quiere el precio por litro o por kilo» (vino 75 cl o magnum 1,5 l, tercio,
+//  500 g). Antes: la oreja de cerdo de 500 g a 4,17 € la bolsa salia a 8,34 €/kg.
+describe("precio tal como se compra (11/11/2026)", () => {
+  const params = (ll: ReturnType<typeof prepararLlamada>) => (ll as { params: Record<string, unknown> }).params;
+
+  it("compras_producto e historial_precios van sin convertir (p_base false) y con su nota", () => {
+    for (const herr of ["compras_producto", "historial_precios"]) {
+      const ll = prepararLlamada(herr, { producto: "oreja de cerdo" }, "¿a cuánto compro la oreja de cerdo?");
+      expect(params(ll).p_base, herr).toBe(false);
+      expect((ll as { notaRespuesta?: string }).notaRespuesta, herr).toBe(NOTA_RESPUESTA_PRECIO_COMPRA);
+    }
+    expect(NOTA_RESPUESTA_PRECIO_COMPRA).toMatch(/botella 75 cl a 12,40 €», «magnum 1,5 l/);
+    expect(NOTA_RESPUESTA_PRECIO_COMPRA).toMatch(/paquete 500 g a 4,17 €/);
+  });
+
+  it("grafico_precio y variacion_precios solo convierten si piden el kilo o el litro", () => {
+    expect(params(prepararLlamada("grafico_precio", { producto: "oreja de cerdo" }, "gráfica de la oreja de cerdo")).p_base).toBe(false);
+    expect(params(prepararLlamada("grafico_precio", { producto: "oreja de cerdo" }, "gráfica del precio por kilo de la oreja")).p_base).toBe(true);
+    expect(params(prepararLlamada("grafico_precio", { producto: "aceite", unidad: "L" }, "evolución del aceite")).p_base).toBe(true);
+    expect(params(prepararLlamada("variacion_precios", { producto: "Arienzo" }, "¿ha subido el Arienzo?")).p_base).toBe(false);
+    expect(params(prepararLlamada("variacion_precios", { producto: "aceite" }, "¿ha subido el litro de aceite?")).p_base).toBe(true);
+  });
+
+  it("volumen_comprado: precio de cada formato salvo pregunta de litro/kilo", () => {
+    const vino = prepararLlamada("compras_producto", { producto: "vino" }, "¿a cuánto compro el vino?");
+    expect(vino).toMatchObject({ rpc: "volumen_comprado_agente", notaRespuesta: NOTA_RESPUESTA_VOLUMEN });
+    expect(NOTA_RESPUESTA_VOLUMEN).toMatch(/precio_envase/);
+    expect(NOTA_RESPUESTA_VOLUMEN).toMatch(/caja de 24 tercios a 41,85 €/);
+    const litro = prepararLlamada("compras_producto", { producto: "vino" }, "precio del litro de vino por proveedor");
+    expect(litro).toMatchObject({ rpc: "volumen_comprado_agente", notaRespuesta: NOTA_RESPUESTA_VOLUMEN_LITRO });
+    expect(NOTA_RESPUESTA_VOLUMEN_LITRO).toMatch(/«precio» es € por litro\/kilo SIN IVA/);
+  });
+
+  it("el prompt manda dar el precio tal como se compra, con su formato", () => {
+    const p = systemPrompt("2026-11-11");
+    expect(p).toMatch(/Precio de un producto: tal como se compra y con su formato \(«botella 75 cl a 12,40 €», «magnum 1,5 l», «paquete 500 g»\)/);
+    expect(p).toMatch(/€\/l o €\/kg solo si lo piden o va a granel/);
+    expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT);
   });
 });

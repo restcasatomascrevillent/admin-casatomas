@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useMemo, useRef, type ComponentProps, type ReactNode } from "react";
+import { lazy, Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -11,13 +11,14 @@ import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { VistaHoy } from "@/components/reservas/VistaHoy";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { BookOpen, LayoutGrid, Table2, Utensils } from "lucide-react";
+import { LayoutGrid, Utensils } from "lucide-react";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { usePuedeCrearReservas } from "@/hooks/usePuedeCrearReservas";
-import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
+import { esEstadoReserva } from "@/lib/reservas/estadosReserva";
 import {
   ETIQUETAS_SUBPESTANA_CONFIGURACION,
+  FILTRO_POR_ATENDER,
   resolverDeepLinkReservas,
   resolverSubpestanaConfiguracion,
   TABS_RESERVAS,
@@ -39,12 +40,9 @@ import { toast } from "sonner";
 // Si tras un despliegue falta un fichero viejo, la barrera de errores recarga
 // sola (ErrorBoundary › PATRON_CHUNK_OBSOLETO), como con las páginas (App.tsx).
 // ============================================================================
-// «Escribir reserva» (10/11/2026): libro de reservas con lápiz, también bajo demanda.
+// «Nueva reserva» (10/11/2026): la hoja del día y el formulario, también bajo demanda.
 const LibroReservas = lazy(() =>
   import("@/components/reservas/libro/LibroReservas").then((m) => ({ default: m.LibroReservas })),
-);
-const ListaReservasAvanzada = lazy(() =>
-  import("@/components/reservas/ListaReservasAvanzada").then((m) => ({ default: m.ListaReservasAvanzada })),
 );
 // La Lista vista como el libro (10/11/2026): hojas por día que se pasan.
 const ListaComoLibro = lazy(() =>
@@ -68,9 +66,6 @@ const ConfiguracionGeneralReservas = lazy(() =>
 );
 const GestionMesasEspacios = lazy(() =>
   import("@/components/reservas/GestionMesasEspacios").then((m) => ({ default: m.GestionMesasEspacios })),
-);
-const PanelAsignacion = lazy(() =>
-  import("@/components/reservas/PanelAsignacion").then((m) => ({ default: m.PanelAsignacion })),
 );
 const EditorPlantillasEmail = lazy(() =>
   import("@/components/emails/EditorPlantillasEmail").then((m) => ({ default: m.EditorPlantillasEmail })),
@@ -96,72 +91,35 @@ function diaLargo(clave: string): string {
 const bajoDemanda = (contenido: ReactNode) => <Suspense fallback={<CargandoPestana />}>{contenido}</Suspense>;
 
 /**
- * La lista con sus solicitudes. `useSolicitudesPendientes` (toda la tabla, realtime y sondeo de cada
- * minuto) vive AQUÍ y no en la página desde el 07/11/2026: solo la usa «Lista», y como Radix desmonta la
- * pestaña que no se ve, con «Hoy» abierta ya no se pide nada de solicitudes. Sigue habiendo UNA sola
- * instancia (ver aviso de realtime en el hook).
+ * Qué abre la Lista cuando llega un estado por la URL (avisos, campana, Dashboard): «por atender»,
+ * «solicitudes» y «pendiente» → «Pendientes»; otro estado de reserva (p. ej. «cancelada») → esas
+ * reservas de hoy en adelante. Sin estado, la hoja de hoy.
  */
-function TablaLista(props: Omit<ComponentProps<typeof ListaReservasAvanzada>, "solicitudesState">) {
-  const solicitudesState = useSolicitudesPendientes();
-  return bajoDemanda(<ListaReservasAvanzada {...props} solicitudesState={solicitudesState} />);
-}
-
-/** Cómo se ve la Lista: como el libro de hojas por día o como la tabla con filtros. Se recuerda en el dispositivo. */
-type VistaLista = "libro" | "tabla";
-const CLAVE_VISTA_LISTA = "reservas.vistaLista";
-
-function leerVistaLista(): VistaLista {
-  try {
-    return localStorage.getItem(CLAVE_VISTA_LISTA) === "tabla" ? "tabla" : "libro";
-  } catch {
-    return "libro";
-  }
+function estadoDesdeUrl(status: string | undefined): string | null {
+  if (!status) return null;
+  if (status === FILTRO_POR_ATENDER || status === "solicitudes" || status === "pendiente") return "pendiente";
+  return esEstadoReserva(status) ? status : null;
 }
 
 /**
- * La pestaña «Lista» (10/11/2026, petición del dueño: «hacer o simular como el libro, que tenga hojas que
- * vas pasando»): por defecto el LIBRO (una hoja por día, `ListaComoLibro`) y, con el conmutador, la TABLA de
- * siempre con sus filtros, intacta. Si se llega con un filtro en la URL (la campana, «Por atender»…) se abre
- * la tabla, que es la que filtra, sin cambiar lo recordado.
+ * La pestaña «Lista» (11/11/2026, petición del dueño: «merge libro y tabla con la vista de libro pero que se
+ * llame lista sin toggle y que haya un buscador que busque en todo el histórico… quita el botón Por atender y
+ * pon Pendientes»): una sola vista, la hoja por día (`ListaComoLibro`), con el buscador de todo el histórico y
+ * «Pendientes». La tabla con filtros y su conmutador «Libro | Tabla» se han quitado.
  */
 function PestanaLista({
+  status,
   onAnadirReserva,
   resaltar,
-  ...props
-}: Omit<ComponentProps<typeof ListaReservasAvanzada>, "solicitudesState"> & {
-  /** «+ Añadir reserva a este día» del libro: abre «Nueva Reserva» en ese día. Sin permiso de crear, no sale. */
+}: {
+  /** El estado que llega por la URL (`?status=`). */
+  status?: string;
+  /** «+ Añadir reserva a este día»: abre «Nueva Reserva» en ese día. Sin permiso de crear, no sale. */
   onAnadirReserva?: (fecha: string) => void;
-  /** La última reserva creada desde «Nueva Reserva»: el libro va a su día y la resalta. */
+  /** La última reserva creada desde «Nueva Reserva»: la hoja va a su día y la resalta. */
   resaltar?: { id: string; fecha: string } | null;
 }) {
-  const conFiltro = !!(props.initialStatusFilter || props.initialDateFilter);
-  const [vista, setVista] = useState<VistaLista>(() => (conFiltro ? "tabla" : leerVistaLista()));
-  const elegir = (v: string) => {
-    if (v !== "libro" && v !== "tabla") return;
-    setVista(v);
-    try {
-      localStorage.setItem(CLAVE_VISTA_LISTA, v);
-    } catch {
-      // Sin almacenamiento (modo privado): vale para esta visita.
-    }
-  };
-  const conmutador = (
-    <ToggleGroup type="single" value={vista} onValueChange={elegir} className="rounded-md border p-1" aria-label="Ver la lista como">
-      <ToggleGroupItem value="libro" className="h-10 gap-1.5 px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-        <BookOpen className="h-4 w-4" /> Libro
-      </ToggleGroupItem>
-      <ToggleGroupItem value="tabla" className="h-10 gap-1.5 px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-        <Table2 className="h-4 w-4" /> Tabla
-      </ToggleGroupItem>
-    </ToggleGroup>
-  );
-  if (vista === "libro") return bajoDemanda(<ListaComoLibro extra={conmutador} onAnadirReserva={onAnadirReserva} resaltar={resaltar} />);
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex justify-end">{conmutador}</div>
-      <TablaLista {...props} />
-    </div>
-  );
+  return bajoDemanda(<ListaComoLibro estadoInicial={estadoDesdeUrl(status)} onAnadirReserva={onAnadirReserva} resaltar={resaltar} />);
 }
 
 /**
@@ -343,33 +301,6 @@ export default function Reservas() {
     }
   };
 
-  /**
-   * Entrada POR RESERVA: abre el plano de SU sala, en SU día y con ella ya
-   * señalada, lista para sentarla. Lo usan la pestaña "Lista"
-   * (`ListaReservasAvanzada`) y el panel de Asignación.
-   *
-   * El destino lo decide `resolverSaltoAsignacion`, que ya ha descartado las
-   * reservas sin sala (su botón llega aquí deshabilitado y explicando por qué),
-   * así que aquí solo queda traducir el `espacioId` a la sala y montar la
-   * pantalla. Se fuerza la vista "plano": el modo servicio es para mirar el
-   * estado en vivo, no para repartir mesas.
-   */
-  const handleAsignarMesa = ({ espacioId, fecha, reservaId, turno }: DestinoAsignacion) => {
-    const espacio = espacios?.find((e) => e.id === espacioId);
-    if (!espacio) {
-      // La sala existía cuando se pintó la fila y ya no está (borrada o
-      // desactivada desde otra pantalla). Mejor decirlo que no hacer nada al
-      // pulsar, que es lo que parecería un botón roto.
-      toast.info("Esa sala ya no está disponible", {
-        description: "Puede que la hayan borrado o desactivado. Recarga la pantalla para ver las salas al día.",
-      });
-      return;
-    }
-    setVistaEspacio("plano");
-    setSaltoAsignacion({ fecha, reservaId, turno });
-    setSelectedEspacio({ id: espacio.id, nombre: espacio.nombre });
-  };
-
   /** Cierra el plano/modo servicio y deshace el salto, si lo hubo. */
   const volverDeEspacio = () => {
     setSelectedEspacio(null);
@@ -463,10 +394,10 @@ export default function Reservas() {
         <PestanasPagina
           accionesDebajoEnMovil="lg"
           pestanas={[
-            { valor: "hoy", etiqueta: "Hoy" },
+            // «Hoy» pasa a llamarse «Reservas», con flechas para pasar días (11/11/2026, petición del dueño).
+            { valor: "hoy", etiqueta: "Reservas" },
             { valor: "reservas", etiqueta: "Lista" },
             { valor: "calendario", etiqueta: "Calendario" },
-            { valor: "asignacion", etiqueta: "Próximas reservas" },
             { valor: "blacklist", etiqueta: "Blacklist" },
             ...(puedeVerConfiguracion ? [{ valor: "configuracion", etiqueta: "Configuración", icono: <Settings /> }] : []),
           ]}
@@ -475,7 +406,9 @@ export default function Reservas() {
                que escriben (y la RLS del INSERT, 20261001170000). Sin él (solo «Ver») el botón no
                existe y su sitio lo ocupa la etiqueta común «Solo lectura» (06/11/2026, decisión del
                dueño: lo que no se puede usar se oculta, no se desactiva). */
-            <>
+            // 11/11/2026: en tablet y móvil la fila de acciones va a todo lo ancho, Avisos a la izquierda y
+            // «Nueva Reserva» a la derecha; en portátil, juntos a la derecha de las pestañas.
+            <div className="flex w-full flex-wrap items-center justify-between gap-2 lg:w-auto lg:flex-nowrap lg:justify-end">
             {/* Avisos de reservas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral). */}
             <BotonAvisosSeccion seccion="reservas" />
             {soloLectura && (soloCrear ? <EtiquetaSoloLectura
@@ -483,13 +416,13 @@ export default function Reservas() {
                   detalle="Puedes ver las reservas y crear reservas nuevas, pero no modificarlas, cambiar su estado ni configurar. Si necesitas más, pídeselo a un administrador."
                 /> : <EtiquetaSoloLectura />)}
             {/* «Nueva Reserva» única (10/11/2026, petición del dueño: «un solo botón y dentro formulario o
-                libro»). Dentro, arriba la lista del día en grande y debajo
-                «Escribir con lápiz» o «Formulario» (LibroReservas; se recuerda la elección en este dispositivo). Ocupa casi toda la pantalla y hace scroll por
-                dentro: la página sigue sin desplazar. */}
+                libro»). Dentro, la lista del día y el formulario (LibroReservas; sin lápiz desde el 11/11/2026). Ocupa
+                casi toda la pantalla y hace scroll por dentro: la página sigue sin desplazar. */}
             {puedeCrearReservas && (
               <Dialog open={openDialog} onOpenChange={cambiarDialogoNueva}>
                 <DialogTrigger asChild>
-                  <Button className="touch-hit h-9 shrink-0 bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-700 pointer-coarse:h-9">
+                  {/* Azul clarito (11/11/2026, dueño: «el botón de nueva reserva en azul clarito bonito»), con texto azul oscuro: se lee bien. */}
+                  <Button className="touch-hit h-9 shrink-0 border border-sky-300 bg-sky-100 font-semibold text-sky-900 shadow-sm hover:bg-sky-200 dark:border-sky-700 dark:bg-sky-900/60 dark:text-sky-50 dark:hover:bg-sky-900 pointer-coarse:h-9">
                     <Plus className="mr-2 h-4 w-4" />
                     Nueva Reserva
                   </Button>
@@ -500,7 +433,7 @@ export default function Reservas() {
                       Nueva reserva
                       {fechaNuevaReserva && fechaHojaNueva ? ` · ${diaLargo(fechaHojaNueva)}` : ""}
                     </DialogTitle>
-                    <DialogDescription className="sr-only">Las reservas del día y, debajo, apuntar una nueva con el lápiz o con el formulario.</DialogDescription>
+                    <DialogDescription className="sr-only">Las reservas del día y, al lado, el formulario para apuntar una nueva.</DialogDescription>
                   </DialogHeader>
                   {bajoDemanda(
                     <LibroReservas
@@ -515,7 +448,7 @@ export default function Reservas() {
                 </DialogContent>
               </Dialog>
             )}
-            </>
+            </div>
           }
         />
 
@@ -554,14 +487,12 @@ export default function Reservas() {
               Historial completo, de cualquier fecha. Las solicitudes que el asistente telefónico no pudo cerrar aparecen marcadas como «Solicitud» con su motivo.
             </p>
             <PestanaLista
-              // `key`: si llega otro filtro por URL estando ya en la página
-              // (p. ej. desde la campana), la lista se reinicia con él.
-              key={`${statusFromUrl ?? ""}|${dateFromUrl ?? ""}`}
-              onAsignarMesa={handleAsignarMesa}
+              // `key`: si llega otro estado por URL estando ya en la página (p. ej. desde la campana),
+              // la lista se reinicia con él.
+              key={statusFromUrl ?? ""}
+              status={statusFromUrl || undefined}
               onAnadirReserva={puedeCrearReservas ? abrirNuevaReserva : undefined}
               resaltar={ultimaCreada}
-              initialStatusFilter={statusFromUrl || undefined}
-              initialDateFilter={dateFromUrl === "today" ? new Date() : undefined}
             />
           </section>
         </TabsContent>
@@ -570,12 +501,8 @@ export default function Reservas() {
           {bajoDemanda(<CalendarioOcupacion />)}
         </TabsContent>
 
-        {/* "Asignación" (reservas-sin-salas, Fase B): el cliente solo reserva
-            una hora; aquí se reparten salas y mesas, con las próximas N horas
-            arriba. "Mesas" usa el mismo salto al plano que Lista y Hoy. */}
-        <TabsContent value="asignacion" className="mt-6">
-          {bajoDemanda(<PanelAsignacion onAsignarMesa={handleAsignarMesa} />)}
-        </TabsContent>
+        {/* «Próximas reservas» (reparto de salas y mesas de los próximos días) se unificó con la Lista el
+            11/11/2026, petición del dueño: la tabla de la Lista tiene el mismo «Dar mesa» por reserva. */}
 
         <TabsContent value="blacklist" className="space-y-6 mt-6">
           <RegionPestanaLarga>

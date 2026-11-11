@@ -19,7 +19,7 @@
 import { useState, type ReactNode } from "react";
 import { formatearPrecioMenu, textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
 import { InsigniaZona } from "@/components/reservas/InterruptoresServiciosOnline";
-import { AlertTriangle, ChevronDown, Lock, Phone, StickyNote, Users } from "lucide-react";
+import { ChevronDown, Lock, Phone, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BotonPersonas } from "@/components/reservas/CambiarPersonas";
 import { cn } from "@/lib/utils";
@@ -41,16 +41,8 @@ export interface ListaHoyEscritorioProps {
   /** Nombre de la sala de una reserva (para el texto de la mesa en el lector de pantalla). */
   salaDe: (r: Reserva) => string | undefined;
   onAbrir: (r: Reserva) => void;
-  /** «Sentar» (por llegar). Sin él (solo «Ver») no hay botón. */
-  onSentar?: (r: Reserva) => void;
-  /** «Liberar» (sentadas con mesa). Sin él no hay botón. */
-  onLiberar?: (r: Reserva) => void;
-  /** El botón azul «Sentar fuera» (por llegar, 10/11/2026). Sin él (solo «Ver») no hay botón. */
+  /** El botón azul «Sentar fuera» de las que faltan por llegar (10/11/2026; se queda en la fila, 11/11/2026). */
   sentarFuera?: (r: Reserva) => ReactNode;
-  /** Su mesa prevista la ocupa alguien sentado: «Sentar» abrirá el selector. */
-  mesaPrevistaOcupada?: (r: Reserva) => boolean;
-  /** Reserva con una acción en curso (botón desactivado). */
-  ocupadaId?: string | null;
   /** La reserva señalada (resaltada aquí y en el plano). */
   señalada?: string | null;
   onSeñalar?: (id: string | null) => void;
@@ -62,11 +54,7 @@ export function ListaHoyEscritorio({
   lista,
   salaDe,
   onAbrir,
-  onSentar,
-  onLiberar,
   sentarFuera,
-  mesaPrevistaOcupada,
-  ocupadaId = null,
   señalada = null,
   onSeñalar,
   servicio = null,
@@ -75,46 +63,15 @@ export function ListaHoyEscritorio({
   const pax = (filas: Array<{ reserva: Reserva }>) => filas.reduce((s, f) => s + (f.reserva.numero_comensales || 0), 0);
   const fila = (f: FilaHoyMovil<Reserva> & { tarde?: boolean }, grupo: "porLlegar" | "sentadas" | "terminadas") => {
     const r = f.reserva;
-    let accion: ReactNode = null;
-    if (grupo === "porLlegar" && onSentar) {
-      const elegir = f.mesas.length === 0 || !!mesaPrevistaOcupada?.(r);
-      accion = (
-        <>
-        {sentarFuera?.(r)}
-        <Button
-          type="button"
-          size="sm"
-          className="pointer-events-auto h-11 w-[4.25rem] shrink-0 px-1 text-sm font-semibold"
-          disabled={ocupadaId === r.id}
-          onClick={() => onSentar(r)}
-          aria-label={elegir ? `Sentar a ${r.nombre || "la reserva"}: elegir mesa` : `Sentar a ${r.nombre || "la reserva"} en ${textoMesas(f.mesas).toLowerCase()}`}
-        >
-          Sentar
-        </Button>
-        </>
-      );
-    } else if (grupo === "sentadas" && onLiberar && f.mesas.length > 0) {
-      accion = (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="pointer-events-auto h-11 w-[4.25rem] shrink-0 px-1 text-sm font-semibold"
-          disabled={ocupadaId === r.id}
-          onClick={() => onLiberar(r)}
-          aria-label={`Liberar ${textoMesas(f.mesas).toLowerCase()} de ${r.nombre || "la reserva"}`}
-        >
-          Liberar
-        </Button>
-      );
-    }
+    // Sin «Sentar» en la fila (11/11/2026, petición del dueño: «quita el botón de sentar»): al tocarla se abre la
+    // ficha, con la información, «Verificar» / «Confirmar» y el resto de acciones. «Sentar fuera» sí se queda.
+    const accion = grupo === "porLlegar" ? sentarFuera?.(r) : null;
     return (
       <FilaEscritorio
         key={r.id}
         reserva={r}
         mesas={f.mesas}
         sala={salaDe(r)}
-        tarde={!!f.tarde}
         grupo={grupo}
         accion={accion}
         señalada={señalada === r.id}
@@ -181,7 +138,6 @@ function FilaEscritorio({
   reserva,
   mesas,
   sala,
-  tarde,
   grupo,
   accion,
   señalada,
@@ -191,9 +147,9 @@ function FilaEscritorio({
   reserva: Reserva;
   mesas: string[];
   sala?: string;
-  tarde: boolean;
   grupo: "porLlegar" | "sentadas" | "terminadas";
-  accion: ReactNode;
+  /** «Sentar fuera» (solo las que faltan por llegar). */
+  accion?: ReactNode;
   señalada: boolean;
   onAbrir: () => void;
   onSeñalar?: (id: string | null) => void;
@@ -208,10 +164,10 @@ function FilaEscritorio({
   const fijada = !!reserva.mesa_fijada && !sinMesa;
   const textoMesa = sinMesa ? "Sin mesa" : mesas.join("+");
   const nombre = reserva.nombre || "Sin nombre";
+  // Sin «Tarde» ni «Sin mesa» (11/11/2026, petición del dueño): junto al nombre, el estado de la reserva
+  // (pendiente, verificada, confirmada…).
   const estado =
-    grupo === "porLlegar" && tarde
-      ? { texto: "Tarde", clase: "bg-red-600 text-white" }
-      : grupo === "terminadas" && reserva.estado === "completada"
+    grupo === "terminadas" && reserva.estado === "completada"
         ? { texto: "Terminada", clase: "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-100" }
         : info
           ? { texto: info.etiqueta, clase: info.insignia }
@@ -233,32 +189,35 @@ function FilaEscritorio({
         aria-label={`${horaCorta(reserva.hora)} ${nombre}, ${reserva.numero_comensales} personas, ${fuera ? `fuera, ${reserva.fuera_lugar}` : sinMesa ? "sin mesa" : `${sala ? `${sala}, ` : ""}${textoMesas(mesas).toLowerCase()}`}${estado ? `, ${estado.texto}` : ""}`}
         className="absolute inset-0 h-full w-full touch-manipulation select-none hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted/70"
       />
-      {/* 10/11/2026 («los nombres no se ven, y eso es lo primordial»): DOS líneas. Arriba, la hora y el nombre
-          con todo el ancho que dejan las personas y los botones; debajo, la mesa, los avisos y el estado. Así el
-          nombre ya no compite con «Sin mesa», el estado y los iconos (antes se quedaba en 3-6 letras). */}
-      <div className="pointer-events-none relative flex min-h-14 items-center gap-1 px-2 py-1">
-        <span className="w-11 shrink-0 self-start pt-0.5 text-base font-semibold tabular-nums">{horaCorta(reserva.hora)}</span>
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-base font-semibold leading-6" title={nombre} data-testid="nombre-fila">
-            {nombre}
-          </span>
-          <span className="flex min-w-0 items-center gap-1 overflow-hidden">
+      {/* 11/11/2026 (dueño: «mismo estilo para todos los avisos y que las filas tengan homogeneidad»): TODAS las filas
+          miden lo mismo y tienen las mismas columnas: hora · (nombre, estado y mesa / observaciones) · personas. La
+          segunda línea está siempre, aunque no haya observaciones, y todas las observaciones (también las alergias) van
+          con el mismo estilo. */}
+      <div className="pointer-events-none relative grid h-[3.75rem] grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-2 px-3">
+        <span className="text-base font-semibold tabular-nums">{horaCorta(reserva.hora)}</span>
+        <span className="flex min-w-0 flex-col justify-center gap-0.5">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate text-base font-semibold leading-6" title={nombre} data-testid="nombre-fila">
+              {nombre}
+            </span>
+            {estado && (
+              <span className={cn("shrink-0 rounded-full px-1.5 text-xs font-medium leading-5", estado.clase)} data-testid="estado-fila">
+                {estado.texto}
+              </span>
+            )}
             {fuera ? (
               <EtiquetaFuera reserva={reserva} compacta className="max-w-[8rem] shrink-0 text-sm" />
             ) : (
-              <span
-                className={cn(
-                  "inline-flex max-w-[6rem] shrink-0 items-center gap-0.5 truncate rounded-md px-1.5 text-sm font-semibold leading-5",
-                  sinMesa
-                    ? "bg-amber-100 text-amber-900 ring-1 ring-amber-400 dark:bg-amber-950/60 dark:text-amber-200"
-                    : "bg-muted text-foreground",
-                )}
-                data-testid="mesa-fila"
-                title={sinMesa ? undefined : `${sala ? `${sala} · ` : ""}${textoMesas(mesas)}`}
-              >
-                {fijada && <Lock className="h-3 w-3 shrink-0" aria-label="Mesa fijada" />}
-                {sinMesa ? textoMesa : `M ${textoMesa}`}
-              </span>
+              !sinMesa && (
+                <span
+                  className="inline-flex max-w-[6rem] shrink-0 items-center gap-0.5 truncate rounded-md bg-muted px-1.5 text-sm font-semibold leading-5 text-foreground"
+                  data-testid="mesa-fila"
+                  title={`${sala ? `${sala} · ` : ""}${textoMesas(mesas)}`}
+                >
+                  {fijada && <Lock className="h-3 w-3 shrink-0" aria-label="Mesa fijada" />}
+                  {`M ${textoMesa}`}
+                </span>
+              )
             )}
             {reserva.menu_del_dia && (
               <span className="shrink-0 rounded-full bg-violet-100 px-1.5 text-xs font-medium leading-5 text-violet-900 dark:bg-violet-950/60 dark:text-violet-200" title="Menú del día">
@@ -274,29 +233,36 @@ function FilaEscritorio({
               </span>
             )}
             <InsigniaZona reserva={reserva} className="px-1.5 py-0 leading-5" />
-            {alergia && <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" aria-label="Alergia" />}
-            {notas && !alergia && <StickyNote className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-label="Notas del cliente" />}
-            {notas && <span className="sr-only">{notas}</span>}
-            {estado && (
-              <span className={cn("min-w-0 truncate rounded-full px-1.5 text-xs font-medium leading-5", estado.clase)} data-testid="estado-fila">
-                {estado.texto}
-              </span>
+          </span>
+          {/* Sin observaciones: el mismo icono y «Sin aviso», en gris (11/11/2026, petición del dueño). */}
+          <span
+            className={cn(
+              "flex h-5 min-w-0 items-center gap-1 text-sm",
+              notas ? "text-amber-800 dark:text-amber-300" : "text-muted-foreground",
             )}
+            data-testid="notas-fila"
+          >
+            <StickyNote className="h-4 w-4 shrink-0" aria-label={notas ? (alergia ? "Alergia" : "Notas del cliente") : undefined} aria-hidden={notas ? undefined : true} />
+            <span className="truncate" title={notas || undefined}>
+              {notas || "Sin aviso"}
+            </span>
           </span>
         </span>
-        {tel && (
-          <a
-            href={tel}
-            aria-label={`Llamar a ${nombre}`}
-            title={telefonoLegible(reserva.telefono) ?? undefined}
-            className="pointer-events-auto hidden h-11 w-11 shrink-0 items-center justify-center rounded-md text-primary hover:bg-muted active:bg-muted 2xl:inline-flex"
-          >
-            <Phone className="h-5 w-5" aria-hidden="true" />
-          </a>
-        )}
-        {/* Tocar el número cambia las personas (10/11/2026). */}
-        <BotonPersonas reserva={reserva} className="my-0 gap-0.5 text-base font-bold" icono="hidden h-4 w-4 2xl:inline" />
-        {accion}
+        <span className="flex shrink-0 items-center gap-1">
+          {tel && (
+            <a
+              href={tel}
+              aria-label={`Llamar a ${nombre}`}
+              title={telefonoLegible(reserva.telefono) ?? undefined}
+              className="pointer-events-auto hidden h-11 w-11 shrink-0 items-center justify-center rounded-md text-primary hover:bg-muted active:bg-muted 2xl:inline-flex"
+            >
+              <Phone className="h-5 w-5" aria-hidden="true" />
+            </a>
+          )}
+          {/* Personas en su recuadro, con el icono y «px» (11/11/2026, petición del dueño). */}
+          <BotonPersonas reserva={reserva} className="my-0 gap-0.5 rounded-md border px-1.5 text-base font-bold" icono="h-4 w-4" sufijo="px" />
+          {accion}
+        </span>
       </div>
     </li>
   );

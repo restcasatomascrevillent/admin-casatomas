@@ -785,18 +785,19 @@ export function TableroCompras({
               )}
             >
               <span className="flex items-center gap-1.5 text-xs font-medium leading-snug text-muted-foreground">
-                <span className="truncate">{c.etiqueta}</span>
+                <span className="line-clamp-2 break-words @[48rem]/tablero:line-clamp-1">{c.etiqueta}</span>
                 {c.aviso && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-label="con avisos" />}
               </span>
               <Cifra formas={c.valor} className="text-[clamp(1.0625rem,0.55rem+4.5cqi,1.375rem)] font-semibold leading-tight tabular-nums tracking-tight text-foreground" />
-              <span className="line-clamp-1 text-xs leading-snug text-muted-foreground">{c.detalle}</span>
+              {/* 11/11/2026 (dueño: móvil): el subtítulo puede ocupar 2 líneas en vez de cortarse. */}
+              <span className="line-clamp-2 break-words text-xs leading-snug text-muted-foreground @[48rem]/tablero:line-clamp-1">{c.detalle}</span>
             </button>
           </li>
         ))}
       </ul>
 
       {/* 2 · Una vista a la vez */}
-      <div role="group" aria-label="Vista del análisis" className="flex min-w-0 shrink-0 gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="pastillas-vistas">
+      <div role="group" aria-label="Vista del análisis" className="flex min-w-0 shrink-0 gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)] max-sm:pr-7" data-testid="pastillas-vistas">
         {VISTAS.map((v) => (
           <button
             key={v.id}

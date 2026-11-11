@@ -27,6 +27,7 @@ import { mesesSeleccionables as mesesTrafico, mesPorDefecto as mesPorDefectoTraf
 import { obtenerInformeFacturas } from "./fuentes/facturas";
 import { obtenerInformeVinoFavorito } from "./fuentes/vinoFavorito";
 import { obtenerInformeServicios } from "./fuentes/servicios";
+import { obtenerInformeCartaFacturas, type TipoCartaFacturas } from "./fuentes/cartaFacturas";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -113,6 +114,21 @@ const facturas = (
   generador: { tipo: "tabla", obtener: (periodo) => obtenerInformeFacturas(modulo, periodo, titulo) },
 });
 
+// 11/11/2026, petición del dueño: «una lista de todos los vinos de la carta, precio en facturas, precio
+// en carta, si está activo o no y si tienen foto o no […]. Para platos lo mismo». Las compras exigen
+// ver Facturas (como Facturas › Márgenes, de donde sale la vinculación producto ↔ vino/plato).
+const cartaFacturas = (tipo: TipoCartaFacturas, titulo: string, descripcion: string): DefinicionInforme => ({
+  id: `facturas-carta-${tipo}`,
+  titulo,
+  descripcion,
+  seccion: "facturas",
+  permiso: { tipo: "seccion", seccion: "facturas", nivel: "view" },
+  periodo: "ninguno",
+  formatos: ["pdf", "csv"],
+  origen: { etiqueta: "Facturas › Márgenes", ruta: "/facturas?tab=margenes" },
+  generador: { tipo: "tabla", obtener: (_periodo, ctx) => obtenerInformeCartaFacturas(tipo, ctx) },
+});
+
 export const INFORMES: DefinicionInforme[] = [
   {
     id: "trafico-web-mensual",
@@ -145,6 +161,8 @@ export const INFORMES: DefinicionInforme[] = [
   facturas("facturas-gasto-familia", "familias", "Gasto por familia", "La base sin IVA de las líneas de compra de cada familia de productos en el periodo."),
   facturas("facturas-gasto-mes", "gasto_mes", "Gasto por mes", "El gasto con IVA de cada mes del periodo, de Casa Tomás y de Touza."),
   facturas("facturas-productos", "productos", "Productos más comprados", "Los productos en los que más se ha gastado en el periodo (base sin IVA de sus líneas)."),
+  cartaFacturas("vinos", "Vinos: facturas y carta", "Todos los vinos: precio en carta, última compra en facturas (precio y fecha), si están activos y si tienen foto."),
+  cartaFacturas("platos", "Platos: facturas y carta", "Todos los platos: precio en carta, última compra de su ingrediente principal, si están activos y si tienen foto."),
   {
     id: "carta-vino-favorito",
     titulo: "Votación del vino favorito",

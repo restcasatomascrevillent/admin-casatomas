@@ -1,7 +1,7 @@
 /**
- * Pestaña «Lista» (10/11/2026, petición del dueño: «hacer o simular como el libro»): conmutador
- * «Libro | Tabla», por defecto el libro, recordado en el dispositivo (localStorage, con try/catch). Con un
- * filtro en la URL (la campana) se abre la tabla, que es la que filtra, sin tocar lo recordado.
+ * Pestaña «Lista» (11/11/2026, petición del dueño: «merge libro y tabla con la vista de libro pero que se llame
+ * lista sin toggle»): una sola vista, la hoja por día. Un estado en la URL (la campana, los avisos) llega a la
+ * Lista como `estadoInicial`: «por atender», «solicitudes» y «pendiente» abren «Pendientes».
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
@@ -12,14 +12,12 @@ vi.mock("@/components/DashboardLayout", () => ({
 }));
 vi.mock("@/components/reservas/VistaHoy", () => ({ VistaHoy: () => null }));
 vi.mock("@/components/reservas/FormularioReserva", () => ({ FormularioReserva: () => null }));
-vi.mock("@/components/reservas/ListaReservasAvanzada", () => ({ ListaReservasAvanzada: () => <div data-testid="tabla-lista" /> }));
 const pag = vi.hoisted(() => ({ puedeEditar: true, libro: vi.fn(), lista: vi.fn() }));
 vi.mock("@/components/reservas/libro/ListaComoLibro", () => ({
-  ListaComoLibro: (props: { extra?: React.ReactNode; onAnadirReserva?: (f: string) => void; resaltar?: unknown }) => {
+  ListaComoLibro: (props: { estadoInicial?: string | null; onAnadirReserva?: (f: string) => void; resaltar?: unknown }) => {
     pag.lista(props);
     return (
-      <div data-testid="libro-lista">
-        {props.extra}
+      <div data-testid="libro-lista" data-estado={props.estadoInicial ?? ""}>
         {props.onAnadirReserva && (
           <button type="button" onClick={() => props.onAnadirReserva!("2026-11-20")}>
             Añadir reserva a este día
@@ -85,52 +83,22 @@ beforeEach(() => {
   pag.lista.mockClear();
 });
 
-describe("Reservas › Lista · conmutador «Libro | Tabla»", () => {
-  it("por defecto se ve el libro", async () => {
+describe("Reservas › Lista · una sola vista, sin conmutador", () => {
+  it("se ve la hoja por día, sin «Libro | Tabla»", async () => {
     montar();
-    expect(await screen.findByTestId("libro-lista")).toBeInTheDocument();
-    expect(screen.queryByTestId("tabla-lista")).not.toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Libro/ })).toHaveAttribute("data-state", "on");
+    expect(await screen.findByTestId("libro-lista")).toHaveAttribute("data-estado", "");
+    expect(screen.queryByRole("radio", { name: /Libro|Tabla/ })).toBeNull();
   });
 
-  it("al elegir «Tabla» sale la tabla y se recuerda para la próxima vez", async () => {
-    montar();
-    fireEvent.click(await screen.findByRole("radio", { name: /Tabla/ }));
-    expect(await screen.findByTestId("tabla-lista")).toBeInTheDocument();
-    expect(screen.queryByTestId("libro-lista")).not.toBeInTheDocument();
-    expect(localStorage.getItem("reservas.vistaLista")).toBe("tabla");
-
-    cleanup();
-    montar();
-    expect(await screen.findByTestId("tabla-lista")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("radio", { name: /Libro/ }));
-    expect(await screen.findByTestId("libro-lista")).toBeInTheDocument();
-    expect(localStorage.getItem("reservas.vistaLista")).toBe("libro");
-  });
-
-  it("sin almacenamiento (modo privado) no rompe: libro por defecto y el conmutador funciona", async () => {
-    const leer = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new Error("bloqueado");
-    });
-    const escribir = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("bloqueado");
-    });
-    try {
-      montar();
-      expect(await screen.findByTestId("libro-lista")).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("radio", { name: /Tabla/ }));
-      expect(await screen.findByTestId("tabla-lista")).toBeInTheDocument();
-    } finally {
-      leer.mockRestore();
-      escribir.mockRestore();
-    }
-  });
-
-  it("con un filtro en la URL (la campana) se abre la tabla sin cambiar lo recordado", async () => {
-    montar("/reservas?tab=reservas&status=pendiente");
-    expect(await screen.findByTestId("tabla-lista")).toBeInTheDocument();
-    expect(localStorage.getItem("reservas.vistaLista")).toBeNull();
+  it.each([
+    ["por_atender", "pendiente"],
+    ["solicitudes", "pendiente"],
+    ["pendiente", "pendiente"],
+    ["cancelada", "cancelada"],
+    ["otra-cosa", ""],
+  ])("con ?status=%s la Lista abre «%s»", async (status, esperado) => {
+    montar(`/reservas?tab=reservas&status=${status}`);
+    expect(await screen.findByTestId("libro-lista")).toHaveAttribute("data-estado", esperado);
   });
 });
 

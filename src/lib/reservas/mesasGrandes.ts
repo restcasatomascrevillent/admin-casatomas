@@ -26,6 +26,13 @@ export const RELLENO_MESAS_GRANDES = 8;
 /** Tamaño máximo de una tarjeta (px), para que con 3 mesas en una sala no salgan de medio metro. */
 const MAX_ANCHO_TARJETA = 144;
 const MAX_ALTO_TARJETA = 100;
+/**
+ * Alto máximo al ESTIRAR las tarjetas hacia abajo cuando sobra alto (11/11/2026, petición del dueño: «que los
+ * recuadros de las mesas se adapten al espacio de forma vertical si hace falta»): hasta llenar el hueco, sin
+ * pasar de 150 px ni de 1,5 veces el ancho (más alta, la tarjeta parece una columna).
+ */
+const MAX_ALTO_ESTIRADA = 150;
+const MAX_PROPORCION_ESTIRADA = 1.5;
 
 /** Las tarjetas de una sala: una por mesa suelta y una por unión. */
 export function unidadesMesas(mesas: readonly MesaPosicion[], uniones: readonly UnionPosicion[] = []): UnidadMesas[] {
@@ -66,7 +73,8 @@ export function medidasTarjetas(ancho: number, alto: number, filas: number, colu
 
 /**
  * «Ordenadas»: cuántas columnas y filas para `n` tarjetas en un hueco de `ancho` × `alto` px, con las tarjetas
- * más grandes posible (lo ancho solo cuenta hasta 1,5 veces el alto: una tarjeta plana no se lee).
+ * más grandes posible (lo ancho solo cuenta hasta 1,5 veces el alto: una tarjeta plana no se lee). Elegida la
+ * rejilla, si sobra alto las tarjetas se estiran hacia abajo hasta llenarlo (ver `MAX_ALTO_ESTIRADA`).
  */
 export function rejillaOrdenadas(n: number, ancho: number, alto: number) {
   let mejor = { columnas: 1, filas: Math.max(1, n), ...medidasTarjetas(ancho, alto, Math.max(1, n), 1) };
@@ -80,5 +88,7 @@ export function rejillaOrdenadas(n: number, ancho: number, alto: number) {
       mejorNota = nota;
     }
   }
-  return mejor;
+  const celdaAlto = (alto - 2 * RELLENO_MESAS_GRANDES - (mejor.filas - 1) * mejor.hueco) / mejor.filas;
+  const estirada = Math.floor(Math.min(celdaAlto, mejor.tarjetaAncho * MAX_PROPORCION_ESTIRADA, MAX_ALTO_ESTIRADA));
+  return { ...mejor, tarjetaAlto: Math.max(mejor.tarjetaAlto, estirada) };
 }

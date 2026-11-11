@@ -47,7 +47,7 @@ describe("FichaDocumento › retención de IRPF", () => {
   it("con retención: Base · IVA · Retención IRPF (−19 %) · Total a pagar, en ese orden", () => {
     montar({ ...base, retencion_irpf: 209, retencion_irpf_pct: 19 });
     const franja = screen.getByLabelText("Importes");
-    expect(franja).toHaveTextContent(/Base imponible\s*1\.100,00\s€\s*IVA\s*231,00\s€\s*Retención IRPF \(−19 %\)\s*−209,00\s€\s*Total a pagar\s*1\.122,00\s€/);
+    expect(franja).toHaveTextContent(/Base imponible\s*1\.100,00\s€\s*IVA \(21 %\)\s*231,00\s€\s*Retención IRPF \(−19 %\)\s*−209,00\s€\s*Total a pagar\s*1\.122,00\s€/);
     expect(screen.getByTestId("retencion-documento")).toBeInTheDocument();
   });
 

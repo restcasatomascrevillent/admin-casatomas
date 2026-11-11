@@ -187,8 +187,9 @@ describe("resolverDeepLinkReservas", () => {
     expect(resolverDeepLinkReservas({ tab: "hoy", date: "today" }).tab).toBe("reservas");
   });
 
-  it("?tab=proximas abre «Próximas reservas»", () => {
-    expect(resolverDeepLinkReservas({ tab: "proximas" }).tab).toBe("asignacion");
+  it("«Próximas reservas» se unificó con la Lista (11/11/2026): ?tab=proximas y ?tab=asignacion abren la Lista", () => {
+    expect(resolverDeepLinkReservas({ tab: "proximas" }).tab).toBe("reservas");
+    expect(resolverDeepLinkReservas({ tab: "asignacion" }).tab).toBe("reservas");
   });
 
   it("redirige las pestañas antiguas a 'reservas' conservando filtros", () => {
@@ -207,9 +208,6 @@ describe("resolverDeepLinkReservas", () => {
   it("respeta las pestañas vigentes y descarta las desconocidas", () => {
     expect(resolverDeepLinkReservas({ tab: "blacklist" }).tab).toBe("blacklist");
     expect(resolverDeepLinkReservas({ tab: "configuracion" }).tab).toBe("configuracion");
-    // El enlace de la campana para `reserva_sin_asignar` (CentroNotificaciones)
-    // es /reservas?tab=asignacion: tiene que abrir esa pestaña, no Lista.
-    expect(resolverDeepLinkReservas({ tab: "asignacion" }).tab).toBe("asignacion");
     expect(resolverDeepLinkReservas({ tab: "inventada" }).tab).toBe("reservas");
     expect(resolverDeepLinkReservas({}).tab).toBe("reservas");
   });

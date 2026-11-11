@@ -25,6 +25,11 @@ export interface UserRoleData {
    * recordado en el dispositivo (`lib/cachePermisos.ts`): vale para dejar pasar, no para echar a nadie.
    */
   verificado?: boolean;
+  /**
+   * Sección que se abre al iniciar sesión (11/11/2026, `lib/seccionInicio.ts`): la clave guardada en
+   * `user_roles.seccion_inicio`, null = lo de siempre y `undefined` = aún no se sabe.
+   */
+  seccionInicio?: string | null;
 }
 
 export const SECTIONS = [
@@ -94,6 +99,25 @@ function recordarSiCompleto(
 }
 
 /**
+ * Sección de inicio del usuario (11/11/2026, petición del dueño: «qué pestaña se le va a abrir por
+ * defecto cuando inician sesión»). Lectura aparte del rol y sin tumbar nada si falla: una BD sin la
+ * columna (migración 20261124134500 aún no aplicada) o un corte devuelven `undefined` (no se sabe).
+ */
+async function leerSeccionInicio(userId: string): Promise<string | null | undefined> {
+  try {
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("seccion_inicio")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return undefined;
+    return typeof data?.seccion_inicio === "string" && data.seccion_inicio ? data.seccion_inicio : null;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Única consulta de rol/permisos para toda la app (2026-09-25).
  *
  * Mismo problema que useAuth: ProtectedRoute y AppSidebar llamaban cada uno
@@ -110,6 +134,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<UserPermissions[]>([]);
   const [loading, setLoading] = useState(true);
   const [verificado, setVerificado] = useState(false);
+  const [seccionInicio, setSeccionInicio] = useState<string | null | undefined>(undefined);
 
   // Se depende de valores primitivos (id, email), NO del objeto `user`:
   // supabase-js re-emite SIGNED_IN / TOKEN_REFRESHED al volver a la app y eso
@@ -133,6 +158,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
     if (!userId) {
       setRole(null);
       setPermissions([]);
+      setSeccionInicio(null);
       setLoading(false);
       setVerificado(true);
       return;
@@ -145,6 +171,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
     // refresco de token), así que es seguro descartar lo del usuario anterior.
     setRole(null);
     setPermissions([]);
+    setSeccionInicio(undefined);
 
     // Si es super admin, acceso inmediato
     if (isSuperAdminUser) {
@@ -158,6 +185,8 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
     if (recordado?.permissions) {
       setRole(recordado.role ?? (isSuperAdminUser ? "admin" : null));
       setPermissions(recordado.permissions);
+      // Una copia de antes del 11/11/2026 no la tiene: se entra como siempre sin esperar a la red.
+      setSeccionInicio(recordado.seccionInicio ?? null);
       setLoading(false);
     }
 
@@ -171,12 +200,18 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
       try {
         // Rol y permisos A LA VEZ (07/11/2026): no dependen uno del otro y en serie eran dos
         // viajes seguidos al entrar (con cobertura de móvil se notaba). Se aplican igual que antes.
-        const [{ data: roleData, error: roleError }, { data: permData, error: permError }] = await Promise.all([
+        // La sección de inicio va en el mismo viaje (11/11/2026): ProtectedRoute la necesita al entrar.
+        const [{ data: roleData, error: roleError }, { data: permData, error: permError }, seccion] = await Promise.all([
           supabase.from("user_roles").select("role").eq("user_id", userId).single(),
           supabase.from("user_permissions").select("section_key, can_view, can_edit").eq("user_id", userId),
+          leerSeccionInicio(userId),
         ]);
         if (!isMounted) return;
         recordarSiCompleto(userId, roleData, roleError, permData, permError);
+        if (seccion !== undefined) {
+          setSeccionInicio(seccion);
+          guardarPermisosRecordados(userId, { seccionInicio: seccion });
+        }
 
         if (roleData) {
           setRole(roleData.role as AppRole);
@@ -191,7 +226,11 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         console.error("Error fetching role/permissions:", error);
       } finally {
         if (isMounted && !isSuperAdminUser) setLoading(false);
-        if (isMounted) setVerificado(true);
+        if (isMounted) {
+          // Sin poder leerla (ni copia): lo de siempre.
+          setSeccionInicio((previa) => (previa === undefined ? null : previa));
+          setVerificado(true);
+        }
       }
     };
 
@@ -252,6 +291,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
     permissions,
     loading,
     verificado,
+    seccionInicio,
   };
 
   return <UserRoleContext.Provider value={value}>{children}</UserRoleContext.Provider>;

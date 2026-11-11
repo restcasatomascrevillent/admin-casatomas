@@ -220,11 +220,11 @@ describe("Hoy · solo «Ver»", () => {
     expect(screen.getByRole("button", { name: /Sin reserva/ })).toBeInTheDocument();
   });
 
-  it("con solo «Ver» no están, y la ayuda no promete acciones", () => {
+  it("con solo «Ver» no están, y no hay ayuda (i) (11/11/2026)", () => {
     h.puedeEditar = false;
     montar();
     expect(screen.queryByRole("button", { name: /Organizar/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Sin reserva/ })).toBeNull();
-    expect(screen.getByRole("note").getAttribute("title")).not.toMatch(/Sentar|fijar/);
+    expect(screen.queryByRole("note")).toBeNull();
   });
 });

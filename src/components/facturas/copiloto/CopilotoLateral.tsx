@@ -125,7 +125,9 @@ export function CopilotoLateral({
             <TooltipProvider delayDuration={300}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <a href={enlacePantallaCompleta} className={BOTON} aria-label="Pantalla completa" onClick={alPulsarPantallaCompleta} data-testid="copiloto-pantalla-completa">
+                  {/* En el móvil el panel ya ocupa toda la pantalla: ampliar no tiene sentido (11/11/2026, dueño).
+                      Desde `sm` (donde el panel mide 360 px), como siempre. */}
+                  <a href={enlacePantallaCompleta} className={cn(BOTON, "hidden sm:inline-flex")} aria-label="Pantalla completa" onClick={alPulsarPantallaCompleta} data-testid="copiloto-pantalla-completa">
                     <Maximize2 className="h-4 w-4" aria-hidden />
                   </a>
                 </TooltipTrigger>

@@ -17,6 +17,7 @@ import { PestanaCostes } from "@/components/servicios/PestanaCostes";
 import { PestanaEstado } from "@/components/servicios/PestanaEstado";
 import { PestanaModelos } from "@/components/servicios/PestanaModelos";
 import { PestanaServicios } from "@/components/servicios/PestanaServicios";
+import { TarjetaTelegram } from "@/components/servicios/TarjetaTelegram";
 import { PESTANA_POR_DEFECTO, type PestanaServicios as Pestana, pestanaDeUrl } from "@/components/servicios/pestanas";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useCostePorModelo, useFuncionesSinRegistro } from "@/hooks/useCostes";
@@ -315,16 +316,20 @@ export default function SuperAdminServicios() {
             {pestana === "modelos" && <PestanaModelos />}
           </TabsContent>
           <TabsContent value="configurar" className={CONTENIDO_PESTANA}>
-            {estado ?? (
-              <PestanaConfigurar
-                enUso={enUso}
-                quitados={quitados}
-                costes={costes}
-                config={config.data ?? null}
-                onEditar={setEditando}
-                onAnadir={anadir}
-              />
-            )}
+            <div className="flex min-w-0 flex-col gap-4 pb-2">
+              {estado ?? (
+                <PestanaConfigurar
+                  enUso={enUso}
+                  quitados={quitados}
+                  costes={costes}
+                  config={config.data ?? null}
+                  onEditar={setEditando}
+                  onAnadir={anadir}
+                />
+              )}
+              {/* Avisos por Telegram (20261126001000): no depende de la tabla de servicios. */}
+              {pestana === "configurar" && <TarjetaTelegram />}
+            </div>
           </TabsContent>
         </Tabs>
       </div>

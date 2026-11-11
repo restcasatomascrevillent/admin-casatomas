@@ -81,6 +81,8 @@ export const ADMITE_INTEGRACION: ReadonlySet<string> = new Set([
   "newsletter-sync-resend", "sync-trafico-web", "ocr-trabajo", "clasificar-productos",
   "sincronizar-costes-openai", "instagram-programador", "instagram-metricas",
   "facturas-originales-drive", "ia-modelos-openai",
+  // Avisos por Telegram (20261126001000): pg_cron con x-ocr-secret o un super admin.
+  "avisos-telegram",
   // Super Admin › Logs: la ingesta la llama cualquier visitante de la web (origen
   // permitido + tope de tamaño + límite por IP con HMAC + cupo diario en la RPC);
   // el proceso, pg_cron con su secreto o un super admin.

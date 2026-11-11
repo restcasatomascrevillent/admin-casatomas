@@ -187,6 +187,8 @@ export interface VistaPlanoHoyProps {
    * abrirla, sus mesas se resaltan y, si están en otra sala, el plano salta a esa sala (solo `fijo`).
    */
   reservaResaltada?: string | null;
+  /** Día que se ve (11/11/2026, Reservas con días). Sin él, hoy (y cambia a medianoche). */
+  fecha?: string;
 }
 
 /**
@@ -227,9 +229,11 @@ export function VistaPlanoHoy({
   onReintentarReservas,
   fijo = false,
   reservaResaltada: reservaResaltadaExterna = null,
+  fecha,
 }: VistaPlanoHoyProps) {
-  // Cambia a medianoche: la tablet se queda en «Hoy» toda la noche.
-  const hoy = useHoyLocal();
+  // Cambia a medianoche: la tablet se queda en «Hoy» toda la noche. Con `fecha`, el día elegido.
+  const hoyLocal = useHoyLocal();
+  const hoy = fecha ?? hoyLocal;
   const esMovil = useIsMobile();
   const enHojas = useIsBelow(ANCHO_PANEL_LATERAL) || fijo;
   const ahora = useAhora();
@@ -739,6 +743,39 @@ export function VistaPlanoHoy({
   const numAjustes = (ajustesQuery.data ?? []).length;
   const esTerraza = !!sala && /terraza/i.test(sala.title);
   const cierreSala = useSalaCerradaServicio(esTerraza ? (sala?.id ?? null) : null, hoy, turno);
+  /**
+   * Cerrar la terraza en este servicio (escribe: solo con «Editar», 06/11/2026). Con solo «Ver», si está cerrada se
+   * dice, sin interruptor. Píldora que dice el estado de verdad, «Abierta» / «Cerrada» (11/11/2026).
+   */
+  const interruptorTerraza = sala ? (
+    <>
+      {esTerraza && puedeEditar && (
+        // 11/11/2026 (dueño: «ajusta esto para que se vea mejor»): píldora compacta que dice el estado de verdad
+        // («Abierta» / «Cerrada», en rojo), a la altura del botón «…». Antes ponía siempre «Cerrada» junto al
+        // interruptor apagado y confundía.
+        <label
+          className={cn(
+            "flex h-11 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm font-medium",
+            cierreSala.cerrada ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-card text-foreground",
+          )}
+        >
+          <Switch
+            className="scale-90"
+            checked={cierreSala.cerrada}
+            onCheckedChange={(v) => void cierreSala.cambiar(v)}
+            aria-label={`${sala.title} cerrada en este servicio`}
+          />
+          {cierreSala.cerrada ? "Cerrada" : "Abierta"}
+        </label>
+      )}
+      {esTerraza && !puedeEditar && cierreSala.cerrada && (
+        <Badge variant="outline" className="h-10 px-2 text-[13px]">
+          Cerrada en este servicio
+        </Badge>
+      )}
+    </>
+  ) : null;
+
   // «Evento: sala entera» (20261119100000): la sala es de un evento en este turno.
   const { data: eventosHoy } = useSalasEvento(hoy);
   const eventosTurno = useMemo(() => eventosDelTurno(eventosHoy, hoy, turno), [eventosHoy, hoy, turno]);
@@ -1235,13 +1272,20 @@ export function VistaPlanoHoy({
           <div className={cn("flex min-w-0 items-center gap-2", fijo && "flex-wrap gap-y-1")}>
             {fijo && sala ? (
               <>
-                <h2 className="flex shrink-0 items-center gap-2 text-2xl font-bold" data-testid="plano-fijo-sala" aria-live="polite">
-                  {sala.privada && <Lock className="h-5 w-5 shrink-0" aria-hidden="true" />}
-                  <span className="whitespace-nowrap" data-testid="plano-fijo-nombre">{sala.title}</span>
-                  <span className="shrink-0 text-lg font-semibold tabular-nums text-muted-foreground">
-                    {indiceSala + 1}/{salas.length}
-                  </span>
-                </h2>
+                {/* 11/11/2026 (dueño: «que se vea como en Comedor, cena y reservas bajo»): el nombre SIEMPRE en su
+                    propia línea; debajo, a la izquierda, el turno y las reservas y, a la derecha, los botones. Igual en
+                    todas las salas, quepa o no en una fila. */}
+                <div className="flex basis-full items-center gap-3">
+                  <h2 className="flex items-center gap-2 text-xl font-bold lg:text-2xl" data-testid="plano-fijo-sala" aria-live="polite">
+                    {sala.privada && <Lock className="h-5 w-5 shrink-0" aria-hidden="true" />}
+                    <span className="whitespace-nowrap" data-testid="plano-fijo-nombre">{sala.title}</span>
+                    <span className="shrink-0 text-lg font-semibold tabular-nums text-muted-foreground">
+                      {indiceSala + 1}/{salas.length}
+                    </span>
+                  </h2>
+                  {/* En la terraza, «Abierta / Cerrada» al lado del nombre (11/11/2026, petición del dueño). */}
+                  {!proponiendo && esTerraza && interruptorTerraza}
+                </div>
                 <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
                   <span className="whitespace-nowrap rounded-md border px-2 py-0.5 text-[13px] font-medium text-foreground" data-testid="plano-fijo-turno">
                     {etiquetaTurno}
@@ -1315,23 +1359,12 @@ export function VistaPlanoHoy({
                     {textoEvento(eventoSala)}
                   </Badge>
                 )}
-                {/* Cerrar la terraza y volver al plano base escriben: solo con «Editar» (06/11/2026). Con
-                    solo «Ver», si la terraza está cerrada se dice, sin interruptor. */}
-                {esTerraza && puedeEditar && (
-                  <label className={cn("flex items-center gap-2 rounded-md border px-2 text-[13px]", fijo ? "h-11" : "h-10")}>
-                    <Switch checked={cierreSala.cerrada} onCheckedChange={(v) => void cierreSala.cambiar(v)} aria-label={`${sala.title} cerrada en este servicio`} />
-                    Cerrada
-                  </label>
-                )}
-                {esTerraza && !puedeEditar && cierreSala.cerrada && (
-                  <Badge variant="outline" className="h-10 px-2 text-[13px]">
-                    Cerrada en este servicio
-                  </Badge>
-                )}
+                {/* Cerrar la terraza: en el plano fijo va junto al nombre (arriba); aquí, en el resto de vistas. */}
+                {!fijo && esTerraza && interruptorTerraza}
                 {puedeEditar && fijo && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="h-11 w-11 p-0" aria-label="Más opciones de la sala">
+                      <Button variant="outline" className="h-11 w-11 rounded-full p-0" aria-label="Más opciones de la sala">
                         <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -1466,9 +1499,12 @@ export function VistaPlanoHoy({
                 <div className="flex min-w-0 items-center gap-2">
                   {/* Fijo (escritorio): leyenda compacta en una línea, siempre entera. */}
                   {!esMovil && listo && (fijo ? <div className="min-w-0 flex-1" data-testid="leyenda-plano">{leyendaCompacta}</div> : <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">{leyendaEn(true)}</div>)}
+                  {/* Sin «Por sentar» en Reservas de tablet y escritorio (11/11/2026, petición del dueño: la lista de la
+                      izquierda ya dice quién falta por sentar). */}
+                  {!fijo && (
                   <Button
                     variant="outline"
-                    className={cn("h-11 justify-between", fijo ? "gap-2 px-3" : "gap-3", esMovil ? "w-full" : "ml-auto shrink-0")}
+                    className={cn("h-11 justify-between gap-3", esMovil ? "w-full" : "ml-auto shrink-0")}
                     disabled={!listo}
                     onClick={() => setPendientesAbiertos(true)}
                     aria-label={
@@ -1479,9 +1515,10 @@ export function VistaPlanoHoy({
                   >
                     <span>Por sentar</span>
                     <span className="text-[13px] tabular-nums text-muted-foreground">
-                      {listo ? (fijo ? `${pendientesSala.length} · ${sinSala.length}` : `${pendientesSala.length} sin mesa · ${sinSala.length} sin sala`) : "…"}
+                      {listo ? `${pendientesSala.length} sin mesa · ${sinSala.length} sin sala` : "…"}
                     </span>
                   </Button>
+                  )}
                 </div>
               ) : (
                 <aside
@@ -1621,8 +1658,10 @@ export function VistaPlanoHoy({
 }
 
 /**
- * Plano fijo de escritorio: flechas grandes (64×56 px) a izquierda y derecha del plano para pasar de sala.
- * Sin `activo` (o con una sola sala) deja el plano tal cual.
+ * Plano fijo de escritorio: pasar de sala. 11/11/2026, petición del dueño: fuera las flechas grandes de los lados;
+ * dos flechas pequeñas y discretas debajo del plano, con el nombre de la sala, para quien no tenga pantalla táctil
+ * (con el dedo también se desliza sobre las mesas, `gestosSala`). Las teclas ← → siguen valiendo. Sin `activo` (o con una sola sala)
+ * deja el plano tal cual.
  */
 function ConFlechasSala({
   activo,
@@ -1641,26 +1680,32 @@ function ConFlechasSala({
 }) {
   if (!activo) return <>{children}</>;
   return (
-    <div className="flex min-h-0 min-w-0 items-stretch gap-2" data-testid="plano-fijo">
-      <Button
-        variant="outline"
-        className="h-auto min-h-14 w-14 shrink-0 self-center py-6"
-        onClick={onAnterior}
-        aria-label={anterior ? `Sala anterior: ${anterior}` : "Sala anterior"}
-        title={anterior ? `${anterior} (←)` : "Sala anterior (←)"}
-      >
-        <ChevronLeft className="!h-9 !w-9" aria-hidden="true" />
-      </Button>
+    <div className="flex min-h-0 min-w-0 flex-col gap-1" data-testid="plano-fijo">
       <div className="grid min-h-0 min-w-0 flex-1">{children}</div>
-      <Button
-        variant="outline"
-        className="h-auto min-h-14 w-14 shrink-0 self-center py-6"
-        onClick={onSiguiente}
-        aria-label={siguiente ? `Sala siguiente: ${siguiente}` : "Sala siguiente"}
-        title={siguiente ? `${siguiente} (→)` : "Sala siguiente (→)"}
-      >
-        <ChevronRight className="!h-9 !w-9" aria-hidden="true" />
-      </Button>
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1 px-2 text-sm font-normal text-muted-foreground hover:text-foreground"
+          onClick={onAnterior}
+          aria-label={anterior ? `Sala anterior: ${anterior}` : "Sala anterior"}
+          title={anterior ? `${anterior} (←)` : "Sala anterior (←)"}
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          {anterior}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1 px-2 text-sm font-normal text-muted-foreground hover:text-foreground"
+          onClick={onSiguiente}
+          aria-label={siguiente ? `Sala siguiente: ${siguiente}` : "Sala siguiente"}
+          title={siguiente ? `${siguiente} (→)` : "Sala siguiente (→)"}
+        >
+          {siguiente}
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </div>
     </div>
   );
 }

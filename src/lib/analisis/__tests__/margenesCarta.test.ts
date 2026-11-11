@@ -77,7 +77,21 @@ describe("razon", () => {
   });
   it("vino: botella y multiplicador", () => {
     expect(razon(d.vinos[0], d.config)).toBe(
-      "Laurent‑Perrier Millésimé: la botella cuesta 80,40 € y se vende a 110,00 € → 1,37× (mínimo 2,50×).",
+      "Laurent‑Perrier Millésimé: la botella cuesta 80,40 € y se vende a 100,00 € sin IVA (110,00 € en carta) → 1,37× (mínimo 2,50×).",
+    );
+  });
+  it("vino con la tienda por debajo y comprado en otro formato", () => {
+    const v = normalizarMargenes({
+      ...RPC,
+      vinos: [{
+        id: "v2", nombre: "Godeval (Magnum)", precio: 42, venta: 38.18, coste: 33.7, multiplicador: 1.13, litros: 1.5, litros_producto: 0.75,
+        formato_distinto: true, en_tienda: true, precio_tienda: 29.4, venta_tienda: 24.3, multiplicador_tienda: 0.72,
+        banderas: ["formato_distinto", "multiplicador_bajo", "tienda_bajo"],
+      }],
+    }).vinos[0];
+    expect(razon(v, { ...CONFIG_POR_DEFECTO })).toBe(
+      "Godeval (Magnum): la botella cuesta 33,70 € y se vende a 38,18 € sin IVA (42,00 € en carta) → 1,13× (mínimo 2,30×); " +
+        "en la tienda, a 29,40 € (24,30 € sin IVA) → 0,72× (mínimo 1,50×); coste estimado desde la botella de 75 cl.",
     );
   });
 });
@@ -94,8 +108,8 @@ describe("problemas y gráfica", () => {
     expect(puntos.find((p) => p.id === "p1")?.rojo).toBe(true);
     expect(puntos.find((p) => p.id === "p2")?.rojo).toBe(false);
   });
-  it("2,5× sobre el precio con IVA del 10 % = 44 % de coste sin IVA", () => {
-    expect(pctDeMultiplicador(2.5, 10)).toBeCloseTo(44, 5);
+  it("vinos sin IVA / sin IVA (20261125100000): 2,3× = 43,5 % de coste", () => {
+    expect(pctDeMultiplicador(2.3)).toBeCloseTo(43.478, 2);
   });
 });
 
