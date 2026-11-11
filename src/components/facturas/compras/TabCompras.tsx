@@ -678,7 +678,7 @@ export function TabCompras({
               <span className="shrink-0 text-xs font-medium text-muted-foreground" aria-hidden="true">
                 Periodo
               </span>
-              <span className={`${PISTA_SEGMENTOS} max-sm:h-auto max-sm:min-w-0 max-sm:flex-wrap`}>
+              <span className={`${PISTA_SEGMENTOS} max-sm:h-auto max-sm:min-w-0 max-sm:shrink max-sm:flex-wrap`}>
                 {PERIODOS.map((p) => (
                   <button
                     key={p.valor}
