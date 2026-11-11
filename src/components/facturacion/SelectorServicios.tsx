@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
@@ -6,7 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Check, Plus, Package, GripVertical, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { categorias, periodicidades, euros, type CatalogoFacturacion, type LineaFactura } from "./modelo";
 import { productosSeleccionados } from "./catalogo";
@@ -22,7 +23,7 @@ export function SelectorServicios({catalogo,lineas,agregar}: Props) {
     <p className="text-xs text-muted-foreground">Las tarifas se editan en «Módulos y paquetes». Después puedes ajustar cada importe en la factura.</p>
   </CardHeader><CardContent>
     <Tabs defaultValue="paquetes">
-      <TabsList><TabsTrigger value="paquetes">Paquetes</TabsTrigger><TabsTrigger value="modulos">Módulos y servicios</TabsTrigger></TabsList>
+      <ChipsSubnivel aria-label="Qué añadir" chips={[{ valor: "paquetes", etiqueta: "Paquetes" }, { valor: "modulos", etiqueta: "Módulos y servicios" }]} />
       <TabsContent value="paquetes" className="space-y-2 pt-2">{catalogo.paquetes.length ? catalogo.paquetes.map(p => {
         const productos = catalogo.productos.filter(v=>p.productoIds.includes(v.id));
         const incluidos = productos.filter(v=>elegidos.has(v.id)).length;

@@ -39,6 +39,11 @@ All colors MUST be HSL.
     --radius: 0.75rem;
 
     /* Status colors */
+    /* Dorado de Casa Tomás (web oficial: CTA «Reservar mesa», 11/11/2026, Fase 3). `gold` para subrayados, bordes,
+       iconos y anillos (3:1 sobre blanco); `gold-strong` para TEXTO dorado (≥ 4,5:1); `gold-deep`, su hover. */
+    --gold: 38 59% 45%;
+    --gold-strong: 38 59% 33%;
+    --gold-deep: 38 59% 28%;
     --status-pending: 45 93% 47%;
     --status-pending-foreground: 206 11% 25%;
     --status-verified: 210 100% 50%;
@@ -100,6 +105,9 @@ All colors MUST be HSL.
     --input: 206 11% 30%;
     --ring: 38 59% 45%;
 
+    --gold: 38 59% 50%;
+    --gold-strong: 38 70% 62%;
+    --gold-deep: 38 70% 70%;
     --status-pending: 45 93% 47%;
     --status-pending-foreground: 0 0% 100%;
     --status-verified: 210 100% 50%;

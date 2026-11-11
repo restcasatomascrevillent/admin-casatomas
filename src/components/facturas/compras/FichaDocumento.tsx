@@ -227,7 +227,7 @@ export function FichaDocumento({
               {puedeEditar && <span className="h-6 w-px bg-border/70" aria-hidden="true" />}
               <Button
                 variant="ghost"
-                className="h-11 min-w-11 shrink-0 gap-1.5 px-3 text-sm font-medium text-[hsl(38,59%,33%)] hover:bg-[hsl(38,59%,45%)/0.1] hover:text-[hsl(38,59%,28%)] dark:text-[hsl(38,59%,62%)]"
+                className="h-11 min-w-11 shrink-0 gap-1.5 px-3 text-sm font-medium text-gold-strong hover:bg-gold/10 hover:text-gold-deep dark:text-gold-strong"
                 onClick={() => onPreguntarIA(doc)}
                 aria-label="Preguntar a la IA"
               >

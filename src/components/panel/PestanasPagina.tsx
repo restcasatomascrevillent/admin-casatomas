@@ -32,7 +32,7 @@ export interface PestanaPagina {
   tonoContador?: "primario" | "dorado";
   /** Nombre accesible del contador (p. ej. «3 procesando»). */
   etiquetaContador?: string;
-  /** Por defecto el contador se oculta por debajo de `sm` (poco sitio); `true` lo deja siempre. */
+  /** Ya no hace nada (Fase 3): el contador se ve SIEMPRE. Se mantiene para no romper a quien lo pasa. */
   contadorEnMovil?: boolean;
   disabled?: boolean;
   /** Marca para el tour guiado (`data-tour`), ver `lib/ayuda/tours.ts`. */
@@ -77,7 +77,7 @@ interface PestanasPaginaProps {
 // sitio, pero NUNCA encogen hasta cortar el nombre («Stoc…», «Configuració…»): si no caben, la tira hace scroll
 // con el degradado del borde (antes `flex-1` las apretaba y el nombre salía cortado sin aviso).
 const CLASE_PESTANA =
-  "flex h-10 items-center gap-1 sm:gap-2 rounded-none border-b-2 border-transparent bg-transparent px-2 sm:px-3 text-muted-foreground shadow-none transition-colors hover:text-foreground pointer-coarse:min-h-11 data-[state=active]:border-[hsl(38,59%,45%)] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none flex-auto shrink-0 sm:flex-none";
+  "flex h-10 items-center gap-1 sm:gap-2 rounded-none border-b-2 border-transparent bg-transparent px-2 sm:px-3 text-muted-foreground shadow-none transition-colors hover:text-foreground pointer-coarse:min-h-11 data-[state=active]:border-gold data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none flex-auto shrink-0 sm:flex-none";
 
 /** Clases de `accionesDebajoEnMovil`: fila, tira de pestañas y acciones, según hasta dónde bajan los botones. */
 const DEBAJO = {
@@ -105,8 +105,19 @@ const DEBAJO = {
 
 const TONO_CONTADOR = {
   primario: "bg-primary/10 text-primary",
-  dorado: "bg-[hsl(38,59%,45%)/0.12] text-[hsl(38,59%,34%)]",
+  dorado: "bg-gold/10 text-gold-strong",
 } as const;
+
+/**
+ * Contador de una pestaña (Fase 3, 11/11/2026): SIEMPRE visible, también en el móvil (antes se ocultaba por debajo de
+ * `sm`). Mismo aspecto en las pestañas de página y en los chips de segundo nivel: píldora de 20 px de alto, cifra
+ * tabular centrada y con separador de miles («1.903»), así 0, 12 o 1.903 quedan alineados con el texto.
+ */
+export const CLASE_CONTADOR =
+  "inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold leading-none tabular-nums";
+// `useGrouping: "always"`: en español el separador de miles no sale con 4 cifras («1903») salvo que se pida.
+const FORMATO_CONTADOR = new Intl.NumberFormat("es-ES", { useGrouping: "always" } as unknown as Intl.NumberFormatOptions);
+export const formatoContador = (n: number) => FORMATO_CONTADOR.format(n);
 
 /** Degradados de los bordes que avisan de que hay más pestañas fuera de la vista. */
 function useBordesScroll() {
@@ -218,19 +229,22 @@ export function PestanasPagina({
               ) : (
                 <span className="truncate text-xs font-medium sm:text-[15px]">{p.etiqueta}</span>
               )}
+              {/* Solo iconos en el móvil: el número va en una burbuja sobre el icono (antes un punto sin cifra). */}
               {soloIconosEnMovil && p.icono && p.contador != null && p.contador > 0 && (
-                <span aria-hidden="true" className="absolute right-1.5 top-2 h-2 w-2 rounded-full bg-[hsl(38,59%,45%)] sm:hidden" data-testid={`punto-${p.valor}`} />
+                <span
+                  aria-hidden="true"
+                  className={cn(CLASE_CONTADOR, "absolute right-0 top-0.5 h-4 min-w-4 bg-gold px-1 text-[11px] text-white sm:hidden")}
+                  data-testid={`punto-${p.valor}`}
+                >
+                  {formatoContador(p.contador)}
+                </span>
               )}
               {p.contador != null && p.contador > 0 && (
                 <span
                   aria-label={p.etiquetaContador}
-                  className={cn(
-                    "ml-1 rounded-full px-1.5 py-0.5 text-[11px] pointer-coarse:text-xs font-semibold leading-none tabular-nums",
-                    TONO_CONTADOR[p.tonoContador ?? "primario"],
-                    !p.contadorEnMovil && "hidden sm:inline",
-                  )}
+                  className={cn(CLASE_CONTADOR, "ml-1", TONO_CONTADOR[p.tonoContador ?? "primario"], soloIconosEnMovil && p.icono && "hidden sm:inline-flex")}
                 >
-                  {p.contador}
+                  {formatoContador(p.contador)}
                 </span>
               )}
             </TabsTrigger>

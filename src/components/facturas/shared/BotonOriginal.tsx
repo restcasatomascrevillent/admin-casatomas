@@ -194,7 +194,7 @@ export function AccionesDocumento({
         <Button
           variant="ghost"
           size="sm"
-          className="h-11 min-w-11 shrink-0 justify-center gap-1.5 whitespace-nowrap p-0 text-xs font-medium text-[hsl(38,59%,45%)] transition-colors hover:bg-[hsl(38,59%,45%)/0.1] hover:text-[hsl(38,59%,45%)] xl:px-2"
+          className="h-11 min-w-11 shrink-0 justify-center gap-1.5 whitespace-nowrap p-0 text-xs font-medium text-gold transition-colors hover:bg-gold/10 hover:text-gold xl:px-2"
           onClick={(e) => {
             e.stopPropagation();
             onPreguntarIA();
