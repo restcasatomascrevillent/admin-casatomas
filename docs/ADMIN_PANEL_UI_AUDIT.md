@@ -40,8 +40,8 @@ Petición del dueño del 11/11/2026; el encargo completo está en la conversaci�
 | Pieza | Regla |
 |---|---|
 | Dorado | Tokens `gold` (bordes, subrayados e iconos; 3:1), `gold-strong` (texto dorado; ≥ 4,5:1) y `gold-deep` (hover). Prohibido `hsl(38,59%,…)` a mano. |
-| Pestañas nivel 1 | `PestanasPagina`: texto con subrayado dorado; 40 px con ratón y 44 px con dedo; si no caben, se desplazan con degradado; nunca se cortan. |
-| Pestañas nivel 2 | `ChipsSubnivel`: píldoras; activa con fondo suave; las filas se parten. |
+| Pestañas nivel 1 | `PestanasPagina`: **activa rellena en pizarra** (el estilo que el dueño pidió el 10/11 para Reservas y Carta, ahora en todo el panel). Inactivas con texto fuerte. 40 px con ratón y 44 px con dedo. Si no caben, se desplazan con degradado; nunca se cortan. |
+| Pestañas nivel 2 | `ChipsSubnivel`, o `PestanasPagina nivel={2}` si hacen falta acciones o scroll: píldoras claras con la activa en `primary/10` y negrita. Nunca dos barras de nivel 1 apiladas. |
 | Contadores | `CLASE_CONTADOR` + `formatoContador`: píldora de 20 px, cifra tabular centrada, separador de miles («1.903»), **siempre visibles**; con 0 no se pintan. |
 | Segmentados de filtro | `ToggleGroup` / `SEGMENTO` (Facturas): no son pestañas, son filtros. |
 | Botón de crear reserva | Azul clarito: `bg-sky-100 text-sky-900 border-sky-300`. |
@@ -71,7 +71,10 @@ Estados: A = auditada en el barrido, C = corregida, V = validada tras corregir.
 - [x] Identidad de la web oficial (captura y estilos calculados).
 - [x] Tokens de dorado y fuera los colores a mano. Commit `89c6e746`.
 - [x] Contadores siempre visibles y con formato. Commit `89c6e746`.
-- [x] Barrido «antes» (en marcha → `resultados.json`).
+- [x] Barrido «antes» (294 medidas).
+- [x] Pestañas unificadas en dos niveles. Commit `2b3fe84c`.
+- [x] Críticos del barrido corregidos (320 px, Reseñas, contraste de «Verificada»).
+- [x] Diálogos: título a la izquierda y pie con hueco. `<main>` con nombre de sección.
 
 ## Pendiente
 - [ ] Analizar el barrido «antes» y abrir la lista de problemas por gravedad.
@@ -80,8 +83,23 @@ Estados: A = auditada en el barrido, C = corregida, V = validada tras corregir.
 - [ ] Barrido «después» y capturas comparadas.
 - [ ] PR a `staging` e informe final.
 
-## Problemas detectados
-_(se rellena con el barrido)_
+## Problemas detectados (barrido «antes»: 294 medidas, 42 pantallas × 7 anchos)
+| Gravedad | Problema | Dónde | Estado |
+|---|---|---|---|
+| Crítica | La página se sale de ancho (358 px en 320): «Avisos» queda fuera | Reservas (todas las pestañas), 320 px | ✅ fila que se parte |
+| Crítica | La página se sale de ancho (359 px en 320): «Pesos por página» | Tráfico web, 320 px | ✅ `flex-wrap` |
+| Crítica | Pantalla de error si el estado de Google llega incompleto (`conectada` de undefined) | Reseñas Google | ✅ `?.` |
+| Alta | Contadores de pestañas ocultos en el móvil | Gestor web, Servicios (y todas las `PestanasPagina`) | ✅ siempre visibles |
+| Alta | Tres estilos de pestaña distintos y dos barras de nivel 1 apiladas | Carta, RRSS › Instagram, Plantillas, Mi cuenta, Suscriptores + 5 `TabsList` sueltos | ✅ dos niveles |
+| Alta | «Verificada»: blanco sobre azul 3,8:1 (< 4,5 AA) | Insignias de estado | ✅ 5,2:1 |
+| Media | Dorado escrito a mano en 17 sitios | Facturas, Servicios, pestañas | ✅ tokens `gold*` |
+| Media | Títulos de diálogo centrados en el móvil (y desviados por la X) | Todos los diálogos | ✅ a la izquierda |
+| Media | Letra de 11 px | «Tú» (Usuarios), vista previa del bot, contadores | ✅ 12 px |
+| Media | Las páginas no tienen `h1` (decisión del dueño: sin títulos) | 32 de 42 | ✅ `<main aria-label="Sección">` |
+| Baja | Consola: `PGRST116` en Cheques con datos sintéticos | Cheques (Supabase falso) | ⏸ solo con datos falsos |
+| Baja | Insignia de versión a 10 px en la cabecera móvil | Cabecera | ⏸ decorativa, se deja |
+
+Sin incidencias en el barrido: objetivos táctiles < 24 px (ninguno) y pestañas cortadas (ninguna).
 
 ## Pruebas ejecutadas
 - tsc: 14 errores, la misma línea base que antes.
@@ -98,4 +116,5 @@ _(se rellena con el barrido)_
 - (ninguna por ahora)
 
 ## Próxima acción
-Leer `resultados.json` del barrido «antes» y priorizar los problemas.
+Pasar las pruebas amplias de `src/components` y `src/pages`, arreglar lo que se haya roto, barrido «después»
+completo, capturas comparadas y PR a `staging`.
