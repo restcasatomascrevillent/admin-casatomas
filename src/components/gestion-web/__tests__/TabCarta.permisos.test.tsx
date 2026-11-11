@@ -16,6 +16,20 @@ const h = vi.hoisted(() => ({
   permisos: [] as Array<{ section_key: string; can_view: boolean; can_edit: boolean }>,
   superAdmin: false,
   mutaciones: [] as string[],
+  /** Carta de Bebidas en la web (configuracion_web.mostrar_carta_bebidas_casa_tomas). */
+  cartaBebidas: false,
+}));
+
+// Interruptor de la carta de Bebidas en la web (11/11/2026): se simula la configuración de la web.
+vi.mock("@/hooks/useConfiguracionWeb", () => ({
+  useConfiguracionWeb: () => ({
+    mostrarCartaBebidas: h.cartaBebidas,
+    cartaBebidasDisponible: true,
+    noDisponible: false,
+    isLoading: false,
+    isError: false,
+    cambiarCartaBebidas: { mutate: (mostrar: boolean) => h.mutaciones.push(`cartaBebidas:${mostrar}`), isPending: false },
+  }),
 }));
 
 const mutacion = (nombre: string) => ({
@@ -121,6 +135,7 @@ beforeEach(() => {
   h.permisos = [];
   h.superAdmin = false;
   h.mutaciones = [];
+  h.cartaBebidas = false;
 });
 
 const SOLO_VER = [{ section_key: "gestor_carta", can_view: true, can_edit: false }];
@@ -231,6 +246,20 @@ describe("Gestor Web › Carta · solo «Ver»", () => {
     expect(botonesDeEscritura()).toEqual([]);
     expect(screen.getByTestId("estado-lectura")).toHaveTextContent("Casa Tomás: sí · Touza: sí");
     expect(screen.getByTestId("etiqueta-solo-lectura")).toBeInTheDocument();
+    // La carta de Bebidas en la web se lee, sin interruptor (11/11/2026).
+    expect(screen.getByTestId("interruptor-carta-bebidas")).toHaveTextContent("Apagada: la web no enseña la carta de bebidas");
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+  });
+
+  it("Bebidas con «Editar»: el interruptor «Carta de bebidas en la web» sale apagado y al pulsarlo la enciende", async () => {
+    h.permisos = EDITAR;
+    await montar();
+    irA(/Bebidas/);
+    await screen.findByRole("heading", { name: "Agua" });
+    const interruptor = screen.getByRole("switch", { name: "Carta de bebidas en la web" });
+    expect(interruptor).not.toBeChecked();
+    fireEvent.click(interruptor);
+    expect(h.mutaciones).toContain("cartaBebidas:true");
   });
 
 });

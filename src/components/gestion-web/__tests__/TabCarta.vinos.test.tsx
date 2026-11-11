@@ -59,6 +59,8 @@ vi.mock("@/components/carta/BotonVinoDesdeFoto", () => ({
 }));
 // La votación del vino favorito tiene sus propias pruebas (EncuestaVinoFavorito.test.tsx).
 vi.mock("@/components/carta/EncuestaVinoFavorito", () => ({ EncuestaVinoFavorito: () => null }));
+// Interruptor «Carta de bebidas en la web» (11/11/2026): aquí solo importa la barra de botones.
+vi.mock("@/components/carta/InterruptorCartaBebidas", () => ({ InterruptorCartaBebidas: () => null }));
 
 // Con «Editar» en la carta (lo de solo «Ver» está en TabCarta.permisos.test.tsx).
 vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));

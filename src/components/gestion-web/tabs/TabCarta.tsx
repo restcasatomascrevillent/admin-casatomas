@@ -47,6 +47,7 @@ import {
 import { esCategoriaOrigenPendiente } from "@/lib/tipos-vino";
 import { categoriasConOrigen } from "@/lib/origen-vino";
 import { filtrarPorVisibilidad, type FiltroVisibilidad } from "@/lib/visibilidad-carta";
+import { InterruptorCartaBebidas } from "@/components/carta/InterruptorCartaBebidas";
 
 type Seccion = "platos" | "bebidas" | "vinos" | "cocteles";
 type FiltroEstado = FiltroVisibilidad;
@@ -470,7 +471,9 @@ export default function TabCarta() {
             <TabsContent value="platos" className="mt-0 space-y-4">
               {renderContenido("platos", <ListaPlatos platos={platosFiltrados} soloLectura={soloLectura} />)}
             </TabsContent>
-            <TabsContent value="bebidas" className="mt-0">
+            <TabsContent value="bebidas" className="mt-0 space-y-4">
+              {/* ¿Sale la carta de Bebidas en la web? (11/11/2026: apagada por defecto). */}
+              <InterruptorCartaBebidas soloLectura={soloLectura} />
               {renderContenido("bebidas", <ListaBebidas bebidas={bebidasFiltradas} soloLectura={soloLectura} />)}
             </TabsContent>
             <TabsContent value="vinos" className="mt-0 space-y-4">
