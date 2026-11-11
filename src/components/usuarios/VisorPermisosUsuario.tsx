@@ -5,6 +5,7 @@ import { Eye, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { seccionesConPermisos, type DatosPermisos } from "./permisosSecciones";
 import { esSeccionSoloEdicion } from "./seccionesSoloEdicion";
+import { opcionInicio, rutaDeInicio } from "@/lib/seccionInicio";
 
 /**
  * Lista de solo lectura de los permisos por sección (Sí / No). La usan este visor y
@@ -57,6 +58,8 @@ export function ListaPermisosUsuario({ user }: { user: DatosPermisos }) {
 
 /** Visor sin controles de escritura, también para superadmins que visitan el panel normal. */
 export function VisorPermisosUsuario({ user, nombre, className }: { user: ManagedUser; nombre: string; className?: string }) {
+  // «Al iniciar sesión, abrir» (11/11/2026): solo si de verdad se abre (la puede ver).
+  const inicio = rutaDeInicio(user.seccion_inicio, user.permissions, user.is_super_admin) ? opcionInicio(user.seccion_inicio) : undefined;
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -78,6 +81,11 @@ export function VisorPermisosUsuario({ user, nombre, className }: { user: Manage
         <div className="shrink-0">
           {user.access_blocked && <p className="mb-3 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">Acceso bloqueado. Se conservan los permisos indicados.</p>}
           {user.is_super_admin && <p className="mb-3 text-sm text-muted-foreground">Super Admin: acceso completo al panel y al área de superadmin.</p>}
+          {inicio && (
+            <p className="mb-3 text-sm text-muted-foreground" data-testid="seccion-inicio">
+              Al iniciar sesión abre: <span className="font-medium text-foreground">{inicio.titulo}</span>
+            </p>
+          )}
           <ListaPermisosUsuario user={user} />
         </div>
         <div className="flex shrink-0 justify-end border-t pt-3">

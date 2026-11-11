@@ -174,6 +174,19 @@ async function abrirPermisosDelCamarero() {
 const interruptor = (dialogo: HTMLElement, nombre: string) =>
   within(dialogo).getByRole("switch", { name: nombre });
 
+describe("ListaUsuarios · «Al iniciar sesión, abrir» (11/11/2026)", () => {
+  it("ofrece las secciones que ve y guarda la elegida en su fila de user_roles", async () => {
+    const dialogo = await abrirPermisosDelCamarero();
+    fireEvent.click(within(dialogo).getByRole("combobox", { name: "Al iniciar sesión, abrir" }));
+    const opciones = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    expect(opciones).toEqual(["Lo de siempre", "Dashboard", "Reservas", "Facturas", "Ayuda"]);
+    fireEvent.click(screen.getByRole("option", { name: "Reservas" }));
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar Permisos" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(doble.filasDe("user_roles", CAMARERO)[0].seccion_inicio).toBe("reservas");
+  });
+});
+
 describe("ListaUsuarios · información de accesos actualizada", () => {
   it("un admin con permisos limitados muestra sus secciones reales, sin acceso completo", async () => {
     doble.bd.tablas.user_roles.find((f) => f.user_id === CAMARERO)!.role =
@@ -215,7 +228,7 @@ describe("ListaUsuarios · información de accesos actualizada", () => {
     const fila = (await screen.findByText("camarero1")).closest("tr")!;
     fireEvent.click(within(fila).getByRole("button", { name: "Permisos" }));
     const dialogo = await screen.findByRole("dialog");
-    fireEvent.click(within(dialogo).getByRole("combobox"));
+    fireEvent.click(within(dialogo).getByRole("combobox", { name: /Tipo de usuario/ }));
     fireEvent.click(await screen.findByRole("option", { name: "Sala" }));
     fireEvent.click(
       within(dialogo).getByRole("button", { name: "Guardar Permisos" }),
@@ -513,8 +526,8 @@ describe("ListaUsuarios · roles preconfigurados y «Puede editar»", () => {
     h.presets = [SIN_EDICION, CON_EDICION];
     const dialogo = await abrirPermisosDelCamarero();
 
-    expect(within(dialogo).getByRole("combobox")).toHaveTextContent("Sala");
-    expect(within(dialogo).getByRole("combobox")).not.toHaveTextContent(
+    expect(within(dialogo).getByRole("combobox", { name: /Tipo de usuario/ })).toHaveTextContent("Sala");
+    expect(within(dialogo).getByRole("combobox", { name: /Tipo de usuario/ })).not.toHaveTextContent(
       "Sala sin edición",
     );
   });
@@ -523,13 +536,13 @@ describe("ListaUsuarios · roles preconfigurados y «Puede editar»", () => {
     h.presets = [SIN_EDICION, CON_EDICION];
     const dialogo = await abrirPermisosDelCamarero();
 
-    fireEvent.click(within(dialogo).getByRole("combobox"));
+    fireEvent.click(within(dialogo).getByRole("combobox", { name: /Tipo de usuario/ }));
     fireEvent.click(
       await screen.findByRole("option", { name: "Sala sin edición" }),
     );
     expect(interruptor(dialogo, "Puede editar Reservas")).not.toBeChecked();
 
-    fireEvent.click(within(dialogo).getByRole("combobox"));
+    fireEvent.click(within(dialogo).getByRole("combobox", { name: /Tipo de usuario/ }));
     fireEvent.click(await screen.findByRole("option", { name: "Sala" }));
     expect(interruptor(dialogo, "Puede editar Reservas")).toBeChecked();
 
@@ -547,7 +560,7 @@ describe("ListaUsuarios · roles preconfigurados y «Puede editar»", () => {
     doble.bd.fallos = { upsert: rechazo, insert: rechazo };
     const dialogo = await abrirPermisosDelCamarero();
 
-    fireEvent.click(within(dialogo).getByRole("combobox"));
+    fireEvent.click(within(dialogo).getByRole("combobox", { name: /Tipo de usuario/ }));
     fireEvent.click(
       await screen.findByRole("option", { name: "Sala sin edición" }),
     );
