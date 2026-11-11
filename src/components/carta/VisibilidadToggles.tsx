@@ -108,13 +108,15 @@ export function VisibilidadToggles({
           <div className="flex items-center gap-2 min-w-0">
             <EyeOff
               className={cn(
+                "shrink-0",
                 estaActivado ? "text-muted-foreground" : "text-destructive",
                 compact ? "h-3.5 w-3.5" : "h-4 w-4"
               )}
             />
+            {/* 11/11/2026 (dueño: móvil perfecto): el texto envuelve en vez de cortarse con «…» en pantallas estrechas. */}
             <span
               className={cn(
-                "truncate",
+                "min-w-0 leading-snug",
                 "text-sm",
                 estaActivado ? "text-muted-foreground" : "text-destructive font-medium"
               )}
