@@ -71,7 +71,8 @@ function Fila({ pagina, fila, total = false }: { pagina: PaginaTabla; fila: Fila
 function DiapositivaTabla({ pagina, numero, textoPeriodo }: { pagina: PaginaTabla; numero: number; textoPeriodo: string }) {
   const { tabla } = pagina;
   // La primera columna (el nombre) se lleva el espacio que sobra; las de cifras, un ancho fijo.
-  const numericas = tabla.columnas.filter((c) => alineadaDerecha(c.tipo)).length;
+  // Una columna con `ancho` propio lo usa (11/11/2026: «Vinos/Platos: facturas y carta», con 8-9 columnas).
+  const numericas = tabla.columnas.filter((c) => alineadaDerecha(c.tipo) && !c.ancho).length;
   const anchoCifra = numericas > 0 ? Math.min(170, Math.floor(620 / numericas)) : 0;
   return (
     <Lienzo numero={numero} titulo={tabla.titulo}>
@@ -83,7 +84,10 @@ function DiapositivaTabla({ pagina, numero, textoPeriodo }: { pagina: PaginaTabl
       <table style={{ width: "100%", marginTop: 22, borderCollapse: "collapse", tableLayout: "fixed" }}>
         <colgroup>
           {tabla.columnas.map((c) => (
-            <col key={c.id} style={alineadaDerecha(c.tipo) && numericas < tabla.columnas.length ? { width: anchoCifra } : undefined} />
+            <col
+              key={c.id}
+              style={c.ancho ? { width: c.ancho } : alineadaDerecha(c.tipo) && numericas < tabla.columnas.length ? { width: anchoCifra } : undefined}
+            />
           ))}
         </colgroup>
         <thead>
