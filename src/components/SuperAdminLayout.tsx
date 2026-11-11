@@ -5,6 +5,7 @@ import { SuperAdminSidebar } from "@/components/SuperAdminSidebar";
 import { RouteErrorBoundary } from "@/components/ErrorBoundary";
 import { useIsCompactNav } from "@/hooks/use-mobile";
 import { VersionPanel } from "@/components/panel/VersionPanel";
+import { NavAutoCollapse, defaultSidebarOpen } from "@/components/NavAutoCollapse";
 
 interface SuperAdminLayoutProps {
   children: ReactNode;
@@ -16,7 +17,10 @@ export function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   const isCompactNav = useIsCompactNav();
 
   return (
-    <SidebarProvider>
+    // Mismo arranque que el panel (11/11/2026): plegado en tablets y pantallas medianas; antes
+    // Super Admin abría siempre el menú desplegado.
+    <SidebarProvider defaultOpen={defaultSidebarOpen()}>
+      <NavAutoCollapse />
       {/* Sin `overflow-x-hidden` aquí ni en el div de abajo (2026-09-25):
           fijaba overflow-x sin fijar overflow-y, así que el navegador
           calculaba `overflow-y: auto` implícito y convertía a este div (y a
