@@ -141,6 +141,42 @@ export function useConfiguracionWeb() {
     onSettled: () => { queryClient.invalidateQueries({ queryKey: QUERY_KEY_CONFIGURACION_WEB }); },
   });
 
+  // Carta de Bebidas en la web (20261124110000, 11/11/2026): apagada por defecto. La web la lee al
+  // construirse y cada minuto; se republica igualmente para que el HTML estático no la traiga.
+  const cambiarCartaBebidas = useMutation({
+    mutationFn: async (mostrar: boolean) => {
+      const { data, error } = await supabase
+        .from("configuracion_web")
+        .update({ mostrar_carta_bebidas_casa_tomas: mostrar })
+        .eq("id", true)
+        .select("mostrar_carta_bebidas_casa_tomas")
+        .maybeSingle();
+      if (error) throw error;
+      // Sin fila devuelta = la RLS no dejó actualizar (sin «Editar» en la carta): no fingir que se guardó.
+      if (!data) throw new Error("No tienes permiso para cambiar la carta de la web.");
+      return data;
+    },
+    onMutate: async (mostrar) => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY_CONFIGURACION_WEB });
+      const previo = queryClient.getQueryData<DatosConfiguracionWeb>(QUERY_KEY_CONFIGURACION_WEB);
+      if (previo?.config) {
+        queryClient.setQueryData<DatosConfiguracionWeb>(QUERY_KEY_CONFIGURACION_WEB, {
+          ...previo,
+          config: { ...previo.config, mostrar_carta_bebidas_casa_tomas: mostrar },
+        });
+      }
+      return { previo };
+    },
+    onError: (error: Error, _mostrar, contexto) => {
+      if (contexto?.previo) queryClient.setQueryData(QUERY_KEY_CONFIGURACION_WEB, contexto.previo);
+      toast.error("No se pudo cambiar la carta de bebidas en la web", { description: mensajeUsuario(error) });
+    },
+    onSuccess: (_data, mostrar) => {
+      notificarGuardadoYPublicacion("bebida", `Carta de bebidas ${mostrar ? "activada" : "desactivada"} en la web`);
+    },
+    onSettled: () => { queryClient.invalidateQueries({ queryKey: QUERY_KEY_CONFIGURACION_WEB }); },
+  });
+
   // Días y horas de cada botón (20261104142000). La web lo lee al vuelo (cada
   // minuto): no hace falta republicarla. `null` = volver a lo de siempre.
   const cambiarHorarioMenuTapas = useMutation({
@@ -186,5 +222,10 @@ export function useConfiguracionWeb() {
     /** La columna existe (migración aplicada): `undefined` si no, `null` si está sin guardar. */
     horariosDisponibles: config !== null && config.horario_menu_dia_casa_tomas !== undefined,
     cambiarHorarioMenuTapas,
+    /** Carta de Bebidas en la web: apagada por defecto (también sin la columna o sin la fila). */
+    mostrarCartaBebidas: config?.mostrar_carta_bebidas_casa_tomas === true,
+    /** La columna existe (migración 20261124110000 aplicada). */
+    cartaBebidasDisponible: typeof config?.mostrar_carta_bebidas_casa_tomas === "boolean",
+    cambiarCartaBebidas,
   };
 }
