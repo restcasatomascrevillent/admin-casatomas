@@ -84,6 +84,9 @@ describe("copiloto: «Pantalla completa» en el panel lateral", () => {
     const p = await abrirPanel();
     const enlace = within(p).getByRole("link", { name: "Pantalla completa" });
     expect(enlace).toHaveAttribute("href", "/facturas/ia");
+    // En el móvil el panel ya ocupa toda la pantalla: el botón se oculta por debajo de `sm` y vuelve desde ahí (11/11/2026).
+    expect(enlace).toHaveClass("hidden", "sm:inline-flex");
+    expect(enlace).not.toHaveClass("inline-flex");
     preguntarEn(p, "¿Cuánto gasté en octubre?");
     expect(await within(panel()).findByText("En octubre, 30.225,87 €.")).toBeInTheDocument();
     expect(within(panel()).getByRole("link", { name: "Pantalla completa" })).toHaveAttribute("href", "/facturas/ia?c=c1");
