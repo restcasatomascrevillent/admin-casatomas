@@ -194,7 +194,9 @@ export function EditarReservaDialog({ reservaId, onClose }: EditarReservaDialogP
   return (
     <>
       <Dialog open onOpenChange={(abierto) => !abierto && intentarCerrar()}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        {/* 11/11/2026 (dueño: tablet «perfecto»): el pie «Guardar cambios» es `sticky bottom-0` y, con el relleno de 24 px del
+            diálogo, dejaba una franja por debajo por la que asomaban los campos; `-bottom-6` lo pega al borde real. */}
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto [&_form>div.sticky:last-child]:-bottom-6">
           <DialogHeader>
             <DialogTitle>Editar reserva</DialogTitle>
             <DialogDescription>{reserva.data ? descripcion(reserva.data) : "Datos de la reserva."}</DialogDescription>
