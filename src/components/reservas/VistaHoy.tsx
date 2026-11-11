@@ -275,7 +275,9 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             pantalla. 10/11/2026 («los nombres no se ven, y eso es lo primordial»): la lista crece a costa de las
             mesas (más pequeñas): 25 rem (tablet vertical), 30 rem (480 px, desde 1024), 32 rem (512 px, desde
             1280), 36 rem (576 px, desde 1536) y 42 rem (672 px, desde 1800). */}
-        <div className="grid min-h-0 grid-cols-[minmax(0,25rem)_minmax(0,1fr)] items-start gap-3 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] xl:grid-cols-[32rem_minmax(0,1fr)] 2xl:grid-cols-[36rem_minmax(0,1fr)] min-[1800px]:grid-cols-[42rem_minmax(0,1fr)]">
+        {/* 11/11/2026 («que la lista sea más ancha»): mitad y mitad en la tablet vertical; 36 rem desde 1024, 40 rem
+            desde 1280, 44 rem desde 1536 y 48 rem desde 1800. */}
+        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-3 lg:grid-cols-[minmax(0,36rem)_minmax(0,1fr)] xl:grid-cols-[40rem_minmax(0,1fr)] 2xl:grid-cols-[44rem_minmax(0,1fr)] min-[1800px]:grid-cols-[48rem_minmax(0,1fr)]">
           <section aria-label="Reservas por llegar" className="min-w-0">
             {errorReservasHoy ? (
               <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />

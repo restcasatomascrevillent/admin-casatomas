@@ -22,12 +22,15 @@ export function BotonPersonas({
   reserva,
   className,
   icono = "h-5 w-5",
+  sufijo,
 }: {
   reserva: ReservaPersonas;
   /** Clases del número (tamaño de letra de la fila donde va). */
   className?: string;
   /** Tamaño del icono de personas. */
   icono?: string;
+  /** Texto pequeño tras el número, p. ej. «px» (11/11/2026, lista de Reservas en tablet). */
+  sufijo?: string;
 }) {
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const [abierto, setAbierto] = useState(false);
@@ -35,6 +38,7 @@ export function BotonPersonas({
     <>
       <Users className={cn(icono, "text-muted-foreground")} aria-hidden="true" />
       {reserva.numero_comensales}
+      {sufijo && <span className="text-xs font-semibold text-muted-foreground">{sufijo}</span>}
     </>
   );
   if (!puedeEditar) {

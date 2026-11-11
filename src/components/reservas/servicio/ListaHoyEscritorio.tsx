@@ -43,8 +43,6 @@ export interface ListaHoyEscritorioProps {
   onAbrir: (r: Reserva) => void;
   /** «Sentar» (por llegar). Sin él (solo «Ver») no hay botón. */
   onSentar?: (r: Reserva) => void;
-  /** «Liberar» (sentadas con mesa). Sin él no hay botón. */
-  onLiberar?: (r: Reserva) => void;
   /** El botón azul «Sentar fuera» (por llegar, 10/11/2026). Sin él (solo «Ver») no hay botón. */
   sentarFuera?: (r: Reserva) => ReactNode;
   /** Su mesa prevista la ocupa alguien sentado: «Sentar» abrirá el selector. */
@@ -63,7 +61,6 @@ export function ListaHoyEscritorio({
   salaDe,
   onAbrir,
   onSentar,
-  onLiberar,
   sentarFuera,
   mesaPrevistaOcupada,
   ocupadaId = null,
@@ -93,28 +90,14 @@ export function ListaHoyEscritorio({
         </Button>
         </>
       );
-    } else if (grupo === "sentadas" && onLiberar && f.mesas.length > 0) {
-      accion = (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="pointer-events-auto h-11 w-[4.25rem] shrink-0 px-1 text-sm font-semibold"
-          disabled={ocupadaId === r.id}
-          onClick={() => onLiberar(r)}
-          aria-label={`Liberar ${textoMesas(f.mesas).toLowerCase()} de ${r.nombre || "la reserva"}`}
-        >
-          Liberar
-        </Button>
-      );
     }
+    // Sin «Liberar» (11/11/2026, petición del dueño: «quita el botón desentar»): liberar la mesa sigue en la ficha.
     return (
       <FilaEscritorio
         key={r.id}
         reserva={r}
         mesas={f.mesas}
         sala={salaDe(r)}
-        tarde={!!f.tarde}
         grupo={grupo}
         accion={accion}
         señalada={señalada === r.id}
@@ -181,7 +164,6 @@ function FilaEscritorio({
   reserva,
   mesas,
   sala,
-  tarde,
   grupo,
   accion,
   señalada,
@@ -191,7 +173,6 @@ function FilaEscritorio({
   reserva: Reserva;
   mesas: string[];
   sala?: string;
-  tarde: boolean;
   grupo: "porLlegar" | "sentadas" | "terminadas";
   accion: ReactNode;
   señalada: boolean;
@@ -208,10 +189,10 @@ function FilaEscritorio({
   const fijada = !!reserva.mesa_fijada && !sinMesa;
   const textoMesa = sinMesa ? "Sin mesa" : mesas.join("+");
   const nombre = reserva.nombre || "Sin nombre";
+  // Sin «Tarde» ni «Sin mesa» (11/11/2026, petición del dueño): junto al nombre, el estado de la reserva
+  // (pendiente, verificada, confirmada…).
   const estado =
-    grupo === "porLlegar" && tarde
-      ? { texto: "Tarde", clase: "bg-red-600 text-white" }
-      : grupo === "terminadas" && reserva.estado === "completada"
+    grupo === "terminadas" && reserva.estado === "completada"
         ? { texto: "Terminada", clase: "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-100" }
         : info
           ? { texto: info.etiqueta, clase: info.insignia }
@@ -239,26 +220,30 @@ function FilaEscritorio({
       <div className="pointer-events-none relative flex min-h-14 items-center gap-1 px-2 py-1">
         <span className="w-11 shrink-0 self-start pt-0.5 text-base font-semibold tabular-nums">{horaCorta(reserva.hora)}</span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-base font-semibold leading-6" title={nombre} data-testid="nombre-fila">
-            {nombre}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate text-base font-semibold leading-6" title={nombre} data-testid="nombre-fila">
+              {nombre}
+            </span>
+            {estado && (
+              <span className={cn("shrink-0 rounded-full px-1.5 text-xs font-medium leading-5", estado.clase)} data-testid="estado-fila">
+                {estado.texto}
+              </span>
+            )}
           </span>
           <span className="flex min-w-0 items-center gap-1 overflow-hidden">
             {fuera ? (
               <EtiquetaFuera reserva={reserva} compacta className="max-w-[8rem] shrink-0 text-sm" />
             ) : (
-              <span
-                className={cn(
-                  "inline-flex max-w-[6rem] shrink-0 items-center gap-0.5 truncate rounded-md px-1.5 text-sm font-semibold leading-5",
-                  sinMesa
-                    ? "bg-amber-100 text-amber-900 ring-1 ring-amber-400 dark:bg-amber-950/60 dark:text-amber-200"
-                    : "bg-muted text-foreground",
-                )}
-                data-testid="mesa-fila"
-                title={sinMesa ? undefined : `${sala ? `${sala} · ` : ""}${textoMesas(mesas)}`}
-              >
-                {fijada && <Lock className="h-3 w-3 shrink-0" aria-label="Mesa fijada" />}
-                {sinMesa ? textoMesa : `M ${textoMesa}`}
-              </span>
+              !sinMesa && (
+                <span
+                  className="inline-flex max-w-[6rem] shrink-0 items-center gap-0.5 truncate rounded-md bg-muted px-1.5 text-sm font-semibold leading-5 text-foreground"
+                  data-testid="mesa-fila"
+                  title={`${sala ? `${sala} · ` : ""}${textoMesas(mesas)}`}
+                >
+                  {fijada && <Lock className="h-3 w-3 shrink-0" aria-label="Mesa fijada" />}
+                  {`M ${textoMesa}`}
+                </span>
+              )
             )}
             {reserva.menu_del_dia && (
               <span className="shrink-0 rounded-full bg-violet-100 px-1.5 text-xs font-medium leading-5 text-violet-900 dark:bg-violet-950/60 dark:text-violet-200" title="Menú del día">
@@ -274,12 +259,19 @@ function FilaEscritorio({
               </span>
             )}
             <InsigniaZona reserva={reserva} className="px-1.5 py-0 leading-5" />
-            {alergia && <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" aria-label="Alergia" />}
-            {notas && !alergia && <StickyNote className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-label="Notas del cliente" />}
-            {notas && <span className="sr-only">{notas}</span>}
-            {estado && (
-              <span className={cn("min-w-0 truncate rounded-full px-1.5 text-xs font-medium leading-5", estado.clase)} data-testid="estado-fila">
-                {estado.texto}
+            {/* Observaciones a la vista (11/11/2026, petición del dueño: «que se vean las observaciones»). */}
+            {notas && (
+              <span
+                className={cn("flex min-w-0 items-center gap-1 text-sm", alergia ? "font-medium text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-300")}
+                title={notas}
+                data-testid="notas-fila"
+              >
+                {alergia ? (
+                  <AlertTriangle className="h-4 w-4 shrink-0" aria-label="Alergia" />
+                ) : (
+                  <StickyNote className="h-4 w-4 shrink-0" aria-label="Notas del cliente" />
+                )}
+                <span className="truncate">{notas}</span>
               </span>
             )}
           </span>
@@ -295,7 +287,8 @@ function FilaEscritorio({
           </a>
         )}
         {/* Tocar el número cambia las personas (10/11/2026). */}
-        <BotonPersonas reserva={reserva} className="my-0 gap-0.5 text-base font-bold" icono="hidden h-4 w-4 2xl:inline" />
+        {/* Personas en su recuadro, con el icono y «px» (11/11/2026, petición del dueño). */}
+        <BotonPersonas reserva={reserva} className="my-0 gap-0.5 rounded-md border px-1.5 text-base font-bold" icono="h-4 w-4" sufijo="px" />
         {accion}
       </div>
     </li>
