@@ -118,3 +118,56 @@ Sin incidencias en el barrido: objetivos táctiles < 24 px (ninguno) y pestañas
 ## Próxima acción
 Pasar las pruebas amplias de `src/components` y `src/pages`, arreglar lo que se haya roto, barrido «después»
 completo, capturas comparadas y PR a `staging`.
+
+---
+
+# Informe final de la Fase 3 (11/11/2026)
+
+## Resumen ejecutivo
+**Antes:** el panel ya partía de la paleta de la web, pero tenía tres estilos de pestaña y contadores que desaparecían en
+el móvil. Reservas se salía de ancho a 320 px, Reseñas se rompía con datos incompletos, el dorado estaba escrito a mano
+en 17 sitios y la insignia «Verificada» no llegaba al contraste AA.
+
+**Después:**
+- Un sistema de pestañas en dos niveles en todo el panel, con contadores siempre visibles y con formato.
+- Tokens de marca para el dorado.
+- Sin desbordes en ninguna de las 42 pantallas en 7 anchos (ver «Responsive»).
+- Diálogos coherentes en el móvil.
+- Contraste AA en las insignias de estado.
+
+## Identidad visual
+Ver «Identidad visual» y «Sistema de diseño» al principio de este documento:
+- Paleta de la web: pizarra, piedra y dorado.
+- Tokens `gold*`.
+- Pestañas en dos niveles y contador común.
+- Botón azul de crear reserva.
+
+## Componentes reutilizados (sin duplicar)
+- `PestanasPagina` (nivel 1 y `nivel={2}`).
+- `ChipsSubnivel`.
+- `CLASE_CONTADOR` / `formatoContador`.
+- Los `Dialog`, `AlertDialog` y `Sheet` de `src/components/ui`.
+- No se han añadido dependencias.
+
+## Pruebas
+- `npx tsc --noEmit -p tsconfig.app.json`: 14 errores, la misma línea base de antes (todos en ficheros que no se tocan).
+- `npm run lint:cambios`: ningún fichero empeora (36 ficheros).
+- Vitest de `src/components` y `src/pages`: 4.202 de 4.203 en verde. El que faltaba ya fallaba en `staging`
+  (`DialogoAccionReserva`) y se ha puesto al día.
+- Barrido con Playwright: ver «Responsive».
+- Suite completa y build de producción: se pasan en la rama `release/X.Y.Z` (regla del repo; CI la pasa en modo
+  completo).
+
+## Riesgos
+- **Pestaña activa rellena en todo el panel:** cambio visible en todos los módulos. Es reversible en un solo sitio
+  (`CLASE_PESTANA` en `PestanasPagina.tsx`).
+- **Títulos de diálogo a la izquierda en el móvil:** afecta a todos los diálogos. Es más legible y no cambia ninguna
+  función.
+- **Datos sintéticos:** pantallas que dependen de respuestas reales (listado de Cheques, Stripe, datos de Google) se han
+  visto vacías o en su estado de error. Conviene repasarlas en la demo.
+
+## Pendientes (fuera de esta entrega)
+- Tercer nivel de navegación propio en Gestor de gasto (pasos «1. Cliente… 4. Revisar») y en Logs («Sesiones |
+  Eventos», `SelectorSubrayado`). Son selectores de paso o de vista, no pestañas de página. Se dejan como están.
+- Repasar en la demo, con datos reales, los diálogos de Vinos, Tapas, Novedades, Instagram y Usuarios de Super Admin.
+- Letra de 10 px en la insignia de versión de la cabecera (decorativa).
