@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { TIPOS_POR_FILTRO, type FiltroAvisos } from "@/lib/avisos";
+import { marcarAvisosRevisados, TIPOS_AVISO_RETIRADOS } from "@/lib/avisosRevisados";
 
 export const TAMANO_PAGINA_AVISOS = 30;
 
@@ -18,7 +19,12 @@ export function useHistorialAvisos(filtro: FiltroAvisos) {
 
   const leer = useCallback(
     async (desde: number) => {
-      let q = supabase.from("notificaciones_dashboard").select("*").order("created_at", { ascending: false });
+      let q = supabase
+        .from("notificaciones_dashboard")
+        .select("*")
+        // Los retirados («Reserva sin sala / sin mesas», 11/11/2026) tampoco salen en el historial.
+        .not("tipo", "in", `(${TIPOS_AVISO_RETIRADOS.join(",")})`)
+        .order("created_at", { ascending: false });
       if (filtro === "sin_leer") q = q.eq("leida", false);
       else if (filtro === "reservas" || filtro === "facturas") q = q.in("tipo", TIPOS_POR_FILTRO[filtro]);
       else if (filtro === "otros") {
@@ -74,7 +80,7 @@ export function useHistorialAvisos(filtro: FiltroAvisos) {
     const aviso = avisos.find((n) => n.id === id);
     if (!aviso || aviso.leida) return;
     setAvisos((prev) => prev.map((n) => (n.id === id ? { ...n, leida: true } : n)));
-    const { error: err } = await supabase.from("notificaciones_dashboard").update({ leida: true }).eq("id", id);
+    const { error: err } = await marcarAvisosRevisados({ ids: [id] });
     if (err) {
       console.error("Error marcando aviso como leído:", err);
       toast.error("No se pudo marcar el aviso como leído");
@@ -86,7 +92,7 @@ export function useHistorialAvisos(filtro: FiltroAvisos) {
     const previas = avisos;
     if (!previas.some((n) => !n.leida)) return;
     setAvisos((prev) => prev.map((n) => ({ ...n, leida: true })));
-    const { error: err } = await supabase.from("notificaciones_dashboard").update({ leida: true }).eq("leida", false);
+    const { error: err } = await marcarAvisosRevisados();
     if (err) {
       console.error("Error marcando todos los avisos como leídos:", err);
       toast.error("No se pudieron marcar los avisos como leídos");

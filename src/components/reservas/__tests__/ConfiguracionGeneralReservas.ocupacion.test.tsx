@@ -116,7 +116,8 @@ describe("Configuración · reglas en solo lectura sin «Puede editar»", () => 
     const comida = within(seccion()).getByLabelText(/Ocupación de mesa · Comida/);
     expect(comida).toHaveValue(105);
     expect(comida).toBeDisabled();
-    for (const interruptor of screen.getAllByRole("switch")) expect(interruptor).toBeDisabled();
+    // «Servicio» ya no tiene interruptores (11/11/2026: fuera «Avisar en la campana»).
+    for (const interruptor of screen.queryAllByRole("switch")) expect(interruptor).toBeDisabled();
     expect(screen.queryByRole("button", { name: /guardar/i })).not.toBeInTheDocument();
     unmount();
 
@@ -131,7 +132,7 @@ describe("Configuración · reglas en solo lectura sin «Puede editar»", () => 
     const { unmount } = render(<ConfiguracionGeneralReservas parte="servicio" />);
 
     expect(within(seccion()).getByLabelText(/Ocupación de mesa · Comida/)).toBeEnabled();
-    expect(screen.getAllByRole("switch").every((s) => !(s as HTMLButtonElement).disabled)).toBe(true);
+    expect(screen.queryAllByRole("switch").every((s) => !(s as HTMLButtonElement).disabled)).toBe(true);
     expect(screen.getByRole("button", { name: /guardar/i })).toBeEnabled();
     unmount();
 

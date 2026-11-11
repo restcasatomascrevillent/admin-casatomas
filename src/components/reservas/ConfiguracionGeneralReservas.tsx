@@ -732,23 +732,8 @@ function SeccionAsignacion({
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="asignacion_aviso_activo"
-            render={({ field }) => (
-              <FormItem className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                <div className="space-y-0.5">
-                  <FormLabel>Avisar en la campana</FormLabel>
-                  <FormDescription>
-                    Un aviso por reserva que entre en la ventana sin sala o sin mesa
-                  </FormDescription>
-                </div>
-                <FormControl>
-                  <Switch checked={field.value} onCheckedChange={field.onChange} />
-                </FormControl>
-              </FormItem>
-            )}
-          />
+          {/* «Avisar en la campana» (aviso «Reserva sin sala / sin mesas») se quitó el 11/11/2026, petición
+              del dueño: ese aviso ya no existe (migración 20261124100000). El valor se sigue guardando tal cual. */}
         </div>
 
         <FormField

@@ -159,6 +159,9 @@ jobs:
       - name: Tipos de usuario «Reservas» (ver y crear) y «Albaranes» (solo fotos) (PGlite)
         if: env.COMPLETA == 'true'
         run: npm run test:usuarios-reservas-albaranes:db
+      - name: Avisos, «Revisado» por sección y fuera el aviso «sin mesa» (PGlite)
+        if: env.COMPLETA == 'true'
+        run: npm run test:avisos-revisado:db
       - name: Vino por copas, Parker, votación del vino favorito, horario de menú y tapas y platos vegetarianos (PGlite)
         if: env.COMPLETA == 'true'
         run: npm run test:vinos-copeo-encuesta:db
