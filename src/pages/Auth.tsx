@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UtensilsCrossed } from "lucide-react";
 import { precargarAlMontarLogin } from "@/lib/precargaLogin";
+// Marca la entrada: AbrirPestanaInicial abre la pestaña elegida para el usuario (si la ve).
+import { ESTADO_INICIO_SESION } from "@/lib/pestanaInicial";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -25,7 +27,7 @@ export default function Auth() {
 
   useEffect(() => {
     if (user) {
-      navigate("/dashboard");
+      navigate("/dashboard", { state: ESTADO_INICIO_SESION });
     }
   }, [user, navigate]);
 
@@ -39,7 +41,7 @@ export default function Auth() {
       : `${normalizedInput.toLowerCase()}@staff.local`;
     const { error } = await signIn(loginIdentifier, loginPassword);
     if (!error) {
-      navigate("/dashboard");
+      navigate("/dashboard", { state: ESTADO_INICIO_SESION });
     }
     setLoading(false);
   };
