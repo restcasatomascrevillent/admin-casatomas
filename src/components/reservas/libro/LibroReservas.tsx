@@ -37,7 +37,8 @@ import { ReservasDeLaHoja } from "./ReservasDeLaHoja";
 // Pasar hojas arrastrando (`useArrastrarHoja`) en la lista de la hoja.
 // ============================================================================
 
-const PAPEL = "bg-[#fbf6e9] text-stone-800";
+// Sin papel (11/11/2026, «no hace falta que parezca un libro»): fondo y texto normales del panel.
+const PAPEL = "bg-background text-foreground";
 
 interface Props {
   /** Solo «Reservas · Crear»: el alta sin «Ocupa la sala entera» (como «Nueva Reserva»). */
@@ -131,8 +132,8 @@ export function LibroReservas({ soloCrear = false, fechaInicial = null, onReserv
       >
         <div
           className={cn(
-            "min-h-[22dvh] touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain border-l-4 border-rose-300/70 px-6 py-5",
-            soloApuntar ? "hidden" : dosColumnas ? "w-2/5 shrink-0 border-r border-r-stone-300" : "flex-1",
+            "min-h-[22dvh] touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4 sm:px-6",
+            soloApuntar ? "hidden" : dosColumnas ? "w-2/5 shrink-0 border-r" : "flex-1",
           )}
           data-testid="lista-hoja-libro"
           {...arrastre}
@@ -148,10 +149,10 @@ export function LibroReservas({ soloCrear = false, fechaInicial = null, onReserv
         <div
           className={cn(
             "flex flex-wrap items-center gap-3 px-6",
-            apuntarAlto ? "border-b border-stone-300 py-4" : "border-t-2 border-dashed border-stone-300 pt-3",
+            apuntarAlto ? "border-b py-4" : "border-t pt-3",
           )}
         >
-          <span className="inline-flex items-center gap-2 text-base font-semibold text-stone-600">
+          <span className="inline-flex items-center gap-2 text-base font-semibold text-muted-foreground">
             <ClipboardList className="h-4 w-4" aria-hidden="true" />
             Apuntar nueva
           </span>

@@ -34,7 +34,7 @@ export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva }: Pr
   }, [espacios]);
   const grupos = useMemo(() => agruparReservasDelDia(reservas), [reservas]);
 
-  if (isLoading) return <Skeleton className="h-24 w-full bg-stone-200/60" />;
+  if (isLoading) return <Skeleton className="h-24 w-full" />;
   if (isError) {
     return (
       <p role="alert" className="text-sm text-red-700">
@@ -45,7 +45,7 @@ export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva }: Pr
       </p>
     );
   }
-  if (!grupos.length) return <p className="py-4 text-base italic text-stone-500">Hoja en blanco: aún no hay reservas este día.</p>;
+  if (!grupos.length) return <p className="py-4 text-base text-muted-foreground">Aún no hay reservas este día.</p>;
 
   const renglon = (r: (typeof grupos)[number]["reservas"][number]) => {
     const info = infoEstadoReserva(r.estado);
@@ -56,10 +56,10 @@ export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva }: Pr
         {/* Nombre entero (10/11/2026, «no se ven los nombres»): sin cortar, y las notas debajo en pequeño. */}
         <span className="min-w-0 flex-1">
           <span className="block break-words font-medium leading-snug">{r.nombre || "Sin nombre"}</span>
-          {r.notas_cliente ? <span className="block truncate text-base font-normal text-stone-500">{r.notas_cliente}</span> : null}
+          {r.notas_cliente ? <span className="block truncate text-sm font-normal text-amber-800 dark:text-amber-300">{r.notas_cliente}</span> : null}
         </span>
-        <span className="shrink-0 font-semibold tabular-nums">{r.numero_comensales} px</span>
-        <span className="hidden w-32 shrink-0 truncate text-lg text-stone-600 sm:inline">{sala ?? "—"}</span>
+        <span className="shrink-0 rounded-md border px-2 py-0.5 text-base font-semibold tabular-nums">{r.numero_comensales} px</span>
+        <span className="hidden w-32 shrink-0 truncate text-base text-muted-foreground sm:inline">{sala ?? "—"}</span>
         {info && (
           <Badge className={cn("shrink-0 text-sm", info.insignia)} variant={info.varianteInsignia}>
             {info.etiqueta}
@@ -67,16 +67,16 @@ export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva }: Pr
         )}
       </>
     );
-    const clases = "flex min-h-14 w-full items-center gap-4 px-1 py-2 text-left text-xl";
+    const clases = "flex min-h-14 w-full items-center gap-3 px-2 py-2 text-left text-lg sm:gap-4";
     return (
       <li
         key={r.id}
-        className={cn("border-b border-sky-300/60", r.estado === ESTADO_NO_SHOW && "opacity-60", resaltada === r.id && "bg-amber-200/50")}
+        className={cn("border-b border-border/60 last:border-b-0", r.estado === ESTADO_NO_SHOW && "opacity-60", resaltada === r.id && "bg-amber-100 dark:bg-amber-900/30")}
       >
         {onAbrirReserva ? (
           <button
             type="button"
-            className={cn(clases, "rounded-sm hover:bg-amber-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600")}
+            className={cn(clases, "rounded-md hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}
             onClick={() => onAbrirReserva(r.id)}
             aria-label={`Abrir la reserva de ${r.nombre || "Sin nombre"}, ${horaCorta(r.hora) ?? r.hora}, ${r.numero_comensales} personas`}
           >
@@ -97,15 +97,15 @@ export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva }: Pr
         const bloques = g.turno === "comida" ? bloquesComidaMenuDelDia(fecha, g.reservas) : null;
         return (
           <section key={g.turno} aria-label={ETIQUETA_TURNO[g.turno]}>
-            <h3 className="mb-1 text-base font-semibold uppercase tracking-wide text-stone-500">
+            <h3 className="mb-1 rounded-md bg-muted px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               {ETIQUETA_TURNO[g.turno]} · {resumen(g.reservas.length, g.pax)}
             </h3>
             {bloques ? (
               <div className="space-y-3">
                 {bloques.map((b) => (
                   <section key={b.clave} aria-label={b.etiqueta} className="pl-2">
-                    <h4 className="mt-2 text-base font-semibold text-stone-700">
-                      {b.etiqueta} <span className="font-normal text-stone-500">· {resumen(b.reservas.length, b.pax)}</span>
+                    <h4 className="mt-2 text-base font-semibold">
+                      {b.etiqueta} <span className="font-normal text-muted-foreground">· {resumen(b.reservas.length, b.pax)}</span>
                     </h4>
                     <ul>{b.reservas.map(renglon)}</ul>
                   </section>

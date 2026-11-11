@@ -42,6 +42,7 @@ import {
   AlertTriangle,
   Armchair,
   Clock,
+  CheckCircle2,
   DoorOpen,
   LayoutGrid,
   List,
@@ -58,6 +59,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -257,7 +259,7 @@ export function VistaHoyMovil({
       columna ? listaHoyEscritorio([...(reservas ?? []), ...(canceladas ?? [])], mesasDe, minutoAhora, { busqueda, filtroTurno }) : null,
     [columna, reservas, canceladas, mesasDe, minutoAhora, busqueda, filtroTurno],
   );
-  const { liberarMesa, estaEnCurso: liberando } = useAccionesModoServicio();
+  const { estaEnCurso: liberando } = useAccionesModoServicio();
   const [señaladaRaton, setSeñaladaRaton] = useState<string | null>(null);
   // Solo lo que está POR LLEGAR (07/11/2026, petición del dueño): las ya sentadas no salen en la lista; liberar o
   // cambiar su mesa sigue en «Mesas».
@@ -396,6 +398,9 @@ export function VistaHoyMovil({
           <Search className="h-5 w-5" aria-hidden="true" />
         </Button>
         <BotonSentarSinReserva soloIcono className="shrink-0" />
+        {/* Avisos también en el móvil (11/11/2026, petición del dueño: «para que se vea el botón de avisos»). Solo
+            dentro del panel de verdad (con menú lateral); en las pruebas sueltas no se pinta. */}
+        {hayMenu && <BotonAvisosSeccion seccion="reservas" className="h-11 px-2.5" />}
       </div>
       )}
       {!columna && <InterruptoresServiciosOnline fecha={fecha} compacta className="shrink-0" />}
@@ -437,7 +442,6 @@ export function VistaHoyMovil({
             salaDe={(r) => (r.espacio_id ? salaPorId.get(r.espacio_id) : undefined)}
             onAbrir={(r) => abrirFicha(r.id)}
             onSentar={puedeEditar ? (r) => void sentarDesdeFila(r, decidirSentarPrevista(asignacionesDia, r, configOcupacion)) : undefined}
-            onLiberar={puedeEditar ? (r) => void liberarMesa(r) : undefined}
             sentarFuera={puedeEditar ? (r) => <BotonSentarFuera reserva={r} variante="compacto" disabled={sentandoId === r.id} /> : undefined}
             mesaPrevistaOcupada={(r) => decidirSentarPrevista(asignacionesDia, r, configOcupacion).tipo === "elegir"}
             ocupadaId={sentandoId ?? (señalada && liberando?.(señalada) ? señalada : null)}
@@ -1577,7 +1581,7 @@ export function PanelReservaMovil({
   onCerrar: () => void;
 }) {
   const qc = useQueryClient();
-  const { marcarLlegada, marcarNoShow, deshacerLlegadaONoShow, quitarFuera } = useAccionesServicioReserva();
+  const { marcarLlegada, marcarNoShow, deshacerLlegadaONoShow, quitarFuera, aceptar, confirmar } = useAccionesServicioReserva();
   const { liberarMesa } = useAccionesModoServicio();
   const sentarReserva = useSentarReservaEnMesa(fecha, mesas);
   const turno: TurnoServicio = turnoDeHora(reserva.hora);
@@ -1755,6 +1759,26 @@ export function PanelReservaMovil({
           </div>
         </SheetDescription>
       </SheetHeader>
+
+      {/* Verificar o confirmar desde la ficha (11/11/2026, petición del dueño: «que cuando cliques la reserva te dé la
+          info de la reserva y puedas verificar o confirmar»). Pendiente → «Verificar»; verificada → «Confirmar». */}
+      {puedeEditar && (reserva.estado === "pendiente" || reserva.estado === "verificada") && (
+        <Button
+          className="h-12 w-full text-base"
+          disabled={ocupado}
+          data-testid="ficha-verificar-confirmar"
+          onClick={() =>
+            void ejecutar(() =>
+              reserva.estado === "pendiente"
+                ? aceptar(reserva as unknown as Parameters<typeof aceptar>[0])
+                : confirmar(reserva as unknown as Parameters<typeof confirmar>[0]),
+            )
+          }
+        >
+          <CheckCircle2 className="mr-2 h-5 w-5" aria-hidden="true" />
+          {reserva.estado === "pendiente" ? "Verificar" : "Confirmar"}
+        </Button>
+      )}
 
       {telefonoLegible(reserva.telefono) && (
         <Button asChild variant="outline" className="h-11 w-full justify-start text-base tabular-nums">

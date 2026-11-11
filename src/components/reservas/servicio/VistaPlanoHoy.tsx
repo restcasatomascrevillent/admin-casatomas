@@ -116,7 +116,7 @@ import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { useFijarMesa } from "@/hooks/useMesaFijada";
 import { mesasPorReservaDe, useMovimientoReservaServicio } from "@/hooks/useMovimientoReservaServicio";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { useIsBelow, useIsMobile } from "@/hooks/use-mobile";
+import { useIsBelow, useIsMobile, useIsCoarsePointer } from "@/hooks/use-mobile";
 import { useHoyLocal } from "@/hooks/useHoyLocal";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { SIN_ASIGNAR, columnaDeReserva, construirColumnas, esSinAsignar } from "@/lib/reservas/columnasServicio";
@@ -1625,8 +1625,11 @@ export function VistaPlanoHoy({
 }
 
 /**
- * Plano fijo de escritorio: flechas grandes (64×56 px) a izquierda y derecha del plano para pasar de sala.
- * Sin `activo` (o con una sola sala) deja el plano tal cual.
+ * Plano fijo de escritorio: pasar de sala. 11/11/2026, petición del dueño («en la tablet, que las flechas de las
+ * mesas las elimine ya que es táctil y ponga flechas abajo más disimuladas en caso de no haber táctil»): con el
+ * dedo como puntero no hay flechas (se desliza sobre las mesas, `gestosSala`); con ratón, dos flechas pequeñas
+ * debajo del plano con el nombre de la sala. Las teclas ← → siguen valiendo. Sin `activo` (o con una sola sala)
+ * deja el plano tal cual.
  */
 function ConFlechasSala({
   activo,
@@ -1643,28 +1646,42 @@ function ConFlechasSala({
   onSiguiente: () => void;
   children: ReactNode;
 }) {
+  const tactil = useIsCoarsePointer();
   if (!activo) return <>{children}</>;
+  if (tactil) {
+    return (
+      <div className="grid min-h-0 min-w-0" data-testid="plano-fijo" data-tactil="">
+        {children}
+      </div>
+    );
+  }
   return (
-    <div className="flex min-h-0 min-w-0 items-stretch gap-2" data-testid="plano-fijo">
-      <Button
-        variant="outline"
-        className="h-auto min-h-14 w-14 shrink-0 self-center py-6"
-        onClick={onAnterior}
-        aria-label={anterior ? `Sala anterior: ${anterior}` : "Sala anterior"}
-        title={anterior ? `${anterior} (←)` : "Sala anterior (←)"}
-      >
-        <ChevronLeft className="!h-9 !w-9" aria-hidden="true" />
-      </Button>
+    <div className="flex min-h-0 min-w-0 flex-col gap-1" data-testid="plano-fijo">
       <div className="grid min-h-0 min-w-0 flex-1">{children}</div>
-      <Button
-        variant="outline"
-        className="h-auto min-h-14 w-14 shrink-0 self-center py-6"
-        onClick={onSiguiente}
-        aria-label={siguiente ? `Sala siguiente: ${siguiente}` : "Sala siguiente"}
-        title={siguiente ? `${siguiente} (→)` : "Sala siguiente (→)"}
-      >
-        <ChevronRight className="!h-9 !w-9" aria-hidden="true" />
-      </Button>
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1 px-2 text-sm font-normal text-muted-foreground hover:text-foreground"
+          onClick={onAnterior}
+          aria-label={anterior ? `Sala anterior: ${anterior}` : "Sala anterior"}
+          title={anterior ? `${anterior} (←)` : "Sala anterior (←)"}
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          {anterior}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1 px-2 text-sm font-normal text-muted-foreground hover:text-foreground"
+          onClick={onSiguiente}
+          aria-label={siguiente ? `Sala siguiente: ${siguiente}` : "Sala siguiente"}
+          title={siguiente ? `${siguiente} (→)` : "Sala siguiente (→)"}
+        >
+          {siguiente}
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </div>
     </div>
   );
 }

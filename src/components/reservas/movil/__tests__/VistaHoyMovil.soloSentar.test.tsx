@@ -174,11 +174,23 @@ describe("VistaHoyMovil · como columna de escritorio", () => {
     expect(terminadas).toHaveTextContent("Ciro Cancela");
   });
 
-  it("filas de una línea con «Sin mesa» resaltado y acción corta «Sentar»", () => {
+  it("sin «Sin mesa» ni «Tarde» (11/11/2026): el estado va junto al nombre, y la acción corta «Sentar»", () => {
     montarEstados();
     const porLlegar = screen.getByRole("region", { name: "Por llegar" });
-    expect(within(porLlegar).getByTestId("mesa-fila")).toHaveTextContent("Sin mesa");
+    expect(within(porLlegar).queryByTestId("mesa-fila")).toBeNull();
+    expect(porLlegar).not.toHaveTextContent("Sin mesa");
+    expect(porLlegar).not.toHaveTextContent("Tarde");
+    const nombre = within(porLlegar).getAllByTestId("nombre-fila")[0];
+    expect(nombre.parentElement).toContainElement(within(porLlegar).getAllByTestId("estado-fila")[0]);
     expect(within(porLlegar).getByRole("button", { name: /^Sentar a Ana Espera/ })).toHaveTextContent("Sentar");
+  });
+
+  it("se ven las observaciones, las personas llevan «px» y las sentadas no tienen «Liberar» (11/11/2026)", () => {
+    montarEstados();
+    const sentadas = screen.getByRole("region", { name: "Sentadas" });
+    expect(within(sentadas).getByTestId("notas-fila")).toHaveTextContent("Alérgica al marisco");
+    expect(within(sentadas).queryByRole("button", { name: /^Liberar/ })).toBeNull();
+    expect(screen.getByRole("region", { name: "Por llegar" })).toHaveTextContent(/px/);
   });
 
   it("con el dedo (sin hover): tocar la fila la señala para el plano (resalta su mesa y salta de sala) y abre la ficha", () => {
@@ -196,9 +208,8 @@ describe("VistaHoyMovil · como columna de escritorio", () => {
     const nombre = within(porLlegar).getAllByTestId("nombre-fila")[0];
     expect(nombre).toHaveTextContent("Ana Espera");
     expect(nombre).toHaveAttribute("title", "Ana Espera");
-    // La mesa no comparte línea con el nombre: va en la segunda línea, dentro de la misma columna.
-    expect(nombre.parentElement).toHaveClass("flex-1");
-    expect(nombre.parentElement).toContainElement(within(porLlegar).getAllByTestId("mesa-fila")[0]);
+    // El nombre va en la primera línea (con su estado) dentro de la columna que ocupa todo el ancho libre.
+    expect(nombre.closest(".flex-1")).not.toBeNull();
     // Botones de la fila estrechos pero de 44 px de alto.
     const sentar = within(porLlegar).getByRole("button", { name: /^Sentar a Ana Espera/ });
     expect(sentar).toHaveClass("h-11", "w-[4.25rem]");

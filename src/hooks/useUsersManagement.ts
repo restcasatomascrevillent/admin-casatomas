@@ -30,11 +30,25 @@ export interface ManagedUser {
   is_super_admin: boolean;
   created_at: string;
   access_blocked?: boolean;
+  /** Sección que se abre al iniciar sesión (11/11/2026, `lib/seccionInicio.ts`); null = lo de siempre. */
+  seccion_inicio?: string | null;
   permissions: {
     section_key: string;
     can_view: boolean;
     can_edit: boolean;
   }[];
+}
+
+type FilaRol = { user_id: string; role: string; created_at: string | null; seccion_inicio?: string | null };
+
+/**
+ * Roles con la sección de inicio (11/11/2026). Si la BD aún no tiene la columna (migración
+ * 20261124134500 sin aplicar), se leen como antes: la lista sale igual, sin sección de inicio.
+ */
+async function leerRoles(): Promise<{ data: FilaRol[] | null; error: unknown }> {
+  const conInicio = await supabase.from("user_roles").select("user_id, role, created_at, seccion_inicio");
+  if (!conInicio.error) return conInicio;
+  return supabase.from("user_roles").select("user_id, role, created_at");
 }
 
 export function useUsersManagement() {
@@ -115,7 +129,7 @@ export function useUsersManagement() {
           { data: permissionsData, error: permError },
           { data: superAdminsData, error: superAdminsError },
         ] = await Promise.all([
-          supabase.from("user_roles").select("user_id, role, created_at"),
+          leerRoles(),
           supabase
             .from("user_permissions")
             .select("user_id, section_key, can_view, can_edit"),
@@ -151,6 +165,7 @@ export function useUsersManagement() {
           const existing = userMap.get(r.user_id);
           if (existing) {
             existing.role = r.role as AppRole;
+            existing.seccion_inicio = r.seccion_inicio ?? null;
             if (!existing.created_at && r.created_at) {
               existing.created_at = r.created_at;
             }
@@ -164,6 +179,7 @@ export function useUsersManagement() {
             role: r.role as AppRole,
             is_super_admin: superAdminIds.has(r.user_id),
             created_at: r.created_at || "",
+            seccion_inicio: r.seccion_inicio ?? null,
             permissions: [],
           });
         });
@@ -379,6 +395,31 @@ export function useUsersManagement() {
     return true;
   };
 
+  /**
+   * «Al iniciar sesión, abrir» (11/11/2026): guarda la sección de inicio (null = lo de siempre) en la
+   * fila de user_roles del usuario. Solo un super admin puede (RLS de user_roles); un UPDATE que la
+   * RLS no deja hacer, o sin fila, no da error: cambia 0 filas, así que se comprueba.
+   */
+  const setSeccionInicio = async (userId: string, seccion: string | null): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .update({ seccion_inicio: seccion })
+        .eq("user_id", userId)
+        .select("user_id");
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("No se ha cambiado nada: vuelve a intentarlo.");
+      await fetchUsers(false);
+      return true;
+    } catch (error) {
+      console.error("Error guardando la sección de inicio:", error);
+      toast.error("No se ha guardado «Al iniciar sesión, abrir»", {
+        description: (error as { message?: string })?.message || undefined,
+      });
+      return false;
+    }
+  };
+
   const updateUserPassword = async (userId: string, password: string) => {
     try {
       const { data, error } = await supabase.functions.invoke<{
@@ -561,6 +602,7 @@ export function useUsersManagement() {
     updateUserRole,
     updateUserPermission,
     setAllPermissions,
+    setSeccionInicio,
     updateUserPassword,
     setSuperAdmin,
     setUserAccessBlocked,
