@@ -121,9 +121,8 @@ export default function Espacios() {
                 <FilaPlana
                   key={espacio.id}
                   titulo={
-                    <span className="inline-flex items-center gap-2">
-                      {espacio.nombre}
-                    </span>
+                    /* 11/11/2026 (dueño: móvil «perfecto»): `block truncate` para que un nombre largo acabe en «…» y no cortado en seco. */
+                    <span className="block truncate">{espacio.nombre}</span>
                   }
                   subtitulo={[
                     espacio.descripcion || "Sin descripción",

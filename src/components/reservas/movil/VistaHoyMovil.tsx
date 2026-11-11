@@ -354,29 +354,32 @@ export function VistaHoyMovil({
       )}
 
       {!columna && (
-      <div className="flex shrink-0 items-center gap-1" data-testid="hoy-movil-controles">
+      /* 11/11/2026 (dueño: móvil «perfecto»): a menos de 390 px, con seis controles, el selector Reservas|Mesas se
+          aplastaba (< 44 px) y se montaba sobre el turno. Ahora ocupa justo 2 × 44 px, el hueco entre controles es
+          menor y el turno es más estrecho: todo cabe en 360 px sin solaparse. */
+      <div className="flex shrink-0 items-center gap-0.5 min-[390px]:gap-1" data-testid="hoy-movil-controles">
         {hayMenu && <SidebarTrigger className="shrink-0" />}
         <ToggleGroup
           type="single"
           value={vista}
           onValueChange={(v) => (v === "reservas" || v === "mesas") && setVista(v)}
           variant="outline"
-          className="grid min-w-0 flex-1 grid-cols-2"
+          className="grid min-w-0 flex-1 grid-cols-2 max-[389px]:flex-none max-[389px]:grid-cols-[2.75rem_2.75rem] max-[389px]:gap-0.5"
           aria-label="Ver reservas o mesas"
         >
           {/* Con el botón del menú en la fila, a menos de 390 px el texto no cabe: solo el icono (el nombre
               sigue para el lector de pantalla). */}
-          <ToggleGroupItem value="reservas" aria-label="Reservas" className="h-11 min-w-0 px-1 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11 pointer-coarse:px-1">
+          <ToggleGroupItem value="reservas" aria-label="Reservas" className="h-11 min-w-11 px-1 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11 pointer-coarse:px-1">
             <List className="h-5 w-5 min-[390px]:hidden" aria-hidden="true" />
             <span className="hidden min-[390px]:inline">Reservas</span>
           </ToggleGroupItem>
-          <ToggleGroupItem value="mesas" aria-label="Mesas" className="h-11 min-w-0 px-1 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11 pointer-coarse:px-1">
+          <ToggleGroupItem value="mesas" aria-label="Mesas" className="h-11 min-w-11 px-1 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11 pointer-coarse:px-1">
             <LayoutGrid className="h-5 w-5 min-[390px]:hidden" aria-hidden="true" />
             <span className="hidden min-[390px]:inline">Mesas</span>
           </ToggleGroupItem>
         </ToggleGroup>
         <Select value={filtroTurno} onValueChange={(v) => setFiltroTurno(v as FiltroTurnoHoy)}>
-          <SelectTrigger className="h-11 w-[5.5rem] shrink-0 gap-1 px-2 text-sm [&>svg]:shrink-0" aria-label="Turno">
+          <SelectTrigger className="h-11 w-[4.75rem] shrink-0 gap-1 px-2 text-sm min-[390px]:w-[5.5rem] [&>svg]:shrink-0" aria-label="Turno">
             <SelectValue>{ETIQUETA_TURNO[filtroTurno]}</SelectValue>
           </SelectTrigger>
           <SelectContent>

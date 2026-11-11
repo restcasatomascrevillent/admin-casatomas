@@ -163,7 +163,7 @@ export function LibroReservas({ soloCrear = false, fechaInicial = null, onReserv
               // En dos columnas, SIN relleno inferior: el `sticky bottom-0` del pie se pega al borde del relleno del
               // contenedor, y con `pb-6` quedaba una franja de 24 px por debajo del botón por la que asomaban los
               // campos («Dentro | Fuera»). El pie lleva su propio fondo y borde (`.formulario-una-columna`, index.css).
-              apuntarAlto ? "formulario-una-columna min-h-0 flex-1 pb-0" : "max-h-[58dvh] pb-6",
+              apuntarAlto ? "formulario-una-columna min-h-0 flex-1 pb-0" : "max-h-[58dvh] pb-6 [&_form>div.sticky:last-child]:-bottom-6", // 11/11/2026: pie pegado al borde real (sin franja por la que asomen los campos)
             )}
           >
             <div className={cn("mx-auto", soloApuntar ? "max-w-3xl" : dosColumnas ? "max-w-2xl" : "max-w-4xl")}>
