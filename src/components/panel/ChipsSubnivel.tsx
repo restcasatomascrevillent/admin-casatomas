@@ -41,7 +41,7 @@ export function ChipsSubnivel({ chips, className }: ChipsSubnivelProps) {
           value={c.valor}
           disabled={c.disabled}
           data-tour={c.tour}
-          className="h-9 shrink-0 gap-1.5 rounded-full border border-transparent px-3.5 text-sm text-muted-foreground shadow-none hover:text-foreground data-[state=active]:border-primary/30 data-[state=active]:bg-primary/10 data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-none pointer-coarse:h-11"
+          className="h-9 shrink-0 gap-1.5 rounded-full border border-transparent px-3.5 text-sm text-muted-foreground shadow-none hover:text-foreground data-[state=active]:border-primary/40 data-[state=active]:bg-primary/15 data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-none pointer-coarse:h-11"
         >
           {c.icono && (
             <span aria-hidden="true" className="inline-flex shrink-0 [&>svg]:h-4 [&>svg]:w-4">

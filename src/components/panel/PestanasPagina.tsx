@@ -114,7 +114,7 @@ const DEBAJO = {
 
 /** Pestaña de segundo nivel: el mismo aspecto que `ChipsSubnivel`. */
 const CLASE_PESTANA_NIVEL_2 =
-  "group flex h-9 items-center gap-1.5 rounded-full border border-transparent bg-transparent px-3.5 text-sm text-foreground/80 shadow-none transition-colors hover:bg-muted hover:text-foreground pointer-coarse:h-11 data-[state=active]:border-primary/30 data-[state=active]:bg-primary/10 data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-none shrink-0";
+  "group flex h-9 items-center gap-1.5 rounded-full border border-transparent bg-transparent px-3.5 text-sm text-foreground/80 shadow-none transition-colors hover:bg-muted hover:text-foreground pointer-coarse:h-11 data-[state=active]:border-primary/40 data-[state=active]:bg-primary/15 data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-none shrink-0";
 
 const TONO_CONTADOR_NIVEL_2 = { primario: "bg-primary/10 text-primary", dorado: "bg-gold/10 text-gold-strong" } as const;
 

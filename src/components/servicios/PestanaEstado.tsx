@@ -345,7 +345,7 @@ export function PestanaEstado({ estado, resumen, pendientes, ultima, cargandoLec
             type="button"
             data-pendiente={p.clave}
             onClick={() => onIr(p.destino)}
-            className="min-h-11 text-left underline underline-offset-2 hover:text-foreground sm:min-h-0"
+            className="min-h-11 text-left underline underline-offset-2 hover:text-foreground sm:min-h-0 pointer-coarse:sm:min-h-11"
           >
             {p.titulo}
           </button>

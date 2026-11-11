@@ -51,18 +51,18 @@ Estados: A = auditada en el barrido, C = corregida, V = validada tras corregir.
 
 | Módulo | Rutas | A | C | V | Notas |
 |---|---|---|---|---|---|
-| Dashboard | `/dashboard` | ☐ | ☐ | ☐ | Cifras clicables y «Próximas» (11/11) |
-| Reservas | día, Lista, Calendario, Blacklist, Configuración (reglas, servicio, mesas, turnos, plantillas) | ☐ | ☐ | ☐ | Turnos › modo → chips |
-| Gestor web | carta, bebidas, vinos, novedades, menús, tapas | ☐ | ☐ | ☐ | Novedades › partes → chips |
-| Marketing / RRSS | `/marketing`, `/rrss` | ☐ | ☐ | ☐ | |
-| Cheques | `/cheques` | ☐ | ☐ | ☐ | Datos sintéticos no traen listado |
-| Tienda | `/tienda` | ☐ | ☐ | ☐ | |
-| Facturas | análisis, márgenes, compras, cargar | ☐ | ☐ | ☐ | Móvil arreglado el 11/11 (`#161`) |
-| Albaranes | `/albaranes` | ☐ | ☐ | ☐ | |
-| Usuarios | `/usuarios` | ☐ | ☐ | ☐ | |
-| Avisos | `/avisos` | ☐ | ☐ | ☐ | «Ver» abre la ficha (`#158`) |
-| Ayuda | `/ayuda` | ☐ | ☐ | ☐ | |
-| Super Admin | panel, ecommerce, asistente, gestor de gasto, reseñas, tráfico web, logs, espacios, bot web, usuarios, auditoría, servicios (+costes), informes | ☐ | ☐ | ☐ | Auditoría › vista y Servicios › paquetes → chips |
+| Dashboard | `/dashboard` | ☑ | ☑ | ☑ | Cifras clicables y «Próximas» (11/11) |
+| Reservas | día, Lista, Calendario, Blacklist, Configuración (reglas, servicio, mesas, turnos, plantillas) | ☑ | ☑ | ☑ | Turnos › modo → chips |
+| Gestor web | carta, bebidas, vinos, novedades, menús, tapas | ☑ | ☑ | ☑ | Novedades › partes → chips |
+| Marketing / RRSS | `/marketing`, `/rrss` | ☑ | ☑ | ☑ | |
+| Cheques | `/cheques` | ☑ | ☑ | ☑ | Datos sintéticos no traen listado |
+| Tienda | `/tienda` | ☑ | ☑ | ☑ | |
+| Facturas | análisis, márgenes, compras, cargar | ☑ | ☑ | ☑ | Móvil arreglado el 11/11 (`#161`) |
+| Albaranes | `/albaranes` | ☑ | ☑ | ☑ | |
+| Usuarios | `/usuarios` | ☑ | ☑ | ☑ | |
+| Avisos | `/avisos` | ☑ | ☑ | ☑ | «Ver» abre la ficha (`#158`) |
+| Ayuda | `/ayuda` | ☑ | ☑ | ☑ | |
+| Super Admin | panel, ecommerce, asistente, gestor de gasto, reseñas, tráfico web, logs, espacios, bot web, usuarios, auditoría, servicios (+costes), informes | ☑ | ☑ | ☑ | Auditoría › vista y Servicios › paquetes → chips |
 
 ## Hecho
 - [x] Inventario de rutas (`src/App.tsx`) y de los sistemas de pestañas: 19 `PestanasPagina`, 8 `ChipsSubnivel`,
@@ -77,10 +77,10 @@ Estados: A = auditada en el barrido, C = corregida, V = validada tras corregir.
 - [x] Diálogos: título a la izquierda y pie con hueco. `<main>` con nombre de sección.
 
 ## Pendiente
-- [ ] Analizar el barrido «antes» y abrir la lista de problemas por gravedad.
-- [ ] Corregir lo crítico: desbordes, cortes, solapes y modales.
-- [ ] Revisar el contraste de `muted-foreground` sobre `muted` y de las insignias de estado.
-- [ ] Barrido «después» y capturas comparadas.
+- [x] Analizar el barrido «antes» y abrir la lista de problemas por gravedad.
+- [x] Corregir lo crítico: desbordes, cortes, solapes y modales.
+- [x] Revisar el contraste de `muted-foreground` sobre `muted` (5,6:1) y de las insignias de estado («Verificada» corregida).
+- [x] Barrido «después» y capturas comparadas.
 - [ ] PR a `staging` e informe final.
 
 ## Problemas detectados (barrido «antes»: 294 medidas, 42 pantallas × 7 anchos)
@@ -116,8 +116,8 @@ Sin incidencias en el barrido: objetivos táctiles < 24 px (ninguno) y pestañas
 - (ninguna por ahora)
 
 ## Próxima acción
-Pasar las pruebas amplias de `src/components` y `src/pages`, arreglar lo que se haya roto, barrido «después»
-completo, capturas comparadas y PR a `staging`.
+PR a `staging` abierta; tras fusionar, el dueño la revisa en la demo. Siguiente tanda posible: los pendientes de abajo
+(tercer nivel en Gestor de gasto y Logs, repaso con datos reales de los diálogos de Vinos, Tapas, Novedades e Instagram).
 
 ---
 
@@ -148,6 +148,36 @@ Ver «Identidad visual» y «Sistema de diseño» al principio de este documento
 - `CLASE_CONTADOR` / `formatoContador`.
 - Los `Dialog`, `AlertDialog` y `Sheet` de `src/components/ui`.
 - No se han añadido dependencias.
+
+## Responsive (barrido con Playwright: 42 pantallas × 7 anchos = 294 medidas)
+| Métrica | Antes | Después |
+|---|---|---|
+| Pantallas que se salen de ancho / elementos fuera | 10 | **0** |
+| Pestañas con el nombre cortado | 0 | 0 |
+| Contadores de pestañas ocultos | 15 | **0** |
+| Errores de JavaScript | 3 (Reseñas roto + Cheques) | 1 (Cheques, solo con datos sintéticos) |
+| Objetivos táctiles < 24 px | 2 | 6¹ |
+
+¹ Los nuevos son el enlace «Place ID Finder», que va dentro de un párrafo de Reseñas: es la excepción de enlace en línea
+de WCAG 2.5.8 y aparece porque Reseñas ya no se rompe. El botón de Servicios ya mide 44 px en tablet táctil
+(`pointer-coarse`).
+
+La letra < 12 px que queda es la insignia de versión de la cabecera (10 px, decorativa) y las leyendas de las barras
+de uso de Servicios.
+
+## Capturas antes / después (`docs/fase3-capturas/`)
+| Pantalla | Fichero |
+|---|---|
+| Dashboard 375 | `dashboard-375.jpg` |
+| Gestor web › Carta 375 (dos niveles, contador «Platos 12») | `gestion-web-375.jpg` |
+| RRSS › Instagram 375 (segundo nivel en píldoras) | `rrss-375.jpg` |
+| Reservas › Configuración 768 | `reservas_tab_configuracion-768.jpg` |
+| Facturas › Compras 375 | `facturas_tab_compras-375.jpg` |
+| Newsletter 1366 | `marketing-1366.jpg` |
+| Super Admin › Servicios 768 | `super-admin_servicios-768.jpg` |
+| Reservas (móvil) 375 | `reservas-375.jpg` |
+| Super Admin › Reseñas 375 (antes, pantalla de error) | `super-admin_resenas-375.jpg` |
+| Super Admin › Auditoría 1366 (vista en chips) | `super-admin_auditoria-1366.jpg` |
 
 ## Pruebas
 - `npx tsc --noEmit -p tsconfig.app.json`: 14 errores, la misma línea base de antes (todos en ficheros que no se tocan).
