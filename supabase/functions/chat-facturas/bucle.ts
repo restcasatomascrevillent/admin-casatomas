@@ -273,11 +273,17 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       data = r.data;
       // compras_producto: si el texto no casa con nada, UNA segunda llamada
       // con el embedding (solo sugerencias). Se paga solo en ese caso.
+      // Es SOLO un extra de sugerencias: si falla (OpenAI, red, RPC) se queda el resultado
+      // textual (sin datos) en vez de tumbar la respuesta con «problema tecnico».
       if (ll.respaldoSemantico && necesitaRespaldoSemantico(data)) {
-        const embedding = await embedConsulta(ll.respaldoSemantico.consulta, ctx);
-        const r2 = await supabase.rpc(ll.rpc, { ...ll.params, [ll.respaldoSemantico.param]: embedding });
-        if (r2.error) throw r2.error;
-        data = r2.data;
+        try {
+          const embedding = await embedConsulta(ll.respaldoSemantico.consulta, ctx);
+          const r2 = await supabase.rpc(ll.rpc, { ...ll.params, [ll.respaldoSemantico.param]: embedding });
+          if (r2.error) throw r2.error;
+          data = r2.data;
+        } catch (e) {
+          console.warn("[chat-facturas] respaldo semantico fallido:", e instanceof Error ? e.message : (e as { message?: string })?.message);
+        }
       }
     } else {
       if (ll.textoPrimero) {

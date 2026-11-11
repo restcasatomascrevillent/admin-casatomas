@@ -143,3 +143,35 @@ describe("chat-facturas · bucle compartido (ejecutarConversacion)", () => {
       .rejects.toThrow(/OpenAI chat 500/);
   });
 });
+
+describe("chat-facturas · respaldo semantico de compras_producto (11/11/2026)", () => {
+  // Caso real: «chuletero de ternera a Embajadores» sin coincidencia -> el embedding fallaba y el bot
+  // contestaba «problema tecnico». El respaldo es solo un extra de sugerencias.
+  it("si el embedding falla, se responde con el resultado sin datos y NO es fallo de herramienta", async () => {
+    const sinDatos = { buscado: "chuletero ternera", coincidencia: "ninguna", sin_datos: true, nota: "No hay compras" };
+    const sb = {
+      rpcs: [] as { fn: string; args: unknown }[],
+      rpc(fn: string, args: unknown) {
+        this.rpcs.push({ fn, args });
+        if (fn === "compras_producto_agente") return Promise.resolve({ data: sinDatos, error: null });
+        return Promise.resolve({ data: fn === "asociar_termino_agente" ? null : [], error: null });
+      },
+      from() { throw new Error("no"); },
+    };
+    const ai = openaiFalso([
+      { body: { choices: [{ message: { role: "assistant", content: null, tool_calls: [{ id: "t1", type: "function", function: { name: "compras_producto", arguments: JSON.stringify({ producto: "chuletero ternera", proveedor: "Grupo Embajadores" }) } }] } }], usage: usage(10, 5) } },
+      { body: { choices: [{ message: { role: "assistant", content: "No hay chuletero de ternera de Embajadores." } }], usage: usage(10, 5) } },
+    ]);
+    const f = (async (url: string, init: RequestInit) => {
+      if (String(url).includes("/embeddings")) return new Response("boom", { status: 500 });
+      return ai.f(url, init);
+    }) as unknown as typeof fetch;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = await ejecutarConversacion({ supabase: sb as any, claveOpenAI: "x", mensaje: "chuletero de ternera a grupo embajadores", modelo: "gpt-x", uso: estado("gpt-x"), fetchImpl: f });
+    expect(r.huboFalloDeHerramienta).toBe(false);
+    expect(r.respuesta).toContain("Embajadores");
+    const llamada = sb.rpcs.find((x) => x.fn === "compras_producto_agente")!.args as Record<string, unknown>;
+    expect(llamada.p_proveedor).toBe("Grupo Embajadores");
+    expect(llamada.p_texto).toBe("chuletero ternera");
+  });
+});
