@@ -52,12 +52,49 @@ type Filtro = "problemas" | "todos" | "sin_datos";
 
 const fechaCorta = (f: string | null) => (f ? new Date(`${f}T00:00:00`).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—");
 
-function Cifra({ etiqueta, valor, detalle, tono }: { etiqueta: string; valor: string; detalle?: string; tono?: "rojo" | "neutro" }) {
+/** Texto largo y, en el móvil, su versión corta (la larga queda como texto para lectores de pantalla). */
+function Corto({ largo, corto }: { largo: string; corto?: string }) {
+  if (!corto) return <>{largo}</>;
   return (
-    <div className="min-w-0 rounded-lg border border-border/70 bg-card px-3 py-2">
-      <p className="truncate text-xs text-muted-foreground">{etiqueta}</p>
+    <>
+      <span className="sm:hidden" aria-hidden="true">{corto}</span>
+      <span className="max-sm:sr-only">{largo}</span>
+    </>
+  );
+}
+
+/**
+ * Tarjeta de cifra. En el móvil (media pantalla por tarjeta) los textos largos se cortaban con «…»
+ * (11/11/2026): ahí van `etiquetaCorta` / `detalleCorto` y el texto envuelve (hasta dos líneas) en vez
+ * de cortarse. Desde `sm`, los textos largos en una línea, como siempre.
+ */
+function Cifra({
+  etiqueta,
+  etiquetaCorta,
+  valor,
+  detalle,
+  detalleCorto,
+  tono,
+}: {
+  etiqueta: string;
+  etiquetaCorta?: string;
+  valor: string;
+  detalle?: string;
+  detalleCorto?: string;
+  tono?: "rojo" | "neutro";
+}) {
+  const texto = "line-clamp-2 break-words text-xs leading-snug text-muted-foreground sm:line-clamp-none sm:truncate";
+  return (
+    <div className="min-w-0 rounded-lg border border-border/70 bg-card px-2.5 py-1.5 sm:px-3 sm:py-2" data-testid="margenes-cifra">
+      <p className={texto} title={etiqueta}>
+        <Corto largo={etiqueta} corto={etiquetaCorta} />
+      </p>
       <p className={cn("text-xl font-semibold tabular-nums sm:text-2xl", tono === "rojo" && "text-destructive")}>{valor}</p>
-      {detalle && <p className="truncate text-xs text-muted-foreground">{detalle}</p>}
+      {detalle && (
+        <p className={texto} title={detalle}>
+          <Corto largo={detalle} corto={detalleCorto} />
+        </p>
+      )}
     </div>
   );
 }
@@ -69,13 +106,17 @@ function Resumen({ d }: { d: Datos }) {
     <div className="grid shrink-0 grid-cols-2 gap-2 md:grid-cols-4" data-testid="margenes-resumen">
       <Cifra
         etiqueta="Al peso: multiplicador (mediana)"
+        etiquetaCorta="Al peso (mediana)"
         valor={veces(r.peso.multiplicadorMediana)}
         detalle={`${porcentaje(r.peso.pctMediana)} de coste · ${r.peso.conDatos} de ${r.peso.total} artículos`}
+        detalleCorto={`${porcentaje(r.peso.pctMediana)} coste · ${r.peso.conDatos}/${r.peso.total}`}
       />
       <Cifra
         etiqueta="Multiplicador de vinos (mediana)"
+        etiquetaCorta="Vinos (mediana)"
         valor={veces(r.vinos.multiplicadorMediana)}
         detalle={`${r.vinos.conDatos} de ${r.vinos.total} vinos · tienda ${veces(d.resumen.vinos.multiplicadorTiendaMediana)}${d.tienda.activa ? "" : " (desactivada)"}`}
+        detalleCorto={`${r.vinos.conDatos}/${r.vinos.total} · tienda ${veces(d.resumen.vinos.multiplicadorTiendaMediana)}${d.tienda.activa ? "" : " (off)"}`}
       />
       <Cifra
         etiqueta="Margen en rojo"
@@ -85,12 +126,17 @@ function Resumen({ d }: { d: Datos }) {
           ` · ${d.resumen.vinos.tiendaEnRojo} en tienda < ${veces(d.config.multiplicadorMinTienda)}` +
           (r.borrador.enRojoRevisados ? ` · ${r.borrador.enRojoRevisados} platos revisados` : "")
         }
+        detalleCorto={
+          `${r.peso.enRojo} peso · ${r.vinos.enRojo} vinos · ${d.resumen.vinos.tiendaEnRojo} tienda` +
+          (r.borrador.enRojoRevisados ? ` · ${r.borrador.enRojoRevisados} platos` : "")
+        }
         tono={rojo > 0 ? "rojo" : "neutro"}
       />
       <Cifra
         etiqueta="Sin datos de coste"
         valor={`${r.peso.sinDatos + r.vinos.sinDatos}`}
         detalle={`${r.peso.sinDatos} al peso · ${r.vinos.sinDatos} vinos · ${r.borrador.total - r.borrador.revisados} platos en borrador`}
+        detalleCorto={`${r.peso.sinDatos} peso · ${r.vinos.sinDatos} vinos · ${r.borrador.total - r.borrador.revisados} borrador`}
       />
     </div>
   );
@@ -208,7 +254,7 @@ function FilaArticulo({ a, d, conIva, onElegir }: { a: ArticuloMargen; d: Datos;
           {a.tipo === "plato" ? porcentaje(a.pct) : veces(a.multiplicador)}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm leading-snug">{razon(a, d.config)}</span>
+          <span className="block break-words text-sm leading-snug">{razon(a, d.config)}</span>
           {a.tipo === "vino" && a.multiplicadorTienda !== null && (
             <span className={cn("block text-xs tabular-nums", a.banderas.includes("tienda_bajo") ? "text-destructive" : "text-muted-foreground")}>
               Tienda: {veces(a.multiplicadorTienda)} (mín. {veces(d.config.multiplicadorMinTienda)}){d.tienda.activa ? "" : " · tienda desactivada"}
@@ -313,25 +359,41 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
       : `Precio de carta (escala logarítmica) frente a % de coste sin IVA${vista === "vinos" ? ` · la línea es ${veces(d.config.multiplicadorMinVino)}` : ""}`;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 sm:gap-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 sm:gap-3">
       <Resumen d={d} />
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
+      {/* Filtros. En el móvil (11/11/2026) ocupaban tres filas; ahora dos, con textos cortos. Fila 1: qué parte de
+          la carta, «IVA» y Umbrales (solo icono); fila 2: qué enseñar, a todo el ancho. Desde `sm`, como antes. */}
+      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-x-1.5 gap-y-1.5 sm:gap-2" data-testid="margenes-filtros">
         <ToggleGroup type="single" value={vista} onValueChange={(v) => v && setVista(v as Vista)} variant="outline" aria-label="Qué parte de la carta">
-          <ToggleGroupItem value="peso" className="min-h-10 gap-1.5 px-3"><Scale className="h-4 w-4" aria-hidden /> Por peso</ToggleGroupItem>
-          <ToggleGroupItem value="vinos" className="min-h-10 gap-1.5 px-3"><Wine className="h-4 w-4" aria-hidden /> Vinos</ToggleGroupItem>
-          <ToggleGroupItem value="borrador" className="min-h-10 gap-1.5 px-3"><ChefHat className="h-4 w-4" aria-hidden /> Platos (borrador)</ToggleGroupItem>
+          <ToggleGroupItem value="peso" aria-label="Por peso" className="min-h-10 gap-1 px-1.5 sm:gap-1.5 sm:px-3">
+            <Scale className="h-4 w-4" aria-hidden /> <span className="sm:hidden">Peso</span>
+            <span className="hidden sm:inline">Por peso</span>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="vinos" aria-label="Vinos" className="min-h-10 gap-1 px-1.5 sm:gap-1.5 sm:px-3">
+            <Wine className="h-4 w-4" aria-hidden /> Vinos
+          </ToggleGroupItem>
+          <ToggleGroupItem value="borrador" aria-label="Platos (borrador)" className="min-h-10 gap-1 px-1.5 sm:gap-1.5 sm:px-3">
+            <ChefHat className="h-4 w-4" aria-hidden /> <span>Platos<span className="hidden sm:inline"> (borrador)</span></span>
+          </ToggleGroupItem>
         </ToggleGroup>
-        <ToggleGroup type="single" value={filtro} onValueChange={(v) => v && setFiltro(v as Filtro)} variant="outline" aria-label="Qué enseñar">
-          <ToggleGroupItem value="problemas" className="min-h-10 px-3">No funciona</ToggleGroupItem>
-          <ToggleGroupItem value="todos" className="min-h-10 px-3">Todos</ToggleGroupItem>
-          <ToggleGroupItem value="sin_datos" className="min-h-10 gap-1 px-3"><CircleSlash className="h-4 w-4" aria-hidden /> Sin datos</ToggleGroupItem>
+        <ToggleGroup
+          type="single"
+          value={filtro}
+          onValueChange={(v) => v && setFiltro(v as Filtro)}
+          variant="outline"
+          aria-label="Qué enseñar"
+          className="max-sm:order-last max-sm:w-full max-sm:[&>*]:flex-1"
+        >
+          <ToggleGroupItem value="problemas" className="min-h-10 px-2 sm:px-3">No funciona</ToggleGroupItem>
+          <ToggleGroupItem value="todos" className="min-h-10 px-2 sm:px-3">Todos</ToggleGroupItem>
+          <ToggleGroupItem value="sin_datos" className="min-h-10 gap-1 px-2 sm:px-3"><CircleSlash className="h-4 w-4" aria-hidden /> Sin datos</ToggleGroupItem>
         </ToggleGroup>
-        <label className="ml-auto flex min-h-10 items-center gap-2 text-sm">
+        <label className="ml-auto flex min-h-10 items-center gap-1.5 text-sm sm:gap-2">
           <Switch checked={conIva} onCheckedChange={setConIva} aria-label="Ver costes y precios con IVA" />
-          Con IVA
+          <span><span className="hidden sm:inline">Con </span>IVA</span>
         </label>
-        <Button variant="ghost" size="sm" className="min-h-10" onClick={() => setUmbrales(true)}>
-          <Settings2 className="mr-1.5 h-4 w-4" aria-hidden /> Umbrales
+        <Button variant="ghost" size="sm" className="min-h-10 px-2 sm:px-3" onClick={() => setUmbrales(true)} aria-label="Umbrales" title="Umbrales">
+          <Settings2 className="h-4 w-4 sm:mr-1.5" aria-hidden /> <span className="hidden sm:inline">Umbrales</span>
         </Button>
       </div>
       {vista === "vinos" && !d.tienda.activa && (
@@ -353,14 +415,21 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
           </span>
         </p>
       )}
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(9rem,38%)_1fr] gap-2 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-1 lg:gap-3">
-        <section className="flex min-h-0 flex-col rounded-lg border border-border/70 bg-card p-2" aria-label="Precio de venta frente a % de coste">
-          <p className="shrink-0 truncate px-1 text-xs text-muted-foreground">{textoEje}</p>
-          <div className="min-h-0 flex-1">
+      {/* `grid-cols-[minmax(0,1fr)]` y `min-w-0` (11/11/2026): sin ellos, en el móvil la columna implícita (`auto`)
+          tomaba el ancho del texto sin cortar del eje y el gráfico y la lista se salían por la derecha. */}
+      <div
+        className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(9rem,38%)_1fr] gap-2 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-1 lg:gap-3"
+        data-testid="margenes-cuerpo"
+      >
+        <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-border/70 bg-card p-2" aria-label="Precio de venta frente a % de coste">
+          <p className="line-clamp-2 shrink-0 px-1 text-xs leading-snug text-muted-foreground sm:line-clamp-none sm:truncate" title={textoEje}>
+            {textoEje}
+          </p>
+          <div className="min-h-0 min-w-0 flex-1">
             <Dispersion lista={lista} umbral={umbral} eje={vista === "borrador" ? "Máx." : "Mín."} porKilo={vista === "peso"} onElegir={elegir} />
           </div>
         </section>
-        <section className="flex min-h-0 flex-col rounded-lg border border-border/70 bg-card" aria-label="Donde no funciona el margen">
+        <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-border/70 bg-card" aria-label="Donde no funciona el margen">
           <p className="shrink-0 border-b border-border/70 px-3 py-2 text-sm font-medium">
             {titulo}
             <span className="ml-1 font-normal text-muted-foreground">({filas.length})</span>

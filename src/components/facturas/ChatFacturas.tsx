@@ -90,7 +90,10 @@ interface ChatFacturasProps {
   ranuraBarra?: HTMLElement | null;
 }
 
-const NOMBRE_PERIODO: Record<PeriodoAnalisis, string> = { mes: "este mes", trimestre: "este trimestre", anio: "este año", todo: "el histórico" };
+// En el móvil, «C. Tomás»: el local y los iconos de la barra caben así en una fila (11/11/2026).
+const LOCALES_BARRA = FILTROS_LOCAL.map((o) => (o.valor === "casa_tomas" ? { ...o, etiquetaMovil: "C. Tomás" } : o));
+
+const NOMBRE_PERIODO: Record<PeriodoAnalisis, string> ={ mes: "este mes", trimestre: "este trimestre", anio: "este año", todo: "el histórico" };
 
 /** Para «Volver …» tras «Ver solo este tramo»: «al año 2026», «a este mes», «a 1 mar – 15 abr 2026». */
 /** «Hoy», que cambia si la tablet se queda encendida pasada la medianoche (cada minuto y al volver a la pestaña). */
@@ -318,22 +321,30 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
 
   const copilotoVisible = conIa && abierto && activa && !pantallaCompleta;
   // Barra única (07/11/2026): periodo, local, «Personalizar» (icono) y la IA, en una
-  // línea con las pestañas de la página. En tablet vertical o móvil puede partir en dos.
+  // línea con las pestañas de la página. En tablet vertical puede partir en dos.
+  // En el móvil (11/11/2026) la barra y su ranura son `contents`: sus piezas se colocan
+  // en la fila de Facturas junto a avisos y ayuda. Fila 1, el periodo entero; fila 2,
+  // el local a la izquierda y, a la derecha, avisos, ayuda, personalizar e IA (iconos).
   const barra = (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 2xl:gap-2" data-tour="facturas-analisis-barra" data-testid="barra-analisis">
+    <div
+      className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 max-sm:contents 2xl:gap-2"
+      data-tour="facturas-analisis-barra"
+      data-testid="barra-analisis"
+    >
       <SelectorPeriodo valor={seleccion} onCambio={elegirPeriodo} hoy={hoy} compacto />
-      <Segmentado<FiltroLocal> etiqueta="Local" opciones={FILTROS_LOCAL} valor={local} onCambio={setLocal} compacto />
+      <Segmentado<FiltroLocal> etiqueta="Local" opciones={LOCALES_BARRA} valor={local} onCambio={setLocal} compacto />
       {tablero.isFetching && !tablero.isLoading && (
         <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> <span className="sr-only">Actualizando…</span>
         </span>
       )}
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="ml-auto flex items-center gap-1.5 max-sm:order-2 max-sm:ml-0 max-sm:gap-1">
         <Button
           type="button"
           variant="outline"
           size="icon"
-          className="h-9 w-9 pointer-coarse:h-11 pointer-coarse:w-11"
+          // En el móvil, 40 px (con dedo también) para que quepan en la fila del local.
+          className="h-10 w-10 pointer-coarse:h-10 pointer-coarse:w-10 sm:h-9 sm:w-9 sm:pointer-coarse:h-11 sm:pointer-coarse:w-11"
           onClick={() => setPersonalizando(true)}
           disabled={!datos || datos.sinDatos}
           aria-haspopup="dialog"
@@ -345,7 +356,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         {conIa && (
           <Button
             type="button"
-            className="h-9 gap-1.5 px-2.5 pointer-coarse:h-11 2xl:px-3"
+            className="h-10 w-10 gap-1.5 px-0 pointer-coarse:h-10 sm:h-9 sm:w-auto sm:px-2.5 sm:pointer-coarse:h-11 2xl:px-3"
             // Abre y cierra el panel (no es modal: el botón sigue a mano con él abierto).
             onClick={() => {
               setVerHistorial(false);
@@ -358,7 +369,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
           >
             <Sparkles className="h-4 w-4" aria-hidden />
             {/* Con poco sitio, «IA» a secas (el nombre accesible sigue entero). */}
-            <span className="hidden 2xl:inline">Pregúntale a la</span> IA
+            {/* En el móvil, solo el icono (el nombre accesible sigue entero). */}
+            <span className="hidden 2xl:inline">Pregúntale a la</span> <span className="max-sm:hidden">IA</span>
           </Button>
         )}
       </div>

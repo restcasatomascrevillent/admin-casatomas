@@ -672,6 +672,16 @@ describe("QA 05/11/2026: página, URL y pestañas", () => {
     expect(barra).toContainElement(boton);
     expect(barra).toContainElement(screen.getByRole("group", { name: "Local" }));
     expect(barra).toContainElement(screen.getByRole("button", { name: "Personalizar el tablero" }));
+    // En el móvil (11/11/2026): la barra se deshace (`contents`) para ordenar sus piezas con avisos y ayuda; el
+    // periodo, solo en la primera fila y en una línea (con «Trim.»); el local, con «C. Tomás»; la IA, solo icono.
+    expect(barra).toHaveClass("max-sm:contents");
+    const periodo = screen.getByRole("group", { name: "Periodo" });
+    expect(periodo).toHaveClass("max-sm:order-first", "max-sm:basis-full", "max-sm:flex-nowrap");
+    expect(within(periodo).getByRole("button", { name: "Trimestre" })).toBeInTheDocument();
+    expect(within(periodo).getByText(".")).toHaveClass("sm:hidden");
+    expect(within(screen.getByRole("group", { name: "Local" })).getByRole("button", { name: "Casa Tomás" })).toHaveTextContent("C. Tomás");
+    expect(within(boton).getByText("IA")).toHaveClass("max-sm:hidden");
+    expect(boton.parentElement).toHaveClass("max-sm:order-2");
     fireEvent.click(boton);
     expect(raiz.className).toContain("lg:pr-[360px]");
   });

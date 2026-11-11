@@ -95,6 +95,22 @@ describe("Botón «Avisos» de cada sección", () => {
     expect(await screen.findByRole("button", { name: "Avisos: ninguno sin revisar" })).toBeInTheDocument();
   });
 
+  it("compacto (Facturas › Análisis): en el móvil, icono de 40 px con el número en una burbujita; sin compacto, nada cambia", async () => {
+    const { unmount } = render(
+      <MemoryRouter>
+        <BotonAvisosSeccion seccion="facturas" compacto />
+      </MemoryRouter>,
+    );
+    const boton = await screen.findByRole("button", { name: "Avisos: 1 sin revisar" });
+    expect(boton).toHaveClass("h-10", "w-10", "max-sm:bg-background", "sm:h-9", "sm:w-auto");
+    expect(screen.getByTestId("avisos-contador")).toHaveClass("max-sm:absolute", "max-sm:text-[10px]");
+    unmount();
+    pintar("facturas");
+    const normal = await screen.findByRole("button", { name: "Avisos: 1 sin revisar" });
+    expect(normal.className).not.toContain("max-sm:");
+    expect(screen.queryByTestId("avisos-contador")).not.toBeInTheDocument();
+  });
+
   it("el modal filtra por estado y por tipo, y marca como revisados solo los de su sección", async () => {
     pintar("reservas");
     fireEvent.click(await screen.findByRole("button", { name: "Avisos: 2 sin revisar" }));

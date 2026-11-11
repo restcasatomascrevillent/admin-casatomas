@@ -100,7 +100,8 @@ export function Segmentado<T extends string>({
   compacto = false,
 }: {
   etiqueta: string;
-  opciones: { valor: T; etiqueta: string }[];
+  /** `etiquetaMovil`: texto por debajo de `sm` (la etiqueta entera sigue siendo el nombre accesible). */
+  opciones: { valor: T; etiqueta: string; etiquetaMovil?: string }[];
   valor: T;
   onCambio: (v: T) => void;
   className?: string;
@@ -117,12 +118,21 @@ export function Segmentado<T extends string>({
           onClick={() => onCambio(o.valor)}
           className={cn(
             "whitespace-nowrap rounded-md font-medium text-muted-foreground transition-colors hover:text-foreground",
-            compacto ? "min-h-8 px-2 text-[0.8125rem] pointer-coarse:min-h-11 2xl:px-2.5" : "min-h-11 px-3 text-sm",
+            compacto ? "min-h-8 px-2 text-[0.8125rem] pointer-coarse:min-h-11 max-sm:px-1.5 2xl:px-2.5" : "min-h-11 px-3 text-sm",
             "aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm",
             FOCO,
           )}
         >
-          {o.etiqueta}
+          {o.etiquetaMovil ? (
+            <>
+              <span className="sm:hidden" aria-hidden="true">
+                {o.etiquetaMovil}
+              </span>
+              <span className="max-sm:sr-only">{o.etiqueta}</span>
+            </>
+          ) : (
+            o.etiqueta
+          )}
         </button>
       ))}
     </div>

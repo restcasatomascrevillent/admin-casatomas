@@ -136,6 +136,28 @@ describe("MargenesCarta", () => {
     expect(within(detalle).getByLabelText("Cantidad de Percebe")).toBeDisabled();
   });
 
+  it("en el móvil (11/11/2026): el gráfico y la lista caben, las cifras no se cortan y los filtros ocupan dos filas", () => {
+    pintar();
+    // La columna de la rejilla no puede crecer con el texto: si no, el gráfico y la lista se salían por la derecha.
+    const cuerpo = screen.getByTestId("margenes-cuerpo");
+    expect(cuerpo).toHaveClass("grid-cols-[minmax(0,1fr)]", "min-w-0");
+    for (const s of cuerpo.querySelectorAll("section")) expect(s).toHaveClass("min-w-0");
+    expect(cuerpo.innerHTML).not.toMatch(/(?:^|[\s"])(min-w|w)-\[\d+px\]/);
+    // El texto de la lista envuelve.
+    expect(within(screen.getByTestId("margenes-lista")).getByText(/^Percebes: lo compras/)).toHaveClass("break-words");
+    // Tarjetas: versión corta en el móvil, que envuelve (sin «…»); la larga, desde sm y para lectores de pantalla.
+    const [peso] = screen.getAllByTestId("margenes-cifra");
+    const corta = within(peso).getByText("Al peso (mediana)");
+    expect(corta).toHaveClass("sm:hidden");
+    expect(within(peso).getByText("Al peso: multiplicador (mediana)")).toHaveClass("max-sm:sr-only");
+    expect(corta.parentElement).toHaveClass("line-clamp-2", "sm:truncate");
+    expect(corta.parentElement).not.toHaveClass("truncate");
+    // Filtros: «Qué enseñar» baja a su fila, a todo el ancho; «Umbrales», solo icono en el móvil.
+    expect(screen.getByRole("group", { name: "Qué enseñar" })).toHaveClass("max-sm:order-last", "max-sm:w-full");
+    expect(screen.getByRole("radio", { name: "Platos (borrador)" })).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: "Umbrales" })).getByText("Umbrales")).toHaveClass("hidden", "sm:inline");
+  });
+
   it("si falla la consulta, lo dice y deja reintentar", () => {
     estado = { isLoading: false, isError: true, data: undefined, error: new Error("Falta aplicar en Supabase la migración"), refetch: vi.fn() };
     pintar();

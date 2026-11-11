@@ -268,6 +268,11 @@ describe("Facturas · gasto de IA a la derecha de la barra de pestañas", () => 
     // El hueco para los controles de Análisis está en la misma fila que las pestañas, y se le pasa a ChatFacturas.
     expect(fila).toContainElement(screen.getByTestId("ranura-analisis"));
     expect(screen.getByTestId("chat-ranura")).toHaveTextContent("con ranura");
+    // En el móvil (11/11/2026) la ranura es `contents`: sus piezas se ordenan con avisos y ayuda en un contenedor que
+    // parte en dos filas; avisos y ayuda, a la derecha de la segunda.
+    expect(screen.getByTestId("ranura-analisis")).toHaveClass("max-sm:contents");
+    expect(screen.getByTestId("acciones-facturas")).toHaveClass("max-sm:flex-wrap");
+    expect(screen.getByRole("button", { name: /Ayuda/ })).toHaveClass("max-sm:order-1", "h-10", "w-10");
     expect(screen.getByTestId("gasto-ia-pestana").className).toContain("2xl:flex");
     // Los iconos de las pestañas, solo en muy ancho (dejan sitio a la barra).
     const icono = within(screen.getByRole("tab", { name: /^Análisis/ })).getByText((_, el) => el?.tagName === "SPAN" && el.getAttribute("aria-hidden") === "true" && !!el.querySelector("svg"));

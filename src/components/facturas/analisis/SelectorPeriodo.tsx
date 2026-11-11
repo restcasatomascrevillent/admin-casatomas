@@ -18,7 +18,12 @@ const aFecha = (iso: string) => new Date(Number(iso.slice(0, 4)), Number(iso.sli
 
 const BOTON =
   "whitespace-nowrap rounded-md font-medium text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm";
-const TAMANO = { normal: "min-h-11 px-3 text-sm", compacto: "min-h-8 px-2 text-[0.8125rem] pointer-coarse:min-h-11 2xl:px-2.5" } as const;
+// Compacto en el móvil (11/11/2026): el grupo ocupa la fila entera y sus botones se reparten el ancho
+// (`flex-1`), así el calendario no baja a una segunda línea.
+const TAMANO = {
+  normal: "min-h-11 px-3 text-sm",
+  compacto: "min-h-8 min-w-0 px-2 text-[0.8125rem] pointer-coarse:min-h-11 max-sm:flex-1 max-sm:px-1.5 2xl:px-2.5",
+} as const;
 
 export function SelectorPeriodo({
   valor,
@@ -50,13 +55,17 @@ export function SelectorPeriodo({
   const listo = rango?.from && rango?.to;
 
   return (
-    <div role="group" aria-label="Periodo" className={cn("inline-flex max-w-full shrink-0 flex-wrap rounded-lg bg-muted/40", compacto ? "gap-0.5 p-0.5" : "gap-1 p-1")}>
+    <div role="group" aria-label="Periodo" className={cn(
+        "inline-flex max-w-full shrink-0 flex-wrap rounded-lg bg-muted/40",
+        compacto ? "gap-0.5 p-0.5 max-sm:order-first max-sm:flex max-sm:w-full max-sm:basis-full max-sm:flex-nowrap" : "gap-1 p-1",
+      )}
+      data-testid="selector-periodo">
       {periodosAnalisis(hoy).map((o) => (
         <button
           key={o.valor}
           type="button"
           aria-pressed={valor.tipo === o.valor}
-          aria-label={compacto && o.valor === "anio" ? o.etiqueta : undefined}
+          aria-label={compacto && (o.valor === "anio" || o.valor === "trimestre") ? o.etiqueta : undefined}
           onClick={() => onCambio({ tipo: o.valor as PeriodoAnalisis })}
           className={cn(BOTON, tam, FOCO)}
         >
@@ -64,6 +73,12 @@ export function SelectorPeriodo({
           {compacto && o.valor === "anio" ? (
             <>
               Año<span className="hidden 2xl:inline">{o.etiqueta.slice(3)}</span>
+            </>
+          ) : compacto && o.valor === "trimestre" ? (
+            // En el móvil, «Trim.» para que el periodo y el calendario quepan en una línea.
+            <>
+              Trim<span className="max-sm:hidden">estre</span>
+              <span className="sm:hidden">.</span>
             </>
           ) : (
             o.etiqueta
@@ -77,7 +92,15 @@ export function SelectorPeriodo({
             aria-pressed={!!personalizado}
             aria-label={personalizado ? `Elegir fechas (ahora, ${textoRango(personalizado.desde, personalizado.hasta)})` : "Elegir fechas"}
             title="Elegir fechas"
-            className={cn(BOTON, tam, FOCO, "inline-flex items-center gap-1.5", !personalizado && (compacto ? "px-2" : "px-2.5"))}
+            className={cn(
+              BOTON,
+              tam,
+              FOCO,
+              "inline-flex items-center justify-center gap-1.5",
+              !personalizado && (compacto ? "px-2" : "px-2.5"),
+              // Con un rango elegido, sus fechas mandan: el botón no se reparte el ancho, toma el suyo.
+              compacto && personalizado && "max-sm:flex-none",
+            )}
             data-testid="periodo-personalizado"
           >
             <CalendarRange className="h-4 w-4" aria-hidden />

@@ -47,7 +47,11 @@ export function BotonAvisosSeccion({ seccion, className, compacto = false }: { s
         variant={conPendientes ? "destructive" : "outline"}
         className={cn(
           "relative h-9 shrink-0 gap-1.5 px-3 pointer-coarse:h-9",
-          late && "bg-red-600 text-white ring-2 ring-red-500 ring-offset-2 ring-offset-background hover:bg-red-700 motion-safe:animate-pulse",
+          // Compacto en el móvil (Facturas › Análisis, 11/11/2026): un icono de 40 px con el número en una
+          // burbujita roja en la esquina, en vez de un botón rojo grande. Desde `sm`, como siempre.
+          compacto &&
+            "h-10 w-10 px-0 pointer-coarse:h-10 sm:h-9 sm:w-auto sm:px-3 sm:pointer-coarse:h-9 max-sm:border max-sm:border-input max-sm:bg-background max-sm:text-foreground max-sm:hover:bg-accent",
+          late &&"bg-red-600 text-white ring-2 ring-red-500 ring-offset-2 ring-offset-background hover:bg-red-700 motion-safe:animate-pulse",
           className,
         )}
         onClick={() => {
@@ -63,7 +67,12 @@ export function BotonAvisosSeccion({ seccion, className, compacto = false }: { s
         {conPendientes && (
           <span
             aria-hidden="true"
-            className="ml-0.5 inline-flex min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-sm font-bold leading-6 text-destructive"
+            className={cn(
+              "ml-0.5 inline-flex min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-sm font-bold leading-6 text-destructive",
+              compacto &&
+                "max-sm:absolute max-sm:-right-1 max-sm:-top-1 max-sm:ml-0 max-sm:h-[1.125rem] max-sm:min-w-[1.125rem] max-sm:bg-destructive max-sm:px-1 max-sm:text-[10px] max-sm:leading-[1.125rem] max-sm:text-white",
+            )}
+            data-testid={compacto ? "avisos-contador" : undefined}
           >
             {pendientes > 99 ? "99+" : pendientes}
           </span>

@@ -217,8 +217,10 @@ const Facturas = () => {
               { valor: "cargar", etiqueta: "Cargar", icono: <Upload />, contador: activosSubida, etiquetaContador: `${activosSubida} procesando`, contadorEnMovil: true, tour: "facturas-pestana-cargar" },
             ].filter((p) => visibles.includes(p.valor as PestanaFacturas))}
             acciones={
-              <>
-                {barraUnica && <div ref={setRanuraAnalisis} className="flex min-w-0 flex-1" data-testid="ranura-analisis" />}
+              // En Análisis, todo en un contenedor propio: en el móvil (11/11/2026) la ranura es `contents` y sus
+              // piezas se ordenan aquí con avisos y ayuda en dos filas (periodo; local + iconos). Desde `sm`, como antes.
+              <div className={barraUnica ? "flex min-w-0 flex-1 items-center gap-2 max-sm:flex-wrap max-sm:gap-x-1 max-sm:gap-y-2" : "contents"} data-testid="acciones-facturas">
+                {barraUnica && <div ref={setRanuraAnalisis} className="flex min-w-0 flex-1 max-sm:contents" data-testid="ranura-analisis" />}
                 {/* El gasto del chatbot es de la IA: solo con «Editar». Sin él, un hueco empuja lo demás a la derecha.
                     En Análisis, con la barra única, solo en pantallas muy anchas (no cabe en 1280). */}
                 {permisos.editar ? (
@@ -229,9 +231,18 @@ const Facturas = () => {
                 {soloLectura && <EtiquetaSoloLectura />}
                 {/* Avisos de facturas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral).
                     Son de lo comprado (precios, documentos): solo para quien consulta Facturas. */}
-                {permisos.consultar && <BotonAvisosSeccion seccion="facturas" compacto={barraUnica} />}
-                <BotonAyuda seccion="facturas" />
-              </>
+                {permisos.consultar && (
+                  <BotonAvisosSeccion seccion="facturas" compacto={barraUnica} className={barraUnica ? "max-sm:order-1 max-sm:ml-auto" : undefined} />
+                )}
+                <BotonAyuda
+                  seccion="facturas"
+                  className={
+                    barraUnica
+                      ? "max-sm:order-1 h-10 w-10 pointer-coarse:h-10 pointer-coarse:w-10 sm:h-11 sm:w-11 sm:pointer-coarse:h-11 sm:pointer-coarse:w-11"
+                      : undefined
+                  }
+                />
+              </div>
             }
           />
 
