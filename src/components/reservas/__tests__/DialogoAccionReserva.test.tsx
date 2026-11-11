@@ -119,7 +119,7 @@ describe("DialogoAccionReserva · el día", () => {
     const hoja = within(dialogo).getByRole("region", { name: "Comida" });
     expect(hoja).toHaveTextContent("Otra Mesa");
     const propia = within(hoja).getByText("Ana López").closest("li")!;
-    expect(propia).toHaveClass("bg-amber-200/50");
+    expect(propia).toHaveClass("bg-amber-100");
   });
 
   it("aviso claro si con esta reserva se pasa del aforo", () => {
