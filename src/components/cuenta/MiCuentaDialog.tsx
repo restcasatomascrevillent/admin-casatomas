@@ -96,6 +96,7 @@ function ContenidoMiCuenta({ user, esSuperAdmin, rol, permisos, tono, pestanaIni
 
       <Tabs value={pestana} onValueChange={(v) => setPestana(v as PestanaMiCuenta)} className="flex min-w-0 flex-col">
         <PestanasPagina
+            nivel={2}
           pestanas={[
             { valor: "datos", etiqueta: "Mi cuenta", icono: <UserRound /> },
             { valor: "contrasena", etiqueta: "Contraseña", icono: <KeyRound /> },

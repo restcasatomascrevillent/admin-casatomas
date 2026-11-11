@@ -56,8 +56,10 @@ const DialogContent = React.forwardRef<
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
+// Fase 3 (11/11/2026): título alineado a la izquierda también en el móvil (antes centrado, y desviado por la X de
+// cerrar) y pie con hueco entre botones apilados en cualquier dispositivo. Igual en AlertDialog y Sheet.
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-1.5 pr-8 text-center sm:text-left pointer-coarse:pr-10", className)} {...props} />
+  <div className={cn("flex flex-col space-y-1.5 pr-8 text-left pointer-coarse:pr-10", className)} {...props} />
 );
 DialogHeader.displayName = "DialogHeader";
 
@@ -66,7 +68,7 @@ const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
     className={cn(
       // Con dedo el pie se queda pegado abajo del diálogo con scroll: los botones de acción no
       // se pierden con el teclado abierto ni en un formulario largo.
-      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pointer-coarse:sticky pointer-coarse:bottom-0 pointer-coarse:z-10 pointer-coarse:gap-2 pointer-coarse:bg-background pointer-coarse:pb-1 pointer-coarse:pt-2 pointer-coarse:sm:gap-3 pointer-coarse:sm:space-x-0",
+      "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-0 sm:space-x-2 pointer-coarse:sticky pointer-coarse:bottom-0 pointer-coarse:z-10 pointer-coarse:gap-2 pointer-coarse:bg-background pointer-coarse:pb-1 pointer-coarse:pt-2 pointer-coarse:sm:gap-3 pointer-coarse:sm:space-x-0",
       className,
     )}
     {...props}

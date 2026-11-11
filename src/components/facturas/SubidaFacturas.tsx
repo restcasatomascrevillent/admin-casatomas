@@ -54,7 +54,7 @@ const rutaDocumento = (id: number | undefined) => (id ? `${RUTA_COMPRAS}&modo=do
  * 34 % de luminosidad (05/11/2026): con texto blanco da 5,3:1 (el de 45 %
  * daba 3,3:1, por debajo del 4,5:1 de WCAG AA).
  */
-const DORADO = "bg-[hsl(38,59%,34%)] text-white hover:bg-[hsl(38,59%,28%)] focus-visible:ring-[hsl(38,59%,34%)]";
+const DORADO = "bg-gold-strong text-white hover:bg-gold-deep focus-visible:ring-gold-strong";
 
 /**
  * Pestaña «Cargar» de Facturas. Solo ENSEÑA la cola global
@@ -166,7 +166,7 @@ export function SubidaFacturas() {
           data-zona="compacta"
           className={cn(
             "flex shrink-0 flex-wrap items-center gap-2 rounded-lg px-1 transition-colors",
-            isDragging && "bg-muted ring-1 ring-[hsl(38,59%,45%)]",
+            isDragging && "bg-muted ring-1 ring-gold",
           )}
         >
           <p className="min-w-0 flex-1 basis-40 text-sm text-muted-foreground">
@@ -181,7 +181,7 @@ export function SubidaFacturas() {
             data-zona="amplia"
             className={cn(
               "w-full max-w-xl rounded-2xl border border-dashed px-6 py-10 text-center transition-colors sm:py-14",
-              isDragging ? "border-[hsl(38,59%,45%)] bg-muted/60" : "border-border bg-muted/20",
+              isDragging ? "border-gold bg-muted/60" : "border-border bg-muted/20",
             )}
           >
             <Upload
@@ -283,7 +283,7 @@ export function SubidaFacturas() {
                     {marcables.includes(e) && (
                       <input
                         type="checkbox"
-                        className="h-5 w-5 shrink-0 accent-[hsl(38,59%,45%)]"
+                        className="h-5 w-5 shrink-0 accent-gold"
                         checked={marcados.has(e.id)}
                         onChange={() => alternarMarca(e.id)}
                         aria-label={`Marcar ${e.nombre} para unirla con otras fotos`}

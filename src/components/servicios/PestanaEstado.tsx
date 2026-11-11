@@ -171,7 +171,7 @@ function Ficha({ ficha, onAbrir }: { ficha: FichaEstado; onAbrir: (proveedor: st
         title={[resumenAnillos, resumenDatos].filter(Boolean).join("\n") || ficha.nombreCompleto}
         aria-label={`${ficha.nombreCompleto}: ${TEXTO_ESTADO[ficha.estado]}, ${ficha.motivo}.${resumenAnillos ? ` ${resumenAnillos}.` : ""}${resumenDatos ? ` ${resumenDatos}.` : ""} Ver detalle`}
         className={cn(
-          "flex h-full w-full min-w-0 flex-col items-center gap-2 rounded-xl border-2 bg-card p-3 text-center transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)] focus-visible:ring-offset-2",
+          "flex h-full w-full min-w-0 flex-col items-center gap-2 rounded-xl border-2 bg-card p-3 text-center transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2",
           tono.borde,
         )}
       >
@@ -295,7 +295,7 @@ export function PestanaEstado({ estado, resumen, pendientes, ultima, cargandoLec
                         onClick={() => onAbrir(f.proveedor)}
                         title={f.motivo}
                         aria-label={`${f.nombreCompleto}: ${f.motivo}. Ver detalle`}
-                        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border bg-card px-3 text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)]"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border bg-card px-3 text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                       >
                         <IconoCat className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                         {f.nombre}
@@ -345,7 +345,7 @@ export function PestanaEstado({ estado, resumen, pendientes, ultima, cargandoLec
             type="button"
             data-pendiente={p.clave}
             onClick={() => onIr(p.destino)}
-            className="min-h-11 text-left underline underline-offset-2 hover:text-foreground sm:min-h-0"
+            className="min-h-11 text-left underline underline-offset-2 hover:text-foreground sm:min-h-0 pointer-coarse:sm:min-h-11"
           >
             {p.titulo}
           </button>
