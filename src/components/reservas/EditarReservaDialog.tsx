@@ -21,7 +21,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2, Lock } from "lucide-react";
+import { Ban, CheckCircle2, Loader2, Lock } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -38,6 +38,8 @@ import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { supabase } from "@/integrations/supabase/client";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
+import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
+import { esEstadoVivo } from "@/lib/reservas/estadosReserva";
 import { OPCIONES_FILTRO_ESTADO } from "@/lib/reservas/vistaUnificada";
 import type { ReservaEditable } from "@/lib/reservas/edicionReserva";
 import { FormularioReserva } from "./FormularioReserva";
@@ -169,6 +171,8 @@ export function EditarReservaDialog({ reservaId, onClose }: EditarReservaDialogP
   } else {
     cuerpo = (
       <>
+        {/* Verificar / Confirmar / Cancelar desde la ficha (11/11/2026): la Lista ya no tiene tabla con esos botones. */}
+        <AccionesEstado reserva={reserva.data} onHecho={onClose} />
         {/* «Sentar fuera» (10/11/2026): dónde está sentada, fuera de las salas; cambiar o volver dentro. */}
         <AvisoSentadaFuera reserva={reserva.data as never} />
         <FormularioReserva
@@ -236,6 +240,62 @@ function AvisoSentadaFuera({ reserva }: { reserva: ReservaServicio & { salida_at
       <EtiquetaFuera reserva={reserva} className="text-sm" />
       <span className="text-muted-foreground">Sentada fuera de las salas: no ocupa mesa ni cuenta en ningún espacio.</span>
       {puedeEditar && <BotonSentarFuera reserva={reserva} className="ml-auto h-11 w-auto px-4 text-sm" />}
+    </div>
+  );
+}
+
+/**
+ * El estado, desde la ficha (11/11/2026, petición del dueño al unir Libro y Tabla en la Lista): pendiente →
+ * «Verificar»; verificada → «Confirmar»; pendiente, verificada o confirmada → «Cancelar» (con pregunta). Son
+ * las acciones de siempre (`useAccionesServicioReserva`: correo al cliente y aviso); al acabar bien se cierra
+ * la ficha, que es lo que se ve cambiado en la Lista.
+ */
+function AccionesEstado({ reserva, onHecho }: { reserva: ReservaEditable; onHecho: () => void }) {
+  const { aceptar, confirmar, cancelar, estaEnCurso } = useAccionesServicioReserva();
+  const [preguntarCancelar, setPreguntarCancelar] = useState(false);
+  const estado = String(reserva.estado ?? "");
+  if (!esEstadoVivo(estado)) return null;
+  const ocupado = estaEnCurso(String(reserva.id));
+  const hacer = async (accion: () => Promise<{ ok: boolean }>) => {
+    if ((await accion()).ok) onHecho();
+  };
+  const fila = reserva as unknown as Parameters<typeof confirmar>[0];
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3" data-testid="acciones-estado">
+      {estado === "pendiente" && (
+        <Button className="h-11 gap-2 text-base" disabled={ocupado} onClick={() => void hacer(() => aceptar(reserva as unknown as Parameters<typeof aceptar>[0]))}>
+          <CheckCircle2 className="h-5 w-5" aria-hidden /> Verificar
+        </Button>
+      )}
+      {estado === "verificada" && (
+        <Button className="h-11 gap-2 text-base" disabled={ocupado} onClick={() => void hacer(() => confirmar(fila))}>
+          <CheckCircle2 className="h-5 w-5" aria-hidden /> Confirmar
+        </Button>
+      )}
+      <Button
+        variant="outline"
+        className="ml-auto h-11 gap-2 border-red-300 text-base text-red-700 hover:bg-red-50 hover:text-red-800 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950"
+        disabled={ocupado}
+        onClick={() => setPreguntarCancelar(true)}
+      >
+        <Ban className="h-5 w-5" aria-hidden /> Cancelar reserva
+      </Button>
+      <AlertDialog open={preguntarCancelar} onOpenChange={setPreguntarCancelar}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar la reserva?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {reserva.nombre || "Sin nombre"}: pasa a «Cancelada»{reserva.email ? " y se le avisa por correo" : ""}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, dejarla</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 text-white hover:bg-red-700" onClick={() => void hacer(() => cancelar(fila))}>
+              Sí, cancelar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
