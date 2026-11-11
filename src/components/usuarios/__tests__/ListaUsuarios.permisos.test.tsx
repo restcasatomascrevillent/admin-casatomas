@@ -215,7 +215,7 @@ describe("ListaUsuarios · información de accesos actualizada", () => {
     const fila = (await screen.findByText("camarero1")).closest("tr")!;
     fireEvent.click(within(fila).getByRole("button", { name: "Permisos" }));
     const dialogo = await screen.findByRole("dialog");
-    fireEvent.click(within(dialogo).getByRole("combobox"));
+    fireEvent.click(within(dialogo).getAllByRole("combobox")[0]);
     fireEvent.click(await screen.findByRole("option", { name: "Sala" }));
     fireEvent.click(
       within(dialogo).getByRole("button", { name: "Guardar Permisos" }),
@@ -513,8 +513,8 @@ describe("ListaUsuarios · roles preconfigurados y «Puede editar»", () => {
     h.presets = [SIN_EDICION, CON_EDICION];
     const dialogo = await abrirPermisosDelCamarero();
 
-    expect(within(dialogo).getByRole("combobox")).toHaveTextContent("Sala");
-    expect(within(dialogo).getByRole("combobox")).not.toHaveTextContent(
+    expect(within(dialogo).getAllByRole("combobox")[0]).toHaveTextContent("Sala");
+    expect(within(dialogo).getAllByRole("combobox")[0]).not.toHaveTextContent(
       "Sala sin edición",
     );
   });
@@ -523,13 +523,13 @@ describe("ListaUsuarios · roles preconfigurados y «Puede editar»", () => {
     h.presets = [SIN_EDICION, CON_EDICION];
     const dialogo = await abrirPermisosDelCamarero();
 
-    fireEvent.click(within(dialogo).getByRole("combobox"));
+    fireEvent.click(within(dialogo).getAllByRole("combobox")[0]);
     fireEvent.click(
       await screen.findByRole("option", { name: "Sala sin edición" }),
     );
     expect(interruptor(dialogo, "Puede editar Reservas")).not.toBeChecked();
 
-    fireEvent.click(within(dialogo).getByRole("combobox"));
+    fireEvent.click(within(dialogo).getAllByRole("combobox")[0]);
     fireEvent.click(await screen.findByRole("option", { name: "Sala" }));
     expect(interruptor(dialogo, "Puede editar Reservas")).toBeChecked();
 
@@ -547,7 +547,7 @@ describe("ListaUsuarios · roles preconfigurados y «Puede editar»", () => {
     doble.bd.fallos = { upsert: rechazo, insert: rechazo };
     const dialogo = await abrirPermisosDelCamarero();
 
-    fireEvent.click(within(dialogo).getByRole("combobox"));
+    fireEvent.click(within(dialogo).getAllByRole("combobox")[0]);
     fireEvent.click(
       await screen.findByRole("option", { name: "Sala sin edición" }),
     );
@@ -887,4 +887,43 @@ it.each([1280, 390])("el cambio de contraseña conserva el diálogo si falla y l
   fireEvent.click(within(dialogo).getByRole("button", { name: "Actualizar contraseña" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(toast.success).toHaveBeenCalledWith("Contraseña actualizada correctamente");
+});
+
+describe("Pestaña al iniciar sesión (11/11/2026)", () => {
+  it("el super admin elige una pestaña que el usuario ve y se guarda con los permisos", async () => {
+    const dialogo = await abrirPermisosDelCamarero();
+    const selector = within(dialogo).getByTestId("selector-pestana-inicial");
+    fireEvent.click(selector);
+    // Solo lo que ve el camarero (Dashboard, Reservas, Facturas) y Ayuda.
+    expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual([
+      "Como siempre", "Dashboard", "Reservas", "Facturas", "Ayuda",
+    ]);
+    fireEvent.click(screen.getByRole("option", { name: "Facturas" }));
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar Permisos" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(doble.escriturasEn("user_pestana_inicial")).toEqual([
+      expect.objectContaining({ tipo: "upsert", payload: [{ user_id: CAMARERO, ruta: "/facturas" }] }),
+    ]);
+  });
+
+  it("si se le quita el permiso de la pestaña guardada, se borra (vuelve a «Como siempre»)", async () => {
+    doble.bd.tablas.user_pestana_inicial = [{ user_id: CAMARERO, ruta: "/reservas" }];
+    const dialogo = await abrirPermisosDelCamarero();
+    expect(within(dialogo).getByTestId("selector-pestana-inicial")).toHaveTextContent("Reservas");
+    fireEvent.click(interruptor(dialogo, "Ver Reservas"));
+    expect(within(dialogo).getByTestId("selector-pestana-inicial")).toHaveTextContent("Como siempre");
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar Permisos" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(doble.escriturasEn("user_pestana_inicial")).toEqual([
+      expect.objectContaining({ tipo: "delete", filtros: [["eq", "user_id", CAMARERO]] }),
+    ]);
+  });
+
+  it("sin tocarla no se escribe nada", async () => {
+    doble.bd.tablas.user_pestana_inicial = [{ user_id: CAMARERO, ruta: "/reservas" }];
+    const dialogo = await abrirPermisosDelCamarero();
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar Permisos" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(doble.escriturasEn("user_pestana_inicial")).toEqual([]);
+  });
 });

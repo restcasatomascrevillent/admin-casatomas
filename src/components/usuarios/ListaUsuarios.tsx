@@ -57,6 +57,9 @@ import { useUserRolePresets, UserRolePreset } from "@/hooks/useUserRolePresets";
 import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
 import { TablaPermisosSecciones } from "@/components/usuarios/TablaPermisosSecciones";
 import { VisorPermisosUsuario } from "@/components/usuarios/VisorPermisosUsuario";
+import { SelectorPestanaInicial } from "@/components/usuarios/SelectorPestanaInicial";
+import { elegirPestanaInicial } from "@/components/menuPanel";
+import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import {
   AccesoUsuario,
   AvatarUsuario,
@@ -97,6 +100,7 @@ export function ListaUsuarios({
     loadError,
     updateUserRole,
     setAllPermissions,
+    setPestanaInicial,
     updateUserPassword,
     setSuperAdmin,
     setUserAccessBlocked,
@@ -120,6 +124,12 @@ export function ListaUsuarios({
     PermisoSeccion[]
   >([]);
   const [selectedPresetId, setSelectedPresetId] = useState("manual");
+  // «Pestaña al iniciar sesión» que se está eligiendo en el diálogo (null = como siempre).
+  const [editingPestana, setEditingPestana] = useState<string | null>(null);
+  // Interruptores del Super Admin: una pestaña apagada no sale en el menú y tampoco se ofrece.
+  const { isEnabled } = useAdminFeatureToggles();
+  // Lo que vería en el menú con lo que se está marcando (el diálogo no se abre para super admins).
+  const contextoPestana = { permisos: editingPermissions, esSuperAdmin: false, isEnabled };
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordTargetUser, setPasswordTargetUser] =
@@ -160,6 +170,7 @@ export function ListaUsuarios({
     // Si no es un preconfigurado, quizá sea uno de los tipos fijos («Reservas», «Albaranes»).
     const tipo = matchingPreset ? null : tipoQueCoincide(perms);
     setSelectedPresetId(matchingPreset?.id ?? (tipo ? valorTipo(tipo) : "manual"));
+    setEditingPestana(user.pestana_inicial ?? null);
   };
 
   const closePermissionsDialog = () => {
@@ -167,6 +178,7 @@ export function ListaUsuarios({
     setSelectedUser(null);
     setEditingPermissions([]);
     setSelectedPresetId("manual");
+    setEditingPestana(null);
   };
 
   // Quien no es super admin ve el diálogo en solo lectura: la RLS de user_permissions
@@ -208,6 +220,13 @@ export function ListaUsuarios({
     if (rolNuevo !== selectedUser.role) {
       const actualizado = await updateUserRole(selectedUser.id, rolNuevo);
       if (!actualizado) return;
+    }
+    // Pestaña al iniciar sesión (11/11/2026): la elegida si la sigue viendo con lo guardado; si no, ninguna.
+    const pestana = elegirPestanaInicial(editingPestana, contextoPestana);
+    if (pestana !== (selectedUser.pestana_inicial ?? null)) {
+      const pestanaGuardada = await setPestanaInicial(selectedUser.id, pestana);
+      await fetchUsers(false);
+      if (!pestanaGuardada) return;
     }
     closePermissionsDialog();
     } finally {
@@ -524,6 +543,12 @@ export function ListaUsuarios({
               {selectedPresetId === "manual" && " · sale de los permisos: edita en todo → Admin; en algo → Manager; solo ve → Staff"}
             </p>
           )}
+          <SelectorPestanaInicial
+            valor={editingPestana}
+            onCambiar={setEditingPestana}
+            contexto={contextoPestana}
+            disabled={!canManageUsers}
+          />
           <div className="max-h-[52dvh] overflow-y-auto pr-1">
             <TablaPermisosSecciones
               permisos={editingPermissions}

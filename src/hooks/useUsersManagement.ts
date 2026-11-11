@@ -30,6 +30,8 @@ export interface ManagedUser {
   is_super_admin: boolean;
   created_at: string;
   access_blocked?: boolean;
+  /** Pestaña al iniciar sesión (user_pestana_inicial); null/undefined = como siempre. */
+  pestana_inicial?: string | null;
   permissions: {
     section_key: string;
     can_view: boolean;
@@ -114,13 +116,20 @@ export function useUsersManagement() {
           { data: rolesData, error: rolesError },
           { data: permissionsData, error: permError },
           { data: superAdminsData, error: superAdminsError },
+          pestanas,
         ] = await Promise.all([
           supabase.from("user_roles").select("user_id, role, created_at"),
           supabase
             .from("user_permissions")
             .select("user_id, section_key, can_view, can_edit"),
           supabase.from("super_admins").select("user_id"),
+          // «Pestaña al iniciar sesión» (11/11/2026). Si falla (p. ej. aún sin la migración) la lista sale igual.
+          Promise.resolve(supabase.from("user_pestana_inicial").select("user_id, ruta")).catch(() => ({ data: null, error: true })),
         ]);
+        const pestanaDe = new Map<string, string>();
+        if (!pestanas.error) {
+          for (const p of (pestanas.data ?? []) as { user_id: string; ruta: string }[]) pestanaDe.set(p.user_id, p.ruta);
+        }
 
         if (rolesError) throw rolesError;
         if (permError) throw permError;
@@ -191,6 +200,10 @@ export function useUsersManagement() {
             can_view: canView,
             can_edit: canEdit,
           });
+        });
+
+        userMap.forEach((u) => {
+          u.pestana_inicial = pestanaDe.get(u.id) ?? null;
         });
 
         const usersArray = Array.from(userMap.values()).sort((a, b) => {
@@ -529,6 +542,31 @@ export function useUsersManagement() {
     }
   };
 
+  /**
+   * Guarda la «Pestaña al iniciar sesión» (`null` = como siempre, borra la fila). Como los permisos, solo la
+   * escribe un super admin (RLS de user_pestana_inicial). No avisa al acabar bien: va dentro de «Guardar Permisos».
+   */
+  const setPestanaInicial = async (userId: string, ruta: string | null): Promise<boolean> => {
+    try {
+      if (ruta) {
+        const { error } = await supabase
+          .from("user_pestana_inicial")
+          .upsert({ user_id: userId, ruta }, { onConflict: "user_id" });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("user_pestana_inicial").delete().eq("user_id", userId);
+        if (error) throw error;
+      }
+      return true;
+    } catch (error) {
+      console.error("Error saving initial tab:", error);
+      toast.error("No se ha guardado la pestaña al iniciar sesión", {
+        description: (error as { message?: string })?.message || undefined,
+      });
+      return false;
+    }
+  };
+
   const deleteUser = async (userId: string) => {
     try {
       const { data, error } = await supabase.functions.invoke<{
@@ -561,6 +599,7 @@ export function useUsersManagement() {
     updateUserRole,
     updateUserPermission,
     setAllPermissions,
+    setPestanaInicial,
     updateUserPassword,
     setSuperAdmin,
     setUserAccessBlocked,

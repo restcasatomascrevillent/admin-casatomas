@@ -16,6 +16,7 @@ import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
 import { ColaVideosProvider } from "@/components/carta/video/ColaVideosProvider";
 import { rutaServicios } from "@/components/servicios/pestanas";
 import { PanelLayout, CargandoContenido } from "@/components/PanelLayout";
+import { AbrirPestanaInicial } from "@/components/AbrirPestanaInicial";
 import { CARGADORES_SECCION, prepararArranqueEnHoy } from "@/lib/precargaSecciones";
 import Auth from "./pages/Auth";
 const Dashboard = lazy(CARGADORES_SECCION["/dashboard"]);
@@ -134,6 +135,8 @@ const marcoPanel = (
   <RouteErrorBoundary>
     <ProtectedRoute requiredSection={[]}>
       <PanelLayout />
+      {/* «Pestaña al iniciar sesión» (11/11/2026): no pinta nada; al entrar abre la elegida en Usuarios. */}
+      <AbrirPestanaInicial />
     </ProtectedRoute>
   </RouteErrorBoundary>
 );

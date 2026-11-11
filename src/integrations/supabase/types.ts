@@ -5037,6 +5037,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_pestana_inicial: {
+        Row: {
+          ruta: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          ruta: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          ruta?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_role_presets: {
         Row: {
           base_role: Database["public"]["Enums"]["app_role"]

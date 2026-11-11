@@ -1,17 +1,9 @@
 import {
-  LayoutDashboard,
   UtensilsCrossed,
-  Globe,
-  Megaphone,
-  Receipt,
-  Gift,
   LogOut,
-  Shield,
   Settings,
-  HelpCircle,
-  Share2,
 } from "lucide-react";
-import { useEffect, type ComponentType, type SVGProps } from "react";
+import { useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { VersionPanel } from "@/components/panel/VersionPanel";
@@ -32,118 +24,12 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserRole, SectionKey } from "@/hooks/useUserRole";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
-import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
+import { itemMenuVisible, MENU_PANEL } from "@/components/menuPanel";
 import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
 import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
-import { Camera, ShoppingBag } from "lucide-react";
-
-// `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
-// cualquiera de ellas (el Gestor Web agrupa carta, contenido web y bot).
-// `toggleKey` es la clave que usa el Super Admin para activar/desactivar el
-// item en el sidebar (independiente del permiso por sección): por defecto es
-// el propio sectionKey cuando es uno solo, o se declara aparte cuando el item
-// agrupa varias secciones o comparte permiso con otro item.
-// Sin `sectionKey` (Ayuda): lo ve todo el mundo, sin permisos ni interruptor.
-const menuItems: {
-  title: string;
-  url: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
-  sectionKey?: SectionKey | SectionKey[];
-  toggleKey?: string;
-  /** Solo con el permiso guardado (el super admin no lo ve por serlo). */
-  soloConPermiso?: boolean;
-}[] = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: LayoutDashboard,
-    sectionKey: "dashboard",
-  },
-  {
-    title: "Reservas",
-    url: "/reservas",
-    icon: UtensilsCrossed,
-    sectionKey: "reservas",
-    toggleKey: "reservas",
-  },
-  // Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Ver
-  // docs/funcionalidades/10-retirada-seccion-personal.md.
-  // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web y
-  // Espacios se gestionan exclusivamente desde el Super Admin y ya no forman
-  // parte del Admin Panel normal (ver /super-admin). Plantillas Email está en
-  // Reservas › Configuración desde el 04/11/2026.
-  {
-    title: "Gestor Web",
-    url: "/gestion-web",
-    icon: Globe,
-    sectionKey: SECCIONES_GESTOR_WEB,
-    toggleKey: "gestion_web",
-  },
-  {
-    title: "Newsletter",
-    url: "/marketing",
-    icon: Megaphone,
-    sectionKey: "marketing",
-    toggleKey: "marketing",
-  },
-  // RRSS (08/11/2026, antes «Instagram», sección propia desde el 05/11/2026): Instagram, Facebook y el
-  // editor IA de fotos y vídeos. Mismo permiso y mismo interruptor del Super Admin que Newsletter («marketing»).
-  {
-    title: "RRSS",
-    url: "/rrss",
-    icon: Share2,
-    // La agencia (Oficiosos) también entra, solo a «Encargos» (docs/instagram-encargos.md).
-    sectionKey: ["marketing", "instagram_agencia"],
-    toggleKey: "marketing",
-  },
-  {
-    title: "Cheques",
-    url: "/cheques",
-    icon: Gift,
-    sectionKey: "cheques",
-    toggleKey: "cheques",
-  },
-  {
-    title: "Tienda",
-    url: "/tienda",
-    icon: ShoppingBag,
-    sectionKey: "tienda",
-    toggleKey: "tienda",
-  },
-  {
-    title: "Facturas",
-    url: "/facturas",
-    icon: Receipt,
-    // Con solo «Facturas · Subida» también sale (entra a la pestaña Cargar, 06/11/2026).
-    sectionKey: ["facturas", "facturas_subida"],
-    toggleKey: "facturas",
-  },
-  // «Subir albaranes» (10/11/2026): la pantalla del tipo de usuario «Albaranes» (solo fotos). No la ve el super
-  // admin (tiene Cargar en Facturas): solo quien tiene el permiso. Interruptor del Super Admin: el de Facturas.
-  {
-    title: "Subir albaranes",
-    url: "/albaranes",
-    icon: Camera,
-    sectionKey: "facturas_albaranes",
-    toggleKey: "facturas",
-    soloConPermiso: true,
-  },
-  // «Análisis general» (07/11/2026) ya no va aquí: desde el 10/11/2026 es la pestaña «Márgenes» de Facturas
-  // (petición del dueño). /analisis lleva a ella.
-  {
-    title: "Usuarios",
-    url: "/usuarios",
-    icon: Shield,
-    sectionKey: "usuarios",
-    toggleKey: "usuarios",
-  },
-  // «Avisos» ya no va aquí (06/11/2026, petición del dueño): cada sección tiene su botón rojo (BotonAvisosSeccion)
-  // y la campana de arriba enlaza a /avisos con todos.
-  { title: "Ayuda", url: "/ayuda", icon: HelpCircle },
-];
 
 export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
@@ -166,22 +52,12 @@ export function AppSidebar() {
     setOpenMobile(false);
   }, [currentPath, setOpenMobile]);
 
-  // Filtrar items según permisos y funcionalidades activadas por el Super Admin
-  const visibleItems = menuItems.filter((item) => {
-    if (loading || togglesLoading || superAdminLoading) return false;
-    if (!item.sectionKey) return true;
-    if (item.toggleKey && !isEnabled(item.toggleKey)) return false;
-    const keys = Array.isArray(item.sectionKey)
-      ? item.sectionKey
-      : [item.sectionKey];
-    // Usuarios se configura por permisos como las demás desde el 06/11/2026 (antes, rol admin).
-    // Ser "admin" ya no da acceso a todo lo demás: solo un super admin lo ve
-    // todo pase lo que pase en la tabla de permisos.
-    if (isSuperAdmin && !item.soloConPermiso) return true;
-    return keys.some(
-      (key) => permissions.find((p) => p.section_key === key)?.can_view,
-    );
-  });
+  // Filtrar items según permisos y funcionalidades activadas por el Super Admin (regla en menuPanel.ts,
+  // la misma que usa la «Pestaña al iniciar sesión» de Usuarios).
+  const visibleItems =
+    loading || togglesLoading || superAdminLoading
+      ? []
+      : MENU_PANEL.filter((item) => itemMenuVisible(item, { permisos: permissions, esSuperAdmin: isSuperAdmin, isEnabled }));
 
   return (
     <Sidebar collapsible="icon">

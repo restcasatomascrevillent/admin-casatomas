@@ -20,6 +20,7 @@ import {
   LIMITE_VOLUMEN_ENVASES,
   LIMITES,
   MAX_CHARS_VOLUMEN,
+  NOTA_PRECIO_UNIDAD_COMPRA,
   NOTA_RESPUESTA_VOLUMEN,
   marcarResultado,
   sinAvisosDeImporte,
@@ -317,6 +318,7 @@ describe("prepararLlamada", () => {
         p_orden: null, p_incluir_servicios: null,
       },
       limite: null,
+      notaRespuesta: NOTA_PRECIO_UNIDAD_COMPRA,
     });
     expect(() => prepararLlamada("ranking", { criterio: null })).toThrow(/criterio/);
     expect(() => prepararLlamada("ranking", { criterio: "cantidad", desde: "enero" })).toThrow(/fecha/);
@@ -362,6 +364,7 @@ describe("prepararLlamada", () => {
         p_limite: LIMITES.compras_producto, p_orden: "precio", p_excluir: "caja",
       },
       limite: null,
+      notaRespuesta: NOTA_PRECIO_UNIDAD_COMPRA,
       respaldoSemantico: { consulta: "centollo", param: "p_embedding" },
     });
     // strict mode manda null en lo no indicado: ambos tipos, todo el historico.
@@ -664,7 +667,8 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
 
   it("unidades distintas: no comparar, cada proveedor en su unidad", () => {
     expect(p).toMatch(/lista TODOS los proveedores, cada uno con su precio en SU unidad/);
-    expect(p).toMatch(/Osborne la caja a 519,40 €; Luga el kilo a 20,50 €/);
+    // El ejemplo va en la nota del resultado (11/11/2026): el prompt estaba en su tope.
+    expect(NOTA_PRECIO_UNIDAD_COMPRA).toMatch(/Osborne la caja a 519,40 €; Luga el kilo a 20,50 €/);
   });
 
   it("unidad y categoria solo se mandan si vienen (compatibles con las RPC de antes)", () => {
@@ -687,6 +691,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
       rpc: "serie_precios_agente",
       params: { p_texto: "jamon", p_desde: null, p_hasta: "2026-10-08", p_unidad: "kg" },
       limite: null,
+      notaRespuesta: NOTA_PRECIO_UNIDAD_COMPRA,
     });
     expect(() => prepararLlamada("grafico_precio", { producto: "jamon", desde: "ayer" })).toThrow(/fecha/);
     expect(p).toMatch(/grafico_precio: grafica, evolucion/);
@@ -727,7 +732,9 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
   it("el prompt manda decir «te dejo la gráfica debajo» sin preguntar, y citar el precio convertido", () => {
     const p = systemPrompt("2026-10-08");
     expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
-    expect(p).toMatch(/Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg»/);
+    // €/l o €/kg solo si lo piden (11/11/2026); lo convertido se sigue citando.
+    expect(p).toMatch(/Con convertido_desde di «convertido desde caja de 10 kg»/);
+    expect(p).toMatch(/€\/l o €\/kg solo si lo piden/);
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
     expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(12_050); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
