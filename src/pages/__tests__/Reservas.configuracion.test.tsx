@@ -215,7 +215,7 @@ describe("Reservas › Configuración · permiso propio «Reservas · Configurac
     h.permisos = new Set(["reservas:view", "reservas_configuracion:view"]);
     montar("/reservas?tab=configuracion&sub=reglas");
 
-    expect(screen.getByRole("tab", { name: "Hoy" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Reservas" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("vista-hoy")).toBeInTheDocument();
     expect(screen.queryByTestId("chip-reglas")).not.toBeInTheDocument();
     expect(screen.getByTestId("ubicacion")).toHaveTextContent(/^\/reservas$/);
@@ -243,7 +243,7 @@ describe("Reservas › Configuración · permiso propio «Reservas · Configurac
     h.permisos = new Set(["reservas:view"]);
     montar("/reservas?tab=configuracion&sub=plantillas");
 
-    expect(screen.getByRole("tab", { name: "Hoy" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Reservas" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("vista-hoy")).toBeInTheDocument();
     expect(screen.queryByTestId("editor-plantillas")).not.toBeInTheDocument();
   });

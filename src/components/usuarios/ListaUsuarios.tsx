@@ -81,6 +81,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { DialogoCambiarContrasena } from "@/components/cuenta/DialogoCambiarContrasena";
+import { INICIO_DE_SIEMPRE, opcionesInicio } from "@/lib/seccionInicio";
 
 interface ListaUsuariosProps {
   /** Activa la gestión solo en el área de Super Admin y para un superadmin autenticado. */
@@ -97,6 +98,7 @@ export function ListaUsuarios({
     loadError,
     updateUserRole,
     setAllPermissions,
+    setSeccionInicio,
     updateUserPassword,
     setSuperAdmin,
     setUserAccessBlocked,
@@ -120,6 +122,8 @@ export function ListaUsuarios({
     PermisoSeccion[]
   >([]);
   const [selectedPresetId, setSelectedPresetId] = useState("manual");
+  // «Al iniciar sesión, abrir» (11/11/2026): clave de lib/seccionInicio.ts o INICIO_DE_SIEMPRE.
+  const [inicioElegido, setInicioElegido] = useState(INICIO_DE_SIEMPRE);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordTargetUser, setPasswordTargetUser] =
@@ -160,6 +164,7 @@ export function ListaUsuarios({
     // Si no es un preconfigurado, quizá sea uno de los tipos fijos («Reservas», «Albaranes»).
     const tipo = matchingPreset ? null : tipoQueCoincide(perms);
     setSelectedPresetId(matchingPreset?.id ?? (tipo ? valorTipo(tipo) : "manual"));
+    setInicioElegido(user.seccion_inicio || INICIO_DE_SIEMPRE);
   };
 
   const closePermissionsDialog = () => {
@@ -167,7 +172,13 @@ export function ListaUsuarios({
     setSelectedUser(null);
     setEditingPermissions([]);
     setSelectedPresetId("manual");
+    setInicioElegido(INICIO_DE_SIEMPRE);
   };
+
+  // Solo las secciones del menú que verá con lo marcado ahora. Si la elegida deja de estar (se le
+  // quita «Ver»), sale y se guarda «Lo de siempre»; al volver a marcarla, vuelve a salir.
+  const opcionesDeInicio = opcionesInicio(editingPermissions);
+  const inicioMostrado = opcionesDeInicio.some((o) => o.clave === inicioElegido) ? inicioElegido : INICIO_DE_SIEMPRE;
 
   // Quien no es super admin ve el diálogo en solo lectura: la RLS de user_permissions
   // solo deja escribir a un super admin y cualquier otro guardado no haría nada.
@@ -208,6 +219,12 @@ export function ListaUsuarios({
     if (rolNuevo !== selectedUser.role) {
       const actualizado = await updateUserRole(selectedUser.id, rolNuevo);
       if (!actualizado) return;
+    }
+    // Después del rol: la sección de inicio va en su fila de user_roles (ya existe).
+    const inicioNuevo = inicioMostrado === INICIO_DE_SIEMPRE ? null : inicioMostrado;
+    if (inicioNuevo !== (selectedUser.seccion_inicio ?? null)) {
+      const guardadoInicio = await setSeccionInicio(selectedUser.id, inicioNuevo);
+      if (!guardadoInicio) return;
     }
     closePermissionsDialog();
     } finally {
@@ -451,7 +468,7 @@ export function ListaUsuarios({
         <fieldset disabled={savingPermissions} className="min-w-0 space-y-4 py-2 sm:py-4">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Label className="text-sm font-medium">
+              <Label htmlFor="tipo-usuario" className="text-sm font-medium">
                 Tipo de usuario o rol preconfigurado
               </Label>
               <ConfigurarRolesModal
@@ -469,7 +486,7 @@ export function ListaUsuarios({
               onValueChange={handlePresetChange}
               disabled={presetsLoading || !isSuperAdmin}
             >
-              <SelectTrigger className="h-11 w-full sm:w-[360px]">
+              <SelectTrigger id="tipo-usuario" className="h-11 w-full sm:w-[360px]">
                 <SelectValue
                   placeholder={
                     presetsLoading
@@ -532,6 +549,29 @@ export function ListaUsuarios({
               puedeConcederEdicion={isSuperAdmin}
               soloLectura={!isSuperAdmin}
             />
+          </div>
+          {/* 11/11/2026, petición del dueño: «qué pestaña se le va a abrir por defecto cuando inician sesión». */}
+          <div className="space-y-2">
+            <Label htmlFor="seccion-inicio" className="text-sm font-medium">
+              Al iniciar sesión, abrir
+            </Label>
+            <Select value={inicioMostrado} onValueChange={setInicioElegido} disabled={!isSuperAdmin}>
+              <SelectTrigger id="seccion-inicio" className="h-11 w-full sm:w-[360px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={INICIO_DE_SIEMPRE}>Lo de siempre</SelectItem>
+                <SelectSeparator />
+                {opcionesDeInicio.map((o) => (
+                  <SelectItem key={o.clave} value={o.clave}>
+                    {o.titulo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Solo las secciones que puede ver. «Lo de siempre»: el Dashboard o, sin él, su primera sección.
+            </p>
           </div>
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
             <Button

@@ -71,15 +71,15 @@ describe("CasillaOcupacion — etiqueta de cierre", () => {
     expect(etiqueta.className).toMatch(/\bshrink-0\b/);
   });
 
-  it("con etiqueta, la cifra cede el alto de esa línea y «N res.» se calla (sigue en el aria-label)", () => {
+  it("con etiqueta (en la línea del número desde el 11/11/2026), la cifra y «N res.» quedan igual que sin ella", () => {
     const { unmount } = pintar(undefined, "completa");
     expect(screen.getByTestId("comensales-casilla")).toHaveAttribute("data-fuente", "22");
     expect(screen.getByTestId("reservas-casilla")).toHaveTextContent("2 res.");
     unmount();
 
     pintar(sinCena, "completa");
-    expect(screen.getByTestId("comensales-casilla")).toHaveAttribute("data-fuente", "20");
-    expect(screen.queryByTestId("reservas-casilla")).toBeNull();
+    expect(screen.getByTestId("comensales-casilla")).toHaveAttribute("data-fuente", "22");
+    expect(screen.getByTestId("reservas-casilla")).toHaveTextContent("2 res.");
     expect(screen.getByRole("button").getAttribute("aria-label")).toMatch(/Sin cena para reservas/);
   });
 

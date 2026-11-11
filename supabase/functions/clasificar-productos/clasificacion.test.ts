@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   agruparPendientes,
+  anadaDe,
   type Categoria,
   clasificarPendientes,
   construirMensajes,
@@ -89,6 +90,84 @@ describe("validarAsignaciones", () => {
       categorias,
     );
     expect(items).toEqual([{ textos: ["raro"], producto_id: null, nombre: "Cosa rara", categoria_id: null, unidad: "ud" }]);
+  });
+
+  describe("añadas: otra añada es otro producto; la misma añada sigue siendo el mismo", () => {
+    const cat: ProductoCatalogo[] = [
+      { id: 20, nombre: "Pago de Carraovejas 2019", categoria_id: 2 },
+      { id: 21, nombre: "Pingus", categoria_id: 2 },
+    ];
+    const lineas = agruparPendientes([
+      linea(1, "PAGO DE CARRAOVEJAS 2020 75CL", "pago de carraovejas 2020 75cl"),
+      linea(2, "PAGO DE CARRAOVEJAS 2019 75CL", "pago de carraovejas 2019 75cl"),
+      linea(3, "PINGUS 2021", "pingus 2021"),
+    ]);
+
+    it("anadaDe lee el año suelto y no las medidas", () => {
+      expect(anadaDe("Pago de Carraovejas 2019 75 cl")).toBe(2019);
+      expect(anadaDe("Harina 2000 g")).toBeNull();
+      expect(anadaDe("Pingus")).toBeNull();
+      expect(anadaDe("Vertical 2015 y 2016")).toBeNull();
+    });
+
+    it("la misma botella con OTRA añada no se une al producto del catálogo: producto nuevo con su añada", () => {
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "pago de carraovejas 2020 75cl", producto_id: 20, nombre_nuevo: null, categoria_id: null }] },
+        lineas, cat, categorias,
+      );
+      expect(items).toEqual([
+        { textos: ["pago de carraovejas 2020 75cl"], producto_id: null, nombre: "Pago de Carraovejas 2020", categoria_id: 2, unidad: "ud" },
+      ]);
+    });
+
+    it("la misma botella con la MISMA añada sigue siendo el mismo producto (duplicado)", () => {
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "pago de carraovejas 2019 75cl", producto_id: 20, nombre_nuevo: null, categoria_id: null }] },
+        lineas, cat, categorias,
+      );
+      expect(items).toEqual([{ textos: ["pago de carraovejas 2019 75cl"], producto_id: 20, nombre: null, categoria_id: null, unidad: null }]);
+    });
+
+    it("si el producto del catálogo no lleva añada no se puede saber: se respeta la asignación", () => {
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "pingus 2021", producto_id: 21, nombre_nuevo: null, categoria_id: null }] },
+        lineas, cat, categorias,
+      );
+      expect(items[0].producto_id).toBe(21);
+    });
+
+    it("un nombre nuevo con otra añada que la línea se corrige a la de la línea", () => {
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "pago de carraovejas 2020 75cl", producto_id: null, nombre_nuevo: "Pago de Carraovejas 2019", categoria_id: 2 }] },
+        lineas, cat, categorias,
+      );
+      expect(items[0].nombre).toBe("Pago de Carraovejas 2020");
+    });
+
+    it("si el vino con la añada de la línea ya está en el catálogo, se usa ese producto (no se duplica)", () => {
+      const conOtra: ProductoCatalogo[] = [...cat, { id: 22, nombre: "Pago de Carraovejas 2020", categoria_id: 2 }];
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "pago de carraovejas 2020 75cl", producto_id: 20, nombre_nuevo: null, categoria_id: null }] },
+        lineas, conOtra, categorias,
+      );
+      expect(items).toEqual([{ textos: ["pago de carraovejas 2020 75cl"], producto_id: 22, nombre: null, categoria_id: null, unidad: null }]);
+    });
+
+    it("fuera de vinos un año en el nombre no separa productos", () => {
+      const turron: ProductoCatalogo[] = [{ id: 30, nombre: "Turrón campaña 2025", categoria_id: 3 }];
+      const lineasT = agruparPendientes([linea(9, "TURRON CAMPAÑA 2026", "turron campaña 2026")]);
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "turron campaña 2026", producto_id: 30, nombre_nuevo: null, categoria_id: null }] },
+        lineasT, turron, categorias,
+      );
+      expect(items[0].producto_id).toBe(30);
+    });
+
+    it("el prompt pide la añada en el nombre de los vinos y trata otra añada como otro producto", () => {
+      const sistema = construirMensajes([], cat, categorias)[0].content;
+      expect(sistema).toContain("CON la añada");
+      expect(sistema).toContain("otra añada del mismo vino");
+    });
   });
 
   it("una respuesta sin forma no propone nada", () => {

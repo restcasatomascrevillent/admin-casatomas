@@ -1287,7 +1287,7 @@ const anchoAcciones = ANCHO_SELECCION;
                   {canEdit && (
                     <TableHead
                       aria-label="Acciones"
-                      className={cn("sticky left-0 z-30 h-12 border-r border-border/60 bg-card", anchoAcciones, CELDA)}
+                      className={cn("sticky left-0 z-30 h-12 border-r border-border/60 bg-muted", anchoAcciones, CELDA)}
                     >
                       <RanuraSeleccion>
                         <Checkbox
@@ -1299,13 +1299,13 @@ const anchoAcciones = ANCHO_SELECCION;
                       </RanuraSeleccion>
                     </TableHead>
                   )}
-                  <TableHead className={cn("h-12 bg-card text-base", ANCHO_FECHA, CELDA)}>
+                  <TableHead className={cn("h-12 bg-muted text-sm font-semibold uppercase tracking-wide text-muted-foreground", ANCHO_FECHA, CELDA)}>
                     <span className="whitespace-nowrap">Fecha y hora</span>
                   </TableHead>
                   {/* Cliente SIN ancho: en una tabla `table-fixed` se queda con lo que dejan las demás. */}
-                  <TableHead className={cn("h-12 bg-card text-base", CELDA)}>Cliente</TableHead>
-                  <TableHead className={cn("h-12 bg-card text-base", ANCHO_PAX, CELDA)} title="Comensales">Pax</TableHead>
-                  <TableHead className={cn("h-12 bg-card text-base", ANCHO_ESTADO, CELDA)}>Estado</TableHead>
+                  <TableHead className={cn("h-12 bg-muted text-sm font-semibold uppercase tracking-wide text-muted-foreground", CELDA)}>Cliente</TableHead>
+                  <TableHead className={cn("h-12 bg-muted text-sm font-semibold uppercase tracking-wide text-muted-foreground", ANCHO_PAX, CELDA)} title="Comensales">Pax</TableHead>
+                  <TableHead className={cn("h-12 bg-muted text-sm font-semibold uppercase tracking-wide text-muted-foreground", ANCHO_ESTADO, CELDA)}>Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1334,7 +1334,8 @@ const anchoAcciones = ANCHO_SELECCION;
                     return (
                     <TableRow
                       key={reservation.id}
-                      className={cn("group", ALTO_FILA, fondo.fila, canEdit && "cursor-pointer")}
+                      // Filas más claras (11/11/2026, «mejora la estética de la tabla»): separación y resalte al pasar.
+                      className={cn("group border-b border-border/60 transition-colors hover:bg-muted/40", ALTO_FILA, fondo.fila, canEdit && "cursor-pointer")}
                       onClick={canEdit ? alTocarFila(al.editar) : undefined}
                     >
                       {/* Acciones PRIMERO (2026-09-26, petición del dueño). El

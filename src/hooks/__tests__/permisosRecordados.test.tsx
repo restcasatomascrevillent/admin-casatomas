@@ -148,6 +148,8 @@ describe("rol y permisos recordados (abrir «Hoy» sin esperar a leerlos)", () =
         role: "staff",
         permissions: [{ section_key: "reservas", can_view: true, can_edit: true }],
         superAdmin: false,
+        // Sección de inicio (11/11/2026): sin elegir.
+        seccionInicio: null,
       }),
     );
   });

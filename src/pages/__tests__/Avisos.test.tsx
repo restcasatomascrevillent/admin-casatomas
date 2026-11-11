@@ -9,6 +9,15 @@ const h = vi.hoisted(() => ({
   rango: [] as number[][],
 }));
 
+// «Ver» en una reserva abre su ficha en un modal si se pueden editar reservas (11/11/2026, `useAbrirAviso`).
+const permiso = vi.hoisted(() => ({ editaReservas: false }));
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: () => ({ canAccess: permiso.editaReservas, loading: false }),
+}));
+vi.mock("@/components/reservas/EditarReservaDialog", () => ({
+  EditarReservaDialog: ({ reservaId }: { reservaId: string }) => <div data-testid="ficha-reserva">{reservaId}</div>,
+}));
+
 vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <main>{children}</main>,
 }));

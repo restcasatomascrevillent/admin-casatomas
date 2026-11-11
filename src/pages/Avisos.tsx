@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { CheckCheck, Info } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useHistorialAvisos } from "@/hooks/useHistorialAvisos";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
+import { useAbrirAviso } from "@/hooks/useAbrirAviso";
 import { agruparPorDia, FILTROS_AVISOS, horaAviso, rutaDeAviso, TIPO_ICON, type FiltroAvisos } from "@/lib/avisos";
 import { cn } from "@/lib/utils";
 
@@ -16,14 +16,14 @@ export default function Avisos() {
   const [filtro, setFiltro] = useState<FiltroAvisos>("todos");
   const { avisos, loading, cargandoMas, hayMas, error, cargarMas, marcarLeida, marcarTodasLeidas } =
     useHistorialAvisos(filtro);
-  const navigate = useNavigate();
+  // «Ver» en una reserva abre su ficha en un modal (11/11/2026); lo demás, su origen.
+  const { abrirAviso, dialogoAviso } = useAbrirAviso();
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_AVISOS);
 
   const abrir = (n: NotificacionDashboard) => {
     void marcarLeida(n.id);
-    const ruta = rutaDeAviso(n);
-    if (ruta) navigate(ruta);
+    abrirAviso(n);
   };
 
   const grupos = agruparPorDia(avisos);
@@ -137,6 +137,7 @@ export default function Avisos() {
           )}
         </div>
       </div>
+      {dialogoAviso}
     </DashboardLayout>
   );
 }

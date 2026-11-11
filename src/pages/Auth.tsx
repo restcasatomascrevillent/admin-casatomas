@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UtensilsCrossed } from "lucide-react";
 import { precargarAlMontarLogin } from "@/lib/precargaLogin";
+import { ESTADO_TRAS_LOGIN } from "@/lib/seccionInicio";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -23,9 +24,11 @@ export default function Auth() {
     precargarAlMontarLogin();
   }, []);
 
+  // Con la marca de «tras iniciar sesión» (11/11/2026): ProtectedRoute abre la sección de inicio
+  // del usuario si tiene una elegida en Usuarios (lib/seccionInicio.ts); si no, el Dashboard de siempre.
   useEffect(() => {
     if (user) {
-      navigate("/dashboard");
+      navigate("/dashboard", { state: ESTADO_TRAS_LOGIN });
     }
   }, [user, navigate]);
 
@@ -39,7 +42,7 @@ export default function Auth() {
       : `${normalizedInput.toLowerCase()}@staff.local`;
     const { error } = await signIn(loginIdentifier, loginPassword);
     if (!error) {
-      navigate("/dashboard");
+      navigate("/dashboard", { state: ESTADO_TRAS_LOGIN });
     }
     setLoading(false);
   };

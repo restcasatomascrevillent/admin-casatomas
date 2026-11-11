@@ -1,15 +1,20 @@
-import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Bot, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, PieChart, Receipt, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
+import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Percent, Bot, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, PieChart, Receipt, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { rutaAlerta, TIPOS_ALERTA_FACTURAS } from "@/lib/facturas/alertas";
 
 /** Adónde lleva un aviso (null = no tiene origen al que ir). Lo comparten la campana y la página «Avisos». */
+/** La reserva de un aviso (nueva, cancelada, sin mesa…), si la trae: su ficha se abre en un modal (`useAbrirAviso`). */
+export function reservaDeAviso(n: { referencia_tipo?: string | null; referencia_id?: string | null }): string | null {
+  return n.referencia_tipo === "reserva" && n.referencia_id ? n.referencia_id : null;
+}
+
 export function rutaDeAviso(
   n: Pick<NotificacionDashboard, "tipo" | "referencia_tipo"> & { referencia_id?: string | null; datos?: NotificacionDashboard["datos"] },
 ): string | null {
   // Alertas de Facturas (20261107300000): cada una trae su enlace del panel (documento, proveedor, mes).
   if (n.referencia_tipo === "facturas_alerta") return rutaAlerta(n.datos) ?? "/facturas?tab=chat";
   // Reserva sin sala o mesa dentro de la ventana: pestaña «Asignación» de /reservas.
-  if (n.tipo === "reserva_sin_asignar") return "/reservas?tab=asignacion";
+  if (n.tipo === "reserva_sin_asignar") return "/reservas?tab=reservas";
   // Reserva nueva o cancelada (20261122160000): la lista de reservas.
   if (n.referencia_tipo === "reserva" && (n.tipo === "reserva_nueva" || n.tipo === "reserva_cancelada")) return "/reservas?tab=reservas";
   // Las solicitudes viven en la pestaña unificada «Reservas», filtradas por «Solicitudes sin resolver».
@@ -27,11 +32,17 @@ export function rutaDeAviso(
   return null;
 }
 
+/**
+ * Margen bajo (20261125110000): un plato o vino cruza su límite de margen (restaurante, tienda o al
+ * peso). Lo crea el cron diario de Facturas; `datos.enlace` abre la factura que lo ha provocado.
+ */
+export const TIPO_MARGEN_BAJO = "facturas_margen_bajo";
+
 export type FiltroAvisos = "todos" | "sin_leer" | "reservas" | "facturas" | "otros";
 
 export const TIPOS_POR_FILTRO: Record<"reservas" | "facturas", string[]> = {
   reservas: ["solicitud_pendiente", "reserva_nueva", "reserva_cancelada", "reserva_sin_asignar"],
-  facturas: ["facturas_subida", "subida_precio", "original_sin_drive", ...TIPOS_ALERTA_FACTURAS.map((t) => t.tipo)],
+  facturas: ["facturas_subida", "subida_precio", "original_sin_drive", ...TIPOS_ALERTA_FACTURAS.map((t) => t.tipo), TIPO_MARGEN_BAJO],
 };
 
 export const FILTROS_AVISOS: { valor: FiltroAvisos; etiqueta: string }[] = [
@@ -99,6 +110,8 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   facturas_precio_baja: TrendingDown,
   facturas_precio_proveedor: TrendingUp,
   facturas_precio_pactado: Handshake,
+  // 20261125110000_avisos_margen_bajo
+  facturas_margen_bajo: Percent,
   // Centro de modelos de IA (cron diario ia-modelos-openai, 20261107500000).
   ia_modelo_nuevo: Bot,
   ia_modelo_retirado: AlertTriangle,
@@ -130,6 +143,7 @@ export const SECCIONES_AVISOS: Record<SeccionAvisos, { titulo: string; tipos: { 
       { tipo: "subida_precio", etiqueta: "Subidas de precio" },
       { tipo: "original_sin_drive", etiqueta: "Originales sin Drive" },
       ...TIPOS_ALERTA_FACTURAS,
+      { tipo: TIPO_MARGEN_BAJO, etiqueta: "Margen bajo" },
     ],
   },
 };

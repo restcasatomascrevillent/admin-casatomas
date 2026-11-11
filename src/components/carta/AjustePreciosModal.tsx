@@ -314,7 +314,7 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
                   id="porcentaje"
                   type="number"
                   step="0.1"
-                  placeholder="Ej: 5 para subir 5%, -10 para bajar 10%"
+                  placeholder="Ej: 5 sube un 5 %, -10 baja un 10 %"
                   value={porcentaje}
                   onChange={(e) => setPorcentaje(e.target.value)}
                   className="h-11 pr-10 text-base md:text-base"
@@ -328,17 +328,18 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
           )}
         </div>
 
-        <div className="flex flex-wrap justify-between items-center gap-3">
+        {/* 11/11/2026 (dueño: móvil perfecto): en móvil los botones van apilados a todo el ancho (acción principal arriba); desde sm, en una fila. */}
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <Button 
             variant="outline" 
             onClick={() => setHistorialOpen(true)}
-            className="h-11 gap-2 px-4"
+            className="h-11 w-full gap-2 px-4 sm:w-auto"
           >
             <History className="h-4 w-4" />
             Ver Historial
           </Button>
           
-          <div className="flex gap-3">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row">
             <Button variant="outline" className="h-11 px-4" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>

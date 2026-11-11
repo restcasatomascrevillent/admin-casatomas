@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
 import { Bell, CheckCheck, ExternalLink, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,6 +6,7 @@ import { useAvisosSeccion, useContadorAvisosSeccion, type FiltrosAvisosSeccion }
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { agruparPorDia, EVENTO_ABRIR_AVISOS, horaAviso, rutaDeAviso, SECCIONES_AVISOS, TIPO_ICON, type SeccionAvisos } from "@/lib/avisos";
 import { cn } from "@/lib/utils";
+import { useAbrirAviso } from "@/hooks/useAbrirAviso";
 import { AjustesAvisosEnVivo } from "@/components/notificaciones/AvisosEnVivo";
 import { useEstadoAvisosEnVivo } from "@/hooks/useAvisosEnVivo";
 import { avisosEnVivo } from "@/lib/avisosEnVivo/preferencias";
@@ -20,6 +20,9 @@ import { avisosEnVivo } from "@/lib/avisosEnVivo/preferencias";
 /** `compacto`: el texto «Avisos» solo en pantallas muy anchas (barra única de Facturas › Análisis). */
 export function BotonAvisosSeccion({ seccion, className, compacto = false }: { seccion: SeccionAvisos; className?: string; compacto?: boolean }) {
   const [abierto, setAbierto] = useState(false);
+  // «Ver» en el aviso de una reserva abre su ficha ENCIMA del modal de avisos (11/11/2026); al cerrarla se
+  // vuelve a la lista. El diálogo vive aquí, fuera del modal (que se desmonta al cerrarse).
+  const { abrirAviso, abreFicha, dialogoAviso } = useAbrirAviso();
   // «Ver todas» de otra parte de la sección (p. ej. «Requiere atención» de Análisis) abre este modal.
   useEffect(() => {
     const alAbrir = (e: Event) => {
@@ -66,7 +69,17 @@ export function BotonAvisosSeccion({ seccion, className, compacto = false }: { s
           </span>
         )}
       </Button>
-      {abierto && <ModalAvisos seccion={seccion} abierto={abierto} onAbiertoChange={setAbierto} pendientes={pendientes} />}
+      {abierto && (
+        <ModalAvisos
+          seccion={seccion}
+          abierto={abierto}
+          onAbiertoChange={setAbierto}
+          pendientes={pendientes}
+          abrirAviso={abrirAviso}
+          abreFicha={abreFicha}
+        />
+      )}
+      {dialogoAviso}
     </>
   );
 }
@@ -92,11 +105,15 @@ function ModalAvisos({
   abierto,
   onAbiertoChange,
   pendientes,
+  abrirAviso,
+  abreFicha,
 }: {
   seccion: SeccionAvisos;
   abierto: boolean;
   onAbiertoChange: (abierto: boolean) => void;
   pendientes: number;
+  abrirAviso: ReturnType<typeof useAbrirAviso>["abrirAviso"];
+  abreFicha: ReturnType<typeof useAbrirAviso>["abreFicha"];
 }) {
   const config = SECCIONES_AVISOS[seccion];
   // Se abre en «Sin revisar» si hay alguno; si no, en «Todos» (para ver el historial).
@@ -106,15 +123,15 @@ function ModalAvisos({
   });
   const { avisos, loading, cargandoMas, hayMas, error, cargarMas, marcarRevisado, marcarTodosRevisados } =
     useAvisosSeccion(seccion, filtros, abierto);
-  const navigate = useNavigate();
   const grupos = agruparPorDia(avisos);
   const haySinRevisar = avisos.some((n) => !n.leida) || pendientes > 0;
   const etiquetaTipo = (tipo: string) => config.tipos.find((t) => t.tipo === tipo)?.etiqueta ?? tipo;
 
-  const irAlOrigen = (n: NotificacionDashboard, ruta: string) => {
+  const irAlOrigen = (n: NotificacionDashboard) => {
     void marcarRevisado(n.id);
-    onAbiertoChange(false);
-    navigate(ruta);
+    // La ficha de una reserva se abre encima y el modal sigue debajo; ir a otra pantalla lo cierra.
+    if (!abreFicha(n)) onAbiertoChange(false);
+    abrirAviso(n);
   };
 
   return (
@@ -202,7 +219,7 @@ function ModalAvisos({
                           </div>
                           <div className="ml-7 flex shrink-0 gap-1.5 sm:ml-0">
                             {ruta && (
-                              <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => irAlOrigen(n, ruta)} aria-label={`Ver: ${n.titulo}`}>
+                              <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => irAlOrigen(n)} aria-label={`Ver: ${n.titulo}`}>
                                 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                                 Ver
                               </Button>

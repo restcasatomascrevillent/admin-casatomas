@@ -737,11 +737,12 @@ describe("Plano de Hoy · fijo (escritorio): una sala a la vez con flechas", () 
     campo.remove();
   });
 
-  it("las flechas miden al menos 44 px", () => {
+  it("flechas pequeñas y discretas debajo del plano, también con el dedo (11/11/2026)", () => {
     montar({ fijo: true });
     for (const nombre of [/^Sala anterior/, /^Sala siguiente/]) {
-      expect(screen.getByRole("button", { name: nombre }).className).toMatch(/(^|\s)w-14(\s|$)/);
+      expect(screen.getByRole("button", { name: nombre })).toHaveClass("h-8");
     }
+    expect(screen.queryByRole("button", { name: /^Por sentar/ })).toBeNull();
   });
 
   it("sin plano realista ni zoom: mesas grandes como tarjetas (07/11/2026)", async () => {

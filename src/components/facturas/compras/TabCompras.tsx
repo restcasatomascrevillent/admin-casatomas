@@ -658,10 +658,11 @@ export function TabCompras({
         {conLocalYPeriodo && (
           <div
             ref={refLocalPeriodo}
-            className={`flex h-11 shrink-0 items-center gap-x-4 overflow-x-auto overscroll-x-contain pr-6 no-scrollbar ${difLocalPeriodo}`}
+            // 11/11/2026 (dueño: móvil): en el móvil, Local y Periodo en dos filas que se parten (antes, una tira cortada por la derecha).
+            className={`flex h-11 shrink-0 items-center gap-x-4 overflow-x-auto overscroll-x-contain pr-6 no-scrollbar max-sm:h-auto max-sm:flex-col max-sm:items-stretch max-sm:gap-y-2 max-sm:overflow-visible max-sm:pr-0 ${difLocalPeriodo}`}
             data-tour="facturas-local-periodo"
           >
-            <div role="group" aria-label="Local" className="flex shrink-0 items-center gap-2">
+            <div role="group" aria-label="Local" className="flex shrink-0 items-center gap-2 max-sm:shrink max-sm:flex-wrap">
               <span className="shrink-0 text-xs font-medium text-muted-foreground" aria-hidden="true">
                 Local
               </span>
@@ -673,11 +674,11 @@ export function TabCompras({
                 ))}
               </span>
             </div>
-            <div role="group" aria-label="Periodo" className="flex shrink-0 items-center gap-2">
+            <div role="group" aria-label="Periodo" className="flex shrink-0 items-center gap-2 max-sm:shrink max-sm:items-start">
               <span className="shrink-0 text-xs font-medium text-muted-foreground" aria-hidden="true">
                 Periodo
               </span>
-              <span className={PISTA_SEGMENTOS}>
+              <span className={`${PISTA_SEGMENTOS} max-sm:h-auto max-sm:min-w-0 max-sm:shrink max-sm:flex-wrap`}>
                 {PERIODOS.map((p) => (
                   <button
                     key={p.valor}
@@ -715,7 +716,7 @@ export function TabCompras({
             <>
               <div
                 ref={refChipsDocs}
-                className={`${BARRA_CHIPS} border-b border-border/60 px-2 pr-6 ${difChipsDocs}`}
+                className={`${BARRA_CHIPS} border-b border-border/60 px-2 pr-6 max-sm:h-auto max-sm:flex-wrap max-sm:gap-y-1.5 max-sm:overflow-visible max-sm:py-1.5 max-sm:pr-2 ${difChipsDocs}`}
                 role="toolbar"
                 aria-label="Filtrar documentos"
                 data-tour="facturas-filtros"
@@ -777,7 +778,7 @@ export function TabCompras({
 
           {modo === "proveedores" && (
             <>
-              <div ref={refChipsProv} className={`${BARRA_CHIPS} border-b border-border/60 px-2 ${difChipsProv}`} role="toolbar" aria-label="Filtrar proveedores">
+              <div ref={refChipsProv} className={`${BARRA_CHIPS} border-b border-border/60 px-2 max-sm:h-auto max-sm:flex-wrap max-sm:gap-y-1.5 max-sm:overflow-visible max-sm:py-1.5 ${difChipsProv}`} role="toolbar" aria-label="Filtrar proveedores">
                 {FILTROS_PROVEEDORES.map((f) => (
                   <button key={f.valor} type="button" className={CHIP} aria-pressed={filtroProv === f.valor} onClick={() => setFiltroProv(f.valor)}>
                     {f.etiqueta}

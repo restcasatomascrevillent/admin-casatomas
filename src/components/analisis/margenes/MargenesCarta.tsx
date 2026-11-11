@@ -10,19 +10,27 @@
 //     umbral y la lista ordenada del porqué («Percebes: lo compras a 109,50
 //     €/kg y lo vendes a 172,73 €/kg sin IVA (190 €/kg en carta) → ×1,58…»).
 //   · Tocar un artículo (lista o gráfica) abre su detalle editable.
+//   · Márgenes SIEMPRE sin IVA (20261125100000). El interruptor «Con IVA» solo
+//     enseña además costes y precios con IVA (el IVA de cada compra; si es supuesto,
+//     se dice). Los vinos llevan también el margen de la tienda (carta − descuento,
+//     IVA 21 %), aunque la tienda esté desactivada (se avisa).
 //   · Sin scroll de página (regla del dueño): el bloque ocupa el alto que le da
 //     la página y solo la lista hace scroll por dentro.
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChefHat, CircleSlash, Loader2, Scale, Settings2, Wine } from "lucide-react";
 import { CartesianGrid, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { useMargenesCarta } from "@/hooks/useMargenesCarta";
 import {
   ETIQUETA_BANDERA,
+  costeVisible,
   dominioLog,
   euros,
+  eurosKg,
+  ivaSupuesto,
   marcasLog,
   pctDeMultiplicador,
   pctDeMultiplicadorPeso,
@@ -47,9 +55,10 @@ const fechaCorta = (f: string | null) => (f ? new Date(`${f}T00:00:00`).toLocale
 function Cifra({ etiqueta, valor, detalle, tono }: { etiqueta: string; valor: string; detalle?: string; tono?: "rojo" | "neutro" }) {
   return (
     <div className="min-w-0 rounded-lg border border-border/70 bg-card px-3 py-2">
-      <p className="truncate text-xs text-muted-foreground">{etiqueta}</p>
+      {/* 11/11/2026 (dueño: móvil): etiqueta y detalle en 2 líneas en vez de cortarse con «…». */}
+      <p className="line-clamp-2 break-words text-xs leading-snug text-muted-foreground sm:line-clamp-1">{etiqueta}</p>
       <p className={cn("text-xl font-semibold tabular-nums sm:text-2xl", tono === "rojo" && "text-destructive")}>{valor}</p>
-      {detalle && <p className="truncate text-xs text-muted-foreground">{detalle}</p>}
+      {detalle && <p className="line-clamp-3 break-words text-xs leading-snug text-muted-foreground sm:line-clamp-1">{detalle}</p>}
     </div>
   );
 }
@@ -67,13 +76,14 @@ function Resumen({ d }: { d: Datos }) {
       <Cifra
         etiqueta="Multiplicador de vinos (mediana)"
         valor={veces(r.vinos.multiplicadorMediana)}
-        detalle={`${r.vinos.conDatos} de ${r.vinos.total} vinos`}
+        detalle={`${r.vinos.conDatos} de ${r.vinos.total} vinos · tienda ${veces(d.resumen.vinos.multiplicadorTiendaMediana)}${d.tienda.activa ? "" : " (desactivada)"}`}
       />
       <Cifra
         etiqueta="Margen en rojo"
         valor={`${rojo}`}
         detalle={
           `${r.peso.enRojo} al peso < ${veces(d.config.multiplicadorMinPeso)} · ${r.vinos.enRojo} vinos < ${veces(d.config.multiplicadorMinVino)}` +
+          ` · ${d.resumen.vinos.tiendaEnRojo} en tienda < ${veces(d.config.multiplicadorMinTienda)}` +
           (r.borrador.enRojoRevisados ? ` · ${r.borrador.enRojoRevisados} platos revisados` : "")
         }
         tono={rojo > 0 ? "rojo" : "neutro"}
@@ -164,7 +174,24 @@ function Dispersion({ lista, umbral, onElegir, eje, porKilo }: { lista: Articulo
   );
 }
 
-function FilaArticulo({ a, d, onElegir }: { a: ArticuloMargen; d: Datos; onElegir: (id: string) => void }) {
+/** Con el interruptor «Con IVA»: coste (con el IVA de sus compras) y precio de carta con IVA. */
+function LineaConIva({ a }: { a: ArticuloMargen }) {
+  const coste = costeVisible(a, true);
+  const supuesto = ivaSupuesto(a);
+  const texto =
+    a.tipo === "peso"
+      ? `Con IVA: compra ${eurosKg(coste, 2)} · carta ${eurosKg(a.ventaKgIva)}`
+      : `Con IVA: coste ${euros(coste)} · carta ${euros(a.precio)}` +
+        (a.tipo === "vino" && a.precioTienda !== null ? ` · tienda ${euros(a.precioTienda)}` : "");
+  return (
+    <span className="block text-xs tabular-nums text-muted-foreground" data-testid="linea-con-iva">
+      {texto}
+      {supuesto && <span className="ml-1 rounded border border-dashed border-border px-1 text-[11px]">IVA supuesto</span>}
+    </span>
+  );
+}
+
+function FilaArticulo({ a, d, conIva, onElegir }: { a: ArticuloMargen; d: Datos; conIva: boolean; onElegir: (id: string) => void }) {
   const rojo = a.banderas.includes("coste_alto") || a.banderas.includes("multiplicador_bajo");
   return (
     <li>
@@ -182,9 +209,15 @@ function FilaArticulo({ a, d, onElegir }: { a: ArticuloMargen; d: Datos; onElegi
           {a.tipo === "plato" ? porcentaje(a.pct) : veces(a.multiplicador)}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm leading-snug">{razon(a, d.config)}</span>
+          <span className="block break-words text-sm leading-snug">{razon(a, d.config)}</span>
+          {a.tipo === "vino" && a.multiplicadorTienda !== null && (
+            <span className={cn("block text-xs tabular-nums", a.banderas.includes("tienda_bajo") ? "text-destructive" : "text-muted-foreground")}>
+              Tienda: {veces(a.multiplicadorTienda)} (mín. {veces(d.config.multiplicadorMinTienda)}){d.tienda.activa ? "" : " · tienda desactivada"}
+            </span>
+          )}
+          {conIva && costeVisible(a, false) !== null && <LineaConIva a={a} />}
           {a.tipo === "peso" && a.ultimoProveedor && (
-            <span className="block truncate text-xs text-muted-foreground">
+            <span className="block break-words text-xs text-muted-foreground sm:truncate">
               {a.producto} · última compra {fechaCorta(a.ultimaFecha)}, {a.ultimoProveedor}
             </span>
           )}
@@ -232,6 +265,7 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
     if (tipo === "vino") setVista("vinos");
   }, [claveInicial]);
   const [umbrales, setUmbrales] = useState(false);
+  const [conIva, setConIva] = useState(false);
 
   const d = q.data;
   const borrador = useMemo(() => (d ? platosBorrador(d) : []), [d]);
@@ -239,7 +273,9 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
   const filas = useMemo(() => {
     if (!d) return [];
     // En el borrador, «No funciona» solo enseña lo que ya está revisado: los gramos estimados no son fiables.
-    if (filtro === "problemas") return problemas(vista === "borrador" ? lista.filter((a) => a.revisado) : lista, d.config);
+    if (filtro === "problemas") {
+      return problemas(vista === "borrador" ? lista.filter((a) => a.revisado) : lista, d.config, { tienda: vista === "vinos" });
+    }
     if (filtro === "sin_datos") return lista.filter((a) => a.pct === null);
     return ordenTodos(lista);
   }, [d, lista, filtro, vista]);
@@ -247,7 +283,7 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
     ? vista === "peso"
       ? pctDeMultiplicadorPeso(d.config.multiplicadorMinPeso)
       : vista === "vinos"
-        ? pctDeMultiplicador(d.config.multiplicadorMinVino, d.config.ivaPct)
+        ? pctDeMultiplicador(d.config.multiplicadorMinVino)
         : d.config.costeMaxPlatoPct
     : 35;
   const articulo = d && elegido ? (elegido.tipo === "plato" ? d.platos : d.vinos).find((a) => a.id === elegido.id) ?? null : null;
@@ -278,23 +314,34 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
       : `Precio de carta (escala logarítmica) frente a % de coste sin IVA${vista === "vinos" ? ` · la línea es ${veces(d.config.multiplicadorMinVino)}` : ""}`;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 sm:gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-2 max-lg:overflow-y-auto max-lg:overscroll-contain sm:gap-3">
       <Resumen d={d} />
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <ToggleGroup type="single" value={vista} onValueChange={(v) => v && setVista(v as Vista)} variant="outline" aria-label="Qué parte de la carta">
-          <ToggleGroupItem value="peso" className="min-h-10 gap-1.5 px-3"><Scale className="h-4 w-4" aria-hidden /> Por peso</ToggleGroupItem>
-          <ToggleGroupItem value="vinos" className="min-h-10 gap-1.5 px-3"><Wine className="h-4 w-4" aria-hidden /> Vinos</ToggleGroupItem>
-          <ToggleGroupItem value="borrador" className="min-h-10 gap-1.5 px-3"><ChefHat className="h-4 w-4" aria-hidden /> Platos (borrador)</ToggleGroupItem>
+                {/* 11/11/2026 (dueño: móvil): controles segmentados compactos a todo el ancho (antes, botones enormes que
+            se partían en varias filas); «(borrador)» solo desde tablet. */}
+        <ToggleGroup type="single" value={vista} onValueChange={(v) => v && setVista(v as Vista)} variant="outline" aria-label="Qué parte de la carta" className="w-full gap-0 sm:w-auto sm:gap-1">
+          <ToggleGroupItem value="peso" className="min-h-10 flex-1 gap-1.5 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm"><Scale className="h-4 w-4" aria-hidden /> Por peso</ToggleGroupItem>
+          <ToggleGroupItem value="vinos" className="min-h-10 flex-1 gap-1.5 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm"><Wine className="h-4 w-4" aria-hidden /> Vinos</ToggleGroupItem>
+          <ToggleGroupItem value="borrador" aria-label="Platos (borrador)" className="min-h-10 flex-1 gap-1.5 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm"><ChefHat className="h-4 w-4" aria-hidden /> Platos<span className="hidden sm:inline">&nbsp;(borrador)</span></ToggleGroupItem>
         </ToggleGroup>
-        <ToggleGroup type="single" value={filtro} onValueChange={(v) => v && setFiltro(v as Filtro)} variant="outline" aria-label="Qué enseñar">
-          <ToggleGroupItem value="problemas" className="min-h-10 px-3">No funciona</ToggleGroupItem>
-          <ToggleGroupItem value="todos" className="min-h-10 px-3">Todos</ToggleGroupItem>
-          <ToggleGroupItem value="sin_datos" className="min-h-10 gap-1 px-3"><CircleSlash className="h-4 w-4" aria-hidden /> Sin datos</ToggleGroupItem>
+        <ToggleGroup type="single" value={filtro} onValueChange={(v) => v && setFiltro(v as Filtro)} variant="outline" aria-label="Qué enseñar" className="w-full gap-0 sm:w-auto sm:gap-1">
+          <ToggleGroupItem value="problemas" className="min-h-10 flex-1 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm">No funciona</ToggleGroupItem>
+          <ToggleGroupItem value="todos" className="min-h-10 flex-1 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm">Todos</ToggleGroupItem>
+          <ToggleGroupItem value="sin_datos" className="min-h-10 flex-1 gap-1 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm"><CircleSlash className="h-4 w-4" aria-hidden /> Sin datos</ToggleGroupItem>
         </ToggleGroup>
-        <Button variant="ghost" size="sm" className="ml-auto min-h-10" onClick={() => setUmbrales(true)}>
+        <label className="ml-auto flex min-h-10 items-center gap-2 text-sm pointer-coarse:min-h-11">
+          <Switch checked={conIva} onCheckedChange={setConIva} aria-label="Ver costes y precios con IVA" />
+          Con IVA
+        </label>
+        <Button variant="ghost" size="sm" className="min-h-10 pointer-coarse:min-h-11" onClick={() => setUmbrales(true)}>
           <Settings2 className="mr-1.5 h-4 w-4" aria-hidden /> Umbrales
         </Button>
       </div>
+      {vista === "vinos" && !d.tienda.activa && (
+        <p className="shrink-0 rounded-lg border border-border/70 bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground" role="note" data-testid="aviso-tienda">
+          La tienda de vinos está desactivada. Su margen se calcula igualmente: precio de tienda = carta − {d.tienda.descuentoPct} %, sin IVA ({d.config.ivaTiendaPct} %).
+        </p>
+      )}
       {vista === "borrador" && (
         <p
           className="flex shrink-0 items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200"
@@ -309,14 +356,15 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
           </span>
         </p>
       )}
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(9rem,38%)_1fr] gap-2 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-1 lg:gap-3">
-        <section className="flex min-h-0 flex-col rounded-lg border border-border/70 bg-card p-2" aria-label="Precio de venta frente a % de coste">
-          <p className="shrink-0 truncate px-1 text-xs text-muted-foreground">{textoEje}</p>
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(9rem,38%)_1fr] gap-2 max-lg:flex-none max-lg:grid-rows-[15rem_auto] lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-1 lg:gap-3">
+        <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-border/70 bg-card p-2" aria-label="Precio de venta frente a % de coste">
+          {/* 11/11/2026: el título largo con `truncate` ensanchaba la columna de la rejilla y la gráfica se salía por la derecha. */}
+          <p className="shrink-0 line-clamp-2 break-words px-1 text-xs text-muted-foreground lg:truncate">{textoEje}</p>
           <div className="min-h-0 flex-1">
             <Dispersion lista={lista} umbral={umbral} eje={vista === "borrador" ? "Máx." : "Mín."} porKilo={vista === "peso"} onElegir={elegir} />
           </div>
         </section>
-        <section className="flex min-h-0 flex-col rounded-lg border border-border/70 bg-card" aria-label="Donde no funciona el margen">
+        <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-border/70 bg-card" aria-label="Donde no funciona el margen">
           <p className="shrink-0 border-b border-border/70 px-3 py-2 text-sm font-medium">
             {titulo}
             <span className="ml-1 font-normal text-muted-foreground">({filas.length})</span>
@@ -326,15 +374,15 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
               {vista === "borrador" && filtro === "problemas" ? "Ningún plato revisado falla. Los que están sin revisar se ven en «Todos»." : "Nada que enseñar aquí."}
             </p>
           ) : (
-            <ul className="min-h-0 flex-1 divide-y divide-border/50 overflow-y-auto overscroll-contain px-1" data-testid="margenes-lista">
+            <ul className="min-h-0 flex-1 divide-y divide-border/50 overflow-y-auto overscroll-contain px-1 max-lg:overflow-visible" data-testid="margenes-lista">
               {filas.map((a) => (
-                <FilaArticulo key={a.id} a={a} d={d} onElegir={elegir} />
+                <FilaArticulo key={a.id} a={a} d={d} conIva={conIva} onElegir={elegir} />
               ))}
             </ul>
           )}
         </section>
       </div>
-      <DetalleArticulo articulo={articulo} config={d.config} puedeEditar={puedeEditar} onCerrar={() => setElegido(null)} />
+      <DetalleArticulo articulo={articulo} config={d.config} tiendaActiva={d.tienda.activa} conIva={conIva} puedeEditar={puedeEditar} onCerrar={() => setElegido(null)} />
       <DialogoUmbrales abierto={umbrales} config={d.config} puedeEditar={puedeEditar} onCerrar={() => setUmbrales(false)} />
     </div>
   );

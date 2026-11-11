@@ -16,6 +16,7 @@ import { useAlertasFacturas } from "@/hooks/useAlertasFacturas";
 import { fmt } from "@/lib/analisis/margenesCarta";
 import {
   cifraMargen,
+  costeYVenta,
   cuentasMargenes,
   enlaceArticulo,
   peoresMargenes,
@@ -74,6 +75,7 @@ export function MargenesPrecio() {
                             {tipoMargen(a)} · {umbralMargen(a, d)}
                             {a.banderas.includes("sube_coste") && a.variacionPct !== null && ` · coste +${fmt(a.variacionPct, 0)} %`}
                           </span>
+                          {costeYVenta(a) && <span className="block truncate text-xs tabular-nums text-foreground/80">{costeYVenta(a)} (sin IVA)</span>}
                         </span>
                         <span className="shrink-0 text-sm font-semibold tabular-nums text-destructive">{cifraMargen(a)}</span>
                       </Link>

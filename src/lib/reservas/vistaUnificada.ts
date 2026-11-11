@@ -240,18 +240,19 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
 // ----------------------------------------------------------------------------
 // Deep links: /reservas?tab=...&status=...&date=today
 // ----------------------------------------------------------------------------
-// "asignacion": panel de salas y mesas (reservas-sin-salas, Fase B); la
-// campana enlaza ahí las notificaciones `reserva_sin_asignar`.
+// "asignacion" («Próximas reservas») se unificó con la Lista el 11/11/2026 (petición del dueño: «Unificar
+// próximas reservas con lista y que se quede lista»): sus enlaces, y los alias `proximas`, abren la Lista.
 // "hoy" (10/11/2026): el kanban del día. Antes `?tab=hoy` caía en la Lista
 // (era el nombre de la pestaña de ANTES de la unificación del 2026-09-23) y un
 // enlace a «Hoy» acababa en otra pantalla; ahora abre «Hoy». Solo si el enlace
 // trae filtro (`status`/`date`, que «Hoy» no tiene) sigue yendo a la Lista.
-export const TABS_RESERVAS = ["hoy", "reservas", "calendario", "asignacion", "blacklist", "configuracion"] as const;
+export const TABS_RESERVAS = ["hoy", "reservas", "calendario", "blacklist", "configuracion"] as const;
 
-/** Nombres de pestaña que se escriben a mano o en notas: `?tab=proximas` abre «Próximas reservas». */
+/** Nombres de pestaña que se escriben a mano o en notas. «Próximas reservas» ya es la Lista. */
 const ALIAS_TAB_RESERVAS = new Map<string, TabReservas>([
-  ["proximas", "asignacion"],
-  ["proximas-reservas", "asignacion"],
+  ["asignacion", "reservas"],
+  ["proximas", "reservas"],
+  ["proximas-reservas", "reservas"],
   ["calendario-ocupacion", "calendario"],
 ]);
 export type TabReservas = (typeof TABS_RESERVAS)[number];

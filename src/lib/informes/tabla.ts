@@ -14,6 +14,8 @@ export interface ColumnaInforme {
   id: string;
   etiqueta: string;
   tipo: TipoCelda;
+  /** Ancho fijo en la diapositiva (px). Sin él: las cifras, un ancho común; el texto, lo que sobra (11/11/2026, tablas con muchas columnas). */
+  ancho?: number;
 }
 
 export type ValorCelda = string | number | null;

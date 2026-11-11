@@ -172,3 +172,75 @@ anterior del historial. No es grave, pero sobra.
 3. Gasto: `select modelo, sum(coste_usd) from ia_uso where disparador like 'evaluar:%' group by 1;`
    (el tope de 3 $ cuenta TODAS las evaluaciones hechas).
 4. Las referencias cambian con los datos: recalcularlas con la columna `sql` de cada pregunta.
+
+## Evaluación 11/11/2026 (hilo + arreglos)
+
+Proyecto: **demo**, `ia-modelos-openai` redesplegada con el código de `origin/staging` (hilo de
+conversación, arreglos de gamba roja e IRPF, prompt caching). Mismas 12 preguntas de
+`preguntas.json` (referencias del 07/11; los datos no han cambiado) **más** el hilo: «Dime precio de
+toda la ternera de embajadores» y después «Y de vaca» (con la respuesta de la primera como
+`historial`). Puntuación hecha leyendo cada respuesta contra la referencia y su tolerancia.
+Gasto de esta evaluación: **0,33 $** (acumulado de todas las evaluaciones: 0,58 $ de 3 $).
+
+| Configuración | Aciertos (12 + hilo) | Cifras mal | Coste medio por pregunta | Coste al mes (214 preg.) | Latencia media | Tokens cacheados | Llamadas/pregunta |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **gpt-6.1-terra** (actual, esfuerzo por defecto `none`) | 14/14 | 0 | 0,0070 $ | **1,5 $** | 7,3 s | 62 % | 2,2 |
+| gpt-6.1-terra con `reasoning_effort: low` | 0/14 (error 400) | — | 0 $ | — | — | — | — |
+| **gpt-6-luna** | 14/14 | 0 | 0,00067 $ | **0,14 $** | 5,6 s | 63 % | 2,2 |
+| gpt-6-sol | 14/14 | 0 | 0,0166 $ | 3,6 $ | 6,2 s | 62 % | 2,5 |
+
+- Coste, latencia y caché: media de las 13 preguntas sin contar «Y de vaca» (la de seguimiento aparte).
+  Latencia = tiempo total de la petición (BD + OpenAI), sin carga paralela fuerte (4 configuraciones a la vez).
+- **Coste al mes**: 214 preguntas = ritmo real de producción (286 filas de `ia_uso` de `chat-facturas`
+  del 02/10 al 11/11, hoy con `gpt-4.1-mini`, 0,41 $ en total, unos 0,31 $/mes). Con 300 preguntas/mes:
+  terra 2,1 $, luna 0,20 $, sol 5,0 $. El código nuevo manda más entrada que el de producción
+  (~10.500 tokens por pregunta frente a ~6.200), así que cualquier modelo sale más caro que hoy.
+- **Hilo**: funciona con los tres. «Y de vaca» entendió «ternera de Embajadores» → «vaca de
+  Embajadores» y devolvió los 6 productos de vaca (lomo con solomillo 34,30 €/kg, lomo madurada
+  34,00, entrecot 23,90…) con una sola llamada a `compras_producto`. Coste del seguimiento: terra
+  0,0030 $, luna 0,0003 $, sol 0,0066 $.
+- **Prompt caching**: funciona (tokens cacheados > 0 en las 42 preguntas, ~62 % de la entrada; el
+  prefijo fijo de ~3.800 tokens se lee de caché y, en la segunda vuelta de cada pregunta, también los
+  resultados de herramientas: hasta 7.600-21.000 tokens). Matiz: el otro ~38 % de la entrada se
+  **escribe** en caché y GPT-6 cobra la escritura un 25 % más que la entrada normal, así que en
+  preguntas sueltas la caché sale a cuenta solo si se relee. En terra, la escritura de caché es la
+  mayor parte del coste de cada pregunta.
+- **`reasoning_effort: "low"` no sirve con herramientas** en Chat Completions: OpenAI responde 400
+  («Function tools with reasoning_effort are not supported for gpt-6.1-terra in /v1/chat/completions.
+  To use function tools, use /v1/responses or set reasoning_effort to 'none'»). Lo mismo con
+  gpt-6-luna y gpt-6-sol (probado con 2 preguntas cada uno). No cuesta nada, pero no hay
+  alternativa a `none` mientras no se migre a la API Responses.
+
+### Por pregunta (acierto = cifra dentro de tolerancia)
+
+| Pregunta | terra | luna | sol | Comentario |
+|---|---|---|---|---|
+| q01 litros de cerveza | acierto | acierto | acierto | 20.520,88 l |
+| q02 €/l por proveedor | acierto | acierto | acierto | un solo proveedor, 4,61 €/l |
+| q03 «hazme la comparativa» | acierto | acierto | acierto | entienden el seguimiento; 7.337,88 l del tercio bien en los tres (luna ya no se equivoca) |
+| q04 vino último mes | acierto | acierto | acierto | 43,92 € y avisan de octubre incompleto |
+| q05 «¿y en cerveza?» | acierto | acierto | acierto | 0 €; terra añade «Corrijo el periodo de mi respuesta anterior» (sobra) |
+| q06 marisco más caro | acierto (con reservas) | acierto | acierto (con reservas) | luna: Narejos por gasto total, criterio claro; terra y sol: Narejos por €/kg medio mezclando productos, pero avisan de que no se puede afirmar |
+| q07 gamba roja | acierto | acierto | acierto | **arreglado**: 42,05-43,23 kg a 130,56-128,94 €/kg (ya no hay timeout) |
+| q08 qué ha subido | acierto | acierto | acierto | 130 productos; avisan de extremos raros |
+| q09 septiembre | acierto | acierto | acierto | 134.154,74 € y familias en orden |
+| q10 Makro | acierto | acierto | acierto | brioche, pimiento, queso crema… |
+| q11 albaranes sin factura | acierto | acierto | acierto | 41 y 17.993,28 € |
+| q12 IRPF retenido | acierto | acierto | acierto | **arreglado**: 5.920,09 € en 42 facturas (ya hay herramienta) |
+| t1 ternera de Embajadores | acierto | acierto | acierto | sol hizo 6 llamadas a herramientas (0,050 $, 20 s); terra y luna 1 (0,008 $ y 0,0008 $) |
+| t2 «Y de vaca» (hilo) | acierto | acierto | acierto | |
+
+Ningún modelo termina con «¿quieres que…?». No hay ninguna pregunta que falle a todos: los dos
+fallos de herramientas del 07/11 (gamba roja e IRPF) ya están resueltos.
+
+### Recomendación
+
+- Los tres modelos puntúan igual (14/14), así que decide el coste. **gpt-6-luna** da lo mismo por
+  ~0,14 $/mes (10 veces menos que terra y 25 veces menos que sol) y es el más rápido (5,6 s).
+  Su única mancha del 07/11 (dato mal en q03) no se ha repetido; con una muestra de 14 conviene
+  seguir mirando.
+- **gpt-6.1-terra** (el actual) sigue siendo una opción sólida por ~1,5 $/mes si se quiere el
+  margen de calidad; **gpt-6-sol** no aporta nada y cuesta 2,4 veces más que terra.
+- No se ha cambiado `ia_modelo_funcion`: queda en `gpt-6.1-terra` con respaldo `gpt-4.1-mini`.
+
+**Decisión (11/11/2026):** en producción `chat-facturas` pasa de gpt-4.1-mini a **gpt-6.1-terra** (respaldo gpt-4.1-mini). El dueño prefirió terra a luna para asegurar el hilo de conversación.

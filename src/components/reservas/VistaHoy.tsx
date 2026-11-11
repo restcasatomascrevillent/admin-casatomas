@@ -1,6 +1,6 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Info, Search, Wand2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Wand2 } from "lucide-react";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { supabase } from "@/integrations/supabase/client";
 import { ReservasEnVivoContexto, useReservasEnVivo } from "@/hooks/useReservasEnVivo";
@@ -12,7 +12,15 @@ import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { admiteReservas } from "@/lib/reservas/negocios";
-import { COLUMNAS_RESERVAS_HOY, guardarSalaPlanoHoy, leerSalaPlanoHoy, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
+import {
+  COLUMNAS_RESERVAS_HOY,
+  etiquetaDiaReservas,
+  guardarSalaPlanoHoy,
+  leerSalaPlanoHoy,
+  sumarDias,
+  turnoPorDefecto,
+  type FiltroTurnoHoy,
+} from "@/lib/reservas/vistaHoy";
 import { VistaPlanoHoy, type ReservaPlanoHoy } from "./servicio/VistaPlanoHoy";
 import { consultaReservasHoy } from "@/lib/reservas/consultaReservasHoy";
 import { AvisoActualizando } from "@/components/panel/AvisoActualizando";
@@ -77,10 +85,35 @@ const SIN_SONDEO = { refetchInterval: false } as const;
  * `onAbrirSala` (sin uso desde el 10/10/2026): abría el reparto de mesas de una sala (`Reservas.tsx`, el
  * mismo salto que el Calendario: `PlanoEspacio2D`, con su conmutador al modo servicio).
  */
+/**
+ * Turno elegido en Reservas (11/11/2026, petición del dueño): sale «Comida» y, desde las 18:00, pasa sola a
+ * «Cena». Si alguien elige otro a mano, se respeta y ya no cambia solo.
+ */
+function useTurnoAutomatico() {
+  const [filtroTurno, setFiltroTurno] = useState<FiltroTurnoHoy>(() => turnoPorDefecto());
+  const aMano = useRef(false);
+  useEffect(() => {
+    const comprobar = () => {
+      if (!aMano.current) setFiltroTurno((actual) => (actual === turnoPorDefecto() ? actual : turnoPorDefecto()));
+    };
+    const id = window.setInterval(comprobar, 60_000);
+    document.addEventListener("visibilitychange", comprobar);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", comprobar);
+    };
+  }, []);
+  const elegir = useCallback((t: FiltroTurnoHoy) => {
+    aMano.current = true;
+    setFiltroTurno(t);
+  }, []);
+  return [filtroTurno, elegir] as const;
+}
+
 export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } = {}) {
   // Lo que comparten las dos vistas: el buscador y el turno de la fila de filtros, y la vista elegida.
   const [busqueda, setBusqueda] = useState("");
-  const [filtroTurno, setFiltroTurno] = useState<FiltroTurnoHoy>("todo");
+  const [filtroTurno, setFiltroTurno] = useTurnoAutomatico();
   const [salaPlano, setSalaPlano] = useState<string | null>(leerSalaPlanoHoy);
   // Móvil (< 768 px): vista propia para el camarero (`movil/VistaHoyMovil.tsx`). Tablet y escritorio, igual.
   const esMovil = useIsMobile();
@@ -114,8 +147,13 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   // para toda la pestaña (kanban, cifras y la rejilla
   // por cuartos, que no abre la suya: `ReservasEnVivoContexto`).
   useReservasEnVivo();
-  // Cambia a medianoche (la tablet se queda toda la noche en «Hoy»).
-  const hoy = useHoyLocal();
+  // Reservas con días (11/11/2026, petición del dueño: «en vez de Hoy que sea Reservas, que tenga para pasar
+  // días»): `hoy` es el día que se ve; sin elegir ninguno, el de hoy (cambia a medianoche: la tablet se queda
+  // toda la noche en Reservas).
+  const hoyReal = useHoyLocal();
+  const [diaElegido, setDiaElegido] = useState<string | null>(null);
+  const hoy = diaElegido ?? hoyReal;
+  const irADia = (clave: string) => setDiaElegido(clave === hoyReal ? null : clave);
   /**
    * Reservas de hoy de Casa Tomás, para el plano del servicio y la vista de hoy en móvil
    * (`marca`, para quedarse con las de Casa Tomás: `admiteReservas`).
@@ -211,14 +249,16 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
       >
         {avisoRed}
         <BarraFiltrosHoy
+          dia={{ fecha: hoy, hoy: hoyReal, onCambiar: irADia }}
+          // Bloqueo de comida / cena online del día elegido (10/11/2026), en la misma barra (11/11/2026).
+          servicios={<InterruptoresServiciosOnline fecha={hoy} />}
           busqueda={busqueda}
           onBusqueda={setBusqueda}
           filtroTurno={filtroTurno}
           onFiltroTurno={cambiarTurno}
-          soloLectura={!puedeEditar}
           accion={
             puedeEditar ? (
-              <div className="flex shrink-0 gap-2 sm:order-2">
+              <div className="flex shrink-0 gap-2">
                 <Button className="touch-hit h-11 gap-1.5 px-4" onClick={pulsarOrganizar} disabled={!!organizando}>
                   <Wand2 className="h-4 w-4" aria-hidden="true" />
                   Organizar
@@ -228,15 +268,15 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             ) : undefined
           }
         />
-        {/* Bloqueo de comida / cena online del día (10/11/2026). */}
-        <InterruptoresServiciosOnline fecha={hoy} />
 
         {/* 07/11/2026: a la izquierda la lista completa del turno, por estados, en filas de una línea (con su
             scroll); a la derecha el plano de mesas grandes, una sala a la vez. Cada columna mide lo que queda de
             pantalla. 10/11/2026 («los nombres no se ven, y eso es lo primordial»): la lista crece a costa de las
             mesas (más pequeñas): 25 rem (tablet vertical), 30 rem (480 px, desde 1024), 32 rem (512 px, desde
             1280), 36 rem (576 px, desde 1536) y 42 rem (672 px, desde 1800). */}
-        <div className="grid min-h-0 grid-cols-[minmax(0,25rem)_minmax(0,1fr)] items-start gap-3 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] xl:grid-cols-[32rem_minmax(0,1fr)] 2xl:grid-cols-[36rem_minmax(0,1fr)] min-[1800px]:grid-cols-[42rem_minmax(0,1fr)]">
+        {/* 11/11/2026 («que la lista sea más ancha»): mitad y mitad en la tablet vertical; 36 rem desde 1024, 40 rem
+            desde 1280, 44 rem desde 1536 y 48 rem desde 1800. */}
+        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-3 lg:grid-cols-[minmax(0,36rem)_minmax(0,1fr)] xl:grid-cols-[40rem_minmax(0,1fr)] 2xl:grid-cols-[44rem_minmax(0,1fr)] min-[1800px]:grid-cols-[48rem_minmax(0,1fr)]">
           <section aria-label="Reservas por llegar" className="min-w-0">
             {errorReservasHoy ? (
               <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />
@@ -259,6 +299,7 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             reservasError={errorReservasHoy}
             onReintentarReservas={() => void refetchReservasHoy()}
             reservaResaltada={señalada}
+            fecha={hoy}
           />
         </div>
       </div>
@@ -290,28 +331,24 @@ function turnoSiguiente(): "comida" | "cena" {
   return new Date().getHours() < 16 ? "comida" : "cena";
 }
 
-/** La ayuda (ⓘ) de «Hoy». Con solo «Ver» no hay acciones. */
-function ayudaVistaHoy(soloLectura: boolean): string {
-  return soloLectura
-    ? "A la izquierda, las reservas del turno por estado; a la derecha, las mesas de la sala. Pasa el ratón por una reserva para ver su mesa."
-    : "A la izquierda, las reservas del turno por estado («Sentar», «Liberar»; pasa el ratón para ver su mesa). A la derecha, las mesas: tócalas para ver, sentar o fijar. Las flechas (o ← →) cambian de sala.";
-}
-
 /**
  * La fila de filtros de «Hoy» de escritorio: buscador, «Todo el día / Comida / Cena», las acciones y la ayuda.
  * Mandan a la vez en la lista de la izquierda y en el plano. (Hasta el 07/11/2026 llevaba el selector
  * «Kanban | Plano»; el kanban ya no sale en Hoy.)
  */
 function BarraFiltrosHoy({
+  dia,
+  servicios,
   busqueda,
   onBusqueda,
   filtroTurno,
   onFiltroTurno,
-  soloLectura = false,
   accion,
 }: {
-  /** Solo «Ver»: la ayuda no habla de acciones. */
-  soloLectura?: boolean;
+  /** El día que se ve, con flechas para pasar al anterior o al siguiente (11/11/2026). */
+  dia?: { fecha: string; hoy: string; onCambiar: (fecha: string) => void };
+  /** «Cerrar comida / Cerrar cena» del día elegido: a la derecha de las acciones. */
+  servicios?: ReactNode;
   /** Botones de acción junto al turno («Organizar», «Sin reserva»). */
   accion?: ReactNode;
   busqueda: string;
@@ -319,39 +356,59 @@ function BarraFiltrosHoy({
   filtroTurno: FiltroTurnoHoy;
   onFiltroTurno: (turno: FiltroTurnoHoy) => void;
 }) {
+  // 11/11/2026 (dueño: «reestructura cómo se ven los botones… para que se vea toda la vista»): dos filas.
+  // Arriba, qué se ve (día, turno y buscador); debajo, qué se hace (Organizar, Sin reserva) y, a la derecha,
+  // «Cerrar comida / Cerrar cena». Cada fila salta de línea si no cabe, nunca se corta.
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
-      <div className="relative w-full min-w-0 sm:order-1 sm:w-64">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-        <Input
-          placeholder="Buscar por nombre, email o teléfono…"
-          value={busqueda}
-          onChange={(e) => onBusqueda(e.target.value)}
-          className="h-11 pl-9"
-          aria-label="Buscar reservas"
-        />
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {dia && (
+          <div className="flex shrink-0 items-center gap-1" role="group" aria-label="Día">
+            <Button type="button" variant="outline" size="icon" className="touch-hit h-11 w-11" aria-label="Día anterior" onClick={() => dia.onCambiar(sumarDias(dia.fecha, -1))}>
+              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+            </Button>
+            <span className="min-w-[10.5rem] px-1 text-center text-base font-semibold" aria-live="polite" data-testid="dia-reservas">
+              {etiquetaDiaReservas(dia.fecha, dia.hoy)}
+            </span>
+            <Button type="button" variant="outline" size="icon" className="touch-hit h-11 w-11" aria-label="Día siguiente" onClick={() => dia.onCambiar(sumarDias(dia.fecha, 1))}>
+              <ChevronRight className="h-5 w-5" aria-hidden="true" />
+            </Button>
+            {dia.fecha !== dia.hoy && (
+              <Button type="button" variant="ghost" className="touch-hit h-11 px-3" onClick={() => dia.onCambiar(dia.hoy)}>
+                Hoy
+              </Button>
+            )}
+          </div>
+        )}
+        <ToggleGroup
+          type="single"
+          value={filtroTurno}
+          onValueChange={(v) => v && onFiltroTurno(v as FiltroTurnoHoy)}
+          variant="outline"
+          className="shrink-0"
+          aria-label="Filtrar por turno"
+        >
+          <ToggleGroupItem value="todo" className="touch-hit h-11 whitespace-nowrap">Todo el día</ToggleGroupItem>
+          <ToggleGroupItem value="comida" className="touch-hit h-11 whitespace-nowrap">Comida</ToggleGroupItem>
+          <ToggleGroupItem value="cena" className="touch-hit h-11 whitespace-nowrap">Cena</ToggleGroupItem>
+        </ToggleGroup>
+        <div className="relative min-w-[12rem] flex-1 basis-56">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <Input
+            placeholder="Buscar por nombre, email o teléfono…"
+            value={busqueda}
+            onChange={(e) => onBusqueda(e.target.value)}
+            className="h-11 pl-9"
+            aria-label="Buscar reservas"
+          />
+        </div>
       </div>
-      <ToggleGroup
-        type="single"
-        value={filtroTurno}
-        onValueChange={(v) => v && onFiltroTurno(v as FiltroTurnoHoy)}
-        variant="outline"
-        className="shrink-0 sm:order-2"
-        aria-label="Filtrar por turno"
-      >
-        <ToggleGroupItem value="todo" className="touch-hit h-11 whitespace-nowrap">Todo el día</ToggleGroupItem>
-        <ToggleGroupItem value="comida" className="touch-hit h-11 whitespace-nowrap">Comida</ToggleGroupItem>
-        <ToggleGroupItem value="cena" className="touch-hit h-11 whitespace-nowrap">Cena</ToggleGroupItem>
-      </ToggleGroup>
-      {accion}
-      <span
-        role="note"
-        className="hidden shrink-0 text-muted-foreground sm:order-4 sm:inline-flex"
-        aria-label={ayudaVistaHoy(soloLectura)}
-        title={ayudaVistaHoy(soloLectura)}
-      >
-        <Info className="h-4 w-4" aria-hidden="true" />
-      </span>
+      {(accion || servicios) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {accion}
+          {servicios && <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">{servicios}</div>}
+        </div>
+      )}
     </div>
   );
 }
