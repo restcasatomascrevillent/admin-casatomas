@@ -59,6 +59,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -397,6 +398,9 @@ export function VistaHoyMovil({
           <Search className="h-5 w-5" aria-hidden="true" />
         </Button>
         <BotonSentarSinReserva soloIcono className="shrink-0" />
+        {/* Avisos también en el móvil (11/11/2026, petición del dueño: «para que se vea el botón de avisos»). Solo
+            dentro del panel de verdad (con menú lateral); en las pruebas sueltas no se pinta. */}
+        {hayMenu && <BotonAvisosSeccion seccion="reservas" className="h-11 px-2.5" />}
       </div>
       )}
       {!columna && <InterruptoresServiciosOnline fecha={fecha} compacta className="shrink-0" />}

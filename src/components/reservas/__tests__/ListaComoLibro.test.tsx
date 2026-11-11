@@ -152,7 +152,7 @@ describe("ListaComoLibro · añadir y arrastrar sin abrir (10/11/2026)", () => {
     const { rerender } = render(<ListaComoLibro resaltar={null} />);
     rerender(<ListaComoLibro resaltar={{ id: "nueva", fecha: dia }} />);
     expect(titulo()).toHaveTextContent(tituloHoja(dia));
-    expect(screen.getByText("Recién Creada").closest("li")).toHaveClass("bg-amber-200/50");
+    expect(screen.getByText("Recién Creada").closest("li")).toHaveClass("bg-amber-100");
   });
 });
 
@@ -174,9 +174,9 @@ describe("ListaComoLibro · las reservas de la hoja", () => {
     expect(h.editada).toHaveBeenCalledWith("r1");
   });
 
-  it("hoja sin reservas: «Hoja en blanco»", () => {
+  it("hoja sin reservas: «Aún no hay reservas este día»", () => {
     render(<ListaComoLibro />);
-    expect(within(hojas()[0]).getByText(/Hoja en blanco/)).toBeInTheDocument();
+    expect(within(hojas()[0]).getByText(/Aún no hay reservas este día/)).toBeInTheDocument();
   });
 });
 

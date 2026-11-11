@@ -472,7 +472,9 @@ export default function Reservas() {
                que escriben (y la RLS del INSERT, 20261001170000). Sin él (solo «Ver») el botón no
                existe y su sitio lo ocupa la etiqueta común «Solo lectura» (06/11/2026, decisión del
                dueño: lo que no se puede usar se oculta, no se desactiva). */
-            <>
+            // 11/11/2026: en tablet y móvil la fila de acciones va a todo lo ancho, Avisos a la izquierda y
+            // «Nueva Reserva» a la derecha; en portátil, juntos a la derecha de las pestañas.
+            <div className="flex w-full flex-wrap items-center justify-between gap-2 lg:w-auto lg:flex-nowrap lg:justify-end">
             {/* Avisos de reservas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral). */}
             <BotonAvisosSeccion seccion="reservas" />
             {soloLectura && (soloCrear ? <EtiquetaSoloLectura
@@ -511,7 +513,7 @@ export default function Reservas() {
                 </DialogContent>
               </Dialog>
             )}
-            </>
+            </div>
           }
         />
 

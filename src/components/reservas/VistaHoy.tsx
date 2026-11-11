@@ -250,6 +250,8 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
         {avisoRed}
         <BarraFiltrosHoy
           dia={{ fecha: hoy, hoy: hoyReal, onCambiar: irADia }}
+          // Bloqueo de comida / cena online del día elegido (10/11/2026), en la misma barra (11/11/2026).
+          servicios={<InterruptoresServiciosOnline fecha={hoy} />}
           busqueda={busqueda}
           onBusqueda={setBusqueda}
           filtroTurno={filtroTurno}
@@ -257,7 +259,7 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
           soloLectura={!puedeEditar}
           accion={
             puedeEditar ? (
-              <div className="flex shrink-0 gap-2 sm:order-2">
+              <div className="flex shrink-0 gap-2">
                 <Button className="touch-hit h-11 gap-1.5 px-4" onClick={pulsarOrganizar} disabled={!!organizando}>
                   <Wand2 className="h-4 w-4" aria-hidden="true" />
                   Organizar
@@ -267,8 +269,6 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             ) : undefined
           }
         />
-        {/* Bloqueo de comida / cena online del día (10/11/2026). */}
-        <InterruptoresServiciosOnline fecha={hoy} />
 
         {/* 07/11/2026: a la izquierda la lista completa del turno, por estados, en filas de una línea (con su
             scroll); a la derecha el plano de mesas grandes, una sala a la vez. Cada columna mide lo que queda de
@@ -346,6 +346,7 @@ function ayudaVistaHoy(soloLectura: boolean): string {
  */
 function BarraFiltrosHoy({
   dia,
+  servicios,
   busqueda,
   onBusqueda,
   filtroTurno,
@@ -355,6 +356,8 @@ function BarraFiltrosHoy({
 }: {
   /** El día que se ve, con flechas para pasar al anterior o al siguiente (11/11/2026). */
   dia?: { fecha: string; hoy: string; onCambiar: (fecha: string) => void };
+  /** «Cerrar comida / Cerrar cena» del día elegido: a la derecha de las acciones. */
+  servicios?: ReactNode;
   /** Solo «Ver»: la ayuda no habla de acciones. */
   soloLectura?: boolean;
   /** Botones de acción junto al turno («Organizar», «Sin reserva»). */
@@ -364,57 +367,67 @@ function BarraFiltrosHoy({
   filtroTurno: FiltroTurnoHoy;
   onFiltroTurno: (turno: FiltroTurnoHoy) => void;
 }) {
+  // 11/11/2026 (dueño: «reestructura cómo se ven los botones… para que se vea toda la vista»): dos filas.
+  // Arriba, qué se ve (día, turno y buscador); debajo, qué se hace (Organizar, Sin reserva) y, a la derecha,
+  // «Cerrar comida / Cerrar cena». Cada fila salta de línea si no cabe, nunca se corta.
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
-      {dia && (
-        <div className="flex shrink-0 items-center gap-1" role="group" aria-label="Día">
-          <Button type="button" variant="outline" size="icon" className="touch-hit h-11 w-11" aria-label="Día anterior" onClick={() => dia.onCambiar(sumarDias(dia.fecha, -1))}>
-            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-          </Button>
-          <span className="min-w-[11rem] px-1 text-center text-base font-semibold" aria-live="polite" data-testid="dia-reservas">
-            {etiquetaDiaReservas(dia.fecha, dia.hoy)}
-          </span>
-          <Button type="button" variant="outline" size="icon" className="touch-hit h-11 w-11" aria-label="Día siguiente" onClick={() => dia.onCambiar(sumarDias(dia.fecha, 1))}>
-            <ChevronRight className="h-5 w-5" aria-hidden="true" />
-          </Button>
-          {dia.fecha !== dia.hoy && (
-            <Button type="button" variant="ghost" className="touch-hit h-11 px-3" onClick={() => dia.onCambiar(dia.hoy)}>
-              Hoy
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {dia && (
+          <div className="flex shrink-0 items-center gap-1" role="group" aria-label="Día">
+            <Button type="button" variant="outline" size="icon" className="touch-hit h-11 w-11" aria-label="Día anterior" onClick={() => dia.onCambiar(sumarDias(dia.fecha, -1))}>
+              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
             </Button>
-          )}
+            <span className="min-w-[10.5rem] px-1 text-center text-base font-semibold" aria-live="polite" data-testid="dia-reservas">
+              {etiquetaDiaReservas(dia.fecha, dia.hoy)}
+            </span>
+            <Button type="button" variant="outline" size="icon" className="touch-hit h-11 w-11" aria-label="Día siguiente" onClick={() => dia.onCambiar(sumarDias(dia.fecha, 1))}>
+              <ChevronRight className="h-5 w-5" aria-hidden="true" />
+            </Button>
+            {dia.fecha !== dia.hoy && (
+              <Button type="button" variant="ghost" className="touch-hit h-11 px-3" onClick={() => dia.onCambiar(dia.hoy)}>
+                Hoy
+              </Button>
+            )}
+          </div>
+        )}
+        <ToggleGroup
+          type="single"
+          value={filtroTurno}
+          onValueChange={(v) => v && onFiltroTurno(v as FiltroTurnoHoy)}
+          variant="outline"
+          className="shrink-0"
+          aria-label="Filtrar por turno"
+        >
+          <ToggleGroupItem value="todo" className="touch-hit h-11 whitespace-nowrap">Todo el día</ToggleGroupItem>
+          <ToggleGroupItem value="comida" className="touch-hit h-11 whitespace-nowrap">Comida</ToggleGroupItem>
+          <ToggleGroupItem value="cena" className="touch-hit h-11 whitespace-nowrap">Cena</ToggleGroupItem>
+        </ToggleGroup>
+        <div className="relative min-w-[12rem] flex-1 basis-56">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <Input
+            placeholder="Buscar por nombre, email o teléfono…"
+            value={busqueda}
+            onChange={(e) => onBusqueda(e.target.value)}
+            className="h-11 pl-9"
+            aria-label="Buscar reservas"
+          />
+        </div>
+        <span
+          role="note"
+          className="hidden shrink-0 text-muted-foreground sm:inline-flex"
+          aria-label={ayudaVistaHoy(soloLectura)}
+          title={ayudaVistaHoy(soloLectura)}
+        >
+          <Info className="h-4 w-4" aria-hidden="true" />
+        </span>
+      </div>
+      {(accion || servicios) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {accion}
+          {servicios && <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">{servicios}</div>}
         </div>
       )}
-      <div className="relative w-full min-w-0 sm:order-1 sm:w-64">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-        <Input
-          placeholder="Buscar por nombre, email o teléfono…"
-          value={busqueda}
-          onChange={(e) => onBusqueda(e.target.value)}
-          className="h-11 pl-9"
-          aria-label="Buscar reservas"
-        />
-      </div>
-      <ToggleGroup
-        type="single"
-        value={filtroTurno}
-        onValueChange={(v) => v && onFiltroTurno(v as FiltroTurnoHoy)}
-        variant="outline"
-        className="shrink-0 sm:order-2"
-        aria-label="Filtrar por turno"
-      >
-        <ToggleGroupItem value="todo" className="touch-hit h-11 whitespace-nowrap">Todo el día</ToggleGroupItem>
-        <ToggleGroupItem value="comida" className="touch-hit h-11 whitespace-nowrap">Comida</ToggleGroupItem>
-        <ToggleGroupItem value="cena" className="touch-hit h-11 whitespace-nowrap">Cena</ToggleGroupItem>
-      </ToggleGroup>
-      {accion}
-      <span
-        role="note"
-        className="hidden shrink-0 text-muted-foreground sm:order-4 sm:inline-flex"
-        aria-label={ayudaVistaHoy(soloLectura)}
-        title={ayudaVistaHoy(soloLectura)}
-      >
-        <Info className="h-4 w-4" aria-hidden="true" />
-      </span>
     </div>
   );
 }
