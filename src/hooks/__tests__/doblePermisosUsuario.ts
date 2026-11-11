@@ -10,6 +10,8 @@
  *     de PostgREST); si no, la crea con los DEFAULT (can_view y can_edit a false).
  *   · `insert(filas)`: las crea; si alguna pareja ya existe, 23505 y no entra ninguna.
  *   · `delete()` + `eq` / `in`: borra las que cumplen todos los filtros.
+ *   · `update(cambios)` + `eq` / `in` (11/11/2026, sección de inicio en `user_roles`): cambia
+ *     las que cumplen los filtros y las devuelve (como `.select()`).
  * Cada escritura queda en `operaciones`, en orden. `fallos[tipo]` hace fallar la
  * SIGUIENTE escritura de ese tipo sin tocar nada (red caída, RLS…), y se consume.
  * `borradoFiltradoPorRls` emula el DELETE de quien no es super admin: la política
@@ -18,7 +20,7 @@
  */
 
 export type Fila = Record<string, unknown>;
-export type TipoEscritura = "insert" | "upsert" | "delete";
+export type TipoEscritura = "insert" | "upsert" | "delete" | "update";
 
 export interface OperacionDoble {
   tabla: string;
@@ -60,6 +62,11 @@ export function crearDoblePermisos() {
         delete bd.fallos[escritura.tipo];
         return { data: null, error: fallo };
       }
+      if (escritura.tipo === "update") {
+        const cambiadas = filas.filter(cumple);
+        for (const f of cambiadas) Object.assign(f, escritura.payload?.[0]);
+        return { data: cambiadas.map((f) => ({ ...f })), error: null };
+      }
       if (escritura.tipo === "delete") {
         if (!bd.borradoFiltradoPorRls) bd.tablas[tabla] = filas.filter((f) => !cumple(f));
         return { data: null, error: null };
@@ -96,6 +103,10 @@ export function crearDoblePermisos() {
       },
       insert: (payload: Fila | Fila[]) => {
         escritura = { tipo: "insert", payload: ([] as Fila[]).concat(payload).map((f) => ({ ...f })) };
+        return q;
+      },
+      update: (cambios: Fila) => {
+        escritura = { tipo: "update", payload: [{ ...cambios }] };
         return q;
       },
       upsert: (payload: Fila | Fila[], opciones?: unknown) => {

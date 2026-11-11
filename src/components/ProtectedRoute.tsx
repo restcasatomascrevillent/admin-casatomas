@@ -6,6 +6,7 @@ import { useUserRole, SectionKey } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Loader2 } from "lucide-react";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
+import { esEntradaAlPanel, rutaDeInicio } from "@/lib/seccionInicio";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -62,7 +63,7 @@ const RUTAS_ENTRADA = new Set(["/", "/dashboard"]);
 
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
-  const { isAdmin, permissions, loading: roleLoading, verificado: rolVerificado = true } = useUserRole();
+  const { isAdmin, permissions, loading: roleLoading, verificado: rolVerificado = true, seccionInicio } = useUserRole();
   const { isSuperAdmin, loading: superAdminLoading, verificado: superVerificado = true } = useSuperAdmin();
   // Rol y permisos pueden venir de lo recordado en el dispositivo (09/11/2026, `lib/cachePermisos.ts`):
   // sirven para DEJAR PASAR al momento, pero no para echar a nadie hasta confirmarlos con el servidor
@@ -72,7 +73,19 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
   const location = useLocation();
 
   const denegado = useRef<string | null>(null);
+  // Entrada (location.key) en la que ya se decidió, con datos del servidor, quedarse: no se vuelve a mirar.
+  const inicioDecidido = useRef<string | null>(null);
   const loading = authLoading || roleLoading || superAdminLoading;
+
+  // Sección de inicio (11/11/2026, petición del dueño: «qué pestaña se le va a abrir por defecto cuando
+  // inician sesión»): al entrar, la elegida si puede verla (null = lo de siempre). Sin saberla aún (sin
+  // copia en el dispositivo ni respuesta del servidor) se espera a la lectura. El marco del panel
+  // (`requiredSection={[]}`, solo sesión) no decide: lo hace la página.
+  const esMarco = Array.isArray(requiredSection) && requiredSection.length === 0;
+  const enEntrada = !esMarco && esEntradaAlPanel(location.pathname, location.state) && inicioDecidido.current !== location.key;
+  const esperandoInicio = enEntrada && seccionInicio === undefined && !verificado;
+  const destinoInicio = enEntrada && !esperandoInicio ? rutaDeInicio(seccionInicio, permissions, isSuperAdmin) : null;
+  const vaAlInicio = destinoInicio !== null && destinoInicio !== location.pathname;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -83,6 +96,18 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
   // Verificar permisos de sección
   useEffect(() => {
     if (loading || !user) return;
+
+    // Al entrar, la sección de inicio del usuario manda (también sobre «lo de siempre» de abajo).
+    if (enEntrada) {
+      if (esperandoInicio) return;
+      if (vaAlInicio && destinoInicio) {
+        inicioDecidido.current = location.key;
+        navigate(destinoInicio, { replace: true });
+        return;
+      }
+      // Con lo recordado en el dispositivo aún puede cambiar al llegar lo del servidor.
+      if (verificado) inicioDecidido.current = location.key;
+    }
 
     const required = requiredSection ?? ROUTE_TO_SECTION[location.pathname];
     const sectionKeys = Array.isArray(required) ? required : required ? [required] : [];
@@ -117,9 +142,9 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
     if (!puedeVer && verificado) {
       rechazar();
     }
-  }, [user, loading, verificado, isAdmin, isSuperAdmin, permissions, location.pathname, location.key, requiredSection, navigate]);
+  }, [user, loading, verificado, isAdmin, isSuperAdmin, permissions, location.pathname, location.key, requiredSection, navigate, enEntrada, esperandoInicio, vaAlInicio, destinoInicio]);
 
-  if (loading) {
+  if (loading || esperandoInicio || vaAlInicio) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
