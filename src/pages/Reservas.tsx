@@ -421,7 +421,8 @@ export default function Reservas() {
             {puedeCrearReservas && (
               <Dialog open={openDialog} onOpenChange={cambiarDialogoNueva}>
                 <DialogTrigger asChild>
-                  <Button className="touch-hit h-9 shrink-0 bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-700 pointer-coarse:h-9">
+                  {/* Azul clarito (11/11/2026, dueño: «el botón de nueva reserva en azul clarito bonito»), con texto azul oscuro: se lee bien. */}
+                  <Button className="touch-hit h-9 shrink-0 border border-sky-300 bg-sky-100 font-semibold text-sky-900 shadow-sm hover:bg-sky-200 dark:border-sky-700 dark:bg-sky-900/60 dark:text-sky-50 dark:hover:bg-sky-900 pointer-coarse:h-9">
                     <Plus className="mr-2 h-4 w-4" />
                     Nueva Reserva
                   </Button>

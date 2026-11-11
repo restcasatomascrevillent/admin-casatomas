@@ -167,7 +167,7 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
         {onAnadirReserva && !buscando && !estado && (
           <Button
             type="button"
-            className="order-2 ml-auto h-11 gap-2 bg-emerald-600 px-4 text-base font-semibold text-white shadow-sm hover:bg-emerald-700 xl:order-3"
+            className="order-2 ml-auto h-11 gap-2 px-4 text-base border border-sky-300 bg-sky-100 font-semibold text-sky-900 shadow-sm hover:bg-sky-200 dark:border-sky-700 dark:bg-sky-900/60 dark:text-sky-50 dark:hover:bg-sky-900 xl:order-3"
             onClick={() => onAnadirReserva(fecha)}
           >
             <Plus className="h-5 w-5" /> Añadir reserva a este día
