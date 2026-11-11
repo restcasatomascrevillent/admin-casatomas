@@ -167,10 +167,16 @@ describe("ReservasHoy compacta · mismos datos en menos alto", () => {
     expect(screen.getByTestId("franja-ocupacion").className).not.toMatch(/(^|\s)bg-/);
   });
 
-  it("«Pendientes» sigue llevando a la lista filtrada", async () => {
+  it("«Pendientes» lleva a «Pendientes» de la Lista", async () => {
     await montar();
     fireEvent.click(within(screen.getByTestId("cifras-hoy")).getByRole("button", { name: /Pendientes/ }));
-    expect(screen.getByTestId("destino")).toHaveTextContent("/reservas?tab=reservas&status=pendiente&date=today");
+    expect(screen.getByTestId("destino")).toHaveTextContent("/reservas?tab=reservas&status=pendiente");
+  });
+
+  it("las demás cifras también se tocan (11/11/2026): «Activas» lleva al día en Reservas", async () => {
+    await montar();
+    fireEvent.click(within(screen.getByTestId("cifras-hoy")).getByRole("button", { name: /Activas/ }));
+    expect(screen.getByTestId("destino")).toHaveTextContent(/^\/reservas$/);
   });
 
   it("se lee: cifras principales de 20 px o más (24 en el %), y los nombres a 12 px", async () => {

@@ -104,3 +104,17 @@ export function cuentasMargenes(d: MargenesCarta): { enRojo: number; subeCoste: 
   const subeCoste = lista.filter((a) => a.banderas.includes("sube_coste")).length;
   return { enRojo, subeCoste };
 }
+
+/**
+ * Lo que cuesta y a cuánto se vende, sin IVA (11/11/2026, dueño: «añade algo más de información»):
+ * «coste 12,50 € · carta 25,00 €» o, al peso, «compra 20,00 €/kg · venta 45,00 €/kg». `null` sin datos.
+ */
+export function costeYVenta(a: ArticuloMargen): string | null {
+  const e = (n: number) => `${fmt(n, 2)} €`;
+  if (a.tipo === "peso") {
+    if (a.compraKg === null || a.ventaKg === null) return null;
+    return `compra ${e(a.compraKg)}/kg · venta ${e(a.ventaKg)}/kg`;
+  }
+  if (a.coste === null || a.venta === null) return null;
+  return `coste ${e(a.coste)} · venta ${e(a.venta)}`;
+}

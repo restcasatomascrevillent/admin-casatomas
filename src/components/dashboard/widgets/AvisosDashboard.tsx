@@ -4,20 +4,33 @@
 // el enlace a su origen. Solo los de las secciones que el usuario puede ver
 // (ver lib/dashboard/avisosDashboard.ts). Tocar uno lo marca leído y abre su
 // origen, como en la campana; «Ver todos» lleva a /avisos.
-import { useMemo } from "react";
+//
+// 11/11/2026 (dueño: «añade algo más de información y que se pueda clicar para hacer cosas»): cada aviso
+// enseña su detalle (`mensaje`: «Jorge Santos · 12/11 15:00 · 8 pers. · web»); el de una reserva abre su
+// ficha aquí mismo (Verificar, Confirmar, Cancelar, editar); «✓» lo da por revisado sin salir; las
+// etiquetas de sección filtran la lista y «Revisar todos» marca todos los que se ven.
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowUpRight, Bell, Info } from "lucide-react";
+import { ArrowUpRight, Bell, Check, CheckCheck, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNotificacionesDashboard, type NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { usePermisosFacturas } from "@/hooks/usePermisosFacturas";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { etiquetaDia, horaAviso, rutaDeAviso, TIPO_ICON } from "@/lib/avisos";
-import { avisosParaDashboard, ETIQUETA_SECCION_AVISO, seccionDeAviso, sinLeerPorSeccion, type PermisosAvisos } from "@/lib/dashboard/avisosDashboard";
+import {
+  avisosParaDashboard,
+  ETIQUETA_SECCION_AVISO,
+  seccionDeAviso,
+  sinLeerPorSeccion,
+  type PermisosAvisos,
+  type SeccionAviso,
+} from "@/lib/dashboard/avisosDashboard";
 import { cn } from "@/lib/utils";
 
 const FOCO = "rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-const MAX_FILAS = 12;
+const MAX_FILAS = 15;
 
 function usePermisosAvisos(): PermisosAvisos & { cargando: boolean } {
   const reservas = useCanAccessSection("reservas");
@@ -40,7 +53,9 @@ const cuando = (iso: string) => {
 };
 
 export function AvisosDashboard() {
-  const { notificaciones, loading, marcarLeida } = useNotificacionesDashboard();
+  const { notificaciones, loading, marcarLeida, marcarTodasLeidas } = useNotificacionesDashboard();
+  const { editarReserva, dialogoEdicion } = useEdicionReserva();
+  const [filtro, setFiltro] = useState<SeccionAviso | null>(null);
   const permisos = usePermisosAvisos();
   const navigate = useNavigate();
   const { cargando, reservas, facturas, rrss, superAdmin } = permisos;
@@ -49,10 +64,14 @@ export function AvisosDashboard() {
     [notificaciones, cargando, reservas, facturas, rrss, superAdmin],
   );
   const porSeccion = useMemo(() => sinLeerPorSeccion(avisos), [avisos]);
+  const visibles = useMemo(() => (filtro ? avisos.filter((n) => seccionDeAviso(n) === filtro) : avisos), [avisos, filtro]);
+  const haySinLeer = porSeccion.length > 0;
 
-  const abrir = (n: NotificacionDashboard, ruta: string) => {
+  // El aviso de una reserva abre su ficha aquí (se verifica o confirma sin cambiar de pantalla); el resto, su origen.
+  const abrir = (n: NotificacionDashboard, ruta: string | null) => {
     void marcarLeida(n.id);
-    navigate(ruta);
+    if (reservas && n.referencia_tipo === "reserva" && n.referencia_id) editarReserva(n.referencia_id);
+    else if (ruta) navigate(ruta);
   };
 
   return (
@@ -62,9 +81,20 @@ export function AvisosDashboard() {
           <Bell className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           Avisos
         </CardTitle>
-        <Link to="/avisos" className={cn("inline-flex min-h-8 items-center gap-1 px-1 text-xs font-medium text-primary hover:underline", FOCO)}>
-          Ver todos <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-        </Link>
+        <div className="flex items-center gap-1">
+          {haySinLeer && (
+            <button
+              type="button"
+              onClick={() => void marcarTodasLeidas()}
+              className={cn("inline-flex min-h-8 items-center gap-1 px-1 text-xs font-medium text-muted-foreground hover:text-foreground", FOCO)}
+            >
+              <CheckCheck className="h-3.5 w-3.5" aria-hidden="true" /> Revisar todos
+            </button>
+          )}
+          <Link to="/avisos" className={cn("inline-flex min-h-8 items-center gap-1 px-1 text-xs font-medium text-primary hover:underline", FOCO)}>
+            Ver todos <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+        </div>
       </CardHeader>
       <CardContent className="flex min-h-[160px] flex-1 flex-col gap-2 overflow-hidden px-4 pb-3 pt-0 sm:px-5">
         {loading || cargando ? (
@@ -76,49 +106,75 @@ export function AvisosDashboard() {
             {porSeccion.length > 0 && (
               <ul aria-label="Sin leer por sección" className="flex shrink-0 flex-wrap gap-1.5">
                 {porSeccion.map(({ seccion, n }) => (
-                  <li key={seccion} className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
-                    {ETIQUETA_SECCION_AVISO[seccion]} · {n}
+                  <li key={seccion}>
+                    <button
+                      type="button"
+                      aria-pressed={filtro === seccion}
+                      onClick={() => setFiltro((f) => (f === seccion ? null : seccion))}
+                      className={cn(
+                        "min-h-7 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors",
+                        filtro === seccion ? "bg-destructive text-destructive-foreground" : "bg-destructive/10 text-destructive hover:bg-destructive/20",
+                        FOCO,
+                      )}
+                    >
+                      {ETIQUETA_SECCION_AVISO[seccion]} · {n}
+                    </button>
                   </li>
                 ))}
               </ul>
             )}
             <ul aria-label="Últimos avisos" className="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto overscroll-contain pr-1">
-              {avisos.slice(0, MAX_FILAS).map((n) => {
+              {visibles.slice(0, MAX_FILAS).map((n) => {
                 const Icono = TIPO_ICON[n.tipo] || Info;
                 const ruta = rutaDeAviso(n);
+                const seAbre = !!ruta || (reservas && n.referencia_tipo === "reserva" && !!n.referencia_id);
                 const contenido = (
                   <>
                     <Icono className={cn("mt-0.5 h-4 w-4 shrink-0", n.leida ? "text-muted-foreground" : "text-destructive")} aria-hidden="true" />
                     <span className="min-w-0 flex-1">
                       <span className={cn("block truncate text-sm", !n.leida && "font-medium")}>{n.titulo}</span>
+                      {n.mensaje ? <span className="block truncate text-xs text-foreground/80">{n.mensaje}</span> : null}
                       <span className="block truncate text-xs text-muted-foreground">
                         {ETIQUETA_SECCION_AVISO[seccionDeAviso(n)]} · {cuando(n.created_at)}
-                        {n.leida ? " · Leído" : ""}
+                        {n.leida ? " · Revisado" : ""}
                       </span>
                     </span>
                   </>
                 );
                 return (
-                  <li key={n.id}>
-                    {ruta ? (
+                  <li key={n.id} className="flex items-start gap-1">
+                    {seAbre ? (
                       <button
                         type="button"
                         onClick={() => abrir(n, ruta)}
-                        className={cn("flex w-full items-start gap-2 py-1.5 text-left hover:bg-muted/50", FOCO)}
-                        aria-label={`Abrir: ${n.titulo}`}
+                        className={cn("flex min-w-0 flex-1 items-start gap-2 py-1.5 text-left hover:bg-muted/50", FOCO)}
+                        aria-label={`Abrir: ${n.titulo}${n.mensaje ? `, ${n.mensaje}` : ""}`}
                       >
                         {contenido}
                       </button>
                     ) : (
-                      <div className="flex items-start gap-2 py-1.5">{contenido}</div>
+                      <div className="flex min-w-0 flex-1 items-start gap-2 py-1.5">{contenido}</div>
+                    )}
+                    {!n.leida && (
+                      <button
+                        type="button"
+                        onClick={() => void marcarLeida(n.id)}
+                        className={cn("mt-1 flex h-9 w-9 shrink-0 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground", FOCO)}
+                        aria-label={`Marcar como revisado: ${n.titulo}`}
+                        title="Revisado"
+                      >
+                        <Check className="h-4 w-4" aria-hidden="true" />
+                      </button>
                     )}
                   </li>
                 );
               })}
+              {visibles.length === 0 && <li className="py-3 text-center text-sm text-muted-foreground">No hay avisos de esta sección.</li>}
             </ul>
           </>
         )}
       </CardContent>
+      {dialogoEdicion}
     </Card>
   );
 }

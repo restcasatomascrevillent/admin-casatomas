@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+import { ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useTodayConfirmedReservations } from "@/hooks/useDashboardStats";
@@ -41,6 +43,10 @@ export function CurvaReservasPorHora() {
     ? Math.max(...datos.map(d => d.comensales)) 
     : 0;
   const yMax = Math.ceil((maxComensales + 5) / 5) * 5;
+  // 11/11/2026 (dueño: «añade algo más de información y que se pueda clicar»): la hora punta y el total, y
+  // «Ver reservas» lleva al día en Reservas.
+  const pico = datos.reduce<(typeof datos)[number] | null>((m, d) => (!m || d.comensales > m.comensales ? d : m), null);
+  const totalPax = datos.reduce((s, d) => s + d.comensales, 0);
   const yTicks = Array.from({ length: yMax / 5 + 1 }, (_, i) => i * 5);
 
   // Sin esto, un fallo de consulta dibujaba una curva vacía como si no hubiera reservas.
@@ -53,7 +59,14 @@ export function CurvaReservasPorHora() {
   return (
     <Card className="flex h-full flex-col">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1 space-y-0 px-4 py-2.5 sm:px-5">
-        <CardTitle className="text-sm font-medium">Curva de Reservas por Hora</CardTitle>
+        <div className="min-w-0">
+          <CardTitle className="text-sm font-medium">Curva de Reservas por Hora</CardTitle>
+          {pico && (
+            <p className="text-xs text-muted-foreground" data-testid="curva-resumen">
+              Hora punta <b className="font-semibold text-foreground tabular-nums">{pico.hora}</b> · {pico.comensales} pax · {totalPax} pax confirmados hoy
+            </p>
+          )}
+        </div>
         <ul aria-label="Leyenda" className="flex items-center gap-3 text-xs text-muted-foreground">
           <li className="flex items-center gap-1.5">
             <span aria-hidden="true" className="h-1 w-4 rounded-full bg-primary" />
@@ -64,6 +77,12 @@ export function CurvaReservasPorHora() {
             Comensales
           </li>
         </ul>
+        <Link
+          to="/reservas"
+          className="inline-flex min-h-8 items-center gap-1 rounded-md px-1 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Ver reservas <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
       </CardHeader>
       <CardContent className="relative min-h-[120px] flex-1 p-0 sm:min-h-[150px]">
         {datos.length > 0 ? (
