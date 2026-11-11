@@ -360,3 +360,8 @@ verify_jwt = false
 # Solo desde el panel, con sesión de super admin (exigirSuperAdmin).
 [functions.resumen-logs-web]
 verify_jwt = true
+
+# Avisos por Telegram (20261126001000): la llaman pg_cron con x-ocr-secret y el super admin
+# con su JWT (exigirSuperAdmin). Ver supabase/functions/avisos-telegram/index.ts.
+[functions.avisos-telegram]
+verify_jwt = false
