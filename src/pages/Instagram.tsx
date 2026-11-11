@@ -225,6 +225,7 @@ export function ContenidoInstagram({ onIrMetricas }: { onIrMetricas?: () => void
       <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
         <Tabs value={pestanaVisible} onValueChange={setPestana} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
           <PestanasPagina
+            nivel={2}
             accionesDebajoEnMovil="lg"
             soloIconosEnMovil={asistenteMovilVisible}
             className={asistenteMovilVisible ? "mb-0" : undefined}

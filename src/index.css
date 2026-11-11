@@ -46,7 +46,8 @@ All colors MUST be HSL.
     --gold-deep: 38 59% 28%;
     --status-pending: 45 93% 47%;
     --status-pending-foreground: 206 11% 25%;
-    --status-verified: 210 100% 50%;
+    /* 42 % (Fase 3, 11/11/2026): con el 50 % de antes, el blanco de «Verificada» daba 3,8:1 (< 4,5 AA); ahora 5,2:1. */
+    --status-verified: 210 100% 42%;
     --status-verified-foreground: 0 0% 100%;
     --status-confirmed: 142 76% 28%;
     --status-confirmed-foreground: 0 0% 100%;
@@ -110,7 +111,8 @@ All colors MUST be HSL.
     --gold-deep: 38 70% 70%;
     --status-pending: 45 93% 47%;
     --status-pending-foreground: 0 0% 100%;
-    --status-verified: 210 100% 50%;
+    /* 42 % (Fase 3, 11/11/2026): con el 50 % de antes, el blanco de «Verificada» daba 3,8:1 (< 4,5 AA); ahora 5,2:1. */
+    --status-verified: 210 100% 42%;
     --status-verified-foreground: 0 0% 100%;
     --status-confirmed: 142 76% 36%;
     --status-confirmed-foreground: 0 0% 100%;
@@ -403,13 +405,7 @@ html {
   --border: 206 10% 45%;
   --muted-foreground: 25 13% 84%;
 }
-.reservas-contraste [role="tab"][data-state="active"] {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-.reservas-contraste [role="tab"][data-state="inactive"] {
-  color: hsl(var(--foreground));
-}
+/* La pestaña activa rellena ya es la de todo el panel (`PestanasPagina`, Fase 3, 11/11/2026): sin regla propia aquí. */
 /* Subpestañas de Reservas › Configuración (Reglas, Servicio, Mesas, Turnos, Plantillas email) a 16 px y
    44 px de alto (10/11/2026, petición del dueño: «letra más grande y botones claros»). */
 .reservas-contraste [data-testid="chips-subnivel"] [role="tab"] {
@@ -492,13 +488,7 @@ html {
   --border: 206 10% 45%;
   --muted-foreground: 25 13% 84%;
 }
-.carta-contraste [role="tab"][data-state="active"] {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-.carta-contraste [role="tab"][data-state="inactive"] {
-  color: hsl(var(--foreground));
-}
+/* La pestaña activa rellena ya es la de todo el panel (`PestanasPagina`, Fase 3, 11/11/2026): sin regla propia aquí. */
 .carta-contraste .text-\[10px\],
 .carta-contraste .text-\[11px\],
 .carta-contraste .text-\[12px\] {

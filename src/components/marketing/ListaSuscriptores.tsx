@@ -38,9 +38,11 @@ export function ListaSuscriptores({ activos, bajas, isLoading }: ListaSuscriptor
     // `data-[state=inactive]:hidden`: Radix deja la pestaña inactiva con el atributo `hidden` y un `flex` le gana.
     <Tabs defaultValue="activos" className="flex min-h-0 flex-1 flex-col">
       <PestanasPagina
+        nivel={2}
         pestanas={[
-          { valor: "activos", etiqueta: `Activos (${activos.length})` },
-          { valor: "bajas", etiqueta: `Dados de baja (${bajas.length})` },
+          // Fase 3: el número como contador (siempre visible y con el mismo estilo), no entre paréntesis en el texto.
+          { valor: "activos", etiqueta: "Activos", contador: activos.length, etiquetaContador: `${activos.length} activos` },
+          { valor: "bajas", etiqueta: "Dados de baja", contador: bajas.length, etiquetaContador: `${bajas.length} dados de baja` },
         ]}
       />
 

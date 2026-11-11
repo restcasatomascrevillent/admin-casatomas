@@ -70,6 +70,12 @@ interface PestanasPaginaProps {
   accionesAnchas?: boolean;
   /** Los iconos de las pestañas solo en pantallas muy anchas (≥ 2xl): deja sitio a `acciones`. */
   iconosSoloMuyAncho?: boolean;
+  /**
+   * Nivel de la barra (Fase 3): 1 = pestañas de página (activa rellena); 2 = segundo nivel dentro de otra pestaña o de
+   * un diálogo, con el aspecto de `ChipsSubnivel` (píldoras claras) pero con todo lo de esta barra (acciones,
+   * contadores, scroll con degradado). Así nunca hay dos barras iguales una encima de otra.
+   */
+  nivel?: 1 | 2;
   className?: string;
 }
 
@@ -77,7 +83,10 @@ interface PestanasPaginaProps {
 // sitio, pero NUNCA encogen hasta cortar el nombre («Stoc…», «Configuració…»): si no caben, la tira hace scroll
 // con el degradado del borde (antes `flex-1` las apretaba y el nombre salía cortado sin aviso).
 const CLASE_PESTANA =
-  "flex h-10 items-center gap-1 sm:gap-2 rounded-none border-b-2 border-transparent bg-transparent px-2 sm:px-3 text-muted-foreground shadow-none transition-colors hover:text-foreground pointer-coarse:min-h-11 data-[state=active]:border-gold data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none flex-auto shrink-0 sm:flex-none";
+  // Fase 3 (11/11/2026, «todas las pestañas con el mismo sistema»): la activa va RELLENA en pizarra, como pidió el
+  // dueño para Reservas y la Carta el 10/11 («que se vean los botones»); ahora en todo el panel. Inactivas con texto
+  // fuerte (no gris claro) y fondo suave al pasar el ratón. Antes: subrayado dorado y, en Reservas/Carta, CSS aparte.
+  "group flex h-10 items-center gap-1 sm:gap-2 rounded-md border-0 bg-transparent px-2.5 sm:px-3.5 text-foreground/80 shadow-none transition-colors hover:bg-muted hover:text-foreground pointer-coarse:min-h-11 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=active]:hover:bg-primary flex-auto shrink-0 sm:flex-none";
 
 /** Clases de `accionesDebajoEnMovil`: fila, tira de pestañas y acciones, según hasta dónde bajan los botones. */
 const DEBAJO = {
@@ -103,9 +112,16 @@ const DEBAJO = {
   },
 } as const;
 
+/** Pestaña de segundo nivel: el mismo aspecto que `ChipsSubnivel`. */
+const CLASE_PESTANA_NIVEL_2 =
+  "group flex h-9 items-center gap-1.5 rounded-full border border-transparent bg-transparent px-3.5 text-sm text-foreground/80 shadow-none transition-colors hover:bg-muted hover:text-foreground pointer-coarse:h-11 data-[state=active]:border-primary/30 data-[state=active]:bg-primary/10 data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-none shrink-0";
+
+const TONO_CONTADOR_NIVEL_2 = { primario: "bg-primary/10 text-primary", dorado: "bg-gold/10 text-gold-strong" } as const;
+
 const TONO_CONTADOR = {
-  primario: "bg-primary/10 text-primary",
-  dorado: "bg-gold/10 text-gold-strong",
+  // En la pestaña activa (rellena) el contador pasa a blanco translúcido para seguir leyéndose.
+  primario: "bg-primary/10 text-primary group-data-[state=active]:bg-primary-foreground/20 group-data-[state=active]:text-primary-foreground",
+  dorado: "bg-gold/10 text-gold-strong group-data-[state=active]:bg-gold group-data-[state=active]:text-white",
 } as const;
 
 /**
@@ -167,8 +183,10 @@ export function PestanasPagina({
   soloIconosEnMovil,
   accionesAnchas,
   iconosSoloMuyAncho,
+  nivel = 1,
   className,
 }: PestanasPaginaProps) {
+  const tonos = nivel === 2 ? TONO_CONTADOR_NIVEL_2 : TONO_CONTADOR;
   const { ref, bordes } = useBordesScroll();
   const debajo = accionesDebajoEnMovil ? DEBAJO[accionesDebajoEnMovil === true ? "sm" : accionesDebajoEnMovil] : null;
   const degradado = "pointer-events-none absolute inset-y-0 z-10 w-10 from-background via-background/70 to-transparent";
@@ -191,7 +209,7 @@ export function PestanasPagina({
       >
         <TabsList
           className={cn(
-            "-mb-px flex h-auto w-full justify-start gap-0 rounded-none bg-transparent p-0 sm:w-auto sm:gap-1 pointer-coarse:min-h-11",
+            "flex h-auto w-full justify-start gap-1 rounded-none bg-transparent p-0 pb-1.5 sm:w-auto pointer-coarse:min-h-11",
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           )}
         >
@@ -200,7 +218,7 @@ export function PestanasPagina({
               key={p.valor}
               value={p.valor}
               disabled={p.disabled}
-              className={cn(CLASE_PESTANA, soloIconosEnMovil && p.icono && "relative min-w-11 justify-center px-1 sm:justify-start sm:px-3")}
+              className={cn(nivel === 2 ? CLASE_PESTANA_NIVEL_2 : CLASE_PESTANA, soloIconosEnMovil && p.icono && "relative min-w-11 justify-center px-1 sm:justify-start sm:px-3")}
               data-tour={p.tour}
               title={soloIconosEnMovil && typeof p.etiqueta === "string" ? p.etiqueta : undefined}
             >
@@ -242,7 +260,7 @@ export function PestanasPagina({
               {p.contador != null && p.contador > 0 && (
                 <span
                   aria-label={p.etiquetaContador}
-                  className={cn(CLASE_CONTADOR, "ml-1", TONO_CONTADOR[p.tonoContador ?? "primario"], soloIconosEnMovil && p.icono && "hidden sm:inline-flex")}
+                  className={cn(CLASE_CONTADOR, "ml-1", tonos[p.tonoContador ?? "primario"], soloIconosEnMovil && p.icono && "hidden sm:inline-flex")}
                 >
                   {formatoContador(p.contador)}
                 </span>

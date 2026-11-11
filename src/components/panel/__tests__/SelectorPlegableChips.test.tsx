@@ -66,7 +66,7 @@ describe("ChipsSubnivel", () => {
     const chip = screen.getByRole("tab", { name: "Bebidas" });
     expect(chip.className).toContain("rounded-full");
     expect(chip.className).toContain("pointer-coarse:h-11");
-    expect(chip.className).toContain("data-[state=active]:bg-muted");
+    expect(chip.className).toContain("data-[state=active]:bg-primary/10");
     expect(chip.className).not.toContain("38,59%");
     expect(screen.getByRole("tab", { name: "Comida" })).toBeInTheDocument();
   });

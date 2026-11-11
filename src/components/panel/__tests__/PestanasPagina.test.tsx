@@ -21,12 +21,12 @@ function montar(props: Partial<React.ComponentProps<typeof PestanasPagina>> = {}
 }
 
 describe("PestanasPagina", () => {
-  it("pinta las pestañas, marca la activa con el subrayado dorado y cambia de contenido", () => {
+  it("pinta las pestañas, marca la activa rellena (Fase 3) y cambia de contenido", () => {
     montar();
     const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
     expect(tabs.map((t) => t.textContent)).toEqual(["Primera12", "Segunda", "Tercera3"]);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(tabs[0].className).toContain("data-[state=active]:border-gold");
+    expect(tabs[0].className).toContain("data-[state=active]:bg-primary");
     expect(screen.getByText("Contenido A")).toBeInTheDocument();
     fireEvent.mouseDown(tabs[1], { button: 0 });
     expect(tabs[1]).toHaveAttribute("aria-selected", "true");
@@ -154,5 +154,19 @@ describe("PestanasPagina · contadores grandes (Fase 3)", () => {
     );
     const c = screen.getByText("1.903");
     expect(c).toHaveClass("min-w-5", "tabular-nums", "justify-center");
+  });
+});
+
+describe("PestanasPagina · segundo nivel (Fase 3)", () => {
+  it("nivel 2: píldoras claras como los chips, no la pestaña rellena", () => {
+    render(
+      <Tabs value="a">
+        <PestanasPagina nivel={2} pestanas={[{ valor: "a", etiqueta: "Platos", contador: 5 }, { valor: "b", etiqueta: "Vinos" }]} />
+      </Tabs>,
+    );
+    const tab = screen.getByRole("tab", { name: /Platos/ });
+    expect(tab.className).toContain("rounded-full");
+    expect(tab.className).not.toContain("data-[state=active]:bg-primary ");
+    expect(screen.getByText("5").className).not.toContain("group-data-[state=active]");
   });
 });
