@@ -160,6 +160,13 @@ describe("alertas de Facturas", () => {
       expect(TIPOS_POR_FILTRO.facturas).toContain(t);
       expect(SECCIONES_AVISOS.facturas.tipos.find((x) => x.tipo === t)?.etiqueta).toBeTruthy();
     }
+    // Margen bajo (20261125110000): abre la factura que lo ha provocado; sección Facturas.
+    expect(rutaDeAviso({ tipo: "facturas_margen_bajo", referencia_tipo: "facturas_alerta", datos: { enlace: "?tab=compras&modo=documentos&doc=42" } })).toBe(
+      "/facturas?tab=compras&modo=documentos&doc=42",
+    );
+    expect(TIPO_ICON.facturas_margen_bajo).toBeTruthy();
+    expect(TIPOS_POR_FILTRO.facturas).toContain("facturas_margen_bajo");
+    expect(SECCIONES_AVISOS.facturas.tipos.find((x) => x.tipo === "facturas_margen_bajo")?.etiqueta).toBe("Margen bajo");
     const ahora = Date.parse("2026-11-07T10:00:00Z");
     expect(avisoCaducado({ caduca_en: "2026-11-07T09:00:00Z" }, ahora)).toBe(true);
     expect(avisoCaducado({ caduca_en: "2026-11-08T09:00:00Z" }, ahora)).toBe(false);

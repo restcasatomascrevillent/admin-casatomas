@@ -1,4 +1,4 @@
-import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Bot, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, PieChart, Receipt, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
+import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Percent, Bot, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, PieChart, Receipt, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { rutaAlerta, TIPOS_ALERTA_FACTURAS } from "@/lib/facturas/alertas";
 
@@ -27,11 +27,17 @@ export function rutaDeAviso(
   return null;
 }
 
+/**
+ * Margen bajo (20261125110000): un plato o vino cruza su límite de margen (restaurante, tienda o al
+ * peso). Lo crea el cron diario de Facturas; `datos.enlace` abre la factura que lo ha provocado.
+ */
+export const TIPO_MARGEN_BAJO = "facturas_margen_bajo";
+
 export type FiltroAvisos = "todos" | "sin_leer" | "reservas" | "facturas" | "otros";
 
 export const TIPOS_POR_FILTRO: Record<"reservas" | "facturas", string[]> = {
   reservas: ["solicitud_pendiente", "reserva_nueva", "reserva_cancelada", "reserva_sin_asignar"],
-  facturas: ["facturas_subida", "subida_precio", "original_sin_drive", ...TIPOS_ALERTA_FACTURAS.map((t) => t.tipo)],
+  facturas: ["facturas_subida", "subida_precio", "original_sin_drive", ...TIPOS_ALERTA_FACTURAS.map((t) => t.tipo), TIPO_MARGEN_BAJO],
 };
 
 export const FILTROS_AVISOS: { valor: FiltroAvisos; etiqueta: string }[] = [
@@ -99,6 +105,8 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   facturas_precio_baja: TrendingDown,
   facturas_precio_proveedor: TrendingUp,
   facturas_precio_pactado: Handshake,
+  // 20261125110000_avisos_margen_bajo
+  facturas_margen_bajo: Percent,
   // Centro de modelos de IA (cron diario ia-modelos-openai, 20261107500000).
   ia_modelo_nuevo: Bot,
   ia_modelo_retirado: AlertTriangle,
@@ -130,6 +138,7 @@ export const SECCIONES_AVISOS: Record<SeccionAvisos, { titulo: string; tipos: { 
       { tipo: "subida_precio", etiqueta: "Subidas de precio" },
       { tipo: "original_sin_drive", etiqueta: "Originales sin Drive" },
       ...TIPOS_ALERTA_FACTURAS,
+      { tipo: TIPO_MARGEN_BAJO, etiqueta: "Margen bajo" },
     ],
   },
 };
