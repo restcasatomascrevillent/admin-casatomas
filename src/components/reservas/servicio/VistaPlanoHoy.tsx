@@ -116,7 +116,7 @@ import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { useFijarMesa } from "@/hooks/useMesaFijada";
 import { mesasPorReservaDe, useMovimientoReservaServicio } from "@/hooks/useMovimientoReservaServicio";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { useIsBelow, useIsMobile, useIsCoarsePointer } from "@/hooks/use-mobile";
+import { useIsBelow, useIsMobile } from "@/hooks/use-mobile";
 import { useHoyLocal } from "@/hooks/useHoyLocal";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { SIN_ASIGNAR, columnaDeReserva, construirColumnas, esSinAsignar } from "@/lib/reservas/columnasServicio";
@@ -1470,9 +1470,12 @@ export function VistaPlanoHoy({
                 <div className="flex min-w-0 items-center gap-2">
                   {/* Fijo (escritorio): leyenda compacta en una línea, siempre entera. */}
                   {!esMovil && listo && (fijo ? <div className="min-w-0 flex-1" data-testid="leyenda-plano">{leyendaCompacta}</div> : <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">{leyendaEn(true)}</div>)}
+                  {/* Sin «Por sentar» en Reservas de tablet y escritorio (11/11/2026, petición del dueño: la lista de la
+                      izquierda ya dice quién falta por sentar). */}
+                  {!fijo && (
                   <Button
                     variant="outline"
-                    className={cn("h-11 justify-between", fijo ? "gap-2 px-3" : "gap-3", esMovil ? "w-full" : "ml-auto shrink-0")}
+                    className={cn("h-11 justify-between gap-3", esMovil ? "w-full" : "ml-auto shrink-0")}
                     disabled={!listo}
                     onClick={() => setPendientesAbiertos(true)}
                     aria-label={
@@ -1483,9 +1486,10 @@ export function VistaPlanoHoy({
                   >
                     <span>Por sentar</span>
                     <span className="text-[13px] tabular-nums text-muted-foreground">
-                      {listo ? (fijo ? `${pendientesSala.length} · ${sinSala.length}` : `${pendientesSala.length} sin mesa · ${sinSala.length} sin sala`) : "…"}
+                      {listo ? `${pendientesSala.length} sin mesa · ${sinSala.length} sin sala` : "…"}
                     </span>
                   </Button>
+                  )}
                 </div>
               ) : (
                 <aside
@@ -1625,10 +1629,9 @@ export function VistaPlanoHoy({
 }
 
 /**
- * Plano fijo de escritorio: pasar de sala. 11/11/2026, petición del dueño («en la tablet, que las flechas de las
- * mesas las elimine ya que es táctil y ponga flechas abajo más disimuladas en caso de no haber táctil»): con el
- * dedo como puntero no hay flechas (se desliza sobre las mesas, `gestosSala`); con ratón, dos flechas pequeñas
- * debajo del plano con el nombre de la sala. Las teclas ← → siguen valiendo. Sin `activo` (o con una sola sala)
+ * Plano fijo de escritorio: pasar de sala. 11/11/2026, petición del dueño: fuera las flechas grandes de los lados;
+ * dos flechas pequeñas y discretas debajo del plano, con el nombre de la sala, para quien no tenga pantalla táctil
+ * (con el dedo también se desliza sobre las mesas, `gestosSala`). Las teclas ← → siguen valiendo. Sin `activo` (o con una sola sala)
  * deja el plano tal cual.
  */
 function ConFlechasSala({
@@ -1646,15 +1649,7 @@ function ConFlechasSala({
   onSiguiente: () => void;
   children: ReactNode;
 }) {
-  const tactil = useIsCoarsePointer();
   if (!activo) return <>{children}</>;
-  if (tactil) {
-    return (
-      <div className="grid min-h-0 min-w-0" data-testid="plano-fijo" data-tactil="">
-        {children}
-      </div>
-    );
-  }
   return (
     <div className="flex min-h-0 min-w-0 flex-col gap-1" data-testid="plano-fijo">
       <div className="grid min-h-0 min-w-0 flex-1">{children}</div>

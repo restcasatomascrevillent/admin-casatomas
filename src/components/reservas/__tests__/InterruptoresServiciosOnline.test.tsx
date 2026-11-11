@@ -30,16 +30,14 @@ describe("Cerrar comida / Cerrar cena", () => {
     puedeEditar = true;
   });
 
-  it("pregunta antes de cerrar y solo cierra al confirmar", () => {
+  it("un toque cierra, sin ventana de confirmación (11/11/2026)", () => {
     pintar();
     fireEvent.click(screen.getByRole("button", { name: /Cerrar cena/ }));
-    expect(screen.getByText(/¿Cerrar las reservas online de la cena del martes 10\/11\?/)).toBeTruthy();
-    expect(cambiar).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Sí, cerrar" }));
     expect(cambiar).toHaveBeenCalledWith("cena", true);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
-  it("compacta (móvil): botones y ayuda (i) en una sola fila, sin saltar de línea", () => {
+  it("compacta (móvil): los dos botones en una sola fila y sin ayuda (i)", () => {
     render(
       <TooltipProvider>
         <InterruptoresServiciosOnline fecha="2026-11-10" compacta />
@@ -49,22 +47,13 @@ describe("Cerrar comida / Cerrar cena", () => {
     expect(fila).toHaveClass("flex-nowrap");
     expect(fila).not.toHaveClass("flex-wrap");
     expect(screen.getByRole("button", { name: /Cerrar comida/ })).toHaveClass("min-h-11", "min-w-0");
-    expect(screen.getByRole("button", { name: "Qué hace cerrar un servicio" })).toHaveClass("h-11", "shrink-0");
+    expect(screen.queryByRole("button", { name: "Qué hace cerrar un servicio" })).toBeNull();
   });
 
-  it("cancelar no cambia nada", () => {
-    pintar();
-    fireEvent.click(screen.getByRole("button", { name: /Cerrar comida/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    expect(cambiar).not.toHaveBeenCalled();
-  });
-
-  it("cerrado: botón «Comida cerrada» y pregunta por volver a abrir", () => {
+  it("cerrado: botón «Comida cerrada» y un toque la vuelve a abrir", () => {
     bloqueados = ["comida"];
     pintar();
     fireEvent.click(screen.getByRole("button", { name: /Comida cerrada/ }));
-    expect(screen.getByText(/¿Volver a abrir las reservas online de la comida/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Sí, abrir" }));
     expect(cambiar).toHaveBeenCalledWith("comida", false);
   });
 

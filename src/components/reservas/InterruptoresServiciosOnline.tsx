@@ -1,27 +1,8 @@
-import { useState } from "react";
 import { textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
 import { textoZona } from "@/lib/reservas/zonaPreferida";
 import { servicioComidaDeReserva } from "@/lib/reservas/menuDelDia";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
-import { Info, Lock, LockOpen } from "lucide-react";
+import { Lock, LockOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
@@ -52,18 +33,9 @@ const TURNOS: Array<{
   },
 ];
 
-function fechaLegible(fecha: string): string {
-  try {
-    return format(parseISO(fecha), "EEEE dd/MM", { locale: es });
-  } catch {
-    return fecha;
-  }
-}
-
 /**
  * Dos botones para el día que se está viendo en Reservas: «Cerrar comida» / «Cerrar cena» (el día elegido con las
- * flechas, 11/11/2026). Al pulsar
- * pregunta antes de cerrar (o de volver a abrir). Cerrado = botón rojo relleno «Comida cerrada».
+ * flechas, 11/11/2026). Un toque cierra o vuelve a abrir, sin preguntar (11/11/2026). Cerrado = botón rojo relleno «Comida cerrada».
  * Solo afecta a la web y al teléfono automático. Sin «Editar» en Reservas se ven pero no se tocan.
  */
 export function InterruptoresServiciosOnline({
@@ -73,16 +45,13 @@ export function InterruptoresServiciosOnline({
 }: {
   fecha: string;
   className?: string;
-  /** Móvil (10/11/2026): los dos botones y la ayuda (i) en UNA fila, sin saltar de línea (antes, a 375 px, la (i)
-   * se quedaba sola en una fila entera). Si aun así no cabe, el texto de los botones se corta con «…». */
+  /** Móvil (10/11/2026): los dos botones en UNA fila, sin saltar de línea. Si no cabe, el texto se corta con «…».
+   * Sin la ayuda (i) desde el 11/11/2026 (petición del dueño): la explicación va en el `title` de cada botón. */
   compacta?: boolean;
 }) {
   const { estaBloqueado, cambiar, disponible, guardando } =
     useServiciosBloqueados(fecha);
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
-  const [preguntando, setPreguntando] = useState<TurnoBloqueable | null>(null);
-  const activo = TURNOS.find((t) => t.turno === preguntando) ?? null;
-  const cerrando = activo ? !estaBloqueado(activo.turno) : false;
   return (
     <div
       className={cn("flex items-center", compacta ? "flex-nowrap gap-1.5" : "flex-wrap gap-2", className)}
@@ -100,9 +69,11 @@ export function InterruptoresServiciosOnline({
             data-testid={`boton-servicio-online-${turno}`}
             aria-pressed={bloqueado}
             disabled={!disponible || !puedeEditar || guardando}
-            onClick={() => setPreguntando(turno)}
+            // Sin ventana de confirmación (11/11/2026, petición del dueño): un toque cierra o vuelve a abrir.
+            onClick={() => cambiar(turno, !bloqueado)}
+            title={AYUDA}
           >
-            {/* En el móvil (compacta) sin candado: así «Comida cerrada» cabe entero junto al (i). */}
+            {/* En el móvil (compacta) sin candado: así «Comida cerrada» cabe entero. */}
             {compacta ? null : bloqueado ? (
               <Lock className="h-4 w-4" aria-hidden />
             ) : (
@@ -112,53 +83,6 @@ export function InterruptoresServiciosOnline({
           </Button>
         );
       })}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label="Qué hace cerrar un servicio"
-              className={cn("inline-flex h-11 shrink-0 items-center justify-center rounded-md text-muted-foreground", compacta ? "w-10" : "w-11")}
-            >
-              <Info className="h-4 w-4" aria-hidden />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">{AYUDA}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      <AlertDialog
-        open={!!activo}
-        onOpenChange={(abierto) => !abierto && setPreguntando(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {cerrando
-                ? `¿Cerrar las reservas online de la ${activo?.servicio} del ${fechaLegible(fecha)}?`
-                : `¿Volver a abrir las reservas online de la ${activo?.servicio} del ${fechaLegible(fecha)}?`}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {cerrando
-                ? AYUDA
-                : "La web y el teléfono automático volverán a aceptar reservas para ese servicio."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="min-h-11">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className={cn(
-                "min-h-11",
-                cerrando &&
-                  "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-              )}
-              onClick={() => activo && cambiar(activo.turno, cerrando)}
-            >
-              {cerrando ? "Sí, cerrar" : "Sí, abrir"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
