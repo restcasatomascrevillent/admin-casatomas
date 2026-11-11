@@ -138,12 +138,12 @@ describe("ListaComoLibro · pasar hojas", () => {
 });
 
 describe("ListaComoLibro · añadir y arrastrar sin abrir (10/11/2026)", () => {
-  it("«Añadir reserva a este día» pasa la fecha de la HOJA que se ve", () => {
+  it("«Añadir reserva a este día» (en la barra, 11/11/2026) pasa la fecha de la HOJA que se ve", () => {
     const onAnadirReserva = vi.fn();
     render(<ListaComoLibro onAnadirReserva={onAnadirReserva} />);
     fireEvent.click(screen.getByRole("button", { name: "Hoja siguiente" }));
-    const boton = within(hojas()[0]).getByRole("button", { name: "Añadir reserva a este día" });
-    expect(boton).toHaveClass("bg-emerald-600", "h-12");
+    const boton = screen.getByRole("button", { name: "Añadir reserva a este día" });
+    expect(boton).toHaveClass("bg-emerald-600", "h-11");
     fireEvent.click(boton);
     expect(onAnadirReserva).toHaveBeenCalledWith(pasarHoja(hoy, 1));
   });
@@ -288,6 +288,12 @@ describe("ListaComoLibro · buscador y «Pendientes»", () => {
     fireEvent.click(screen.getByRole("button", { name: /Ver el día/ }));
     expect(titulo()).toHaveTextContent(tituloHoja("2025-03-14"));
     expect(screen.getByRole("searchbox")).toHaveValue("");
+  });
+
+  it("buscando no sale «Añadir reserva a este día» (no hay hoja a la vista)", () => {
+    render(<ListaComoLibro onAnadirReserva={vi.fn()} />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "zz" } });
+    expect(screen.queryByRole("button", { name: "Añadir reserva a este día" })).toBeNull();
   });
 
   it("sin resultados lo dice", () => {
