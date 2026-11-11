@@ -1239,7 +1239,10 @@ export function VistaPlanoHoy({
           <div className={cn("flex min-w-0 items-center gap-2", fijo && "flex-wrap gap-y-1")}>
             {fijo && sala ? (
               <>
-                <h2 className="flex shrink-0 items-center gap-2 text-xl font-bold lg:text-2xl" data-testid="plano-fijo-sala" aria-live="polite">
+                {/* 11/11/2026 (dueño: «que se vea como en Comedor, cena y reservas bajo»): el nombre SIEMPRE en su
+                    propia línea; debajo, a la izquierda, el turno y las reservas y, a la derecha, los botones. Igual en
+                    todas las salas, quepa o no en una fila. */}
+                <h2 className="flex basis-full items-center gap-2 text-xl font-bold lg:text-2xl" data-testid="plano-fijo-sala" aria-live="polite">
                   {sala.privada && <Lock className="h-5 w-5 shrink-0" aria-hidden="true" />}
                   <span className="whitespace-nowrap" data-testid="plano-fijo-nombre">{sala.title}</span>
                   <span className="shrink-0 text-lg font-semibold tabular-nums text-muted-foreground">
