@@ -31,7 +31,7 @@ export function AjustesContestadorForm({ ajustes, estado, onCambio }: Props) {
   const cambiar = <K extends keyof Ajustes>(k: K, v: Ajustes[K]) => setF({ ...f, [k]: v });
   const estrella = (n: number, on: boolean) =>
     cambiar("autorespuesta_estrellas", (on ? [...f.autorespuesta_estrellas, n] : f.autorespuesta_estrellas.filter((x) => x !== n)).filter((x, i, a) => a.indexOf(x) === i).sort());
-  const googleListo = !!estado?.google.conectada && !!estado.google.ubicacion;
+  const googleListo = !!estado?.google?.conectada && !!estado?.google?.ubicacion;
 
   const guardar = async () => {
     setGuardando(true);

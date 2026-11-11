@@ -95,7 +95,7 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, sin
     <Card
       id={`tarjeta-${servicio.proveedor}`}
       tabIndex={-1}
-      className="flex min-w-0 scroll-mt-4 flex-col outline-none focus:ring-2 focus:ring-[hsl(38,59%,45%)] focus:ring-offset-2 focus:ring-offset-background"
+      className="flex min-w-0 scroll-mt-4 flex-col outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2 focus:ring-offset-background"
       aria-labelledby={idTitulo}
       role="article"
     >

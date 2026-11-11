@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
+import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { FiltrosAuditoria } from "@/components/auditoria/FiltrosAuditoria";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ScrollText, Loader2, Cog } from "lucide-react";
 import {
   useAuditLog,
@@ -242,11 +243,15 @@ export default function SuperAdminAuditoria() {
         <Card className="flex min-h-48 min-w-0 flex-1 flex-col">
           <Tabs value={vista} onValueChange={setVista} className="flex min-h-0 flex-1 flex-col">
             <CardHeader className="shrink-0 gap-3 border-b bg-muted/20 p-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0 lg:px-4">
-              <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:self-start">
-                <TabsTrigger value="lista">Lista</TabsTrigger>
-                <TabsTrigger value="mes">Por mes</TabsTrigger>
-                <TabsTrigger value="dia">Por día</TabsTrigger>
-              </TabsList>
+              <ChipsSubnivel
+                aria-label="Vista"
+                className="sm:self-start"
+                chips={[
+                  { valor: "lista", etiqueta: "Lista" },
+                  { valor: "mes", etiqueta: "Por mes" },
+                  { valor: "dia", etiqueta: "Por día" },
+                ]}
+              />
               {vista === "lista" && (
                 <div className="flex items-center justify-between gap-3 lg:ml-auto">
                   <p className="text-sm text-muted-foreground">

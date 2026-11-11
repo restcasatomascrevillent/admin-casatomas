@@ -33,6 +33,8 @@ vi.mock("@/hooks/useMesas", () => ({ useMesas: () => ({ data: [] }) }));
 vi.mock("@/hooks/useConfiguracionReservas", () => ({ useConfiguracionReservas: () => ({ data: undefined }) }));
 vi.mock("@/hooks/useAlDiaMovil", () => ({ useAlDiaMovil: () => undefined }));
 vi.mock("@/hooks/useSalaCerradaServicio", () => ({ useSalaCerradaServicio: () => ({ cerrada: false }) }));
+// El botón de Avisos (con su modal y su ficha) se prueba aparte; aquí solo importa el orden de la fila.
+vi.mock("@/components/avisos/BotonAvisosSeccion", () => ({ BotonAvisosSeccion: () => <button type="button">Avisos</button> }));
 vi.mock("@/hooks/useAjustesMesaServicio", () => ({
   CLAVE_AJUSTES_MESA: "ajustes",
   useAjustesMesaDia: () => ({ data: [] }),

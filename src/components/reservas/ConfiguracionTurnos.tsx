@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { leerHorasFijasTexto, textoHorasFijas } from "@/lib/reservas/horasFijas";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Plus, Pencil, Trash2, Clock, TrendingUp, Settings, Layers } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -514,13 +515,13 @@ export function ConfiguracionTurnos() {
                     render={({ field }) => (
                       <FormItem>
                         <Tabs value={field.value} onValueChange={(v) => field.onChange(v as "legacy" | "avanzado")}>
-                          <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="legacy">Modo simple</TabsTrigger>
-                            <TabsTrigger value="avanzado">
-                              <Layers className="h-3.5 w-3.5 mr-1.5" />
-                              Escalera avanzada
-                            </TabsTrigger>
-                          </TabsList>
+                          <ChipsSubnivel
+                            aria-label="Modo de la escalera"
+                            chips={[
+                              { valor: "legacy", etiqueta: "Modo simple" },
+                              { valor: "avanzado", etiqueta: "Escalera avanzada", icono: <Layers /> },
+                            ]}
+                          />
 
                           <TabsContent value="legacy" className="space-y-4 pt-4">
                             <FormField

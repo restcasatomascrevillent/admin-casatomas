@@ -8,6 +8,8 @@ import { useIsCompactNav, useIsMobile } from "@/hooks/use-mobile";
 import { NavAutoCollapse, defaultSidebarOpen } from "@/components/NavAutoCollapse";
 import { PrecargaRecorte } from "@/components/carta/recorte/PrecargaRecorte";
 import { VersionPanel } from "@/components/panel/VersionPanel";
+import { useLocation } from "react-router-dom";
+import { OPCIONES_INICIO } from "@/lib/seccionInicio";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -66,6 +68,8 @@ function OpcionesEnMarco({
 
 /** Menú lateral + cabecera de tablet/móvil + `<main>`. Lo pinta `DashboardLayout` suelto o `PanelLayout` una vez. */
 export function MarcoPanel({ children, fixedHeight = false, sinCabeceraMovil = false }: DashboardLayoutProps) {
+  const { pathname } = useLocation();
+  const seccionActual = pathname === "/" ? "Dashboard" : OPCIONES_INICIO.find((o) => pathname === o.ruta || pathname.startsWith(`${o.ruta}/`))?.titulo ?? "Contenido";
   // Por debajo de 1024px (`useIsCompactNav`: iPad vertical 768/810/820, Android
   // 800, teléfonos) el menú lateral se renderiza como panel deslizante (Sheet)
   // y SOLO se puede abrir desde fuera de él: sin esta barra no habría manera de
@@ -125,7 +129,10 @@ export function MarcoPanel({ children, fixedHeight = false, sinCabeceraMovil = f
               <CentroNotificaciones className="shrink-0" />
             </header>
           )}
+          {/* Fase 3 (11/11/2026): las páginas no llevan título visible (dueño, 06/10: «perdemos mucho espacio vertical»);
+              la región principal se nombra con la sección para el lector de pantalla. */}
           <main
+            aria-label={seccionActual}
             className={`flex-1 min-w-0 p-3 sm:p-6 ${
               // Sin la barra superior, el contenido baja lo que ocupe la barra del sistema (notch).
               sinCabecera ? "pt-[calc(0.75rem+env(safe-area-inset-top))] sm:pt-[calc(1.5rem+env(safe-area-inset-top))] " : ""

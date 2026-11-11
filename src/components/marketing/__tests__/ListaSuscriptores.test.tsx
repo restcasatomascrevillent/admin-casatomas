@@ -27,8 +27,8 @@ const baja: SuscriptorNewsletter = {
 describe("ListaSuscriptores", () => {
   it("muestra los contadores de activos y dados de baja", () => {
     render(<ListaSuscriptores activos={[activo]} bajas={[baja]} isLoading={false} />);
-    expect(screen.getByRole("tab", { name: "Activos (1)" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Dados de baja (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Activos\s*1 activos$/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Dados de baja\s*1 dados de baja$/ })).toBeInTheDocument();
     expect(screen.getByText("activo@ejemplo.es")).toBeInTheDocument();
     expect(screen.getByText(/Ana · Se apuntó por: Reserva web/)).toBeInTheDocument();
     // Lista plana: una fila por suscriptor, sin tarjetas.
@@ -37,7 +37,7 @@ describe("ListaSuscriptores", () => {
 
   it("los dados de baja muestran fecha y motivo, y no hay botón para reactivarlos", () => {
     render(<ListaSuscriptores activos={[activo]} bajas={[baja]} isLoading={false} />);
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Dados de baja (1)" }));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Dados de baja\s*1 dados de baja$/ }));
     expect(screen.getByText("baja@ejemplo.es")).toBeInTheDocument();
     expect(screen.getByText("Marcó el correo como spam")).toBeInTheDocument();
     expect(screen.getByText(/^Baja: /)).toBeInTheDocument();
