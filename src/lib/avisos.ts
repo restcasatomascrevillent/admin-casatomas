@@ -9,7 +9,7 @@ export function rutaDeAviso(
   // Alertas de Facturas (20261107300000): cada una trae su enlace del panel (documento, proveedor, mes).
   if (n.referencia_tipo === "facturas_alerta") return rutaAlerta(n.datos) ?? "/facturas?tab=chat";
   // Reserva sin sala o mesa dentro de la ventana: pestaña «Asignación» de /reservas.
-  if (n.tipo === "reserva_sin_asignar") return "/reservas?tab=asignacion";
+  if (n.tipo === "reserva_sin_asignar") return "/reservas?tab=reservas";
   // Reserva nueva o cancelada (20261122160000): la lista de reservas.
   if (n.referencia_tipo === "reserva" && (n.tipo === "reserva_nueva" || n.tipo === "reserva_cancelada")) return "/reservas?tab=reservas";
   // Las solicitudes viven en la pestaña unificada «Reservas», filtradas por «Solicitudes sin resolver».

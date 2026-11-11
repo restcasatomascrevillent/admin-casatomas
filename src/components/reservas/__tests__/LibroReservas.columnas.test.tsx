@@ -7,7 +7,6 @@
  *   · «con el táctil se pueda pasar arrastrando»: SOLO en la lista de la hoja, nunca en el lienzo de escribir.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { forwardRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { pasarHoja, tituloHoja } from "@/lib/reservas/libroReservas";
@@ -19,22 +18,11 @@ vi.mock("@/hooks/useReservasServicioDia", () => ({
   useReservasServicioDia: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
 }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data: [] }) }));
-vi.mock("@/hooks/useBorradoresManuscritos", () => ({
-  useBorradoresPendientes: () => ({ data: [] }),
-  useGuardarBorrador: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useResolverBorrador: () => ({ mutate: vi.fn(), isPending: false }),
-}));
-vi.mock("@/hooks/useGastoLecturaManuscrita", () => ({ useGastoLecturaManuscrita: () => ({ data: null }) }));
 vi.mock("@/components/reservas/FormularioReserva", () => ({
   FormularioReserva: (props: { datosPreseleccionados?: { fecha?: Date } }) => {
     h.formulario(props);
     return <div data-testid="formulario" />;
   },
-}));
-vi.mock("@/components/reservas/libro/LienzoManuscrito", () => ({
-  LienzoManuscrito: forwardRef(function Lienzo(_p, _ref) {
-    return <div data-testid="lienzo" style={{ touchAction: "none" }} />;
-  }),
 }));
 
 import { LibroReservas } from "@/components/reservas/libro/LibroReservas";
@@ -71,11 +59,6 @@ function pantalla(ancho: boolean) {
 const original = window.matchMedia;
 beforeEach(() => {
   h.formulario.mockClear();
-  try {
-    localStorage.setItem("reservas.modoAlta", "lapiz");
-  } catch {
-    /* sin almacenamiento */
-  }
 });
 afterEach(() => {
   window.matchMedia = original;
@@ -96,7 +79,6 @@ describe("LibroReservas · dos columnas en horizontal, una en vertical", () => {
   it("en ancho, el formulario va en una columna con su propio scroll", () => {
     pantalla(true);
     montar();
-    fireEvent.click(screen.getByRole("button", { name: /Formulario/ }));
     const caja = screen.getByTestId("formulario").parentElement!.parentElement!;
     expect(caja).toHaveClass("formulario-una-columna", "overflow-y-auto", "flex-1");
     // Sin relleno inferior: con él, por debajo del «Crear Reserva» fijo asomaban los campos.
@@ -104,21 +86,13 @@ describe("LibroReservas · dos columnas en horizontal, una en vertical", () => {
     expect(caja).not.toHaveClass("pb-6");
   });
 
-  it("en ancho, el renglón del lápiz ocupa el alto de la columna (mínimo 280 px) con los botones abajo", () => {
+  it("sin lápiz (11/11/2026): solo el formulario, sin elegir cómo apuntar", () => {
     pantalla(true);
     montar();
-    expect(screen.getByTestId("zona-lapiz")).toHaveClass("flex", "flex-col", "flex-1");
-    const caja = screen.getByTestId("caja-lienzo");
-    expect(caja).toHaveClass("flex-1", "min-h-[280px]");
-    expect(caja).not.toHaveClass("h-[clamp(11rem,32dvh,20rem)]");
-    // Los botones, después del renglón.
-    expect(caja.nextElementSibling!.textContent).toMatch(/Borrar.*Deshacer.*Guardar sin interpretar.*Interpretar/);
-  });
-
-  it("apilado, el renglón del lápiz conserva su alto de siempre", () => {
-    pantalla(false);
-    montar();
-    expect(screen.getByTestId("caja-lienzo")).toHaveClass("h-[clamp(11rem,32dvh,20rem)]");
+    expect(screen.getByTestId("formulario")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Escribir con lápiz/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("zona-lapiz")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Por pasar a limpio/)).not.toBeInTheDocument();
   });
 
   it("en estrecho (o sin matchMedia): apilado como antes", () => {
@@ -142,8 +116,7 @@ describe("LibroReservas · solo apuntar (desde «Añadir reserva a este día»)"
     expect(screen.getByTestId("lista-hoja-libro")).toHaveClass("hidden");
     expect(screen.getByTestId("columna-apuntar")).toHaveClass("flex-1");
     expect(screen.getByTestId("lista-hoja-libro").parentElement).toHaveAttribute("data-columnas", "1");
-    // El lienzo, a todo el alto; el día sigue a la vista y se puede cambiar.
-    expect(screen.getByTestId("caja-lienzo")).toHaveClass("flex-1", "min-h-[280px]");
+    // El día sigue a la vista y se puede cambiar.
     expect(fechaVisible()).toHaveTextContent(tituloHoja(FECHA));
     fireEvent.click(screen.getByRole("button", { name: "Día siguiente" }));
     expect(fechaVisible()).toHaveTextContent(tituloHoja(pasarHoja(FECHA, 1)));
@@ -151,7 +124,6 @@ describe("LibroReservas · solo apuntar (desde «Añadir reserva a este día»)"
 
   it("el formulario centrado en una columna cómoda (máx. 48rem)", () => {
     montar({ fechaInicial: FECHA, soloApuntar: true });
-    fireEvent.click(screen.getByRole("button", { name: /Formulario/ }));
     const centro = screen.getByTestId("formulario").parentElement!;
     expect(centro).toHaveClass("mx-auto", "max-w-3xl");
     expect(centro.parentElement).toHaveClass("formulario-una-columna", "flex-1");
@@ -170,7 +142,6 @@ describe("LibroReservas · abrir en un día y pasar hojas arrastrando", () => {
   it("con `fechaInicial` abre en esa hoja y el formulario trae ese día", () => {
     montar({ fechaInicial: FECHA });
     expect(fechaVisible()).toHaveTextContent(tituloHoja(FECHA));
-    fireEvent.click(screen.getByRole("button", { name: /Formulario/ }));
     const props = h.formulario.mock.calls.at(-1)![0] as { datosPreseleccionados: { fecha: Date } };
     expect(props.datosPreseleccionados.fecha.getDate()).toBe(20);
   });
@@ -180,11 +151,5 @@ describe("LibroReservas · abrir en un día y pasar hojas arrastrando", () => {
     arrastrar(screen.getByTestId("lista-hoja-libro"), 400, 250);
     expect(fechaVisible()).toHaveTextContent(tituloHoja(pasarHoja(FECHA, 1)));
     expect(screen.getByTestId("lista-hoja-libro")).toHaveClass("touch-pan-y", "overflow-x-hidden");
-  });
-
-  it("arrastrar en el LIENZO de escribir NO pasa de día", () => {
-    montar({ fechaInicial: FECHA });
-    arrastrar(screen.getByTestId("lienzo"), 400, 100);
-    expect(fechaVisible()).toHaveTextContent(tituloHoja(FECHA));
   });
 });
