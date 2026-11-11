@@ -29,7 +29,47 @@ export interface MensajeChat {
   persistido?: boolean;
   /** Gráficas que acompañan a la respuesta (columna `adjuntos` de la BD). */
   adjuntos?: AdjuntoChat[];
+  /**
+   * Herramientas que usó la IA para esta respuesta y modelo (lo devuelve
+   * chat-facturas en `traza`). Se guarda en `adjuntos` como { tipo: "contexto" }
+   * para que el siguiente turno sepa de qué se hablaba, y viaja con el 👍/👎.
+   */
+  traza?: TrazaChat;
+  /** 👍 (1) / 👎 (-1) ya dado por este usuario: no se vota dos veces. */
+  valoracion?: 1 | -1;
 }
+
+/** Traza de herramientas de una respuesta (chat-facturas/hilo.ts, trazaParaPanel). */
+export interface TrazaChat {
+  modelo: string | null;
+  herramientas: unknown[];
+}
+
+/** Tabla sin tipos generados (migración 20261123200000_chat_feedback). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const dbFeedback = supabase as any;
+
+/** Mensajes previos que se guardan con la valoración (mismo tope que llega al modelo). */
+export const MAX_HISTORIAL_FEEDBACK = 10;
+
+/** Adjunto `contexto` (no se pinta: normalizarAdjuntos lo ignora) a partir de la traza. */
+export function trazaDeAdjuntos(adjuntos: unknown): TrazaChat | undefined {
+  if (!Array.isArray(adjuntos)) return undefined;
+  const a = adjuntos.find((x) => x && typeof x === "object" && (x as { tipo?: unknown }).tipo === "contexto") as
+    { datos?: { modelo?: unknown; herramientas?: unknown } } | undefined;
+  if (!a?.datos || !Array.isArray(a.datos.herramientas)) return undefined;
+  return { modelo: typeof a.datos.modelo === "string" ? a.datos.modelo : null, herramientas: a.datos.herramientas };
+}
+
+/** La traza que devuelve chat-facturas (`traza` + `modelo`), o undefined si no viene (función sin desplegar). */
+export function trazaDeRespuesta(data: unknown): TrazaChat | undefined {
+  const d = data as { traza?: { herramientas?: unknown }; modelo?: unknown } | null;
+  if (!d || !d.traza || !Array.isArray(d.traza.herramientas)) return undefined;
+  return { modelo: typeof d.modelo === "string" ? d.modelo : null, herramientas: d.traza.herramientas };
+}
+
+const adjuntoContexto = (t: TrazaChat | undefined) =>
+  t ? [{ tipo: "contexto", datos: { modelo: t.modelo, herramientas: t.herramientas } }] : [];
 
 /**
  * `activo` = false (quien no tiene «Editar» en Facturas: sin IA, 06/11/2026):
@@ -81,10 +121,36 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
       created_at: m.created_at,
       persistido: true,
       adjuntos: normalizarAdjuntos(m.adjuntos),
+      traza: m.rol === "assistant" ? trazaDeAdjuntos(m.adjuntos) : undefined,
     }));
 
     setMensajes(mapped);
     setIsLoading(false);
+
+    // Votos ya dados por este usuario a estas respuestas (best-effort: sin la
+    // tabla o sin permiso de lectura, simplemente no se marcan).
+    const idsAsistente = mapped.filter((m) => m.rol === "assistant").map((m) => m.id);
+    if (idsAsistente.length > 0) {
+      try {
+        const { data: sesion } = await supabase.auth.getSession();
+        const uid = sesion?.session?.user?.id;
+        if (uid) {
+          const { data: votos } = await dbFeedback
+            .from("chat_feedback")
+            .select("mensaje_id, valoracion")
+            .eq("usuario_id", uid)
+            .in("mensaje_id", idsAsistente);
+          const porId = new Map<string, 1 | -1>(
+            ((votos ?? []) as { mensaje_id: string; valoracion: number }[]).map((v) => [v.mensaje_id, v.valoracion === 1 ? 1 : -1]),
+          );
+          if (porId.size > 0) {
+            setMensajes((prev) => prev.map((m) => (porId.has(m.id) ? { ...m, valoracion: porId.get(m.id) } : m)));
+          }
+        }
+      } catch (e) {
+        console.warn("[chat-facturas] No se pudieron leer las valoraciones:", e);
+      }
+    }
   }, []);
 
   // ─── Seleccionar conversación ─────────────────────────────────────────────────
@@ -145,7 +211,8 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
     conversacion: Pick<Conversacion, "id" | "session_id">,
     contenido: string,
     rol: "user" | "assistant",
-    adjuntos: AdjuntoChat[] = []
+    adjuntos: AdjuntoChat[] = [],
+    traza?: TrazaChat
   ) => {
     const fila = {
       conversacion_id: conversacion.id,
@@ -160,8 +227,10 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
         .select()
         .single();
 
-    let { data, error } = await insertar(adjuntos.length > 0 ? { adjuntos } : {});
-    if (error && adjuntos.length > 0) {
+    // El contexto de herramientas va junto a las gráficas en `adjuntos` (jsonb).
+    const todos = [...adjuntos, ...adjuntoContexto(traza)];
+    let { data, error } = await insertar(todos.length > 0 ? { adjuntos: todos } : {});
+    if (error && todos.length > 0) {
       // Columna `adjuntos` aún sin crear (migración sin aplicar): se guarda el
       // texto igualmente; la gráfica se ve ahora y se pierde al recargar.
       console.warn("[chat-facturas] Guardado con adjuntos fallido, se reintenta sin ellos:", error);
@@ -252,9 +321,10 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
 
       const respuesta = data?.respuesta || "No pude obtener una respuesta.";
       const adjuntos = normalizarAdjuntos(data?.adjuntos);
+      const traza = trazaDeRespuesta(data);
 
       // Guardar respuesta del asistente en Supabase y usar el ID real
-      const savedAssistantMsg = await guardarMensaje(conv, respuesta, "assistant", adjuntos);
+      const savedAssistantMsg = await guardarMensaje(conv, respuesta, "assistant", adjuntos, traza);
 
       // Actualizar updated_at de la conversación
       await supabase
@@ -270,6 +340,7 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
         created_at: savedAssistantMsg?.created_at ?? new Date().toISOString(),
         persistido: !!savedAssistantMsg,
         adjuntos,
+        traza,
       };
       setMensajes((prev) => [...prev, msgAsistente]);
     } catch (error) {
@@ -345,7 +416,8 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
       if (error) throw new Error(error.message);
       const respuesta = data?.respuesta || "No pude obtener una respuesta.";
       const adjuntos = normalizarAdjuntos(data?.adjuntos);
-      const savedMsg = await guardarMensaje(conversacionActiva, respuesta, "assistant", adjuntos);
+      const traza = trazaDeRespuesta(data);
+      const savedMsg = await guardarMensaje(conversacionActiva, respuesta, "assistant", adjuntos, traza);
       // Mantener la conversacion arriba en la lista tras regenerar.
       await supabase
         .from("chat_facturas_conversaciones")
@@ -361,6 +433,7 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
           created_at: savedMsg?.created_at ?? new Date().toISOString(),
           persistido: !!savedMsg,
           adjuntos,
+          traza,
         },
       ]);
     } catch {
@@ -369,6 +442,42 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
       setIsSending(false);
     }
   }, [isSending, mensajes, conversacionActiva, guardarMensaje]);
+
+  // ─── 👍/👎 de una respuesta (tabla chat_feedback, 20261123200000) ────────
+  // Guarda la pregunta, la respuesta, los mensajes previos, la traza de
+  // herramientas y el modelo. Un voto por mensaje: si ya existía (23505), se
+  // marca igualmente como votado.
+  const valorarRespuesta = useCallback(async (mensajeId: string, valoracion: 1 | -1, comentario?: string): Promise<boolean> => {
+    const i = mensajes.findIndex((m) => m.id === mensajeId);
+    const msg = mensajes[i];
+    if (!msg || msg.rol !== "assistant" || msg.valoracion) return false;
+    const iPregunta = mensajes.slice(0, i).map((m) => m.rol).lastIndexOf("user");
+    const pregunta = iPregunta >= 0 ? mensajes[iPregunta].contenido : "";
+    if (!pregunta.trim()) return false;
+    const historial = mensajes
+      .slice(Math.max(0, iPregunta - MAX_HISTORIAL_FEEDBACK), iPregunta)
+      .map((m) => ({ rol: m.rol, contenido: m.contenido }));
+    const nota = comentario?.trim().slice(0, 1000) || null;
+    const { error } = await dbFeedback.from("chat_feedback").insert({
+      conversacion_id: msg.persistido ? msg.conversacion_id : null,
+      mensaje_id: msg.persistido ? msg.id : null,
+      pregunta: pregunta.slice(0, 16000),
+      respuesta: msg.contenido.slice(0, 40000),
+      historial,
+      herramientas: msg.traza?.herramientas ?? [],
+      modelo: msg.traza?.modelo ?? null,
+      valoracion,
+      comentario: nota,
+    });
+    if (error && error.code !== "23505") {
+      console.error("[chat-facturas] Error guardando la valoración:", error);
+      toast.error("No se ha podido guardar la valoración");
+      return false;
+    }
+    setMensajes((prev) => prev.map((m) => (m.id === mensajeId ? { ...m, valoracion } : m)));
+    if (!error) toast.success(valoracion === 1 ? "Gracias por la valoración" : "Gracias: lo revisaremos");
+    return true;
+  }, [mensajes]);
 
   // ─── Cargar conversaciones al montar ─────────────────────────────────────
   useEffect(() => {
@@ -387,6 +496,7 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
     nuevaConversacion,
     enviarMensaje,
     regenerarRespuesta,
+    valorarRespuesta,
     eliminarConversacion,
     cargarConversaciones,
   };

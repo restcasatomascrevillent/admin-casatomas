@@ -13,7 +13,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 // GFM: la IA contesta con TABLAS markdown (`| a | b |`) y sin esto salían en crudo (QA 05/11/2026).
 import remarkGfm from "remark-gfm";
-import { ArrowUp, Check, Copy, Crosshair, FileText, LineChart, Pin, PinOff, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowUp, Check, Copy, Crosshair, FileText, LineChart, Pin, PinOff, RefreshCw, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { COMPONENTES_MARKDOWN_SEGUROS, urlMarkdownSegura } from "@/lib/markdown-seguro";
@@ -47,6 +47,8 @@ interface Props {
   sugerencias: string[];
   onEnviar: (texto: string) => void;
   onRegenerar?: () => void;
+  /** 👍/👎 de una respuesta (chat_feedback). true si quedó guardado. */
+  onValorar?: (mensajeId: string, valoracion: 1 | -1, comentario?: string) => Promise<boolean>;
   /** Ids de las gráficas ya fijadas en el tablero. */
   fijadas: ReadonlySet<string>;
   onFijar: (g: GraficaIa) => void;
@@ -131,6 +133,84 @@ function BotonCopiar({ texto }: { texto: string }) {
   );
 }
 
+/**
+ * 👍/👎 junto a «Copiar». Con 👎 se abre un campo corto opcional «¿Qué estaba
+ * mal?». Votado, queda marcado y no se puede volver a votar.
+ */
+export function BotonesValoracion({
+  valoracion,
+  onValorar,
+}: {
+  valoracion?: 1 | -1;
+  onValorar: (valoracion: 1 | -1, comentario?: string) => Promise<boolean>;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [comentario, setComentario] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const votado = valoracion !== undefined;
+
+  const votar = async (v: 1 | -1, nota?: string) => {
+    if (votado || enviando) return;
+    setEnviando(true);
+    try {
+      if (await onValorar(v, nota)) setAbierto(false);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => void votar(1)}
+        disabled={votado || enviando}
+        aria-pressed={valoracion === 1}
+        aria-label="Buena respuesta"
+        title={votado ? "Ya has valorado esta respuesta" : "Buena respuesta"}
+        className={cn(BOTON_PIE, "disabled:cursor-default", valoracion === 1 && "text-emerald-600", votado && valoracion !== 1 && "opacity-40")}
+      >
+        <ThumbsUp className="h-3.5 w-3.5" aria-hidden />
+      </button>
+      <button
+        type="button"
+        onClick={() => setAbierto((a) => !a)}
+        disabled={votado || enviando}
+        aria-pressed={valoracion === -1}
+        aria-expanded={abierto}
+        aria-label="Mala respuesta"
+        title={votado ? "Ya has valorado esta respuesta" : "Mala respuesta"}
+        className={cn(BOTON_PIE, "disabled:cursor-default", valoracion === -1 && "text-destructive", votado && valoracion !== -1 && "opacity-40")}
+      >
+        <ThumbsDown className="h-3.5 w-3.5" aria-hidden />
+      </button>
+      {abierto && !votado && (
+        <form
+          className="order-last flex w-full items-center gap-1 py-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void votar(-1, comentario);
+          }}
+        >
+          <input
+            type="text"
+            value={comentario}
+            onChange={(e) => setComentario(e.target.value)}
+            maxLength={300}
+            placeholder="¿Qué estaba mal? (opcional)"
+            aria-label="¿Qué estaba mal?"
+            autoFocus
+            className={cn("h-9 min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 text-sm text-foreground placeholder:text-muted-foreground", FOCO)}
+          />
+          <button type="submit" disabled={enviando} className={cn(BOTON_PIE, "text-foreground")}>
+            Enviar
+          </button>
+        </form>
+      )}
+    </>
+  );
+}
+
 export function PanelCopiloto({
   mensajes,
   isLoading,
@@ -138,6 +218,7 @@ export function PanelCopiloto({
   sugerencias,
   onEnviar,
   onRegenerar,
+  onValorar,
   fijadas,
   onFijar,
   onQuitarFijada,
@@ -244,6 +325,7 @@ export function PanelCopiloto({
                     onFijar={onFijar}
                     onQuitarFijada={onQuitarFijada}
                     onRegenerar={i === ultimoAsistente && !isSending ? onRegenerar : undefined}
+                    onValorar={onValorar}
                   />
                 )}
               </li>
@@ -330,6 +412,7 @@ function MensajeAsistente({
   onFijar,
   onQuitarFijada,
   onRegenerar,
+  onValorar,
 }: {
   mensaje: MensajeChat;
   completa?: boolean;
@@ -337,6 +420,7 @@ function MensajeAsistente({
   onFijar: (g: GraficaIa) => void;
   onQuitarFijada: (id: string) => void;
   onRegenerar?: () => void;
+  onValorar?: (mensajeId: string, valoracion: 1 | -1, comentario?: string) => Promise<boolean>;
 }) {
   const documentos = (mensaje.adjuntos ?? []).flatMap((a) => (a.tipo === "documentos" ? a.datos : []));
   const graficas = graficasDeMensaje(mensaje);
@@ -369,6 +453,9 @@ function MensajeAsistente({
       {documentos.length > 0 && <DocumentosCitados documentos={documentos} />}
       <div className="-ml-2 flex flex-wrap items-center gap-x-0.5 text-xs text-muted-foreground/80">
         <BotonCopiar texto={mensaje.contenido} />
+        {onValorar && (
+          <BotonesValoracion valoracion={mensaje.valoracion} onValorar={(v, c) => onValorar(mensaje.id, v, c)} />
+        )}
         {onRegenerar && (
           <button type="button" onClick={onRegenerar} title="Regenerar respuesta" className={BOTON_PIE}>
             <RefreshCw className="h-3.5 w-3.5" aria-hidden />

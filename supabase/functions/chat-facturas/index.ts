@@ -4,7 +4,8 @@ import { createClient as createClientBase } from "https://esm.sh/@supabase/supab
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { configModeloFuncion } from "../_shared/modelo-funcion.ts";
 import { modeloChat, sinDuplicar } from "./herramientas.ts";
-import { ejecutarConversacion } from "./bucle.ts";
+import { ejecutarConversacion, MAX_MENSAJES_HISTORIAL, type Traza, type TurnoHistorial } from "./bucle.ts";
+import { contextoDeAdjuntos, trazaParaPanel } from "./hilo.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion, registrarHerramientaChat } from "../_shared/audit-client.ts";
 const createClient = clienteConAuditoria(createClientBase, "chat-facturas");
 
@@ -14,7 +15,10 @@ const createClient = clienteConAuditoria(createClientBase, "chat-facturas");
 //  Bucle de function-calling de OpenAI sobre las RPC de Postgres.
 //  Mantiene el MISMO contrato que espera useChatFacturas.ts:
 //    IN : { mensaje, session_id }
-//    OUT: { success, respuesta, adjuntos? }
+//    OUT: { success, respuesta, adjuntos?, modelo, traza }
+//  traza (11/11/2026): { herramientas: [{ nombre, argumentos, resultado,
+//  error?, resumen? }] }. El panel la guarda con la respuesta (adjunto
+//  "contexto", para el hilo) y con el 👍/👎 (tabla chat_feedback).
 //  adjuntos (20261008120000, contrato con la UI): [{ tipo: 'serie_precio',
 //  datos: <serie_precios_agente> }] cuando el modelo llama a grafico_precio;
 //  se omite si no hay. El modelo solo ve el resumen (separarAdjunto).
@@ -57,7 +61,8 @@ const OPENAI_KEY = claveOpenAI("chat");
 // ia_modelo_funcion (Super Admin › Servicios › Modelos, _shared/modelo-funcion.ts):
 // si su fila no tiene modelo, se usa este (secreto o por defecto), como antes.
 const MODELO = modeloChat(Deno.env.get("CHAT_FACTURAS_MODELO"));
-const MAX_HISTORIAL = 10;   // mismo valor que el contextWindowLength de n8n
+// Historial: los ultimos MAX_MENSAJES_HISTORIAL mensajes (bucle.ts los recorta
+// tambien por tamaño). Antes 10 aqui, mismo valor que el contextWindowLength de n8n.
 // Bucle, topes de coste/tiempo y ejecucion de herramientas: bucle.ts
 // (compartido con la evaluacion de modelos de ia-modelos-openai, 07/11/2026).
 
@@ -126,7 +131,11 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       // El contenido de la consulta queda en auditoría, no en logs técnicos.
 
       // ── Historial de la conversacion ──
-      const historial: { role: "user" | "assistant"; content: string }[] = [];
+      // Las respuestas traen en `adjuntos` el contexto de herramientas que
+      // guardo el panel (tipo "contexto": nombre, argumentos y proveedores/
+      // productos del resultado): bucle.ts lo reconstruye como tool_calls para
+      // que un seguimiento («Y de vaca») sepa de que proveedor se hablaba.
+      const historial: TurnoHistorial[] = [];
       if (session_id) {
         const { data: conv, error: convErr } = await supabase
           .from("chat_facturas_conversaciones")
@@ -138,21 +147,29 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
         if (conv?.id) {
           const { data: previos, error: msgErr } = await supabase
             .from("chat_facturas_mensajes")
-            .select("rol, contenido, created_at")
+            .select("rol, contenido, adjuntos, created_at")
             .eq("conversacion_id", conv.id)
             .order("created_at", { ascending: false })
-            .limit(MAX_HISTORIAL);
+            .limit(MAX_MENSAJES_HISTORIAL + 1); // +1: la pregunta actual ya esta guardada
           if (msgErr) console.error("[chat-facturas] Error leyendo historial:", msgErr.message);
 
           for (const m of (previos ?? []).reverse()) {
             if (!m.contenido) continue;
-            historial.push({ role: m.rol === "user" ? "user" : "assistant", content: m.contenido });
+            const herramientas = m.rol === "user" ? [] : contextoDeAdjuntos(m.adjuntos);
+            historial.push({
+              role: m.rol === "user" ? "user" : "assistant",
+              content: m.contenido,
+              ...(herramientas.length > 0 ? { herramientas } : {}),
+            });
           }
         }
       }
 
       // Pista de la pregunta + bucle de function-calling (bucle.ts).
-      const { respuesta, adjuntos } = await ejecutarConversacion({
+      // Traza de las herramientas: vuelve al panel para guardarla con la
+      // respuesta (hilo) y con el 👍/👎 (chat_feedback).
+      const traza: Traza = { llamadas: [], herramientas: [] };
+      const { respuesta, adjuntos, modelo: modeloUsado } = await ejecutarConversacion({
         supabase,
         claveOpenAI: OPENAI_KEY,
         mensaje,
@@ -165,9 +182,18 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
           nuevoAcumuladorChat: (m) => new AcumuladorUso("chat-facturas", m, "chat"),
         },
         alEjecutarHerramienta: registrarHerramientaChat,
+        traza,
+        // Una clave por conversacion: sus rondas y preguntas comparten prefijo.
+        claveCache: typeof session_id === "string" && session_id ? `chat-facturas:${session_id}`.slice(0, 64) : undefined,
       });
 
-      return json({ success: true, respuesta, ...(adjuntos.length > 0 ? { adjuntos } : {}) }, 200);
+      return json({
+        success: true,
+        respuesta,
+        ...(adjuntos.length > 0 ? { adjuntos } : {}),
+        modelo: modeloUsado,
+        traza: trazaParaPanel(traza),
+      }, 200);
     } catch (error) {
       console.error("[chat-facturas] Error:", error);
       usosChat[usosChat.length - 1].marcarError();

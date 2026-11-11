@@ -43,6 +43,8 @@ interface Props {
   sugerencias: string[];
   onEnviar: (texto: string) => void;
   onRegenerar?: () => void;
+  /** 👍/👎 de una respuesta (chat_feedback). true si quedó guardado. */
+  onValorar?: (mensajeId: string, valoracion: 1 | -1, comentario?: string) => Promise<boolean>;
   fijadas: ReadonlySet<string>;
   onFijar: (g: GraficaIa) => void;
   onQuitarFijada: (id: string) => void;
