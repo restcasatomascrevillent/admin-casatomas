@@ -87,7 +87,7 @@ describe("Reservas (página) · «Nueva Reserva» pide permiso de edición", () 
     expect(screen.queryByTestId("formulario-alta")).not.toBeInTheDocument();
     expect(h.formulario).not.toHaveBeenCalled();
     // Las pestañas de consulta siguen.
-    for (const nombre of ["Hoy", "Lista", "Calendario", "Blacklist"]) {
+    for (const nombre of ["Reservas", "Lista", "Calendario", "Blacklist"]) {
       expect(screen.getByRole("tab", { name: nombre })).toBeInTheDocument();
     }
   });

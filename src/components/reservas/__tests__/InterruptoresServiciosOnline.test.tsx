@@ -23,7 +23,7 @@ const pintar = () =>
     </TooltipProvider>,
   );
 
-describe("Cerrar comida / Cerrar noche", () => {
+describe("Cerrar comida / Cerrar cena", () => {
   beforeEach(() => {
     cambiar.mockClear();
     bloqueados = [];
@@ -32,8 +32,8 @@ describe("Cerrar comida / Cerrar noche", () => {
 
   it("pregunta antes de cerrar y solo cierra al confirmar", () => {
     pintar();
-    fireEvent.click(screen.getByRole("button", { name: /Cerrar noche/ }));
-    expect(screen.getByText(/¿Cerrar las reservas online de la noche de hoy \(martes 10\/11\)\?/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Cerrar cena/ }));
+    expect(screen.getByText(/¿Cerrar las reservas online de la cena del martes 10\/11\?/)).toBeTruthy();
     expect(cambiar).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Sí, cerrar" }));
     expect(cambiar).toHaveBeenCalledWith("cena", true);

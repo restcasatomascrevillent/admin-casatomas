@@ -46,9 +46,9 @@ const TURNOS: Array<{
   },
   {
     turno: "cena",
-    abrir: "Cerrar noche",
-    cerrado: "Noche cerrada",
-    servicio: "noche",
+    abrir: "Cerrar cena",
+    cerrado: "Cena cerrada",
+    servicio: "cena",
   },
 ];
 
@@ -61,7 +61,8 @@ function fechaLegible(fecha: string): string {
 }
 
 /**
- * Dos botones para el día que se está viendo en «Hoy»: «Cerrar comida» / «Cerrar noche». Al pulsar
+ * Dos botones para el día que se está viendo en Reservas: «Cerrar comida» / «Cerrar cena» (el día elegido con las
+ * flechas, 11/11/2026). Al pulsar
  * pregunta antes de cerrar (o de volver a abrir). Cerrado = botón rojo relleno «Comida cerrada».
  * Solo afecta a la web y al teléfono automático. Sin «Editar» en Reservas se ven pero no se tocan.
  */
@@ -134,8 +135,8 @@ export function InterruptoresServiciosOnline({
           <AlertDialogHeader>
             <AlertDialogTitle>
               {cerrando
-                ? `¿Cerrar las reservas online de la ${activo?.servicio} de hoy (${fechaLegible(fecha)})?`
-                : `¿Volver a abrir las reservas online de la ${activo?.servicio} de hoy (${fechaLegible(fecha)})?`}
+                ? `¿Cerrar las reservas online de la ${activo?.servicio} del ${fechaLegible(fecha)}?`
+                : `¿Volver a abrir las reservas online de la ${activo?.servicio} del ${fechaLegible(fecha)}?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {cerrando

@@ -92,7 +92,7 @@ import { COLORES_MESA, estadoColorMovil } from "@/lib/reservas/coloresMesa";
 import { configServicioSalaDesde, type ReservaMesaServicio } from "@/lib/reservas/servicioSala";
 import { turnoDeHora } from "@/lib/reservas/asignacionMesas";
 import { ESTADOS_RESERVA, type EstadoReserva } from "@/lib/reservas/estadosReserva";
-import type { FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
+import { turnoPorDefecto, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
 import {
   estadoMesasHoy,
   candidatasParaMesa,
@@ -195,7 +195,8 @@ export function VistaHoyMovil({
   const [vistaPropia, setVista] = useState<Vista>("reservas");
   const vista: Vista = columna ? "reservas" : vistaPropia;
   // El turno del reloj por defecto: la lista sale corta (solo el servicio en curso). Se puede cambiar.
-  const [filtroTurnoPropio, setFiltroTurno] = useState<FiltroTurnoHoy>(() => turnoDeHora(horaActual()));
+  // Comida por defecto y, desde las 18:00, cena (11/11/2026, la misma regla que Reservas en tablet y escritorio).
+  const [filtroTurnoPropio, setFiltroTurno] = useState<FiltroTurnoHoy>(() => turnoPorDefecto());
   const [busquedaPropia, setBusqueda] = useState("");
   const filtroTurno = columna?.filtroTurno ?? filtroTurnoPropio;
   const busqueda = columna?.busqueda ?? busquedaPropia;
