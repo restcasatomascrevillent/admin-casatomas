@@ -1239,7 +1239,7 @@ export function VistaPlanoHoy({
           <div className={cn("flex min-w-0 items-center gap-2", fijo && "flex-wrap gap-y-1")}>
             {fijo && sala ? (
               <>
-                <h2 className="flex shrink-0 items-center gap-2 text-2xl font-bold" data-testid="plano-fijo-sala" aria-live="polite">
+                <h2 className="flex shrink-0 items-center gap-2 text-xl font-bold lg:text-2xl" data-testid="plano-fijo-sala" aria-live="polite">
                   {sala.privada && <Lock className="h-5 w-5 shrink-0" aria-hidden="true" />}
                   <span className="whitespace-nowrap" data-testid="plano-fijo-nombre">{sala.title}</span>
                   <span className="shrink-0 text-lg font-semibold tabular-nums text-muted-foreground">
@@ -1322,9 +1322,22 @@ export function VistaPlanoHoy({
                 {/* Cerrar la terraza y volver al plano base escriben: solo con «Editar» (06/11/2026). Con
                     solo «Ver», si la terraza está cerrada se dice, sin interruptor. */}
                 {esTerraza && puedeEditar && (
-                  <label className={cn("flex items-center gap-2 rounded-md border px-2 text-[13px]", fijo ? "h-11" : "h-10")}>
-                    <Switch checked={cierreSala.cerrada} onCheckedChange={(v) => void cierreSala.cambiar(v)} aria-label={`${sala.title} cerrada en este servicio`} />
-                    Cerrada
+                  // 11/11/2026 (dueño: «ajusta esto para que se vea mejor»): píldora compacta que dice el estado de verdad
+                  // («Abierta» / «Cerrada», en rojo), a la altura del botón «…». Antes ponía siempre «Cerrada» junto al
+                  // interruptor apagado y confundía.
+                  <label
+                    className={cn(
+                      "flex h-11 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm font-medium",
+                      cierreSala.cerrada ? "border-destructive/40 bg-destructive/10 text-destructive" : "bg-card text-foreground",
+                    )}
+                  >
+                    <Switch
+                      className="scale-90"
+                      checked={cierreSala.cerrada}
+                      onCheckedChange={(v) => void cierreSala.cambiar(v)}
+                      aria-label={`${sala.title} cerrada en este servicio`}
+                    />
+                    {cierreSala.cerrada ? "Cerrada" : "Abierta"}
                   </label>
                 )}
                 {esTerraza && !puedeEditar && cierreSala.cerrada && (
@@ -1335,7 +1348,7 @@ export function VistaPlanoHoy({
                 {puedeEditar && fijo && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="h-11 w-11 p-0" aria-label="Más opciones de la sala">
+                      <Button variant="outline" className="h-11 w-11 rounded-full p-0" aria-label="Más opciones de la sala">
                         <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
                       </Button>
                     </DropdownMenuTrigger>

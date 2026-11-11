@@ -440,6 +440,7 @@ export function VistaHoyMovil({
             lista={listaEscritorio}
             salaDe={(r) => (r.espacio_id ? salaPorId.get(r.espacio_id) : undefined)}
             onAbrir={(r) => abrirFicha(r.id)}
+            sentarFuera={puedeEditar ? (r) => <BotonSentarFuera reserva={r} variante="compacto" disabled={sentandoId === r.id} /> : undefined}
             señalada={señalada}
             onSeñalar={setSeñaladaRaton}
             servicio={{ fecha, filtroTurno }}
