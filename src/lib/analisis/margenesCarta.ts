@@ -52,6 +52,12 @@ export interface Ingrediente {
   coste6m: number | null;
   lineas: number | null;
   ultima: string | null;
+  /** IVA de compra de sus facturas (%), si la RPC lo trae (11/11/2026: conmutador con/sin IVA). */
+  ivaPct: number | null;
+  /** Coste con IVA de compra, si la RPC lo trae. */
+  costeIva: number | null;
+  /** El IVA no sale de las facturas: se supone el habitual. */
+  ivaSupuesto: boolean;
 }
 
 export interface PlatoMargen {
@@ -75,6 +81,9 @@ export interface PlatoMargen {
   motivo: string | null;
   banderas: Bandera[];
   ingredientes: Ingrediente[];
+  /** Coste con el IVA de compra de cada ingrediente, si la RPC lo trae. */
+  costeIva: number | null;
+  ivaSupuesto: boolean;
 }
 
 export interface VinoMargen {
@@ -101,6 +110,10 @@ export interface VinoMargen {
   revisado: boolean;
   motivo: string | null;
   banderas: Bandera[];
+  /** IVA de compra de la botella (%) y su coste con IVA, si la RPC los trae. */
+  ivaCompraPct: number | null;
+  costeIva: number | null;
+  ivaSupuesto: boolean;
 }
 
 /**
@@ -136,6 +149,10 @@ export interface PesoMargen {
   revisado: boolean;
   motivo: string | null;
   banderas: Bandera[];
+  /** IVA de compra (%) y kilo comprado con IVA, si la RPC los trae. */
+  ivaCompraPct: number | null;
+  compraKgIva: number | null;
+  ivaSupuesto: boolean;
 }
 
 export type ArticuloMargen = PlatoMargen | VinoMargen | PesoMargen;
@@ -220,7 +237,12 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
       coste6m: num(i.coste_6m),
       lineas: num(i.lineas),
       ultima: txt(i.ultima),
+      ivaPct: num(i.iva_pct),
+      costeIva: num(i.coste_iva),
+      ivaSupuesto: i.iva_origen === "supuesto" || num(i.iva_pct) === null,
     })),
+    costeIva: num(p.coste_iva),
+    ivaSupuesto: p.iva_supuesto === true || num(p.coste_iva) === null,
   }));
   const vinos: VinoMargen[] = arr(r.vinos).map(obj).filter((v) => txt(v.id)).map((v) => ({
     tipo: "vino",
@@ -246,6 +268,9 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
     revisado: v.revisado === true,
     motivo: txt(v.motivo),
     banderas: banderas(v.banderas),
+    ivaCompraPct: num(v.iva_compra_pct),
+    costeIva: num(v.coste_iva),
+    ivaSupuesto: v.iva_origen === "supuesto" || num(v.iva_compra_pct) === null,
   }));
   const peso: PesoMargen[] = arr(r.peso).map(obj).filter((x) => txt(x.id)).map((x) => ({
     tipo: "peso",
@@ -271,6 +296,9 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
     revisado: x.revisado === true,
     motivo: txt(x.motivo),
     banderas: banderas(x.banderas),
+    ivaCompraPct: num(x.iva_compra_pct),
+    compraKgIva: num(x.compra_kg_iva),
+    ivaSupuesto: x.iva_origen === "supuesto" || num(x.iva_compra_pct) === null,
   }));
   return {
     hoy: txt(r.hoy),

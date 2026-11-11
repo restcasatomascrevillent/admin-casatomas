@@ -1,4 +1,4 @@
-import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Bot, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, PieChart, Receipt, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
+import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Bot, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, PieChart, Receipt, Scale, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { rutaAlerta, TIPOS_ALERTA_FACTURAS } from "@/lib/facturas/alertas";
 
@@ -99,6 +99,8 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   facturas_precio_baja: TrendingDown,
   facturas_precio_proveedor: TrendingUp,
   facturas_precio_pactado: Handshake,
+  // 11/11/2026: margen bajo de un plato o vino de la carta.
+  facturas_margen_bajo: Scale,
   // Centro de modelos de IA (cron diario ia-modelos-openai, 20261107500000).
   ia_modelo_nuevo: Bot,
   ia_modelo_retirado: AlertTriangle,

@@ -9,6 +9,9 @@
 //   · «Compras»: las líneas que forman el coste de cada producto; tocar una abre
 //     el original de la factura (VisorDocumento de Facturas › Análisis).
 //   Sin «Editar» en Facturas, todo es de solo lectura.
+//   · Con IVA o sin IVA (11/11/2026, conmutador de la página): cada cifra dice
+//     cuál es, con una explicación para tontos («De cada 100 € que cobras…») y
+//     qué parte de cada precio es IVA.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, Loader2, Plus, Search, Trash2, X } from "lucide-react";
@@ -25,8 +28,6 @@ import {
   cantidadTexto,
   euros,
   porcentaje,
-  precioCompra,
-  razon,
   veces,
   type PlatoMargen,
   type VinoMargen,
@@ -34,14 +35,26 @@ import {
   type ProductoBuscado,
   type UnidadEscandallo,
 } from "@/lib/analisis/margenesCarta";
+import {
+  ETIQUETA_MODO,
+  cifrasIva,
+  costeIngredienteModo,
+  desgloseIva,
+  explicacionIva,
+  precioCompraModo,
+  razonIva,
+  textoIvaCompra,
+  type ModoIva,
+} from "@/lib/analisis/margenesIva";
 
 const fechaCorta = (f: string | null) => (f ? new Date(`${f}T00:00:00`).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—");
 
-function Dato({ etiqueta, valor, rojo }: { etiqueta: string; valor: string; rojo?: boolean }) {
+function Dato({ etiqueta, valor, rojo, detalle }: { etiqueta: string; valor: string; rojo?: boolean; detalle?: string }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs text-muted-foreground">{etiqueta}</dt>
       <dd className={cn("font-semibold tabular-nums", rojo && "text-destructive")}>{valor}</dd>
+      {detalle && <dd className="text-xs text-muted-foreground">{detalle}</dd>}
     </div>
   );
 }
@@ -117,11 +130,14 @@ function ComprasProducto({ productoId, onCerrar }: { productoId: number; onCerra
 export function DetalleArticulo({
   articulo,
   config,
+  modo = "sin",
   puedeEditar,
   onCerrar,
 }: {
   articulo: PlatoMargen | VinoMargen | null;
   config: ConfigMargenes;
+  /** Cuenta del conmutador de la página: sin IVA (base) o con IVA. */
+  modo?: ModoIva;
   puedeEditar: boolean;
   onCerrar: () => void;
 }) {
@@ -144,6 +160,13 @@ export function DetalleArticulo({
 
   const a = articulo;
   const rojo = !!a && (a.banderas.includes("coste_alto") || a.banderas.includes("multiplicador_bajo"));
+  const c = a ? cifrasIva(a, modo, config) : null;
+  const et = ETIQUETA_MODO[modo];
+  const otra = modo === "sin" ? "con" : "sin";
+  const cOtra = a ? cifrasIva(a, otra, config) : null;
+  const varios = a?.tipo === "plato" && a.ingredientes.filter((i) => i.coste !== null).length > 1;
+  // Coste de hace 6 meses en esta cuenta (con IVA, con el IVA de compra de ahora).
+  const coste6m = a && c && a.coste6m !== null ? (modo === "sin" || c.costeSinIva === null || c.costeConIva === null || c.costeSinIva <= 0 ? a.coste6m : a.coste6m * (c.costeConIva / c.costeSinIva)) : null;
   const cambiar = (i: number, parche: Partial<IngredienteEditado & { producto: string }>) => {
     setIngs((xs) => xs.map((x, j) => (j === i ? { ...x, ...parche } : x)));
     setCambiado(true);
@@ -189,23 +212,36 @@ export function DetalleArticulo({
               </div>
             </SheetHeader>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
-              <p className={cn("text-sm", rojo && "text-destructive")}>{razon(a, config)}</p>
-              <dl className="grid grid-cols-3 gap-2 text-sm">
-                <Dato etiqueta="Precio de carta" valor={euros(a.precio)} />
-                <Dato etiqueta={`Sin IVA (${config.ivaPct} %)`} valor={euros(a.venta)} />
-                <Dato etiqueta="Coste actual" valor={euros(a.coste)} />
-                {a.tipo === "vino" ? (
-                  <Dato etiqueta="Multiplicador" valor={veces(a.multiplicador)} rojo={rojo} />
-                ) : (
-                  <Dato etiqueta="% de coste" valor={porcentaje(a.pct)} rojo={rojo} />
-                )}
-                <Dato etiqueta="Margen bruto" valor={euros(a.margen)} />
-                <Dato
-                  etiqueta="Coste hace 6 meses"
-                  valor={a.coste6m === null ? "—" : `${euros(a.coste6m)}${a.variacionPct !== null ? ` (${a.variacionPct > 0 ? "+" : ""}${porcentaje(a.variacionPct)})` : ""}`}
-                  rojo={a.banderas.includes("sube_coste")}
-                />
-              </dl>
+              <p className={cn("text-sm", rojo && "text-destructive")}>{razonIva(a, config, modo)}</p>
+              {c && explicacionIva(a, config, modo) && (
+                <p className="rounded-md bg-muted/50 px-3 py-2 text-sm" data-testid="explicacion-margen">{explicacionIva(a, config, modo)}</p>
+              )}
+              {c && cOtra && (
+                <dl className="grid grid-cols-3 gap-2 text-sm" data-testid="cifras-margen">
+                  <Dato
+                    etiqueta={modo === "sin" ? `Precio sin IVA (quitado el ${config.ivaPct} %)` : "Precio de carta (con IVA)"}
+                    valor={euros(c.precio)}
+                    detalle={modo === "sin" ? `${euros(c.precioCarta)} en carta` : `${euros(c.precioBase)} sin IVA`}
+                  />
+                  <Dato
+                    etiqueta={`Coste ${et}`}
+                    valor={euros(c.coste)}
+                    detalle={c.coste === null ? undefined : `${euros(cOtra.coste)} ${ETIQUETA_MODO[otra]} · ${textoIvaCompra(c, varios)}`}
+                  />
+                  {a.tipo === "vino" ? (
+                    <Dato etiqueta={`Multiplicador ${et}`} valor={veces(c.multiplicador)} rojo={rojo} detalle={`mínimo ${veces(c.limite)}`} />
+                  ) : (
+                    <Dato etiqueta={`% de coste ${et}`} valor={porcentaje(c.pct)} rojo={rojo} detalle={`máximo ${porcentaje(c.limite)}`} />
+                  )}
+                  <Dato etiqueta={`Margen ${et}`} valor={euros(c.margen)} detalle="lo que queda de cada venta" />
+                  <Dato
+                    etiqueta={`Coste hace 6 meses ${et}`}
+                    valor={coste6m === null ? "—" : `${euros(coste6m)}${a.variacionPct !== null ? ` (${a.variacionPct > 0 ? "+" : ""}${porcentaje(a.variacionPct)})` : ""}`}
+                    rojo={a.banderas.includes("sube_coste")}
+                  />
+                </dl>
+              )}
+              {desgloseIva(a, config) && <p className="text-xs text-muted-foreground" data-testid="desglose-iva">{desgloseIva(a, config)}</p>}
 
               {a.tipo === "plato" ? (
                 <section className="space-y-2" aria-label="Escandallo">
@@ -223,7 +259,7 @@ export function DetalleArticulo({
                             <p className="min-w-0 flex-1 text-sm font-medium leading-snug">{x.producto}</p>
                             {orig && (
                               <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                                {precioCompra(orig)} → <span className="font-medium text-foreground">{euros(orig.coste)}</span>
+                                {precioCompraModo(orig, modo)} → <span className="font-medium text-foreground">{euros(costeIngredienteModo(orig, modo))}</span>
                               </span>
                             )}
                           </div>

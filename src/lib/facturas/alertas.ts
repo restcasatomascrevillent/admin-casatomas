@@ -14,7 +14,9 @@ export type TipoAlertaFacturas =
   // 20261115100000_facturas_decision
   | "facturas_precio_baja"
   | "facturas_precio_proveedor"
-  | "facturas_precio_pactado";
+  | "facturas_precio_pactado"
+  // 11/11/2026: un plato o vino de la carta baja de su límite de margen (Facturas › Márgenes).
+  | "facturas_margen_bajo";
 
 export const TIPOS_ALERTA_FACTURAS: { tipo: TipoAlertaFacturas; etiqueta: string }[] = [
   { tipo: "facturas_precio_sube", etiqueta: "Suben de precio" },
@@ -27,6 +29,7 @@ export const TIPOS_ALERTA_FACTURAS: { tipo: TipoAlertaFacturas; etiqueta: string
   { tipo: "facturas_precio_baja", etiqueta: "Bajan de precio" },
   { tipo: "facturas_precio_proveedor", etiqueta: "Un proveedor sube varias cosas" },
   { tipo: "facturas_precio_pactado", etiqueta: "Precio pactado roto" },
+  { tipo: "facturas_margen_bajo", etiqueta: "Margen bajo en la carta" },
 ];
 
 export const esTipoAlertaFacturas = (t: string): t is TipoAlertaFacturas => TIPOS_ALERTA_FACTURAS.some((x) => x.tipo === t);

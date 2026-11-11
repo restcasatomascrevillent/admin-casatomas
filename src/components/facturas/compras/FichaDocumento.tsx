@@ -5,6 +5,7 @@ import type { AlertaValidacion, Factura, ProductoFactura } from "@/hooks/useFact
 import { usePuedeCorregirDocumento } from "@/hooks/usePermisosFacturas";
 import { formatDate, formatDateTime, formatImporte, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
 import { etiquetaRetencion } from "@/lib/facturas/retencion";
+import { EXPLICACION_IMPORTES, etiquetaIva, importesIva } from "@/lib/facturas/importesIva";
 import { OriginalIncrustado } from "@/components/facturas/shared/OriginalIncrustado";
 import { vistaPreviaDrive } from "@/lib/facturas/documentosCifra";
 import { EstadoDocumento } from "@/components/facturas/shared/EstadoDocumento";
@@ -98,6 +99,10 @@ const Punto = () => (
  *     fecha, CIF y local; a la derecha las acciones agrupadas (Editar · Preguntar a la IA).
  *   · Importes en una franja (Base · IVA · Total · Regalado) y las líneas en una
  *     tabla limpia (columnas cuando cabe; nombre e importe con el detalle debajo si no).
+ *     11/11/2026 (dueño: «calcular con bases imponibles, antes de impuestos y después de
+ *     impuestos… explicándolos para tontos»): el IVA dice su % (o «varios tipos»), la base o
+ *     el IVA que falten se calculan con el total, una frase explica qué es cada cifra y el
+ *     importe de las líneas dice «sin IVA».
  *   · El ORIGINAL (vista previa de Drive o copia de Storage) grande: a la derecha,
  *     a todo el alto y con su propio scroll, si la ficha mide 880 px o más (tablet
  *     en horizontal); si no, debajo de los importes. Es el ÚNICO sitio del original
@@ -239,27 +244,35 @@ export function FichaDocumento({
   );
 
   const retencion = doc.retencion_irpf ?? null;
+  const conIva = importesIva(doc);
   const importes = hayImportes && (
-    <dl aria-label="Importes" className="grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] divide-x divide-border/60 border-y border-border/60">
-      {doc.subtotal != null && <Cifra etiqueta="Base imponible">{formatImporte(doc.subtotal)}</Cifra>}
-      {doc.iva != null && <Cifra etiqueta="IVA">{formatImporte(doc.iva)}</Cifra>}
-      {retencion != null && (
-        <Cifra etiqueta={etiquetaRetencion(doc.retencion_irpf_pct)} testId="retencion-documento">
-          {formatImporte(-retencion)}
-        </Cifra>
+    <div className="space-y-1">
+      <dl aria-label="Importes" className="grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] divide-x divide-border/60 border-y border-border/60">
+        {conIva.base != null && (
+          <Cifra etiqueta={`Base imponible${conIva.baseCalculada ? " (calculada)" : ""}`}>{formatImporte(conIva.base)}</Cifra>
+        )}
+        {conIva.iva != null && <Cifra etiqueta={etiquetaIva(conIva)}>{formatImporte(conIva.iva)}</Cifra>}
+        {retencion != null && (
+          <Cifra etiqueta={etiquetaRetencion(doc.retencion_irpf_pct)} testId="retencion-documento">
+            {formatImporte(-retencion)}
+          </Cifra>
+        )}
+        {doc.total != null && (
+          <Cifra etiqueta={`${retencion != null ? "Total a pagar" : "Total"}${doc.total_origen === "deducido" ? " (calculado, no leído)" : ""}`} destacada>
+            <span className={abono ? "text-emerald-700 dark:text-emerald-400" : ""}>{formatImporte(doc.total)}</span>
+          </Cifra>
+        )}
+        {regalado.importe > 0 && (
+          <Cifra etiqueta="Regalado / descuentos" testId="regalado-documento">
+            {formatImporte(regalado.importe)}
+            <span className="text-xs font-normal text-muted-foreground"> sin IVA{regalado.estimado ? " · estimado" : ""}</span>
+          </Cifra>
+        )}
+      </dl>
+      {conIva.base != null && conIva.iva != null && (
+        <p className="text-xs text-muted-foreground" data-testid="explicacion-importes">{EXPLICACION_IMPORTES}</p>
       )}
-      {doc.total != null && (
-        <Cifra etiqueta={`${retencion != null ? "Total a pagar" : "Total"}${doc.total_origen === "deducido" ? " (calculado, no leído)" : ""}`} destacada>
-          <span className={abono ? "text-emerald-700 dark:text-emerald-400" : ""}>{formatImporte(doc.total)}</span>
-        </Cifra>
-      )}
-      {regalado.importe > 0 && (
-        <Cifra etiqueta="Regalado / descuentos" testId="regalado-documento">
-          {formatImporte(regalado.importe)}
-          <span className="text-xs font-normal text-muted-foreground"> sin IVA{regalado.estimado ? " · estimado" : ""}</span>
-        </Cifra>
-      )}
-    </dl>
+    </div>
   );
 
   const lineas = (
@@ -279,7 +292,7 @@ export function FichaDocumento({
             <span>Producto</span>
             <span className="text-right">Cantidad</span>
             <span className="text-right">Precio</span>
-            <span className="text-right">Importe</span>
+            <span className="text-right">Importe sin IVA</span>
             <span />
           </div>
           {doc.productos.map((p) => (

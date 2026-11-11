@@ -66,13 +66,13 @@ describe("MargenesCarta", () => {
     pintar();
     expect(screen.getByRole("radio", { name: /Por peso/ })).toHaveAttribute("aria-checked", "true");
     const resumen = screen.getByTestId("margenes-resumen");
-    // Mediana del multiplicador al peso (1,57 y 3,45) y de vinos; el food cost estimado de platos ya no sale.
+    // Mediana del multiplicador al peso (1,57 y 3,45) y de vinos (sin IVA: 100 / 80,40); el food cost estimado de platos ya no sale.
     expect(within(resumen).getByText("2,51×")).toBeInTheDocument();
-    expect(within(resumen).getByText("1,37×")).toBeInTheDocument();
+    expect(within(resumen).getByText("1,24×")).toBeInTheDocument();
     expect(within(resumen).queryByText("44 %")).not.toBeInTheDocument();
     const lista = screen.getByTestId("margenes-lista");
     expect(
-      within(lista).getByText("Percebes: lo compras a 110,00 €/kg y lo vendes a 172,73 €/kg sin IVA (190 €/kg en carta) → ×1,57, 64 % de coste."),
+      within(lista).getByText("Percebes: lo compras a 110,00 €/kg sin IVA y lo vendes a 172,73 €/kg sin IVA (190 €/kg en carta) → ×1,57, 64 % de coste."),
     ).toBeInTheDocument();
     expect(within(lista).getByText(/última compra 03\/10\/26, CETAREA ANGELMAR/)).toBeInTheDocument();
     expect(within(lista).queryByText(/Bogavante/)).not.toBeInTheDocument();
@@ -99,7 +99,28 @@ describe("MargenesCarta", () => {
   it("pestaña Vinos con el multiplicador", () => {
     pintar();
     fireEvent.click(screen.getByRole("radio", { name: /Vinos/ }));
-    expect(within(screen.getByTestId("margenes-lista")).getByText(/la botella cuesta 80,40 € y se vende a 110,00 € → 1,37×/)).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("margenes-lista")).getByText(/la botella te cuesta 80,40 € sin IVA y la vendes a 100,00 € sin IVA \(110,00 € en carta\) → ×1,24/),
+    ).toBeInTheDocument();
+  });
+
+  it("«Con IVA» cambia todas las cifras y lo explica", () => {
+    localStorage.removeItem("margenes-modo-iva");
+    pintar();
+    expect(screen.getByRole("radio", { name: "Sin IVA (base)" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId("explicacion-iva")).toHaveTextContent(/lo que de verdad ganas/);
+    fireEvent.click(screen.getByRole("radio", { name: "Con IVA" }));
+    expect(screen.getByTestId("explicacion-iva")).toHaveTextContent(/con el impuesto dentro/);
+    expect(within(screen.getByTestId("margenes-resumen")).getByText(/multiplicador con IVA/)).toBeInTheDocument();
+    const lista = screen.getByTestId("margenes-lista");
+    expect(within(lista).getByText(/Percebes: lo compras a 121,00 €\/kg con IVA \(IVA 10 %, supuesto\) y en carta lo vendes a 190 €\/kg con IVA/)).toBeInTheDocument();
+    fireEvent.click(within(lista).getByRole("button", { name: /Percebes/ }));
+    const detalle = screen.getByTestId("detalle-margen");
+    expect(within(detalle).getByTestId("cifras-margen")).toHaveTextContent(/Precio de carta \(con IVA\)\s*19,00 €/);
+    expect(within(detalle).getByTestId("explicacion-margen")).toHaveTextContent(/De cada 100 € que cobras con IVA/);
+    // Se recuerda en este navegador.
+    expect(localStorage.getItem("margenes-modo-iva")).toBe("con");
+    localStorage.removeItem("margenes-modo-iva");
   });
 
   it("el detalle deja cambiar los gramos y guardar el escandallo", () => {
