@@ -9,6 +9,15 @@ const bd = vi.hoisted(() => ({
   /** Llamadas a la RPC marcar_avisos_revisados (11/11/2026: «Revisado» ya no es un UPDATE directo). */
   revisados: [] as { p_ids: string[] | null; p_tipos: string[] | null }[],
 }));
+// «Ver» en una reserva abre su ficha en un modal si se pueden editar reservas (11/11/2026, `useAbrirAviso`).
+const permiso = vi.hoisted(() => ({ editaReservas: false }));
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: () => ({ canAccess: permiso.editaReservas, loading: false }),
+}));
+vi.mock("@/components/reservas/EditarReservaDialog", () => ({
+  EditarReservaDialog: ({ reservaId }: { reservaId: string }) => <div data-testid="ficha-reserva">{reservaId}</div>,
+}));
+
 vi.mock("@/integrations/supabase/client", () => {
   const consulta = (head = false) => {
     const filtros: [string, string, unknown][] = [];
@@ -60,7 +69,7 @@ const pintar = (seccion: "reservas" | "facturas") =>
 beforeEach(() => {
   bd.revisados = [];
   bd.filas = [
-    aviso("r1", "reserva_nueva", false, { referencia_tipo: "reserva" }),
+    aviso("r1", "reserva_nueva", false, { referencia_tipo: "reserva", referencia_id: "res-r1" }),
     aviso("r2", "reserva_cancelada", false, { referencia_tipo: "reserva" }),
     aviso("r3", "reserva_nueva", true, { referencia_tipo: "reserva" }),
     // Ya no salen en el botón de Reservas (10/11/2026): solo nuevas y canceladas.
@@ -145,5 +154,20 @@ describe("Botón «Avisos» de cada sección", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByTestId("ruta")).toHaveTextContent("/reservas?tab=reservas");
     expect(bd.revisados[0]).toEqual({ p_ids: ["r1"], p_tipos: null });
+  });
+
+  it("con permiso de editar reservas, «Ver» en una reserva abre su ficha encima y el modal sigue abierto", async () => {
+    permiso.editaReservas = true;
+    try {
+      pintar("reservas");
+      fireEvent.click(await screen.findByRole("button", { name: "Avisos: 2 sin revisar" }));
+      const modal = await screen.findByRole("dialog");
+      fireEvent.click(await within(modal).findByRole("button", { name: "Ver: Aviso r1" }));
+      expect(await screen.findByTestId("ficha-reserva")).toHaveTextContent("res-r1");
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(bd.revisados[0]).toEqual({ p_ids: ["r1"], p_tipos: null });
+    } finally {
+      permiso.editaReservas = false;
+    }
   });
 });

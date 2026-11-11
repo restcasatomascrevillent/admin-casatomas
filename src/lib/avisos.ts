@@ -3,6 +3,11 @@ import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { rutaAlerta, TIPOS_ALERTA_FACTURAS } from "@/lib/facturas/alertas";
 
 /** Adónde lleva un aviso (null = no tiene origen al que ir). Lo comparten la campana y la página «Avisos». */
+/** La reserva de un aviso (nueva, cancelada, sin mesa…), si la trae: su ficha se abre en un modal (`useAbrirAviso`). */
+export function reservaDeAviso(n: { referencia_tipo?: string | null; referencia_id?: string | null }): string | null {
+  return n.referencia_tipo === "reserva" && n.referencia_id ? n.referencia_id : null;
+}
+
 export function rutaDeAviso(
   n: Pick<NotificacionDashboard, "tipo" | "referencia_tipo"> & { referencia_id?: string | null; datos?: NotificacionDashboard["datos"] },
 ): string | null {
