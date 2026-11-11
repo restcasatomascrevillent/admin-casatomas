@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Info, Search, Wand2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Wand2 } from "lucide-react";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { supabase } from "@/integrations/supabase/client";
 import { ReservasEnVivoContexto, useReservasEnVivo } from "@/hooks/useReservasEnVivo";
@@ -256,7 +256,6 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
           onBusqueda={setBusqueda}
           filtroTurno={filtroTurno}
           onFiltroTurno={cambiarTurno}
-          soloLectura={!puedeEditar}
           accion={
             puedeEditar ? (
               <div className="flex shrink-0 gap-2">
@@ -332,13 +331,6 @@ function turnoSiguiente(): "comida" | "cena" {
   return new Date().getHours() < 16 ? "comida" : "cena";
 }
 
-/** La ayuda (ⓘ) de «Hoy». Con solo «Ver» no hay acciones. */
-function ayudaVistaHoy(soloLectura: boolean): string {
-  return soloLectura
-    ? "A la izquierda, las reservas del turno por estado; a la derecha, las mesas de la sala. Pasa el ratón por una reserva para ver su mesa."
-    : "A la izquierda, las reservas del turno por estado («Sentar», «Liberar»; pasa el ratón para ver su mesa). A la derecha, las mesas: tócalas para ver, sentar o fijar. Las flechas (o ← →) cambian de sala.";
-}
-
 /**
  * La fila de filtros de «Hoy» de escritorio: buscador, «Todo el día / Comida / Cena», las acciones y la ayuda.
  * Mandan a la vez en la lista de la izquierda y en el plano. (Hasta el 07/11/2026 llevaba el selector
@@ -351,15 +343,12 @@ function BarraFiltrosHoy({
   onBusqueda,
   filtroTurno,
   onFiltroTurno,
-  soloLectura = false,
   accion,
 }: {
   /** El día que se ve, con flechas para pasar al anterior o al siguiente (11/11/2026). */
   dia?: { fecha: string; hoy: string; onCambiar: (fecha: string) => void };
   /** «Cerrar comida / Cerrar cena» del día elegido: a la derecha de las acciones. */
   servicios?: ReactNode;
-  /** Solo «Ver»: la ayuda no habla de acciones. */
-  soloLectura?: boolean;
   /** Botones de acción junto al turno («Organizar», «Sin reserva»). */
   accion?: ReactNode;
   busqueda: string;
@@ -413,14 +402,6 @@ function BarraFiltrosHoy({
             aria-label="Buscar reservas"
           />
         </div>
-        <span
-          role="note"
-          className="hidden shrink-0 text-muted-foreground sm:inline-flex"
-          aria-label={ayudaVistaHoy(soloLectura)}
-          title={ayudaVistaHoy(soloLectura)}
-        >
-          <Info className="h-4 w-4" aria-hidden="true" />
-        </span>
       </div>
       {(accion || servicios) && (
         <div className="flex flex-wrap items-center gap-2">

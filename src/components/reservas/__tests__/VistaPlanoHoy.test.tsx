@@ -737,26 +737,12 @@ describe("Plano de Hoy · fijo (escritorio): una sala a la vez con flechas", () 
     campo.remove();
   });
 
-  it("con ratón, flechas pequeñas debajo del plano (11/11/2026); con el dedo, ninguna (se desliza)", () => {
-    const { unmount } = montar({ fijo: true });
+  it("flechas pequeñas y discretas debajo del plano, también con el dedo (11/11/2026)", () => {
+    montar({ fijo: true });
     for (const nombre of [/^Sala anterior/, /^Sala siguiente/]) {
       expect(screen.getByRole("button", { name: nombre })).toHaveClass("h-8");
     }
-    unmount();
-    const original = window.matchMedia;
-    window.matchMedia = ((q: string) => ({
-      matches: q.includes("pointer: coarse"),
-      media: q,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    })) as unknown as typeof window.matchMedia;
-    try {
-      montar({ fijo: true });
-      expect(screen.queryByRole("button", { name: /^Sala anterior/ })).toBeNull();
-      expect(screen.queryByRole("button", { name: /^Sala siguiente/ })).toBeNull();
-    } finally {
-      window.matchMedia = original;
-    }
+    expect(screen.queryByRole("button", { name: /^Por sentar/ })).toBeNull();
   });
 
   it("sin plano realista ni zoom: mesas grandes como tarjetas (07/11/2026)", async () => {

@@ -119,7 +119,8 @@ export function CasillaOcupacion({
   // Con etiqueta de cierre (o de evento) la casilla de alto fijo tiene una línea más: la cifra cede
   // ese alto y «N res.» se calla (sigue en el tooltip y el aria-label) para que nada se monte ni se
   // corte por abajo (el tamaño de `medirCasilla` no cuenta con ella).
-  const lineasExtra = (textoEtiqueta ? 1 : 0) + (eventos && eventos.length > 0 && !compacta ? 1 : 0);
+  // La etiqueta («Cerrado», «Sin cena», «Sin web») va en la línea del número desde el 11/11/2026: no resta alto.
+  const lineasExtra = eventos && eventos.length > 0 && !compacta ? 1 : 0;
   const verReservas = fija && densidad === "completa" && lineasExtra === 0;
   const verPorcentaje = fija && densidad !== "compacta";
   const nivel = resumen?.nivel ?? "vacio";
@@ -210,47 +211,42 @@ export function CasillaOcupacion({
         seleccionada && "z-10 ring-2 ring-primary ring-offset-1",
       )}
     >
-      {/* Número del día y, si toca, el punto de «sin sala». La cifra de comensales va siempre en su propia línea. */}
-      <span className="flex items-start justify-between gap-1">
-        <span className="flex min-w-0 items-start gap-0.5">
-          <span
-            className={cn(
-              "flex items-center justify-center rounded-full px-1 font-medium leading-none tabular-nums",
-              !fija && "h-6 min-w-6 text-base sm:h-7 sm:min-w-7 sm:text-lg",
-              fija && (densidad === "completa" ? "h-7 min-w-7 text-lg" : "h-6 min-w-6 text-lg"),
-              esHoy && cn(estilo.hoy, "font-semibold"),
-            )}
-          >
-            {format(dia, "d")}
-          </span>
-          {compacta && conReservas && resumen.sinSalaEnVentana > 0 && indicadores}
-        </span>
-        {!compacta && <span className="flex shrink-0 items-center gap-0.5">{indicadores}</span>}
-      </span>
-
-      {/* La etiqueta de cierre no se recorta nunca (dueño, 2026-11-10: «la palabra cerrado se ve
-          cortada»): `shrink-0` para que la columna flex no la aplaste contra la cifra en una casilla
-          de alto fijo, sin `truncate` (si un día no cabe en una línea, parte en dos) y también en la
-          densidad compacta, donde antes los días de medio servicio la escondían. */}
-      {textoEtiqueta && (
+      {/* 11/11/2026 (dueño: «optimiza los recuadros de los días, no se ven bien, están desfasados»): todas las casillas
+          con la MISMA estructura. Arriba, en una línea, el número del día y su etiqueta («CERRADO», «SIN CENA», «Sin
+          web») como insignia pequeña; debajo, la cifra de comensales centrada en el hueco que queda. Antes la etiqueta
+          ocupaba su propia línea y empujaba la cifra, que salía en sitios distintos según el día. */}
+      <span className="flex min-w-0 shrink-0 items-center gap-1">
         <span
-          data-testid="cierre-casilla"
           className={cn(
-            "block shrink-0 break-words text-sm leading-tight",
-            textoCierre ? "font-semibold uppercase" : "font-medium",
-            cierraComida && cierraCena ? "text-destructive" : "text-muted-foreground",
+            "flex shrink-0 items-center justify-center rounded-full px-1 font-medium leading-none tabular-nums",
+            !fija && "h-6 min-w-6 text-base sm:h-7 sm:min-w-7 sm:text-lg",
+            fija && (densidad === "completa" ? "h-7 min-w-7 text-lg" : "h-6 min-w-6 text-lg"),
+            esHoy && cn(estilo.hoy, "font-semibold"),
           )}
         >
-          {textoCierre ?? (
-            // «Sin reservas web» parte en dos líneas en una casilla estrecha (iPad vertical) y empuja
-            // el % fuera: ahí basta «Sin web» (el aria-label lo dice entero). La casilla es contenedor.
-            <>
-              <span className="[@container(min-width:7.5rem)]:hidden">Sin web</span>
-              <span className="hidden [@container(min-width:7.5rem)]:inline">{textoSinWeb}</span>
-            </>
-          )}
+          {format(dia, "d")}
         </span>
-      )}
+        {textoEtiqueta && (
+          <span
+            data-testid="cierre-casilla"
+            className={cn(
+              // Sin recortar (dueño, 10/11/2026: «la palabra cerrado se ve cortada»): palabras cortas en una línea.
+              "shrink-0 whitespace-nowrap rounded px-1 text-[11px] leading-5 sm:text-xs",
+              textoCierre ? "font-semibold uppercase" : "font-medium",
+              cierraComida && cierraCena ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground",
+            )}
+            title={textoCierre ?? textoSinWeb ?? undefined}
+          >
+            {textoCierre ?? (
+              <>
+                <span className="[@container(min-width:9rem)]:hidden">Sin web</span>
+                <span className="hidden [@container(min-width:9rem)]:inline">{textoSinWeb}</span>
+              </>
+            )}
+          </span>
+        )}
+        <span className="ml-auto flex shrink-0 items-center gap-0.5">{indicadores}</span>
+      </span>
       {eventos && eventos.length > 0 && (
         <span
           data-testid="evento-casilla"
@@ -265,7 +261,8 @@ export function CasillaOcupacion({
       )}
       {conReservas && (
         <>
-          {cifra}
+          {/* La cifra, centrada en el hueco que queda: en todas las casillas a la misma altura. */}
+          <span className="flex min-h-0 flex-1 items-center justify-center">{cifra}</span>
           {(verReservas || !fija) && (
             <span
               data-testid="reservas-casilla"
