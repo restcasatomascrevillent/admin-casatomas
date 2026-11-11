@@ -224,6 +224,7 @@ export const TOOLS = [
       orden: { type: ["string", "null"], enum: ["importe", "cantidad", "precio", null], description: "precio = mas barato primero" },
       excluir: { type: ["string", "null"], description: "Palabras a quitar ('caja')" },
       unidad: UNIDAD,
+      proveedor: { type: ["string", "null"], description: "No va en producto" },
     }),
   fn("gasto_por_categoria",
     "Gasto por categoria (vinos, marisco, limpieza...) con sus productos top ('que licor compro mas'), o de " +
@@ -759,7 +760,7 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
           p_limite: LIMITES.compras_producto,
           p_orden: texto(args.orden),
           p_excluir: texto(args.excluir),
-          ...opcionales({ p_unidad: texto(args.unidad) }),
+          ...opcionales({ p_unidad: texto(args.unidad), p_proveedor: texto(args.proveedor) }),
         },
         limite: null,
         respaldoSemantico: { consulta: producto, param: "p_embedding" },

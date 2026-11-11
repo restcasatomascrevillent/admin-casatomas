@@ -21,6 +21,7 @@ import {
   idsDeFilas,
   unirReferencias,
   esErrorCorregible,
+  hoyMadrid,
   marcarResultado,
   mesesIncompletosRecientes,
   parametrosModelo,
@@ -64,8 +65,15 @@ export interface HerramientaEjecutada {
   duracion_ms: number;
 }
 
-/** En la traza de la evaluación, además, el error que vio el modelo (recortado). */
-export type HerramientaTrazada = HerramientaEjecutada & { error?: string };
+/** Proveedores y productos que salieron en el resultado de una herramienta (para el hilo). */
+export interface ResumenResultado { proveedores: string[]; productos: string[] }
+
+/**
+ * En la traza, además, el error que vio el modelo (recortado) y el resumen del
+ * resultado. chat-facturas la devuelve al panel, que la guarda con la respuesta
+ * (adjunto `contexto`) y con el 👍/👎 (chat_feedback.herramientas).
+ */
+export type HerramientaTrazada = HerramientaEjecutada & { error?: string; resumen?: ResumenResultado };
 
 /** Traza opcional para la evaluación: cada llamada a chat/completions y cada herramienta. */
 export interface Traza {
@@ -88,8 +96,18 @@ export interface OpcionesBucle {
   supabase: Cliente;
   claveOpenAI: string;
   mensaje: string;
-  /** Turnos anteriores ya ordenados (antiguo → reciente). */
-  historial?: { role: "user" | "assistant"; content: string }[];
+  /**
+   * Turnos anteriores ya ordenados (antiguo → reciente). Las respuestas pueden
+   * traer las herramientas que usaron (con su resumen): se reconstruyen como
+   * tool_calls para que el seguimiento («Y de vaca») sepa de qué se hablaba.
+   * Se recorta con recortarHistorial.
+   */
+  historial?: TurnoHistorial[];
+  /**
+   * prompt_cache_key de OpenAI: agrupa las peticiones que comparten prefijo
+   * (las rondas de una misma conversación). Por defecto, "chat-facturas".
+   */
+  claveCache?: string;
   modelo: string;
   respaldo?: string | null;
   uso: EstadoUso;
@@ -129,6 +147,162 @@ interface Ctx {
   pregunta: string;
   clave: string;
   fetchImpl: typeof fetch;
+}
+
+// ─── Hilo de la conversación (11/11/2026) ────────────────────────────────────
+//  Antes solo llegaba el TEXTO de los turnos anteriores: si la respuesta no
+//  repetía el proveedor («la ternera te sale a 12,40 €/kg»), el seguimiento
+//  «Y de vaca» perdía «de Embajadores». Ahora cada respuesta guarda qué
+//  herramientas usó (nombre, argumentos y proveedores/productos del resultado)
+//  y aquí se reconstruyen como tool_calls + resultado resumido.
+
+/** Herramienta usada en un turno anterior (lo que guarda el panel en el adjunto `contexto`). */
+export interface ContextoHerramienta {
+  nombre: string;
+  argumentos?: unknown;
+  error?: string;
+  resumen?: ResumenResultado;
+}
+
+export interface TurnoHistorial {
+  role: "user" | "assistant";
+  content: string;
+  herramientas?: ContextoHerramienta[];
+}
+
+/** Últimos mensajes que llegan al modelo (5 preguntas con su respuesta). */
+export const MAX_MENSAJES_HISTORIAL = 10;
+/** Tope por turno: una tabla larga de hace tres preguntas no aporta al seguimiento. */
+export const MAX_CHARS_TURNO = 2_000;
+/** Tope del historial entero (se quitan los turnos más antiguos). */
+export const MAX_CHARS_HISTORIAL = 10_000;
+const MAX_HERRAMIENTAS_TURNO = 4;
+const MAX_NOMBRES_RESUMEN = 6;
+
+/** Fecha fuera del prefijo cacheable: el prompt de sistema dice dónde está. */
+const FECHA_EN_AVISO = "la fecha del aviso FECHA, justo antes de la pregunta";
+export const CLAVE_CACHE_POR_DEFECTO = "chat-facturas";
+
+/**
+ * Lo que queda del historial: los MAX_MENSAJES_HISTORIAL más recientes, cada
+ * uno recortado a MAX_CHARS_TURNO, y sin pasar de MAX_CHARS_HISTORIAL en total
+ * (se quitan los más antiguos). Empieza siempre por una pregunta del usuario.
+ */
+export function recortarHistorial(historial: TurnoHistorial[] | undefined): TurnoHistorial[] {
+  const limpios = (historial ?? [])
+    .filter((m) => m && typeof m.content === "string" && m.content.trim())
+    .slice(-MAX_MENSAJES_HISTORIAL)
+    .map((m) => ({
+      ...m,
+      role: m.role === "user" ? "user" as const : "assistant" as const,
+      content: m.content.length > MAX_CHARS_TURNO ? m.content.slice(0, MAX_CHARS_TURNO) + " […]" : m.content,
+    }));
+  const salida: TurnoHistorial[] = [];
+  let total = 0;
+  for (let i = limpios.length - 1; i >= 0; i--) {
+    total += limpios[i].content.length;
+    if (total > MAX_CHARS_HISTORIAL && salida.length > 0) break;
+    salida.unshift(limpios[i]);
+  }
+  while (salida.length > 0 && salida[0].role !== "user") salida.shift();
+  return salida;
+}
+
+const CLAVES_RESUMEN = /"(proveedor(?:_txt|_nombre)?|producto(?:_nombre)?|nombre_producto)"\s*:\s*"((?:[^"\\]|\\.){1,120})"/g;
+
+/** Proveedores y productos que aparecen en el resultado (JSON, quizá recortado) de una herramienta. */
+export function resumenDeResultado(contenido: string): ResumenResultado {
+  const proveedores = new Set<string>();
+  const productos = new Set<string>();
+  for (const m of contenido.matchAll(CLAVES_RESUMEN)) {
+    let valor = m[2];
+    try { valor = JSON.parse(`"${m[2]}"`); } catch { /* se queda tal cual */ }
+    valor = valor.trim();
+    if (!valor) continue;
+    const destino = m[1].startsWith("proveedor") ? proveedores : productos;
+    if (destino.size < MAX_NOMBRES_RESUMEN) destino.add(valor);
+  }
+  return { proveedores: [...proveedores], productos: [...productos] };
+}
+
+/** Argumentos sin los null (strict los manda todos), para que el resumen sea corto. */
+function argumentosUtiles(a: unknown): Record<string, unknown> {
+  if (!a || typeof a !== "object" || Array.isArray(a)) return {};
+  const salida: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(a as Record<string, unknown>)) {
+    if (v === null || v === undefined || v === "") continue;
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const dentro = argumentosUtiles(v);
+      if (Object.keys(dentro).length > 0) salida[k] = dentro;
+    } else salida[k] = v;
+  }
+  return salida;
+}
+
+/**
+ * Mensajes de Chat Completions para el historial. Una respuesta con
+ * herramientas se reconstruye como: assistant con tool_calls → un mensaje tool
+ * por llamada con el resumen (proveedores/productos, nunca cifras: para cifras
+ * hay que volver a consultar) → assistant con el texto de la respuesta.
+ */
+export function mensajesDeHistorial(historial: TurnoHistorial[]): Mensaje[] {
+  const salida: Mensaje[] = [];
+  historial.forEach((m, i) => {
+    const hs = m.role === "assistant" ? (m.herramientas ?? []).filter((h) => h && typeof h.nombre === "string" && h.nombre).slice(0, MAX_HERRAMIENTAS_TURNO) : [];
+    if (hs.length > 0) {
+      const ids = hs.map((_, j) => `hist_${i}_${j}`);
+      salida.push({
+        role: "assistant",
+        content: null,
+        tool_calls: hs.map((h, j) => ({
+          id: ids[j], type: "function",
+          function: { name: h.nombre, arguments: JSON.stringify(argumentosUtiles(h.argumentos)) },
+        })),
+      });
+      hs.forEach((h, j) => {
+        salida.push({
+          role: "tool",
+          tool_call_id: ids[j],
+          content: JSON.stringify({
+            turno_anterior: true,
+            ...(h.error ? { error: String(h.error).slice(0, 200) } : {}),
+            ...(h.resumen?.proveedores?.length ? { proveedores: h.resumen.proveedores } : {}),
+            ...(h.resumen?.productos?.length ? { productos: h.resumen.productos } : {}),
+            nota: "Resumen de un turno anterior (sin cifras). Para dar cifras, vuelve a consultar.",
+          }),
+        });
+      });
+    }
+    salida.push({ role: m.role, content: m.content });
+  });
+  return salida;
+}
+
+/** «Y de vaca», «¿y en cerveza?», «lo mismo de octubre»: la pregunta se apoya en la anterior. */
+export function esSeguimiento(mensaje: string): boolean {
+  const t = mensaje.trim().toLowerCase().replace(/^[¿¡]\s*/, "");
+  if (/^(y|e|tambi[eé]n|lo mismo|igual|otra vez|compáralo|comparalo|hazme la comparativa)(\s|[?.!,]|$)/.test(t)) return true;
+  return t.split(/\s+/).filter(Boolean).length <= 2;
+}
+
+/**
+ * Aviso de hilo para un seguimiento: la pregunta anterior y lo que se consultó
+ * (herramienta, argumentos, proveedores). null si no es seguimiento o no hay
+ * turno anterior.
+ */
+export function pistaDelHilo(historial: TurnoHistorial[], mensaje: string): string | null {
+  if (!esSeguimiento(mensaje)) return null;
+  const previa = [...historial].reverse().find((m) => m.role === "user");
+  if (!previa) return null;
+  const respuesta = [...historial].reverse().find((m) => m.role === "assistant" && (m.herramientas?.length ?? 0) > 0);
+  const consultas = (respuesta?.herramientas ?? []).slice(0, MAX_HERRAMIENTAS_TURNO).map((h) => {
+    const prov = h.resumen?.proveedores?.length ? ` → proveedores: ${h.resumen.proveedores.join(", ")}` : "";
+    return `${h.nombre} ${JSON.stringify(argumentosUtiles(h.argumentos))}${prov}`;
+  });
+  const pregunta = previa.content.length > 300 ? previa.content.slice(0, 300) + "…" : previa.content;
+  return `HILO: «${mensaje.trim().slice(0, 200)}» sigue a la pregunta anterior «${pregunta}»` +
+    (consultas.length > 0 ? `, que consultó: ${consultas.join("; ")}` : "") +
+    ". Completa la pregunta con lo que no cambia (proveedor, periodo, tipo de dato) y consulta de nuevo con las herramientas.";
 }
 
 // ─── Utilidades ──────────────────────────────────────────────────────────────
@@ -273,11 +447,17 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       data = r.data;
       // compras_producto: si el texto no casa con nada, UNA segunda llamada
       // con el embedding (solo sugerencias). Se paga solo en ese caso.
+      // Es SOLO un extra de sugerencias: si falla (OpenAI, red, RPC) se queda el resultado
+      // textual (sin datos) en vez de tumbar la respuesta con «problema tecnico».
       if (ll.respaldoSemantico && necesitaRespaldoSemantico(data)) {
-        const embedding = await embedConsulta(ll.respaldoSemantico.consulta, ctx);
-        const r2 = await supabase.rpc(ll.rpc, { ...ll.params, [ll.respaldoSemantico.param]: embedding });
-        if (r2.error) throw r2.error;
-        data = r2.data;
+        try {
+          const embedding = await embedConsulta(ll.respaldoSemantico.consulta, ctx);
+          const r2 = await supabase.rpc(ll.rpc, { ...ll.params, [ll.respaldoSemantico.param]: embedding });
+          if (r2.error) throw r2.error;
+          data = r2.data;
+        } catch (e) {
+          console.warn("[chat-facturas] respaldo semantico fallido:", e instanceof Error ? e.message : (e as { message?: string })?.message);
+        }
       }
     } else {
       if (ll.textoPrimero) {
@@ -348,16 +528,23 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   let modelo = o.modelo;
   const mensaje = o.mensaje;
 
-  const messages: Mensaje[] = [{ role: "system", content: systemPrompt(o.hoy) }];
-  for (const m of o.historial ?? []) {
-    if (!m.content) continue;
-    messages.push({ role: m.role === "user" ? "user" : "assistant", content: m.content });
-  }
-  // Garantizar que el ultimo turno es el mensaje actual del usuario.
-  const last = messages[messages.length - 1];
-  if (!last || last.role !== "user" || last.content !== mensaje) {
-    messages.push({ role: "user", content: mensaje });
-  }
+  // ── Prompt caching (11/11/2026) ──
+  //  OpenAI cachea el prefijo idéntico: herramientas + prompt de sistema van
+  //  primero y SIN fecha (la fecha va en el aviso FECHA, al final, junto a la
+  //  pista). Después, el historial, que también se repite entre las rondas
+  //  del bucle y entre preguntas de la misma conversación.
+  const messages: Mensaje[] = [{ role: "system", content: systemPrompt(FECHA_EN_AVISO) }];
+  let historial = recortarHistorial(o.historial);
+  // El panel guarda la pregunta antes de llamar: si ya viene al final del historial, no se repite.
+  const ultimo = historial[historial.length - 1];
+  if (ultimo && ultimo.role === "user" && ultimo.content === mensaje) historial = historial.slice(0, -1);
+  messages.push(...mensajesDeHistorial(historial));
+  messages.push({ role: "user", content: mensaje });
+
+  // Aviso final (sistema, justo antes de la pregunta): fecha, hilo y pista.
+  const aviso: string[] = [`FECHA: hoy es ${o.hoy ?? hoyMadrid()}.`];
+  const hilo = pistaDelHilo(historial, String(mensaje));
+  if (hilo) aviso.push(hilo);
 
   // ── Pista de la pregunta (20261107100000) ──
   //  Que es cada palabra en el catalogo («vino» = familia Vinos), el tema del
@@ -379,10 +566,11 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
       }
     }
     const pista = pistaPregunta(actual, anterior, incR.error ? [] : mesesIncompletosRecientes(incR.data));
-    if (pista) messages.splice(messages.length - 1, 0, { role: "system", content: pista });
+    if (pista) aviso.push(pista);
   } catch (e) {
     console.warn("[chat-facturas] pista de la pregunta fallida:", e instanceof Error ? e.message : e);
   }
+  messages.splice(messages.length - 1, 0, { role: "system", content: aviso.join("\n") });
 
   // ── Bucle de function-calling ──
   //  Acotado por tres lados: MAX_PASOS rondas, MAX_TOOL_CALLS_POR_RONDA
@@ -400,9 +588,13 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   let huboFalloDeHerramienta = false;
   const adjuntos: Adjunto[] = [];
   const referenciasAcum: DocRef[][] = [];
-  const apuntar = (h: HerramientaEjecutada, error?: string) => {
+  const apuntar = (h: HerramientaEjecutada, error?: string, resumen?: ResumenResultado) => {
     o.alEjecutarHerramienta?.(h);
-    o.traza?.herramientas.push(error ? { ...h, error: error.slice(0, 300) } : h);
+    o.traza?.herramientas.push({
+      ...h,
+      ...(error ? { error: error.slice(0, 300) } : {}),
+      ...(resumen && (resumen.proveedores.length || resumen.productos.length) ? { resumen } : {}),
+    });
   };
 
   for (let paso = 0; paso < MAX_PASOS; paso++) {
@@ -419,6 +611,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
       body: JSON.stringify({
         model: modelo,
         messages,
+        prompt_cache_key: o.claveCache ?? CLAVE_CACHE_POR_DEFECTO,
         ...parametrosModelo(modelo, MAX_TOKENS_RESPUESTA),
         ...(o.parametrosExtra ?? {}),
         ...(esUltimo ? {} : { tools: TOOLS }),
@@ -453,7 +646,11 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
         const inicioTool = Date.now();
         const r = await ejecutarTool(tc.function.name, args, supabase, ctx);
         const textoError = (() => { try { const e = JSON.parse(r.contenido).error; return e ? String(e) : ""; } catch { return ""; } })();
-        apuntar({ nombre: tc.function.name, argumentos: args, resultado: r.fallo || textoError ? "fallida" : "completada", duracion_ms: Date.now() - inicioTool }, textoError || undefined);
+        apuntar(
+          { nombre: tc.function.name, argumentos: args, resultado: r.fallo || textoError ? "fallida" : "completada", duracion_ms: Date.now() - inicioTool },
+          textoError || undefined,
+          textoError ? undefined : resumenDeResultado(r.contenido),
+        );
         if (r.fallo) huboFalloDeHerramienta = true;
         if (r.adjunto) adjuntos.push(r.adjunto);
         if (r.referencias?.length) referenciasAcum.push(r.referencias);

@@ -226,6 +226,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     nuevaConversacion,
     enviarMensaje,
     regenerarRespuesta,
+    valorarRespuesta,
     eliminarConversacion,
   } = useChatFacturas({ activo: conIa });
   // Lo escrito en la caja vive aquí: sigue al pasar del panel a pantalla completa y al volver.
@@ -399,6 +400,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
           sugerencias={sugerencias}
           onEnviar={(texto) => void enviarMensaje(texto)}
           onRegenerar={regenerarRespuesta}
+          onValorar={valorarRespuesta}
           fijadas={idsFijadas}
           onFijar={fijar}
           onQuitarFijada={quitar}
@@ -426,6 +428,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         sugerencias={sugerencias}
         onEnviar={(texto) => void enviarMensaje(texto)}
         onRegenerar={regenerarRespuesta}
+        onValorar={valorarRespuesta}
         fijadas={idsFijadas}
         onFijar={fijar}
         onQuitarFijada={quitar}
