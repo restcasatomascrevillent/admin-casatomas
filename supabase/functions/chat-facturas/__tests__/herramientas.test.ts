@@ -139,7 +139,7 @@ describe("TOOLS", () => {
     // +174, ~45 tokens por ronda).
     // 11.9xx con margenes_carta y alertas_precio (16/11/2026: margenes de la carta y avisos de
     // Analisis; +1.310, ~330 tokens por ronda; las pautas de lectura van en "como_leer" del resultado).
-    expect(tamano).toBeLessThan(11_950); // + IRPF (07/11/2026)
+    expect(tamano).toBeLessThan(12_050); // + IRPF (07/11/2026) + proveedor en compras_producto (23/11/2026)
     for (const t of TOOLS) expect(t.function.description.length, t.function.name).toBeLessThan(330);
   });
 });
@@ -729,7 +729,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
     expect(p).toMatch(/Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg»/);
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(11_950); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(12_050); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
 });
 
@@ -763,7 +763,7 @@ describe("ronda 9 (10/10/2026, migracion 20261010170000)", () => {
 
   it("tamaños: el prompt y TOOLS no crecen respecto a la ronda 8 (5.728 y 9.620 caracteres)", () => {
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(11_950); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(12_050); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
 });
 
@@ -938,5 +938,15 @@ describe("margenes_carta y alertas_precio (16/11/2026, migracion 20261116100000)
 
   it("el prompt manda seguir como_leer", () => {
     expect(systemPrompt("2026-11-16")).toMatch(/como_leer/);
+  });
+});
+
+describe("compras_producto con proveedor (11/11/2026)", () => {
+  it("manda p_proveedor solo si viene, sin mezclarlo con el producto", () => {
+    const con = prepararLlamada("compras_producto", { producto: "chuletero", proveedor: "Grupo Embajadores" });
+    expect(con).toMatchObject({ rpc: "compras_producto_agente" });
+    expect((con as { params: Record<string, unknown> }).params).toMatchObject({ p_texto: "chuletero", p_proveedor: "Grupo Embajadores" });
+    const sin = prepararLlamada("compras_producto", { producto: "chuletero", proveedor: null });
+    expect(Object.keys((sin as { params: Record<string, unknown> }).params)).not.toContain("p_proveedor");
   });
 });
