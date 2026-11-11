@@ -239,7 +239,7 @@ export function ListaDocumentos({
                   </span>
                   {mesesIncompletos?.has(mes.clave) && (
                     <span
-                      className="whitespace-nowrap text-xs font-medium text-amber-700 dark:text-amber-400"
+                      className="whitespace-nowrap text-xs font-medium text-amber-700 max-sm:basis-full dark:text-amber-400"
                       title="Tiene muchos menos documentos que un mes normal: faltan facturas por subir"
                       data-mes-incompleto
                     >
@@ -248,7 +248,7 @@ export function ListaDocumentos({
                   )}
                   <span className="sr-only"> · </span>
                 </span>
-                <span className="flex shrink-0 flex-wrap items-baseline justify-end gap-x-1 text-right">
+                <span className="flex shrink-0 flex-col items-end text-right sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-end sm:gap-x-1">
                   <span className="text-[13px] font-semibold tabular-nums text-foreground/80">{formatImporte(mes.total)}</span>
                   <span className="text-xs font-normal text-muted-foreground">
                     <span className="sr-only"> </span>con IVA

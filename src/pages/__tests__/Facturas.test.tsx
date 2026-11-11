@@ -199,9 +199,9 @@ describe("Facturas · pestañas", () => {
     expect(screen.getByText("Contenido del chat")).toBeInTheDocument();
   });
 
-  it("en el móvil las pestañas van solo con icono (a 390 px el gasto de IA tapaba «Cargar»)", () => {
+  it("en el móvil las pestañas llevan icono y nombre visible (11/11/2026); los botones bajan a su fila", () => {
     montar();
-    for (const p of within(screen.getByRole("tablist")).getAllByRole("tab")) expect(p.className).toContain("min-w-11");
+    for (const p of within(screen.getByRole("tablist")).getAllByRole("tab")) expect(p.className).not.toContain("min-w-11");
     expect(screen.getByRole("tab", { name: /^Cargar/ })).toHaveAccessibleName(/Cargar/);
   });
 
