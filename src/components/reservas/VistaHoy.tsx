@@ -1,6 +1,6 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Info, Search, Wand2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Info, Search, Wand2 } from "lucide-react";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { supabase } from "@/integrations/supabase/client";
 import { ReservasEnVivoContexto, useReservasEnVivo } from "@/hooks/useReservasEnVivo";
@@ -12,7 +12,15 @@ import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { admiteReservas } from "@/lib/reservas/negocios";
-import { COLUMNAS_RESERVAS_HOY, guardarSalaPlanoHoy, leerSalaPlanoHoy, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
+import {
+  COLUMNAS_RESERVAS_HOY,
+  etiquetaDiaReservas,
+  guardarSalaPlanoHoy,
+  leerSalaPlanoHoy,
+  sumarDias,
+  turnoPorDefecto,
+  type FiltroTurnoHoy,
+} from "@/lib/reservas/vistaHoy";
 import { VistaPlanoHoy, type ReservaPlanoHoy } from "./servicio/VistaPlanoHoy";
 import { consultaReservasHoy } from "@/lib/reservas/consultaReservasHoy";
 import { AvisoActualizando } from "@/components/panel/AvisoActualizando";
@@ -77,10 +85,35 @@ const SIN_SONDEO = { refetchInterval: false } as const;
  * `onAbrirSala` (sin uso desde el 10/10/2026): abría el reparto de mesas de una sala (`Reservas.tsx`, el
  * mismo salto que el Calendario: `PlanoEspacio2D`, con su conmutador al modo servicio).
  */
+/**
+ * Turno elegido en Reservas (11/11/2026, petición del dueño): sale «Comida» y, desde las 18:00, pasa sola a
+ * «Cena». Si alguien elige otro a mano, se respeta y ya no cambia solo.
+ */
+function useTurnoAutomatico() {
+  const [filtroTurno, setFiltroTurno] = useState<FiltroTurnoHoy>(() => turnoPorDefecto());
+  const aMano = useRef(false);
+  useEffect(() => {
+    const comprobar = () => {
+      if (!aMano.current) setFiltroTurno((actual) => (actual === turnoPorDefecto() ? actual : turnoPorDefecto()));
+    };
+    const id = window.setInterval(comprobar, 60_000);
+    document.addEventListener("visibilitychange", comprobar);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", comprobar);
+    };
+  }, []);
+  const elegir = useCallback((t: FiltroTurnoHoy) => {
+    aMano.current = true;
+    setFiltroTurno(t);
+  }, []);
+  return [filtroTurno, elegir] as const;
+}
+
 export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } = {}) {
   // Lo que comparten las dos vistas: el buscador y el turno de la fila de filtros, y la vista elegida.
   const [busqueda, setBusqueda] = useState("");
-  const [filtroTurno, setFiltroTurno] = useState<FiltroTurnoHoy>("todo");
+  const [filtroTurno, setFiltroTurno] = useTurnoAutomatico();
   const [salaPlano, setSalaPlano] = useState<string | null>(leerSalaPlanoHoy);
   // Móvil (< 768 px): vista propia para el camarero (`movil/VistaHoyMovil.tsx`). Tablet y escritorio, igual.
   const esMovil = useIsMobile();
@@ -114,8 +147,13 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   // para toda la pestaña (kanban, cifras y la rejilla
   // por cuartos, que no abre la suya: `ReservasEnVivoContexto`).
   useReservasEnVivo();
-  // Cambia a medianoche (la tablet se queda toda la noche en «Hoy»).
-  const hoy = useHoyLocal();
+  // Reservas con días (11/11/2026, petición del dueño: «en vez de Hoy que sea Reservas, que tenga para pasar
+  // días»): `hoy` es el día que se ve; sin elegir ninguno, el de hoy (cambia a medianoche: la tablet se queda
+  // toda la noche en Reservas).
+  const hoyReal = useHoyLocal();
+  const [diaElegido, setDiaElegido] = useState<string | null>(null);
+  const hoy = diaElegido ?? hoyReal;
+  const irADia = (clave: string) => setDiaElegido(clave === hoyReal ? null : clave);
   /**
    * Reservas de hoy de Casa Tomás, para el plano del servicio y la vista de hoy en móvil
    * (`marca`, para quedarse con las de Casa Tomás: `admiteReservas`).
@@ -211,6 +249,7 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
       >
         {avisoRed}
         <BarraFiltrosHoy
+          dia={{ fecha: hoy, hoy: hoyReal, onCambiar: irADia }}
           busqueda={busqueda}
           onBusqueda={setBusqueda}
           filtroTurno={filtroTurno}
@@ -259,6 +298,7 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             reservasError={errorReservasHoy}
             onReintentarReservas={() => void refetchReservasHoy()}
             reservaResaltada={señalada}
+            fecha={hoy}
           />
         </div>
       </div>
@@ -303,6 +343,7 @@ function ayudaVistaHoy(soloLectura: boolean): string {
  * «Kanban | Plano»; el kanban ya no sale en Hoy.)
  */
 function BarraFiltrosHoy({
+  dia,
   busqueda,
   onBusqueda,
   filtroTurno,
@@ -310,6 +351,8 @@ function BarraFiltrosHoy({
   soloLectura = false,
   accion,
 }: {
+  /** El día que se ve, con flechas para pasar al anterior o al siguiente (11/11/2026). */
+  dia?: { fecha: string; hoy: string; onCambiar: (fecha: string) => void };
   /** Solo «Ver»: la ayuda no habla de acciones. */
   soloLectura?: boolean;
   /** Botones de acción junto al turno («Organizar», «Sin reserva»). */
@@ -321,6 +364,24 @@ function BarraFiltrosHoy({
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
+      {dia && (
+        <div className="flex shrink-0 items-center gap-1" role="group" aria-label="Día">
+          <Button type="button" variant="outline" size="icon" className="touch-hit h-11 w-11" aria-label="Día anterior" onClick={() => dia.onCambiar(sumarDias(dia.fecha, -1))}>
+            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+          </Button>
+          <span className="min-w-[11rem] px-1 text-center text-base font-semibold" aria-live="polite" data-testid="dia-reservas">
+            {etiquetaDiaReservas(dia.fecha, dia.hoy)}
+          </span>
+          <Button type="button" variant="outline" size="icon" className="touch-hit h-11 w-11" aria-label="Día siguiente" onClick={() => dia.onCambiar(sumarDias(dia.fecha, 1))}>
+            <ChevronRight className="h-5 w-5" aria-hidden="true" />
+          </Button>
+          {dia.fecha !== dia.hoy && (
+            <Button type="button" variant="ghost" className="touch-hit h-11 px-3" onClick={() => dia.onCambiar(dia.hoy)}>
+              Hoy
+            </Button>
+          )}
+        </div>
+      )}
       <div className="relative w-full min-w-0 sm:order-1 sm:w-64">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
         <Input

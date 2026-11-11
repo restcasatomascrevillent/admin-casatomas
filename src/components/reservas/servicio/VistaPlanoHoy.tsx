@@ -187,6 +187,8 @@ export interface VistaPlanoHoyProps {
    * abrirla, sus mesas se resaltan y, si están en otra sala, el plano salta a esa sala (solo `fijo`).
    */
   reservaResaltada?: string | null;
+  /** Día que se ve (11/11/2026, Reservas con días). Sin él, hoy (y cambia a medianoche). */
+  fecha?: string;
 }
 
 /**
@@ -227,9 +229,11 @@ export function VistaPlanoHoy({
   onReintentarReservas,
   fijo = false,
   reservaResaltada: reservaResaltadaExterna = null,
+  fecha,
 }: VistaPlanoHoyProps) {
-  // Cambia a medianoche: la tablet se queda en «Hoy» toda la noche.
-  const hoy = useHoyLocal();
+  // Cambia a medianoche: la tablet se queda en «Hoy» toda la noche. Con `fecha`, el día elegido.
+  const hoyLocal = useHoyLocal();
+  const hoy = fecha ?? hoyLocal;
   const esMovil = useIsMobile();
   const enHojas = useIsBelow(ANCHO_PANEL_LATERAL) || fijo;
   const ahora = useAhora();

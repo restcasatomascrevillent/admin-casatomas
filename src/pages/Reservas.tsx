@@ -460,7 +460,8 @@ export default function Reservas() {
         <PestanasPagina
           accionesDebajoEnMovil="lg"
           pestanas={[
-            { valor: "hoy", etiqueta: "Hoy" },
+            // «Hoy» pasa a llamarse «Reservas», con flechas para pasar días (11/11/2026, petición del dueño).
+            { valor: "hoy", etiqueta: "Reservas" },
             { valor: "reservas", etiqueta: "Lista" },
             { valor: "calendario", etiqueta: "Calendario" },
             { valor: "blacklist", etiqueta: "Blacklist" },
