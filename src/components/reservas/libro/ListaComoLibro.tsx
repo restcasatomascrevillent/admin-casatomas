@@ -50,13 +50,11 @@ function Hoja({
   fecha,
   lado,
   onAbrir,
-  onAnadir,
   resaltada,
 }: {
   fecha: string;
   lado: "izquierda" | "derecha" | "sola";
   onAbrir: (id: string) => void;
-  onAnadir?: (fecha: string) => void;
   resaltada?: string | null;
 }) {
   return (
@@ -71,18 +69,8 @@ function Hoja({
         lado === "sola" && "rounded-xl",
       )}
     >
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-5 py-3">
-        <h2 className="mr-auto text-xl font-semibold sm:text-2xl">{tituloHoja(fecha)}</h2>
-        {onAnadir && (
-          <Button
-            type="button"
-            className="h-12 gap-2 bg-emerald-600 px-5 text-base font-semibold text-white shadow-sm hover:bg-emerald-700 [&_svg]:size-5"
-            onClick={() => onAnadir(fecha)}
-          >
-            <Plus /> Añadir reserva a este día
-          </Button>
-        )}
-      </div>
+      {/* 11/11/2026 («ajusta la estética»): el día ya está en la barra; aquí solo para el lector de pantalla. */}
+      <h2 className="sr-only">{tituloHoja(fecha)}</h2>
       {/* `touch-pan-y` y `overflow-x-hidden` AQUÍ, en el contenedor con scroll: si no, el navegador se queda el
           gesto lateral y arrastrar no pasa la hoja (ver `useArrastrarHoja`). */}
       <div
@@ -143,14 +131,16 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
   return (
     <div className="flex min-w-0 flex-col gap-3">
       {/* Barra: pasar hojas, «Hoy», el buscador y «Pendientes». */}
+      {/* 11/11/2026 («ajusta la estética»): en tablet, arriba el día y «Añadir reserva»; debajo, el buscador a todo
+          lo ancho (que se lea entero) y «Pendientes». Desde 1280 px, todo en una línea. */}
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1">
+        <div className="order-1 flex items-center gap-1">
           <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label="Hoja anterior" onClick={() => pasar(-1)}>
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <Popover open={calendarioAbierto} onOpenChange={setCalendarioAbierto}>
             <PopoverTrigger asChild>
-              <Button type="button" variant="outline" className="h-11 min-w-[15rem] justify-start text-base font-semibold" aria-label="Elegir día">
+              <Button type="button" variant="outline" className="h-11 justify-start px-3 text-base font-semibold" aria-label="Elegir día">
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {tituloHoja(fecha)}
               </Button>
@@ -171,11 +161,20 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
             <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
-        <Button type="button" variant="ghost" className="h-11 text-base" onClick={() => irA(hoy)} disabled={fecha === hoy && !buscando && !estado}>
+        <Button type="button" variant="outline" className="order-1 h-11 px-4 text-base" onClick={() => irA(hoy)} disabled={fecha === hoy && !buscando && !estado}>
           Hoy
         </Button>
-        <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <div className="relative min-w-0 flex-1 sm:w-80 sm:flex-none">
+        {onAnadirReserva && !buscando && !estado && (
+          <Button
+            type="button"
+            className="order-2 ml-auto h-11 gap-2 bg-emerald-600 px-4 text-base font-semibold text-white shadow-sm hover:bg-emerald-700 xl:order-3"
+            onClick={() => onAnadirReserva(fecha)}
+          >
+            <Plus className="h-5 w-5" /> Añadir reserva a este día
+          </Button>
+        )}
+        <div className="order-3 flex w-full items-center gap-2 xl:order-2 xl:w-auto xl:flex-1">
+          <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input
               type="search"
@@ -279,7 +278,7 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
               <Hoja fecha={pasarHoja(fecha, 1)} lado="derecha" onAbrir={editarReserva} />
             </>
           ) : (
-            <Hoja fecha={fecha} lado="sola" onAbrir={editarReserva} onAnadir={onAnadirReserva} resaltada={resaltada} />
+            <Hoja fecha={fecha} lado="sola" onAbrir={editarReserva} resaltada={resaltada} />
           )}
         </div>
         </div>
