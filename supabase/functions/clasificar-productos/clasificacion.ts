@@ -151,10 +151,11 @@ export function construirMensajes(
     "- Si es EL MISMO producto que uno del catálogo (aunque esté escrito distinto, con erratas del OCR o el " +
     "formato del envase repetido), pon su producto_id y deja nombre_nuevo y categoria_id a null.\n" +
     "- Si no está, inventa nombre_nuevo: corto, legible, en español con mayúscula inicial, con la marca si " +
-    "aporta y el formato si distingue (70 cl, 5 L, Magnum); sin códigos internos ni añada. Varias líneas que " +
+    "aporta y el formato si distingue (70 cl, 5 L, Magnum); sin códigos internos. En vinos, cavas y champanes, " +
+    "CON la añada si la línea la trae («Pago de Carraovejas 2019»). Varias líneas que " +
     "sean el mismo producto nuevo llevan EXACTAMENTE el mismo nombre_nuevo. Pon categoria_id con la categoría " +
     "MÁS CONCRETA de la lista (la subcategoría si la hay).\n" +
-    "- Otro vino, otra variedad u otro tamaño (botella frente a Magnum) son productos distintos.\n" +
+    "- Otro vino, otra añada del mismo vino, otra variedad u otro tamaño (botella frente a Magnum) son productos distintos.\n" +
     "- Portes, mano de obra, reparaciones, guardias, gestión y logística o rappels van a Servicios.\n" +
     `Categorías (id: ruta — qué entra):\n${taxonomia}`;
   const lista = catalogo.length
@@ -169,6 +170,33 @@ export function construirMensajes(
     { role: "system", content: sistema },
     { role: "user", content: usuario },
   ];
+}
+
+/**
+ * Añada de un texto de línea o de producto: un año de 4 cifras suelto
+ * (1950-2049) que no sea una medida («2000 g», «1500 ml»). null si no hay o
+ * si hay dos años distintos (no se sabe cuál es la añada).
+ */
+export function anadaDe(texto: string | null | undefined): number | null {
+  if (!texto) return null;
+  const anos = new Set<number>();
+  for (const m of texto.matchAll(/(?<![\d.,])(19[5-9]\d|20[0-4]\d)(?![\d.,])(?!\s*(?:g|gr|grs|kg|mg|ml|cl|l|lt|cc|uds?|unid)\b)/gi)) {
+    anos.add(Number(m[1]));
+  }
+  return anos.size === 1 ? [...anos][0] : null;
+}
+
+/**
+ * Dos añadas del mismo vino son productos DISTINTOS. Si la línea trae una
+ * añada y el producto (del catálogo o el nombre nuevo) lleva OTRA, no es el
+ * mismo producto: devuelve el nombre con la añada de la línea. Si alguno de
+ * los dos no lleva añada no se puede saber y devuelve null (se deja como está).
+ */
+export function nombreConOtraAnada(nombreProducto: string, textoLinea: string, ejemplo?: string | null): string | null {
+  const deLinea = anadaDe(textoLinea) ?? anadaDe(ejemplo);
+  const delProducto = anadaDe(nombreProducto);
+  if (deLinea === null || delProducto === null || deLinea === delProducto) return null;
+  return nombreProducto.replace(String(delProducto), String(deLinea));
 }
 
 const limpiarNombre = (s: unknown): string =>
@@ -187,7 +215,7 @@ export function validarAsignaciones(
   categorias: Categoria[],
 ): ElementoClasificacion[] {
   const pedidos = new Map(textos.map((t) => [t.texto, t]));
-  const productos = new Set(catalogo.map((p) => p.id));
+  const productos = new Map(catalogo.map((p) => [p.id, p]));
   const categoriasActivas = new Set(categorias.filter((c) => c.activa).map((c) => c.id));
   const lista = (respuesta as { asignaciones?: unknown })?.asignaciones;
   if (!Array.isArray(lista)) return [];
@@ -201,14 +229,19 @@ export function validarAsignaciones(
     if (!pedido || vistos.has(texto)) continue;
     let clave: string;
     let elemento: ElementoClasificacion;
-    if (typeof a.producto_id === "number" && productos.has(a.producto_id)) {
-      clave = `id:${a.producto_id}`;
-      elemento = { textos: [], producto_id: a.producto_id, nombre: null, categoria_id: null, unidad: null };
+    const delCatalogo = typeof a.producto_id === "number" ? productos.get(a.producto_id) : undefined;
+    // El mismo vino de OTRA añada que la del catálogo es un producto nuevo, con la añada de la línea.
+    const otraAnada = delCatalogo ? nombreConOtraAnada(delCatalogo.nombre, pedido.texto, pedido.ejemplo) : null;
+    if (delCatalogo && otraAnada === null) {
+      clave = `id:${delCatalogo.id}`;
+      elemento = { textos: [], producto_id: delCatalogo.id, nombre: null, categoria_id: null, unidad: null };
     } else {
-      const nombre = limpiarNombre(a.nombre_nuevo).slice(0, 200);
+      const propuesto = otraAnada ?? limpiarNombre(a.nombre_nuevo).slice(0, 200);
+      const nombre = propuesto ? (nombreConOtraAnada(propuesto, pedido.texto, pedido.ejemplo) ?? propuesto) : "";
       if (!nombre) continue;
       clave = `nuevo:${claveNombre(nombre)}`;
-      const categoria = typeof a.categoria_id === "number" && categoriasActivas.has(a.categoria_id) ? a.categoria_id : null;
+      const categoriaPedida = otraAnada ? delCatalogo?.categoria_id : a.categoria_id;
+      const categoria = typeof categoriaPedida === "number" && categoriasActivas.has(categoriaPedida) ? categoriaPedida : null;
       elemento = { textos: [], producto_id: null, nombre, categoria_id: categoria, unidad: pedido.unidad };
     }
     vistos.add(texto);
