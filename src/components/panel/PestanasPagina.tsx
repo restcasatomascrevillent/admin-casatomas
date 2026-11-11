@@ -73,8 +73,11 @@ interface PestanasPaginaProps {
   className?: string;
 }
 
+// `flex-auto shrink-0` (11/11/2026, revisión móvil del dueño): en el móvil las pestañas llenan la fila si sobran
+// sitio, pero NUNCA encogen hasta cortar el nombre («Stoc…», «Configuració…»): si no caben, la tira hace scroll
+// con el degradado del borde (antes `flex-1` las apretaba y el nombre salía cortado sin aviso).
 const CLASE_PESTANA =
-  "flex h-10 items-center gap-1 sm:gap-2 rounded-none border-b-2 border-transparent bg-transparent px-2 sm:px-3 text-muted-foreground shadow-none transition-colors hover:text-foreground pointer-coarse:min-h-11 data-[state=active]:border-[hsl(38,59%,45%)] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none flex-1 sm:flex-none";
+  "flex h-10 items-center gap-1 sm:gap-2 rounded-none border-b-2 border-transparent bg-transparent px-2 sm:px-3 text-muted-foreground shadow-none transition-colors hover:text-foreground pointer-coarse:min-h-11 data-[state=active]:border-[hsl(38,59%,45%)] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none flex-auto shrink-0 sm:flex-none";
 
 /** Clases de `accionesDebajoEnMovil`: fila, tira de pestañas y acciones, según hasta dónde bajan los botones. */
 const DEBAJO = {
@@ -157,7 +160,7 @@ export function PestanasPagina({
 }: PestanasPaginaProps) {
   const { ref, bordes } = useBordesScroll();
   const debajo = accionesDebajoEnMovil ? DEBAJO[accionesDebajoEnMovil === true ? "sm" : accionesDebajoEnMovil] : null;
-  const degradado = "pointer-events-none absolute inset-y-0 z-10 w-8 from-background to-transparent";
+  const degradado = "pointer-events-none absolute inset-y-0 z-10 w-10 from-background via-background/70 to-transparent";
   return (
     <div
       data-testid="pestanas-pagina"
