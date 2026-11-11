@@ -18,6 +18,18 @@ const mocks = vi.hoisted(() => ({
   errorMesas: null as unknown,
   consultas: [] as Array<{ tabla: string; columnas?: string; filtros: Array<[string, unknown]> }>,
   formulario: vi.fn(),
+  aceptar: vi.fn(async () => ({ ok: true })),
+  confirmar: vi.fn(async () => ({ ok: true })),
+  cancelar: vi.fn(async () => ({ ok: true })),
+}));
+
+vi.mock("@/hooks/useAccionesServicioReserva", () => ({
+  useAccionesServicioReserva: () => ({
+    aceptar: mocks.aceptar,
+    confirmar: mocks.confirmar,
+    cancelar: mocks.cancelar,
+    estaEnCurso: () => false,
+  }),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -434,5 +446,43 @@ describe("useEdicionReserva · lo que usan las vistas para abrir el editor", () 
     fireEvent.click(screen.getByRole("button", { name: "editar res-1" }));
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+});
+
+// 11/11/2026: al unir Libro y Tabla en la Lista, el estado se cambia desde la ficha.
+describe("EditarReservaDialog · Verificar, Confirmar y Cancelar", () => {
+  it("pendiente: «Verificar» la acepta y cierra la ficha", async () => {
+    mocks.reserva = fila({ estado: "pendiente" });
+    const { onClose } = montar();
+    fireEvent.click(await screen.findByRole("button", { name: "Verificar" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mocks.aceptar).toHaveBeenCalledWith(expect.objectContaining({ id: "res-1", estado: "pendiente" }));
+    expect(screen.queryByRole("button", { name: "Confirmar" })).toBeNull();
+  });
+
+  it("verificada: «Confirmar»", async () => {
+    mocks.reserva = fila({ estado: "verificada" });
+    const { onClose } = montar();
+    fireEvent.click(await screen.findByRole("button", { name: "Confirmar" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mocks.confirmar).toHaveBeenCalled();
+  });
+
+  it("«Cancelar reserva» pregunta antes; con «No, dejarla» no cancela", async () => {
+    const { onClose } = montar();
+    fireEvent.click(await screen.findByRole("button", { name: "Cancelar reserva" }));
+    fireEvent.click(await screen.findByRole("button", { name: "No, dejarla" }));
+    expect(mocks.cancelar).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar reserva" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sí, cancelar" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mocks.cancelar).toHaveBeenCalled();
+  });
+
+  it("una reserva terminada (llegó, no vino, cancelada) no tiene botones de estado", async () => {
+    mocks.reserva = fila({ estado: "completada" });
+    montar();
+    await screen.findByRole("button", { name: "simular guardado" });
+    expect(screen.queryByTestId("acciones-estado")).toBeNull();
   });
 });
