@@ -56,14 +56,16 @@ function Hoja({
     <article
       aria-label={`Hoja del ${tituloHoja(fecha)}`}
       className={cn(
-        "flex min-h-0 min-w-0 flex-1 flex-col bg-[#fbf6e9] text-stone-800 shadow-md ring-1 ring-stone-300",
-        lado === "izquierda" && "rounded-l-lg",
-        lado === "derecha" && "rounded-r-lg",
-        lado === "sola" && "rounded-lg",
+        // 11/11/2026 (dueño: «el libro vale que se vea bien pero no hace falta que parezca un libro»): una tarjeta
+        // limpia, sin papel, sin margen rojo ni renglones azules.
+        "flex min-h-0 min-w-0 flex-1 flex-col border bg-card text-card-foreground shadow-sm",
+        lado === "izquierda" && "rounded-l-xl",
+        lado === "derecha" && "rounded-r-xl",
+        lado === "sola" && "rounded-xl",
       )}
     >
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b-2 border-sky-300/70 px-6 pb-3 pt-4">
-        <h2 className="mr-auto text-2xl font-semibold text-stone-800">{tituloHoja(fecha)}</h2>
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-5 py-3">
+        <h2 className="mr-auto text-xl font-semibold sm:text-2xl">{tituloHoja(fecha)}</h2>
         {onAnadir && (
           <Button
             type="button"
@@ -77,7 +79,7 @@ function Hoja({
       {/* `touch-pan-y` y `overflow-x-hidden` AQUÍ, en el contenedor con scroll: si no, el navegador se queda el
           gesto lateral y arrastrar no pasa la hoja (ver `useArrastrarHoja`). */}
       <div
-        className="min-h-0 flex-1 touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain border-l-4 border-rose-300/70 px-5 py-3"
+        className="min-h-0 flex-1 touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3 sm:px-5"
         data-testid="hoja-scroll"
       >
         <ReservasDeLaHoja fecha={fecha} onAbrirReserva={onAbrir} resaltada={resaltada} />
