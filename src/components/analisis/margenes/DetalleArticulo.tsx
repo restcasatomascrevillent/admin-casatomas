@@ -24,6 +24,8 @@ import {
   ETIQUETA_BANDERA,
   cantidadTexto,
   euros,
+  litrosTexto,
+  notaIva,
   porcentaje,
   precioCompra,
   razon,
@@ -117,11 +119,17 @@ function ComprasProducto({ productoId, onCerrar }: { productoId: number; onCerra
 export function DetalleArticulo({
   articulo,
   config,
+  tiendaActiva = false,
+  conIva = false,
   puedeEditar,
   onCerrar,
 }: {
   articulo: PlatoMargen | VinoMargen | null;
   config: ConfigMargenes;
+  /** configuracion_tienda.activa: el margen de tienda se enseña igual, avisando si está desactivada. */
+  tiendaActiva?: boolean;
+  /** Interruptor «Con IVA» de la pantalla: enseña también el coste con el IVA de las compras. */
+  conIva?: boolean;
   puedeEditar: boolean;
   onCerrar: () => void;
 }) {
@@ -182,7 +190,7 @@ export function DetalleArticulo({
               </SheetDescription>
               <div className="flex flex-wrap gap-1 pt-1">
                 {a.banderas.map((b) => (
-                  <span key={b} className={cn("rounded px-1.5 py-0.5 text-xs", b === "coste_alto" || b === "multiplicador_bajo" || b === "sube_coste" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground")}>
+                  <span key={b} className={cn("rounded px-1.5 py-0.5 text-xs", b === "coste_alto" || b === "multiplicador_bajo" || b === "sube_coste" || b === "tienda_bajo" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground")}>
                     {ETIQUETA_BANDERA[b]}
                   </span>
                 ))}
@@ -205,7 +213,31 @@ export function DetalleArticulo({
                   valor={a.coste6m === null ? "—" : `${euros(a.coste6m)}${a.variacionPct !== null ? ` (${a.variacionPct > 0 ? "+" : ""}${porcentaje(a.variacionPct)})` : ""}`}
                   rojo={a.banderas.includes("sube_coste")}
                 />
+                {conIva && <Dato etiqueta="Coste con IVA" valor={euros(a.costeIva)} />}
               </dl>
+              {conIva && notaIva(a) && <p className="text-xs text-muted-foreground">{notaIva(a)}.</p>}
+              {a.tipo === "vino" && a.formatoDistinto && (
+                <p className="text-xs text-muted-foreground" data-testid="nota-formato">
+                  Coste estimado desde la botella de {litrosTexto(a.litrosProducto)}: la carta es de {litrosTexto(a.litros)}.
+                </p>
+              )}
+              {a.tipo === "vino" && a.enTienda && (
+                <section className="space-y-1" aria-label="Margen en la tienda" data-testid="margen-tienda">
+                  <h3 className="text-sm font-medium">
+                    En la tienda{tiendaActiva ? "" : <span className="font-normal text-muted-foreground"> (tienda desactivada: cálculo informativo)</span>}
+                  </h3>
+                  <dl className="grid grid-cols-3 gap-2 text-sm">
+                    <Dato etiqueta="Precio de tienda" valor={euros(a.precioTienda)} />
+                    <Dato etiqueta={`Sin IVA (${config.ivaTiendaPct} %)`} valor={euros(a.ventaTienda)} />
+                    <Dato
+                      etiqueta={`Multiplicador (mín. ${veces(config.multiplicadorMinTienda)})`}
+                      valor={veces(a.multiplicadorTienda)}
+                      rojo={a.banderas.includes("tienda_bajo")}
+                    />
+                    <Dato etiqueta="Margen bruto" valor={euros(a.margenTienda)} />
+                  </dl>
+                </section>
+              )}
 
               {a.tipo === "plato" ? (
                 <section className="space-y-2" aria-label="Escandallo">
