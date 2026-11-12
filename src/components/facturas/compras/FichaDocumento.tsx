@@ -157,7 +157,7 @@ export function FichaDocumento({
   const hayVisor = Boolean(vistaPreviaDrive(doc.drive_url) || doc.archivo_path);
   const visorLateral = ancha && hayVisor;
 
-  const original = <OriginalIncrustado driveUrl={doc.drive_url} archivoPath={doc.archivo_path} titulo={titulo} relleno={visorLateral} />;
+  const original = <OriginalIncrustado driveUrl={doc.drive_url} archivoPath={doc.archivo_path} documentoId={doc.id} titulo={titulo} relleno={visorLateral} />;
 
   const cabecera = (
     // Bajo 640 px (móvil) el título ocupa su fila entera y las acciones van en otra
