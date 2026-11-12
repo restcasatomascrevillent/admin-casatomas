@@ -227,6 +227,26 @@ describe("EstudioInstagram", () => {
   });
 });
 
+describe("EstudioInstagram en el móvil (< 768 px)", () => {
+  const anchoOriginal = window.innerWidth;
+  beforeEach(() => Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 390 }));
+  afterAll(() => Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: anchoOriginal }));
+
+  it("la semana es una tira con scroll horizontal (casillas de 72 px) y las miniaturas solo se ven: la casilla del día es el botón", async () => {
+    const p = props();
+    pintar(<EstudioInstagram {...p} />);
+    const tira = screen.getByTestId("semana-estudio");
+    expect(tira).toHaveClass("overflow-x-auto");
+    expect(tira).not.toHaveClass("grid-cols-7");
+    expect(within(tira).getAllByRole("listitem")).toHaveLength(7);
+    await waitFor(() => expect(screen.getAllByTestId("mini-semana")).toHaveLength(3));
+    // Nada de botones anidados dentro de la casilla: solo los 7 «Ver el día».
+    expect(within(tira).getAllByRole("button")).toHaveLength(7);
+    fireEvent.click(within(tira).getByRole("button", { name: /^vie 6/ }));
+    expect(p.onVerDia).toHaveBeenCalledWith("2026-11-06");
+  });
+});
+
 describe("IndicadorCuenta («● @cuenta» de la barra)", () => {
   const ESTADO = {
     ok: true, cuentasPorMarca: [], variables: [], comprobaciones: [], cuenta: { id: "1", username: "casatomas" }, cuota: null, avisos: [], comoArreglarlo: [], drive: null,

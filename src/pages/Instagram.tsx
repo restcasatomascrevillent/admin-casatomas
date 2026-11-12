@@ -7,6 +7,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
+import { SeccionesMovil } from "@/components/instagram/SeccionesMovil";
 import { useIsMobile } from "@/hooks/use-mobile";
 // Solo lo ligero va en el paquete de /instagram (los index arrastran las pestañas enteras): ver docs/instagram-rendimiento.md.
 import { CLAVE_CAMPANAS, leerPieza, listarCampanas, type IdeaSemanaIA } from "@/components/instagram/campanas/api";
@@ -15,6 +16,7 @@ import type { ReelPieza } from "@/lib/instagram/reels";
 import { EstudioInstagram } from "@/components/instagram/estudio/EstudioInstagram";
 import { prefetchEstudio } from "@/components/instagram/estudio/consultas";
 import { IndicadorCuenta, SelectorMarca, type FiltroMarca } from "@/components/instagram/BarraInstagram";
+import { cn } from "@/lib/utils";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { encargosActivos, usePendientesEncargos, useRolesEncargos } from "@/components/instagram/encargos/useEncargos";
 import type { DatosFormulario } from "@/components/instagram/encargos/logica";
@@ -122,7 +124,7 @@ export default function Instagram() {
  * Todo lo de Instagram sin el marco: lo monta la pestaña «Instagram» de RRSS
  * (src/pages/RRSS.tsx, 08/11/2026) y, con el marco, la página de arriba.
  */
-export function ContenidoInstagram({ onIrMetricas }: { onIrMetricas?: () => void } = {}) {
+export function ContenidoInstagram({ onIrMetricas, incrustado = false }: { onIrMetricas?: () => void; incrustado?: boolean } = {}) {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_INSTAGRAM);
   // null hasta abrir «Reels» (el reel de partida sale del motor, que se carga con la pestaña).
@@ -158,6 +160,9 @@ export function ContenidoInstagram({ onIrMetricas }: { onIrMetricas?: () => void
   const esMovil = useIsMobile();
   const [editorCompletoEnMovil, setEditorCompletoEnMovil] = useState(false);
   const crearEnMovil = esMovil && !abrir && !editorCompletoEnMovil;
+  // En RRSS (móvil) hay una barra de redes debajo de este bloque: el alto lo reparte el flex de la página y no se mide
+  // contra el fondo de la pantalla (se pisaría con la barra). En tablet y escritorio, todo como siempre.
+  const repartePadre = esMovil && incrustado;
   // Con el asistente a la vista, todo el alto para él (pedido del dueño, 05/11/2026): sin la fila de marca y
   // cuenta (el asistente tiene su selector y el punto de la cuenta va en su cabecera), pestañas solo con iconos
   // y el asistente de borde a borde hasta abajo.
@@ -193,6 +198,30 @@ export function ContenidoInstagram({ onIrMetricas }: { onIrMetricas?: () => void
     [campanas.data, marca],
   );
 
+  // Las seis secciones (las usan la barra de pestañas y, en el móvil, la hoja de secciones).
+  const seccionesLista = [
+    { valor: "estudio", etiqueta: "Estudio", icono: <Home /> },
+    { valor: "crear", etiqueta: "Crear", icono: <PenLine /> },
+    {
+      valor: "campanas",
+      etiqueta: "Campañas",
+      icono: <Flag />,
+      contador: propuestasNuevas,
+      tonoContador: "dorado" as const,
+      etiquetaContador: `${propuestasNuevas} ${propuestasNuevas === 1 ? "propuesta nueva" : "propuestas nuevas"}`,
+    },
+    { valor: "reels", etiqueta: "Reels", icono: <Clapperboard /> },
+    { valor: "calendario", etiqueta: "Calendario", icono: <CalendarDays /> },
+    {
+      valor: "encargos",
+      etiqueta: "Encargos",
+      icono: <KanbanSquare />,
+      contador: pendientesEncargos,
+      tonoContador: "dorado" as const,
+      etiquetaContador: `${pendientesEncargos} pendientes`,
+    },
+  ];
+
   // Borradores de campaña (y cualquier pieza del calendario): se abren en «Crear».
   const abrirEnEditor = async (piezaId: string) => {
     try {
@@ -222,44 +251,37 @@ export function ContenidoInstagram({ onIrMetricas }: { onIrMetricas?: () => void
   return (
     <>
       {/* Sin título de página: «RRSS › Instagram» activo ya dice dónde estás. */}
-      <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
+      <div ref={setRaiz} className={cn("flex flex-col", repartePadre && "min-h-0 flex-1")} style={alto && !repartePadre ? { height: alto } : undefined}>
         <Tabs value={pestanaVisible} onValueChange={setPestana} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
-          <PestanasPagina
-            nivel={2}
-            accionesDebajoEnMovil="lg"
-            soloIconosEnMovil={asistenteMovilVisible}
-            className={asistenteMovilVisible ? "mb-0" : undefined}
-            acciones={
-              soloAgencia || asistenteMovilVisible ? undefined : (
-                <>
-                  <SelectorMarca valor={marca} onCambio={setMarca} />
-                  <IndicadorCuenta marca={marca} />
-                </>
-              )
-            }
-            pestanas={[
-              { valor: "estudio", etiqueta: "Estudio", icono: <Home /> },
-              { valor: "crear", etiqueta: "Crear", icono: <PenLine /> },
-              {
-                valor: "campanas",
-                etiqueta: "Campañas",
-                icono: <Flag />,
-                contador: propuestasNuevas,
-                tonoContador: "dorado" as const,
-                etiquetaContador: `${propuestasNuevas} ${propuestasNuevas === 1 ? "propuesta nueva" : "propuestas nuevas"}`,
-              },
-              { valor: "reels", etiqueta: "Reels", icono: <Clapperboard /> },
-              { valor: "calendario", etiqueta: "Calendario", icono: <CalendarDays /> },
-              {
-                valor: "encargos",
-                etiqueta: "Encargos",
-                icono: <KanbanSquare />,
-                contador: pendientesEncargos,
-                tonoContador: "dorado" as const,
-                etiquetaContador: `${pendientesEncargos} pendientes`,
-              },
-            ].filter((p) => !soloAgencia || p.valor === "encargos")}
-          />
+          {esMovil ? (
+            // Móvil (12/11/2026): un selector de sección de 48 px + el filtro de marca en una sola fila (la cuenta va
+            // dentro de la hoja de secciones). Con el asistente de «Crear» a la vista, la marca la elige él.
+            !soloAgencia && (
+              <SeccionesMovil
+                secciones={seccionesLista}
+                valor={pestanaVisible}
+                onCambio={setPestana}
+                derecha={asistenteMovilVisible ? undefined : <SelectorMarca valor={marca} onCambio={setMarca} grande />}
+                pie={<IndicadorCuenta marca={marca} className="h-12 w-full max-w-none justify-start gap-2 px-3 text-sm pointer-coarse:h-12" />}
+              />
+            )
+          ) : (
+            <PestanasPagina
+              nivel={2}
+              accionesDebajoEnMovil="lg"
+              soloIconosEnMovil={asistenteMovilVisible}
+              className={asistenteMovilVisible ? "mb-0" : undefined}
+              acciones={
+                soloAgencia || asistenteMovilVisible ? undefined : (
+                  <>
+                    <SelectorMarca valor={marca} onCambio={setMarca} />
+                    <IndicadorCuenta marca={marca} />
+                  </>
+                )
+              }
+              pestanas={seccionesLista.filter((p) => !soloAgencia || p.valor === "encargos")}
+            />
+          )}
 
           {/* Estudio: dos columnas con listas que hacen scroll por dentro desde `lg`. */}
           <TabsContent value="estudio" className={`${CONTENIDO_PESTANA} lg:overflow-hidden`}>
@@ -288,7 +310,7 @@ export function ContenidoInstagram({ onIrMetricas }: { onIrMetricas?: () => void
           {/* En el móvil, el asistente va de borde a borde (anula el relleno del <main>) y reparte el alto él solo. */}
           <TabsContent
             value="crear"
-            className={`${CONTENIDO_PESTANA} lg:flex lg:flex-col lg:overflow-hidden ${asistenteMovilVisible ? "-mx-3 -mb-3 flex flex-col overflow-hidden" : ""}`}
+            className={`${CONTENIDO_PESTANA} lg:flex lg:flex-col lg:overflow-hidden ${asistenteMovilVisible ? `-mx-3 ${incrustado ? "" : "-mb-3"} flex flex-col overflow-hidden` : ""}`}
             data-testid="pagina-instagram"
           >
             {/* La agencia sin Marketing no tiene editor (no puede leer piezas ni Drive). */}
