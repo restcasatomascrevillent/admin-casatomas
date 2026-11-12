@@ -104,7 +104,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("instagram-ia · montar_pieza", () => {
   it("1 foto → post con su plantilla, rótulos, alt y texto; la IA ve la foto", async () => {
     const { f, openai, llamadas } = falso([respuestaOpenAI(montaje([diapo(1, "Centolla recién llegada")]))]);
-    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [foto(1)], indicacion: "llegó bonito del Cantábrico" }), deps(f));
+    const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos: [foto(1)], indicacion: "llegó bonito del Cantábrico" }), deps(f));
     expect(r.status).toBe(200);
     const j = await r.json();
     expect(j).toMatchObject({
@@ -139,7 +139,7 @@ describe("instagram-ia · montar_pieza", () => {
     const { f, openai } = falso([
       respuestaOpenAI(montaje([...orden.map((n) => diapo(n, `Marisco ${n}`)), diapo(9, "Foto que no existe"), diapo(3, "Repetida")])),
     ]);
-    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [1, 2, 3, 4, 5, 6].map(foto), formato: "auto" }), deps(f));
+    const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos: [1, 2, 3, 4, 5, 6].map(foto), formato: "auto" }), deps(f));
     expect(r.status).toBe(200);
     const j = await r.json();
     expect(j.formato).toBe("carrusel");
@@ -156,7 +156,7 @@ describe("instagram-ia · montar_pieza", () => {
 
   it("plantilla inexistente o sin foto → se corrige a la de foto de la marca y se avisa", async () => {
     const { f } = falso([respuestaOpenAI(montaje([diapo(1, "Centolla recién llegada", { plantilla: "ct-no-existe" }), diapo(2, "Nécoras", { plantilla: "ct-tipografica" })]))]);
-    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [foto(1), foto(2)] }), deps(f));
+    const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos: [foto(1), foto(2)] }), deps(f));
     const j = await r.json();
     // 2 fotos: portada y cierre (la plantilla va por el papel, diga lo que diga la IA).
     expect(j.diapositivas.map((d: { plantilla: string }) => d.plantilla)).toEqual(["ct-portada", "ct-cierre"]);
@@ -168,7 +168,7 @@ describe("instagram-ia · montar_pieza", () => {
     const larga = montaje([diapo(1, "Un titular con muchas más palabras de las que caben")]);
     const conPrecio = montaje([diapo(1, "Centolla")], { caption: "Centolla a 30 € la ración, solo hoy en Casa Tomás, cocida al punto con agua de mar y laurel; ven a por ella antes de que se acabe." });
     const { f, openai } = falso([respuestaOpenAI(larga), respuestaOpenAI(conPrecio)]);
-    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [foto(1)] }), deps(f));
+    const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos: [foto(1)] }), deps(f));
     expect(r.status).toBe(422);
     const j = await r.json();
     expect(j.descartadas[0].motivos.join(" ")).toMatch(/6/);
@@ -185,24 +185,24 @@ describe("instagram-ia · montar_pieza", () => {
       "http://169.254.169.254/latest/meta-data/",
     ]) {
       const { f, openai } = falso();
-      const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [{ id: "drive:abc", url }] }), deps(f));
+      const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos: [{ id: "drive:abc", url }] }), deps(f));
       expect(r.status, url).toBe(400);
       expect(await r.json()).toMatchObject({ ok: false, tipo: "foto_no_valida" });
       expect(openai()).toHaveLength(0);
     }
     const { f } = falso();
     const once = Array.from({ length: 11 }, (_, i) => foto(i + 1));
-    expect((await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: once }), deps(f))).status).toBe(400);
-    expect((await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [] }), deps(f))).status).toBe(400);
-    expect((await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [foto(1)], formato: "carrusel" }), deps(f))).status).toBe(400);
-    expect((await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [foto(1), foto(1)] }), deps(f))).status).toBe(400);
-    expect((await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [{ id: "otro:1", url: tmp(1) }] }), deps(f))).status).toBe(400);
+    expect((await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos: once }), deps(f))).status).toBe(400);
+    expect((await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos: [] }), deps(f))).status).toBe(400);
+    expect((await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos: [foto(1)], formato: "carrusel" }), deps(f))).status).toBe(400);
+    expect((await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos: [foto(1), foto(1)] }), deps(f))).status).toBe(400);
+    expect((await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos: [{ id: "otro:1", url: tmp(1) }] }), deps(f))).status).toBe(400);
   });
 
   it("formato fijo manda: «post» con 3 fotos deja una imagen; las fotos de platos/vinos de nuestro bucket valen", async () => {
     const { f } = falso([respuestaOpenAI(montaje([diapo(2, "Centolla"), diapo(1, "Nécoras")]))]);
     const fotos = [foto(1), { id: "carta:centolla", url: `${SB}/storage/v1/object/public/platos/centolla.webp` }, foto(3)];
-    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos, formato: "post" }), {
+    const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos, formato: "post" }), {
       ...deps(f),
       fetch: (async (u: string | URL | Request, i?: RequestInit) =>
         String(u).startsWith(`${SB}/rest/v1/Platos?id=eq.`) ? resp(200, [{ id: "centolla", nombre: "Centolla cocida", activado: true, restaurante: true, touza: false }]) : f(u, i)) as typeof fetch,
@@ -224,7 +224,7 @@ describe("montar_pieza · fotos que no cubren (Foto enmarcada)", () => {
 
   it("foto de la carta + plantilla a sangre → se corrige a la portada enmarcada y se avisa; la IA sabe que no cubre", async () => {
     const { f, openai } = falso([respuestaOpenAI(montaje([diapo(1, "Centolla recién llegada", { cita: "Centolla cocida" })]))]);
-    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [carta] }), { ...deps(f), fetch: conPlato(f) });
+    const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos: [carta] }), { ...deps(f), fetch: conPlato(f) });
     expect(r.status).toBe(200);
     const j = await r.json();
     expect(j.diapositivas[0]).toMatchObject({ foto: "carta:centolla", plantilla: "ct-portada-marco", datos: { titular: "Centolla recién llegada", cita: "Centolla cocida" } });
@@ -244,7 +244,7 @@ describe("montar_pieza · fotos que no cubren (Foto enmarcada)", () => {
       { ...foto(1), ancho: 1920, alto: 1080 },
       { ...foto(2), ancho: 3000, alto: 4000 },
     ];
-    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos }), deps(f));
+    const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos }), deps(f));
     expect(r.status).toBe(200);
     const j = await r.json();
     expect(j.diapositivas.map((d: { plantilla: string }) => d.plantilla)).toEqual(["ct-portada-marco", "ct-cierre"]);
@@ -258,7 +258,7 @@ describe("montar_pieza · fotos que no cubren (Foto enmarcada)", () => {
 
   it("plantilla inexistente con una foto de la carta (Touza, story) → «tz-portada-marco»", async () => {
     const { f } = falso([respuestaOpenAI(montaje([diapo(1, "Para empezar la noche", { plantilla: "tz-no-existe", antetitulo: "Touza" })]))]);
-    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "touza", formato: "story", fotos: [{ id: "carta:vermut", url: `${SB}/storage/v1/object/public/platos/vermut.webp` }] }), {
+    const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "touza", formato: "story", fotos: [{ id: "carta:vermut", url: `${SB}/storage/v1/object/public/platos/vermut.webp` }] }), {
       ...deps(f),
       fetch: (async (u: string | URL | Request, i?: RequestInit) =>
         String(u).startsWith(`${SB}/rest/v1/Platos?id=eq.`) ? resp(200, [{ id: "vermut", nombre: "Vermut", activado: true, restaurante: false, touza: true }]) : f(u, i)) as typeof fetch,
@@ -291,7 +291,7 @@ describe("montar_pieza · papeles del carrusel (plantillas v2)", () => {
       ),
     ]);
     const fotos = [1, 2, 3, 4].map(foto);
-    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos }), deps(f));
+    const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos }), deps(f));
     expect(r.status).toBe(200);
     const j = await r.json();
     expect(j.diapositivas.map((d: { plantilla: string }) => d.plantilla)).toEqual(["ct-portada", "ct-plato", "ct-plato", "ct-cierre"]);
@@ -305,7 +305,7 @@ describe("montar_pieza · papeles del carrusel (plantillas v2)", () => {
   it("Touza: el cierre nunca dice «Reservar» (se descarta y se reintenta)", async () => {
     const mal = montaje([diapo(1, "La noche empieza aquí", { antetitulo: "" }), diapo(2, "", { antetitulo: "", cta: "Reservar mesa" })]);
     const { f } = falso([respuestaOpenAI(mal), respuestaOpenAI(mal)]);
-    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "touza", fotos: [foto(1), foto(2)] }), deps(f));
+    const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "touza", fotos: [foto(1), foto(2)] }), deps(f));
     expect(r.status).toBe(422);
     expect(JSON.stringify(await r.json())).toMatch(/TOUZA no admite reservas/);
   });
@@ -313,7 +313,7 @@ describe("montar_pieza · papeles del carrusel (plantillas v2)", () => {
   it("carrusel con fotos de la carta: todas enmarcadas, cada una con su papel", async () => {
     const { f } = falso([respuestaOpenAI(montaje([diapo(1, "Lo que nunca falta"), diapo(2, "Centolla", { antetitulo: "" }), diapo(3, "", { antetitulo: "" })]))]);
     const fotos = [1, 2, 3].map((n) => ({ ...foto(n), ancho: 1200, alto: 900 }));
-    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos }), deps(f));
+    const r = await manejarIA(peticion({ accion: "montar_pieza", estilo: "rotulos", marca: "casa-tomas", fotos }), deps(f));
     expect(r.status).toBe(200);
     expect((await r.json()).diapositivas.map((d: { plantilla: string }) => d.plantilla)).toEqual(["ct-portada-marco", "ct-plato-marco", "ct-cierre-marco"]);
   });
@@ -325,7 +325,7 @@ describe("montar: piezas", () => {
     expect(formatoFinal("auto", 6)).toBe("carrusel");
     expect(formatoFinal("story", 3)).toBe("story");
     // Solo las v2 con foto (sin clásicas ni las de sin foto).
-    expect(plantillasMontar("casa-tomas", "carrusel").map((p) => p.id)).toEqual(["ct-cierre", "ct-cierre-marco", "ct-plato", "ct-plato-marco", "ct-portada", "ct-portada-marco"]);
+    expect(plantillasMontar("casa-tomas", "carrusel", "rotulos").map((p) => p.id)).toEqual(["ct-cierre", "ct-cierre-marco", "ct-plato", "ct-plato-marco", "ct-portada", "ct-portada-marco"]);
     expect(plantillasMontar("touza", "story").map((p) => p.id)).toEqual(["tz-cierre", "tz-cierre-marco", "tz-plato", "tz-plato-marco", "tz-portada", "tz-portada-marco"]);
     expect([0, 1, 2, 3].map((i) => papelDe(i, 4, "carrusel"))).toEqual(["portada", "plato", "plato", "cierre"]);
     expect(papelDe(0, 1, "story")).toBe("portada");
@@ -342,5 +342,44 @@ describe("montar: piezas", () => {
         .filter((l) => !l.startsWith("import type"))
         .join("\n");
     expect(sinImport("supabase/functions/_shared/instagram/montar.ts")).toBe(sinImport("src/lib/instagram/montar.ts"));
+  });
+});
+
+describe("montar_pieza · estilo del feed «Solo foto» (por defecto, 12/11/2026)", () => {
+  it("sin estilo: post y carrusel con «Solo foto» en todas las imágenes, sin rótulos; el prompt pide el plato y el gancho en el texto", async () => {
+    // Una apaisada de 1200×900 (como las de la carta): con rótulos iría enmarcada; con «Solo foto», también «Solo foto».
+    const apaisada = { ...foto(3), ancho: 1200, alto: 900 };
+    const { f, openai } = falso([
+      respuestaOpenAI(montaje([diapo(2, "Centolla", { plantilla: "ct-portada", cta: "Reservar mesa" }), diapo(1, "Nécoras"), diapo(3, "Chuleta")])),
+    ]);
+    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [foto(1), foto(2), apaisada] }), deps(f));
+    expect(r.status).toBe(200);
+    const j = await r.json();
+    expect(j.formato).toBe("carrusel");
+    expect(j.diapositivas.map((d: { foto: string; plantilla: string; datos: object }) => [d.foto, d.plantilla, d.datos])).toEqual([
+      ["drive:FotoDeDrive0002", "ct-solo-foto", {}],
+      ["drive:FotoDeDrive0001", "ct-solo-foto", {}],
+      ["drive:FotoDeDrive0003", "ct-solo-foto", {}],
+    ]);
+    expect(j.diapositivas[0].altText).toBe("Foto 2 de marisco sobre hielo.");
+    // Sin correcciones de plantilla ni de botón: no hay rótulos que revisar.
+    expect(j.avisos.join(" ")).not.toMatch(/plantilla|botón/);
+    const sistema = openai()[0].messages[0].content as string;
+    expect(sistema).toContain("«ct-solo-foto»");
+    expect(sistema).toMatch(/SIN NINGÚN TEXTO/);
+    expect(sistema).toMatch(/NOMBRE DEL PLATO/);
+    expect(sistema).not.toMatch(/ct-portada/);
+  });
+
+  it("1 foto de Touza → post con tz-solo-foto; la story sigue con rótulos; estilo desconocido → 400", async () => {
+    const { f } = falso([respuestaOpenAI(montaje([diapo(1, "Vermut de grifo", { plantilla: "tz-portada" })]))]);
+    const r = await manejarIA(peticion({ accion: "montar_pieza", marca: "touza", fotos: [foto(1)] }), deps(f));
+    expect(r.status).toBe(200);
+    expect((await r.json()).diapositivas).toMatchObject([{ plantilla: "tz-solo-foto", datos: {} }]);
+    expect(plantillasMontar("casa-tomas", "post").map((p) => p.id)).toEqual(["ct-solo-foto"]);
+    expect(plantillasMontar("casa-tomas", "carrusel", "solo_foto").map((p) => p.id)).toEqual(["ct-solo-foto"]);
+    expect(plantillasMontar("casa-tomas", "story").map((p) => p.id)).toEqual(["ct-cierre", "ct-cierre-marco", "ct-plato", "ct-plato-marco", "ct-portada", "ct-portada-marco"]);
+    const { f: f2 } = falso();
+    expect((await manejarIA(peticion({ accion: "montar_pieza", marca: "casa-tomas", fotos: [foto(1)], estilo: "otro" }), deps(f2))).status).toBe(400);
   });
 });

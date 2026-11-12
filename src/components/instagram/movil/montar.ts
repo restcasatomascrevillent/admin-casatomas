@@ -10,8 +10,9 @@
  * montajes por sesión (MAX_MONTAJES_SESION).
  */
 import { ErrorIA, llamar, type OpcionesLlamada, type TonoIA } from "@/components/instagram/ia/api";
-import { obtenerPlantilla, plantillaPara, type MarcaId } from "@/lib/instagram";
+import { obtenerPlantilla, plantillaPara, plantillasDe, type MarcaId } from "@/lib/instagram";
 import {
+  ESTILO_FEED_POR_DEFECTO,
   MAX_FOTOS_CARRUSEL,
   type DiapositivaMontada,
   type FormatoMontado,
@@ -90,6 +91,7 @@ export const montarPieza: FuncionMontar = async (p, opts) => {
     marca: p.marca,
     fotos: p.fotos.map((f) => ({ id: f.id, url: f.url, ancho: f.ancho ?? null, alto: f.alto ?? null })),
     formato: p.formato ?? "auto",
+    estilo: p.estilo ?? ESTILO_FEED_POR_DEFECTO,
   };
   const indicacion = p.indicacion?.trim();
   if (indicacion) cuerpo.indicacion = indicacion;
@@ -157,12 +159,14 @@ export function crearMontarSimulado(o: { espera?: number; fallar?: (llamada: num
     if (error) throw error;
     const tono: TonoIA = p.tono ?? "cercano";
     const version = llamadas.length;
-    const plantilla = plantillaConFoto(p.marca);
+    // Como el servidor: con el estilo «Solo foto» (por defecto), el feed va sin texto encima.
+    const soloFoto = p.formato !== "story" && (p.estilo ?? ESTILO_FEED_POR_DEFECTO) === "solo_foto" ? plantillasDe(p.marca, "post").find((x) => x.sinTexto) : undefined;
+    const plantilla = soloFoto?.id ?? plantillaConFoto(p.marca);
     const pl = obtenerPlantilla(plantilla);
     const extra = p.indicacion?.trim() ? ` («${p.indicacion.trim().slice(0, 60)}»)` : "";
     const titulares = ["Recién llegado", "Del mar a la mesa", "Solo estos días", "Mira qué género", "Hoy en cocina", "Para compartir", "Fresco de verdad", "Temporada", "Así llega", "Y esto también"];
     const diapositivas = p.fotos.map((foto, i) => {
-      const datos: Record<string, unknown> = { titular: titulares[(i + version - 1) % titulares.length] };
+      const datos: Record<string, unknown> = soloFoto ? {} : { titular: titulares[(i + version - 1) % titulares.length] };
       if (pl?.admitidos.includes("antetitulo") && i === 0) datos.antetitulo = p.marca === "touza" ? "Touza" : "Casa Tomás";
       return { foto: foto.id, plantilla, datos, altText: `Foto ${i + 1}: producto fresco sobre la mesa de la cocina.` };
     });

@@ -8,7 +8,7 @@
  */
 import { FORMATOS, MARGEN, generarCss, type FormatoId, type MarcaId } from "./tokens.js";
 import { urlFoto, urlLogo, urlRecurso } from "./recursos.js";
-import type { Foto } from "./fotos.js";
+import { FOTOS, type Foto } from "./fotos.js";
 import { obtenerPlantilla } from "./plantillas/index.js";
 import { esc, type ContextoPlantilla, type DatosPieza, type Plantilla } from "./tipos.js";
 
@@ -39,6 +39,10 @@ export function crearContexto(marca: MarcaId, formato: FormatoId, bases: Pick<Op
     urlFoto: (id) => urlFoto(bases.baseFotos, id, bases.fotos),
     urlLogo: (pieza, color) => urlLogo(bases.baseRecursos, marca, pieza, color),
     urlFuente: (fichero) => urlRecurso(bases.baseRecursos, `fuentes/${fichero}`),
+    medidasFoto: (id) => {
+      const f = (bases.fotos ?? FOTOS).find((x) => x.id === id);
+      return f && f.ancho > 0 && f.alto > 0 ? { ancho: f.ancho, alto: f.alto } : undefined;
+    },
   };
 }
 

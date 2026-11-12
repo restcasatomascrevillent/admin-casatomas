@@ -59,7 +59,8 @@ try {
 if (!chromiumInstalado) console.warn("[instagram editorial.render.test] SE SALTA: no está el Chromium de Playwright");
 
 // Las de «anuncio» (story del jueves de tapas) tienen su propia prueba (tapas.render.test.ts).
-const V2 = PLANTILLAS.filter((p) => !esClasica(p) && p.papel && p.papel !== "anuncio" && p.id !== "tz-tipografica");
+// «Solo foto» (sin texto) tiene su propia prueba: soloFoto.render.test.ts.
+const V2 = PLANTILLAS.filter((p) => !esClasica(p) && p.papel && p.papel !== "anuncio" && !p.sinTexto && p.id !== "tz-tipografica");
 
 // ── Fotos ────────────────────────────────────────────────────────────────────
 interface FuenteFoto {

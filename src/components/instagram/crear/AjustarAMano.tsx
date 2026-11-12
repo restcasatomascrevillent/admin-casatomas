@@ -127,6 +127,12 @@ export function AjustarAMano({ estado, abierto, onAbierto, actual, onActual, onM
               </Select>
             </div>
 
+            {plantilla?.sinTexto && (
+              <p className="text-xs text-muted-foreground" data-testid="sin-rotulos">
+                Esta plantilla va sin texto encima: el nombre del plato y el gancho van en el texto de la publicación.
+              </p>
+            )}
+
             {campos.map((c) => (
               <CampoRotuloInput key={`${foto}-${c}`} campo={c} valor={ajuste.datos[c] ?? ""} limite={plantilla?.limites?.[c]} onCambio={(v) => onAjuste(foto, { datos: { [c]: v } })} />
             ))}

@@ -4,7 +4,8 @@
  * cuota de IA) y la app, la real.
  */
 import type { MarcaId } from "@/lib/instagram";
-import type { FotoParaMontar } from "@/lib/instagram/montar";
+import type { EstiloFeed, FotoParaMontar } from "@/lib/instagram/montar";
+import { leerEstiloFeed } from "@/components/instagram/ajustes/estiloFeed";
 import { convertirFoto } from "@/components/marketing/instagram/convertirFoto";
 import { almacenPorDefecto, crearAlmacenMemoria, type Almacen } from "./almacen";
 import { apiPublicacionReal, archivarEnDrive, listarPlatosCarta, prepararPlatoCarta, subirFotoTmp, type PlatoCarta } from "./apiReal";
@@ -28,6 +29,8 @@ export interface ServiciosMovil {
   listarCarta(marca: MarcaId): Promise<PlatoCarta[]>;
   prepararCarta(marca: MarcaId, platoId: string): Promise<FotoParaMontar>;
   montar: FuncionMontar;
+  /** Estilo del feed de RRSS › Instagram › Ajustes (sin él, «Solo foto»). */
+  estiloFeed?(): Promise<EstiloFeed>;
   api: ApiPublicacionMovil;
   /** Archivo en Drive tras publicar (segundo plano). */
   archivar(fotos: Array<{ blob: Blob }>, marca: MarcaId, descripcion: string): Promise<number>;
@@ -47,6 +50,7 @@ export function serviciosReales(): ServiciosMovil {
     listarCarta: listarPlatosCarta,
     prepararCarta: prepararPlatoCarta,
     montar: montarPieza,
+    estiloFeed: leerEstiloFeed,
     api: apiPublicacionReal,
     archivar: archivarEnDrive,
     almacen: almacenPorDefecto(),

@@ -39,8 +39,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import type { MarcaId } from "@/lib/instagram";
-import type { RespuestaMontar } from "@/lib/instagram/montar";
+import { obtenerPlantilla, type MarcaId } from "@/lib/instagram";
+import { ESTILO_FEED_POR_DEFECTO, type EstiloFeed, type RespuestaMontar } from "@/lib/instagram/montar";
 import { TONOS_IA, type TonoIA } from "@/components/instagram/ia/api";
 import { hoyMadrid, sumarDias, utcAMadrid, validarProgramacion, MAXIMO_DIAS } from "@/components/instagram/programar/logica";
 import { firmaMontaje, horaInicial, nombreDia, unirCaption } from "./logica";
@@ -132,6 +132,18 @@ export function CrearMovil({
   const [marca, setMarca] = useState<MarcaId>(marcaInicial);
   const [indicacion, setIndicacion] = useState("");
   const [tono, setTono] = useState<TonoIA>("cercano");
+  // Estilo del feed (RRSS › Instagram › Ajustes): «Solo foto» por defecto.
+  const [estilo, setEstilo] = useState<EstiloFeed>(ESTILO_FEED_POR_DEFECTO);
+  useEffect(() => {
+    let vivo = true;
+    servicios
+      .estiloFeed?.()
+      .then((e) => vivo && setEstilo(e))
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [servicios]);
   const [fotos, despachar] = useReducer(reducirFotos, []);
   const [seleccionada, setSeleccionada] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -418,7 +430,7 @@ export function CrearMovil({
       setMontajesUsados(usadosRef.current);
       setMontando("ia");
       setMensajeIA(0);
-      const r = await servicios.montar({ accion: "montar_pieza", marca: marcaRef.current, fotos: fotosParaMontar(l), formato: "auto", indicacion: indicacion.trim() || undefined, tono: tonoPedido });
+      const r = await servicios.montar({ accion: "montar_pieza", marca: marcaRef.current, fotos: fotosParaMontar(l), formato: "auto", indicacion: indicacion.trim() || undefined, tono: tonoPedido, estilo });
       setMontaje(r);
       setFirmaDelMontaje(firma);
       setCaption(unirCaption(r));
@@ -754,6 +766,11 @@ export function CrearMovil({
         {montaje && !montando && (
           <>
             <CarruselPrevia marca={marca} formato={montaje.formato} diapositivas={montaje.diapositivas} fotos={fotosSubidasParaPrevia} />
+            {montaje.diapositivas.every((d) => obtenerPlantilla(d.plantilla)?.sinTexto) && (
+              <p className="text-sm text-muted-foreground" data-testid="aviso-solo-foto">
+                Sin texto encima, como vuestro feed: el nombre del plato y el gancho van en el texto.
+              </p>
+            )}
             {montaje.resumen && (
               <p className="rounded-lg bg-muted p-3 text-base" data-testid="resumen-ia">
                 {montaje.resumen}

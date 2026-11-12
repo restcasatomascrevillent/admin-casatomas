@@ -9,7 +9,7 @@
  * su ajuste la acompaña y no hay que reconciliar listas.
  */
 import { obtenerPlantilla, plantillaPara, plantillasVisibles, type FormatoId, type MarcaId, type Plantilla } from "@/lib/instagram";
-import { MAX_FOTOS_CARRUSEL, type FormatoMontado, type RespuestaMontar } from "@/lib/instagram/montar";
+import { ESTILO_FEED_POR_DEFECTO, MAX_FOTOS_CARRUSEL, type EstiloFeed, type FormatoMontado, type RespuestaMontar } from "@/lib/instagram/montar";
 import { borradorDesdeDatos, borradorVacio, piezaDesdeBorrador } from "@/components/marketing/instagram/pieza";
 import type { TonoIA } from "@/components/instagram/ia/api";
 
@@ -47,6 +47,11 @@ export interface EstadoCrear {
   montado: boolean;
   /** Id de instagram_piezas de la primera imagen si se abrió un borrador (se actualiza en vez de crear otra). */
   piezaId: string | null;
+  /**
+   * Estilo del feed (RRSS › Instagram › Ajustes; por defecto «solo_foto»): la
+   * plantilla de partida de un post o carrusel es «Solo foto» o la portada.
+   */
+  estilo?: EstiloFeed;
 }
 
 export function estadoInicial(marca: MarcaId = "casa-tomas"): EstadoCrear {
@@ -98,9 +103,14 @@ export function plantillaValida(id: string, marca: MarcaId, formato: FormatoId):
   return !!p && p.marca === marca && p.formatos.includes(formato) && p.admitidos.includes("foto");
 }
 
-/** Ajuste por defecto: la portada a sangre de la marca. */
-export function ajusteBase(marca: MarcaId, formato: FormatoId): AjusteImagen {
-  const portada = plantillaPara(marca, formato, "portada", "sangre") ?? plantillasConFoto(marca, formato)[0];
+/**
+ * Ajuste por defecto: en un post o carrusel con el estilo «Solo foto» (el de
+ * por defecto, como el feed real de la cuenta), «Solo foto»; si no (story o
+ * «Con rótulos»), la portada a sangre de la marca.
+ */
+export function ajusteBase(marca: MarcaId, formato: FormatoId, estilo: EstiloFeed = ESTILO_FEED_POR_DEFECTO): AjusteImagen {
+  const soloFoto = estilo === "solo_foto" ? plantillaPara(marca, formato, "foto") : undefined;
+  const portada = soloFoto ?? plantillaPara(marca, formato, "portada", "sangre") ?? plantillasConFoto(marca, formato)[0];
   return { plantilla: portada?.id ?? "", datos: {}, altText: "" };
 }
 
@@ -108,8 +118,8 @@ export function ajusteBase(marca: MarcaId, formato: FormatoId): AjusteImagen {
 export function ajusteDe(e: EstadoCrear, foto: string): AjusteImagen {
   const formato = formatoImagen(formatoEfectivo(e));
   const a = e.ajustes[foto];
-  if (!a) return ajusteBase(e.marca, formato);
-  if (!plantillaValida(a.plantilla, e.marca, formato)) return { ...a, plantilla: ajusteBase(e.marca, formato).plantilla };
+  if (!a) return ajusteBase(e.marca, formato, e.estilo);
+  if (!plantillaValida(a.plantilla, e.marca, formato)) return { ...a, plantilla: ajusteBase(e.marca, formato, e.estilo).plantilla };
   return a;
 }
 
@@ -158,7 +168,7 @@ export function moverFoto(e: EstadoCrear, desde: number, hasta: number): EstadoC
 /** Cambiar de marca vacía la selección: las fotos y las plantillas son de cada marca. */
 export function cambiarMarca(e: EstadoCrear, marca: MarcaId): EstadoCrear {
   if (marca === e.marca) return e;
-  return { ...estadoInicial(marca), indicacion: e.indicacion, tono: e.tono };
+  return { ...estadoInicial(marca), indicacion: e.indicacion, tono: e.tono, estilo: e.estilo };
 }
 
 // ─── Ajustes a mano ───────────────────────────────────────────────────────
@@ -197,7 +207,7 @@ export function aplicarMontaje(e: EstadoCrear, r: RespuestaMontar): EstadoCrear 
       if (v) datos[c] = v;
     }
     ajustes[d.foto] = {
-      plantilla: plantillaValida(d.plantilla, e.marca, formato) ? d.plantilla : ajusteBase(e.marca, formato).plantilla,
+      plantilla: plantillaValida(d.plantilla, e.marca, formato) ? d.plantilla : ajusteBase(e.marca, formato, e.estilo).plantilla,
       datos,
       altText: texto(d.altText).trim(),
     };
