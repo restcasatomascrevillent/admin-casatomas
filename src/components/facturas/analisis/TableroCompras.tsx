@@ -799,10 +799,10 @@ export function TableroCompras({
         ))}
       </ul>
 
-      {/* 2 · Una vista a la vez (en el móvil, fijas arriba al bajar; el fondo va en la envoltura porque la máscara
-          del degradado también borraría el fondo) */}
+      {/* 2 · Una vista a la vez (en el móvil, fijas arriba al bajar). Móvil (12/11/2026, dueño: «pestañas cortadas»): las
+          seis pastillas en dos filas, sin scroll ni degradado que tape «Proveedores» y «Por revisar». */}
       <div className="min-w-0 shrink-0 max-sm:sticky max-sm:top-0 max-sm:z-10 max-sm:bg-background max-sm:py-1">
-        <div role="group" aria-label="Vista del análisis" className="flex min-w-0 gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)] max-sm:pr-7" data-testid="pastillas-vistas">
+        <div role="group" aria-label="Vista del análisis" className="flex min-w-0 gap-1 pb-0.5 max-sm:flex-wrap sm:overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="pastillas-vistas">
           {VISTAS.map((v) => (
             <button
               key={v.id}

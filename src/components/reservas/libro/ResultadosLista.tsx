@@ -89,7 +89,8 @@ export function ResultadosLista({ titulo, reservas, cargando, error, onReintenta
                     verificar && r.estado === "pendiente" ? (
                       <Button
                         type="button"
-                        className="h-11 shrink-0 gap-1.5 bg-emerald-600 px-3 font-semibold text-white hover:bg-emerald-700"
+                        // Móvil: icono encima del texto y 72 px de ancho (como «Verificar» de las filas de Hoy), para dejar sitio al nombre.
+                        className="h-14 w-[4.5rem] shrink-0 flex-col gap-0.5 bg-emerald-600 px-1 text-xs font-semibold text-white hover:bg-emerald-700 sm:h-11 sm:w-auto sm:flex-row sm:gap-1.5 sm:px-3 sm:text-sm"
                         disabled={estaEnCurso(r.id)}
                         onClick={() => void aceptar(r as unknown as Parameters<typeof aceptar>[0])}
                         aria-label={`Verificar la reserva de ${r.nombre || "Sin nombre"}`}

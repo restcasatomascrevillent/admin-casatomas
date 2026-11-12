@@ -323,17 +323,17 @@ export default function GestionResenas() {
 
                 {/* Lista de reseñas: ocupa el resto y es lo único que hace scroll. */}
                 <Tabs value={filtroActivo} onValueChange={(v) => setFiltro(v as FiltroResenas)} className="shrink-0">
-                    <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none]">
-                        <ChipsSubnivel
-                            className="flex-nowrap"
-                            chips={[
-                                { valor: "por_responder", etiqueta: `Por responder · ${cuentas.por_responder}` },
-                                { valor: "aprobadas", etiqueta: `Aprobadas · ${cuentas.aprobadas}` },
-                                { valor: "respondidas", etiqueta: `Respondidas · ${cuentas.respondidas}` },
-                                { valor: "todas", etiqueta: `Todas · ${cuentas.todas}` },
-                            ]}
-                        />
-                    </div>
+                    {/* 12/11/2026 (captura del dueño: «Respond…» cortado en el móvil): los chips bajan de fila si no caben y el
+                        número va en el contador de siempre, no pegado al texto. */}
+                    <ChipsSubnivel
+                        aria-label="Qué reseñas ver"
+                        chips={[
+                            { valor: "por_responder", etiqueta: "Por responder", contador: cuentas.por_responder },
+                            { valor: "aprobadas", etiqueta: "Aprobadas", contador: cuentas.aprobadas },
+                            { valor: "respondidas", etiqueta: "Respondidas", contador: cuentas.respondidas },
+                            { valor: "todas", etiqueta: "Todas", contador: cuentas.todas },
+                        ]}
+                    />
                 </Tabs>
                 {resenasLoading ? (
                     <div className="space-y-3">

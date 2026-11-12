@@ -30,11 +30,19 @@ export interface ChipSubnivel {
 interface ChipsSubnivelProps {
   chips: ChipSubnivel[];
   className?: string;
+  /** Nombre del grupo para el lector de pantalla (p. ej. «Qué reseñas ver»). */
+  "aria-label"?: string;
 }
 
-export function ChipsSubnivel({ chips, className }: ChipsSubnivelProps) {
+export function ChipsSubnivel({ chips, className, "aria-label": etiquetaGrupo }: ChipsSubnivelProps) {
   return (
-    <TabsList data-testid="chips-subnivel" className={cn("h-auto shrink-0 justify-start gap-1.5 bg-transparent p-0", className)}>
+    // `flex flex-wrap` (12/11/2026, captura del dueño en Reseñas: «Todas» se salía de la pantalla a 390 px): si no caben
+    // en una fila, los chips bajan a la siguiente; nunca quedan fuera de la vista.
+    <TabsList
+      data-testid="chips-subnivel"
+      aria-label={etiquetaGrupo}
+      className={cn("flex h-auto shrink-0 flex-wrap justify-start gap-1.5 bg-transparent p-0", className)}
+    >
       {chips.map((c) => (
         <TabsTrigger
           key={c.valor}

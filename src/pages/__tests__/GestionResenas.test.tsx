@@ -92,8 +92,8 @@ describe("GestionResenas", () => {
     expect(within(lista).queryByText("Elena")).not.toBeInTheDocument();
     expect(within(lista).getByText("Propuesta lista")).toBeInTheDocument();
     expect(within(lista).getByText("Sin respuesta")).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: /Todas · 4/ }));
-    fireEvent.click(screen.getByRole("tab", { name: /Todas · 4/ }));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /Todas\s*4/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Todas\s*4/ }));
     await waitFor(() => expect(within(lista).getByText("Rosa")).toBeInTheDocument());
     expect(within(lista).getByText("Oculta en la web")).toBeInTheDocument();
     expect(within(lista).getByText("Respondida")).toBeInTheDocument();

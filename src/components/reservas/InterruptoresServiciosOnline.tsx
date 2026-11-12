@@ -82,7 +82,9 @@ export function InterruptoresServiciosOnline({
             type="button"
             size="sm"
             variant={bloqueado ? "destructive" : "outline"}
-            className={cn("touch-hit min-h-11", compacta ? "min-w-0 flex-1 gap-1.5 px-2" : "gap-2")}
+            className={cn("touch-hit min-h-11", compacta ? "h-auto min-w-0 flex-1 flex-col gap-0 px-1.5 py-1 leading-tight" : "gap-2")}
+            // Compacta: el nombre accesible entero («Cerrar comida»), aunque se pinte en dos líneas.
+            aria-label={compacta ? (bloqueado ? cerrado : abrir) : undefined}
             data-testid={`boton-servicio-online-${turno}`}
             aria-pressed={bloqueado}
             disabled={!disponible || !puedeEditar || guardando}
@@ -96,7 +98,16 @@ export function InterruptoresServiciosOnline({
             ) : (
               <LockOpen className="h-4 w-4" aria-hidden />
             )}
-            <span className={compacta ? "truncate text-[15px]" : undefined}>{bloqueado ? cerrado : abrir}</span>
+            {/* Móvil (12/11/2026, captura del dueño: «Cerrar co…» cortado a 390 px): en dos líneas, como «Sentar / Elegir
+                mesa» de las filas; arriba lo que hace el botón y abajo el turno, que siempre cabe. */}
+            {compacta ? (
+              <>
+                <span className="text-xs font-normal">{bloqueado ? "Cerrada" : "Cerrar"}</span>
+                <span className="text-sm font-semibold">{turno === "comida" ? "Comida" : "Cena"}</span>
+              </>
+            ) : (
+              <span>{bloqueado ? cerrado : abrir}</span>
+            )}
           </Button>
         );
       })}
