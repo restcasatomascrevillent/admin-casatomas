@@ -6,6 +6,7 @@ import { useAvisosSeccion, useContadorAvisosSeccion, type FiltrosAvisosSeccion }
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { agruparPorDia, EVENTO_ABRIR_AVISOS, horaAviso, rutaDeAviso, SECCIONES_AVISOS, TIPO_ICON, type SeccionAvisos } from "@/lib/avisos";
 import { cn } from "@/lib/utils";
+import { EstadoReservaAviso, useEstadosReservasAvisos } from "@/hooks/useEstadosReservasAvisos";
 import { useAbrirAviso } from "@/hooks/useAbrirAviso";
 import { AjustesAvisosEnVivo } from "@/components/notificaciones/AvisosEnVivo";
 import { useEstadoAvisosEnVivo } from "@/hooks/useAvisosEnVivo";
@@ -125,6 +126,8 @@ function ModalAvisos({
   const { avisos, loading, cargandoMas, hayMas, error, cargarMas, marcarRevisado, marcarTodosRevisados } =
     useAvisosSeccion(seccion, filtros, abierto);
   const grupos = agruparPorDia(avisos);
+  // Estado actual de cada reserva avisada (12/11/2026, petición del dueño).
+  const estados = useEstadosReservasAvisos(avisos);
   const haySinRevisar = avisos.some((n) => !n.leida) || pendientes > 0;
   const etiquetaTipo = (tipo: string) => config.tipos.find((t) => t.tipo === tipo)?.etiqueta ?? tipo;
 
@@ -211,7 +214,10 @@ function ModalAvisos({
                             aria-hidden="true"
                           />
                           <div className="min-w-0 flex-1">
-                            <p className={cn("text-sm [overflow-wrap:anywhere]", !n.leida && "font-medium")}>{n.titulo}</p>
+                            <p className={cn("flex flex-wrap items-center gap-1.5 text-sm [overflow-wrap:anywhere]", !n.leida && "font-medium")}>
+                              {n.titulo}
+                              <EstadoReservaAviso aviso={n} estados={estados} />
+                            </p>
                             {n.mensaje && <p className="mt-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">{n.mensaje}</p>}
                             <p className="mt-1 text-xs text-muted-foreground">
                               {horaAviso(n.created_at)} · {etiquetaTipo(n.tipo)}

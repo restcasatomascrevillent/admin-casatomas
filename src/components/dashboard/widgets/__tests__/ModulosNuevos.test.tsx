@@ -19,6 +19,12 @@ const h = vi.hoisted(() => ({
   superAdmin: false,
 }));
 
+// Estado de las reservas avisadas (12/11/2026): se prueba aparte; aquí sin consulta.
+vi.mock("@/hooks/useEstadosReservasAvisos", () => ({
+  useEstadosReservasAvisos: () => new Map([["res-r1", "pendiente"]]),
+  EstadoReservaAviso: ({ aviso, estados }: { aviso: { referencia_id?: string | null }; estados: Map<string, string> }) =>
+    aviso.referencia_id && estados.get(aviso.referencia_id) ? <span data-testid="estado-reserva-aviso">{estados.get(aviso.referencia_id)}</span> : null,
+}));
 vi.mock("@/hooks/useMargenesCarta", () => ({ useMargenesCarta: () => h.margenes }));
 vi.mock("@/hooks/useAlertasFacturas", () => ({ useAlertasFacturas: () => ({ data: h.alertas }) }));
 vi.mock("@/hooks/useNotificacionesDashboard", () => ({
