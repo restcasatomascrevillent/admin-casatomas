@@ -2,6 +2,17 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.28.0] - 2026-11-12
+
+Objetivo: Fase 3 (pestañas y contadores unificados), «Pendientes» con Verificar, informes con margen, Dashboard más limpio y el chat de Facturas enlazando a Drive cada factura
+
+### Añadido
+- Fase 3: auditoría visual — pestañas y contadores unificados, responsive 320–1920 y contraste ([#168](https://github.com/restcasatomascrevillent/admin-casatomas/pull/168))
+- «Pendientes» en la pestaña Reservas · Dashboard sin campana ni bocadillo · Tienda sin «212 vinos» ([#169](https://github.com/restcasatomascrevillent/admin-casatomas/pull/169))
+- Informes: margen de beneficio en vinos y «Falta el escandallo» en platos ([#170](https://github.com/restcasatomascrevillent/admin-casatomas/pull/170))
+- «Pendientes» en el móvil, en amarillo y con «Verificar» en cada fila ([#171](https://github.com/restcasatomascrevillent/admin-casatomas/pull/171))
+- Facturas: el chat enlaza a Drive cada factura que nombra ([#180](https://github.com/restcasatomascrevillent/admin-casatomas/pull/180))
+
 ## [1.26.0] - 2026-11-11
 
 Objetivo: Producción igualada con staging: Fase 2 de reservas, Fases 4 y 5 (vinos, márgenes sin IVA, tienda), dashboard, revisión móvil y avisos por Telegram
