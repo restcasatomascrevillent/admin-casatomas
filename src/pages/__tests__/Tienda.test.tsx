@@ -265,7 +265,8 @@ describe("Tienda › Vinos", () => {
   it("filtro A la venta / Fuera con sus cuentas, contador de resultados y estado vacío que quita los filtros", async () => {
     pintar();
     const tabla = await tablaVinos();
-    expect(screen.getByText("vinos", { exact: false, selector: "p[aria-live]" })).toHaveTextContent("3 vinos");
+    // Sin filtro no hay línea «3 vinos» (12/11/2026, dueño: información repetida con «Todos 3» y «A la venta … de 3»).
+    expect(document.querySelector("p[aria-live]")).toBeNull();
     fireEvent.click(screen.getByRole("radio", { name: "Fuera 2" }));
     expect(within(tabla).getAllByRole("row").slice(1).map((f) => f.getAttribute("data-estado"))).toEqual(["excluido", "no-vendible"]);
     expect(screen.getByText(/Mostrando/)).toHaveTextContent("Mostrando 2 de 3 vinos");
