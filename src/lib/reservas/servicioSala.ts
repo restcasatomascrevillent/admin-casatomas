@@ -136,6 +136,11 @@ export function estanciaMinutosDeReserva(hora: string, turno: "comida" | "cena",
 }
 
 /** "HH:MM" o "HH:MM:SS" → minutos desde medianoche. Basura → 0 (medianoche). */
+/** `YYYY-MM-DD` local de una fecha. */
+function diaLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function minutosDelDia(hora: string): number {
   const m = /^(\d{1,2}):(\d{2})/.exec(typeof hora === "string" ? hora.trim() : "");
   if (!m) return 0;
@@ -215,9 +220,15 @@ export function estadoMesaServicio(
   turno: "comida" | "cena",
   ahora: Date,
   config: ConfigServicioSala = CONFIG_SERVICIO_SALA_POR_DEFECTO,
+  /**
+   * El día que se está mirando (`YYYY-MM-DD`). Si no es el de `ahora`, nada va «retrasada» ni lleva minutos
+   * (12/11/2026, captura del dueño: el sábado 14 salía «+169 min» porque solo se comparaba la hora del reloj).
+   */
+  dia?: string,
 ): ResultadoEstadoMesa {
   const reserva = reservaRelevanteDeMesa(mesaId, asignaciones, reservas, turno);
   if (!reserva) return { estado: "libre", reserva: null, minutos: null };
+  if (dia && dia !== diaLocal(ahora) && !haLlegado(reserva.estado)) return { estado: "reservada", reserva, minutos: null };
 
   const ahoraMinutos = ahora.getHours() * 60 + ahora.getMinutes();
 
