@@ -17,8 +17,12 @@ import { esErrorDeModelo } from "../_shared/modelo-funcion.ts";
 import {
   type Adjunto,
   type DocRef,
+  type DocNombrado,
   anotarRuta,
+  documentosNombrados,
+  elegirDocumento,
   idsDeFilas,
+  nombradosEnRespuesta,
   unirReferencias,
   esErrorCorregible,
   hoyMadrid,
@@ -354,7 +358,7 @@ async function embedConsulta(consulta: string, ctx: Ctx): Promise<string> {
   return vector;
 }
 
-interface ResultadoTool { contenido: string; fallo: boolean; adjunto?: Adjunto | null; referencias?: DocRef[] }
+interface ResultadoTool { contenido: string; fallo: boolean; adjunto?: Adjunto | null; referencias?: DocRef[]; nombrados?: DocNombrado[] }
 
 /** Documentos (con enlace al original) para los ids dados. Best-effort: si falla, sin referencias. */
 async function cargarReferencias(ids: number[], supabase: Cliente): Promise<DocRef[]> {
@@ -373,6 +377,41 @@ async function cargarReferencias(ids: number[], supabase: Cliente): Promise<DocR
     }));
   } catch (e) {
     console.warn("[chat-facturas] referencias no disponibles:", e instanceof Error ? e.message : e);
+    return [];
+  }
+}
+
+/**
+ * Enlaces de los documentos que la respuesta nombra por su número (detalle,
+ * historial de precios, albaranes, búsqueda…: las RPC que no traen el id).
+ * Se buscan en `facturas` por número y se elige el del proveedor nombrado
+ * (`elegirDocumento`). Best-effort: si falla, sin estos enlaces.
+ */
+async function referenciasDeNombrados(nombrados: DocNombrado[], supabase: Cliente): Promise<DocRef[]> {
+  if (nombrados.length === 0) return [];
+  try {
+    const numeros = [...new Set(nombrados.map((n) => n.numero))];
+    const { data, error } = await supabase
+      .from("facturas")
+      .select("id, tipo, numero_documento, proveedor, fecha, drive_url, archivo_path")
+      .in("numero_documento", numeros)
+      .limit(200);
+    if (error) throw error;
+    // deno-lint-ignore no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filas: any[] = data ?? [];
+    const salida: DocRef[] = [];
+    for (const n of nombrados) {
+      const f = elegirDocumento(n, filas.filter((x) => x.numero_documento === n.numero));
+      if (!f) continue;
+      salida.push({
+        id: f.id, tipo: f.tipo ?? null, numero: f.numero_documento ?? null, proveedor: f.proveedor ?? null,
+        fecha: f.fecha ?? null, drive_url: f.drive_url ?? null, archivo_path: f.archivo_path ?? null,
+      });
+    }
+    return salida;
+  } catch (e) {
+    console.warn("[chat-facturas] enlaces de documentos nombrados no disponibles:", e instanceof Error ? e.message : e);
     return [];
   }
 }
@@ -478,10 +517,13 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
     let referencias: DocRef[] = [];
     if (nombre === "variacion_precios") referencias = await referenciasVariacion(data, supabase);
     else if (nombre === "filtrar_documentos") referencias = await cargarReferencias(idsDeFilas(data), supabase);
+    // Documentos nombrados por su número: su enlace se busca al final, solo
+    // para los que la respuesta cite (`referenciasDeNombrados`).
+    const nombrados = documentosNombrados(data);
     // Va en el resultado y no en el prompt de sistema (que viaja en cada ronda y tiene tope de tamaño).
-    if (referencias.length > 0 && data && typeof data === "object" && !Array.isArray(data)) {
+    if ((referencias.length > 0 || nombrados.length > 0) && data && typeof data === "object" && !Array.isArray(data)) {
       (data as Record<string, unknown>).nota_referencias =
-        "Cita de cada dato proveedor, numero y fecha. La app muestra debajo los enlaces a la foto del original: no escribas URLs ni digas que no puedes enseñarla.";
+        "Cita cada documento por su proveedor, su numero TAL CUAL viene aqui y su fecha: la app convierte el numero en enlace al original en Drive y lo lista debajo. No escribas URLs ni digas que no puedes enseñarlo.";
     }
 
     const { data: paraModelo, adjunto } = separarAdjunto(nombre, anotarRuta(ll, data));
@@ -489,6 +531,7 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       fallo: false,
       adjunto,
       referencias,
+      nombrados,
       contenido: recortar(
         JSON.stringify(marcarResultado(nombre, paraModelo, ll.limite, ctx.pregunta)),
         ll.tipo === "rpc" ? ll.maxChars : undefined,
@@ -590,6 +633,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   let huboFalloDeHerramienta = false;
   const adjuntos: Adjunto[] = [];
   const referenciasAcum: DocRef[][] = [];
+  const nombradosAcum: DocNombrado[] = [];
   const apuntar = (h: HerramientaEjecutada, error?: string, resumen?: ResumenResultado) => {
     o.alEjecutarHerramienta?.(h);
     o.traza?.herramientas.push({
@@ -656,6 +700,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
         if (r.fallo) huboFalloDeHerramienta = true;
         if (r.adjunto) adjuntos.push(r.adjunto);
         if (r.referencias?.length) referenciasAcum.push(r.referencias);
+        if (r.nombrados?.length) nombradosAcum.push(...r.nombrados);
         messages.push({ role: "tool", tool_call_id: tc.id, content: r.contenido });
       }
       // La API exige una respuesta por cada tool_call emitida: las que se
@@ -687,7 +732,10 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
       : "No he conseguido resolver la consulta. Prueba a preguntarlo de forma mas concreta, por ejemplo indicando un proveedor, un numero de documento o un mes.";
   }
 
-  const refs = unirReferencias(referenciasAcum);
+  // Primero los documentos que la respuesta nombra (con su enlace a Drive);
+  // luego, como hasta ahora, los de filtrar_documentos y variacion_precios.
+  const citados = respuesta.trim() ? await referenciasDeNombrados(nombradosEnRespuesta(nombradosAcum, respuesta), supabase) : [];
+  const refs = unirReferencias([citados, ...referenciasAcum]);
   if (refs.length > 0 && respuesta.trim()) adjuntos.push({ tipo: "documentos", datos: refs });
 
   return { respuesta, adjuntos, modelo, huboFalloDeHerramienta };
