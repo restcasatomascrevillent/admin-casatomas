@@ -21,6 +21,7 @@ import type { MensajeChat } from "@/hooks/useChatFacturas";
 import { asuntoDeContexto, graficasDeMensaje, separarContexto, type GraficaIa } from "@/lib/facturas/graficasCopiloto";
 import type { DocumentoCitado } from "@/lib/facturas/seriePrecio";
 import { formatFechaEs } from "@/lib/facturas/preguntasRapidas";
+import { enlazarDocumentos } from "@/lib/facturas/enlacesDocumentos";
 import { BotonOriginal } from "../shared/BotonOriginal";
 import { GraficoSeriePrecio } from "../GraficoSeriePrecio";
 import { desplazarA } from "../analisis/desplazar";
@@ -427,8 +428,9 @@ function MensajeAsistente({
   return (
     <div className="flex flex-col gap-1">
       <div className={cn(CLASES_PROSA, "prose prose-sm max-w-none text-foreground dark:prose-invert prose-p:my-1", completa && "sm:prose-base sm:prose-p:my-1.5")}>
+        {/* El número de cada documento citado, enlazado a su original en Drive. */}
         <ReactMarkdown remarkPlugins={PLUGINS_MARKDOWN} components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>
-          {mensaje.contenido}
+          {enlazarDocumentos(mensaje.contenido, documentos)}
         </ReactMarkdown>
       </div>
       {graficas.map((g) => {

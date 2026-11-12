@@ -1026,6 +1026,99 @@ export function unirReferencias(listas: DocRef[][]): DocRef[] {
   return salida;
 }
 
+/**
+ * Un documento que sale en el resultado de una herramienta, por su número tal
+ * cual lo da la RPC (y el proveedor, si viene al lado). Casi todas las RPC
+ * (detalle, historial y compras de producto, albaranes sin factura,
+ * búsqueda…) nombran los documentos así, sin su id.
+ */
+export interface DocNombrado {
+  numero: string;
+  proveedor: string | null;
+}
+
+const MAX_NOMBRADOS = 80;
+
+/** Recorre el resultado (con tope de profundidad y de cantidad) y apunta cada objeto con `numero`. */
+export function documentosNombrados(data: unknown): DocNombrado[] {
+  const salida: DocNombrado[] = [];
+  const vistos = new Set<string>();
+  const visitar = (v: unknown, profundidad: number) => {
+    if (salida.length >= MAX_NOMBRADOS || profundidad > 6 || !v || typeof v !== "object") return;
+    if (Array.isArray(v)) {
+      for (const x of v) visitar(x, profundidad + 1);
+      return;
+    }
+    const o = v as Record<string, unknown>;
+    const numero = typeof o.numero === "string" || typeof o.numero === "number" ? String(o.numero).trim() : "";
+    if (numero && claveDocumento(numero).length >= 3) {
+      const proveedor = typeof o.proveedor === "string" && o.proveedor.trim() ? o.proveedor.trim() : null;
+      const clave = `${numero}\u0000${proveedor ?? ""}`;
+      if (!vistos.has(clave)) {
+        vistos.add(clave);
+        salida.push({ numero, proveedor });
+      }
+    }
+    for (const x of Object.values(o)) if (x && typeof x === "object") visitar(x, profundidad + 1);
+  };
+  visitar(data, 0);
+  return salida;
+}
+
+/** Para comparar números y proveedores: minúsculas, sin tildes ni separadores. */
+export function claveDocumento(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * ¿La respuesta nombra este número? Se busca el número con los separadores
+ * que quiera (espacios, puntos, guiones, barras: «FV-2026/12» = «FV 2026 12»)
+ * y sin letras ni cifras pegadas a los lados: «2482» no casa con «12482» ni
+ * con «24,82 €».
+ */
+export function respuestaNombra(respuesta: string, numero: string): boolean {
+  const chars = claveDocumento(numero).split("");
+  if (chars.length < 3) return false;
+  const patron = chars.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[\\s./-]*");
+  return new RegExp(`(?<![\\p{L}\\p{N}])${patron}(?![\\p{L}\\p{N}])`, "iu").test(
+    respuesta.normalize("NFD").replace(/[̀-ͯ]/g, ""),
+  );
+}
+
+/** Los documentos (sin repetir) cuyo número aparece en la respuesta, en el orden en que salieron. */
+export function nombradosEnRespuesta(nombrados: DocNombrado[], respuesta: string): DocNombrado[] {
+  const vistos = new Set<string>();
+  const salida: DocNombrado[] = [];
+  for (const n of nombrados) {
+    const clave = `${claveDocumento(n.numero)}\u0000${claveDocumento(n.proveedor ?? "")}`;
+    if (vistos.has(clave) || !respuestaNombra(respuesta, n.numero)) continue;
+    vistos.add(clave);
+    salida.push(n);
+    if (salida.length >= MAX_REFERENCIAS) break;
+  }
+  return salida;
+}
+
+/**
+ * De las filas de `facturas` con ese número, la del documento nombrado: si
+ * viene el proveedor, la suya (uno contiene al otro, sin tildes ni signos); si
+ * no, solo cuando no hay duda (una sola fila). Nunca se adivina entre varias.
+ */
+export function elegirDocumento<T extends { proveedor: string | null; fecha: string | null }>(
+  nombrado: DocNombrado,
+  filas: T[],
+): T | null {
+  if (filas.length === 0) return null;
+  if (!nombrado.proveedor) return filas.length === 1 ? filas[0] : null;
+  const buscado = claveDocumento(nombrado.proveedor);
+  const suyas = filas.filter((f) => {
+    const p = claveDocumento(f.proveedor ?? "");
+    return !!p && (p.includes(buscado) || buscado.includes(p));
+  });
+  if (suyas.length === 0) return null;
+  return [...suyas].sort((a, b) => String(b.fecha ?? "").localeCompare(String(a.fecha ?? "")))[0];
+}
+
 /** Ids de documento de las filas de filtrar_documentos (cada fila trae `id`). */
 // deno-lint-ignore no-explicit-any
 export function idsDeFilas(data: any): number[] {
