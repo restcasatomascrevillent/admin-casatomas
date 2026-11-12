@@ -113,7 +113,8 @@ export default function TraficoWeb() {
             de la transferencia) y la hora del último sync van en la línea discreta de debajo de las cifras. */}
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <FiltrosTrafico proyecto={proyecto} onProyectoChange={setProyecto} dias={dias} onDiasChange={setDias} />
-          <div className="flex items-center gap-2">
+          {/* `flex-wrap` (Fase 3): a 320 px «Pesos por página» se salía de la pantalla. */}
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" className="h-11 gap-2" onClick={() => setInformeAbierto(true)}>
               <FileBarChart2 className="h-4 w-4" aria-hidden />
               Generar informe

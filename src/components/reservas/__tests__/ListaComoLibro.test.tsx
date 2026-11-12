@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   buscadas: [] as string[],
   encontradas: [] as unknown[],
   porEstado: {} as Record<string, unknown[]>,
+  aceptar: vi.fn(async () => ({ ok: true })),
 }));
 
 vi.mock("@/hooks/useBusquedaReservas", async (importOriginal) => {
@@ -40,6 +41,8 @@ vi.mock("@/hooks/useReservasServicioDia", () => ({
     return { data: h.porDia[fecha] ?? [], isLoading: false, isError: false, refetch: vi.fn() };
   },
 }));
+vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
+vi.mock("@/hooks/useAccionesServicioReserva", () => ({ useAccionesServicioReserva: () => ({ aceptar: h.aceptar, estaEnCurso: () => false }) }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({
   useEspaciosReserva: () => ({ data: [{ id: "s1", nombre: "Salón" }] }),
 }));
@@ -312,6 +315,9 @@ describe("ListaComoLibro · buscador y «Pendientes»", () => {
     expect(boton).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("heading", { name: /Pendientes de verificar/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Abrir la reserva de Berta/ })).toBeInTheDocument();
+    // «Verificar» en cada fila (12/11/2026): verifica sin abrir la ficha.
+    fireEvent.click(screen.getByRole("button", { name: "Verificar la reserva de Berta" }));
+    expect(h.aceptar).toHaveBeenCalledWith(expect.objectContaining({ id: "p2", estado: "pendiente" }));
     fireEvent.click(boton);
     expect(hojas()[0]).toHaveAccessibleName(`Hoja del ${tituloHoja(hoy)}`);
   });
@@ -321,5 +327,6 @@ describe("ListaComoLibro · buscador y «Pendientes»", () => {
     render(<ListaComoLibro estadoInicial="cancelada" />);
     expect(screen.getByRole("heading", { name: /Canceladas/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Abrir la reserva de Carlos/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Verificar/ })).toBeNull();
   });
 });

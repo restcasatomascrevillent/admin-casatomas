@@ -101,7 +101,7 @@ describe("GestionCorreos (pestaña Suscriptores)", () => {
 
     // La pestaña ya cargó: contadores, lista y tarjeta de la lista de envío (así la ausencia de los textos
     // no se debe a que todavía no se hubiera pintado nada).
-    expect(await screen.findByRole("tab", { name: "Activos (2)" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: /^Activos\s*2 activos$/ })).toBeInTheDocument();
     expect(await screen.findByText("Lista de envío")).toBeInTheDocument();
     // Las cifras, en una tira (sin tarjetas): activos y dados de baja con su explicación corta.
     const tira = screen.getByTestId("cifras-suscriptores");
@@ -119,7 +119,7 @@ describe("GestionCorreos (pestaña Suscriptores)", () => {
   // que en el navegador la pestaña mida justo el alto de la pantalla (medido con el navegador real, 2026-10-06).
   it("la lista toma el alto que sobra y hace scroll por dentro: sin alturas fijas y con toda la cadena pudiendo encoger", async () => {
     const { container } = pintar();
-    await screen.findByRole("tab", { name: "Activos (2)" });
+    await screen.findByRole("tab", { name: /^Activos\s*2 activos$/ });
 
     // La pestaña llena el alto que le da la página (Marketing mide la pantalla) y no pone scroll propio: el
     // de la pestaña es el de Marketing y el del listado, el de la propia lista.

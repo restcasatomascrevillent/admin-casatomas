@@ -136,7 +136,7 @@ export function VistaPreviaBot({ borradores }: VistaPreviaBotProps) {
               </span>
             )}
           </div>
-          <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground mt-1.5">
+          <p className="text-xs text-muted-foreground mt-1.5">
             El saludo ("{saludo}") lo calcula el bot solo, según la hora en Madrid — el mensaje de bienvenida es
             una sugerencia que se combina con él, no un texto fijo palabra por palabra.
           </p>

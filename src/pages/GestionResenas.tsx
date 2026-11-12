@@ -78,7 +78,7 @@ export default function GestionResenas() {
     const filtroActivo: FiltroResenas = filtro ?? (cuentas.por_responder > 0 ? "por_responder" : "todas");
     const visibles = useMemo(() => filtrar(lista, filtroActivo), [lista, filtroActivo]);
     const resenaAbierta = lista.find((r) => r.id === abierta) ?? null;
-    const googleConectado = !!estadoContestador?.google.conectada && !!estadoContestador.google.ubicacion;
+    const googleConectado = !!estadoContestador?.google?.conectada && !!estadoContestador?.google?.ubicacion;
 
     // Vuelta de Google OAuth: ?google=conectado|error|cancelado
     useEffect(() => {
