@@ -479,10 +479,17 @@ describe("EditarReservaDialog · Verificar, Confirmar y Cancelar", () => {
     expect(mocks.cancelar).toHaveBeenCalled();
   });
 
-  it("una reserva terminada (llegó, no vino, cancelada) no tiene botones de estado", async () => {
+  it("una reserva terminada (llegó, no vino, cancelada) enseña su estado pero no tiene botones de estado", async () => {
     mocks.reserva = fila({ estado: "completada" });
     montar();
     await screen.findByRole("button", { name: "simular guardado" });
-    expect(screen.queryByTestId("acciones-estado")).toBeNull();
+    expect(screen.getByTestId("estado-ficha")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Cancelar reserva|Verificar|Confirmar/ })).toBeNull();
+  });
+
+  it("dice cuándo y por dónde se hizo la reserva (12/11/2026)", async () => {
+    mocks.reserva = fila({ created_at: "2026-11-11T12:30:00Z", canal: "web" });
+    montar();
+    expect(await screen.findByTestId("creada-ficha")).toHaveTextContent(/^Hecha el .*11 nov 2026 a las \d\d:30 · Web$/);
   });
 });

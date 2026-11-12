@@ -11,6 +11,12 @@ const bd = vi.hoisted(() => ({
 }));
 // «Ver» en una reserva abre su ficha en un modal si se pueden editar reservas (11/11/2026, `useAbrirAviso`).
 const permiso = vi.hoisted(() => ({ editaReservas: false }));
+// Estado de las reservas avisadas (12/11/2026): se prueba aparte; aquí sin consulta.
+vi.mock("@/hooks/useEstadosReservasAvisos", () => ({
+  useEstadosReservasAvisos: () => new Map([["res-r1", "pendiente"]]),
+  EstadoReservaAviso: ({ aviso, estados }: { aviso: { referencia_id?: string | null }; estados: Map<string, string> }) =>
+    aviso.referencia_id && estados.get(aviso.referencia_id) ? <span data-testid="estado-reserva-aviso">{estados.get(aviso.referencia_id)}</span> : null,
+}));
 vi.mock("@/hooks/useUserRole", () => ({
   useCanAccessSection: () => ({ canAccess: permiso.editaReservas, loading: false }),
 }));
@@ -162,6 +168,8 @@ describe("Botón «Avisos» de cada sección", () => {
       pintar("reservas");
       fireEvent.click(await screen.findByRole("button", { name: "Avisos: 2 sin revisar" }));
       const modal = await screen.findByRole("dialog");
+      // El estado actual de la reserva avisada sale junto al título (12/11/2026).
+      expect(within(modal).getAllByTestId("estado-reserva-aviso")[0]).toHaveTextContent("pendiente");
       fireEvent.click(await within(modal).findByRole("button", { name: "Ver: Aviso r1" }));
       expect(await screen.findByTestId("ficha-reserva")).toHaveTextContent("res-r1");
       expect(screen.getByRole("dialog")).toBeInTheDocument();
