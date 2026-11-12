@@ -7,6 +7,7 @@ import {
   type Accion, agruparEnMensajes, type Aviso, type ConfigTelegram, construirResumen, cuerpoSendMessage, diaMadrid, type Envio, errorSaneado, esAccion,
   mensajeAviso, pendientesDeEnvio, SIN_CONFIGURAR, silencioAhora, TEXTO_PRUEBA,
 } from "./logica.ts";
+import { type Contexto, type Fallo, idAlbaran, mensajeFallo } from "./fallos.ts";
 const createClient = clienteConAuditoria(createClientBase, "avisos-telegram");
 
 // ============================================================================
@@ -17,6 +18,8 @@ const createClient = clienteConAuditoria(createClientBase, "avisos-telegram");
 //       silencio nocturno. Varios a la vez van juntos en mensajes de ≤ 4.096.
 //  POST { accion: "resumen" }     un mensaje con los avisos de las últimas 24 h
 //       agrupados por tipo; guarda resumen_ultimo_dia (uno al día).
+//  POST { accion: "fallos" }      fallos internos para desarrolladores (fallos.ts): un mensaje
+//       por fila pendiente de fallos_internos, sin silencio nocturno.
 //  POST { accion: "probar" }      «Prueba de avisos de Casa Tomás» al chat
 //       configurado (aunque esté desactivado: sirve para montarlo).
 //  Todo queda en avisos_telegram_envios (ok o error).
@@ -90,7 +93,7 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
     // sin cuerpo
   }
   const accion: Accion | null = esAccion(body.accion) ? body.accion : null;
-  if (!accion) return json({ ok: false, error: "Acción desconocida (pendientes, resumen o probar)" }, 400);
+  if (!accion) return json({ ok: false, error: "Acción desconocida (pendientes, resumen, fallos o probar)" }, 400);
 
   const sb = createClient(URL_SB, SERVICE, { auth: { autoRefreshToken: false, persistSession: false } });
   const { data: cfgFila, error: eCfg } = await sb.from("avisos_telegram_config").select("*").eq("id", true).maybeSingle();
@@ -101,7 +104,7 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
   const cfg = cfgFila as ConfigTelegram | null;
   const chatId = cfg?.chat_id?.trim() ?? "";
 
-  const registrar = async (filas: { tipo: string; aviso_id?: string | null; ok: boolean; error?: string | null; mensaje_id?: number | null }[]) => {
+  const registrar = async (filas: { tipo: string; aviso_id?: string | null; fallo_id?: number | null; ok: boolean; error?: string | null; mensaje_id?: number | null }[]) => {
     if (filas.length === 0) return;
     const { error } = await sb.from("avisos_telegram_envios").insert(filas.map((f) => ({ chat_id: chatId || null, ...f })));
     if (error) console.error("[avisos-telegram] registro:", error.message);
@@ -129,6 +132,30 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
 
   if (!cfg?.activo) return json({ ok: true, enviados: 0, motivo: "inactivo" });
   const ahora = new Date();
+
+  if (accion === "fallos") {
+    // Fallos internos (tabla fallos_internos): un mensaje por fallo, sin silencio nocturno.
+    const { data: filas, error: eRec } = await sb.rpc("fallos_internos_reclamar", { p_limite: 20 });
+    if (eRec) return json({ ok: false, error: eRec.message }, 500);
+    const fallos = (filas ?? []) as Fallo[];
+    let enviados = 0;
+    const errores: string[] = [];
+    for (const f of fallos) {
+      const ctx: Contexto = {};
+      const idAlb = f.tipo === "albaran_aviso" ? idAlbaran(f) : null;
+      if (idAlb) {
+        const { data: alb } = await sb.from("facturas").select("id, proveedor, fecha").eq("id", idAlb).maybeSingle();
+        if (alb) ctx.albaran = alb as Contexto["albaran"];
+      }
+      const r = await enviarTelegram(chatId, mensajeFallo(f, ctx));
+      await registrar([{ tipo: "fallo", fallo_id: f.id, ok: r.ok, error: r.ok ? null : r.error, mensaje_id: r.ok ? r.mensaje_id : null }]);
+      await sb.from("fallos_internos").update(r.ok ? { enviado_en: new Date().toISOString(), ultimo_error: null } : { ultimo_error: r.error }).eq("id", f.id);
+      if (r.ok) enviados++;
+      else errores.push(r.error);
+    }
+    console.log(`[avisos-telegram] ${quien} · fallos · ${enviados}/${fallos.length}${errores.length ? ` · ${errores[0]}` : ""}`);
+    return json({ ok: errores.length === 0, enviados, fallos: fallos.length, error: errores[0] });
+  }
 
   if (accion === "pendientes") {
     if (silencioAhora(cfg, ahora)) return json({ ok: true, enviados: 0, motivo: "silencio" });
