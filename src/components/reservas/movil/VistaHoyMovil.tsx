@@ -60,6 +60,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
+import { BotonPendientes } from "@/components/reservas/libro/BotonPendientes";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -407,7 +408,14 @@ export function VistaHoyMovil({
         {hayMenu && <BotonAvisosSeccion seccion="reservas" className="h-11 px-2.5" />}
       </div>
       )}
-      {!columna && <InterruptoresServiciosOnline fecha={fecha} compacta className="shrink-0" />}
+      {/* «Pendientes» también en el móvil (12/11/2026, petición del dueño): reloj y número junto a «Cerrar comida / Cerrar
+          cena»; abre la misma lista que en la Lista y en Reservas (aquí sin «Ver el día»: el móvil no cambia de día). */}
+      {!columna && (
+        <div className="flex shrink-0 items-center gap-1.5" data-testid="hoy-movil-servicios">
+          <BotonPendientes compacto className="shrink-0" />
+          <InterruptoresServiciosOnline fecha={fecha} compacta className="min-w-0 flex-1" />
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border bg-card" data-testid="hoy-movil-lista">
         {reservas === undefined ? (

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { horaCorta } from "@/lib/reservas/ocupacionSalas";
@@ -28,9 +29,13 @@ interface Props {
   /** Teléfono bajo el nombre (en los resultados de búsqueda: ayuda a distinguir a dos «María»). */
   conTelefono?: boolean;
   onAbrir?: (id: string) => void;
+  /** Sin la insignia de estado (12/11/2026: en «Pendientes» todas lo son y su sitio lo ocupa «Verificar»). */
+  sinEstado?: boolean;
+  /** Algo al final de la fila, FUERA del botón de abrir (p. ej. «Verificar»): no se anidan botones. */
+  accion?: ReactNode;
 }
 
-export function RenglonReserva({ reserva: r, sala, resaltada = false, conTelefono = false, onAbrir }: Props) {
+export function RenglonReserva({ reserva: r, sala, resaltada = false, conTelefono = false, onAbrir, sinEstado = false, accion }: Props) {
   const info = infoEstadoReserva(r.estado);
   const hora = horaCorta(r.hora) ?? r.hora;
   const debajo = [conTelefono ? r.telefono : null].filter(Boolean).join(" · ");
@@ -44,19 +49,32 @@ export function RenglonReserva({ reserva: r, sala, resaltada = false, conTelefon
       </span>
       <span className="justify-self-end rounded-md border px-2 py-0.5 text-sm font-semibold tabular-nums">{r.numero_comensales} px</span>
       <span className="hidden truncate text-sm text-muted-foreground sm:block">{sala ?? "—"}</span>
-      <span className="flex justify-end">
-        {info && (
-          <Badge className={cn("text-xs", info.insignia)} variant={info.varianteInsignia}>
-            {info.etiqueta}
-          </Badge>
-        )}
-      </span>
+      {!sinEstado && (
+        <span className="flex justify-end">
+          {info && (
+            <Badge className={cn("text-xs", info.insignia)} variant={info.varianteInsignia}>
+              {info.etiqueta}
+            </Badge>
+          )}
+        </span>
+      )}
     </>
   );
-  const clases =
-    "grid min-h-14 w-full grid-cols-[3.25rem_minmax(0,1fr)_auto_auto] items-center gap-x-3 px-3 py-2 text-left text-base sm:grid-cols-[3.5rem_minmax(0,1fr)_4rem_8rem_7rem]";
+  const clases = cn(
+    "grid min-h-14 w-full min-w-0 items-center gap-x-3 px-3 py-2 text-left text-base",
+    sinEstado
+      ? "grid-cols-[3.25rem_minmax(0,1fr)_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_4rem_8rem]"
+      : "grid-cols-[3.25rem_minmax(0,1fr)_auto_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_4rem_8rem_7rem]",
+  );
   return (
-    <li className={cn("border-b border-border/60 last:border-b-0", r.estado === ESTADO_NO_SHOW && "opacity-60", resaltada && "bg-amber-100 dark:bg-amber-900/30")}>
+    <li
+      className={cn(
+        "border-b border-border/60 last:border-b-0",
+        accion && "flex items-center gap-2 pr-2",
+        r.estado === ESTADO_NO_SHOW && "opacity-60",
+        resaltada && "bg-amber-100 dark:bg-amber-900/30",
+      )}
+    >
       {onAbrir ? (
         <button
           type="button"
@@ -69,6 +87,7 @@ export function RenglonReserva({ reserva: r, sala, resaltada = false, conTelefon
       ) : (
         <div className={clases}>{contenido}</div>
       )}
+      {accion}
     </li>
   );
 }
