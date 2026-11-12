@@ -39,7 +39,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
-import { esEstadoVivo } from "@/lib/reservas/estadosReserva";
+import { esEstadoVivo, infoEstadoReserva } from "@/lib/reservas/estadosReserva";
+import { textoCreada } from "@/lib/reservas/creada";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { OPCIONES_FILTRO_ESTADO } from "@/lib/reservas/vistaUnificada";
 import type { ReservaEditable } from "@/lib/reservas/edicionReserva";
 import { FormularioReserva } from "./FormularioReserva";
@@ -256,32 +259,64 @@ function AccionesEstado({ reserva, onHecho }: { reserva: ReservaEditable; onHech
   const { aceptar, confirmar, cancelar, estaEnCurso } = useAccionesServicioReserva();
   const [preguntarCancelar, setPreguntarCancelar] = useState(false);
   const estado = String(reserva.estado ?? "");
-  if (!esEstadoVivo(estado)) return null;
+  const vivo = esEstadoVivo(estado);
+  const info = infoEstadoReserva(estado);
+  const creada = textoCreada(reserva as { created_at?: string | null; canal?: string | null });
   const ocupado = estaEnCurso(String(reserva.id));
   const hacer = async (accion: () => Promise<{ ok: boolean }>) => {
     if ((await accion()).ok) onHecho();
   };
   const fila = reserva as unknown as Parameters<typeof confirmar>[0];
+  // 12/11/2026 (dueño: «no se ve bonito lo de cancelar reserva»): antes, una caja gris casi vacía con «Cancelar reserva»
+  // suelto a la derecha. Ahora una franja limpia: a la izquierda el estado y cuándo se hizo; a la derecha la acción
+  // principal (Verificar / Confirmar, verde) y «Cancelar reserva» discreto (texto rojo, sin caja).
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3" data-testid="acciones-estado">
-      {estado === "pendiente" && (
-        <Button className="h-11 gap-2 text-base" disabled={ocupado} onClick={() => void hacer(() => aceptar(reserva as unknown as Parameters<typeof aceptar>[0]))}>
-          <CheckCircle2 className="h-5 w-5" aria-hidden /> Verificar
-        </Button>
+    <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b pb-3" data-testid="acciones-estado">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex items-center gap-2 text-sm text-muted-foreground">
+          Estado
+          {info && (
+            <Badge className={cn("text-xs", info.insignia)} variant={info.varianteInsignia} data-testid="estado-ficha">
+              {info.etiqueta}
+            </Badge>
+          )}
+        </span>
+        {creada && (
+          <span className="text-sm text-muted-foreground" data-testid="creada-ficha">
+            {creada}
+          </span>
+        )}
+      </div>
+      {vivo && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="ghost"
+            className="h-11 gap-2 px-3 text-base text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-300 dark:hover:bg-red-950"
+            disabled={ocupado}
+            onClick={() => setPreguntarCancelar(true)}
+          >
+            <Ban className="h-4 w-4" aria-hidden /> Cancelar reserva
+          </Button>
+          {estado === "pendiente" && (
+            <Button
+              className="h-11 gap-2 bg-emerald-600 px-4 text-base font-semibold text-white hover:bg-emerald-700"
+              disabled={ocupado}
+              onClick={() => void hacer(() => aceptar(reserva as unknown as Parameters<typeof aceptar>[0]))}
+            >
+              <CheckCircle2 className="h-5 w-5" aria-hidden /> Verificar
+            </Button>
+          )}
+          {estado === "verificada" && (
+            <Button
+              className="h-11 gap-2 bg-emerald-600 px-4 text-base font-semibold text-white hover:bg-emerald-700"
+              disabled={ocupado}
+              onClick={() => void hacer(() => confirmar(fila))}
+            >
+              <CheckCircle2 className="h-5 w-5" aria-hidden /> Confirmar
+            </Button>
+          )}
+        </div>
       )}
-      {estado === "verificada" && (
-        <Button className="h-11 gap-2 text-base" disabled={ocupado} onClick={() => void hacer(() => confirmar(fila))}>
-          <CheckCircle2 className="h-5 w-5" aria-hidden /> Confirmar
-        </Button>
-      )}
-      <Button
-        variant="outline"
-        className="ml-auto h-11 gap-2 border-red-300 text-base text-red-700 hover:bg-red-50 hover:text-red-800 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950"
-        disabled={ocupado}
-        onClick={() => setPreguntarCancelar(true)}
-      >
-        <Ban className="h-5 w-5" aria-hidden /> Cancelar reserva
-      </Button>
       <AlertDialog open={preguntarCancelar} onOpenChange={setPreguntarCancelar}>
         <AlertDialogContent>
           <AlertDialogHeader>

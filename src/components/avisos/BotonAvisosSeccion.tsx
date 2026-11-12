@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Bell, CheckCheck, ExternalLink, Info } from "lucide-react";
+import { Bell, CheckCheck, ChevronDown, ExternalLink, Info, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAvisosSeccion, useContadorAvisosSeccion, type FiltrosAvisosSeccion } from "@/hooks/useAvisosSeccion";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { agruparPorDia, EVENTO_ABRIR_AVISOS, horaAviso, rutaDeAviso, SECCIONES_AVISOS, TIPO_ICON, type SeccionAvisos } from "@/lib/avisos";
 import { cn } from "@/lib/utils";
+import { EstadoReservaAviso, useEstadosReservasAvisos } from "@/hooks/useEstadosReservasAvisos";
 import { useAbrirAviso } from "@/hooks/useAbrirAviso";
 import { AjustesAvisosEnVivo } from "@/components/notificaciones/AvisosEnVivo";
 import { useEstadoAvisosEnVivo } from "@/hooks/useAvisosEnVivo";
@@ -125,6 +126,8 @@ function ModalAvisos({
   const { avisos, loading, cargandoMas, hayMas, error, cargarMas, marcarRevisado, marcarTodosRevisados } =
     useAvisosSeccion(seccion, filtros, abierto);
   const grupos = agruparPorDia(avisos);
+  // Estado actual de cada reserva avisada (12/11/2026, petición del dueño).
+  const estados = useEstadosReservasAvisos(avisos);
   const haySinRevisar = avisos.some((n) => !n.leida) || pendientes > 0;
   const etiquetaTipo = (tipo: string) => config.tipos.find((t) => t.tipo === tipo)?.etiqueta ?? tipo;
 
@@ -149,7 +152,17 @@ function ModalAvisos({
           </DialogDescription>
         </DialogHeader>
 
-        {seccion === "reservas" && <AjustesAvisosEnVivo className="shrink-0 rounded-md border px-3 py-2" />}
+        {/* Sonido y avisos del ordenador, plegados (12/11/2026, captura del dueño en el móvil: ocupaban media pantalla). */}
+        {seccion === "reservas" && (
+          <details className="group shrink-0 rounded-md border">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+              <Volume2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              Sonido y avisos en este dispositivo
+              <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+            </summary>
+            <AjustesAvisosEnVivo className="border-t px-3 py-2" />
+          </details>
+        )}
 
         <div className="flex shrink-0 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrar por estado">
@@ -160,17 +173,35 @@ function ModalAvisos({
               Todos
             </Chip>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="ml-auto h-9 gap-1.5"
+              className="ml-auto h-9 gap-1.5 px-2"
               onClick={() => void marcarTodosRevisados()}
               disabled={!haySinRevisar}
+              aria-label="Marcar todos como revisados"
             >
               <CheckCheck className="h-4 w-4" aria-hidden="true" />
-              Marcar todos como revisados
+              Revisar todos
             </Button>
           </div>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por tipo">
+          {/* En el móvil, un desplegable en vez de chips (12/11/2026, capturas del dueño: Facturas tiene 15 tipos y en Reservas
+              «Canceladas» quedaba sola en otra fila). Desde 640 px, los chips. */}
+          {config.tipos.length > 1 && (
+            <select
+              aria-label="Filtrar por tipo"
+              value={filtros.tipo}
+              onChange={(e) => setFiltros((f) => ({ ...f, tipo: e.target.value }))}
+              className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm sm:hidden"
+            >
+              <option value="todos">Todos los tipos</option>
+              {config.tipos.map((t) => (
+                <option key={t.tipo} value={t.tipo}>
+                  {t.etiqueta}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className={cn("flex-wrap gap-2", config.tipos.length > 1 ? "hidden sm:flex" : "flex")} role="group" aria-label="Filtrar por tipo">
             <Chip activo={filtros.tipo === "todos"} onClick={() => setFiltros((f) => ({ ...f, tipo: "todos" }))}>
               Todos los tipos
             </Chip>
@@ -210,15 +241,19 @@ function ModalAvisos({
                             className={cn("mt-0.5 h-4 w-4 shrink-0", !n.leida ? "text-destructive" : "text-muted-foreground")}
                             aria-hidden="true"
                           />
-                          <div className="min-w-0 flex-1">
-                            <p className={cn("text-sm [overflow-wrap:anywhere]", !n.leida && "font-medium")}>{n.titulo}</p>
+                          {/* En el móvil el texto ocupa toda la fila y los botones bajan debajo (antes se estrujaba en una columna). */}
+                          <div className="min-w-0 flex-1 max-sm:basis-[calc(100%-1.75rem)]">
+                            <p className={cn("flex flex-wrap items-center gap-1.5 text-sm [overflow-wrap:anywhere]", !n.leida && "font-medium")}>
+                              {n.titulo}
+                              <EstadoReservaAviso aviso={n} estados={estados} />
+                            </p>
                             {n.mensaje && <p className="mt-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">{n.mensaje}</p>}
                             <p className="mt-1 text-xs text-muted-foreground">
                               {horaAviso(n.created_at)} · {etiquetaTipo(n.tipo)}
                               {n.leida && " · Revisado"}
                             </p>
                           </div>
-                          <div className="ml-7 flex shrink-0 gap-1.5 sm:ml-0">
+                          <div className="ml-7 flex shrink-0 gap-1.5 max-sm:w-[calc(100%-1.75rem)] sm:ml-0">
                             {ruta && (
                               <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => irAlOrigen(n)} aria-label={`Ver: ${n.titulo}`}>
                                 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
@@ -229,7 +264,7 @@ function ModalAvisos({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-9"
+                                className="h-9 gap-1"
                                 onClick={() => void marcarRevisado(n.id)}
                                 aria-label={`Marcar como revisado: ${n.titulo}`}
                               >

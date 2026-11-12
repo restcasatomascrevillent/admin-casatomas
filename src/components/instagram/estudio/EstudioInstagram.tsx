@@ -17,12 +17,13 @@
  * ven esqueletos grises con la forma del contenido. Las claves están en
  * ./consultas.ts, que también usa el prefetch de la página.
  */
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, CheckCircle2, Clapperboard, Image as ImageIcon, Plus, Smartphone, TrendingDown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 // Directo de cada fichero (no de los index): así el Estudio no arrastra Campañas ni el Calendario al paquete de /instagram.
 import { SugerenciaSemana } from "@/components/instagram/campanas/SugerenciaSemana";
 import type { IdeaSemanaIA } from "@/components/instagram/campanas/api";
@@ -172,8 +173,34 @@ function Enlace({ children, onClick }: { children: React.ReactNode; onClick: () 
 }
 
 /** Miniatura pequeña de un evento en la semana (26 px; programada con contorno oro). */
-function MiniDia({ e, onAbrir }: { e: EventoCalendario; onAbrir: (id: string) => void }) {
+function MiniDia({ e, onAbrir, soloVista = false }: { e: EventoCalendario; onAbrir: (id: string) => void; soloVista?: boolean }) {
   const titulo = `${tituloEvento(e)} · ${e.hora} · ${ESTADOS_CALENDARIO[e.estado].etiqueta}`;
+  const contenido =
+    e.tipo === "publicada" ? (
+      <span className="flex h-full w-full items-center justify-center bg-[rgb(17_126_57/0.1)] text-[#117e39]">
+        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+      </span>
+    ) : (
+      <Miniatura evento={e} className="h-full w-full !aspect-auto" />
+    );
+  // En el móvil la casilla entera del día es el botón (48 px o más); la miniatura solo se ve.
+  if (soloVista) {
+    return (
+      <span
+        aria-hidden="true"
+        data-testid="mini-semana"
+        data-estado={e.estado}
+        className={cn(
+          "relative block h-8 w-8 shrink-0 overflow-hidden rounded-md outline-2 outline-offset-1",
+          e.estado === "programada" && "outline",
+          ESTILO_TONO[ESTADOS_CALENDARIO[e.estado].tono].contorno,
+          e.tipo === "borrador" && "border border-dashed border-[#9b8a7d]",
+        )}
+      >
+        {contenido}
+      </span>
+    );
+  }
   return (
     <button
       type="button"
@@ -192,19 +219,22 @@ function MiniDia({ e, onAbrir }: { e: EventoCalendario; onAbrir: (id: string) =>
         e.tipo === "borrador" && "border border-dashed border-[#9b8a7d]",
       )}
     >
-      {e.tipo === "publicada" ? (
-        <span className="flex h-full w-full items-center justify-center bg-[rgb(17_126_57/0.1)] text-[#117e39]">
-          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-        </span>
-      ) : (
-        <Miniatura evento={e} className="h-full w-full !aspect-auto" />
-      )}
+      {contenido}
     </button>
   );
 }
 
 export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaPieza, onCrearIdea, onAbrirEncargo, onPedirEncargo, className }: EstudioInstagramProps) {
   const hoy = hoyMadrid();
+  const esMovil = useIsMobile();
+  // Móvil: la semana es una tira con scroll horizontal y el día de hoy en el centro (siete casillas no caben a 390 px).
+  const tiraSemana = useRef<HTMLOListElement>(null);
+  useLayoutEffect(() => {
+    const tira = tiraSemana.current;
+    const hoyEl = tira?.querySelector<HTMLElement>("[aria-current=date]")?.closest("li");
+    if (!tira || !hoyEl || !esMovil) return;
+    tira.scrollLeft = Math.max(0, hoyEl.offsetLeft - (tira.clientWidth - hoyEl.offsetWidth) / 2);
+  }, [esMovil]);
   // Una sola consulta: desde el lunes hasta dentro de un mes (semana + próximas). Misma clave que el prefetch.
   const [rango] = useState(() => rangoEstudio(hoy));
   const lunes = rango.lunes;
@@ -240,14 +270,22 @@ export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaP
       {/* Columna izquierda */}
       <div className="flex min-h-0 flex-col gap-4">
         <Tarjeta titulo={tituloSemana(lunes)} accion={<Enlace onClick={() => onIr("calendario")}>Ver el mes</Enlace>} className="shrink-0">
-          <ol className="grid grid-cols-7 gap-1.5 px-3.5 pb-3.5" aria-label="Piezas de la semana" data-testid="semana-estudio">
+          <ol
+            ref={tiraSemana}
+            className={cn(
+              "gap-1.5 px-3.5 pb-3.5",
+              esMovil ? "flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" : "grid grid-cols-7",
+            )}
+            aria-label="Piezas de la semana"
+            data-testid="semana-estudio"
+          >
             {Array.from({ length: 7 }, (_, i) => sumarDias(lunes, i)).map((d, i) => {
               const lista = porDia.get(d) ?? [];
               const esHoy = d === hoy;
               const pasado = d < hoy;
               const visibles = lista.slice(0, 4);
               return (
-                <li key={d}>
+                <li key={d} className={cn(esMovil && "w-[4.5rem] shrink-0 snap-center")}>
                   <div
                     role="button"
                     tabIndex={0}
@@ -261,7 +299,9 @@ export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaP
                     aria-label={`${DIAS_CORTOS[i]} ${Number(d.slice(8))}: ${lista.length ? `${lista.length} ${lista.length === 1 ? "pieza" : "piezas"}` : "sin piezas"}. Ver el día`}
                     aria-current={esHoy ? "date" : undefined}
                     className={cn(
-                      "flex min-h-[4.75rem] cursor-pointer flex-col gap-1.5 rounded-lg border border-transparent bg-[#f6f3f1] p-2 transition-colors hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "flex min-h-[4.75rem] cursor-pointer flex-col gap-1.5 rounded-lg border border-transparent bg-[#f6f3f1] p-2 transition-colors",
+                      esMovil && "h-full min-h-[6.5rem] items-center text-center",
+                      " hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       esHoy && "border-[#b6852f] bg-background shadow-[inset_0_0_0_1px_#b6852f]",
                       pasado && "opacity-70",
                     )}
@@ -269,9 +309,9 @@ export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaP
                     <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {DIAS_CORTOS[i]} <span className="text-[15px] normal-case tracking-normal text-foreground">{Number(d.slice(8))}</span>
                     </span>
-                    <span className="flex flex-wrap gap-1">
+                    <span className={cn("flex flex-wrap gap-1", esMovil && "justify-center")}>
                       {visibles.map((e) => (
-                        <MiniDia key={e.clave} e={e} onAbrir={onAbrirPieza} />
+                        <MiniDia key={e.clave} e={e} onAbrir={onAbrirPieza} soloVista={esMovil} />
                       ))}
                       {lista.length > visibles.length && <span className="self-center text-xs text-muted-foreground">+{lista.length - visibles.length}</span>}
                     </span>
@@ -350,10 +390,10 @@ export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaP
               <p className="py-3 text-sm text-muted-foreground">Aún no hay cifras de Instagram. Cuando lleguen, verás aquí el alcance, las interacciones y los seguidores.</p>
             )}
             {cifras.map((c) => (
-              <div key={c.nombre} className="grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-2.5 border-t border-[#efebe8] py-2.5 first:border-t-0">
-                <div>
+              <div key={c.nombre} className="flex items-center gap-2.5 border-t border-[#efebe8] py-2.5 first:border-t-0 sm:grid sm:grid-cols-[minmax(0,1fr)_6rem]">
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-2 sm:block">
                   <div className="text-xs text-muted-foreground">{c.nombre}</div>
-                  <div className="flex flex-wrap items-baseline gap-x-1.5">
+                  <div className="flex flex-wrap items-baseline justify-end gap-x-1.5 sm:justify-start">
                     <span className="text-[22px] font-semibold tabular-nums tracking-tight">{c.valor}</span>
                     {typeof c.variacion === "number" && (
                       <span className={cn("inline-flex items-center gap-0.5 text-xs font-semibold", c.variacion >= 0 ? "text-[#117e39]" : "text-[#b42318]")}>
@@ -363,7 +403,7 @@ export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaP
                     )}
                   </div>
                 </div>
-                <Chispa valores={c.serie} />
+                <Chispa valores={c.serie} className="hidden sm:block" />
               </div>
             ))}
           </div>

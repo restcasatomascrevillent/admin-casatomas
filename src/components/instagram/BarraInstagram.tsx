@@ -29,9 +29,25 @@ const OPCIONES: ReadonlyArray<{ valor: FiltroMarca; nombre: string; corto: strin
   { valor: "touza", nombre: "Touza", corto: "TZ" },
 ];
 
-export function SelectorMarca({ valor, onCambio, className }: { valor: FiltroMarca; onCambio: (m: FiltroMarca) => void; className?: string }) {
+export function SelectorMarca({
+  valor,
+  onCambio,
+  className,
+  grande = false,
+}: {
+  valor: FiltroMarca;
+  onCambio: (m: FiltroMarca) => void;
+  className?: string;
+  /** Móvil (12/11/2026): botones de 48 px y texto de 14 px, sin relleno alrededor (el grupo mide 48). */
+  grande?: boolean;
+}) {
   return (
-    <div role="group" aria-label="Ver marca" className={cn("inline-flex shrink-0 gap-0.5 rounded-full border bg-[#f6f3f1] p-[3px]", className)} data-testid="selector-marca">
+    <div
+      role="group"
+      aria-label="Ver marca"
+      className={cn("inline-flex shrink-0 gap-0.5 rounded-full border bg-[#f6f3f1]", grande ? "overflow-hidden p-0" : "p-[3px]", className)}
+      data-testid="selector-marca"
+    >
       {OPCIONES.map((o) => (
         <button
           key={o.valor}
@@ -40,7 +56,8 @@ export function SelectorMarca({ valor, onCambio, className }: { valor: FiltroMar
           onClick={() => onCambio(o.valor)}
           className={cn(
             "h-8 rounded-full px-3 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:h-10",
-            valor === o.valor && "bg-background font-medium text-foreground shadow-sm",
+            grande && "h-12 min-w-11 px-2.5 text-sm pointer-coarse:h-12",
+            valor === o.valor && (grande ? "bg-primary font-semibold text-primary-foreground" : "bg-background font-medium text-foreground shadow-sm"),
           )}
         >
           <span className="hidden 2xl:inline">{o.nombre}</span>

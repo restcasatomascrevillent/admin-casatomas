@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useMargenesCarta } from "@/hooks/useMargenesCarta";
 import {
   ETIQUETA_BANDERA,
@@ -101,6 +102,7 @@ const formatoEje = (n: number) => `${n.toLocaleString("es-ES", { maximumFraction
 
 function Dispersion({ lista, umbral, onElegir, eje, porKilo }: { lista: ArticuloMargen[]; umbral: number; onElegir: (id: string) => void; eje: string; porKilo: boolean }) {
   const puntos = useMemo(() => puntosDispersion(lista, umbral), [lista, umbral]);
+  const movil = useIsMobile();
   const rojos = puntos.filter((p) => p.rojo);
   const bien = puntos.filter((p) => !p.rojo);
   const precios = puntos.map((p) => p.precio);
@@ -112,7 +114,8 @@ function Dispersion({ lista, umbral, onElegir, eje, porKilo }: { lista: Articulo
   const unidad = porKilo ? "/kg" : "";
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <ScatterChart margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+      {/* Margen derecho de 26 px: la última marca del eje («100 €», «500 €/kg») se cortaba en el móvil (12/11/2026). */}
+      <ScatterChart margin={{ top: 8, right: movil ? 26 : 12, bottom: 4, left: 0 }}>
         <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
         <XAxis
           type="number"

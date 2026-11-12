@@ -14,7 +14,8 @@
  */
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CalendarDays, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { CalendarDays, ChevronDown, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -71,6 +72,12 @@ export function SugerenciaSemana({ marca, semana, onCrear, onVerCampanas, onPedi
   const lista = ideas.data?.ideas ?? [];
   const idea = lista.length ? lista[indice % lista.length] : null;
   const primeraFecha = (fechas.data ?? [])[0];
+  // Móvil: con varias fechas señaladas se resumen en una línea («3 fechas esta semana») y se despliegan al pulsar:
+  // antes salían todas las píldoras (a veces ocho, «sin verificar») antes del botón.
+  const esMovil = useIsMobile();
+  const [fechasAbiertas, setFechasAbiertas] = useState(false);
+  const listaFechas = fechas.data ?? [];
+  const resumirFechas = esMovil && listaFechas.length > 1;
 
   return (
     <article
@@ -95,14 +102,28 @@ export function SugerenciaSemana({ marca, semana, onCrear, onVerCampanas, onPedi
           )}
         </header>
 
-        <div className="flex flex-wrap gap-1.5" aria-label="Fechas señaladas de la semana">
+        {resumirFechas && (
+          <button
+            type="button"
+            onClick={() => setFechasAbiertas((a) => !a)}
+            aria-expanded={fechasAbiertas}
+            aria-controls="fechas-semana"
+            className="flex h-12 w-full items-center gap-2 rounded-lg bg-muted/70 px-3 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            data-testid="resumen-fechas"
+          >
+            <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="flex-1">{listaFechas.length} fechas esta semana</span>
+            <ChevronDown aria-hidden="true" className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", fechasAbiertas && "rotate-180")} />
+          </button>
+        )}
+        <div id="fechas-semana" className={cn("flex flex-wrap gap-1.5", resumirFechas && !fechasAbiertas && "hidden")} aria-label="Fechas señaladas de la semana">
           {fechas.isLoading && (
             <span role="status" aria-label="Cargando fechas" className="flex gap-1.5">
               <Skeleton className="h-5 w-28 rounded-full" />
               <Skeleton className="h-5 w-20 rounded-full" />
             </span>
           )}
-          {(fechas.data ?? []).map((f) => (
+          {listaFechas.map((f) => (
             <span
               key={`${f.titulo}-${f.desde}`}
               className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs"
@@ -113,7 +134,7 @@ export function SugerenciaSemana({ marca, semana, onCrear, onVerCampanas, onPedi
               {f.verificacion === "sin verificar" && <span className="text-muted-foreground">(sin verificar)</span>}
             </span>
           ))}
-          {!fechas.isLoading && !fechas.error && (fechas.data ?? []).length === 0 && (
+          {!fechas.isLoading && !fechas.error && listaFechas.length === 0 && (
             <span className="text-xs text-muted-foreground">Sin fechas señaladas esta semana.</span>
           )}
         </div>

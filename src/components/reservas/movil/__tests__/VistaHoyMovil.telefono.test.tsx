@@ -134,7 +134,8 @@ describe("FilaReservaMovil", () => {
       </ul>,
     );
     expect(screen.queryByRole("button", { name: /Sentar/ })).toBeNull();
-    expect(screen.getByText("Tarde")).toBeInTheDocument();
+    // Sin «Tarde» (12/11/2026, petición del dueño): aunque vaya con retraso, solo el estado.
+    expect(screen.queryByText("Tarde")).toBeNull();
   });
 });
 

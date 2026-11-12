@@ -4,8 +4,8 @@
  * /instagram?… redirige a /rrss?red=instagram conservando los parámetros.
  */
 import type { ReactNode } from "react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 const roles = { cargando: false, agencia: false, restaurante: true };
@@ -112,5 +112,54 @@ describe("RRSS", () => {
     montar("/instagram?tab=encargos&encargo=e1");
     expect(screen.getByTestId("donde").textContent).toBe("/rrss?tab=encargos&encargo=e1&red=instagram");
     expect(screen.getByText("Contenido de Instagram")).toBeInTheDocument();
+  });
+});
+
+describe("RRSS en el móvil (< 768 px)", () => {
+  const anchoOriginal = window.innerWidth;
+  beforeEach(() => {
+    Object.assign(roles, { cargando: false, agencia: false, restaurante: true });
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 390 });
+  });
+  afterEach(() => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: anchoOriginal });
+  });
+
+  it("las redes van en una barra inferior (no arriba) con las mismas cuatro pestañas", () => {
+    montar("/rrss");
+    const barra = screen.getByTestId("barra-redes-movil");
+    expect(within(barra).getByRole("tab", { name: /Instagram/ })).toHaveAttribute("data-state", "active");
+    expect(within(barra).getByRole("tab", { name: "Facebook" })).toBeInTheDocument();
+    // «Subida» a la vista; el nombre accesible sigue siendo «Subida de fotos».
+    expect(within(barra).getByRole("tab", { name: "Subida de fotos" })).toHaveTextContent("Subida");
+    expect(within(barra).getByRole("tab", { name: "Métricas" })).toBeInTheDocument();
+    expect(screen.queryByTestId("pestanas-pagina")).toBeNull();
+    // El bloque lleva la clase que sube los controles a 48 px y los textos a 14 px.
+    expect(screen.getByTestId("pagina-rrss")).toHaveClass("rrss-movil");
+  });
+
+  it("pulsar una red de la barra cambia de pestaña y pone ?red=", async () => {
+    montar("/rrss");
+    fireEvent.mouseDown(within(screen.getByTestId("barra-redes-movil")).getByRole("tab", { name: "Facebook" }));
+    expect(await screen.findByText("Pestaña Facebook")).toBeInTheDocument();
+    expect(screen.getByTestId("donde").textContent).toBe("/rrss?red=facebook");
+  });
+
+  it("con el teclado abierto (foco en un campo de texto) la barra se quita y deja el alto al campo", async () => {
+    montar("/rrss?red=editor&modo=ideas");
+    expect(screen.getByTestId("barra-redes-movil")).toBeInTheDocument();
+    const campo = document.createElement("textarea");
+    document.body.appendChild(campo);
+    campo.focus();
+    await waitFor(() => expect(screen.queryByTestId("barra-redes-movil")).toBeNull());
+    campo.blur();
+    await waitFor(() => expect(screen.getByTestId("barra-redes-movil")).toBeInTheDocument());
+    campo.remove();
+  });
+
+  it("la agencia no tiene barra de redes", () => {
+    Object.assign(roles, { agencia: true, restaurante: false });
+    montar("/rrss");
+    expect(screen.queryByTestId("barra-redes-movil")).toBeNull();
   });
 });

@@ -28,6 +28,7 @@ import {
   type SeccionAviso,
 } from "@/lib/dashboard/avisosDashboard";
 import { cn } from "@/lib/utils";
+import { EstadoReservaAviso, useEstadosReservasAvisos } from "@/hooks/useEstadosReservasAvisos";
 
 const FOCO = "rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const MAX_FILAS = 15;
@@ -65,6 +66,8 @@ export function AvisosDashboard() {
   );
   const porSeccion = useMemo(() => sinLeerPorSeccion(avisos), [avisos]);
   const visibles = useMemo(() => (filtro ? avisos.filter((n) => seccionDeAviso(n) === filtro) : avisos), [avisos, filtro]);
+  // Estado actual de cada reserva avisada (12/11/2026): «Pendiente», «Verificada», «Confirmada»…
+  const estados = useEstadosReservasAvisos(visibles.slice(0, MAX_FILAS));
   const haySinLeer = porSeccion.length > 0;
 
   // El aviso de una reserva abre su ficha aquí (se verifica o confirma sin cambiar de pantalla); el resto, su origen.
@@ -132,7 +135,10 @@ export function AvisosDashboard() {
                   <>
                     <Icono className={cn("mt-0.5 h-4 w-4 shrink-0", n.leida ? "text-muted-foreground" : "text-destructive")} aria-hidden="true" />
                     <span className="min-w-0 flex-1">
-                      <span className={cn("block truncate text-sm", !n.leida && "font-medium")}>{n.titulo}</span>
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className={cn("truncate text-sm", !n.leida && "font-medium")}>{n.titulo}</span>
+                        <EstadoReservaAviso aviso={n} estados={estados} />
+                      </span>
                       {n.mensaje ? <span className="block truncate text-xs text-foreground/80">{n.mensaje}</span> : null}
                       <span className="block truncate text-xs text-muted-foreground">
                         {ETIQUETA_SECCION_AVISO[seccionDeAviso(n)]} · {cuando(n.created_at)}

@@ -397,7 +397,8 @@ describe("Hoja de una mesa libre (móvil): a quién sentar, grande y ordenado", 
     expect(linea("sanchez")).toHaveTextContent("Fijada · Comedor 7");
     expect(within(linea("sanchez")).getByLabelText("Mesa fijada")).toBeInTheDocument();
     expect(linea("grupo")).toHaveTextContent("Son 6 · mesa de 4");
-    expect(linea("lopez")).toHaveTextContent("Tarde");
+    // Sin «Tarde» (12/11/2026, petición del dueño).
+    expect(linea("lopez")).not.toHaveTextContent("Tarde");
     const contenido = screen.getByTestId("hoja-mesa-contenido");
     expect(contenido).toHaveClass("overflow-y-auto");
     expect(contenido.querySelectorAll(".overflow-y-auto")).toHaveLength(0);

@@ -7,6 +7,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useTecladoAbierto } from "@/hooks/useTecladoAbierto";
+import { BarraRedesMovil } from "@/components/rrss/BarraRedesMovil";
+import { cn } from "@/lib/utils";
 import { useRolesEncargos } from "@/components/instagram/encargos/useEncargos";
 import { ContenidoInstagram } from "@/pages/Instagram";
 
@@ -20,7 +24,8 @@ export const REDES = ["instagram", "facebook", "editor", "metricas"] as const;
 export type RedRrss = (typeof REDES)[number];
 
 const ALTURA_MINIMA = 360;
-const CONTENIDO = "mt-0 flex-1 min-h-0 data-[state=inactive]:hidden";
+// `relative`: lo que va en `position: absolute` (textos sr-only de las gráficas) queda dentro del scroll de la pestaña y no alarga la página.
+const CONTENIDO = "relative mt-0 flex-1 min-h-0 data-[state=inactive]:hidden";
 
 function Cargando() {
   return (
@@ -70,6 +75,10 @@ export default function RRSS() {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA);
   const roles = useRolesEncargos();
+  // Móvil (< 768 px, 12/11/2026): las redes van en una barra inferior (BarraRedesMovil) y no arriba; con el teclado
+  // abierto la barra se quita para dejar todo el alto a lo que se escribe.
+  const esMovil = useIsMobile();
+  const tecladoAbierto = useTecladoAbierto();
   // Agencia sin Marketing: solo Instagram (y dentro, solo Encargos).
   const soloAgencia = !roles.cargando && roles.agencia && !roles.restaurante;
   // Enlaces antiguos a Instagram › Métricas (`?tab=metricas`, con o sin `red=instagram`): ahora es RRSS › Métricas.
@@ -97,9 +106,9 @@ export default function RRSS() {
   return (
     <DashboardLayout>
       <h1 className="sr-only">RRSS</h1>
-      <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined} data-testid="pagina-rrss">
+      <div ref={setRaiz} className={cn("flex flex-col", esMovil && "rrss-movil")} style={alto ? { height: alto } : undefined} data-testid="pagina-rrss">
         <Tabs value={red} onValueChange={cambiarRed} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
-          {!soloAgencia && (
+          {!soloAgencia && !esMovil && (
             <PestanasPagina
               // Cuatro pestañas no caben con iconos a 390 px: en el móvil, solo el texto.
               iconosSoloEscritorio
@@ -113,7 +122,7 @@ export default function RRSS() {
           )}
 
           <TabsContent value="instagram" className={`${CONTENIDO} flex flex-col`}>
-            {red === "instagram" && <ContenidoInstagram onIrMetricas={() => cambiarRed("metricas")} />}
+            {red === "instagram" && <ContenidoInstagram incrustado onIrMetricas={() => cambiarRed("metricas")} />}
           </TabsContent>
 
           <TabsContent value="facebook" className={`${CONTENIDO} overflow-y-auto overscroll-contain`}>
@@ -128,7 +137,8 @@ export default function RRSS() {
             {red === "editor" && (
               <Tabs value={modoEditor} onValueChange={(v) => setModoEditor(v as "editor" | "ideas")} className="flex flex-1 min-h-0 flex-col gap-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm text-muted-foreground">
+                  {/* En el móvil sobra la explicación (cada pantalla ya dice qué hace): solo los dos botones. */}
+                  <p className="hidden text-sm text-muted-foreground sm:block">
                     <span className="font-medium text-foreground">Editor IA de fotos y vídeos.</span> Sube tus fotos y vídeos, elige qué quieres conseguir y la IA prepara la edición. Nada se publica solo.
                   </p>
                   <ChipsSubnivel
@@ -164,6 +174,16 @@ export default function RRSS() {
               </Perezosa>
             )}
           </TabsContent>
+          {!soloAgencia && esMovil && !tecladoAbierto && (
+            <BarraRedesMovil
+              redes={[
+                { valor: "instagram", etiqueta: "Instagram", icono: <Instagram /> },
+                { valor: "facebook", etiqueta: "Facebook", icono: <Facebook /> },
+                { valor: "editor", etiqueta: "Subida", nombre: "Subida de fotos", icono: <Sparkles /> },
+                { valor: "metricas", etiqueta: "Métricas", icono: <BarChart3 /> },
+              ]}
+            />
+          )}
         </Tabs>
       </div>
     </DashboardLayout>

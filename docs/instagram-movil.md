@@ -112,3 +112,13 @@ Lo que la API real (`apiReal.ts`) espera del servidor:
 
 `<CrearMovil simulado />` usa `serviciosSimulados()`: subidas a object URLs,
 carta de muestra, IA y publicación falsas, sin gastar nada.
+
+## RRSS en el móvil, de punta a punta (12/11/2026)
+
+Revisión de toda la sección `/rrss` por debajo de 768 px (tablet y escritorio, píxel a píxel iguales).
+- **Redes abajo:** Instagram, Facebook, Subida y Métricas van en una barra inferior (`components/rrss/BarraRedesMovil.tsx`, 56 px, al alcance del pulgar). Se quita con el teclado abierto (`hooks/useTecladoAbierto.ts`).
+- **Secciones de Instagram:** una sola fila de 48 px: botón «Estudio ▾» que abre una hoja inferior con las seis secciones y sus contadores (`instagram/SeccionesMovil.tsx`), más el filtro de marca; la cuenta conectada va en el pie de la hoja.
+- **Estudio:** semana en tira con scroll horizontal y hoy centrado; fechas de la sugerencia resumidas («3 fechas esta semana», desplegable); cifras en filas sin gráfica.
+- **Calendario** sin alto fijo y con «Filtros» plegado; **Encargos** con columnas a 86 % con imán; **Facebook** con «Publicar en Facebook · No conectado» plegado.
+- **Regla global** `.rrss-movil` (src/index.css): controles ≥ 48 px y textos ≥ 14 px en toda la sección.
+- Capturas: `tests/e2e-movil/rrss-movil.capturas.mjs <carpeta>` (mide scroll, controles bajos y letra pequeña).

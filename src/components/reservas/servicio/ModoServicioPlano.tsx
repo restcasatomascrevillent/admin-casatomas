@@ -171,9 +171,9 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
     const reservas: ReservaMesaServicio[] = reservasData ?? [];
     return mesas.map((mesa) => ({
       mesa,
-      resultado: estadoMesaServicio(mesa.id, asignaciones, reservas, turnoSel, ahora, config),
+      resultado: estadoMesaServicio(mesa.id, asignaciones, reservas, turnoSel, ahora, config, fechaSel),
     }));
-  }, [mesasData, reservasData, asignaciones, turnoSel, ahora, config]);
+  }, [mesasData, reservasData, asignaciones, turnoSel, ahora, config, fechaSel]);
 
   const mesas = mesasData ?? [];
 
