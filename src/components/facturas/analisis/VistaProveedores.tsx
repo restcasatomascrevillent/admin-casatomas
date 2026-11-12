@@ -298,7 +298,7 @@ function OpcionProveedor({ f, max, elegido, deshabilitado, onElegir }: { f: Fila
       data-testid="fila-proveedor"
       className={cn("grid min-h-11 w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2 gap-y-0.5 rounded-md px-2 py-1.5 text-left hover:bg-muted/50 disabled:cursor-default", elegido && "bg-muted", FOCO)}
     >
-      <span className="truncate text-sm font-medium leading-snug">{nombreCorto(f.nombre)}</span>
+      <span className="truncate max-sm:line-clamp-2 max-sm:whitespace-normal max-sm:break-words text-sm font-medium leading-snug">{nombreCorto(f.nombre)}</span>
       <span className="text-sm font-semibold tabular-nums">{dejado ? "0 €" : euros(f.gasto)}</span>
       <span className="col-span-2 block h-1.5 rounded-full bg-muted/70" aria-hidden>
         <span className={cn("block h-full rounded-full", dejado ? "bg-muted-foreground/30" : "bg-primary/70")} style={{ width: `${((dejado ? (f.anterior ?? 0) : f.gasto) / max) * 100}%` }} />
@@ -441,7 +441,7 @@ function FichaProveedor({
             <ol className="space-y-0.5 text-xs" data-testid="productos-proveedor">
               {productos.puntos.map((p) => (
                 <li key={p.clave} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-x-2">
-                  <span className="truncate" title={p.etiqueta}>
+                  <span className="truncate max-sm:line-clamp-2 max-sm:whitespace-normal max-sm:break-words" title={p.etiqueta}>
                     {p.etiqueta}
                   </span>
                   <span className="tabular-nums">{euros(p.valor ?? 0)}</span>
@@ -460,7 +460,7 @@ function FichaProveedor({
             {a.subidas.map((c) => (
               <li key={c.alerta.id}>
                 <button type="button" disabled={pendiente} onClick={() => onVerPrecio(c.alerta.id)} className={cn("flex min-h-9 w-full items-center gap-2 rounded-md px-1.5 text-left text-xs hover:bg-muted/50 disabled:opacity-50 pointer-coarse:min-h-11", FOCO)}>
-                  <span className="min-w-0 flex-1 truncate">
+                  <span className="min-w-0 flex-1 truncate max-sm:line-clamp-2 max-sm:whitespace-normal max-sm:break-words">
                     <b className="font-medium">{c.alerta.datos.producto ?? tituloCortoAlerta(c.alerta)}</b> · {resumenCortoAlerta(c.alerta)}
                   </span>
                   {c.impactoMes !== null && c.impactoMes > 0 && <Chip tono="sube">+{formatEntero(c.impactoMes)} €/mes</Chip>}
@@ -471,7 +471,7 @@ function FichaProveedor({
             {a.masBarato.length > 0 && (
               <li>
                 <button type="button" disabled={pendiente} onClick={() => onIrAVista("ahorro")} className={cn("flex min-h-9 w-full items-center gap-2 rounded-md px-1.5 text-left text-xs hover:bg-muted/50 disabled:opacity-50 pointer-coarse:min-h-11", FOCO)}>
-                  <span className="min-w-0 flex-1 truncate">
+                  <span className="min-w-0 flex-1 truncate max-sm:line-clamp-2 max-sm:whitespace-normal max-sm:break-words">
                     <b className="font-medium">{plural(a.masBarato.length, "producto", "productos")} más barato en otro proveedor</b>
                     {a.masBarato[0].alerta.datos.producto ? ` · ${a.masBarato.map((c) => c.alerta.datos.producto).filter(Boolean).slice(0, 3).join(", ")}` : ""}
                   </span>
@@ -483,7 +483,7 @@ function FichaProveedor({
             {a.otros.map((c) => (
               <li key={c.alerta.id}>
                 <button type="button" disabled={pendiente} onClick={() => onIrAVista("revisar")} className={cn("flex min-h-9 w-full items-center gap-2 rounded-md px-1.5 text-left text-xs hover:bg-muted/50 disabled:opacity-50 pointer-coarse:min-h-11", FOCO)}>
-                  <span className="min-w-0 flex-1 truncate">
+                  <span className="min-w-0 flex-1 truncate max-sm:line-clamp-2 max-sm:whitespace-normal max-sm:break-words">
                     <b className="font-medium">{tituloCortoAlerta(c.alerta)}</b> · {resumenCortoAlerta(c.alerta)}
                   </span>
                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />

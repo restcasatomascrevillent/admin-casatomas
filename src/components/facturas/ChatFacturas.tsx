@@ -321,7 +321,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
   // línea con las pestañas de la página. En tablet vertical o móvil puede partir en dos.
   const barra = (
     // 11/11/2026 (dueño: móvil): en el móvil la barra «se disuelve» (`contents`) en la fila de acciones de la
-    // página y se reparte por `order`: local + avisos/ayuda arriba; periodo + personalizar + IA debajo.
+    // página y se reparte por `order`: local + personalizar + IA arriba; periodo + avisos/ayuda debajo (dos filas;
+    // antes eran tres, 12/11/2026).
     <div className="contents min-w-0 flex-1 flex-wrap items-center gap-1.5 sm:flex 2xl:gap-2" data-tour="facturas-analisis-barra" data-testid="barra-analisis">
       <div className="order-3 max-w-full sm:order-none">
         <SelectorPeriodo valor={seleccion} onCambio={elegirPeriodo} hoy={hoy} compacto />
@@ -334,7 +335,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> <span className="sr-only">Actualizando…</span>
         </span>
       )}
-      <div className="order-4 ml-auto flex items-center gap-1.5 sm:order-none">
+      <div className="order-2 ml-auto flex items-center gap-1.5 sm:order-none">
         <Button
           type="button"
           variant="outline"

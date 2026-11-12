@@ -173,7 +173,7 @@ export function FamiliasFrenteMedia({
                     )}
                   >
                     <span className="col-span-3 flex min-w-0 items-center gap-1.5 text-sm @[30rem]:col-span-1">
-                      <span className="min-w-0 truncate" title={f.familia}>{f.familia}</span>
+                      <span className="min-w-0 truncate max-sm:line-clamp-2 max-sm:whitespace-normal max-sm:break-words" title={f.familia}>{f.familia}</span>
                       {f.aviso && <Chip tono="aviso" title="Genera aviso">Aviso</Chip>}
                     </span>
                     <span className="relative block h-3.5 min-w-10" aria-hidden>
