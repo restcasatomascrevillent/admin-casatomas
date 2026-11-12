@@ -1,18 +1,13 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarCheck, ShieldBan, MessageSquare, AlertTriangle, SquarePen } from "lucide-react";
+import { CalendarCheck, ShieldBan, AlertTriangle } from "lucide-react";
 import { AyudaPopover } from "@/components/AyudaPopover";
-import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
-import { useIsCompactNav } from "@/hooks/use-mobile";
 import { useTodayReservations, useTodayConfirmedReservations } from "@/hooks/useDashboardStats";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { TiraCifras } from "@/components/panel/TiraCifras";
-import { Badge, badgeVariants } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { consultaEspaciosReserva } from "@/hooks/useEspaciosReserva";
@@ -68,13 +63,7 @@ const getStatusColor = (p: number) => {
 
 export function ReservasHoy() {
   const navigate = useNavigate();
-  // En tablet vertical / móvil (< 1024px) la campana ya está en la barra superior de
-  // DashboardLayout: aquí no se monta una segunda (doble suscripción realtime).
-  const navCompacta = useIsCompactNav();
-  // Editar una reserva desde el popup de notas (2026-09-30). El popup pasa a ser
-  // controlado para poder cerrarlo al abrir el editor (dos diálogos uno encima
-  // de otro no se entienden). Hooks ANTES del `return` de error de más abajo.
-  const [notasAbiertas, setNotasAbiertas] = useState(false);
+  // Editar una reserva desde «Próximas» o «Próxima». Hooks ANTES del `return` de error de más abajo.
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
   const todasQuery = useTodayReservations();
@@ -116,7 +105,6 @@ export function ReservasHoy() {
 
   // Alertas
   const reservasBlacklist = todasReservas?.filter(r => r.en_blacklist) || [];
-  const reservasConNotas = todasReservas?.filter(r => r.notas_cliente && r.notas_cliente.trim() !== '') || [];
 
   // Estados
   // Salen de las activas (sin el Reservado) para que sumen exactamente las "reservas activas" de arriba.
@@ -180,69 +168,9 @@ export function ReservasHoy() {
               {reservasBlacklist.length}
             </Badge>
           )}
-          {reservasConNotas.length > 0 && (
-            <Dialog open={notasAbiertas} onOpenChange={setNotasAbiertas}>
-              <DialogTrigger asChild>
-                {/* Un <button> real (antes un <div> de Badge): enfocable, con área pulsable de 44px en táctil. */}
-                <button
-                  type="button"
-                  aria-label={`Ver notas y peticiones especiales (${reservasConNotas.length})`}
-                  className={cn(badgeVariants({ variant: "secondary" }), "touch-hit gap-1 cursor-pointer hover:bg-secondary/80 active:bg-secondary/70 transition-colors")}
-                >
-                  <MessageSquare className="h-3 w-3" />
-                  {reservasConNotas.length}
-                </button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5 text-primary" />
-                    Notas y peticiones especiales
-                  </DialogTitle>
-                </DialogHeader>
-                <ScrollArea className="max-h-[60vh]">
-                  <div className="space-y-3 pr-4">
-                    {reservasConNotas.map(r => (
-                      <div key={r.id} className="p-3 bg-muted/50 rounded-lg border">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <span className="font-medium">{r.nombre || "Sin nombre"}</span>
-                            <span className="text-muted-foreground text-sm ml-2">· {r.numero_comensales} pax</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Badge variant="outline">{r.hora.substring(0, 5)}</Badge>
-                            {/* Editar datos, día, hora, comensales, sala o notas de esta
-                                reserva, sea cual sea su estado. Cierra el popup antes. Sin
-                                «Editar» en Reservas no sale (06/11/2026: se oculta, no se
-                                desactiva). */}
-                            {puedeEditar && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-muted-foreground"
-                                aria-label={`Editar la reserva de ${r.nombre || "este cliente"}`}
-                                title="Editar la reserva"
-                                onClick={() => {
-                                  setNotasAbiertas(false);
-                                  editarReserva(r.id);
-                                }}
-                              >
-                                <SquarePen className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground bg-background p-2 rounded italic">
-                          "{r.notas_cliente}"
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
-          )}
+          {/* Sin el bocadillo de notas ni la campana (12/11/2026, petición del dueño: «quita las notificaciones y el
+              bocadillo de ahí»). Las notas se ven en la ficha de cada reserva («Próximas») y los avisos, en el
+              módulo «Avisos» de aquí al lado, la página Avisos y la campana de la barra en móvil y tablet. */}
           {reservasEnRiesgo.length > 0 && (
             <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600">
               <AlertTriangle className="h-3 w-3" />
@@ -250,10 +178,6 @@ export function ReservasHoy() {
             </Badge>
           )}
           <CalendarCheck className="h-5 w-5 text-primary" />
-          {/* La campana vivía en la cabecera del menú lateral (AppSidebar.tsx);
-              se mudó aquí para que el cubierto decorativo del sidebar pudiera
-              volver, a petición del dueño. */}
-          {!navCompacta && <CentroNotificaciones className="h-7 w-7" />}
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-2 px-4 pb-3 pt-0 sm:px-5">
@@ -333,7 +257,7 @@ export function ReservasHoy() {
           </ul>
         )}
       </CardContent>
-      {/* Editor de la reserva elegida en el popup de notas. `null` hasta que se pide. */}
+      {/* Editor de la reserva elegida en «Próximas». `null` hasta que se pide. */}
       {dialogoEdicion}
     </Card>
   );
