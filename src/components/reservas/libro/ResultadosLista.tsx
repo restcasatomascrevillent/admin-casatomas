@@ -25,9 +25,11 @@ interface Props {
   conTelefono?: boolean;
   onAbrir: (id: string) => void;
   onVerDia: (fecha: string) => void;
+  /** Sin la tarjeta ni el título (dentro de un diálogo que ya lo pone, p. ej. «Pendientes» de la pestaña Reservas). */
+  sinMarco?: boolean;
 }
 
-export function ResultadosLista({ titulo, reservas, cargando, error, onReintentar, vacio, nota, conTelefono, onAbrir, onVerDia }: Props) {
+export function ResultadosLista({ titulo, reservas, cargando, error, onReintentar, vacio, nota, conTelefono, onAbrir, onVerDia, sinMarco = false }: Props) {
   const { data: espacios } = useEspaciosReserva();
   const nombreSala = useMemo(() => {
     const m = new Map<string, string>();
@@ -78,6 +80,8 @@ export function ResultadosLista({ titulo, reservas, cargando, error, onReintenta
       </div>
     );
   }
+
+  if (sinMarco) return <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-testid="resultados-scroll">{cuerpo}</div>;
 
   return (
     <article aria-label="Resultados" className="flex min-h-0 min-w-0 flex-1 flex-col rounded-xl border bg-card text-card-foreground shadow-sm">

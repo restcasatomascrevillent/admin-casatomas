@@ -13,6 +13,7 @@ import { etiquetaEstadoReserva } from "@/lib/reservas/estadosReserva";
 import { MIN_LETRAS_BUSQUEDA, useBuscarReservas, useReservasPorEstado } from "@/hooks/useBusquedaReservas";
 import { ReservasDeLaHoja } from "./ReservasDeLaHoja";
 import { ResultadosLista } from "./ResultadosLista";
+import { clasesNumeroPendientes } from "./BotonPendientes";
 
 // ============================================================================
 // LA LISTA COMO EL LIBRO (10/11/2026, petición del dueño: «hacer o simular como
@@ -206,12 +207,7 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
             }}
           >
             <Clock className="h-4 w-4" /> Pendientes
-            <span
-              className={cn(
-                "min-w-6 rounded-full px-1.5 text-sm font-semibold tabular-nums",
-                estado === "pendiente" ? "bg-primary-foreground/20" : numPendientes ? "bg-status-pending text-status-pending-foreground" : "bg-muted text-muted-foreground",
-              )}
-            >
+            <span className={clasesNumeroPendientes(numPendientes, estado === "pendiente")}>
               {numPendientes}
             </span>
           </Button>
