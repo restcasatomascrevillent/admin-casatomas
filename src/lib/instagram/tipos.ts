@@ -56,14 +56,15 @@ export interface DatosPieza {
   /** Solo plantillas con numeral (Touza tipográfica). Por defecto "01". */
   numeral?: string;
   /**
-   * Punto de interés vertical de la foto, en % (0 arriba, 100 abajo; por
-   * defecto 50), como imagen_posicion_y de Platos. Lo usa «Solo foto» cuando
-   * la foto cubre el lienzo y hay que recortarla. No es un campo de texto.
+   * Encuadre de la foto al recortarla a sangre, en % (0 izquierda/arriba, 100
+   * derecha/abajo; por defecto 50, el centro), como imagen_posicion_y de
+   * Platos. Lo usa «Solo foto». No son campos de texto.
    */
+  posicionX?: number;
   posicionY?: number;
 }
 
-export type CampoPieza = Exclude<keyof DatosPieza, "marca" | "plantilla" | "formato" | "posicionY">;
+export type CampoPieza = Exclude<keyof DatosPieza, "marca" | "plantilla" | "formato" | "posicionX" | "posicionY">;
 
 /** Todos los campos de contenido de una pieza, en orden de formulario. */
 export const CAMPOS_PIEZA: readonly CampoPieza[] = ["foto", "antetitulo", "titular", "cita", "cta", "lista", "pie", "numeral"];
@@ -86,7 +87,7 @@ export interface ContextoPlantilla {
    * clásica del jueves de tapas va en Montserrat, como la que hacen ahora).
    */
   urlFuente?(fichero: string): string;
-  /** Medidas de una foto del catálogo (undefined si no está): «Solo foto» decide si recorta o enmarca. */
+  /** Medidas de una foto del catálogo (undefined si no está): «Solo foto» avisa si el recorte se queda pequeño. */
   medidasFoto?(id: string): { ancho: number; alto: number } | undefined;
 }
 

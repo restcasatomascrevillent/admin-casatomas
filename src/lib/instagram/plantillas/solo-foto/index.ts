@@ -6,43 +6,37 @@
  * stories y para quien lo elija en «Ajustar a mano».
  *
  * Solo post (1080×1350; también cada imagen del carrusel). Sin ningún texto ni
- * logo (sinTexto: no pide titular). Dos casos, según las medidas de la foto
- * (ctx.medidasFoto, del catálogo):
- *  - la foto CUBRE el lienzo ampliando como mucho un 5 % (AMPLIACION_MAXIMA):
- *    se recorta a 1080×1350 (object-fit: cover) centrada en horizontal y en
- *    vertical en `posicionY` % (por defecto 50, como imagen_posicion_y de
- *    Platos);
- *  - NO lo cubre (las de la carta, 1200×900, o una foto pequeña): la foto
- *    ENTERA, centrada, con un margen fino y NUNCA ampliada (como mucho a su
- *    tamaño natural), sobre un fondo del color de la propia foto (la misma
- *    foto muy desenfocada: sin detalle, solo su color).
- * Sin medidas (no está en el catálogo), se recorta como en el primer caso.
+ * logo (sinTexto: no pide titular). Decisión del dueño (12/11/2026): la foto
+ * SIEMPRE se recorta a 4:5 a sangre, como su feed (object-fit: cover), aunque
+ * haya que ampliarla; nada de foto entera sobre fondo. Qué parte se ve lo
+ * dicen `posicionX` y `posicionY` (0-100 %, por defecto 50: el centro; como
+ * imagen_posicion_y de Platos). Las de la carta (1200×900) son apaisadas: el
+ * recorte es horizontal y manda `posicionX`.
  *
- * Valida como «marco» (encaje): vale cualquier foto con el lado largo de
- * 800 px o más (LADO_MINIMO_MARCO); recortar o enmarcar lo decide aquí.
+ * Calidad: si el trozo de la foto que se ve mide menos de RECORTE_MINIMO px de
+ * ancho reales (ctx.medidasFoto, del catálogo), la pieza sigue valiendo pero
+ * lleva un aviso («la foto es pequeña y puede verse blanda») en data-aviso,
+ * que comprobarMaquetacion devuelve en `avisos`.
+ *
+ * Validación: cualquier foto vale (esquema.ts no mira el tamaño con sinTexto).
  */
-import { AMPLIACION_MAXIMA, escalaParaCubrir } from "../../fotos.js";
+import { escalaParaCubrir } from "../../fotos.js";
 import type { MarcaId } from "../../tokens.js";
 import { esc, type ContextoPlantilla, type DatosPieza, type Plantilla } from "../../tipos.js";
 
-/** Margen fino (px) alrededor de una foto que no cubre el lienzo. */
-export const MARGEN_SOLO_FOTO = 48;
+/** Ancho real mínimo (px de la foto) del recorte antes de avisar de que puede verse blanda. */
+export const RECORTE_MINIMO = 600;
 
-export type ModoSoloFoto = { modo: "cubre" } | { modo: "marco"; ancho: number; alto: number };
+export const AVISO_FOTO_PEQUENA = "La foto es pequeña y puede verse blanda";
 
-/**
- * Cómo va la foto en un lienzo de ancho×alto: recortada («cubre») o entera y
- * sin ampliar dentro del margen («marco», con su tamaño final en px).
- */
-export function modoSoloFoto(medidas: { ancho: number; alto: number } | undefined, ancho: number, alto: number, margen = MARGEN_SOLO_FOTO): ModoSoloFoto {
-  if (!medidas || !(medidas.ancho > 0) || !(medidas.alto > 0)) return { modo: "cubre" };
-  if (escalaParaCubrir(medidas.ancho, medidas.alto, ancho, alto) <= AMPLIACION_MAXIMA) return { modo: "cubre" };
-  const escala = Math.min(1, (ancho - 2 * margen) / medidas.ancho, (alto - 2 * margen) / medidas.alto);
-  return { modo: "marco", ancho: Math.round(medidas.ancho * escala), alto: Math.round(medidas.alto * escala) };
+/** Ancho real (px de la foto original) del trozo que se ve al recortarla a ancho×alto, o null sin medidas. */
+export function anchoRecorte(medidas: { ancho: number; alto: number } | undefined, ancho: number, alto: number): number | null {
+  if (!medidas || !(medidas.ancho > 0) || !(medidas.alto > 0)) return null;
+  return Math.round(ancho / escalaParaCubrir(medidas.ancho, medidas.alto, ancho, alto));
 }
 
-/** posicionY válido (0-100) o 50. */
-export function posicionVertical(v: unknown): number {
+/** Posición válida (0-100) o 50. */
+export function posicionEncuadre(v: unknown): number {
   return typeof v === "number" && Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : 50;
 }
 
@@ -61,33 +55,6 @@ const CSS = `
   height: 100%;
   object-fit: cover;
 }
-/* Fondo del color de la propia foto: la misma, muy desenfocada y un poco más grande (sin bordes del desenfoque). */
-.sf__fondo {
-  position: absolute;
-  left: -15%;
-  top: -15%;
-  width: 130%;
-  height: 130%;
-  display: block;
-  object-fit: cover;
-  filter: blur(110px) saturate(1.15) brightness(0.96);
-}
-.sf__marco {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.sf__entera {
-  display: block;
-  flex: none;
-  /* Tamaño exacto (atributos width/height) calculado sin ampliar nunca. */
-  max-width: none;
-  box-shadow:
-    0 30px 70px -34px color-mix(in srgb, black 45%, transparent),
-    0 8px 22px -12px color-mix(in srgb, black 25%, transparent);
-}
 `;
 
 function crear(marca: MarcaId, id: string, descripcion: string): Plantilla {
@@ -104,13 +71,14 @@ function crear(marca: MarcaId, id: string, descripcion: string): Plantilla {
     sinTexto: true,
     html(datos: DatosPieza, ctx: ContextoPlantilla): string {
       const idFoto = datos.foto ?? "";
-      const src = esc(ctx.urlFoto(idFoto));
-      const m = modoSoloFoto(ctx.medidasFoto?.(idFoto), ctx.ancho, ctx.alto);
-      const cuerpo =
-        m.modo === "cubre"
-          ? `<img class="sf__foto" src="${src}" alt="" style="object-position: 50% ${posicionVertical(datos.posicionY)}%">`
-          : `<img class="sf__fondo" src="${src}" alt="" aria-hidden="true"><div class="sf__marco"><img class="sf__entera sf__foto--entera" src="${src}" alt="" width="${m.ancho}" height="${m.alto}" style="width: ${m.ancho}px; height: ${m.alto}px"></div>`;
-      return `<style>${CSS}</style><div class="sf sf--${m.modo}" data-modo="${m.modo}">${cuerpo}</div>`;
+      const x = posicionEncuadre(datos.posicionX);
+      const y = posicionEncuadre(datos.posicionY);
+      const recorte = anchoRecorte(ctx.medidasFoto?.(idFoto), ctx.ancho, ctx.alto);
+      const aviso =
+        recorte !== null && recorte < RECORTE_MINIMO
+          ? ` data-aviso="${esc(`${AVISO_FOTO_PEQUENA} (se ven ${recorte} px de ancho; lo bueno es ${RECORTE_MINIMO} o más)`)}"`
+          : "";
+      return `<style>${CSS}</style><div class="sf"${aviso}><img class="sf__foto" src="${esc(ctx.urlFoto(idFoto))}" alt="" style="object-position: ${x}% ${y}%"></div>`;
     },
   };
 }
@@ -119,11 +87,11 @@ export const PLANTILLAS_SOLO_FOTO: readonly Plantilla[] = [
   crear(
     "casa-tomas",
     "ct-solo-foto",
-    "La foto limpia, sin texto ni logo, como el feed de @casatomascrevillent: recortada a 4:5 si cubre; si no (las de la carta, 1200×900), entera y sin ampliar sobre el color de la propia foto. El texto va en el pie de la publicación.",
+    "La foto limpia, sin texto ni logo, recortada a 4:5 a sangre como el feed de @casatomascrevillent; se elige qué parte se ve. El texto va en el pie de la publicación.",
   ),
   crear(
     "touza",
     "tz-solo-foto",
-    "La foto limpia, sin texto ni logo: recortada a 4:5 si cubre; si no (las de la carta, 1200×900), entera y sin ampliar sobre el color de la propia foto. El texto va en el pie de la publicación.",
+    "La foto limpia, sin texto ni logo, recortada a 4:5 a sangre; se elige qué parte se ve. El texto va en el pie de la publicación.",
   ),
 ];

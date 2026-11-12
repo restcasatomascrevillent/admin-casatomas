@@ -176,18 +176,23 @@ Por eso `ct-solo-foto` y `tz-solo-foto` (`src/lib/instagram/plantillas/solo-foto
 
 - Sin ningún texto ni logo. No piden titular (`validarPieza` lo acepta sin él y da error si llega
   uno: «va sin texto: quita el «titular»»).
-- Si la foto **cubre** 1080×1350 ampliando ≤ 5 %, se recorta (`object-fit: cover`) centrada en
-  horizontal y en vertical en `posicionY` % (0-100, por defecto 50; campo opcional de la pieza, como
-  `imagen_posicion_y` de Platos; no es un campo de texto).
-- Si **no cubre** (las de la carta, 1200×900, o una pequeña), la foto **entera**, centrada, con un
-  margen fino de 48 px y **nunca ampliada** (como mucho a su tamaño natural), sobre un fondo del
-  color de la propia foto (la misma foto muy desenfocada). Valida como «marco»: lado largo ≥ 800 px.
-- La plantilla sabe las medidas por `ctx.medidasFoto(id)` (del catálogo; `crearContexto`). Sin
-  medidas, recorta.
+- **Siempre a sangre** (decisión del dueño, 12/11/2026): la foto se recorta a 4:5 (`object-fit:
+  cover`) aunque haya que ampliarla, como su feed. Nada de foto entera sobre fondo.
+- **Encuadre**: `posicionX` y `posicionY` (0-100 %, por defecto 50; campos opcionales de la pieza,
+  no de texto). Las de la carta (1200×900) son apaisadas: el recorte es horizontal y manda
+  `posicionX`. Se elige arrastrando la foto dentro del marco 4:5 (o con dos deslizadores) en
+  «Ajustar a mano» (escritorio) y en «Encuadrar la foto» bajo la vista previa del móvil
+  (`src/components/instagram/EncuadreFoto.tsx`, `movil/EncuadreMovil.tsx`). Se guarda en los datos
+  de la pieza.
+- **Calidad**: vale cualquier foto (sin mínimo de tamaño), pero si el trozo que se ve mide menos de
+  600 px de ancho reales (`ctx.medidasFoto`, del catálogo), la plantilla pone `data-aviso` y
+  `comprobarMaquetacion` lo devuelve en `avisos`: «La foto es pequeña y puede verse blanda (se ven
+  N px de ancho…)». Una de la carta da 720 px: sin aviso.
 - Es la de por defecto del feed en «Montar con IA» (ver `docs/instagram-ia.md`, «Estilo del feed»).
-- Pruebas: `src/lib/instagram/__tests__/soloFoto.render.test.ts` (Chromium: vertical recortada,
-  1200×900 entera sin ampliar, 900×700 a su tamaño). Con `INSTAGRAM_CAPTURAS_SOLO_FOTO=<carpeta>`
-  guarda los JPEG; los del 12/11/2026 están en `instagram-studio/propuesta/evaluacion/solo-foto/`.
+- Pruebas: `src/lib/instagram/__tests__/soloFoto.render.test.ts` (Chromium: vertical, carta
+  centrada y con `posicionX=30`, 640×480 con aviso) y `crear/__tests__/encuadre.test.ts`. Con
+  `INSTAGRAM_CAPTURAS_SOLO_FOTO=<carpeta>` guarda los JPEG; los del 12/11/2026 están en
+  `instagram-studio/propuesta/evaluacion/solo-foto/`.
 
 ## Vinos de la carta
 

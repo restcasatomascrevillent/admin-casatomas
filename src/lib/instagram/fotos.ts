@@ -111,8 +111,10 @@ export function valeParaMarco(foto: Pick<Foto, "ancho" | "alto">): boolean {
 export function esAptaPara(
   foto: Pick<Foto, "ancho" | "alto">,
   formato: FormatoId,
-  plantilla?: Pick<Plantilla, "encaje"> | EncajeFoto | null,
+  plantilla?: Pick<Plantilla, "encaje" | "sinTexto"> | EncajeFoto | null,
 ): boolean {
+  // «Solo foto» recorta a sangre cualquier foto (si queda pequeña, solo avisa).
+  if (plantilla && typeof plantilla === "object" && plantilla.sinTexto) return true;
   return encajeDe(plantilla) === "marco" ? valeParaMarco(foto) : cubreFormato(foto, formato);
 }
 

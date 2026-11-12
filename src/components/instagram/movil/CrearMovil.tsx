@@ -46,6 +46,7 @@ import { hoyMadrid, sumarDias, utcAMadrid, validarProgramacion, MAXIMO_DIAS } fr
 import { firmaMontaje, horaInicial, nombreDia, unirCaption } from "./logica";
 import type { BorradorMovil, FotoGuardada, PasoMovil } from "./almacen";
 import { CarruselPrevia } from "./CarruselPrevia";
+import { EncuadreMovil } from "./EncuadreMovil";
 import { ElegirCarta } from "./ElegirCarta";
 import { fotosParaMontar, huecosLibres, reducirFotos, resumenSubidas, subidaCaducada, todasSubidas, type FotoMovil } from "./estado";
 import { MiniaturasOrdenables } from "./MiniaturasOrdenables";
@@ -771,6 +772,15 @@ export function CrearMovil({
                 Sin texto encima, como vuestro feed: el nombre del plato y el gancho van en el texto.
               </p>
             )}
+            <EncuadreMovil
+              diapositivas={montaje.diapositivas}
+              fotos={fotosSubidasParaPrevia}
+              onCambio={(i, en) =>
+                setMontaje((m) =>
+                  m ? { ...m, diapositivas: m.diapositivas.map((d, k) => (k === i ? { ...d, datos: { ...d.datos, posicionX: en.x, posicionY: en.y } } : d)) } : m,
+                )
+              }
+            />
             {montaje.resumen && (
               <p className="rounded-lg bg-muted p-3 text-base" data-testid="resumen-ia">
                 {montaje.resumen}
