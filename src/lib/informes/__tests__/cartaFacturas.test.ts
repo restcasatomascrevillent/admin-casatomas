@@ -49,12 +49,16 @@ describe("informes «Vinos/Platos: facturas y carta»", () => {
           { articuloId: "a", productoId: 20, producto: "Albariño", orden: 0 },
         ],
         compras,
+        margenes: new Map([["b", 2.3], ["a", null]]),
       },
       { hoy: "2026-11-11" },
     ) as InformeTabla;
 
     const t = r.tablas[0];
-    expect(t.columnas.map((c) => c.id)).toEqual(["nombre", "categoria", "precio", "compra", "unidad", "fecha", "activo", "foto"]);
+    expect(t.columnas.map((c) => c.id)).toEqual(["nombre", "categoria", "precio", "compra", "margen", "unidad", "fecha", "activo", "foto"]);
+    // Margen (12/11/2026): el multiplicador de Facturas › Márgenes y el beneficio sobre la venta; sin coste, vacío.
+    expect(t.filas.find((f) => f.nombre === "Muga Reserva")).toMatchObject({ margen: "×2,30 · 57 %" });
+    expect(t.filas.find((f) => f.nombre === "Albariño")).toMatchObject({ margen: null });
     expect(t.filas.map((f) => f.nombre)).toEqual(["Albariño", "Arzuaga", "Muga Reserva", "Sin categoría"]);
     expect(t.filas[0]).toMatchObject({ precio: 24, compra: 45, unidad: "caja", fecha: "10/08/2026", activo: "No", foto: "No" });
     expect(t.filas[1]).toMatchObject({ compra: null, unidad: null, fecha: null, activo: "Sí" });
@@ -78,5 +82,20 @@ describe("informes «Vinos/Platos: facturas y carta»", () => {
     ) as InformeTabla;
     expect(r.tablas[0].columnas.map((c) => c.id)).toContain("producto");
     expect(r.tablas[0].filas[0]).toMatchObject({ producto: "Pulpo congelado", precio: 22, compra: 15, unidad: "kg", fecha: "20/10/2026" });
+  });
+
+  it("platos sin escandallo: «Falta el escandallo» y la cuenta en la descripción (12/11/2026)", () => {
+    const r = informeCartaFacturas(
+      "platos",
+      {
+        articulos: [articulo("p", "Pulpo a la gallega", "Entrantes"), articulo("q", "Croquetas", "Entrantes")],
+        vinculos: [{ articuloId: "p", productoId: 1, producto: "Pulpo congelado", orden: 0 }],
+        compras: new Map(),
+      },
+      { hoy: "2026-11-11" },
+    ) as InformeTabla;
+    expect(r.tablas[0].filas.find((f) => f.nombre === "Croquetas")).toMatchObject({ producto: "Falta el escandallo", compra: null });
+    expect(r.tablas[0].columnas.map((c) => c.id)).not.toContain("margen");
+    expect(r.descripcion).toContain("a 1 le falta el escandallo");
   });
 });
