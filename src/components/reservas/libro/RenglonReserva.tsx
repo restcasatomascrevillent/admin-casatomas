@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { horaCorta } from "@/lib/reservas/ocupacionSalas";
 import { ESTADO_NO_SHOW, infoEstadoReserva } from "@/lib/reservas/estadosReserva";
+import { textoCreadaCorta } from "@/lib/reservas/creada";
 
 // ============================================================================
 // Un renglón de la Lista (11/11/2026, «ajusta la estética de lista»): la misma
@@ -20,6 +21,7 @@ export interface DatosRenglon {
   estado: string;
   notas_cliente?: string | null;
   telefono?: string | null;
+  created_at?: string | null;
 }
 
 interface Props {
@@ -38,7 +40,8 @@ interface Props {
 export function RenglonReserva({ reserva: r, sala, resaltada = false, conTelefono = false, onAbrir, sinEstado = false, accion }: Props) {
   const info = infoEstadoReserva(r.estado);
   const hora = horaCorta(r.hora) ?? r.hora;
-  const debajo = [conTelefono ? r.telefono : null].filter(Boolean).join(" · ");
+  // Con teléfono (resultados y «Pendientes»), también cuándo se hizo (12/11/2026, petición del dueño).
+  const debajo = [conTelefono ? r.telefono : null, conTelefono ? textoCreadaCorta(r) : null].filter(Boolean).join(" · ");
   const contenido = (
     <>
       <span className="font-semibold tabular-nums">{hora}</span>

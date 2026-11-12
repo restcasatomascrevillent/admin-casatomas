@@ -30,11 +30,17 @@ describe("Cerrar comida / Cerrar cena", () => {
     puedeEditar = true;
   });
 
-  it("un toque cierra, sin ventana de confirmación (11/11/2026)", () => {
+  it("cerrar pide confirmación (12/11/2026): «No» no cierra y «Sí, cerrar cena» cierra", async () => {
     pintar();
     fireEvent.click(screen.getByRole("button", { name: /Cerrar cena/ }));
+    const dialogo = await screen.findByRole("alertdialog");
+    expect(dialogo).toHaveTextContent("¿Cerrar cena?");
+    expect(cambiar).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "No, dejarla abierta" }));
+    expect(cambiar).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Cerrar cena/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sí, cerrar cena" }));
     expect(cambiar).toHaveBeenCalledWith("cena", true);
-    expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
   it("compacta (móvil): los dos botones en una sola fila y sin ayuda (i)", () => {
