@@ -52,7 +52,8 @@ describe("registro estático de plantillas", () => {
   it("tiene las clásicas (4 del prototipo y 2 enmarcadas) y las 16 v2, y todas cumplen el contrato", () => {
     const clasicas = ["ct-foto-titular", "ct-marco", "ct-tipografica", "tz-foto-titular", "tz-marco"];
     const v2 = ["portada", "portada-marco", "plato", "plato-marco", "cierre", "cierre-marco", "cierre-marca", "frase"];
-    const esperadas = [...clasicas, "tz-tipografica", ...v2.flatMap((x) => [`ct-${x}`, `tz-${x}`])].sort();
+    // + las dos de la story del jueves de tapas (papel «anuncio», 12/11/2026).
+    const esperadas = [...clasicas, "tz-tipografica", "ct-tapas", "ct-tapas-clasica", ...v2.flatMap((x) => [`ct-${x}`, `tz-${x}`])].sort();
     expect(PLANTILLAS.map((p) => p.id)).toEqual(esperadas);
     for (const p of PLANTILLAS) expect(problemasDePlantilla(p), p.id).toEqual([]);
     expect(PLANTILLAS.filter((p) => p.clasica).map((p) => p.id).sort()).toEqual(clasicas.sort());
@@ -194,7 +195,7 @@ describe("construirDocumento", () => {
   });
   it("todos los ejemplos validan y construyen", () => {
     expect(EJEMPLOS).toHaveLength(16);
-    expect(EJEMPLOS_V2).toHaveLength(32); // 16 plantillas v2 × post y story
+    expect(EJEMPLOS_V2).toHaveLength(34); // 16 plantillas v2 × post y story + las 2 stories del jueves de tapas
     for (const e of [...EJEMPLOS, ...EJEMPLOS_V2]) {
       const r = validarPieza(e.json);
       expect(r.ok ? [] : r.problemas, e.id).toEqual([]);

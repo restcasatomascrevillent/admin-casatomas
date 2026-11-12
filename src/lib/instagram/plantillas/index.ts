@@ -10,6 +10,7 @@ import { FORMATOS, MARCAS, type FormatoId, type MarcaId } from "../tokens.js";
 import { CAMPOS_PIEZA, PAPELES, encajeDe, type CampoPieza, type EncajeFoto, type PapelPlantilla, type Plantilla } from "../tipos.js";
 import { PLANTILLAS_CT_EDITORIAL } from "./ct-editorial/index.js";
 import { PLANTILLAS_TZ_EDITORIAL } from "./tz-editorial/index.js";
+import { PLANTILLAS_CT_TAPAS } from "./ct-tapas/index.js";
 import ctFotoTitular from "./ct-foto-titular/index.js";
 import ctMarco from "./ct-marco/index.js";
 import ctTipografica from "./ct-tipografica/index.js";
@@ -21,6 +22,8 @@ const TODAS: readonly Plantilla[] = [
   // Plantillas v2 (08/11/2026): un juego por marca con papeles (portada, plato, cierre, tipográfica).
   ...PLANTILLAS_CT_EDITORIAL,
   ...PLANTILLAS_TZ_EDITORIAL,
+  // Anuncios con flujo propio (12/11/2026): la story del jueves de tapas (no salen en los selectores).
+  ...PLANTILLAS_CT_TAPAS,
   // Clásicas (salvo tz-tipografica): se siguen abriendo, pero no salen en los selectores.
   ctFotoTitular,
   ctMarco,
@@ -65,7 +68,8 @@ function orden(p: Plantilla): number {
  */
 export function plantillasVisibles(marca: MarcaId, formato?: FormatoId, incluir?: string): Plantilla[] {
   const visibles = plantillasDe(marca, formato)
-    .filter((p) => !esClasica(p))
+    // Las de «anuncio» (jueves de tapas) las montan su botón y su automático, no los selectores.
+    .filter((p) => !esClasica(p) && p.papel !== "anuncio")
     .sort((a, b) => orden(a) - orden(b) || a.id.localeCompare(b.id));
   const actual = incluir ? obtenerPlantilla(incluir) : undefined;
   if (actual && esClasica(actual) && actual.marca === marca && (!formato || actual.formatos.includes(formato))) visibles.push(actual);

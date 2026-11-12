@@ -25,7 +25,7 @@ export interface PlantillaIA extends PlantillaCampana {
 }
 
 /** Papel de una plantilla v2 (src/lib/instagram/tipos.ts → PapelPlantilla). */
-export type PapelIA = "portada" | "plato" | "cierre" | "tipografica";
+export type PapelIA = "portada" | "plato" | "cierre" | "tipografica" | "anuncio";
 
 export const PLANTILLAS_IA: readonly PlantillaIA[] = [
   {
@@ -139,6 +139,30 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     encaje: "marco",
     papel: "portada",
     campanas: true,
+  },
+  // Story del jueves de tapas (12/11/2026): papel «anuncio», la montan su botón y su automático
+  // (lista de tapas obligatoria): ni montar_pieza ni las campañas las eligen.
+  {
+    id: "ct-tapas",
+    marca: "casa-tomas",
+    campos: ["antetitulo", "titular", "cita", "pie"],
+    limites: { antetitulo: 20, titular: 12, cita: 30, pie: 44 },
+    formatos: ["story"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "anuncio",
+    campanas: false,
+  },
+  {
+    id: "ct-tapas-clasica",
+    marca: "casa-tomas",
+    campos: ["antetitulo", "titular"],
+    limites: { antetitulo: 20, titular: 12 },
+    formatos: ["story"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "anuncio",
+    campanas: false,
   },
   {
     id: "ct-tipografica",

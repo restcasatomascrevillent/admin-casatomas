@@ -187,7 +187,8 @@ describe.skipIf(!!motivo)("render real con Chromium", () => {
       if (!v.ok) return;
       const r = await renderizar(v.datos);
       expect(r.fallosCarga).toEqual([]);
-      expect(r.caras).toBe(FUENTES[v.datos.marca].length);
+      // La story clásica del jueves de tapas trae además Montserrat 300 y 400 (latin y latin-ext).
+      expect(r.caras).toBe(FUENTES[v.datos.marca].length + (v.datos.plantilla === "ct-tapas-clasica" ? 4 : 0));
       expect(r.errores).toEqual([]);
       expect(r.avisos).toEqual([]);
       await comprobarImagen(r.png, v.datos.formato);

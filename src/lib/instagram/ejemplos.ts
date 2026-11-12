@@ -238,6 +238,17 @@ export const EJEMPLOS: readonly EjemploPieza[] = [
  * que sus rótulos («Nuevo», «Cocktail bar»…) no cuentan como «rótulos de
  * ejemplo olvidados» en instagram-ia (ejemplos.ts). Los usan las pruebas de render.
  */
+/** Las 7 tapas de la story que publicaban el 12/11/2026 (referencias-actuales/story-jueves-de-tapas.jpg). */
+export const TAPAS_EJEMPLO: readonly string[] = [
+  "Crujiente de fuet con queso brie",
+  "Costillas desmechadas con pan bao y crema de guacamole",
+  "Buñuelos de bacalao con salsa de tomate",
+  "Trío de queso de cabra con mermelada de mango",
+  "Ensaladilla de alcachofas con atún",
+  "Gambón rebozado",
+  "Coulant de calabaza asada con chocolate blanco",
+];
+
 export const EJEMPLOS_V2: readonly EjemploPieza[] = ejemplosV2();
 
 /**
@@ -264,13 +275,27 @@ function ejemplosV2(): EjemploPieza[] {
     ["tz-cierre-marca", "touza", null, { antetitulo: "Cocktail bar", cita: "Touza no es solo un bar; es una declaración de intenciones." }],
     ["tz-frase", "touza", null, { antetitulo: "Jueves a sábado", cita: "Cada cóctel cuenta una historia." }],
   ];
-  return filas.flatMap(([plantilla, marca, foto, textos]) =>
+  const v2 = filas.flatMap(([plantilla, marca, foto, textos]) =>
     (["post", "story"] as const).map((formato) => ({
       id: `${plantilla}-${formato}`,
       json: { marca, plantilla, formato, ...(foto ? { foto } : {}), ...textos } as EntradaPieza,
     })),
   );
+  // Story del jueves de tapas (solo story): las 7 tapas de la que publican hoy.
+  const lista = TAPAS_EJEMPLO.map((etiqueta) => ({ etiqueta }));
+  return [
+    ...v2,
+    {
+      id: "ct-tapas-story",
+      json: { marca: "casa-tomas", plantilla: "ct-tapas", formato: "story", foto: "ct-salon-5", titular: "Jueves", cita: "12 de noviembre", antetitulo: "De tapas", lista, pie: "Turnos 20:30 y 22:00" },
+    },
+    {
+      id: "ct-tapas-clasica-story",
+      json: { marca: "casa-tomas", plantilla: "ct-tapas-clasica", formato: "story", foto: "ct-salon-5", titular: "Jueves", antetitulo: "De tapas", lista },
+    },
+  ];
 }
+
 
 /** Ejemplos de una plantilla (y, si se pide, de un formato). */
 export function ejemplosDe(plantilla: string, formato?: EntradaPieza["formato"]): EjemploPieza[] {
