@@ -155,6 +155,20 @@ function infoEstado(estado: string) {
 }
 
 /** Minuto del día de ahora; se actualiza cada 30 s. */
+/**
+ * Minuto «de ahora» para otro día que no es hoy (12/11/2026, captura del dueño: el sábado 14, con el reloj a las 16:19,
+ * las de las 13:30 salían «Tarde»). Tan pronto que ninguna reserva «llega ahora», va tarde ni está retrasada.
+ */
+const MINUTO_FUERA_DE_HOY = -1000;
+
+/** El minuto del reloj si `fecha` es hoy (o no se pasa); otro día, `MINUTO_FUERA_DE_HOY`. */
+function minutoDelDia(minutoReloj: number, fecha: string | undefined): number {
+  if (!fecha) return minutoReloj;
+  const d = new Date();
+  const hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return fecha === hoy ? minutoReloj : MINUTO_FUERA_DE_HOY;
+}
+
 function useMinutoAhora(): number {
   const calcular = () => {
     const d = new Date();
@@ -208,7 +222,8 @@ export function VistaHoyMovil({
   const [inicioFicha, setInicioFicha] = useState<InicioFicha>("normal");
   const [mesaLibre, setMesaLibre] = useState<{ mesa: MesaOpcion; prevista: PrevistaMesa | null } | null>(null);
   const [sentandoId, setSentandoId] = useState<string | null>(null);
-  const minutoAhora = useMinutoAhora();
+  const minutoReloj = useMinutoAhora();
+  const minutoAhora = minutoDelDia(minutoReloj, fecha);
   useAlDiaMovil();
   const { marcarLlegada, aceptar, estaEnCurso } = useAccionesServicioReserva();
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
@@ -232,7 +247,7 @@ export function VistaHoyMovil({
   // Turno que pintan las mesas: el del filtro o, con «Todo el día», el del reloj.
   const turno: TurnoServicio =
     filtroTurno === "todo"
-      ? turnoDeHora(`${String(Math.floor(minutoAhora / 60)).padStart(2, "0")}:${String(minutoAhora % 60).padStart(2, "0")}`)
+      ? turnoDeHora(`${String(Math.floor(minutoReloj / 60)).padStart(2, "0")}:${String(minutoReloj % 60).padStart(2, "0")}`)
       : filtroTurno;
   const terraza = salas.find((s) => /terraza/i.test(s.nombre)) ?? null;
   const cierre = useSalaCerradaServicio(terraza?.id ?? null, fecha, turno);
@@ -1481,7 +1496,7 @@ export function HojaMesaSentar({
   extra?: ReactNode;
   onCerrar: () => void;
 }) {
-  const minutoAhora = useMinutoAhora();
+  const minutoAhora = minutoDelDia(useMinutoAhora(), fecha);
   const { data: espacios } = useEspaciosReserva();
   const { data: mesas } = useMesas();
   const { data: asignaciones } = useAsignacionesMesa(fecha);
