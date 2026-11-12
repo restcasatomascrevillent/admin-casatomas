@@ -13,7 +13,7 @@ import { etiquetaEstadoReserva } from "@/lib/reservas/estadosReserva";
 import { MIN_LETRAS_BUSQUEDA, useBuscarReservas, useReservasPorEstado } from "@/hooks/useBusquedaReservas";
 import { ReservasDeLaHoja } from "./ReservasDeLaHoja";
 import { ResultadosLista } from "./ResultadosLista";
-import { clasesNumeroPendientes } from "./BotonPendientes";
+import { clasesBotonPendientes, clasesNumeroPendientes } from "./BotonPendientes";
 
 // ============================================================================
 // LA LISTA COMO EL LIBRO (10/11/2026, petición del dueño: «hacer o simular como
@@ -198,8 +198,8 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
           </div>
           <Button
             type="button"
-            variant={estado === "pendiente" ? "default" : "outline"}
-            className="h-11 gap-2 text-base"
+            variant="outline"
+            className={cn("h-11 gap-2 text-base", clasesBotonPendientes(estado === "pendiente"))}
             aria-pressed={estado === "pendiente"}
             onClick={() => {
               setTexto("");
@@ -262,6 +262,7 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
               error={porEstado.isError}
               onReintentar={() => void porEstado.refetch()}
               vacio={estado === "pendiente" ? "No hay reservas pendientes de verificar." : "No hay reservas en este estado desde hoy."}
+              conVerificar={estado === "pendiente"}
               conTelefono
               onAbrir={editarReserva}
               onVerDia={irA}
