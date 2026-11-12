@@ -27,6 +27,7 @@ import { ALTURA_MINIMA_FACTURAS } from "@/lib/facturas/alturaCargar";
 import { esRutaIaCompleta } from "@/lib/facturas/copilotoCompleto";
 import { MargenesCarta } from "@/components/analisis/margenes/MargenesCarta";
 import { leerArticuloEnlace } from "@/lib/dashboard/margenesDashboard";
+import { cn } from "@/lib/utils";
 
 // Rediseño del 08/10/2026: «Documentos» y «Productos» (las pestañas de antes) son
 // ahora modos de Compras; sus enlaces antiguos (`?tab=productos` de la campana,
@@ -229,7 +230,7 @@ const Facturas = () => {
                 {soloLectura && <EtiquetaSoloLectura />}
                 {/* Avisos de facturas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral).
                     Son de lo comprado (precios, documentos): solo para quien consulta Facturas. */}
-                <div className="order-2 ml-auto flex items-center gap-2 sm:order-none sm:ml-0">
+                <div className={cn("ml-auto flex items-center gap-2 sm:order-none sm:ml-0", barraUnica ? "order-4" : "order-2")}>
                   {permisos.consultar && <BotonAvisosSeccion seccion="facturas" compacto={barraUnica} />}
                   <BotonAyuda seccion="facturas" />
                 </div>
