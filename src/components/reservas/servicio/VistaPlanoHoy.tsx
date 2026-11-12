@@ -407,8 +407,8 @@ export function VistaPlanoHoy({
       .map((a) => ({ mesa_id: a.mesa_id, reserva_id: a.reserva_id }));
   }, [mesas, asignacionesDeHoy]);
   const estadosReales = useMemo(
-    () => new Map(mesas.map((m) => [m.id, estadoMesaServicio(m.id, asignacionesSala, lista, turno, ahora, config)])),
-    [mesas, asignacionesSala, lista, turno, ahora, config],
+    () => new Map(mesas.map((m) => [m.id, estadoMesaServicio(m.id, asignacionesSala, lista, turno, ahora, config, hoy)])),
+    [mesas, asignacionesSala, lista, turno, ahora, config, hoy],
   );
   /** En la propuesta: cada mesa con la reserva que tendría (nombre y personas en el cartel). */
   const estados = useMemo(() => {
