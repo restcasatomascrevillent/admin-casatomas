@@ -2,6 +2,22 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.29.0] - 2026-11-12
+
+Objetivo: Reservas (Pendientes en la lista del día, confirmación al cerrar turno, ficha con estado y hora de creación, retraso solo hoy), móvil sin cortes, RRSS en el móvil, Facturas legible en el móvil y original de Drive sin sesión de Google
+
+### Añadido
+- Pendientes en naranja con «Verificar» en la lista del día · Avisos en «Sin revisar» por defecto ([#173](https://github.com/restcasatomascrevillent/admin-casatomas/pull/173))
+- Rrss: vista móvil de RRSS con redes abajo, selector de secciones y controles de 48 px ([e74a4ff](https://github.com/restcasatomascrevillent/admin-casatomas/commit/e74a4ffa1ae24eec8002b385940151ac6e6e5b81))
+- Reservas: confirmación al cerrar la comida o la cena ([#174](https://github.com/restcasatomascrevillent/admin-casatomas/pull/174))
+- Ficha con estado y hora de creación, «Cancelar» discreto · estado de la reserva en los avisos ([#176](https://github.com/restcasatomascrevillent/admin-casatomas/pull/176))
+
+### Cambiado
+- Facturas: Análisis y Márgenes legibles en el móvil ([#175](https://github.com/restcasatomascrevillent/admin-casatomas/pull/175))
+- Movil: pestañas, barras y diálogos que se cortaban en el móvil; sin «Tarde» ([#178](https://github.com/restcasatomascrevillent/admin-casatomas/pull/178))
+- Reservas: el retraso («+X min», «Tarde») solo cuenta hoy ([#179](https://github.com/restcasatomascrevillent/admin-casatomas/pull/179))
+- Facturas: el original de Drive se ve sin sesión de Google ([6d0a66f](https://github.com/restcasatomascrevillent/admin-casatomas/commit/6d0a66fac197adcff4797a4c36224edc813a282e))
+
 ## [1.28.0] - 2026-11-12
 
 Objetivo: Fase 3 (pestañas y contadores unificados), «Pendientes» con Verificar, informes con margen, Dashboard más limpio y el chat de Facturas enlazando a Drive cada factura
