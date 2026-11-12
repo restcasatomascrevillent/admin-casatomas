@@ -56,6 +56,7 @@ const doble = vi.hoisted(() => {
     rpc: (...a: unknown[]) => rpc(...(a as [string, Record<string, unknown>])),
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
     storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
+    auth: { getSession: async () => ({ data: { session: { access_token: "jwt-de-prueba" } } }) },
   };
   return { supabase, rpc, rpcs, invoke, inserts, estado };
 });
@@ -422,6 +423,17 @@ describe("periodo personalizado y URL", () => {
 
 describe("ver documentos de una cifra", () => {
   it("un indicador abre la lista de documentos (que cuadra) y un documento abre el visor con su PDF", async () => {
+    // El original de Drive lo sirve facturas-original (sin sesión de Google): se simula la función.
+    const pedidas: Array<{ url: string; auth: string | null }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (u: string, init: RequestInit = {}) => {
+        pedidas.push({ url: String(u), auth: new Headers(init.headers).get("authorization") });
+        return new Response("%PDF-1.4", { status: 200, headers: { "Content-Type": "application/pdf" } });
+      }),
+    );
+    URL.createObjectURL = vi.fn(() => "blob:original-f77");
+    URL.revokeObjectURL = vi.fn();
     const onIrA = vi.fn();
     montar({ onIrA });
     await screen.findByText("1.362.491,57 €");
@@ -438,7 +450,8 @@ describe("ver documentos de una cifra", () => {
     expect(within(lista).getAllByRole("button")).toHaveLength(2);
     fireEvent.click(within(lista).getByRole("button", { name: /^Factura F-77 de EMBAJADORES MADRID/ }));
     const visor = await screen.findByTestId("visor-documento");
-    expect(within(visor).getByTitle(/^Original: Factura F-77/)).toHaveAttribute("src", "https://drive.google.com/file/d/1EhhlvBMUAhvrgKYiviZjBEpC6uqFC4Tr/preview");
+    expect(await within(visor).findByTitle(/^Original: Factura F-77/)).toHaveAttribute("src", "blob:original-f77");
+    expect(pedidas).toEqual([{ url: expect.stringMatching(/\/functions\/v1\/facturas-original\?id=11$/), auth: "Bearer jwt-de-prueba" }]);
     const drive = within(visor).getByRole("link", { name: /Abrir en Drive/ });
     expect(drive).toHaveAttribute("target", "_blank");
     expect(drive).toHaveAttribute("rel", expect.stringContaining("noopener"));
@@ -448,6 +461,7 @@ describe("ver documentos de una cifra", () => {
     expect(within(visor).getByText(/No se guardó el original/)).toBeInTheDocument();
     fireEvent.click(within(visor).getByRole("button", { name: "Abrir en Compras" }));
     expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=documentos&doc=12");
+    vi.unstubAllGlobals();
   });
 
   it("«Por revisar» abre su vista con solo los albaranes sin factura", async () => {
