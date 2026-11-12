@@ -1,8 +1,10 @@
 import { useMemo, type ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { agruparPorDia, type ReservaEncontrada } from "@/hooks/useBusquedaReservas";
 import { tituloHoja } from "@/lib/reservas/libroReservas";
 import { RenglonReserva } from "./RenglonReserva";
@@ -24,12 +26,21 @@ interface Props {
   nota?: string | null;
   conTelefono?: boolean;
   onAbrir: (id: string) => void;
-  onVerDia: (fecha: string) => void;
+  /** «Ver el día» de cada grupo. Sin él (móvil, que no cambia de día) el botón no sale. */
+  onVerDia?: (fecha: string) => void;
   /** Sin la tarjeta ni el título (dentro de un diálogo que ya lo pone, p. ej. «Pendientes» de la pestaña Reservas). */
   sinMarco?: boolean;
+  /**
+   * «Verificar» en cada fila pendiente (12/11/2026, petición del dueño: «que haya un botón de verificar en cada fila
+   * cuando pulsas Pendientes»). La misma acción que en la ficha (correo al cliente y aviso). Solo con permiso de editar.
+   */
+  conVerificar?: boolean;
 }
 
-export function ResultadosLista({ titulo, reservas, cargando, error, onReintentar, vacio, nota, conTelefono, onAbrir, onVerDia, sinMarco = false }: Props) {
+export function ResultadosLista({ titulo, reservas, cargando, error, onReintentar, vacio, nota, conTelefono, onAbrir, onVerDia, sinMarco = false, conVerificar = false }: Props) {
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  const { aceptar, estaEnCurso } = useAccionesServicioReserva();
+  const verificar = conVerificar && puedeEditar;
   const { data: espacios } = useEspaciosReserva();
   const nombreSala = useMemo(() => {
     const m = new Map<string, string>();
@@ -59,9 +70,11 @@ export function ResultadosLista({ titulo, reservas, cargando, error, onReintenta
               <h3 className="mr-auto text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 {tituloHoja(g.fecha)} · {g.reservas.length} {g.reservas.length === 1 ? "reserva" : "reservas"}
               </h3>
-              <Button type="button" variant="ghost" size="sm" className="h-11 gap-1 text-sm" onClick={() => onVerDia(g.fecha)}>
-                Ver el día <ArrowRight className="h-4 w-4" />
-              </Button>
+              {onVerDia && (
+                <Button type="button" variant="ghost" size="sm" className="h-11 gap-1 text-sm" onClick={() => onVerDia(g.fecha)}>
+                  Ver el día <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
             </div>
             <ul>
               {g.reservas.map((r) => (
@@ -71,6 +84,20 @@ export function ResultadosLista({ titulo, reservas, cargando, error, onReintenta
                   sala={r.espacio_id ? nombreSala.get(r.espacio_id) : null}
                   conTelefono={conTelefono}
                   onAbrir={onAbrir}
+                  sinEstado={verificar}
+                  accion={
+                    verificar && r.estado === "pendiente" ? (
+                      <Button
+                        type="button"
+                        className="h-11 shrink-0 gap-1.5 bg-emerald-600 px-3 font-semibold text-white hover:bg-emerald-700"
+                        disabled={estaEnCurso(r.id)}
+                        onClick={() => void aceptar(r as unknown as Parameters<typeof aceptar>[0])}
+                        aria-label={`Verificar la reserva de ${r.nombre || "Sin nombre"}`}
+                      >
+                        <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Verificar
+                      </Button>
+                    ) : undefined
+                  }
                 />
               ))}
             </ul>
