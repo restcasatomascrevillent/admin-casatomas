@@ -118,7 +118,8 @@ function ModalAvisos({
   const config = SECCIONES_AVISOS[seccion];
   // Se abre en «Sin revisar» si hay alguno; si no, en «Todos» (para ver el historial).
   const [filtros, setFiltros] = useState<FiltrosAvisosSeccion>({
-    estado: pendientes > 0 ? "sin_revisar" : "todos",
+    // Siempre en «Sin revisar» (12/11/2026, petición del dueño: «que salgan los sin revisar por defecto»).
+    estado: "sin_revisar",
     tipo: "todos",
   });
   const { avisos, loading, cargandoMas, hayMas, error, cargarMas, marcarRevisado, marcarTodosRevisados } =
