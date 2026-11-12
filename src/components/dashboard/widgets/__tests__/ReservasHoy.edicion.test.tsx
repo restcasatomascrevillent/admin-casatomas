@@ -1,12 +1,7 @@
 /**
- * Widget «Reservas de Hoy» del Dashboard: el popup «Notas y peticiones
- * especiales» lista las reservas de hoy que llevan nota (nombre, comensales,
- * hora y la nota). Desde ahí se puede EDITAR la reserva (2026-09-30: las
- * reservas se editan siempre, desde cualquier vista donde aparezcan), p. ej.
- * para corregir una alergia mal apuntada.
- *
- * El widget lee las reservas de hoy NO canceladas, de cualquier estado; el
- * popup solo enseña las que tienen nota.
+ * Widget «Reservas de Hoy» del Dashboard (12/11/2026, petición del dueño: «quita las notificaciones y el bocadillo
+ * de ahí»): ya no hay insignia de notas con su popup ni campana. Las reservas se editan desde «Próximas» (su ficha);
+ * sin permiso de editar, tocar una lleva al día en Reservas.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
@@ -55,7 +50,7 @@ import { ReservasHoy } from "@/components/dashboard/widgets/ReservasHoy";
 const reserva = (id: string, estado: string, nombre: string | null, notas: string | null, extra: Record<string, unknown> = {}) => ({
   id,
   nombre,
-  hora: "21:00:00",
+  hora: "23:59:00",
   numero_comensales: 4,
   estado,
   notas_cliente: notas,
@@ -75,19 +70,6 @@ function montar() {
   );
 }
 
-/**
- * La insignia de las notas: el botón «Ver notas y peticiones especiales (N)» que abre el popup. Por su nombre, no
- * por `aria-haspopup="dialog"`: desde el 06/10/2026 la franja de ocupación lleva también una ayuda «ⓘ» (un popover,
- * con el mismo atributo) con el desglose de las reservas activas.
- */
-const insigniaDeNotas = () => screen.queryByRole("button", { name: /^Ver notas y peticiones especiales/ });
-
-async function abrirNotas() {
-  montar();
-  fireEvent.click(insigniaDeNotas()!);
-  return await screen.findByRole("dialog");
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   h.canEdit = true;
@@ -95,68 +77,34 @@ beforeEach(() => {
     reserva("r-pendiente", "pendiente", "Ana Pendiente", "Alergia a los frutos secos"),
     reserva("r-confirmada", "confirmada", "Carlos Confirmado", "Trona para un bebé"),
     reserva("r-llego", "completada", "Elena Llegó", "Cumpleaños"),
-    reserva("r-sin-notas", "confirmada", "Sin Notas", null),
   ];
 });
 
-describe("ReservasHoy · editar desde el popup de notas", () => {
-  it.each([
-    ["Ana Pendiente", "r-pendiente"],
-    ["Carlos Confirmado", "r-confirmada"],
-    ["Elena Llegó", "r-llego"],
-  ])("la nota de %s lleva «Editar» y abre el editor de esa reserva", async (cliente, id) => {
-    const popup = await abrirNotas();
-
-    fireEvent.click(within(popup).getByRole("button", { name: `Editar la reserva de ${cliente}` }));
-
-    expect(h.editarReserva).toHaveBeenCalledTimes(1);
-    expect(h.editarReserva).toHaveBeenCalledWith(id);
+describe("ReservasHoy · sin bocadillo de notas ni campana; se edita desde «Próximas»", () => {
+  it("no hay insignia de notas ni campana en la tarjeta", () => {
+    montar();
+    expect(screen.queryByRole("button", { name: /notas y peticiones especiales/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /notificaciones/i })).toBeNull();
+    expect(screen.getByText("Reservas de Hoy")).toBeInTheDocument();
   });
 
-  it("al editar se cierra el popup de notas, para no dejar dos diálogos uno sobre otro", async () => {
-    const popup = await abrirNotas();
-
-    fireEvent.click(within(popup).getByRole("button", { name: "Editar la reserva de Ana Pendiente" }));
-
-    await waitFor(() => expect(screen.queryByText("Notas y peticiones especiales")).not.toBeInTheDocument());
+  it("tocar una reserva de «Próximas» abre su ficha (solo las vivas: la que ya llegó no sale)", () => {
+    montar();
+    const proximas = screen.getByRole("list", { name: "Próximas reservas de hoy" });
+    expect(within(proximas).queryByText("Elena Llegó")).toBeNull();
+    fireEvent.click(within(proximas).getByRole("button", { name: /Ana Pendiente/ }));
+    expect(h.editarReserva).toHaveBeenCalledWith("r-pendiente");
   });
 
-  it("solo salen (y se editan desde aquí) las reservas con nota: el resto no entra en el popup", async () => {
-    const popup = await abrirNotas();
-
-    expect(within(popup).queryByText("Sin Notas")).not.toBeInTheDocument();
-    expect(within(popup).getAllByRole("button", { name: /^Editar la reserva de/ })).toHaveLength(3);
-  });
-
-  it("una reserva sin nombre (la BD lo permite) se puede editar igual", async () => {
-    h.reservas = [reserva("r-anonima", "confirmada", null, "Silla de ruedas")];
-    const popup = await abrirNotas();
-
-    fireEvent.click(within(popup).getByRole("button", { name: "Editar la reserva de este cliente" }));
-    expect(h.editarReserva).toHaveBeenCalledWith("r-anonima");
-  });
-
-  it("sin permiso de edición sobre «reservas» no hay botón (06/11/2026: oculto, no desactivado)", async () => {
+  it("sin permiso de edición, tocarla no abre la ficha", () => {
     h.canEdit = false;
-    const popup = await abrirNotas();
-
-    // La nota se sigue leyendo; el lápiz no está.
-    expect(within(popup).getByText("Ana Pendiente")).toBeInTheDocument();
-    expect(within(popup).queryByRole("button", { name: "Editar la reserva de Ana Pendiente" })).not.toBeInTheDocument();
+    montar();
+    fireEvent.click(within(screen.getByRole("list", { name: "Próximas reservas de hoy" })).getByRole("button", { name: /Carlos Confirmado/ }));
     expect(h.editarReserva).not.toHaveBeenCalled();
   });
 
-  it("pinta el diálogo de edición que devuelve el hook (una vez para todo el widget)", () => {
+  it("pinta el diálogo de edición que devuelve el hook (una vez para todo el widget)", async () => {
     montar();
-
-    expect(screen.getAllByTestId("dialogo-edicion")).toHaveLength(1);
-  });
-
-  it("sin reservas con nota no hay insignia de notas ni popup: el widget sigue igual", () => {
-    h.reservas = [reserva("r1", "confirmada", "Ana", null)];
-    montar();
-
-    expect(insigniaDeNotas()).toBeNull();
-    expect(screen.getByText("Reservas de Hoy")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByTestId("dialogo-edicion")).toHaveLength(1));
   });
 });

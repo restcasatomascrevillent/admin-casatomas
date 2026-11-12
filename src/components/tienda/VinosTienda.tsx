@@ -248,15 +248,14 @@ export function VinosTienda({ config, puedeEditar }: Props) {
         </ToggleGroup>
       </div>
 
-      {/* Contador y acciones sobre los mostrados (solo con un filtro puesto, para no tocar la carta entera sin querer). */}
+      {/* Contador y acciones sobre los mostrados (solo con un filtro puesto, para no tocar la carta entera sin querer).
+          Sin filtro no sale nada (12/11/2026, petición del dueño: «quita el 212 vinos de arriba de la lista, es
+          información repetida»: ya lo dicen «A la venta 195 de 212» y el botón «Todos 212»). */}
+      {hayFiltro && (
       <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex min-h-11 items-center gap-1">
           <p className="text-sm text-muted-foreground" aria-live="polite">
-            {hayFiltro ? (
-              <>Mostrando <strong className="tabular-nums text-foreground">{filas.length}</strong> de {total} {vinos(total)}</>
-            ) : (
-              <><strong className="tabular-nums text-foreground">{total}</strong> {vinos(total)}</>
-            )}
+            Mostrando <strong className="tabular-nums text-foreground">{filas.length}</strong> de {total} {vinos(total)}
           </p>
           {hayFiltro && (
             <Button variant="ghost" className="h-11 gap-1 px-3 text-muted-foreground" onClick={quitarFiltros}>
@@ -280,6 +279,7 @@ export function VinosTienda({ config, puedeEditar }: Props) {
           </div>
         )}
       </div>
+      )}
 
       {esMovil ? (
         filas.length === 0 ? (
