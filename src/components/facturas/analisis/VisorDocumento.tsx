@@ -1,7 +1,9 @@
 // Visor emergente de un documento desde «Ver documentos» de Análisis.
 //
 //   · Diálogo grande (pantalla completa en móvil) con el ORIGINAL incrustado:
-//       drive_url    → vista previa de Drive (`/file/d/<id>/preview`);
+//       drive_url    → lo descarga el servidor (Edge Function facturas-original)
+//                      con la cuenta del restaurante: no hace falta sesión de
+//                      Google en el navegador (12/11/2026);
 //       archivo_path → URL firmada de Storage (PDF en <iframe>, foto con zoom).
 //     Si no se puede incrustar, quedan los botones para abrirlo.
 //   · Cabecera: proveedor, nº, fecha, tipo, local y total; «Abrir en Drive»
@@ -19,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { urlSegura } from "@/lib/url-segura";
 import { fechaCorta } from "@/lib/facturas/tableroCompras";
 import { ETIQUETA_LOCAL, ETIQUETA_TIPO, enlaceDocumentoCompras, esPdf, vistaPreviaDrive, type DocumentoCifra } from "@/lib/facturas/documentosCifra";
+import { useOriginalDrive, useUrlDeBlob } from "@/lib/facturas/originalDrive";
 import { FOCO } from "./piezas";
 import { useFocoAlCerrar } from "./desplazar";
 
@@ -44,12 +47,35 @@ function useUrlFirmada(ruta: string | null) {
 const ACCION =
   "inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted/60 disabled:pointer-events-none disabled:opacity-40";
 
+/** El original de Drive, servido por la Edge Function (blob URL). */
+function OriginalDrive({ doc, titulo }: { doc: DocumentoCifra; titulo: string }) {
+  const q = useOriginalDrive(doc.id);
+  const url = useUrlDeBlob(q.data);
+  if (q.isError && !q.isFetching)
+    return (
+      <p role="status" className="m-auto flex max-w-sm flex-col items-center gap-2 p-6 text-center text-sm text-muted-foreground">
+        <FileX2 className="h-5 w-5" aria-hidden />
+        No se ha podido cargar el original desde Google Drive{q.error instanceof Error && q.error.message ? ` (${q.error.message.replace(/\.$/, "")})` : ""}.
+        Usa «Abrir en Drive».
+      </p>
+    );
+  if (!url)
+    return (
+      <div className="m-auto flex items-center gap-2 text-sm text-muted-foreground" role="status">
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> Cargando el original…
+      </div>
+    );
+  return q.data?.type === "application/pdf" ? (
+    <iframe key={doc.id} src={url} title={`Original: ${titulo}`} className="h-full w-full border-0 bg-muted/30" />
+  ) : (
+    <ImagenZoom key={doc.id} src={url} alt={`Original: ${titulo}`} className="h-full min-h-0 w-full rounded-none border-0" />
+  );
+}
+
 function Original({ doc, titulo }: { doc: DocumentoCifra; titulo: string }) {
   const previa = vistaPreviaDrive(doc.driveUrl);
   const firmada = useUrlFirmada(!previa ? doc.archivoPath : null);
-  if (previa) {
-    return <iframe key={doc.id} src={previa} title={`Original: ${titulo}`} className="h-full w-full border-0 bg-muted/30" allow="autoplay" referrerPolicy="no-referrer" />;
-  }
+  if (previa) return <OriginalDrive key={doc.id} doc={doc} titulo={titulo} />;
   if (doc.archivoPath) {
     if (firmada.isError)
       return (
@@ -175,11 +201,6 @@ export function VisorDocumento({
             <div className="flex min-h-0 flex-1 flex-col bg-muted/20">
               <Original doc={doc} titulo={titulo} />
             </div>
-            {drive && (
-              <p className="shrink-0 border-t border-border/70 px-3 py-1.5 text-xs text-muted-foreground">
-                La vista previa es la de Google Drive: si pide iniciar sesión o no se ve, usa «Abrir en Drive».
-              </p>
-            )}
           </>
         )}
       </DialogContent>

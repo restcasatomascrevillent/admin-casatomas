@@ -100,7 +100,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
         titulo: "Análisis: el tablero y la IA",
         pasos: [
           "En «Análisis» el tablero sale hecho: las cifras del periodo, los proveedores a los que más compras, lo que más ha subido de precio, el gasto por familia, los gastos fijos al mes, los abonos y Casa Tomás frente a Touza. Arriba eliges el periodo (mes, trimestre, año, todo o «Personalizado» con las fechas que quieras) y el local; el enlace de la página guarda esa elección para volver o compartirla. No gasta IA.",
-          "Desde cualquier cifra llegas a sus facturas: toca un indicador o una fila de las tarjetas. Sale la lista de documentos que forman esa cifra (con el total, que cuadra) y, al tocar uno, su PDF en grande con «Anterior/Siguiente», «Abrir en Drive» y «Abrir en Compras». Si Drive pide iniciar sesión, usa «Abrir en Drive».",
+          "Desde cualquier cifra llegas a sus facturas: toca un indicador o una fila de las tarjetas. Sale la lista de documentos que forman esa cifra (con el total, que cuadra) y, al tocar uno, su PDF en grande con «Anterior/Siguiente», «Abrir en Drive» y «Abrir en Compras». Se ve sin iniciar sesión en Google: el panel trae el original de Drive con la cuenta del restaurante.",
           "Para lo demás, pulsa «Pregúntale a la IA»: sale un panel a la derecha con sugerencias y una caja para escribir con tus palabras. Si la respuesta trae una gráfica, «Fijar en el tablero» la deja al final del tablero. Tus conversaciones están en «Historial», dentro del panel. Arriba a la derecha ves lo que ha costado la IA este mes.",
         ],
       },
