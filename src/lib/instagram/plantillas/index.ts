@@ -12,6 +12,7 @@ import { PLANTILLAS_CT_EDITORIAL } from "./ct-editorial/index.js";
 import { PLANTILLAS_TZ_EDITORIAL } from "./tz-editorial/index.js";
 import { PLANTILLAS_CT_TAPAS } from "./ct-tapas/index.js";
 import { PLANTILLAS_SOLO_FOTO } from "./solo-foto/index.js";
+import { PLANTILLAS_CT_ESTILOS } from "./ct-estilos/index.js";
 import ctFotoTitular from "./ct-foto-titular/index.js";
 import ctMarco from "./ct-marco/index.js";
 import ctTipografica from "./ct-tipografica/index.js";
@@ -27,6 +28,8 @@ const TODAS: readonly Plantilla[] = [
   ...PLANTILLAS_CT_TAPAS,
   // «Solo foto» (12/11/2026): la foto limpia, sin texto; la de por defecto del feed (ct-solo-foto, tz-solo-foto).
   ...PLANTILLAS_SOLO_FOTO,
+  // Estilos de las stories que publica hoy Casa Tomás (12/11/2026): rótulos, reseña, Vosotros, anuncios y portadas de destacadas.
+  ...PLANTILLAS_CT_ESTILOS,
   // Clásicas (salvo tz-tipografica): se siguen abriendo, pero no salen en los selectores.
   ctFotoTitular,
   ctMarco,

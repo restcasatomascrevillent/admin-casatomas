@@ -4,6 +4,7 @@
  * validarPieza y comprobarMaquetacion (lo comprueban los tests).
  */
 import type { EntradaPieza } from "./esquema.js";
+import { EJEMPLOS_CT_ESTILOS } from "./plantillas/ct-estilos/index.js";
 
 export interface EjemploPieza {
   /** Nombre del fichero del prototipo sin .json, p. ej. "ct-tipografica-lema". */
@@ -293,6 +294,8 @@ function ejemplosV2(): EjemploPieza[] {
       id: "ct-tapas-clasica-story",
       json: { marca: "casa-tomas", plantilla: "ct-tapas-clasica", formato: "story", foto: "ct-salon-5", titular: "Jueves", antetitulo: "De tapas", lista },
     },
+    // Estilos de las stories de ahora (12/11/2026): uno por plantilla y formato.
+    ...EJEMPLOS_CT_ESTILOS,
   ];
 }
 

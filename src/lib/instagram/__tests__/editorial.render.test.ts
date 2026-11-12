@@ -19,6 +19,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chromium, type Browser } from "@playwright/test";
 import sharp from "sharp";
+import { IDS_CT_ESTILOS } from "../plantillas/ct-estilos/index.js";
 import {
   CODIGO_COMPROBAR_MAQUETACION,
   CODIGO_ESPERAR_RECURSOS,
@@ -60,7 +61,8 @@ if (!chromiumInstalado) console.warn("[instagram editorial.render.test] SE SALTA
 
 // Las de «anuncio» (story del jueves de tapas) tienen su propia prueba (tapas.render.test.ts).
 // «Solo foto» (sin texto) tiene su propia prueba: soloFoto.render.test.ts.
-const V2 = PLANTILLAS.filter((p) => !esClasica(p) && p.papel && p.papel !== "anuncio" && !p.sinTexto && p.id !== "tz-tipografica");
+// Los estilos de las stories de ahora (ct-estilos), en estilos.render.test.ts.
+const V2 = PLANTILLAS.filter((p) => !esClasica(p) && p.papel && p.papel !== "anuncio" && !p.sinTexto && p.id !== "tz-tipografica" && !IDS_CT_ESTILOS.includes(p.id));
 
 // ── Fotos ────────────────────────────────────────────────────────────────────
 interface FuenteFoto {

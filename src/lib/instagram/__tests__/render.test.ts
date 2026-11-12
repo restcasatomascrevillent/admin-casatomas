@@ -33,6 +33,7 @@ import {
   type Plantilla,
 } from "..";
 import { plantillaPrueba } from "./fixtures/plantilla-prueba";
+import { carasExtraEstilos } from "../plantillas/ct-estilos/index.js";
 
 const LENTO = 120_000;
 const TITULAR_LARGO =
@@ -188,7 +189,8 @@ describe.skipIf(!!motivo)("render real con Chromium", () => {
       const r = await renderizar(v.datos);
       expect(r.fallosCarga).toEqual([]);
       // La story clásica del jueves de tapas trae además Montserrat 300 y 400 (latin y latin-ext).
-      expect(r.caras).toBe(FUENTES[v.datos.marca].length + (v.datos.plantilla === "ct-tapas-clasica" ? 4 : 0));
+      // Los estilos de ct-estilos declaran además sus caras de Montserrat y Cormorant.
+      expect(r.caras).toBe(FUENTES[v.datos.marca].length + (v.datos.plantilla === "ct-tapas-clasica" ? 4 : 0) + carasExtraEstilos(v.datos.plantilla));
       expect(r.errores).toEqual([]);
       expect(r.avisos).toEqual([]);
       await comprobarImagen(r.png, v.datos.formato);
