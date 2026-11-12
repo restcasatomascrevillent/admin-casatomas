@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { CalendarDays, Clapperboard, Flag, Home, KanbanSquare, PenLine } from "lucide-react";
+import { CalendarDays, Clapperboard, Flag, Home, KanbanSquare, PenLine, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -23,6 +23,8 @@ import type { DatosFormulario } from "@/components/instagram/encargos/logica";
 const CrearInstagram = lazy(() => import("@/components/instagram/crear/CrearInstagram").then((m) => ({ default: m.CrearInstagram })));
 const CampanasInstagram = lazy(() => import("@/components/instagram/campanas/CampanasInstagram").then((m) => ({ default: m.CampanasInstagram })));
 const CalendarioInstagram = lazy(() => import("@/components/instagram/programar/CalendarioInstagram").then((m) => ({ default: m.CalendarioInstagram })));
+// Ajustes (12/11/2026): story automática del jueves de tapas y «Lo que publicáis ahora».
+const PestanaAjustesInstagram = lazy(() => import("@/components/instagram/tapas/PestanaAjustesInstagram").then((m) => ({ default: m.PestanaAjustesInstagram })));
 const EncargosInstagram = lazy(() => import("@/components/instagram/encargos/EncargosInstagram").then((m) => ({ default: m.EncargosInstagram })));
 // ── Crear en el móvil (instagram-movil): ver el bloque «Crear en el móvil» más abajo. ──
 const CrearMovil = lazy(() => import("@/components/instagram/movil/CrearMovil").then((m) => ({ default: m.CrearMovil })));
@@ -63,7 +65,7 @@ const Perezosa = ({ children }: { children: ReactNode }) => <Suspense fallback={
  */
 const ALTURA_MINIMA_INSTAGRAM = 360;
 
-const PESTANAS = ["estudio", "crear", "campanas", "reels", "calendario", "encargos"] as const;
+const PESTANAS = ["estudio", "crear", "campanas", "reels", "calendario", "encargos", "ajustes"] as const;
 type Pestana = (typeof PESTANAS)[number];
 
 const CONTENIDO_PESTANA = "mt-0 flex-1 min-h-0 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
@@ -258,6 +260,7 @@ export function ContenidoInstagram({ onIrMetricas }: { onIrMetricas?: () => void
                 tonoContador: "dorado" as const,
                 etiquetaContador: `${pendientesEncargos} pendientes`,
               },
+              { valor: "ajustes", etiqueta: "Ajustes", icono: <Settings2 /> },
             ].filter((p) => !soloAgencia || p.valor === "encargos")}
           />
 
@@ -364,6 +367,14 @@ export function ContenidoInstagram({ onIrMetricas }: { onIrMetricas?: () => void
             )}
           </TabsContent>
 
+          {/* Ajustes: story automática del jueves de tapas y referencias de la cuenta (solo se monta al abrirla). */}
+          <TabsContent value="ajustes" className={`${CONTENIDO_PESTANA} overflow-hidden`}>
+            {pestanaVisible === "ajustes" && (
+              <Perezosa>
+                <PestanaAjustesInstagram />
+              </Perezosa>
+            )}
+          </TabsContent>
         </Tabs>
       </div>
     </>

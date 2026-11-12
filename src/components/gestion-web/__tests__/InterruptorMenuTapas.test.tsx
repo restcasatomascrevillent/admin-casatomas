@@ -15,7 +15,8 @@ describe("Interruptores de Menú del día y Tapas", () => {
     render(<InterruptorMenuTapas boton={boton} />);
     const interruptor = screen.getByRole("switch");
     fireEvent.click(interruptor);
-    expect(mock.mutate).toHaveBeenCalledWith({ boton, mostrar: boton === "tapas" });
+    // El 2.º argumento lleva el onSuccess de la story automática del jueves de tapas.
+    expect(mock.mutate).toHaveBeenCalledWith({ boton, mostrar: boton === "tapas" }, expect.anything());
   });
   it("no permite cambios si la migración no está aplicada", () => {
     mock.disponible = false;

@@ -39,6 +39,8 @@ vi.mock("@/hooks/usePlatosParaMenu", () => ({
 vi.mock("@/components/gestion-web/InterruptorMenuTapas", () => ({ InterruptorMenuTapas: () => null }));
 vi.mock("@/lib/rebuild-webs", () => ({ notificarGuardadoYPublicacion: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
+// «Crear story de Instagram» (tapas) mira el permiso de Marketing.
+vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: false, loading: false }) }));
 
 import { EditorMenuTapasWeb } from "@/components/gestion-web/EditorMenuTapasWeb";
 import { serializarMenuDia, itemLibre } from "@/lib/menu-dia";

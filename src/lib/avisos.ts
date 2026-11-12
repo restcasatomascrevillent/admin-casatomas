@@ -1,4 +1,4 @@
-import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Percent, Bot, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, PieChart, Receipt, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
+import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Percent, Bot, CalendarClock, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, PieChart, Receipt, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { rutaAlerta, TIPOS_ALERTA_FACTURAS } from "@/lib/facturas/alertas";
 
@@ -26,6 +26,8 @@ export function rutaDeAviso(
   // Modelos de OpenAI nuevos, retirados o sin precio (20261107500000): solo super admin.
   if (n.referencia_tipo === "ia_modelos") return "/super-admin/servicios?tab=modelos";
   // Encargos de Instagram (20261110100000): la ficha del encargo.
+  // Story del jueves de tapas (20261127090000): sus ajustes y cómo va la de esta semana.
+  if (n.referencia_tipo === "instagram_story_tapas") return "/rrss?red=instagram&tab=ajustes";
   if (n.referencia_tipo === "instagram_encargo") {
     return n.referencia_id ? `/rrss?red=instagram&tab=encargos&encargo=${encodeURIComponent(n.referencia_id)}` : "/rrss?red=instagram&tab=encargos";
   }
@@ -99,6 +101,8 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   original_sin_drive: CloudOff,
   // Encargos de Instagram: aceptado, entregado, mensaje de Oficiosos…
   instagram_encargo: KanbanSquare,
+  // Story del jueves de tapas programada (20261127090000).
+  instagram_story_tapas: CalendarClock,
   // Alertas diarias de Facturas (cron facturas-alertas, 20261107300000).
   facturas_precio_sube: TrendingUp,
   facturas_precio_mejor: BadgePercent,
