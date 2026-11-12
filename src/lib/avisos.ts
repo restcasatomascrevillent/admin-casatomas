@@ -46,8 +46,9 @@ export const TIPOS_POR_FILTRO: Record<"reservas" | "facturas", string[]> = {
 };
 
 export const FILTROS_AVISOS: { valor: FiltroAvisos; etiqueta: string }[] = [
+  // «Sin revisar» primero y por defecto (12/11/2026, petición del dueño), con el mismo nombre que en el resto del panel.
+  { valor: "sin_leer", etiqueta: "Sin revisar" },
   { valor: "todos", etiqueta: "Todos" },
-  { valor: "sin_leer", etiqueta: "Sin leer" },
   { valor: "reservas", etiqueta: "Reservas" },
   { valor: "facturas", etiqueta: "Facturas" },
   { valor: "otros", etiqueta: "Otros" },

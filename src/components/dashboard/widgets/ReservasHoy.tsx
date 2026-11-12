@@ -238,13 +238,14 @@ export function ReservasHoy() {
           ]}
         />
         {proximas.length > 0 && (
-          <ul aria-label="Próximas reservas de hoy" className="flex flex-wrap gap-1.5" data-testid="proximas-hoy">
+          // Móvil (12/11/2026, captura del dueño: cuatro píldoras una debajo de otra): en dos columnas.
+          <ul aria-label="Próximas reservas de hoy" className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap" data-testid="proximas-hoy">
             {proximas.map(r => (
               <li key={r.id} className="min-w-0">
                 <button
                   type="button"
                   onClick={() => (puedeEditar ? editarReserva(r.id) : irAReservasHoy())}
-                  className="flex min-h-9 max-w-[16rem] items-center gap-1.5 rounded-full border bg-background px-3 text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex min-h-9 w-full items-center gap-1.5 rounded-full border bg-background px-3 text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:max-w-[16rem]"
                   aria-label={`Abrir la reserva de ${r.nombre || "Sin nombre"}, ${r.hora.slice(0, 5)}, ${r.numero_comensales} personas`}
                 >
                   <span className="font-semibold tabular-nums">{r.hora.slice(0, 5)}</span>

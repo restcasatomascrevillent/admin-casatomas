@@ -766,7 +766,10 @@ export function TableroCompras({
   }
 
   return (
-    <div className="@container/tablero flex h-full min-h-0 flex-col gap-2.5">
+    // Móvil (< 640 px, 12/11/2026, dueño: «la información no se ve bien»): el tablero entero desplaza como una página
+    // (dentro de `tablero-analisis`, la página sigue sin scroll) y las pastillas de vista se quedan arriba; antes las
+    // cifras y las pastillas eran fijas y cada lista cabía en una franja de ~250 px con su propio scroll.
+    <div className="@container/tablero flex h-full min-h-0 flex-col gap-2.5 max-sm:h-auto">
       {/* 1 · Cifras que también son navegación */}
       <ul className={cn("grid shrink-0 grid-cols-2 gap-2 @[48rem]/tablero:grid-cols-4 @[48rem]/tablero:gap-2.5", atenuar)} aria-label="Indicadores del periodo" aria-busy={pendiente || undefined} data-tour="facturas-analisis-indicadores">
         {cifrasNav.map((c) => (
@@ -796,28 +799,31 @@ export function TableroCompras({
         ))}
       </ul>
 
-      {/* 2 · Una vista a la vez */}
-      <div role="group" aria-label="Vista del análisis" className="flex min-w-0 shrink-0 gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)] max-sm:pr-7" data-testid="pastillas-vistas">
-        {VISTAS.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            aria-pressed={vista === v.id}
-            onClick={() => irAVista(v.id)}
-            className={cn(
-              "min-h-9 shrink-0 whitespace-nowrap rounded-full border border-transparent px-3 text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground pointer-coarse:min-h-11",
-              "aria-pressed:border-border aria-pressed:bg-muted aria-pressed:font-semibold aria-pressed:text-foreground",
-              FOCO,
-            )}
-          >
-            {v.etiqueta}
-          </button>
-        ))}
+      {/* 2 · Una vista a la vez (en el móvil, fijas arriba al bajar). Móvil (12/11/2026, dueño: «pestañas cortadas»): las
+          seis pastillas en dos filas, sin scroll ni degradado que tape «Proveedores» y «Por revisar». */}
+      <div className="min-w-0 shrink-0 max-sm:sticky max-sm:top-0 max-sm:z-10 max-sm:bg-background max-sm:py-1">
+        <div role="group" aria-label="Vista del análisis" className="flex min-w-0 gap-1 pb-0.5 max-sm:flex-wrap sm:overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="pastillas-vistas">
+          {VISTAS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              aria-pressed={vista === v.id}
+              onClick={() => irAVista(v.id)}
+              className={cn(
+                "min-h-9 shrink-0 whitespace-nowrap rounded-full border border-transparent px-3 text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground pointer-coarse:min-h-11",
+                "aria-pressed:border-border aria-pressed:bg-muted aria-pressed:font-semibold aria-pressed:text-foreground",
+                FOCO,
+              )}
+            >
+              {v.etiqueta}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 3 · La vista: reparte el alto que queda (en estrecho, una columna con scroll dentro) */}
       <div
-        className={cn("relative min-h-0 flex-1 overflow-y-auto overscroll-contain @[48rem]/tablero:overflow-hidden", atenuar)}
+        className={cn("relative min-h-0 flex-1 overflow-y-auto overscroll-contain @[48rem]/tablero:overflow-hidden max-sm:flex-none max-sm:overflow-visible", atenuar)}
         role="region"
         aria-label={`Vista: ${VISTAS.find((v) => v.id === vista)?.etiqueta ?? ""}`}
         aria-busy={pendiente || undefined}

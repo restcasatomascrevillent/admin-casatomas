@@ -8,12 +8,14 @@ import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { useAbrirAviso } from "@/hooks/useAbrirAviso";
 import { agruparPorDia, FILTROS_AVISOS, horaAviso, rutaDeAviso, TIPO_ICON, type FiltroAvisos } from "@/lib/avisos";
 import { cn } from "@/lib/utils";
+import { EstadoReservaAviso, useEstadosReservasAvisos } from "@/hooks/useEstadosReservasAvisos";
 
 /** Suelo (px) del alto de la página: por debajo vuelve el scroll de página. */
 const ALTURA_MINIMA_AVISOS = 380;
 
 export default function Avisos() {
-  const [filtro, setFiltro] = useState<FiltroAvisos>("todos");
+  // Por defecto, los sin revisar (12/11/2026, petición del dueño).
+  const [filtro, setFiltro] = useState<FiltroAvisos>("sin_leer");
   const { avisos, loading, cargandoMas, hayMas, error, cargarMas, marcarLeida, marcarTodasLeidas } =
     useHistorialAvisos(filtro);
   // «Ver» en una reserva abre su ficha en un modal (11/11/2026); lo demás, su origen.
@@ -27,6 +29,8 @@ export default function Avisos() {
   };
 
   const grupos = agruparPorDia(avisos);
+  // Estado actual de cada reserva avisada (12/11/2026, petición del dueño).
+  const estados = useEstadosReservasAvisos(avisos);
   const haySinLeer = avisos.some((n) => !n.leida);
 
   return (
@@ -101,7 +105,10 @@ export default function Avisos() {
                               aria-hidden="true"
                             />
                             <span className="min-w-0 flex-1">
-                              <span className={cn("block text-sm", !n.leida && "font-medium")}>{n.titulo}</span>
+                              <span className={cn("flex flex-wrap items-center gap-1.5 text-sm", !n.leida && "font-medium")}>
+                                {n.titulo}
+                                <EstadoReservaAviso aviso={n} estados={estados} />
+                              </span>
                               {n.mensaje && (
                                 <span className="mt-0.5 block text-xs text-muted-foreground">{n.mensaje}</span>
                               )}

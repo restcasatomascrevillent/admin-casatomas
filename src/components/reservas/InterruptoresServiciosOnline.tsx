@@ -1,7 +1,19 @@
 import { textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
 import { textoZona } from "@/lib/reservas/zonaPreferida";
 import { servicioComidaDeReserva } from "@/lib/reservas/menuDelDia";
+import { useState } from "react";
 import { Lock, LockOpen } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { etiquetaDiaReservas } from "@/lib/reservas/vistaHoy";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useCanAccessSection } from "@/hooks/useUserRole";
@@ -35,7 +47,9 @@ const TURNOS: Array<{
 
 /**
  * Dos botones para el día que se está viendo en Reservas: «Cerrar comida» / «Cerrar cena» (el día elegido con las
- * flechas, 11/11/2026). Un toque cierra o vuelve a abrir, sin preguntar (11/11/2026). Cerrado = botón rojo relleno «Comida cerrada».
+ * flechas, 11/11/2026). CERRAR pide confirmación (12/11/2026, petición del dueño: «añade modal de confirmación al
+ * cerrar comida o cena»; del 11/11 al 12/11 cerraba sin preguntar); volver a abrir es un toque. Cerrado = botón rojo
+ * relleno «Comida cerrada».
  * Solo afecta a la web y al teléfono automático. Sin «Editar» en Reservas se ven pero no se tocan.
  */
 export function InterruptoresServiciosOnline({
@@ -52,7 +66,10 @@ export function InterruptoresServiciosOnline({
   const { estaBloqueado, cambiar, disponible, guardando } =
     useServiciosBloqueados(fecha);
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  // El turno que se va a cerrar, a la espera del «Sí, cerrar».
+  const [porCerrar, setPorCerrar] = useState<(typeof TURNOS)[number] | null>(null);
   return (
+    <>
     <div
       className={cn("flex items-center", compacta ? "flex-nowrap gap-1.5" : "flex-wrap gap-2", className)}
       data-testid="interruptores-servicios-online"
@@ -65,12 +82,14 @@ export function InterruptoresServiciosOnline({
             type="button"
             size="sm"
             variant={bloqueado ? "destructive" : "outline"}
-            className={cn("touch-hit min-h-11", compacta ? "min-w-0 flex-1 gap-1.5 px-2" : "gap-2")}
+            className={cn("touch-hit min-h-11", compacta ? "h-auto min-w-0 flex-1 flex-col gap-0 px-1.5 py-1 leading-tight" : "gap-2")}
+            // Compacta: el nombre accesible entero («Cerrar comida»), aunque se pinte en dos líneas.
+            aria-label={compacta ? (bloqueado ? cerrado : abrir) : undefined}
             data-testid={`boton-servicio-online-${turno}`}
             aria-pressed={bloqueado}
             disabled={!disponible || !puedeEditar || guardando}
-            // Sin ventana de confirmación (11/11/2026, petición del dueño): un toque cierra o vuelve a abrir.
-            onClick={() => cambiar(turno, !bloqueado)}
+            // Cerrar pregunta antes; abrir, directo.
+            onClick={() => (bloqueado ? cambiar(turno, false) : setPorCerrar(TURNOS.find((t) => t.turno === turno) ?? null))}
             title={AYUDA}
           >
             {/* En el móvil (compacta) sin candado: así «Comida cerrada» cabe entero. */}
@@ -79,12 +98,52 @@ export function InterruptoresServiciosOnline({
             ) : (
               <LockOpen className="h-4 w-4" aria-hidden />
             )}
-            <span className={compacta ? "truncate text-[15px]" : undefined}>{bloqueado ? cerrado : abrir}</span>
+            {/* Móvil (12/11/2026, captura del dueño: «Cerrar co…» cortado a 390 px): en dos líneas, como «Sentar / Elegir
+                mesa» de las filas; arriba lo que hace el botón y abajo el turno, que siempre cabe. */}
+            {compacta ? (
+              <>
+                <span className="text-xs font-normal">{bloqueado ? "Cerrada" : "Cerrar"}</span>
+                <span className="text-sm font-semibold">{turno === "comida" ? "Comida" : "Cena"}</span>
+              </>
+            ) : (
+              <span>{bloqueado ? cerrado : abrir}</span>
+            )}
           </Button>
         );
       })}
     </div>
+    <AlertDialog open={!!porCerrar} onOpenChange={(abierto) => !abierto && setPorCerrar(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿{porCerrar?.abrir}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            <strong className="text-foreground">{etiquetaDiaReservas(fecha, fechaHoy())}</strong>: la web y el teléfono automático dejarán de
+            aceptar reservas para la {porCerrar?.servicio}. Las reservas que ya hay no cambian y desde el panel se puede seguir apuntando. Se
+            vuelve a abrir con un toque.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>No, dejarla abierta</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-red-600 text-white hover:bg-red-700"
+            onClick={() => {
+              if (porCerrar) cambiar(porCerrar.turno, true);
+              setPorCerrar(null);
+            }}
+          >
+            Sí, {porCerrar?.abrir.toLowerCase()}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
+}
+
+/** Hoy en `yyyy-MM-dd` (hora local), para decir «hoy» o el día en la pregunta. */
+function fechaHoy(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /**

@@ -507,10 +507,13 @@ html {
   font-size: 1.0625rem;
   line-height: 1.625rem;
 }
-.carta-contraste [role="tab"],
-.carta-contraste [role="tab"] span {
-  font-size: 1rem;
-  line-height: 1.5rem;
+/* Solo desde 640 px (12/11/2026): en el móvil, a 16 px las pestañas de la Carta no cabían y se cortaban. */
+@media (min-width: 640px) {
+  .carta-contraste [role="tab"],
+  .carta-contraste [role="tab"] span {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
 }
 .carta-contraste h3.text-lg {
   font-size: 1.125rem;
@@ -553,4 +556,51 @@ body:has([data-dialogo-nueva-reserva]) [data-sonner-toaster][data-x-position="ri
 }
 .formulario-una-columna form > :nth-last-child(2) {
   padding-bottom: 6.25rem;
+}
+
+/* RRSS en el móvil (12/11/2026, `.rrss-movil` lo pone la página RRSS por debajo de 768 px): una mano, sin letra
+   diminuta. Controles de 48 px como mínimo y textos de 14 px como mínimo en TODAS las pantallas de la sección
+   (Instagram, Facebook, Subida y Métricas) sin tocar cada componente: tablet y escritorio no llevan la clase.
+   Quedan fuera los interruptores y casillas (su zona táctil la da la fila entera) y lo marcado con `data-compacto`. */
+.rrss-movil :is(.text-xs, [class*="text-[10px]"], [class*="text-[11px]"], [class*="text-[12px]"], [class*="text-[13px]"], [class*="text-[8px]"], [class*="text-[9px]"]) {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+.rrss-movil
+  :is(button, [role="tab"], [role="combobox"], select, input:not([type]), input[type="text"], input[type="search"], input[type="number"], input[type="date"], input[type="time"], input[type="email"], input[type="url"]):not(
+    [role="switch"],
+    [role="checkbox"],
+    [role="radio"],
+    [data-compacto]
+  ) {
+  min-height: 3rem;
+}
+.rrss-movil button:has(> svg:only-child):not([role="switch"], [role="checkbox"], [role="radio"], [data-compacto]) {
+  min-width: 3rem;
+}
+/* Grupos de botones exclusivos (ToggleGroup: Mes/Semana, 7/28 días) son role="radio" dentro de un role="group". */
+.rrss-movil [role="group"] > button[role="radio"] {
+  min-height: 3rem;
+}
+.rrss-movil input[type="range"] {
+  min-height: 3rem;
+}
+
+/* Campos de fecha y hora en el iPhone (12/11/2026, captura del dueño en Cheques): Safari les da un ancho mínimo
+   propio (se salían por la derecha) y un alto mayor que el resto. Ocupan su caja, como los demás campos. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"] {
+  min-width: 0;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.25em;
 }

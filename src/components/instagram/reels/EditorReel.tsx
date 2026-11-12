@@ -210,7 +210,7 @@ export function EditorReel({
       {/* Cabecera: base y duración */}
       <div className="flex shrink-0 flex-wrap items-end gap-2">
         {permitirCambiarBase && (
-          <div className="flex min-w-0 flex-1 items-end gap-2">
+          <div className="flex min-w-0 flex-1 items-end gap-2 max-sm:basis-full">
             <div className="min-w-0 flex-1">
               <Label htmlFor="reel-base" className="text-xs">
                 Empezar desde una base

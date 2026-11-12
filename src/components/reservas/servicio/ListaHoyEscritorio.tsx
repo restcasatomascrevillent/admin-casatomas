@@ -19,7 +19,9 @@
 import { useState, type ReactNode } from "react";
 import { formatearPrecioMenu, textoInsigniaMenu } from "@/lib/reservas/menuCerrado";
 import { InsigniaZona } from "@/components/reservas/InterruptoresServiciosOnline";
-import { ChevronDown, Lock, Phone, StickyNote } from "lucide-react";
+import { CheckCircle2, ChevronDown, Lock, Phone, StickyNote } from "lucide-react";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { Button } from "@/components/ui/button";
 import { BotonPersonas } from "@/components/reservas/CambiarPersonas";
 import { cn } from "@/lib/utils";
@@ -60,12 +62,31 @@ export function ListaHoyEscritorio({
   servicio = null,
 }: ListaHoyEscritorioProps) {
   const [verTerminadas, setVerTerminadas] = useState(false);
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  const { aceptar, estaEnCurso } = useAccionesServicioReserva();
   const pax = (filas: Array<{ reserva: Reserva }>) => filas.reduce((s, f) => s + (f.reserva.numero_comensales || 0), 0);
   const fila = (f: FilaHoyMovil<Reserva> & { tarde?: boolean }, grupo: "porLlegar" | "sentadas" | "terminadas") => {
     const r = f.reserva;
     // Sin «Sentar» en la fila (11/11/2026, petición del dueño: «quita el botón de sentar»): al tocarla se abre la
     // ficha, con la información, «Verificar» / «Confirmar» y el resto de acciones. «Sentar fuera» sí se queda.
-    const accion = grupo === "porLlegar" ? sentarFuera?.(r) : null;
+    // Pendiente (12/11/2026, petición del dueño: «en vez de botón de sentar fuera, verificar»): «Verificar» verde, la
+    // misma acción que la ficha (correo al cliente y aviso). Las demás que faltan por llegar, «Sentar fuera».
+    const pendiente = grupo === "porLlegar" && r.estado === "pendiente";
+    const accion =
+      pendiente && puedeEditar ? (
+        <Button
+          type="button"
+          className="pointer-events-auto h-11 shrink-0 gap-1.5 bg-emerald-600 px-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+          disabled={estaEnCurso(r.id)}
+          onClick={() => void aceptar(r as unknown as Parameters<typeof aceptar>[0])}
+          aria-label={`Verificar la reserva de ${r.nombre || "Sin nombre"}`}
+          data-testid="verificar-fila"
+        >
+          <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Verificar
+        </Button>
+      ) : grupo === "porLlegar" ? (
+        sentarFuera?.(r)
+      ) : null;
     return (
       <FilaEscritorio
         key={r.id}
@@ -175,7 +196,9 @@ function FilaEscritorio({
   const señalar = (si: boolean) => onSeñalar?.(si ? reserva.id : null);
   return (
     <li
-      className={cn("relative", señalada && "bg-primary/10")}
+      // Pendientes con fondo naranja translúcido (12/11/2026, petición del dueño), para verlas de un vistazo.
+      className={cn("relative", señalada ? "bg-primary/10" : reserva.estado === "pendiente" && grupo === "porLlegar" && "bg-orange-500/15 dark:bg-orange-400/15")}
+      data-pendiente={reserva.estado === "pendiente" ? "true" : undefined}
       data-reserva-id={reserva.id}
       data-señalada={señalada ? "true" : undefined}
       onMouseEnter={() => señalar(true)}

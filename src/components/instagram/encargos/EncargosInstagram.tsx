@@ -206,13 +206,13 @@ export function EncargosInstagram({ className, onAbrirPieza, encargoInicial = nu
         </div>
       ) : (
         <div
-          className={cn("grid min-h-0 flex-1 auto-cols-[minmax(10.75rem,1fr)] xl:auto-cols-[minmax(11.5rem,1fr)] grid-flow-col gap-2 overflow-x-auto pb-1")}
+          className={cn("grid min-h-0 flex-1 auto-cols-[minmax(10.75rem,1fr)] xl:auto-cols-[minmax(11.5rem,1fr)] grid-flow-col gap-2 overflow-x-auto pb-1", "max-sm:snap-x max-sm:snap-mandatory max-sm:auto-cols-[86%]")}
           data-testid="tablero-encargos"
         >
           {columnas.map((c) => {
             const lista = visibles.filter((e) => c.estados.includes(e.estado));
             return (
-              <section key={c.id} aria-label={c.nombre} className="flex min-h-0 flex-col rounded-md border bg-muted/30">
+              <section key={c.id} aria-label={c.nombre} className="flex min-h-0 flex-col rounded-md border bg-muted/30 max-sm:snap-start">
                 <h3 className="flex shrink-0 items-center gap-1.5 border-b px-2 py-1.5 text-xs font-semibold">
                   <span className={cn("h-2 w-2 rounded-full", c.color)} aria-hidden="true" />
                   {c.nombre}

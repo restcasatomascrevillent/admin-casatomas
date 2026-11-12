@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, ExternalLink, Loader2, MoveRight, Pencil, Plus, XCircle } from "lucide-react";
+import { AlertTriangle, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, MoveRight, Pencil, Plus, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { MarcaId } from "@/lib/instagram";
 import { cn } from "@/lib/utils";
 import { ESTADOS_CALENDARIO, ESTILO_TONO, LEYENDA_CALENDARIO } from "@/components/instagram/estados";
@@ -253,6 +254,10 @@ export function CalendarioInstagram({
 }: CalendarioInstagramProps) {
   const [nodo, setNodo] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(nodo, altoMinimo);
+  // Móvil (12/11/2026): sin alto fijo (siete filas de día no caben apretadas: la pestaña hace scroll) y la leyenda
+  // de estados plegada tras un botón «Filtros».
+  const esMovil = useIsMobile();
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
   const [vista, setVista] = useState<VistaCalendario>(() => vistaPorDefecto(vistaInicial));
   const [dia, setDia] = useState(() => diaInicial ?? hoyMadrid());
   const [elegido, setElegido] = useState(() => diaInicial ?? hoyMadrid());
@@ -315,7 +320,7 @@ export function CalendarioInstagram({
   );
 
   return (
-    <div ref={setNodo} className={cn("flex min-h-0 flex-col gap-2", className)} style={alto ? { height: alto } : undefined} data-testid="calendario-instagram">
+    <div ref={setNodo} className={cn("flex min-h-0 flex-col gap-2", className)} style={alto && !esMovil ? { height: alto } : undefined} data-testid="calendario-instagram">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <div className="flex items-center gap-1">
           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setDia((d) => moverVista(vista, d, -1))} aria-label={vista === "semana" ? "Semana anterior" : "Mes anterior"}>
@@ -341,7 +346,26 @@ export function CalendarioInstagram({
         </h3>
         {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Cargando" />}
         {!isLoading && !error && total === 0 && ocultos.size === 0 && <span className="text-xs text-muted-foreground">Nada programado ni publicado en estas fechas.</span>}
-        <div role="group" aria-label="Filtrar por estado" className="ml-auto flex flex-wrap items-center gap-1" data-testid="leyenda-calendario">
+        {esMovil && (
+          <button
+            type="button"
+            onClick={() => setFiltrosAbiertos((a) => !a)}
+            aria-expanded={filtrosAbiertos}
+            aria-controls="leyenda-calendario"
+            className="ml-auto inline-flex h-12 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            data-testid="filtros-calendario"
+          >
+            Filtros{ocultos.size > 0 ? ` (${ocultos.size} ocultos)` : ""}
+            <ChevronDown aria-hidden="true" className={cn("h-4 w-4 transition-transform", filtrosAbiertos && "rotate-180")} />
+          </button>
+        )}
+        <div
+          id="leyenda-calendario"
+          role="group"
+          aria-label="Filtrar por estado"
+          className={cn("ml-auto flex flex-wrap items-center gap-1", esMovil && "order-last w-full gap-2", esMovil && !filtrosAbiertos && "hidden")}
+          data-testid="leyenda-calendario"
+        >
           {LEYENDA_CALENDARIO.map((l) => {
             const activo = !ocultos.has(l.id);
             return (
@@ -401,7 +425,7 @@ export function CalendarioInstagram({
                       setElegido(d);
                     }}
                     className={cn(
-                      "flex min-h-0 cursor-pointer flex-col border-b border-r p-1 last:border-r-0",
+                      "flex min-h-0 cursor-pointer flex-col border-b border-r p-1 last:border-r-0 max-sm:min-h-14",
                       vista === "mes" && "min-h-[4.5rem]",
                       fuera && "bg-muted/30 text-muted-foreground",
                       pasado && !fuera && "bg-muted/10",
@@ -411,6 +435,7 @@ export function CalendarioInstagram({
                     <div className="mb-1 flex shrink-0 items-center gap-1 text-xs">
                       <button
                         type="button"
+                        data-compacto
                         onClick={() => setElegido(d)}
                         aria-label={`Ver el ${textoDiaLargo(d)}`}
                         aria-pressed={sel}

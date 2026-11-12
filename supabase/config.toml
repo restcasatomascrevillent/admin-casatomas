@@ -102,6 +102,11 @@ verify_jwt = false
 [functions.facturas-originales-drive]
 verify_jwt = false
 
+# facturas-original: el original de Drive de una factura, servido con la cuenta
+# del restaurante para la ficha del panel (JWT + «Ver» en Facturas, lo comprueba ella).
+[functions.facturas-original]
+verify_jwt = true
+
 # clasificar-productos: la llama el cron «clasificar-productos» por pg_net (sin
 # JWT) con la cabecera x-ocr-secret == OCR_TRABAJOS_SECRET (mismo secreto y
 # mismo valor de Vault que ocr-trabajo), y el botón de Facturas › Productos con

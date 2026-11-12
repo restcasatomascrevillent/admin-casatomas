@@ -97,6 +97,16 @@ describe("estadoMesaServicio", () => {
     expect(out.minutos).toBe(15);
   });
 
+  it("otro día no hay retraso (12/11/2026: el sábado 14, con el reloj a las 16:19, la de las 13:30 salía «+169 min»)", () => {
+    const res = reserva({ hora: "13:30:00", estado: "confirmada" });
+    const ahora = new Date("2026-11-12T16:19:00");
+    const sabado = estadoMesaServicio("m1", [asignacion("m1", "r1")], [res], "comida", ahora, config, "2026-11-14");
+    expect(sabado.estado).toBe("reservada");
+    expect(sabado.minutos).toBeNull();
+    // Hoy, sí.
+    expect(estadoMesaServicio("m1", [asignacion("m1", "r1")], [res], "comida", ahora, config, "2026-11-12").estado).toBe("retrasada");
+  });
+
   it("ocupada: llegó y no ha pasado la estancia de cena (120 min)", () => {
     const res = reserva({ estado: "completada", llegada_at: "2026-09-26T20:00:00" });
     const ahora = new Date("2026-09-26T21:30:00"); // +90 min
