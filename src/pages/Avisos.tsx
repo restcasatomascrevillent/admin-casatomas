@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
 const ALTURA_MINIMA_AVISOS = 380;
 
 export default function Avisos() {
-  const [filtro, setFiltro] = useState<FiltroAvisos>("todos");
+  // Por defecto, los sin revisar (12/11/2026, petición del dueño).
+  const [filtro, setFiltro] = useState<FiltroAvisos>("sin_leer");
   const { avisos, loading, cargandoMas, hayMas, error, cargarMas, marcarLeida, marcarTodasLeidas } =
     useHistorialAvisos(filtro);
   // «Ver» en una reserva abre su ficha en un modal (11/11/2026); lo demás, su origen.
