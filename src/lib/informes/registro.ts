@@ -161,8 +161,8 @@ export const INFORMES: DefinicionInforme[] = [
   facturas("facturas-gasto-familia", "familias", "Gasto por familia", "La base sin IVA de las líneas de compra de cada familia de productos en el periodo."),
   facturas("facturas-gasto-mes", "gasto_mes", "Gasto por mes", "El gasto con IVA de cada mes del periodo, de Casa Tomás y de Touza."),
   facturas("facturas-productos", "productos", "Productos más comprados", "Los productos en los que más se ha gastado en el periodo (base sin IVA de sus líneas)."),
-  cartaFacturas("vinos", "Vinos: facturas y carta", "Todos los vinos: precio en carta, última compra en facturas (precio y fecha), si están activos y si tienen foto."),
-  cartaFacturas("platos", "Platos: facturas y carta", "Todos los platos: precio en carta, última compra de su ingrediente principal, si están activos y si tienen foto."),
+  cartaFacturas("vinos", "Vinos: facturas y carta", "Todos los vinos: precio en carta, última compra en facturas (precio y fecha), margen de beneficio, si están activos y si tienen foto."),
+  cartaFacturas("platos", "Platos: facturas y carta", "Todos los platos: precio en carta, última compra de su ingrediente principal (o «Falta el escandallo»), si están activos y si tienen foto."),
   {
     id: "carta-vino-favorito",
     titulo: "Votación del vino favorito",
