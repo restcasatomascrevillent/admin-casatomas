@@ -187,6 +187,7 @@ export function PestanasPagina({
   className,
 }: PestanasPaginaProps) {
   const tonos = nivel === 2 ? TONO_CONTADOR_NIVEL_2 : TONO_CONTADOR;
+  const enRejillaMovil = !soloIconosEnMovil && pestanas.length >= 4;
   const { ref, bordes } = useBordesScroll();
   const debajo = accionesDebajoEnMovil ? DEBAJO[accionesDebajoEnMovil === true ? "sm" : accionesDebajoEnMovil] : null;
   const degradado = "pointer-events-none absolute inset-y-0 z-10 w-10 from-background via-background/70 to-transparent";
@@ -210,6 +211,12 @@ export function PestanasPagina({
         <TabsList
           className={cn(
             "flex h-auto w-full justify-start gap-1 rounded-none bg-transparent p-0 pb-1.5 sm:w-auto pointer-coarse:min-h-11",
+            // Móvil (12/11/2026, dueño: «no me hagas más cagadas»): las pestañas NUNCA se cortan ni quedan tapadas por
+            // un degradado: si no caben, bajan a otra fila. Desde 640 px, una fila con scroll como siempre.
+            "max-sm:flex-wrap max-sm:overflow-visible",
+            // Con 4 o más, en el móvil van de dos en dos (rejilla pareja; antes 3 + 1 con la última suelta a lo ancho).
+            // Si son impares, la última ocupa la fila entera.
+            enRejillaMovil && "max-sm:grid max-sm:grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2",
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           )}
         >

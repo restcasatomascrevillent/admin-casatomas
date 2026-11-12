@@ -43,6 +43,8 @@ export function GastoIaPestana({ className = "" }: { className?: string }) {
         >
           {estadoTope.nivel !== "ok" && <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
           <span className="whitespace-nowrap">
+            {/* En el móvil, «IA ·» delante: un importe suelto no se entendía (12/11/2026, captura del dueño). */}
+            <span className="sm:hidden">IA · </span>
             {importe}
             {sufijo && <span className="hidden sm:inline">{sufijo}</span>}
           </span>

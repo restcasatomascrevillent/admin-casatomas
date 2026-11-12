@@ -230,7 +230,9 @@ const Facturas = () => {
                 {soloLectura && <EtiquetaSoloLectura />}
                 {/* Avisos de facturas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral).
                     Son de lo comprado (precios, documentos): solo para quien consulta Facturas. */}
-                <div className={cn("ml-auto flex items-center gap-2 sm:order-none sm:ml-0", barraUnica ? "order-4" : "order-2")}>
+                {/* 12/11/2026 (móvil): el gasto de IA, Avisos y Ayuda juntos a la derecha. Antes había dos `ml-auto` y el
+                    importe quedaba suelto en medio de la fila. */}
+                <div className={cn("flex items-center gap-2 sm:order-none sm:ml-0", barraUnica ? "order-4 ml-auto" : "order-2")}>
                   {permisos.consultar && <BotonAvisosSeccion seccion="facturas" compacto={barraUnica} />}
                   <BotonAyuda seccion="facturas" />
                 </div>

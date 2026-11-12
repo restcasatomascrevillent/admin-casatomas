@@ -507,10 +507,13 @@ html {
   font-size: 1.0625rem;
   line-height: 1.625rem;
 }
-.carta-contraste [role="tab"],
-.carta-contraste [role="tab"] span {
-  font-size: 1rem;
-  line-height: 1.5rem;
+/* Solo desde 640 px (12/11/2026): en el móvil, a 16 px las pestañas de la Carta no cabían y se cortaban. */
+@media (min-width: 640px) {
+  .carta-contraste [role="tab"],
+  .carta-contraste [role="tab"] span {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
 }
 .carta-contraste h3.text-lg {
   font-size: 1.125rem;
@@ -581,4 +584,23 @@ body:has([data-dialogo-nueva-reserva]) [data-sonner-toaster][data-x-position="ri
 }
 .rrss-movil input[type="range"] {
   min-height: 3rem;
+}
+
+/* Campos de fecha y hora en el iPhone (12/11/2026, captura del dueño en Cheques): Safari les da un ancho mínimo
+   propio (se salían por la derecha) y un alto mayor que el resto. Ocupan su caja, como los demás campos. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"] {
+  min-width: 0;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.25em;
 }

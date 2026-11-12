@@ -107,17 +107,18 @@ export function ListaTickets() {
         </div>
       </CardHeader>
       <CardContent className="p-4 sm:p-5 space-y-3">
-        <form role="search" className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,2fr)_repeat(4,minmax(0,1fr))_auto] items-end" onSubmit={e => e.preventDefault()}>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Buscar<Input type="search" aria-label="Buscar tickets por código o comprador" placeholder="Código, comprador, email o teléfono…" value={texto} onChange={e => { setTexto(e.target.value); setPagina(0); }} className="h-10 pointer-coarse:h-11" /></label>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Estado<select aria-label="Filtrar por estado" value={estado} onChange={e => { setEstado(e.target.value); setPagina(0); }} className="h-10 pointer-coarse:h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
+        {/* Móvil (12/11/2026, captura del dueño): en dos columnas (Estado | Ordenar, Desde | Hasta) y no un campo debajo de otro. */}
+        <form role="search" className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-[minmax(12rem,2fr)_repeat(4,minmax(0,1fr))_auto] items-end" onSubmit={e => e.preventDefault()}>
+          <label className="col-span-2 grid min-w-0 gap-1 text-xs font-medium xl:col-span-1">Buscar<Input type="search" aria-label="Buscar tickets por código o comprador" placeholder="Código, comprador, email o teléfono…" value={texto} onChange={e => { setTexto(e.target.value); setPagina(0); }} className="h-10 pointer-coarse:h-11" /></label>
+          <label className="grid min-w-0 gap-1 text-xs font-medium max-sm:order-1">Estado<select aria-label="Filtrar por estado" value={estado} onChange={e => { setEstado(e.target.value); setPagina(0); }} className="h-10 pointer-coarse:h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
             <option value="todos">Todos</option><option value="disponible">Disponibles</option><option value="canjeado">Canjeados</option><option value="caducado">Caducados</option><option value="cancelado">Cancelados</option>
           </select></label>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Desde<Input aria-label="Fecha desde" type="date" value={desde} max={hasta || undefined} onChange={e => { setDesde(e.target.value); setPagina(0); }} className="h-10 min-w-0" /></label>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Hasta<Input aria-label="Fecha hasta" type="date" value={hasta} min={desde || undefined} onChange={e => { setHasta(e.target.value); setPagina(0); }} className="h-10 min-w-0" /></label>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Ordenar por<select aria-label="Ordenar tickets" value={orden} onChange={e => { setOrden(e.target.value); setPagina(0); }} className="h-10 pointer-coarse:h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
+          <label className="grid min-w-0 gap-1 text-xs font-medium max-sm:order-3">Desde<Input aria-label="Fecha desde" type="date" value={desde} max={hasta || undefined} onChange={e => { setDesde(e.target.value); setPagina(0); }} className="h-10 min-w-0 pointer-coarse:h-11" /></label>
+          <label className="grid min-w-0 gap-1 text-xs font-medium max-sm:order-4">Hasta<Input aria-label="Fecha hasta" type="date" value={hasta} min={desde || undefined} onChange={e => { setHasta(e.target.value); setPagina(0); }} className="h-10 min-w-0 pointer-coarse:h-11" /></label>
+          <label className="grid min-w-0 gap-1 text-xs font-medium max-sm:order-2">Ordenar por<select aria-label="Ordenar tickets" value={orden} onChange={e => { setOrden(e.target.value); setPagina(0); }} className="h-10 pointer-coarse:h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
             <option value="fecha_desc">Más recientes</option><option value="fecha_asc">Más antiguos</option><option value="importe_asc">Importe: menor a mayor</option><option value="importe_desc">Importe: mayor a menor</option><option value="comprador_asc">Comprador: A–Z</option><option value="comprador_desc">Comprador: Z–A</option><option value="caducidad_asc">Caducidad: más próxima</option><option value="caducidad_desc">Caducidad: más lejana</option>
           </select></label>
-          {hayFiltros && <Button type="button" variant="outline" className="h-10 pointer-coarse:h-11" onClick={limpiar}>Limpiar</Button>}
+          {hayFiltros && <Button type="button" variant="outline" className="col-span-2 h-10 pointer-coarse:h-11 max-sm:order-5 xl:col-span-1" onClick={limpiar}>Limpiar</Button>}
         </form>
         {fechasInvalidas && <p role="alert" className="text-sm text-destructive">La fecha inicial no puede ser posterior a la final.</p>}
         {cargando && datos && <span role="status" className="sr-only">Filtrando tickets…</span>}

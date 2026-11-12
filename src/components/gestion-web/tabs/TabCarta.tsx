@@ -384,8 +384,10 @@ export default function TabCarta() {
         ) : (
           <>
             {/* Filtros */}
+            {/* Móvil (12/11/2026, captura del dueño): el buscador a todo lo ancho y, debajo, categoría y visibilidad en
+                una fila (antes, cada uno en la suya y «Ordenar» en otra: media pantalla de filtros). */}
             <div className="flex flex-wrap items-center gap-2" data-tour="gw-carta-filtros">
-              <div className="relative min-w-[200px] flex-1">
+              <div className="relative min-w-[200px] flex-1 max-sm:basis-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por nombre o descripción..."
@@ -408,7 +410,7 @@ export default function TabCarta() {
               {seccionActiva !== "vinos" && actual.categorias.length > 0 && (
                 <Select value={actual.categoria} onValueChange={actual.setCategoria} disabled={hayBusqueda}>
                   <SelectTrigger
-                    className="w-full sm:w-[180px] lg:w-[220px] bg-background"
+                    className="min-w-0 flex-1 basis-[calc(50%-0.25rem)] bg-background sm:w-[180px] sm:flex-none sm:basis-auto lg:w-[220px]"
                     aria-label="Categoría"
                     title={hayBusqueda ? "La búsqueda incluye todas las categorías" : undefined}
                   >
@@ -425,7 +427,7 @@ export default function TabCarta() {
               )}
 
               <Select value={filtroEstado} onValueChange={(value) => setFiltroEstado(value as FiltroEstado)}>
-                <SelectTrigger className="w-full sm:w-[200px] bg-background" aria-label="Filtrar visibilidad">
+                <SelectTrigger className="min-w-0 flex-1 basis-[calc(50%-0.25rem)] bg-background sm:w-[200px] sm:flex-none sm:basis-auto" aria-label="Filtrar visibilidad">
                   <SelectValue>{ETIQUETAS_FILTRO_ESTADO[filtroEstado]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>

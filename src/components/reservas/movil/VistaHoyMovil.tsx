@@ -210,7 +210,7 @@ export function VistaHoyMovil({
   const [sentandoId, setSentandoId] = useState<string | null>(null);
   const minutoAhora = useMinutoAhora();
   useAlDiaMovil();
-  const { marcarLlegada } = useAccionesServicioReserva();
+  const { marcarLlegada, aceptar, estaEnCurso } = useAccionesServicioReserva();
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
 
   const { data: espacios } = useEspaciosReserva();
@@ -310,9 +310,26 @@ export function VistaHoyMovil({
         onSentar={puedeEditar && !extra.sentada ? () => void sentarDesdeFila(reserva, decision) : undefined}
         mesaPrevistaOcupada={nombresMesa.length > 0 && decision.tipo === "elegir"}
         sentando={sentandoId === reserva.id}
-        // «Sentar fuera» (10/11/2026): el botón azul, junto a «Sentar». Solo con «Editar».
+        // «Sentar fuera» (10/11/2026): el botón azul, junto a «Sentar». Solo con «Editar». Si está PENDIENTE, en su lugar
+        // «Verificar» en verde (12/11/2026, como en la lista de tablet y escritorio).
         sentarFuera={
-          puedeEditar && !extra.sentada ? <BotonSentarFuera reserva={reserva} variante="fila" disabled={sentandoId === reserva.id} /> : undefined
+          puedeEditar && !extra.sentada ? (
+            reserva.estado === "pendiente" ? (
+              <Button
+                type="button"
+                className="pointer-events-auto h-14 w-[4.5rem] shrink-0 flex-col gap-0.5 bg-emerald-600 px-0 text-xs font-semibold leading-tight text-white hover:bg-emerald-700 pointer-coarse:h-14 pointer-coarse:px-0"
+                disabled={estaEnCurso(reserva.id)}
+                onClick={() => void aceptar(reserva as unknown as Parameters<typeof aceptar>[0])}
+                aria-label={`Verificar la reserva de ${reserva.nombre || "Sin nombre"}`}
+                data-testid="verificar-fila-movil"
+              >
+                <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+                Verificar
+              </Button>
+            ) : (
+              <BotonSentarFuera reserva={reserva} variante="fila" disabled={sentandoId === reserva.id} />
+            )
+          ) : undefined
         }
       />
     );
@@ -367,14 +384,16 @@ export function VistaHoyMovil({
           value={vista}
           onValueChange={(v) => (v === "reservas" || v === "mesas") && setVista(v)}
           variant="outline"
+          // 12/11/2026 (captura del dueño a 412 px: «Reservas» y «Mesas» se pisaban): «Lista | Mesas», que caben desde 390 px (con el turno entero, «Comida», al lado);
+          // por debajo, solo los iconos.
           className="grid min-w-0 flex-1 grid-cols-2 max-[389px]:flex-none max-[389px]:grid-cols-[2.75rem_2.75rem] max-[389px]:gap-0.5"
           aria-label="Ver reservas o mesas"
         >
           {/* Con el botón del menú en la fila, a menos de 390 px el texto no cabe: solo el icono (el nombre
               sigue para el lector de pantalla). */}
-          <ToggleGroupItem value="reservas" aria-label="Reservas" className="h-11 min-w-11 px-1 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11 pointer-coarse:px-1">
+          <ToggleGroupItem value="reservas" aria-label="Lista de reservas" className="h-11 min-w-11 px-1 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11 pointer-coarse:px-1">
             <List className="h-5 w-5 min-[390px]:hidden" aria-hidden="true" />
-            <span className="hidden min-[390px]:inline">Reservas</span>
+            <span className="hidden min-[390px]:inline">Lista</span>
           </ToggleGroupItem>
           <ToggleGroupItem value="mesas" aria-label="Mesas" className="h-11 min-w-11 px-1 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11 pointer-coarse:px-1">
             <LayoutGrid className="h-5 w-5 min-[390px]:hidden" aria-hidden="true" />
@@ -382,7 +401,7 @@ export function VistaHoyMovil({
           </ToggleGroupItem>
         </ToggleGroup>
         <Select value={filtroTurno} onValueChange={(v) => setFiltroTurno(v as FiltroTurnoHoy)}>
-          <SelectTrigger className="h-11 w-[4.75rem] shrink-0 gap-1 px-2 text-sm min-[390px]:w-[5.5rem] [&>svg]:shrink-0" aria-label="Turno">
+          <SelectTrigger className="h-11 w-[5.5rem] shrink-0 gap-1 px-2 text-sm [&>svg]:shrink-0" aria-label="Turno">
             <SelectValue>{ETIQUETA_TURNO[filtroTurno]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -402,10 +421,9 @@ export function VistaHoyMovil({
         >
           <Search className="h-5 w-5" aria-hidden="true" />
         </Button>
-        <BotonSentarSinReserva soloIcono className="shrink-0" />
         {/* Avisos también en el móvil (11/11/2026, petición del dueño: «para que se vea el botón de avisos»). Solo
             dentro del panel de verdad (con menú lateral); en las pruebas sueltas no se pinta. */}
-        {hayMenu && <BotonAvisosSeccion seccion="reservas" className="h-11 px-2.5" />}
+        {hayMenu && <BotonAvisosSeccion seccion="reservas" className="h-11 gap-1 px-2" />}
       </div>
       )}
       {/* «Pendientes» también en el móvil (12/11/2026, petición del dueño): reloj y número junto a «Cerrar comida / Cerrar
@@ -413,6 +431,8 @@ export function VistaHoyMovil({
       {!columna && (
         <div className="flex shrink-0 items-center gap-1.5" data-testid="hoy-movil-servicios">
           <BotonPendientes compacto className="shrink-0" />
+          {/* «Sin reserva» baja aquí (12/11/2026): arriba no cabía junto a «Lista | Mesas». */}
+          <BotonSentarSinReserva soloIcono className="shrink-0" />
           <InterruptoresServiciosOnline fecha={fecha} compacta className="min-w-0 flex-1" />
         </div>
       )}
@@ -575,7 +595,6 @@ export function FilaReservaMovil({
   reserva,
   nombresMesa,
   terminada,
-  tarde,
   sala,
   onAbrir,
   onSentar,
@@ -587,6 +606,7 @@ export function FilaReservaMovil({
   nombresMesa: string[];
   /** Ya sentada: «En mesa 9» y sin botón. */
   terminada: boolean;
+  /** Ya no se pinta (12/11/2026: sin «Tarde», solo el estado); se acepta para no romper a quien lo pasa. */
   tarde?: boolean;
   /** Nombre de la sala, junto a la mesa. */
   sala?: string;
@@ -609,7 +629,8 @@ export function FilaReservaMovil({
   const fijada = !!reserva.mesa_fijada && nombresMesa.length > 0;
   const notas = (reserva.notas_cliente ?? "").trim();
   return (
-    <li className="relative">
+    // Pendientes con fondo naranja translúcido (12/11/2026), como en la lista de tablet y escritorio.
+    <li className={cn("relative", reserva.estado === "pendiente" && !terminada && "bg-orange-500/15 dark:bg-orange-400/15")}>
       <button
         type="button"
         onClick={onAbrir}
@@ -688,11 +709,8 @@ export function FilaReservaMovil({
         {/* Estado y menús en su propia línea, a todo lo ancho (10/11/2026): al lado de «Sentar» y «Fuera» cada
             insignia se iba a una línea y la fila crecía mucho a 375 px. */}
         <div className="flex flex-wrap items-center gap-1.5 empty:hidden" data-testid="insignias-fila">
-          {tarde ? (
-            <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">Tarde</span>
-          ) : (
-            info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
-          )}
+          {/* Sin «Tarde» (12/11/2026, petición del dueño): solo el estado (pendiente, verificada o confirmada). */}
+          {info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>}
           <InsigniaMenuDelDia reserva={reserva} />
           <InsigniaMenuCerrado reserva={reserva} />
           <InsigniaZona reserva={reserva} />
@@ -1516,7 +1534,8 @@ function FilaCandidataMesa({
   disabled: boolean;
   onSentar: () => void;
 }) {
-  const { reserva: r, situacion, textoSituacion, noCaben, retrasada } = candidata;
+  // Sin «Tarde» (12/11/2026, petición del dueño): `retrasada` solo ordena, ya no se pinta.
+  const { reserva: r, situacion, textoSituacion, noCaben } = candidata;
   const notas = (r.notas_cliente ?? "").trim();
   const alergia = tieneAlergia(notas);
   return (
@@ -1541,7 +1560,6 @@ function FilaCandidataMesa({
             {(situacion === "fijada" || textoSituacion.startsWith("Fijada")) && <Lock className="h-3.5 w-3.5" aria-label="Mesa fijada" />}
             {textoSituacion}
           </span>
-          {retrasada && <span className="rounded-full bg-red-600 px-1.5 text-white">Tarde</span>}
           {noCaben && (
             <span className="rounded-full bg-amber-100 px-1.5 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200" data-testid="aviso-no-caben">
               Son {r.numero_comensales} · mesa de {plazasMesa}
