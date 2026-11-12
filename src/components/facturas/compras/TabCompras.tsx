@@ -674,11 +674,28 @@ export function TabCompras({
                 ))}
               </span>
             </div>
-            <div role="group" aria-label="Periodo" className="flex shrink-0 items-center gap-2 max-sm:shrink max-sm:items-start">
+            <div role="group" aria-label="Periodo" className="flex shrink-0 items-center gap-2 max-sm:shrink">
               <span className="shrink-0 text-xs font-medium text-muted-foreground" aria-hidden="true">
                 Periodo
               </span>
-              <span className={`${PISTA_SEGMENTOS} max-sm:h-auto max-sm:min-w-0 max-sm:shrink max-sm:flex-wrap`}>
+              {/* Móvil (12/11/2026, captura del dueño): un desplegable; los cinco botones se partían en dos filas con
+                  «Todo» descolgado dentro de la pastilla gris. Desde 640 px, los botones de siempre. */}
+              <select
+                aria-label="Periodo"
+                value={periodo.tipo === "mes" ? "mes" : periodo.tipo}
+                onChange={(e) => {
+                  if (e.target.value !== "mes") elegirPeriodo({ tipo: e.target.value as (typeof PERIODOS)[number]["valor"] });
+                }}
+                className="h-11 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm sm:hidden"
+              >
+                {PERIODOS.map((p) => (
+                  <option key={p.valor} value={p.valor}>
+                    {p.etiqueta}
+                  </option>
+                ))}
+                {mesElegido && <option value="mes">{etiquetaMes(mesElegido)}</option>}
+              </select>
+              <span className={`${PISTA_SEGMENTOS} max-sm:hidden`}>
                 {PERIODOS.map((p) => (
                   <button
                     key={p.valor}

@@ -67,7 +67,7 @@ export function BotonPendientes({
         <span className={clasesNumeroPendientes(n)}>{n}</span>
       </Button>
       <Dialog open={abierto} onOpenChange={setAbierto}>
-        <DialogContent className="flex max-h-[90dvh] max-w-3xl flex-col gap-3">
+        <DialogContent className="flex max-h-[90dvh] max-w-3xl flex-col gap-3 max-sm:p-4">
           <DialogHeader>
             <DialogTitle>Pendientes de verificar</DialogTitle>
             <DialogDescription>Desde hoy. «Verificar» la verifica y avisa al cliente; toca la reserva para ver su ficha, cancelarla o editarla.</DialogDescription>

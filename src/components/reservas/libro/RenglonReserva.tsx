@@ -47,10 +47,17 @@ export function RenglonReserva({ reserva: r, sala, resaltada = false, conTelefon
       <span className="font-semibold tabular-nums">{hora}</span>
       <span className="min-w-0">
         <span className="block break-words font-medium leading-snug">{r.nombre || "Sin nombre"}</span>
-        {debajo ? <span className="block truncate text-sm text-muted-foreground tabular-nums">{debajo}</span> : null}
+        {/* Sin estado (lista de «Pendientes» con «Verificar»), en el móvil las personas van aquí debajo: así el nombre tiene
+            sitio y no se parte letra a letra (12/11/2026, revisión móvil). */}
+        {sinEstado ? (
+          <span className="block truncate text-sm text-muted-foreground tabular-nums sm:hidden">
+            {[`${r.numero_comensales} px`, debajo].filter(Boolean).join(" · ")}
+          </span>
+        ) : null}
+        {debajo ? <span className={cn("block truncate text-sm text-muted-foreground tabular-nums", sinEstado && "max-sm:hidden")}>{debajo}</span> : null}
         {r.notas_cliente ? <span className="block truncate text-sm text-amber-800 dark:text-amber-300">{r.notas_cliente}</span> : null}
       </span>
-      <span className="justify-self-end rounded-md border px-2 py-0.5 text-sm font-semibold tabular-nums">{r.numero_comensales} px</span>
+      <span className={cn("justify-self-end rounded-md border px-2 py-0.5 text-sm font-semibold tabular-nums", sinEstado && "max-sm:hidden")}>{r.numero_comensales} px</span>
       <span className="hidden truncate text-sm text-muted-foreground sm:block">{sala ?? "—"}</span>
       {!sinEstado && (
         <span className="flex justify-end">
@@ -66,7 +73,7 @@ export function RenglonReserva({ reserva: r, sala, resaltada = false, conTelefon
   const clases = cn(
     "grid min-h-14 w-full min-w-0 items-center gap-x-3 px-3 py-2 text-left text-base",
     sinEstado
-      ? "grid-cols-[3.25rem_minmax(0,1fr)_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_4rem_8rem]"
+      ? "grid-cols-[3.25rem_minmax(0,1fr)] sm:grid-cols-[3.5rem_minmax(0,1fr)_4rem_8rem]"
       : "grid-cols-[3.25rem_minmax(0,1fr)_auto_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_4rem_8rem_7rem]",
   );
   return (
