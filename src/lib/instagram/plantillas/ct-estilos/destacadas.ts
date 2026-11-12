@@ -11,7 +11,7 @@
  * Cualquier otro nombre lleva el medallón del logo.
  */
 import { esc, type ContextoPlantilla, type DatosPieza, type Plantilla } from "../../tipos.js";
-import { CSS_BASE, SANS, fuentes, type Cara } from "./base.js";
+import { CSS_BASE, MONT, fuentes, type Cara } from "./base.js";
 
 export type IconoDestacada = "opinais" | "tapas" | "platos" | "vosotros" | "touza";
 
@@ -43,7 +43,7 @@ export function iconoPara(nombre: string): IconoDestacada | null {
   return null;
 }
 
-export const CARAS_DESTACADA: readonly Cara[] = ["sans-400"];
+export const CARAS_DESTACADA: readonly Cara[] = ["mont-400"];
 
 function html(datos: DatosPieza, ctx: ContextoPlantilla): string {
   const icono = iconoPara(datos.titular);
@@ -55,7 +55,7 @@ function html(datos: DatosPieza, ctx: ContextoPlantilla): string {
 .ctsd__circulo{position:absolute;left:50%;top:960px;width:600px;height:600px;margin:-300px 0 0 -300px;border:5px solid var(--color-oro);border-radius:50%;display:flex;align-items:center;justify-content:center}
 .ctsd__icono{width:350px;height:350px;display:block}
 .ctsd__medallon{width:300px;height:300px;display:block}
-.ctsd__nombre{position:absolute;left:72px;right:72px;top:1350px;font-family:${SANS};font-weight:400;font-size:40px;line-height:1.3;letter-spacing:.3em;padding-left:.3em;text-transform:uppercase;text-align:center;white-space:nowrap;color:var(--color-oro-claro)}
+.ctsd__nombre{position:absolute;left:72px;right:72px;top:1350px;font-family:${MONT};font-weight:400;font-size:40px;line-height:1.3;letter-spacing:.3em;padding-left:.3em;text-transform:uppercase;text-align:center;white-space:nowrap;color:var(--color-oro-claro)}
 </style>
 <div class="cts ctsd cts--story">
   <div class="ctsd__circulo">${dentro}</div>

@@ -328,16 +328,16 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
   // 12/11/2026). Al FINAL a propósito: plantillaPara devuelve la primera que encaja, y tienen
   // que seguir saliendo ct-portada, ct-plato, ct-cierre y sus «-marco».
   { id: "ct-rotulo-hilo", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 40, cita: 60 }, formatos: ["post", "story"], conFoto: true, encaje: "sangre", papel: "plato", campanas: true },
-  { id: "ct-rotulo-recuadro", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 32, cita: 70 }, formatos: ["post", "story"], conFoto: true, encaje: "sangre", papel: "plato", campanas: true },
-  { id: "ct-rotulo-titular", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 28, cita: 40 }, formatos: ["post", "story"], conFoto: true, encaje: "sangre", papel: "portada", campanas: true },
-  { id: "ct-rotulo-manuscrita", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 26, cita: 22 }, formatos: ["post", "story"], conFoto: true, encaje: "sangre", papel: "plato", campanas: true },
-  { id: "ct-resena", marca: "casa-tomas", campos: ["antetitulo", "titular", "cita"], limites: { antetitulo: 32, titular: 34, cita: 560 }, titularOpcional: true, formatos: ["post", "story"], conFoto: false, papel: "tipografica", campanas: false },
-  { id: "ct-resena-foto", marca: "casa-tomas", campos: ["antetitulo", "titular", "cita"], limites: { antetitulo: 32, titular: 34, cita: 560 }, titularOpcional: true, formatos: ["post", "story"], conFoto: true, encaje: "marco", papel: "portada", campanas: false },
-  { id: "ct-vosotros-celebracion", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 48, cita: 56 }, formatos: ["story"], conFoto: true, encaje: "marco", papel: "portada", campanas: false },
-  { id: "ct-vosotros-gracias", marca: "casa-tomas", campos: ["titular", "pie"], limites: { titular: 34, pie: 32 }, formatos: ["story"], conFoto: true, encaje: "marco", papel: "portada", campanas: false },
-  { id: "ct-reserva-mesa", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 16, cita: 32 }, formatos: ["story"], conFoto: true, encaje: "sangre", papel: "cierre", campanas: true },
-  { id: "ct-touza-descubre", marca: "casa-tomas", campos: ["titular", "cita", "pie"], limites: { titular: 22, cita: 60, pie: 34 }, formatos: ["story"], conFoto: true, encaje: "sangre", papel: "portada", campanas: true },
-  { id: "ct-tapas-poster", marca: "casa-tomas", campos: ["antetitulo", "titular", "pie"], limites: { antetitulo: 14, titular: 20, pie: 22 }, formatos: ["story"], conFoto: true, encaje: "sangre", papel: "portada", campanas: true },
+  { id: "ct-rotulo-recuadro", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 22, cita: 70 }, formatos: ["post", "story"], conFoto: true, encaje: "sangre", papel: "plato", campanas: true },
+  { id: "ct-rotulo-titular", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 28, cita: 50 }, formatos: ["post", "story"], conFoto: true, encaje: "sangre", papel: "portada", campanas: true },
+  { id: "ct-rotulo-manuscrita", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 18, cita: 12 }, formatos: ["post", "story"], conFoto: true, encaje: "sangre", papel: "plato", campanas: true },
+  { id: "ct-resena", marca: "casa-tomas", campos: ["antetitulo", "titular", "cita"], limites: { antetitulo: 28, titular: 34, cita: 560 }, titularOpcional: true, formatos: ["post", "story"], conFoto: false, papel: "tipografica", campanas: false },
+  { id: "ct-resena-foto", marca: "casa-tomas", campos: ["antetitulo", "titular", "cita"], limites: { antetitulo: 28, titular: 34, cita: 560 }, titularOpcional: true, formatos: ["post", "story"], conFoto: true, encaje: "marco", papel: "portada", campanas: false },
+  { id: "ct-vosotros-celebracion", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 48, cita: 40 }, formatos: ["story"], conFoto: true, encaje: "marco", papel: "portada", campanas: false },
+  { id: "ct-vosotros-gracias", marca: "casa-tomas", campos: ["titular", "pie"], limites: { titular: 24, pie: 32 }, formatos: ["story"], conFoto: true, encaje: "marco", papel: "portada", campanas: false },
+  { id: "ct-reserva-mesa", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 16, cita: 26 }, formatos: ["story"], conFoto: true, encaje: "sangre", papel: "cierre", campanas: true },
+  { id: "ct-touza-descubre", marca: "casa-tomas", campos: ["titular", "cita", "pie"], limites: { titular: 16, cita: 50, pie: 16 }, formatos: ["story"], conFoto: true, encaje: "sangre", papel: "portada", campanas: true },
+  { id: "ct-tapas-poster", marca: "casa-tomas", campos: ["antetitulo", "titular", "pie"], limites: { antetitulo: 10, titular: 16, pie: 16 }, formatos: ["story"], conFoto: true, encaje: "sangre", papel: "portada", campanas: true },
   { id: "ct-icono-destacada", marca: "casa-tomas", campos: ["titular"], limites: { titular: 18 }, formatos: ["story"], conFoto: false, papel: "tipografica", campanas: false },
 ];
 

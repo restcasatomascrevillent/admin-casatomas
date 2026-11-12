@@ -1,44 +1,73 @@
 /**
  * Piezas comunes de los estilos de las stories de Casa Tomás (12/11/2026):
- * fuentes extra (Montserrat, Great Vibes y Oswald, autoalojadas en
- * public/instagram/fuentes), velos locales y el CSS base.
+ * las fuentes de verdad de cada estilo, autoalojadas en public/instagram/
+ * fuentes (OFL, paquetes @fontsource 5.3.0, latin y latin-ext), y el CSS base.
  *
- * Por qué fuentes extra: lo que publican hoy (referencias-actuales/
- * CATALOGO-ESTILOS.md) va en mayúsculas finas de palo seco muy espaciadas
- * (Montserrat/Poppins) con una manuscrita como acento. El documento de una
- * pieza de Casa Tomás solo trae Libre Baskerville (tokens.ts → FUENTES), así
- * que cada plantilla declara las caras que usa, como ct-tapas-clasica. La
- * manuscrita (Great Vibes) y la condensada (Oswald 600) se añadieron a
- * public/instagram/fuentes el 12/11/2026 para parecerse a las de ahora; el
- * render del servidor las incluye con public/instagram/** (vercel.json).
+ * Fuentes identificadas comparando las originales a tamaño real
+ * (referencias-actuales/alta, medidas en MEDIDAS.md junto a este fichero):
+ *   IBM Plex Sans   rótulos con hilo, recuadro, caja «CON HELADO», @ del cliente
+ *   Spectral        subtítulo del recuadro («Disfruta de los mejores sabores»)
+ *   Sacramento      manuscrita de «Tarta de queso»
+ *   Anton al 78,5 % titular grande («ENSALADILLA», «TATAKI DE CHULETA»)
+ *   Poppins         título y nombre de la reseña
+ *   Montserrat      cuerpo de la reseña, subtítulos del titular, jueves
+ *   Amaranth        nombres y motivo de la celebración
+ *   DM Sans         «RESERVA MESA», «DESCUBRE TOUZA», «RESERVA TU MESA»
+ *   Old Standard TT «Gracias por visitarnos»
+ *   Great Vibes     «Tapas y cóctel» del póster del jueves
+ * El documento de una pieza de Casa Tomás solo trae Libre Baskerville
+ * (tokens.ts → FUENTES): cada plantilla declara las caras que usa. El render
+ * del servidor las incluye con public/instagram/** (vercel.json).
  */
 import { UNICODE_LATIN, UNICODE_LATIN_EXT } from "../../tokens.js";
 import { esc, type ContextoPlantilla } from "../../tipos.js";
 import { degradado } from "../comun.js";
 
-export type Cara = "sans-300" | "sans-400" | "sans-500" | "sans-600" | "manuscrita" | "condensada";
+interface DefCara {
+  familia: string;
+  carpeta: string;
+  peso: number;
+  estilo: "normal" | "italic";
+  /** false si la familia no trae latin-ext (Amaranth). */
+  ext?: boolean;
+}
 
-const FICHEROS: Record<Cara, { familia: string; peso: number; estilo: "normal" | "italic"; ruta: (r: string) => string }> = {
-  "sans-300": { familia: "CT Estilos Sans", peso: 300, estilo: "normal", ruta: (r) => `montserrat/montserrat-${r}-300-normal.woff2` },
-  "sans-400": { familia: "CT Estilos Sans", peso: 400, estilo: "normal", ruta: (r) => `montserrat/montserrat-${r}-400-normal.woff2` },
-  "sans-500": { familia: "CT Estilos Sans", peso: 500, estilo: "normal", ruta: (r) => `montserrat/montserrat-${r}-500-normal.woff2` },
-  "sans-600": { familia: "CT Estilos Sans", peso: 600, estilo: "normal", ruta: (r) => `montserrat/montserrat-${r}-600-normal.woff2` },
-  // Great Vibes (OFL, @fontsource/great-vibes 5.3.0): la más parecida a «Tapas y cóctel» y «Tarta de queso».
-  manuscrita: { familia: "CT Estilos Manuscrita", peso: 400, estilo: "normal", ruta: (r) => `great-vibes/great-vibes-${r}-400-normal.woff2` },
-  // Oswald 600 (OFL, @fontsource/oswald 5.3.0): la condensada gruesa de «ENSALADILLA» y «TATAKI DE CHULETA».
-  condensada: { familia: "CT Estilos Condensada", peso: 600, estilo: "normal", ruta: (r) => `oswald/oswald-${r}-600-normal.woff2` },
-};
+const CARAS = {
+  "plex-300": { familia: "CT Plex", carpeta: "ibm-plex-sans", peso: 300, estilo: "normal" },
+  "plex-500": { familia: "CT Plex", carpeta: "ibm-plex-sans", peso: 500, estilo: "normal" },
+  "poppins-400": { familia: "CT Poppins", carpeta: "poppins", peso: 400, estilo: "normal" },
+  "poppins-500": { familia: "CT Poppins", carpeta: "poppins", peso: 500, estilo: "normal" },
+  "mont-300": { familia: "CT Montserrat", carpeta: "montserrat", peso: 300, estilo: "normal" },
+  "mont-400": { familia: "CT Montserrat", carpeta: "montserrat", peso: 400, estilo: "normal" },
+  "mont-600": { familia: "CT Montserrat", carpeta: "montserrat", peso: 600, estilo: "normal" },
+  "mont-300i": { familia: "CT Montserrat", carpeta: "montserrat", peso: 300, estilo: "italic" },
+  anton: { familia: "CT Anton", carpeta: "anton", peso: 400, estilo: "normal" },
+  sacramento: { familia: "CT Sacramento", carpeta: "sacramento", peso: 400, estilo: "normal" },
+  spectral: { familia: "CT Spectral", carpeta: "spectral", peso: 500, estilo: "normal" },
+  oldstandard: { familia: "CT Old Standard", carpeta: "old-standard-tt", peso: 400, estilo: "normal" },
+  greatvibes: { familia: "CT Great Vibes", carpeta: "great-vibes", peso: 400, estilo: "normal" },
+  "dm-300": { familia: "CT DM Sans", carpeta: "dm-sans", peso: 300, estilo: "normal" },
+  amaranth: { familia: "CT Amaranth", carpeta: "amaranth", peso: 400, estilo: "normal", ext: false },
+} as const satisfies Record<string, DefCara>;
 
-/** Palo seco (Montserrat, la de las stories de ahora). */
-export const SANS = '"CT Estilos Sans", "Montserrat", sans-serif';
-/** La manuscrita de acento (Great Vibes). Una sola por pieza. */
-export const MANUSCRITA = '"CT Estilos Manuscrita", "Great Vibes", cursive';
-/** Condensada gruesa del titular grande (Oswald 600). */
-export const CONDENSADA = '"CT Estilos Condensada", "Oswald", sans-serif';
+export type Cara = keyof typeof CARAS;
 
-/** Caras @font-face que declara una pieza con estas fuentes (latin + latin-ext de cada una). */
+export const PLEX = '"CT Plex", "IBM Plex Sans", sans-serif';
+export const POPPINS = '"CT Poppins", "Poppins", sans-serif';
+export const MONT = '"CT Montserrat", "Montserrat", sans-serif';
+/** Anton estrechada al 78,5 % (scaleX): así miden «ENSALADILLA» y «TATAKI DE CHULETA». */
+export const ANTON = '"CT Anton", "Anton", sans-serif';
+export const ESTRECHO_ANTON = 0.785;
+export const SACRAMENTO = '"CT Sacramento", "Sacramento", cursive';
+export const SPECTRAL = '"CT Spectral", "Spectral", serif';
+export const OLD_STANDARD = '"CT Old Standard", "Old Standard TT", serif';
+export const GREAT_VIBES = '"CT Great Vibes", "Great Vibes", cursive';
+export const DM_SANS = '"CT DM Sans", "DM Sans", sans-serif';
+export const AMARANTH = '"CT Amaranth", "Amaranth", sans-serif';
+
+/** Caras @font-face que declara una pieza con estas fuentes (latin + latin-ext de cada una, si la hay). */
 export function numeroDeCaras(caras: readonly Cara[]): number {
-  return caras.length * 2;
+  return caras.reduce((n, c) => n + ((CARAS[c] as DefCara).ext === false ? 1 : 2), 0);
 }
 
 /** Bloque @font-face de las caras pedidas (latin y latin-ext, como las de la marca). */
@@ -46,18 +75,18 @@ export function fuentes(ctx: ContextoPlantilla, caras: readonly Cara[]): string 
   const url = (fichero: string) => esc(ctx.urlFuente ? ctx.urlFuente(fichero) : `/instagram/fuentes/${fichero}`);
   return caras
     .flatMap((c) => {
-      const f = FICHEROS[c];
-      return (["latin", "latin-ext"] as const).map(
+      const f: DefCara = CARAS[c];
+      return (f.ext === false ? (["latin"] as const) : (["latin", "latin-ext"] as const)).map(
         (r) =>
-          `@font-face{font-family:"${f.familia}";font-style:${f.estilo};font-weight:${f.peso};font-display:block;src:url("${url(f.ruta(r))}") format("woff2");unicode-range:${r === "latin" ? UNICODE_LATIN : UNICODE_LATIN_EXT}}`,
+          `@font-face{font-family:"${f.familia}";font-style:${f.estilo};font-weight:${f.peso};font-display:block;src:url("${url(`${f.carpeta}/${f.carpeta}-${r}-${f.peso}-${f.estilo}.woff2`)}") format("woff2");unicode-range:${r === "latin" ? UNICODE_LATIN : UNICODE_LATIN_EXT}}`,
       );
     })
     .join("\n");
 }
 
 /**
- * Velo SOLO donde va el texto (la mejora pedida: que se lea en cualquier foto
- * sin apagar el plato). Degradado suave de pizarra oscura, sin colores.
+ * Velo SOLO donde va el texto, muy suave (las originales no llevan): lo justo
+ * para que se lea en fotos claras. Degradado de pizarra oscura, sin colores.
  * `desde` = "arriba" | "abajo"; `alto` en px; `alfa` en %.
  */
 export function velo(desde: "arriba" | "abajo", alto: number, alfa: number): string {
