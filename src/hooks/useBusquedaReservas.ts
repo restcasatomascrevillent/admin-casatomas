@@ -20,7 +20,7 @@ import { claveDia } from "@/lib/reservas/libroReservas";
 
 export const MIN_LETRAS_BUSQUEDA = 2;
 const LIMITE_RESULTADOS = 100;
-const COLUMNAS = "id, fecha, hora, nombre, telefono, email, numero_comensales, estado, espacio_id, notas_cliente";
+const COLUMNAS = "id, fecha, hora, nombre, telefono, email, numero_comensales, estado, espacio_id, notas_cliente, created_at, canal";
 
 export interface ReservaEncontrada {
   id: string;
@@ -33,6 +33,9 @@ export interface ReservaEncontrada {
   estado: string;
   espacio_id: string | null;
   notas_cliente: string | null;
+  /** Cuándo se hizo (12/11/2026: se enseña en la fila). */
+  created_at?: string | null;
+  canal?: string | null;
 }
 
 /**
@@ -57,6 +60,8 @@ function aReserva(r: Record<string, unknown>): ReservaEncontrada {
     estado: String(r.estado ?? ""),
     espacio_id: (r.espacio_id as string | null) ?? null,
     notas_cliente: (r.notas_cliente as string | null) ?? null,
+    created_at: (r.created_at as string | null) ?? null,
+    canal: (r.canal as string | null) ?? null,
   };
 }
 
