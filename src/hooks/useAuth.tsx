@@ -1,4 +1,5 @@
 import { completeAuditEnabled } from "@/lib/audit-version";
+import { ESPERAS_REINTENTO_SESION_MS, esFalloTransitorioAuth, esperar } from "@/lib/reintentosSesion";
 import {
   createContext,
   useContext,
@@ -78,6 +79,9 @@ function esFalloTransitorio(error: ErrorAuth | undefined): boolean {
   return !Number.isFinite(status) || status === 0 || status >= 500;
 }
 
+/** Error al registrar el acceso que viene de la red (sin código de PostgreSQL): se puede reintentar. */
+class ErrorRedAuditoria extends Error {}
+
 /**
  * Espera al registro mientras sigue vigente el token. Si falla, el llamador
  * debe avisar y no presentar el acceso como registrado correctamente.
@@ -105,7 +109,24 @@ async function registrarAccesoAuditoria(accion: "acceso" | "logout") {
     p_tipo: accion,
     p_ruta: window.location.pathname,
   });
-  if (error) throw new Error(`No se pudo registrar ${accion} en la auditoría`);
+  if (error) {
+    const mensaje = `No se pudo registrar ${accion} en la auditoría`;
+    // Sin código de PostgreSQL: no llegó al servidor (red). Con código, el servidor dijo que no.
+    throw (error as { code?: string }).code ? new Error(mensaje) : new ErrorRedAuditoria(mensaje);
+  }
+}
+
+/** Registro del acceso con reintentos si falla por la red (poca cobertura). */
+async function registrarAccesoConReintentos(esVigente: () => boolean): Promise<void> {
+  for (let intento = 0; ; intento++) {
+    try {
+      await registrarAccesoAuditoria("acceso");
+      return;
+    } catch (e) {
+      if (!(e instanceof ErrorRedAuditoria) || intento >= ESPERAS_REINTENTO_SESION_MS.length || !esVigente()) throw e;
+      await esperar(ESPERAS_REINTENTO_SESION_MS[intento]);
+    }
+  }
 }
 
 /**
@@ -280,7 +301,13 @@ export function AuthProvider({
         return;
       }
 
-      const { data: userData, error: userError } = await getUserCompartido();
+      let { data: userData, error: userError } = await getUserCompartido();
+      // Poca cobertura: se reintenta antes de dar la sesión por perdida.
+      for (let intento = 0; userError && esFalloTransitorioAuth(userError) && intento < ESPERAS_REINTENTO_SESION_MS.length; intento++) {
+        await esperar(ESPERAS_REINTENTO_SESION_MS[intento]);
+        if (!esVigente()) return;
+        ({ data: userData, error: userError } = await getUserCompartido());
+      }
       if (!esVigente()) return;
       const status =
         typeof userError === "object" &&
@@ -316,7 +343,7 @@ export function AuthProvider({
           setUser(null);
           setLoading(false);
           toast.error(
-            "No se pudo verificar y registrar el acceso. Recarga la página para reintentarlo.",
+            "No se pudo comprobar tu sesión: parece que no hay conexión. Cuando tengas cobertura, recarga la página.",
           );
           return;
         }
@@ -339,7 +366,7 @@ export function AuthProvider({
         return;
       }
       if (!accesos.current.has(userId))
-        accesos.current.set(userId, registrarAccesoAuditoria("acceso"));
+        accesos.current.set(userId, registrarAccesoConReintentos(esVigente));
       try {
         await accesos.current.get(userId);
       } catch {
@@ -350,7 +377,7 @@ export function AuthProvider({
           setUser(null);
           setLoading(false);
           toast.error(
-            "No se pudo registrar el acceso al panel. Recarga la página para reintentarlo.",
+            "No se pudo registrar el acceso al panel (¿sin conexión?). Cuando tengas cobertura, recarga la página.",
           );
         }
         return;
