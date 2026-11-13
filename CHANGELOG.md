@@ -2,6 +2,18 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.30.0] - 2026-11-13
+
+Objetivo: «Anular mesa» en la ficha de la reserva (cancela, tenga mesa o no; arriba, bajo Confirmar), casillas de mesa con nombre largo sin salirse y la primera tarjeta de Facturas con el gasto del mes y las facturas subidas
+
+### Añadido
+- Reservas: «Anular mesa» en la ficha de la reserva ([#184](https://github.com/restcasatomascrevillent/admin-casatomas/pull/184))
+- Facturas: la primera tarjeta de Análisis, gasto del mes en curso y facturas subidas ([#185](https://github.com/restcasatomascrevillent/admin-casatomas/pull/185))
+
+### Cambiado
+- Reservas: «Anular mesa» cancela la reserva y sale tenga mesa o no ([#186](https://github.com/restcasatomascrevillent/admin-casatomas/pull/186))
+- Reservas: «Anular mesa» arriba, bajo Confirmar; mesas de nombre largo sin salirse ([#187](https://github.com/restcasatomascrevillent/admin-casatomas/pull/187))
+
 ## [1.29.0] - 2026-11-12
 
 Objetivo: Reservas (Pendientes en la lista del día, confirmación al cerrar turno, ficha con estado y hora de creación, retraso solo hoy), móvil sin cortes, RRSS en el móvil, Facturas legible en el móvil y original de Drive sin sesión de Google
