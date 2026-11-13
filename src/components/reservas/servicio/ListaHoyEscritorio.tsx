@@ -72,7 +72,8 @@ export function ListaHoyEscritorio({
     // Pendiente (12/11/2026, petición del dueño: «en vez de botón de sentar fuera, verificar»): «Verificar» verde, la
     // misma acción que la ficha (correo al cliente y aviso). Las demás que faltan por llegar, «Sentar fuera».
     const pendiente = grupo === "porLlegar" && r.estado === "pendiente";
-    const accion =
+    const anulada = r.estado === "cancelada";
+    const accion = anulada ? null :
       pendiente && puedeEditar ? (
         <Button
           type="button"
@@ -102,14 +103,18 @@ export function ListaHoyEscritorio({
     );
   };
 
-  const cabecera = (titulo: string, filas: Array<{ reserva: Reserva }>) => (
-    <>
-      <span>{titulo}</span>
-      <span className="text-sm font-normal tabular-nums text-muted-foreground">
-        {filas.length} · {pax(filas)} pax
-      </span>
-    </>
-  );
+  // Las anuladas se ven en su sitio pero no cuentan (ni reservas ni personas).
+  const cabecera = (titulo: string, todas: Array<{ reserva: Reserva }>) => {
+    const filas = todas.filter((f) => f.reserva.estado !== "cancelada");
+    return (
+      <>
+        <span>{titulo}</span>
+        <span className="text-sm font-normal tabular-nums text-muted-foreground">
+          {filas.length} · {pax(filas)} pax
+        </span>
+      </>
+    );
+  };
   const claseCabecera = "sticky top-0 z-10 flex min-h-11 w-full items-center justify-between gap-2 border-b bg-muted/95 px-3 py-1.5 text-base font-semibold backdrop-blur";
 
   return (
@@ -130,12 +135,12 @@ export function ListaHoyEscritorio({
           <FilasPorMenu filas={lista.sentadas} servicio={servicio} pintar={(f) => fila(f, "sentadas")} />
         )}
       </section>
-      <section aria-label="Terminadas, no vino y canceladas">
+      <section aria-label="Terminadas y no vino">
         <h3>
           <button type="button" className={cn(claseCabecera, "text-left")} aria-expanded={verTerminadas} onClick={() => setVerTerminadas((v) => !v)}>
             <span className="flex items-center gap-1.5">
               <ChevronDown className={cn("h-4 w-4 transition-transform", verTerminadas && "rotate-180")} aria-hidden="true" />
-              Terminadas / No vino / Canceladas
+              Terminadas / No vino
             </span>
             <span className="text-sm font-normal tabular-nums text-muted-foreground">{lista.terminadas.length}</span>
           </button>
@@ -187,8 +192,10 @@ function FilaEscritorio({
   const nombre = reserva.nombre || "Sin nombre";
   // Sin «Tarde» ni «Sin mesa» (11/11/2026, petición del dueño): junto al nombre, el estado de la reserva
   // (pendiente, verificada, confirmada…).
-  const estado =
-    grupo === "terminadas" && reserva.estado === "completada"
+  const anulada = reserva.estado === "cancelada";
+  const estado = anulada
+    ? { texto: "Anulada", clase: "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-200" }
+    : grupo === "terminadas" && reserva.estado === "completada"
         ? { texto: "Terminada", clase: "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-100" }
         : info
           ? { texto: info.etiqueta, clase: info.insignia }
@@ -197,7 +204,13 @@ function FilaEscritorio({
   return (
     <li
       // Pendientes con fondo naranja translúcido (12/11/2026, petición del dueño), para verlas de un vistazo.
-      className={cn("relative", señalada ? "bg-primary/10" : reserva.estado === "pendiente" && grupo === "porLlegar" && "bg-orange-500/15 dark:bg-orange-400/15")}
+      className={cn(
+        "relative",
+        señalada ? "bg-primary/10" : reserva.estado === "pendiente" && grupo === "porLlegar" && "bg-orange-500/15 dark:bg-orange-400/15",
+        // Anulada: en su sitio, más apagada (13/11/2026).
+        anulada && "opacity-60",
+      )}
+      data-anulada={anulada ? "true" : undefined}
       data-pendiente={reserva.estado === "pendiente" ? "true" : undefined}
       data-reserva-id={reserva.id}
       data-señalada={señalada ? "true" : undefined}
@@ -283,7 +296,14 @@ function FilaEscritorio({
             </a>
           )}
           {/* Personas en su recuadro, con el icono y «px» (11/11/2026, petición del dueño). */}
-          <BotonPersonas reserva={reserva} className="my-0 gap-0.5 rounded-md border px-1.5 text-base font-bold" icono="h-4 w-4" sufijo="px" />
+          {anulada ? (
+            <span className="rounded-md border px-1.5 text-base font-bold tabular-nums">
+              {reserva.numero_comensales}
+              <span className="text-xs font-semibold"> px</span>
+            </span>
+          ) : (
+            <BotonPersonas reserva={reserva} className="my-0 gap-0.5 rounded-md border px-1.5 text-base font-bold" icono="h-4 w-4" sufijo="px" />
+          )}
           {accion}
         </span>
       </div>

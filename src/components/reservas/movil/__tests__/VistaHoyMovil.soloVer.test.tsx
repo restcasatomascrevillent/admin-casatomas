@@ -108,13 +108,21 @@ describe("Ficha de una reserva (móvil)", () => {
     expect(botones()).toEqual(expect.arrayContaining(["Sentar en mesa 3", "Cambiar mesa", "No vino", "Cerrar"]));
   });
 
-  it("«Anular mesa» (13/11/2026): cancela la reserva tras confirmar, tenga mesa o no", async () => {
+  it("«Anular reserva» (13/11/2026): cancela la reserva tras confirmar, tenga mesa o no; anulada, la ficha solo informa", async () => {
     panelReserva("confirmada", []);
     fireEvent.click(screen.getByTestId("ficha-anular-mesa"));
-    expect(screen.getByRole("alert")).toHaveTextContent("¿Anular la mesa de Ana López? La reserva pasa a «Cancelada»");
+    expect(screen.getByTestId("ficha-anular-mesa")).toHaveTextContent("Anular reserva");
+    expect(screen.getByRole("alert")).toHaveTextContent("¿Anular la reserva de Ana López? Sigue en la lista como «Anulada»");
     expect(h.escrituras).toEqual([]);
     fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sí, anular" }));
     await waitFor(() => expect(h.escrituras).toEqual(["cancelar"]));
+  });
+
+  it("anulada (13/11/2026): «Anulada» en la ficha y ningún botón que escriba", () => {
+    panelReserva("cancelada", ["3"]);
+    expect(screen.getByRole("dialog")).toHaveTextContent("Anulada");
+    expect(screen.getByTestId("ficha-anulada")).toBeInTheDocument();
+    expect(botones()).toEqual(["Cerrar"]);
   });
 
   it("con solo «Ver»: datos, nota y «Llamar», pero ningún botón que escriba", () => {

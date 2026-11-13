@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.31.0] - 2026-11-13
+
+Objetivo: Las reservas anuladas siguen en la lista del día con la etiqueta «Anulada» y el botón pasa a «Anular reserva»
+
+### Añadido
+- Reservas: las anuladas siguen en la lista con «Anulada»; botón «Anular reserva» ([#189](https://github.com/restcasatomascrevillent/admin-casatomas/pull/189))
+
 ## [1.30.0] - 2026-11-13
 
 Objetivo: «Anular mesa» en la ficha de la reserva (cancela, tenga mesa o no; arriba, bajo Confirmar), casillas de mesa con nombre largo sin salirse y la primera tarjeta de Facturas con el gasto del mes y las facturas subidas
