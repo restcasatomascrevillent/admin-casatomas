@@ -2,6 +2,8 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import { describe, it, expect, vi, beforeEach } from "vitest";
 const rpc = vi.hoisted(() => vi.fn());
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc } }));
+// La ficha de una compra web pagada ofrece «Reenviar correo al cliente», que mira el permiso de edición.
+vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
 import { ListaTickets } from "../ListaTickets";
 describe("Listado de tickets", () => {
   beforeEach(() => rpc.mockReset());
@@ -65,6 +67,7 @@ describe("Listado de tickets", () => {
     expect(await screen.findByText("ana@example.com")).toBeTruthy();
     expect(screen.getByText("Feliz cumpleaños")).toBeTruthy();
     expect(rpc).toHaveBeenLastCalledWith("detalle_cheque_regalo", { p_id: "1" });
+    expect(screen.getByRole("button", { name: /Reenviar correo al cliente/ })).toBeTruthy();
   });
   it("pagina sin scroll interno de tabla y adapta las filas al móvil", async () => {
     rpc.mockResolvedValue({ data: { total: 1, expedidos: 1, canjeados: 0, coincidencias: 1, importe_pagado: 50, tickets: [{ id: "1", codigo: "CT-XYZ", creado_en: null, comprador_nombre: "Luis", importe_eur: 50, estado: "pagado", usado: false }] }, error: null });
