@@ -1843,6 +1843,27 @@ export function PanelReservaMovil({
         </Button>
       )}
 
+      {/* «Anular mesa» (13/11/2026, petición del dueño): arriba, justo debajo de «Verificar / Confirmar». Cancela la
+          reserva, tenga mesa o no: la misma acción que «Cancelar reserva» de la ficha grande (pasa a «Cancelada» y, si
+          tiene correo, se le avisa). Pide confirmación en la propia ficha. */}
+      {puedeEditar && !terminada && (
+        <Button
+          variant="outline"
+          className="h-12 w-full text-base text-destructive hover:text-destructive"
+          disabled={ocupado}
+          data-testid="ficha-anular-mesa"
+          onClick={() =>
+            setPendiente({
+              texto: `¿Anular la mesa de ${reserva.nombre || "esta reserva"}? La reserva pasa a «Cancelada»${(reserva as { email?: string | null }).email ? " y se le avisa por correo" : ""}.`,
+              boton: "Sí, anular",
+              ejecutar: () => ejecutar(() => cancelar(reserva as unknown as Parameters<typeof cancelar>[0])),
+            })
+          }
+        >
+          <CircleSlash className="mr-2 h-5 w-5" aria-hidden="true" /> Anular mesa
+        </Button>
+      )}
+
       {telefonoLegible(reserva.telefono) && (
         <Button asChild variant="outline" className="h-11 w-full justify-start text-base tabular-nums">
           <a href={enlaceTelefono(reserva.telefono) ?? undefined}>
@@ -1967,28 +1988,7 @@ export function PanelReservaMovil({
             <span className="truncate">No vino</span>
           </Button>
         )}
-        {/* «Anular mesa» (13/11/2026, petición del dueño: «una reserva que se pueda anular», tenga mesa o no): cancela la
-            reserva, la misma acción que «Cancelar reserva» de la ficha grande (pasa a «Cancelada» y, si tiene correo, se le
-            avisa). Pide confirmación en la propia ficha. */}
-        {puedeEditar && !terminada && (
-          <Button
-            variant="outline"
-            className="h-12 min-w-0 text-destructive"
-            disabled={ocupado}
-            data-testid="ficha-anular-mesa"
-            onClick={() =>
-              setPendiente({
-                texto: `¿Anular la mesa de ${reserva.nombre || "esta reserva"}? La reserva pasa a «Cancelada»${(reserva as { email?: string | null }).email ? " y se le avisa por correo" : ""}.`,
-                boton: "Sí, anular",
-                ejecutar: () => ejecutar(() => cancelar(reserva as unknown as Parameters<typeof cancelar>[0])),
-              })
-            }
-          >
-            <CircleSlash className="h-4 w-4" />
-            <span className="truncate">Anular mesa</span>
-          </Button>
-        )}
-        <Button variant="ghost" className="col-span-2 h-12 min-w-0" onClick={onCerrar}>
+        <Button variant="ghost" className={cn("h-12 min-w-0", (terminada || !puedeEditar) && "col-span-2")} onClick={onCerrar}>
           Cerrar
         </Button>
       </div>
