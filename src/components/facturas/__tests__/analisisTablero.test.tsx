@@ -61,6 +61,13 @@ const doble = vi.hoisted(() => {
   return { supabase, rpc, rpcs, invoke, inserts, estado };
 });
 
+// pdf.js no corre en jsdom: se simula el pintado de las hojas del PDF.
+vi.mock("@/lib/facturas/pintarPdf", () => ({
+  pintarHojasPdf: async (_d: ArrayBuffer, o: { alHoja?: (u: string, i: number, t: number) => void } = {}) => {
+    o.alHoja?.("blob:hoja-1", 0, 1);
+    return { hojas: ["blob:hoja-1"], total: 1 };
+  },
+}));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: doble.supabase }));
 const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }));
 vi.mock("sonner", () => ({ toast: toastMock }));
@@ -457,7 +464,10 @@ describe("ver documentos de una cifra", () => {
     expect(within(lista).getAllByRole("button")).toHaveLength(2);
     fireEvent.click(within(lista).getByRole("button", { name: /^Factura F-77 de EMBAJADORES MADRID/ }));
     const visor = await screen.findByTestId("visor-documento");
-    expect(await within(visor).findByTitle(/^Original: Factura F-77/)).toHaveAttribute("src", "blob:original-f77");
+    // PDF hoja a hoja con pdf.js (simulado): ni <iframe> ni <object>, que bloquea la CSP.
+    expect(await within(visor).findByAltText(/^Original: Factura F-77.* · hoja 1$/)).toHaveAttribute("src", "blob:hoja-1");
+    expect(visor.querySelector("iframe, object, embed")).toBeNull();
+    expect(within(visor).getByRole("link", { name: /Descargar PDF/ })).toHaveAttribute("href", "blob:original-f77");
     expect(pedidas).toEqual([{ url: expect.stringMatching(/\/functions\/v1\/facturas-original\?id=11$/), auth: "Bearer jwt-de-prueba" }]);
     const drive = within(visor).getByRole("link", { name: /Abrir en Drive/ });
     expect(drive).toHaveAttribute("target", "_blank");
