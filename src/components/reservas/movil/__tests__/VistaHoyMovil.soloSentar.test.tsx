@@ -162,18 +162,22 @@ describe("VistaHoyMovil · como columna de escritorio", () => {
     );
   };
 
-  it("agrupa en «Por llegar», «Sentadas» y, plegadas al final, «Terminadas / No vino / Canceladas»", () => {
+  it("agrupa en «Por llegar» (con las anuladas, 13/11/2026), «Sentadas» y, plegadas al final, «Terminadas / No vino»", () => {
     montarEstados();
-    expect(screen.getByRole("region", { name: "Por llegar" })).toHaveTextContent("Ana Espera");
+    const porLlegar = screen.getByRole("region", { name: "Por llegar" });
+    expect(porLlegar).toHaveTextContent("Ana Espera");
+    // La anulada sigue en su sitio, con «Anulada» y sin contar en la cabecera.
+    expect(porLlegar).toHaveTextContent("Ciro Cancela");
+    expect(within(porLlegar).getByText("Anulada")).toBeInTheDocument();
     const sentadas = screen.getByRole("region", { name: "Sentadas" });
     expect(sentadas).toHaveTextContent("Bea Sentada");
     expect(within(sentadas).getByLabelText("Alergia")).toBeInTheDocument();
-    const terminadas = screen.getByRole("region", { name: "Terminadas, no vino y canceladas" });
+    const terminadas = screen.getByRole("region", { name: "Terminadas y no vino" });
     expect(terminadas).not.toHaveTextContent("Nora Novino");
-    fireEvent.click(within(terminadas).getByRole("button", { name: /Terminadas \/ No vino \/ Canceladas/ }));
+    fireEvent.click(within(terminadas).getByRole("button", { name: /Terminadas \/ No vino/ }));
     expect(terminadas).toHaveTextContent("Íñigo Ido");
     expect(terminadas).toHaveTextContent("Nora Novino");
-    expect(terminadas).toHaveTextContent("Ciro Cancela");
+    expect(terminadas).not.toHaveTextContent("Ciro Cancela");
   });
 
   it("sin «Sin mesa» ni «Tarde» (11/11/2026): el estado va junto al nombre", () => {
@@ -216,7 +220,7 @@ describe("VistaHoyMovil · como columna de escritorio", () => {
 
   it("objetivos táctiles de 44 px: la cabecera del grupo plegado", () => {
     montarEstados();
-    expect(screen.getByRole("button", { name: /Terminadas \/ No vino \/ Canceladas/ })).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: /Terminadas \/ No vino/ })).toHaveClass("min-h-11");
   });
 
   it("pasar el ratón por una fila la señala para el plano; al salir, deja de señalarla", () => {

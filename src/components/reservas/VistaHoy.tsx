@@ -185,12 +185,12 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   });
 
   /**
-   * Canceladas de hoy, solo para la lista de escritorio (plegadas al final, 07/11/2026). Aparte de la de
-   * arriba para no meterlas en el plano ni en el móvil. Clave con el prefijo "reservas-hoy": se refresca igual.
+   * Canceladas (anuladas) de hoy, para las listas de escritorio y móvil: salen en «Por llegar» con «Anulada»
+   * (13/11/2026; antes, plegadas al final y solo en escritorio). Aparte de la de arriba para no meterlas en el
+   * plano. Clave con el prefijo "reservas-hoy": se refresca igual.
    */
   const { data: canceladasHoy } = useQuery({
     ...REFRESCO_PERIODICO,
-    enabled: !esMovil,
     queryKey: ["reservas-hoy", "canceladas", hoy],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -229,7 +229,7 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
           {errorReservasHoy ? (
             <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />
           ) : (
-            <VistaHoyMovil reservas={reservasHoy} fecha={hoy} />
+            <VistaHoyMovil reservas={reservasHoy} fecha={hoy} canceladas={canceladasHoy} />
           )}
         </div>
       </ReservasEnVivoContexto.Provider>
