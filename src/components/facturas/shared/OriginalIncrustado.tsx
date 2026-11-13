@@ -1,12 +1,14 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, FileText, FileX2, ImageOff, Loader2, RefreshCw } from "lucide-react";
+import { Download, ExternalLink, FileText, FileX2, ImageOff, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ImagenZoom } from "./ImagenZoom";
 import { urlSegura } from "@/lib/url-segura";
 import { vistaPreviaDrive } from "@/lib/facturas/documentosCifra";
 import { useOriginalDrive, useUrlDeBlob } from "@/lib/facturas/originalDrive";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { ENLACE_ORIGINAL, VisorPantallaCompleta } from "./VisorPantallaCompleta";
+import { VisorPdf } from "./VisorPdf";
+import { nombrePdf } from "@/lib/facturas/nombrePdf";
 
 const BUCKET = "facturas-originales";
 /** Vida de la URL firmada de la vista previa (más larga que la del botón: la imagen se pide al desplazarse). */
@@ -32,44 +34,7 @@ function useUrlOriginal(archivoPath: string | null) {
   });
 }
 
-const ENLACE =
-  "inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40 dark:hover:text-blue-300";
-
-/** Visor a pantalla completa: la misma imagen con zoom (rueda, pellizco, arrastre, giro) a todo el alto del diálogo. */
-function VisorPantallaCompleta({
-  url,
-  abierto,
-  onCerrar,
-  titulo,
-  conEnlace = true,
-}: {
-  url: string;
-  abierto: boolean;
-  onCerrar: () => void;
-  titulo: string;
-  /** Sin él con un blob URL: en otra pestaña se libera al cerrar la ficha. */
-  conEnlace?: boolean;
-}) {
-  return (
-    <Dialog open={abierto} onOpenChange={(o) => !o && onCerrar()}>
-      <DialogContent className="h-[94dvh] w-[96vw] max-w-[96vw] gap-0 p-0 sm:rounded-lg pointer-coarse:max-h-[94dvh]">
-        <DialogTitle className="sr-only">{titulo}</DialogTitle>
-        <DialogDescription className="sr-only">Documento original a pantalla completa</DialogDescription>
-        <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1 pr-14">
-          {conEnlace && (
-            <a href={url} target="_blank" rel="noopener noreferrer" className={ENLACE}>
-              <ExternalLink className="h-4 w-4" aria-hidden="true" /> Abrir en pestaña nueva
-            </a>
-          )}
-          <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">Rueda o pellizco para ampliar · arrastra para moverte · doble clic para acercar</span>
-        </div>
-        <div data-testid="visor-original" className="flex min-h-0 flex-1 flex-col">
-          <ImagenZoom src={url} alt={titulo} className="min-h-0 flex-1 rounded-none border-0" />
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
+const ENLACE = ENLACE_ORIGINAL;
 
 /** Cabecera común del visor: título pequeño y, a la derecha, un único enlace para abrirlo fuera. */
 function CabeceraVisor({ enlace }: { enlace: ReactNode }) {
@@ -89,12 +54,13 @@ function CabeceraVisor({ enlace }: { enlace: ReactNode }) {
  * de los datos, sin abrir otra pestaña).
  *   - `drive_url` de Drive  -> el servidor (Edge Function `facturas-original`)
  *                              lo descarga con la cuenta del restaurante: foto
- *                              con zoom o PDF incrustado + «Abrir en Drive».
+ *                              con zoom o PDF hoja a hoja (VisorPdf) +
+ *                              «Descargar PDF» y «Abrir en Drive».
  *                              No depende de la sesión de Google del navegador
  *                              (dueño, 12/11/2026). Sin `documentoId`, la vista
  *                              previa de Drive en un iframe, como antes.
  *   - `archivo_path` imagen -> foto en un recuadro con zoom/arrastre/giro; botón de pantalla completa.
- *   - `archivo_path` PDF    -> PDF incrustado + enlace «Abrir PDF».
+ *   - `archivo_path` PDF    -> PDF hoja a hoja (VisorPdf) + enlace «Abrir PDF».
  *   - `drive_url` sin id    -> una línea con el enlace (no se sabe incrustar).
  *   - nada                  -> estado vacío discreto, en una línea.
  * Drive va primero: `archivo_path` es la copia TEMPORAL mientras Drive no la tiene.
@@ -141,6 +107,19 @@ export function OriginalIncrustado({
   );
 }
 
+/**
+ * «Descargar PDF» con la copia que ya ha bajado el servidor (blob URL): no
+ * pide sesión de Google, al contrario que «Abrir en Drive». En el iPad lo abre
+ * su visor de PDF, con todas las hojas.
+ */
+export function EnlaceDescargarPdf({ url, titulo, className = ENLACE }: { url: string; titulo: string; className?: string }) {
+  return (
+    <a href={url} download={nombrePdf(titulo)} className={className}>
+      <Download className="h-4 w-4" aria-hidden="true" /> Descargar PDF
+    </a>
+  );
+}
+
 function EnlaceDrive({ driveUrl }: { driveUrl: string }) {
   return (
     <a href={driveUrl} target="_blank" rel="noopener noreferrer" className={ENLACE}>
@@ -174,15 +153,26 @@ function OriginalDeDrive({ documentoId, driveUrl, titulo, relleno }: { documento
   const q = useOriginalDrive(documentoId);
   const url = useUrlDeBlob(q.data);
   const motivo = q.error instanceof Error && q.error.message ? ` (${sinPunto(q.error.message)})` : "";
+  const pdf = q.data?.type === "application/pdf";
   return (
     <VisorArchivo
       key={url ?? "sin-url"}
       url={url}
-      pdf={q.data?.type === "application/pdf"}
+      pdf={pdf}
+      fuentePdf={pdf ? q.data : undefined}
       fallo={q.isError && !q.isFetching}
       mensajeFallo={`No se ha podido cargar el original desde Google Drive${motivo}. Puedes verlo con «Abrir en Drive».`}
       onReintentar={() => void q.refetch()}
-      enlace={<EnlaceDrive driveUrl={driveUrl} />}
+      enlace={
+        pdf && url ? (
+          <span className="flex flex-wrap items-center justify-end gap-1">
+            <EnlaceDescargarPdf url={url} titulo={titulo} />
+            <EnlaceDrive driveUrl={driveUrl} />
+          </span>
+        ) : (
+          <EnlaceDrive driveUrl={driveUrl} />
+        )
+      }
       enlacePantallaCompleta={false}
       titulo={titulo}
       relleno={relleno}
@@ -219,6 +209,7 @@ function OriginalDeStorage({ archivoPath, titulo, relleno }: { archivoPath: stri
 function VisorArchivo({
   url,
   pdf,
+  fuentePdf,
   fallo,
   mensajeFallo,
   onReintentar,
@@ -229,6 +220,8 @@ function VisorArchivo({
 }: {
   url: string | undefined;
   pdf: boolean;
+  /** El PDF como Blob (Drive). Sin él, VisorPdf descarga `url` (URL firmada de Storage). */
+  fuentePdf?: Blob;
   fallo: boolean;
   mensajeFallo: string;
   onReintentar: () => void;
@@ -266,11 +259,9 @@ function VisorArchivo({
       </div>
     );
   } else if (pdf) {
-    cuerpo = (
-      <object data={url} type="application/pdf" aria-label={titulo} className={`w-full rounded-md border bg-muted/40 ${relleno ? "min-h-0 flex-1" : "h-[70dvh] min-h-80"}`}>
-        <p className="p-3 text-sm text-muted-foreground">Este navegador no puede mostrar el PDF aquí. Ábrelo con el enlace de arriba.</p>
-      </object>
-    );
+    // Hoja a hoja con pdf.js (13/11/2026): un <object>/<iframe> con el PDF lo
+    // bloqueaba la CSP del panel (`object-src 'none'`, `frame-src` sin blob:).
+    cuerpo = <VisorPdf fuente={fuentePdf ?? url} titulo={titulo} className={relleno ? "min-h-0 flex-1" : "h-[70dvh] min-h-80"} />;
   } else {
     cuerpo = (
       <div className={relleno ? "flex min-h-0 flex-1 flex-col gap-1" : "space-y-1"}>

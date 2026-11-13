@@ -24,6 +24,8 @@ vi.mock("@/hooks/useAuth", () => ({ useUsuarioIdOpcional: () => "u-1" }));
 vi.mock("../AlbaranesDeFactura", () => ({ AlbaranesDeFactura: () => null }));
 vi.mock("../FacturaDelAlbaran", () => ({ FacturaDelAlbaran: () => null }));
 vi.mock("@/components/facturas/CosteLecturaDocumento", () => ({ CosteLecturaFactura: () => null }));
+// El visor del PDF (pdf.js) se prueba en OriginalIncrustado: aquí solo importa dónde va.
+vi.mock("@/components/facturas/shared/VisorPdf", () => ({ VisorPdf: () => <div data-testid="visor-pdf" /> }));
 
 import { FichaDocumento } from "../FichaDocumento";
 import type { Factura } from "@/hooks/useFacturas";
