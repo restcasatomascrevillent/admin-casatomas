@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { nombreCarta, descripcionCarta } from "@/lib/limites-carta";
 import { categoriasConOrigen, categoriaVino, mensajeFaltaOrigen, origenVinoClaro, paisVino, regionVino } from "@/lib/origen-vino";
-import { Loader2, Camera, X, Sparkles, ImagePlus, Copy } from "lucide-react";
+import { Loader2, Camera, X, Sparkles, ImagePlus, Copy, History } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,8 @@ import { subirFotoCarta } from "./subirFotoCarta";
 import { useQueryClient } from "@tanstack/react-query";
 import { CamposVino } from "./CamposVino";
 import type { VinoDesdeFoto } from "./leerVinoFoto";
-import { useLecturaEtiquetaVino, valoresDesdeDatosVino } from "./lecturaEtiquetaVino";
+import { useLecturaEtiquetaVino, valoresDesdeDatosVino, type LecturaHecha } from "./lecturaEtiquetaVino";
+import { borrarBorradorVino, guardarBorradorVino, haceCuantoBorrador, leerBorradorVino, type BorradorVino } from "./borradorVino";
 import { PistaPrecioVino } from "./PistaPrecioVino";
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
@@ -101,9 +102,18 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
   // Sin las categorías «… — ORIGEN PENDIENTE»: no se puede elegir ninguna.
   const categoriasValidas = categoriasConOrigen(categorias);
 
-  // Lectura de la etiqueta con IA al poner la foto (en paralelo al recorte,
-  // que ya se hace aquí también en el móvil).
-  const lectura = useLecturaEtiquetaVino(form, categoriasValidas);
+  // Vino a medias guardado en el navegador (ver borradorVino.ts): si la página
+  // se recargó antes de guardar la ficha, se ofrece recuperarlo al abrir.
+  const [borrador, setBorrador] = useState<BorradorVino | null>(null);
+
+  // Lectura de la etiqueta con IA al poner la foto. En cuanto lee, la foto y lo
+  // leído se guardan como borrador (13/11/2026: si el móvil recarga la página,
+  // no se pierde ni se paga otra lectura).
+  const alLeerEtiqueta = (r: LecturaHecha) => {
+    if (typeof r.fuente === "string") return;
+    void guardarBorradorVino({ foto: r.fuente, nombreFoto: r.fuente.name || "botella.jpg", datos: r.datos });
+  };
+  const lectura = useLecturaEtiquetaVino(form, categoriasValidas, alLeerEtiqueta);
   const { cancelar: cancelarLectura, limpiar: limpiarLectura } = lectura;
 
   // Puntuación Parker en segundo plano: si falla, la ficha se guarda igual.
@@ -117,6 +127,37 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
   const precargadoRef = useRef(false);
   // Precarga con la que se abrió (modo lote: avisar al cerrar aunque el padre ya la haya limpiado).
   const precargaAbiertaRef = useRef<VinoDesdeFoto | null>(null);
+  // Al abrir «Añadir vino» (sin lote): ¿hay un vino a medias de antes de recargar?
+  useEffect(() => {
+    if (!open || precarga) {
+      setBorrador(null);
+      return;
+    }
+    let vivo = true;
+    void leerBorradorVino().then((b) => {
+      if (vivo) setBorrador(b);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [open, precarga]);
+
+  const recuperarBorrador = () => {
+    if (!borrador) return;
+    const b = borrador;
+    setBorrador(null);
+    const foto = new File([b.foto], b.nombreFoto, { type: b.foto.type || "image/jpeg" });
+    lectura.restaurar(b.datos);
+    // Se vuelve a quitar el fondo (el recorte no se guarda), sin leer otra vez la etiqueta.
+    recorte.iniciar(foto);
+    toast.success("Vino recuperado: foto y datos de la etiqueta. Revísalos y guarda.");
+  };
+
+  const descartarBorrador = () => {
+    setBorrador(null);
+    void borrarBorradorVino();
+  };
+
   useEffect(() => {
     if (!open) {
       const anterior = precargaAbiertaRef.current;
@@ -196,6 +237,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
   };
 
   const clearImage = () => {
+    // Quitar la foto a propósito: el vino a medias ya no hace falta.
+    void borrarBorradorVino();
     lectura.limpiar();
     busquedaParker.limpiar();
     recorte.limpiar();
@@ -222,6 +265,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
 
     const nuevoVino = await crearVino.mutateAsync(vinoData);
     precarga?.alGuardar?.();
+    // Ficha guardada: fuera el vino a medias.
+    void borrarBorradorVino();
 
     // Puntuación Parker con su fuente (si hubo búsqueda y no se descartó). Un
     // fallo aquí no deshace la ficha: se avisa y se puede repetir al editar.
@@ -301,7 +346,31 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                 data-testid="vino-camara"
               />
               <PegarFotoRecortada onFoto={(f) => void usarFoto(f)} />
-              
+
+              {borrador && !recorte.original && (
+                <div
+                  role="status"
+                  className="flex flex-col gap-2 rounded-md border border-sky-300 bg-sky-50 p-3 text-sm text-sky-950 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-100"
+                  data-testid="borrador-vino"
+                >
+                  <p className="flex items-start gap-2">
+                    <History className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span>
+                      Tienes un vino a medias{borrador.datos.nombre ? <> («{borrador.datos.nombre}»)</> : null}: la foto y lo que leyó la IA{" "}
+                      {haceCuantoBorrador(borrador.guardadoEn)}. ¿Lo recuperas?
+                    </span>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" className="h-10" onClick={recuperarBorrador}>
+                      Recuperar
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" className="h-10" onClick={descartarBorrador}>
+                      Descartar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {recorte.original ? (
                 <SelectorFotoCarta
                   recorte={recorte}

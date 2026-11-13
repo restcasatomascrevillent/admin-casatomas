@@ -19,6 +19,16 @@ const m = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   toastInfo: vi.fn(),
   vinos: [] as Partial<Vino>[],
+  borradorLeer: vi.fn(async () => null as unknown),
+  borradorGuardar: vi.fn(async () => undefined),
+  borradorBorrar: vi.fn(async () => undefined),
+}));
+// Vino a medias (IndexedDB): simulado; por defecto no hay ninguno.
+vi.mock("../borradorVino", async (original) => ({
+  ...(await original<typeof import("../borradorVino")>()),
+  leerBorradorVino: m.borradorLeer,
+  guardarBorradorVino: m.borradorGuardar,
+  borrarBorradorVino: m.borradorBorrar,
 }));
 
 vi.mock("@/hooks/useVinos", () => ({
@@ -123,6 +133,46 @@ const valor = (etiqueta: RegExp | string) => (screen.getByLabelText(etiqueta) as
 beforeEach(() => {
   vi.clearAllMocks();
   m.vinos = [];
+  m.borradorLeer.mockResolvedValue(null);
+});
+
+describe("VinoForm: vino a medias tras recargar la página (13/11/2026)", () => {
+  it("al leer la etiqueta guarda la foto y lo leído como borrador", async () => {
+    m.leer.mockResolvedValue(respuesta());
+    envolver(<VinoForm open onOpenChange={vi.fn()} />);
+    const f = ponerFoto();
+    await waitFor(() => expect(m.borradorGuardar).toHaveBeenCalledWith({ foto: f, nombreFoto: "botella.jpg", datos: DATOS }));
+  });
+
+  it("al abrir ofrece recuperarlo; «Recuperar» rellena la ficha y pone la foto SIN volver a llamar a la IA", async () => {
+    const guardada = new File(["b"], "IMG_9.jpg", { type: "image/jpeg" });
+    m.borradorLeer.mockResolvedValue({ foto: guardada, nombreFoto: "IMG_9.jpg", datos: DATOS, guardadoEn: Date.now() - 5 * 60000 });
+    envolver(<VinoForm open onOpenChange={vi.fn()} />);
+    const aviso = await screen.findByTestId("borrador-vino");
+    expect(aviso).toHaveTextContent("Tienes un vino a medias («Viña Pomal Crianza 2020»)");
+    expect(aviso).toHaveTextContent("hace 5 min");
+    fireEvent.click(screen.getByRole("button", { name: "Recuperar" }));
+    await waitFor(() => expect(valor("Nombre del vino")).toBe("Viña Pomal Crianza 2020"));
+    expect(screen.getByText(/Sugerido:/)).toBeInTheDocument();
+    expect(m.leer).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("borrador-vino")).toBeNull();
+    expect(screen.getByTestId("foto")).toBeInTheDocument();
+  });
+
+  it("«Descartar» lo borra", async () => {
+    m.borradorLeer.mockResolvedValue({ foto: foto(), nombreFoto: "b.jpg", datos: DATOS, guardadoEn: Date.now() });
+    envolver(<VinoForm open onOpenChange={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Descartar" }));
+    expect(m.borradorBorrar).toHaveBeenCalled();
+    expect(screen.queryByTestId("borrador-vino")).toBeNull();
+  });
+
+  it("en el lote («Varias botellas», con precarga) no se ofrece", async () => {
+    m.borradorLeer.mockResolvedValue({ foto: foto(), nombreFoto: "b.jpg", datos: DATOS, guardadoEn: Date.now() });
+    envolver(<VinoForm open onOpenChange={vi.fn()} precarga={{ foto: foto(), datos: DATOS, recorte: Promise.reject(new Error("x")).catch(() => undefined) as never }} />);
+    await act(async () => {});
+    expect(screen.queryByTestId("borrador-vino")).toBeNull();
+  });
 });
 
 describe("camposVaciosARellenar", () => {

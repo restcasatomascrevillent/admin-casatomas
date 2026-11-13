@@ -90,6 +90,18 @@ export function useLecturaEtiquetaVino(
     ultimo.current = { form, categorias, alLeer };
   });
 
+  /** Rellena los campos vacíos con lo leído; devuelve cuántos se rellenaron. */
+  const rellenarCon = useCallback((d: DatosVinoFoto): number => {
+    setDatos(d);
+    // Se mira el formulario AHORA: lo escrito mientras leía no se toca.
+    const rellenar = camposVaciosARellenar(ultimo.current.form.getValues(), d);
+    const campos = Object.keys(rellenar) as CampoTextoVino[];
+    for (const campo of campos) {
+      ultimo.current.form.setValue(campo, rellenar[campo] as string, { shouldDirty: true, shouldValidate: true });
+    }
+    return campos.length;
+  }, []);
+
   const leer = useCallback(async (fuente: File | string) => {
     const mio = ++turno.current;
     setLeyendo(true);
@@ -97,19 +109,13 @@ export function useLecturaEtiquetaVino(
       const archivo = typeof fuente === "string" ? await archivoDeUrl(fuente) : fuente;
       const r = await leerDatosVinoDeFoto(archivo, ultimo.current.categorias.filter(Boolean));
       if (mio !== turno.current) return; // foto cambiada, quitada o formulario cerrado
-      setDatos(r.datos);
-      // Se mira el formulario AHORA: lo escrito mientras leía no se toca.
-      const rellenar = camposVaciosARellenar(ultimo.current.form.getValues(), r.datos);
-      const campos = Object.keys(rellenar) as CampoTextoVino[];
-      for (const campo of campos) {
-        ultimo.current.form.setValue(campo, rellenar[campo] as string, { shouldDirty: true, shouldValidate: true });
-      }
+      const rellenados = rellenarCon(r.datos);
       if (!r.datos.nombre) {
         toast.warning("No se ha podido leer el nombre en la etiqueta. Revisa los datos o prueba con una foto más cerca y con luz.");
-      } else if (campos.length === 0) {
+      } else if (rellenados === 0) {
         toast.info("Etiqueta leída: la ficha ya estaba rellena, no se ha cambiado nada.");
       } else {
-        toast.success(`Etiqueta leída: ${campos.length === 1 ? "1 campo rellenado" : `${campos.length} campos rellenados`}. Revísalos antes de guardar.`);
+        toast.success(`Etiqueta leída: ${rellenados === 1 ? "1 campo rellenado" : `${rellenados} campos rellenados`}. Revísalos antes de guardar.`);
       }
       ultimo.current.alLeer?.({ datos: r.datos, fuente });
     } catch (e) {
@@ -120,7 +126,20 @@ export function useLecturaEtiquetaVino(
     } finally {
       if (mio === turno.current) setLeyendo(false);
     }
-  }, []);
+  }, [rellenarCon]);
+
+  /**
+   * Lo leído en una lectura anterior (borrador recuperado tras recargar la
+   * página): rellena como si se acabara de leer, SIN volver a llamar a la IA.
+   */
+  const restaurar = useCallback(
+    (d: DatosVinoFoto) => {
+      turno.current++;
+      setLeyendo(false);
+      rellenarCon(d);
+    },
+    [rellenarCon],
+  );
 
   /** Descarta la lectura en curso (foto cambiada o formulario cerrado). */
   const cancelar = useCallback(() => {
@@ -135,7 +154,7 @@ export function useLecturaEtiquetaVino(
     setDatos(null);
   }, []);
 
-  return { leyendo, datos, leer, cancelar, limpiar };
+  return { leyendo, datos, leer, restaurar, cancelar, limpiar };
 }
 
 export type LecturaEtiquetaVino = ReturnType<typeof useLecturaEtiquetaVino>;
