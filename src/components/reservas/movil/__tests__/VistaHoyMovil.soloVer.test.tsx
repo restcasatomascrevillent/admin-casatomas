@@ -23,6 +23,7 @@ vi.mock("@/hooks/useAccionesServicioReserva", () => ({
   useAccionesServicioReserva: () => ({
     marcarLlegada: anota("marcarLlegada"),
     marcarNoShow: anota("marcarNoShow"),
+    cancelar: anota("cancelar"),
     deshacerLlegadaONoShow: anota("deshacer"),
     moverEspacio: anota("moverEspacio"),
   }),
@@ -107,13 +108,13 @@ describe("Ficha de una reserva (móvil)", () => {
     expect(botones()).toEqual(expect.arrayContaining(["Sentar en mesa 3", "Cambiar mesa", "No vino", "Cerrar"]));
   });
 
-  it("«Anular mesa» (13/11/2026): pide confirmación y deja la reserva sin mesa", async () => {
-    panelReserva("confirmada", ["3"]);
+  it("«Anular mesa» (13/11/2026): cancela la reserva tras confirmar, tenga mesa o no", async () => {
+    panelReserva("confirmada", []);
     fireEvent.click(screen.getByTestId("ficha-anular-mesa"));
-    expect(screen.getByRole("alert")).toHaveTextContent("Se libera mesa 3");
+    expect(screen.getByRole("alert")).toHaveTextContent("¿Anular la mesa de Ana López? La reserva pasa a «Cancelada»");
     expect(h.escrituras).toEqual([]);
-    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Anular mesa" }));
-    await waitFor(() => expect(h.escrituras).toEqual(["asignar"]));
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sí, anular" }));
+    await waitFor(() => expect(h.escrituras).toEqual(["cancelar"]));
   });
 
   it("con solo «Ver»: datos, nota y «Llamar», pero ningún botón que escriba", () => {
