@@ -216,7 +216,8 @@ export interface ListaHoyMovil<R extends ReservaHoyMovil = ReservaHoyMovil> {
 
 /**
  * La lista de Hoy en móvil, pensada para sentar rápido: primero las que aún no han llegado («Llegan ahora»
- * arriba y luego el resto por hora), y abajo las ya sentadas. «No vino» y canceladas no salen. Mismos
+ * arriba y luego el resto por hora), y abajo las ya sentadas. «No vino» no sale; las anuladas que se pasen salen en
+ * «Por llegar» (13/11/2026). Mismos
  * filtros (turno y buscador) que la barra.
  */
 export function listaHoyMovil<R extends ReservaHoyMovil>(
@@ -229,10 +230,12 @@ export function listaHoyMovil<R extends ReservaHoyMovil>(
   const enLlegan = new Set(llegan.map((f) => f.reserva.id));
   const porHora = (a: R, b: R) => a.hora.localeCompare(b.hora) || (a.nombre ?? "").localeCompare(b.nombre ?? "", "es");
   const vivas = reservas.filter((r) => coincideFiltroHoy(r, filtros));
+  // Las anuladas que lleguen en la lista (13/11/2026, «que siga saliendo en las tablas») van aquí, a su hora.
   const porLlegar = vivas
-    .filter((r) => ESTADOS_POR_LLEGAR.has(r.estado) && !enLlegan.has(r.id))
+    .filter((r) => (ESTADOS_POR_LLEGAR.has(r.estado) || r.estado === "cancelada") && !enLlegan.has(r.id))
     .sort(porHora)
     .map((r) => {
+      if (r.estado === "cancelada") return { reserva: r, mesas: [], terminada: false, tarde: false };
       const m = minutos(r.hora);
       return { reserva: r, mesas: mesasDe(r.id), terminada: false, tarde: m != null && m < minutoAhora };
     });
@@ -317,11 +320,11 @@ export function reservasConMesaEnSala<R extends { id: string; hora: string; esta
 // ─── «Hoy» de escritorio: la lista completa por estados (07/11/2026) ─────────
 
 export interface ListaHoyEscritorio<R extends ReservaHoyMovil = ReservaHoyMovil> {
-  /** Aún no han llegado (pendiente, verificada, confirmada), por hora; las pasadas de hora, «Tarde». */
+  /** Aún no han llegado (pendiente, verificada, confirmada) y las anuladas del día, por hora. */
   porLlegar: FilaLlegada<R>[];
   /** «Llegó» y siguen en la mesa (sin `salida_at`), por hora. */
   sentadas: FilaHoyMovil<R>[];
-  /** Ya se fueron (mesa liberada), «No vino» y canceladas, por hora: al final y plegadas. */
+  /** Ya se fueron (mesa liberada) y «No vino», por hora: al final y plegadas. */
   terminadas: FilaHoyMovil<R>[];
 }
 
@@ -347,9 +350,13 @@ export function listaHoyEscritorio<R extends ReservaHoyMovil & { salida_at?: str
     if (ESTADOS_POR_LLEGAR.has(r.estado)) {
       const m = minutos(r.hora);
       porLlegar.push({ reserva: r, mesas: mesasDe(r.id), terminada: false, tarde: m != null && m < minutoAhora });
+    } else if (r.estado === "cancelada") {
+      // Anuladas (13/11/2026, petición del dueño: «que siga saliendo en las tablas»): se quedan en «Por llegar», a su
+      // hora, con la etiqueta «Anulada» y sin acciones; no cuentan en el total de la cabecera.
+      porLlegar.push({ reserva: r, mesas: [], terminada: false, tarde: false });
     } else if (r.estado === ESTADO_LLEGADA && !r.salida_at) {
       sentadas.push({ reserva: r, mesas: mesasDe(r.id), terminada: false });
-    } else if (r.estado === ESTADO_LLEGADA || r.estado === ESTADO_NO_SHOW || r.estado === "cancelada") {
+    } else if (r.estado === ESTADO_LLEGADA || r.estado === ESTADO_NO_SHOW) {
       terminadas.push({ reserva: r, mesas: mesasDe(r.id), terminada: true });
     }
   }
