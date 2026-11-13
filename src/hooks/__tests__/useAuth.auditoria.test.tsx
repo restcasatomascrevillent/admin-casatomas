@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider, useAuth } from "../useAuth";
+import { ESPERAS_REINTENTO_SESION_MS, esFalloTransitorioAuth } from "@/lib/reintentosSesion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { reiniciarCacheVersionAuditoria } from "@/lib/audit-version";
@@ -226,17 +227,69 @@ it("un servidor aún sin la migración mantiene el login anterior hasta activar 
     expect.objectContaining({ accion: "login", actor_user_id: user.id }),
   );
 });
-it("una restauración sin conexión no entra sin comprobar al usuario y registrar el acceso", async () => {
+it("una restauración sin conexión no entra sin comprobar al usuario y registrar el acceso (tras reintentar)", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
+      data: { session },
+      error: null,
+    } as never);
+    // Sin conexión en todos los intentos (el primero y los reintentos).
+    for (let i = 0; i <= ESPERAS_REINTENTO_SESION_MS.length; i++)
+      vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({ data: { user: null }, error: { status: 503 } } as never);
+    const hook = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESPERAS_REINTENTO_SESION_MS.reduce((a, b) => a + b, 0) + 500);
+    });
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    expect(hook.result.current.user).toBeNull();
+    expect(vi.mocked(supabase.auth.getUser).mock.calls.length).toBeGreaterThanOrEqual(ESPERAS_REINTENTO_SESION_MS.length + 1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("poca cobertura al abrir el panel: si la comprobación falla por la red y al reintentar va bien, NO echa al usuario", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
+      data: { session },
+      error: null,
+    } as never);
+    vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({ data: { user: null }, error: { status: 0, name: "AuthRetryableFetchError" } } as never);
+    const hook = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ESPERAS_REINTENTO_SESION_MS[0] + 200);
+    });
+    await waitFor(() => expect(hook.result.current.user?.id).toBe(user.id));
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("un 401 al comprobar la sesión no se reintenta: es caducidad", async () => {
   vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
     data: { session },
     error: null,
   } as never);
-  vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({
-    data: { user: null },
-    error: { status: 503 },
-  } as never);
+  vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({ data: { user: null }, error: { status: 401 } } as never);
+  const antes = vi.mocked(supabase.auth.getUser).mock.calls.length;
   const { result } = await mount();
   expect(result.current.user).toBeNull();
+  expect(vi.mocked(supabase.auth.getUser).mock.calls.length - antes).toBe(1);
+});
+
+describe("esFalloTransitorioAuth", () => {
+  it("red, 5xx, 408 y 429 se reintentan; 401/403 y otros 4xx no", () => {
+    expect(esFalloTransitorioAuth({ name: "AuthRetryableFetchError", status: 0 })).toBe(true);
+    expect(esFalloTransitorioAuth({ status: 503 })).toBe(true);
+    expect(esFalloTransitorioAuth({ status: 429 })).toBe(true);
+    expect(esFalloTransitorioAuth({})).toBe(true);
+    expect(esFalloTransitorioAuth({ status: 401 })).toBe(false);
+    expect(esFalloTransitorioAuth({ status: 403 })).toBe(false);
+    expect(esFalloTransitorioAuth({ status: 400 })).toBe(false);
+    expect(esFalloTransitorioAuth(null)).toBe(false);
+  });
 });
 
 it("un bloqueo remoto cierra la sesión abierta y desmonta el acceso", async () => {
