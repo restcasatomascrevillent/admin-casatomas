@@ -1,6 +1,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import type { ResultadoConexionLinear } from "../../supabase/functions/procesar-logs-web/linear";
+
+export type { EquipoLinear, ResultadoConexionLinear } from "../../supabase/functions/procesar-logs-web/linear";
 
 /**
  * Super Admin › Logs (migración 20261118100000_logs_web.sql).
@@ -532,6 +535,24 @@ export function useProcesarAhora() {
       return data ?? {};
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_LOGS }),
+  });
+}
+
+/**
+ * «Probar conexión con Linear»: la función, con la clave del servidor, dice si
+ * funciona y devuelve equipos, proyectos, estados y etiquetas para elegirlos.
+ * No procesa nada ni guarda nada (se guarda con «Guardar configuración»).
+ */
+export function useProbarLinear() {
+  return useMutation({
+    mutationFn: async (): Promise<ResultadoConexionLinear> => {
+      const { data, error } = await supabase.functions.invoke<ResultadoConexionLinear>("procesar-logs-web", { body: { accion: "probar_linear" } });
+      if (error) throw new Error(await mensajeFuncion("procesar-logs-web", error));
+      if (!data || typeof data !== "object" || !("estado" in data)) {
+        throw new Error("La función procesar-logs-web aún no sabe probar Linear: hay que desplegar la versión nueva.");
+      }
+      return data;
+    },
   });
 }
 

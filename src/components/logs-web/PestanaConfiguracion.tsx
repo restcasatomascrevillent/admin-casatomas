@@ -23,6 +23,7 @@ import {
 } from "@/hooks/useLogsWeb";
 import { fmtFechaHora, NOMBRE_CATEGORIA, NOMBRE_TIPO } from "./calculos";
 import { Interruptor } from "./Controles";
+import { ConexionLinear } from "./ConexionLinear";
 
 const ENTORNOS: Entorno[] = ["produccion", "demo", "local"];
 const NOMBRE_ENTORNO: Record<Entorno, string> = { produccion: "Producción", demo: "Demo", local: "Local" };
@@ -209,37 +210,9 @@ export function PestanaConfiguracion({ estado }: { estado: EstadoRecogidaDatos |
       </Seccion>
 
       <Seccion titulo="Linear">
-        <div className="flex flex-wrap gap-6">
-          <div className="space-y-1">
-            <Label className="text-xs">Destino de los tickets</Label>
-            <Select value={b.linear_modo} onValueChange={(v) => set("linear_modo", v as ConfigLogsWeb["linear_modo"])}>
-              <SelectTrigger className="h-11 w-72"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="prueba">Destino de pruebas (no toca Linear)</SelectItem>
-                <SelectItem value="real">Linear (necesita LINEAR_API_KEY)</SelectItem>
-                <SelectItem value="desactivado">Desactivado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="l-eq" className="text-xs">Equipo (id)</Label>
-            <Input id="l-eq" className="h-11 w-72" value={b.linear_equipo_id ?? ""} onChange={(e) => set("linear_equipo_id", e.target.value.trim() || null)} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="l-pr" className="text-xs">Proyecto (id, opcional)</Label>
-            <Input id="l-pr" className="h-11 w-72" value={b.linear_proyecto_id ?? ""} onChange={(e) => set("linear_proyecto_id", e.target.value.trim() || null)} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="l-et" className="text-xs">Etiquetas (ids, separadas por comas)</Label>
-            <Input id="l-et" className="h-11 w-72" value={b.linear_etiquetas.join(", ")} onChange={(e) => set("linear_etiquetas", e.target.value.split(",").map((x) => x.trim()).filter(Boolean))} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="l-re" className="text-xs">Estado al reabrir (id, opcional)</Label>
-            <Input id="l-re" className="h-11 w-72" value={b.linear_estado_reabrir_id ?? ""} onChange={(e) => set("linear_estado_reabrir_id", e.target.value.trim() || null)} />
-          </div>
-          <Numero id="l-max" etiqueta="Tickets nuevos por día (máx.)" valor={b.linear_max_tickets_dia} min={0} max={500} onCambio={(n) => set("linear_max_tickets_dia", n)} />
-        </div>
-        <p className="text-xs text-muted-foreground">La clave de Linear es un secreto de la función en Supabase: nunca se guarda aquí ni llega al navegador.</p>
+        <ConexionLinear valores={b} onCambio={(c) => setBorrador({ ...b, ...c })} />
+        <Numero id="l-max" etiqueta="Tickets nuevos por día (máx.)" valor={b.linear_max_tickets_dia} min={0} max={500} onCambio={(n) => set("linear_max_tickets_dia", n)}
+          ayuda="Primero los más graves y con más visitantes afectados; el resto espera al día siguiente." />
       </Seccion>
 
       <Seccion titulo="IA, retención y límites de coste">
