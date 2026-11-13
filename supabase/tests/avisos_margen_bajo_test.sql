@@ -6,10 +6,11 @@ set client_encoding = 'UTF8';
 --   T1 permisos: tabla de estado sin acceso para el panel; funciones internas sin
 --      EXECUTE para authenticated.
 --   T2 margen bajo: vino a 30 € con botella a 10 € (2,73×); llega una factura a
---      14 € → coste 12 € → 2,27× < 2,3× → UN aviso facturas_margen_bajo con el texto
+--      14 € → coste 14 € (desde 20261128140000, el de la ÚLTIMA factura; antes, la
+--      mediana: 12 €) → 1,95× < 2,3× → UN aviso facturas_margen_bajo con el texto
 --      sencillo, enlace a la factura y texto_telegram; repetir el cron no lo duplica.
 --      La tienda (desactivada) cruza también su límite y NO avisa.
---   T3 vuelve a estar bien (límite 2,0): su aviso caduca.
+--   T3 vuelve a estar bien (límite 1,9): su aviso caduca.
 --   T4 texto de la subida de precio: cuánto, factura, compra anterior y carta.
 --   T5 facturas_generar_alertas devuelve el resumen de márgenes.
 begin;
@@ -55,7 +56,7 @@ begin
    where tipo = 'facturas_margen_bajo' and datos->>'articulo_id' = 'prueba-f5av-ribera';
   if v_cuantos <> 1 then raise exception 'FALLO T2: % avisos del vino (esperaba 1, solo restaurante) %', v_cuantos, j; end if;
   select * into n from notificaciones_dashboard where tipo = 'facturas_margen_bajo' and datos->>'articulo_id' = 'prueba-f5av-ribera';
-  if n.mensaje not like 'El vino «PRUEBA Ribera» ha bajado a 2,27× (límite 2,3×): la botella te cuesta ahora 12,00 € (antes 10,00 €), según la factura de PRUEBA CATRAL F5 del 29/06.%' then
+  if n.mensaje not like 'El vino «PRUEBA Ribera» ha bajado a 1,95× (límite 2,3×): la botella te cuesta ahora 14,00 € (antes 10,00 €), según la factura de PRUEBA CATRAL F5 del 29/06.%' then
     raise exception 'FALLO T2: texto «%»', n.mensaje;
   end if;
   if n.datos->>'enlace' <> '?tab=compras&modo=documentos&doc=' || v_f2 or n.referencia_tipo <> 'facturas_alerta'
@@ -73,7 +74,7 @@ begin
   if v_cuantos <> 1 then raise exception 'FALLO T2: se duplica el aviso (% avisos)', v_cuantos; end if;
 
   -- T3 ─────────────────────────────────────────────────────────────────────
-  update margenes_carta_config set multiplicador_min_vino = 2.0 where id;
+  update margenes_carta_config set multiplicador_min_vino = 1.9 where id;
   perform public.margenes_generar_avisos('2031-07-01');
   if exists (select 1 from notificaciones_dashboard where tipo = 'facturas_margen_bajo'
               and datos->>'articulo_id' = 'prueba-f5av-ribera' and datos->>'canal' = 'vino' and caduca_en > now()) then

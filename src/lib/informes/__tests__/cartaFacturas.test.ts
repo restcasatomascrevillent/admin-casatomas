@@ -57,7 +57,8 @@ describe("informes «Vinos/Platos: facturas y carta»", () => {
     const t = r.tablas[0];
     expect(t.columnas.map((c) => c.id)).toEqual(["nombre", "categoria", "precio", "compra", "margen", "unidad", "fecha", "activo", "foto"]);
     // Margen (12/11/2026): el multiplicador de Facturas › Márgenes y el beneficio sobre la venta; sin coste, vacío.
-    expect(t.filas.find((f) => f.nombre === "Muga Reserva")).toMatchObject({ margen: "×2,30 · 57 %" });
+    // 13/11/2026: el % lleva su nombre («beneficio»), para no confundirlo con el % de coste.
+    expect(t.filas.find((f) => f.nombre === "Muga Reserva")).toMatchObject({ margen: "×2,30 · beneficio 57 %" });
     expect(t.filas.find((f) => f.nombre === "Albariño")).toMatchObject({ margen: null });
     expect(t.filas.map((f) => f.nombre)).toEqual(["Albariño", "Arzuaga", "Muga Reserva", "Sin categoría"]);
     expect(t.filas[0]).toMatchObject({ precio: 24, compra: 45, unidad: "caja", fecha: "10/08/2026", activo: "No", foto: "No" });
