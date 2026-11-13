@@ -19,7 +19,9 @@
 //  facturas y carta y en platos di que falta el escandallo»):
 //    · Vinos: columna «Margen», la MISMA cuenta que Facturas › Márgenes (RPC
 //      `margenes_carta`): venta sin IVA ÷ coste sin IVA en el formato de la
-//      carta («×2,30 · 57 %»; el % es el beneficio sobre la venta).
+//      carta («×2,30 · beneficio 57 %»: el % es el beneficio sobre la venta sin IVA).
+//  13/11/2026: el coste de Facturas › Márgenes es el de la ÚLTIMA factura (migración
+//  20261128140000), como la columna «Compra» de este informe.
 //    · Platos sin escandallo: «Falta el escandallo» en lugar del ingrediente.
 // ============================================================================
 import { supabase } from "@/integrations/supabase/client";
@@ -123,7 +125,7 @@ export function columnasCartaFacturas(tipo: TipoCartaFacturas): ColumnaInforme[]
     ...(tipo === "platos" ? [{ id: "producto", etiqueta: "Ingrediente", tipo: "texto" as const, ancho: 170 }] : []),
     { id: "precio", etiqueta: "Carta", tipo: "precio", ancho: 105 },
     { id: "compra", etiqueta: "Compra", tipo: "precio", ancho: 105 },
-    ...(tipo === "vinos" ? [{ id: "margen", etiqueta: "Margen", tipo: "texto" as const, ancho: 130 }] : []),
+    ...(tipo === "vinos" ? [{ id: "margen", etiqueta: "Margen", tipo: "texto" as const, ancho: 160 }] : []),
     { id: "unidad", etiqueta: "Unidad", tipo: "texto", ancho: 90 },
     { id: "fecha", etiqueta: "Fecha", tipo: "fecha", ancho: 120 },
     { id: "activo", etiqueta: "Activo", tipo: "texto", ancho: 85 },
@@ -148,11 +150,15 @@ export function vinculosPrincipales(vinculos: readonly VinculoCompra[]): Map<str
 /** Multiplicador de un vino en Facturas › Márgenes (venta sin IVA ÷ coste sin IVA). */
 export type MargenesVinos = ReadonlyMap<string, number | null>;
 
-/** «×2,30 · 57 %»: multiplicador y beneficio sobre la venta (1 − 1/×). «—» sin datos de coste. */
+/**
+ * «×2,30 · beneficio 57 %»: multiplicador y beneficio sobre la venta sin IVA (1 − 1/×).
+ * 13/11/2026 (dueño): el % va con su nombre; antes salía «57 %» solo y se confundía con el
+ * % de coste. «—» sin datos de coste.
+ */
 export function textoMargen(multiplicador: number | null | undefined): string | null {
   if (multiplicador === null || multiplicador === undefined || !(multiplicador > 0)) return null;
   const beneficio = Math.round((1 - 1 / multiplicador) * 100);
-  return `×${fmt(multiplicador, 2)} · ${beneficio} %`;
+  return `×${fmt(multiplicador, 2)} · beneficio ${beneficio} %`;
 }
 
 export const FALTA_ESCANDALLO = "Falta el escandallo";
@@ -227,7 +233,7 @@ export function informeCartaFacturas(tipo: TipoCartaFacturas, datos: DatosCartaF
         nota:
           "Compra: última factura o albarán de Casa Tomás, sin IVA, por la unidad en que se compra. «—»: sin compra vinculada (se vincula en Facturas › Márgenes)." +
           (tipo === "vinos"
-            ? " Margen: el de Facturas › Márgenes, venta sin IVA ÷ coste sin IVA en el formato de la carta (×) y beneficio sobre la venta (%)."
+            ? " Margen: el de Facturas › Márgenes con la última factura: cuántas veces cobras lo que pagas (venta sin IVA ÷ coste sin IVA, en el formato de la carta) y el beneficio, en % del precio de venta sin IVA."
             : " «Falta el escandallo»: el plato no tiene ingredientes; se añaden en Facturas › Márgenes."),
       },
     ],

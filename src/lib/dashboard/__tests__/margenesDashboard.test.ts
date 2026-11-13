@@ -4,11 +4,13 @@ import { normalizarAlertas } from "@/lib/facturas/alertas";
 import {
   articulosFiables,
   cifraMargen,
+  costeYVenta,
   cuentasMargenes,
   enlaceArticulo,
   leerArticuloEnlace,
   peoresMargenes,
   subidasQueAfectan,
+  ultimaFacturaCorta,
   umbralMargen,
 } from "@/lib/dashboard/margenesDashboard";
 
@@ -63,13 +65,26 @@ describe("Dashboard › Márgenes de precio: reutiliza las cuentas de Facturas �
     expect(peoresMargenes(DATOS, 1)).toHaveLength(1);
   });
 
-  it("cifra y umbral cortos: ×1,37 / mín. ×2,50 en vinos y «46 % coste» / máx. 35 % en platos", () => {
+  it("cifra y umbral cortos: ×1,37 / mín. ×2,50 en vinos y «coste: 46 % de lo que cobras» / máx. 35 % en platos", () => {
     const [vino, peso, plato] = peoresMargenes(DATOS);
     expect(cifraMargen(vino)).toBe("×1,37");
     expect(umbralMargen(vino, DATOS)).toBe("mín. ×2,50");
-    expect(cifraMargen(plato)).toBe("46 % coste");
-    expect(umbralMargen(plato, DATOS)).toBe("máx. 35 %");
+    // 13/11/2026: el % de coste es de lo que se COBRA (precio de venta sin IVA), y se dice.
+    expect(cifraMargen(plato)).toBe("coste: 46 % de lo que cobras");
+    expect(umbralMargen(plato, DATOS)).toBe("máx. 35 % de lo que cobras");
     expect(umbralMargen(peso, DATOS)).toBe("mín. ×2,00");
+  });
+
+  it("lo que cuesta (última factura) y a cuánto se vende, en sencillo; y de qué factura sale", () => {
+    const [vino, peso] = peoresMargenes(DATOS);
+    expect(costeYVenta(vino)).toBe("te cuesta 80,40 € · lo vendes a 100,00 €");
+    expect(costeYVenta(peso)).toBe("el kilo te cuesta 110,00 € · lo vendes a 172,73 €");
+    expect(ultimaFacturaCorta(vino)).toBeNull();
+    const conFactura = normalizarMargenes({
+      vinos: [{ id: "v", nombre: "Vino", coste: 12, venta: 30, multiplicador: 2.5, banderas: [],
+        factura: { id: 7, fecha: "2026-11-03", proveedor: "BODEGA X", unidad_compra: "botella", precio_unidad: 12, medida: "l", eur_base: 16 } }],
+    }).vinos[0];
+    expect(ultimaFacturaCorta(conFactura, "2026-11-13")).toBe("Última factura: BODEGA X, 03/11 · 12,00 € la botella (16,00 €/l)");
   });
 
   it("cuentas de arriba: margen en rojo y coste subiendo (solo lo fiable)", () => {

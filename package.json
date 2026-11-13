@@ -40,6 +40,7 @@
     "test:permisos-facturas-subida:db": "node scripts/test-permisos-facturas-subida.mjs",
     "test:usuarios-reservas-albaranes:db": "node scripts/test-usuarios-reservas-albaranes.mjs",
     "test:avisos-revisado:db": "node scripts/test-avisos-revisado.mjs",
+    "test:margenes-ultima-factura:db": "node scripts/test-margenes-ultima-factura.mjs",
     "test:carta-bebidas-web:db": "node scripts/test-carta-bebidas-web.mjs",
     "test:vinos-copeo-encuesta:db": "node scripts/test-vinos-copeo-encuesta.mjs",
     "test:vinos-parker:db": "node scripts/test-vinos-parker.mjs",
