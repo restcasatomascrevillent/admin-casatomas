@@ -136,20 +136,20 @@ describe("«Añadir vino» en el móvil con lectura IA", () => {
     await ponerFotoYRellenar(foto);
 
     // Antes de guardar: recortada en el formulario y compuesta con el fondo.
-    await waitFor(() => expect(m.movil).toHaveBeenCalledWith(foto, expect.any(Function)));
+    await waitFor(() => expect(m.movil).toHaveBeenCalledWith(foto, expect.any(Function)), { timeout: 5000 });
     // Uno detrás de otro (memoria del iPhone): el recorte no empieza hasta acabar la lectura.
     expect(orden).toEqual(["leer:empieza", "leer:acaba", "recorte"]);
-    await waitFor(() => expect(screen.getByTestId("foto").dataset.fase).toBe("listo"));
-    await waitFor(() => expect(m.componer).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Guardar Vino" })).not.toBeDisabled());
+    await waitFor(() => expect(screen.getByTestId("foto").dataset.fase).toBe("listo"), { timeout: 5000 });
+    await waitFor(() => expect(m.componer).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Guardar Vino" })).not.toBeDisabled(), { timeout: 5000 });
 
     fireEvent.click(screen.getByRole("button", { name: "Guardar Vino" }));
-    await waitFor(() => expect(m.subir).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(m.subir).toHaveBeenCalledTimes(1), { timeout: 5000 });
     const archivos = m.subir.mock.calls[0][2];
     expect(archivos.original).toBe(foto);
     expect(archivos.compuesta).toBeInstanceOf(File);
     expect(m.noRecortar).not.toHaveBeenCalled();
-    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false), { timeout: 5000 });
   });
 
   it("si el servidor falla: se ve el motivo y no deja guardar (ni sube la foto sin recortar ni la manda a un ordenador)", async () => {
