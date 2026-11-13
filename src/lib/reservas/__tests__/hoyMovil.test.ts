@@ -176,7 +176,7 @@ describe("listaHoyEscritorio", () => {
   });
   const sinMesas = () => [] as string[];
 
-  it("agrupa en por llegar, sentadas y terminadas (liberadas, no vino y canceladas), cada grupo por hora", () => {
+  it("agrupa en por llegar (con las anuladas a su hora, 13/11/2026), sentadas y terminadas (liberadas y no vino)", () => {
     const l = listaHoyEscritorio(
       [
         r("conf-14", "14:00", "confirmada"),
@@ -190,10 +190,10 @@ describe("listaHoyEscritorio", () => {
       13 * 60 + 30,
       { busqueda: "", filtroTurno: "todo" },
     );
-    expect(l.porLlegar.map((f) => f.reserva.id)).toEqual(["pend-13", "conf-14"]);
-    expect(l.porLlegar.map((f) => f.tarde)).toEqual([true, false]);
+    expect(l.porLlegar.map((f) => f.reserva.id)).toEqual(["pend-13", "conf-14", "canc"]);
+    expect(l.porLlegar.map((f) => f.tarde)).toEqual([true, false, false]);
     expect(l.sentadas.map((f) => f.reserva.id)).toEqual(["sent"]);
-    expect(l.terminadas.map((f) => f.reserva.id)).toEqual(["ida", "noshow", "canc"]);
+    expect(l.terminadas.map((f) => f.reserva.id)).toEqual(["ida", "noshow"]);
   });
 
   it("respeta el turno y el buscador", () => {

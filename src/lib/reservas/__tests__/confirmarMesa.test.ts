@@ -178,10 +178,12 @@ describe("listaHoyMovil", () => {
   ];
   const l = listaHoyMovil(reservas, () => [], 21 * 60, { busqueda: "", filtroTurno: "cena" });
 
-  it("llegan ahora arriba, el resto por llegar por hora (con «Tarde»), sentadas aparte; sin no-show ni canceladas", () => {
+  it("llegan ahora arriba, el resto por llegar por hora (con «Tarde»), sentadas aparte; sin no-show; las anuladas, a su hora", () => {
     expect(l.llegan.map((f) => f.reserva.id)).toEqual(["ya"]);
+    // 13/11/2026: la anulada («cancel», 21:00) sigue en «Por llegar», a su hora y sin «Tarde».
     expect(l.porLlegar.map((f) => [f.reserva.id, f.tarde])).toEqual([
       ["tarde", true],
+      ["cancel", false],
       ["antes", false],
       ["luego", false],
     ]);

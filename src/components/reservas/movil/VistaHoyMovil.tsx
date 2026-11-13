@@ -203,10 +203,13 @@ export function VistaHoyMovil({
   reservas,
   fecha,
   columna,
+  canceladas: canceladasMovil,
 }: {
   reservas: ReservaMovil[] | undefined;
   fecha: string;
   columna?: ColumnaHoy;
+  /** Las anuladas del día en el móvil (13/11/2026): salen en «Por llegar» con la etiqueta «Anulada». */
+  canceladas?: ReservaMovil[];
 }) {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, 240);
@@ -266,11 +269,11 @@ export function VistaHoyMovil({
   }, [asignacionesDia, mesaPorId]);
 
   const lista = useMemo(
-    () => listaHoyMovil(reservas ?? [], mesasDe, minutoAhora, { busqueda, filtroTurno }),
-    [reservas, mesasDe, minutoAhora, busqueda, filtroTurno],
+    () => listaHoyMovil([...(reservas ?? []), ...(canceladasMovil ?? [])], mesasDe, minutoAhora, { busqueda, filtroTurno }),
+    [reservas, canceladasMovil, mesasDe, minutoAhora, busqueda, filtroTurno],
   );
   // Escritorio (07/11/2026, «eso era para el móvil»): TODAS las del turno, por estados, en filas de una línea.
-  const canceladas = columna?.canceladas;
+  const canceladas = columna?.canceladas ?? canceladasMovil;
   const listaEscritorio = useMemo(
     () =>
       columna ? listaHoyEscritorio([...(reservas ?? []), ...(canceladas ?? [])], mesasDe, minutoAhora, { busqueda, filtroTurno }) : null,
@@ -323,13 +326,13 @@ export function VistaHoyMovil({
         tarde={extra.tarde}
         sala={reserva.espacio_id ? (salaPorId.get(reserva.espacio_id) ?? "") : undefined}
         onAbrir={() => abrirFicha(reserva.id)}
-        onSentar={puedeEditar && !extra.sentada ? () => void sentarDesdeFila(reserva, decision) : undefined}
+        onSentar={puedeEditar && !extra.sentada && reserva.estado !== "cancelada" ? () => void sentarDesdeFila(reserva, decision) : undefined}
         mesaPrevistaOcupada={nombresMesa.length > 0 && decision.tipo === "elegir"}
         sentando={sentandoId === reserva.id}
         // «Sentar fuera» (10/11/2026): el botón azul, junto a «Sentar». Solo con «Editar». Si está PENDIENTE, en su lugar
         // «Verificar» en verde (12/11/2026, como en la lista de tablet y escritorio).
         sentarFuera={
-          puedeEditar && !extra.sentada ? (
+          puedeEditar && !extra.sentada && reserva.estado !== "cancelada" ? (
             reserva.estado === "pendiente" ? (
               <Button
                 type="button"
@@ -514,7 +517,11 @@ export function VistaHoyMovil({
                 <h3 className="sticky top-0 z-10 flex items-center justify-between border-b bg-muted/95 px-3 py-2 text-base font-semibold backdrop-blur">
                   <span>Por llegar</span>
                   <span className="text-xs font-normal text-muted-foreground tabular-nums">
-                    {lista.porLlegar.length} {lista.porLlegar.length === 1 ? "reserva" : "reservas"} · {pax(lista.porLlegar)} pax
+                    {(() => {
+                      // Las anuladas se ven pero no cuentan (13/11/2026).
+                      const vivasPorLlegar = lista.porLlegar.filter((f) => f.reserva.estado !== "cancelada");
+                      return `${vivasPorLlegar.length} ${vivasPorLlegar.length === 1 ? "reserva" : "reservas"} · ${pax(vivasPorLlegar)} pax`;
+                    })()}
                   </span>
                 </h3>
                 <FilasPorMenu
@@ -646,7 +653,7 @@ export function FilaReservaMovil({
   const notas = (reserva.notas_cliente ?? "").trim();
   return (
     // Pendientes con fondo naranja translúcido (12/11/2026), como en la lista de tablet y escritorio.
-    <li className={cn("relative", reserva.estado === "pendiente" && !terminada && "bg-orange-500/15 dark:bg-orange-400/15")}>
+    <li className={cn("relative", reserva.estado === "pendiente" && !terminada && "bg-orange-500/15 dark:bg-orange-400/15", reserva.estado === "cancelada" && "opacity-60")}>
       <button
         type="button"
         onClick={onAbrir}
@@ -725,8 +732,13 @@ export function FilaReservaMovil({
         {/* Estado y menús en su propia línea, a todo lo ancho (10/11/2026): al lado de «Sentar» y «Fuera» cada
             insignia se iba a una línea y la fila crecía mucho a 375 px. */}
         <div className="flex flex-wrap items-center gap-1.5 empty:hidden" data-testid="insignias-fila">
-          {/* Sin «Tarde» (12/11/2026, petición del dueño): solo el estado (pendiente, verificada o confirmada). */}
-          {info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>}
+          {/* Sin «Tarde» (12/11/2026, petición del dueño): solo el estado (pendiente, verificada o confirmada). Las
+              anuladas, «Anulada» (13/11/2026). */}
+          {reserva.estado === "cancelada" ? (
+            <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-950/60 dark:text-red-200">Anulada</span>
+          ) : (
+            info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
+          )}
           <InsigniaMenuDelDia reserva={reserva} />
           <InsigniaMenuCerrado reserva={reserva} />
           <InsigniaZona reserva={reserva} />
@@ -1640,6 +1652,8 @@ export function PanelReservaMovil({
 
   const salaNombre = (id: string | null) => salas.find((s) => s.id === id)?.nombre ?? "Sin sala";
   const terminada = estaTerminada(reserva.estado);
+  /** Anulada (cancelada): la ficha solo enseña los datos; nada de sentar, mesas ni «No vino» (13/11/2026). */
+  const anulada = reserva.estado === "cancelada";
   const sentada = reserva.estado === "completada";
   /** Sentada fuera de las salas (Touza, Terraza Touza…): sin sala ni mesa (10/11/2026). */
   const fuera = estaSentadaFuera(reserva);
@@ -1777,7 +1791,11 @@ export function PanelReservaMovil({
       <SheetHeader className="space-y-3 text-left">
         <SheetTitle className="flex flex-wrap items-center gap-2 pr-8 text-xl leading-tight">
           <span className="break-words">{reserva.nombre || "Sin nombre"}</span>
-          {info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>}
+          {anulada ? (
+            <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-950/60 dark:text-red-200">Anulada</span>
+          ) : (
+            info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
+          )}
           <InsigniaMenuDelDia reserva={reserva} />
           <InsigniaMenuCerrado reserva={reserva} />
           <InsigniaZona reserva={reserva} />
@@ -1788,7 +1806,14 @@ export function PanelReservaMovil({
             <dd className="font-semibold tabular-nums">{horaCorta(reserva.hora)}</dd>
             <dt className="flex items-center gap-1.5 text-muted-foreground"><Users className="h-4 w-4" aria-hidden />Personas</dt>
             <dd className="flex items-center gap-1">
-              <BotonPersonas reserva={reserva} className="text-base font-semibold" icono="hidden" sufijo="px" />
+              {/* Anulada: solo el número (no se cambian las personas de una reserva anulada). */}
+              {anulada ? (
+                <span className="text-base font-semibold tabular-nums">
+                  {reserva.numero_comensales} <span className="text-xs">px</span>
+                </span>
+              ) : (
+                <BotonPersonas reserva={reserva} className="text-base font-semibold" icono="hidden" sufijo="px" />
+              )}
             </dd>
             <dt className="flex items-center gap-1.5 text-muted-foreground"><MapPin className="h-4 w-4" aria-hidden />Sitio</dt>
             <dd className="min-w-0 break-words">
@@ -1843,10 +1868,10 @@ export function PanelReservaMovil({
         </Button>
       )}
 
-      {/* «Anular mesa» (13/11/2026, petición del dueño): arriba, justo debajo de «Verificar / Confirmar». Cancela la
+      {/* «Anular reserva» (13/11/2026, petición del dueño; antes «Anular mesa»): arriba, justo debajo de «Verificar / Confirmar». Cancela la
           reserva, tenga mesa o no: la misma acción que «Cancelar reserva» de la ficha grande (pasa a «Cancelada» y, si
           tiene correo, se le avisa). Pide confirmación en la propia ficha. */}
-      {puedeEditar && !terminada && (
+      {puedeEditar && !terminada && !anulada && (
         <Button
           variant="outline"
           className="h-12 w-full text-base text-destructive hover:text-destructive"
@@ -1854,13 +1879,13 @@ export function PanelReservaMovil({
           data-testid="ficha-anular-mesa"
           onClick={() =>
             setPendiente({
-              texto: `¿Anular la mesa de ${reserva.nombre || "esta reserva"}? La reserva pasa a «Cancelada»${(reserva as { email?: string | null }).email ? " y se le avisa por correo" : ""}.`,
+              texto: `¿Anular la reserva de ${reserva.nombre || "esta persona"}? Sigue en la lista como «Anulada»${(reserva as { email?: string | null }).email ? " y se le avisa por correo" : ""}.`,
               boton: "Sí, anular",
               ejecutar: () => ejecutar(() => cancelar(reserva as unknown as Parameters<typeof cancelar>[0])),
             })
           }
         >
-          <CircleSlash className="mr-2 h-5 w-5" aria-hidden="true" /> Anular mesa
+          <CircleSlash className="mr-2 h-5 w-5" aria-hidden="true" /> Anular reserva
         </Button>
       )}
 
@@ -1882,7 +1907,11 @@ export function PanelReservaMovil({
         />
       ) : (
         <>
-          {!puedeEditar ? null : terminada ? (
+          {!puedeEditar ? null : anulada ? (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100" data-testid="ficha-anulada">
+              Reserva anulada: no ocupa mesa ni cuenta en el servicio.
+            </p>
+          ) : terminada ? (
             <div className="grid gap-2">
               {puedeLiberar && (
                 <Button className="h-14 text-base" disabled={ocupado} onClick={() => ejecutar(() => liberarMesa(reserva))}>
@@ -1950,7 +1979,7 @@ export function PanelReservaMovil({
             </div>
           )}
 
-          {puedeEditar && eligiendo && (!terminada || (sentada && !fuera)) && (
+          {puedeEditar && eligiendo && !anulada && (!terminada || (sentada && !fuera)) && (
             <div className="space-y-3">
               {propuesta && (
                 <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:bg-amber-950/40">
@@ -1977,7 +2006,7 @@ export function PanelReservaMovil({
       )}
 
       <div className="grid grid-cols-2 gap-2">
-        {puedeEditar && !terminada && (
+        {puedeEditar && !terminada && !anulada && (
           <Button
             variant="outline"
             className="h-12 min-w-0 text-destructive"
@@ -1988,7 +2017,7 @@ export function PanelReservaMovil({
             <span className="truncate">No vino</span>
           </Button>
         )}
-        <Button variant="ghost" className={cn("h-12 min-w-0", (terminada || !puedeEditar) && "col-span-2")} onClick={onCerrar}>
+        <Button variant="ghost" className={cn("h-12 min-w-0", (terminada || anulada || !puedeEditar) && "col-span-2")} onClick={onCerrar}>
           Cerrar
         </Button>
       </div>
