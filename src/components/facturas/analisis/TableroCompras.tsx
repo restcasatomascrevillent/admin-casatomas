@@ -32,7 +32,6 @@ import {
   fechasPeriodo,
   nombreCorto,
   textoMesesIncompletos,
-  textoPct,
   textoRangoMeses,
   textoVariacion,
   type TableroCompras as Datos,
@@ -135,8 +134,8 @@ export function TableroCompras({
   // «Gasto este mes» (solo si está en el tablero): el tablero del mes en curso,
   // que Análisis ya precarga, así que casi siempre sale de la caché.
   const mesActual = useMemo(() => fechasPeriodo("mes", new Date()), []);
-  const conMes = config.cifras.includes("gasto_este_mes");
-  const tableroMes = useQuery({ ...consultaTablero(mesActual.desde, mesActual.hasta, local), enabled: conMes });
+  // También lo usa la primera tarjeta de arriba (13/11/2026): siempre se pide.
+  const tableroMes = useQuery({ ...consultaTablero(mesActual.desde, mesActual.hasta, local) });
 
   const docs = (
     titulo: string,
@@ -543,29 +542,19 @@ export function TableroCompras({
 
   // ─── Las cuatro cifras de arriba (navegación) ─────────────────────────────
 
-  const nombreGasto = datos.meses.length === 1 ? `Gasto de ${etiquetaMes(datos.meses[0].mes).toLowerCase().replace(/\s\d{4}$/, "")}` : "Gasto del periodo";
-  const pctNormal = rd?.variacionBasePct ?? null;
-  const usaNormal = pctNormal !== null && dec?.periodo.comparado?.modo !== "ultimo_mes";
+  // Primera tarjeta (13/11/2026, petición del dueño: «quita el gasto total de la tarjeta y que ponga el gasto mensual
+  // que llevamos y el número de facturas subidas»): el gasto del MES EN CURSO con IVA y cuántas facturas de este mes
+  // hay subidas, sea cual sea el periodo elegido. Tocarla sigue abriendo la vista «Gasto» del periodo.
+  const indMes = tableroMes.data?.indicadores;
+  const nombreMesActual = mesActual.desde ? etiquetaMes(mesActual.desde.slice(0, 7)).toLowerCase().replace(/\s\d{4}$/, "") : "este mes";
   const cifrasNav: { vista: IdVista; etiqueta: string; valor: string[]; detalle: ReactNode; aviso?: boolean; listo: boolean }[] = [
     {
       vista: "gasto",
-      etiqueta: nombreGasto,
-      valor: formasImporte(i.gasto),
-      detalle: (
-        <>
-          con IVA
-          {usaNormal ? (
-            <span className={cn("font-medium", (pctNormal as number) > 0 ? "text-red-700 dark:text-red-400" : "text-emerald-700 dark:text-emerald-400")}>
-              {" "}· {textoPct(pctNormal as number)} que lo normal
-            </span>
-          ) : variacion ? (
-            <span className={cn("font-medium", variacion.sube ? "text-red-700 dark:text-red-400" : "text-emerald-700 dark:text-emerald-400")} title={variacion.texto}>
-              {" "}· {variacion.texto.split(" frente")[0]} que el anterior
-            </span>
-          ) : null}
-        </>
-      ),
-      aviso: !!mesesIncompletos || !!i.variacionAviso,
+      etiqueta: `Gasto de ${nombreMesActual}`,
+      valor: indMes ? formasImporte(indMes.gasto) : ["…"],
+      detalle: indMes ? `con IVA · ${plural(indMes.facturas, "factura subida", "facturas subidas")}` : "Cargando…",
+      // Punto de aviso si el mes en curso está marcado como incompleto (faltan facturas por subir).
+      aviso: !!tableroMes.data?.mesesIncompletos?.length,
       listo: true,
     },
     {
