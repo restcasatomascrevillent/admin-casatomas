@@ -217,24 +217,31 @@ async function cerrarInfo() {
 }
 
 describe("tablero: sale hecho al abrir la pestaña", () => {
-  it("una sola llamada a tablero_compras con el año en curso y todos los locales", async () => {
+  it("tablero_compras con el año en curso y, para la primera tarjeta, el mes en curso (13/11/2026); todos los locales", async () => {
     montar();
     expect(await screen.findByText("1.362.491,57 €")).toBeInTheDocument();
-    expect(llamadasTablero()).toEqual([{ p_desde: "2026-01-01", p_hasta: "2026-12-31", p_local: null }]);
+    await waitFor(() => expect(llamadasTablero()).toHaveLength(2));
+    expect(llamadasTablero()).toEqual(
+      expect.arrayContaining([
+        { p_desde: "2026-01-01", p_hasta: "2026-12-31", p_local: null },
+        { p_desde: "2026-11-01", p_hasta: "2026-11-30", p_local: null },
+      ]),
+    );
     expect(within(screen.getByRole("group", { name: "Periodo" })).getByRole("button", { name: "Año 2026" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("4 cifras que también son navegación: pulsar una abre su vista y queda marcada; las demás cifras, en «Gasto»", async () => {
     montar();
     const ind = await screen.findByLabelText("Indicadores del periodo");
-    expect(ind).toHaveTextContent(/Gasto del periodo1\.362\.491,57\s€con IVA · \+13,5 % que el anterior/);
+    // 13/11/2026: la primera tarjeta es el gasto del mes en curso y las facturas subidas (el doble responde lo mismo).
+    await waitFor(() => expect(ind).toHaveTextContent(/Gasto de noviembre1\.362\.491,57\s€con IVA · 1\.844 facturas subidas/));
     expect(ind).toHaveTextContent(/Precios que han subido/);
     expect(ind).toHaveTextContent(/Puedes ahorrar/);
     expect(ind).toHaveTextContent(/Por revisar40albaranes sin factura/);
     const vistas = screen.getByRole("group", { name: "Vista del análisis" });
     // Por defecto, «Qué decidir hoy».
     expect(within(vistas).getByRole("button", { name: "Qué decidir hoy" })).toHaveAttribute("aria-pressed", "true");
-    const gasto = within(ind).getByRole("button", { name: /^Gasto del periodo/ });
+    const gasto = within(ind).getByRole("button", { name: /^Gasto de noviembre/ });
     expect(gasto).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(gasto);
     expect(gasto).toHaveAttribute("aria-pressed", "true");
@@ -489,7 +496,8 @@ describe("tablero: carga, vacío y error", () => {
     montar();
     expect(await screen.findByText(/No hay documentos en este año/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Ver todo el histórico" }));
-    expect(await screen.findByText("1.362.491,57 €")).toBeInTheDocument();
+    await waitFor(() => expect(llamadasTablero()).toContainEqual({ p_desde: null, p_hasta: null, p_local: null }));
+    expect(await screen.findByLabelText("Indicadores del periodo")).toHaveTextContent(/Por revisar40albaranes sin factura/);
   });
 
   it("error con «Reintentar»; si falta la migración, lo dice", async () => {
@@ -710,7 +718,7 @@ describe("QA 05/11/2026: cifras de otro periodo, tramos y documentos", () => {
       // Las filas de las tarjetas, desactivadas.
       expect(screen.getByRole("option", { name: /Proveedor 1/ })).toBeDisabled();
       await act(async () => soltar({ data: TABLERO, error: null }));
-      await waitFor(() => expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Gasto del periodo/ })).toBeEnabled());
+      await waitFor(() => expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Gasto de noviembre/ })).toBeEnabled());
     } finally {
       doble.rpc.mockImplementation(original);
     }
@@ -811,9 +819,9 @@ describe("tablero: retención de IRPF y meses incompletos (06/11/2026)", () => {
   it("el gasto no cambia; «Gasto» dice lo retenido, el coste real, el mes incompleto y que la variación no es fiable", async () => {
     montar();
     const ind = await screen.findByLabelText("Indicadores del periodo");
-    expect(ind).toHaveTextContent(/Gasto del periodo1\.362\.491,57\s€/);
-    // Marca de aviso en la cifra (mes incompleto y variación no fiable).
-    const gasto = within(ind).getByRole("button", { name: /^Gasto del periodo/ });
+    await waitFor(() => expect(ind).toHaveTextContent(/Gasto de noviembre1\.362\.491,57\s€/));
+    // Marca de aviso en la cifra (el doble marca un mes incompleto también en la consulta del mes en curso).
+    const gasto = within(ind).getByRole("button", { name: /^Gasto de noviembre/ });
     expect(gasto).toHaveAccessibleName(/con avisos/);
     fireEvent.click(gasto);
     const franja = screen.getByTestId("franja-gasto");
@@ -827,7 +835,7 @@ describe("tablero: retención de IRPF y meses incompletos (06/11/2026)", () => {
     doble.rpcs.explorar_compras = explorar;
     montar();
     const ind = await screen.findByLabelText("Indicadores del periodo");
-    expect(within(ind).getByRole("button", { name: /^Gasto del periodo/ })).not.toHaveAccessibleName(/con avisos/);
+    expect(within(ind).getByRole("button", { name: /^Gasto de noviembre/ })).not.toHaveAccessibleName(/con avisos/);
     verVista("Gasto");
     const franja = screen.getByTestId("franja-gasto");
     expect(within(franja).queryByTestId("nota-retencion-irpf")).toBeNull();

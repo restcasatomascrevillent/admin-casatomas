@@ -43,6 +43,7 @@ import {
   Armchair,
   Clock,
   CheckCircle2,
+  CircleSlash,
   DoorOpen,
   LayoutGrid,
   List,
@@ -1623,7 +1624,7 @@ export function PanelReservaMovil({
   onCerrar: () => void;
 }) {
   const qc = useQueryClient();
-  const { marcarLlegada, marcarNoShow, deshacerLlegadaONoShow, quitarFuera, aceptar, confirmar } = useAccionesServicioReserva();
+  const { marcarLlegada, marcarNoShow, deshacerLlegadaONoShow, quitarFuera, aceptar, confirmar, cancelar } = useAccionesServicioReserva();
   const { liberarMesa } = useAccionesModoServicio();
   const sentarReserva = useSentarReservaEnMesa(fecha, mesas);
   const turno: TurnoServicio = turnoDeHora(reserva.hora);
@@ -1839,6 +1840,27 @@ export function PanelReservaMovil({
         >
           <CheckCircle2 className="mr-2 h-5 w-5" aria-hidden="true" />
           {reserva.estado === "pendiente" ? "Verificar" : "Confirmar"}
+        </Button>
+      )}
+
+      {/* «Anular mesa» (13/11/2026, petición del dueño): arriba, justo debajo de «Verificar / Confirmar». Cancela la
+          reserva, tenga mesa o no: la misma acción que «Cancelar reserva» de la ficha grande (pasa a «Cancelada» y, si
+          tiene correo, se le avisa). Pide confirmación en la propia ficha. */}
+      {puedeEditar && !terminada && (
+        <Button
+          variant="outline"
+          className="h-12 w-full text-base text-destructive hover:text-destructive"
+          disabled={ocupado}
+          data-testid="ficha-anular-mesa"
+          onClick={() =>
+            setPendiente({
+              texto: `¿Anular la mesa de ${reserva.nombre || "esta reserva"}? La reserva pasa a «Cancelada»${(reserva as { email?: string | null }).email ? " y se le avisa por correo" : ""}.`,
+              boton: "Sí, anular",
+              ejecutar: () => ejecutar(() => cancelar(reserva as unknown as Parameters<typeof cancelar>[0])),
+            })
+          }
+        >
+          <CircleSlash className="mr-2 h-5 w-5" aria-hidden="true" /> Anular mesa
         </Button>
       )}
 

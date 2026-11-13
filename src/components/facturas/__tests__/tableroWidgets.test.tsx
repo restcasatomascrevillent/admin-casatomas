@@ -516,7 +516,7 @@ describe("cifras que nunca se cortan", () => {
     conSitio(90);
     montar();
     const ind = await screen.findByLabelText("Indicadores del periodo");
-    const gasto = await within(ind).findByRole("button", { name: /^Gasto del periodo.*1\.362\.491,57\s€/ });
+    const gasto = await within(ind).findByRole("button", { name: /^Gasto de noviembre.*1\.362\.491,57\s€/ });
     await waitFor(() => expect(gasto.querySelector("[title]")).toHaveAttribute("title", "1.362.491,57 €"));
     act(() => undefined);
   });

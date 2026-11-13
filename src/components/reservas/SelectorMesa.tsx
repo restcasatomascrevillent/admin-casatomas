@@ -80,17 +80,25 @@ export function SelectorMesaMovil({
             marcada && "ring-4 ring-primary ring-offset-2 ring-offset-background",
           )}
         >
-          <span className="flex w-full items-baseline justify-between gap-1">
-            <span className="flex items-center gap-1 text-lg font-bold leading-none">
-              {m.nombre}
-              {candado && <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
-            </span>
-            <span className="flex items-center gap-0.5 text-xs font-semibold tabular-nums">
+          {/* 13/11/2026 (captura del dueño: «Reservado» se salía de la casilla y empujaba las plazas fuera): el nombre
+              tiene todo el ancho arriba (un punto más pequeño si es largo; parte línea por los espacios) y las plazas bajan
+              a la línea del estado, a la derecha, donde nunca chocan con el nombre. */}
+          <span
+            className={cn(
+              "flex w-full min-w-0 items-center gap-1 break-words font-bold leading-tight",
+              m.nombre.length > 4 ? "text-base" : "text-lg leading-none",
+            )}
+          >
+            <span className="min-w-0">{m.nombre}</span>
+            {candado && <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+          </span>
+          <span className="flex w-full min-w-0 items-end justify-between gap-1">
+            <span className="line-clamp-2 min-w-0 text-xs font-medium">{detalle}</span>
+            <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold tabular-nums">
               <Users className="h-3 w-3" aria-hidden />
               {m.plazas}
             </span>
           </span>
-          <span className="line-clamp-2 w-full text-xs font-medium">{detalle}</span>
         </button>
       </li>
     );
