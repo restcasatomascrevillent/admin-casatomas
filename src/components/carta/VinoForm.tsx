@@ -186,10 +186,13 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     if (!file) return;
     lectura.cancelar();
     busquedaParker.limpiar();
-    recorte.iniciar(file);
-    // Vino nuevo sin nombre: la IA lee la etiqueta a la vez que se recorta.
+    // Vino nuevo sin nombre: la IA lee la etiqueta. En el ordenador, a la vez
+    // que se recorta; en el móvil, primero la etiqueta y después el recorte,
+    // con la misma foto reducida una sola vez (13/11/2026: a la vez y con la
+    // foto entera, el iPhone se quedaba sin memoria y recargaba la página).
     // Con precarga (lote) la foto ya se leyó; con nombre escrito, botón manual.
-    if (!precarga && !String(form.getValues("nombre") ?? "").trim()) void lectura.leer(file);
+    const leer = !precarga && !String(form.getValues("nombre") ?? "").trim();
+    recorte.iniciar(file, undefined, leer ? { antes: (foto) => lectura.leer(foto) } : undefined);
   };
 
   const clearImage = () => {
@@ -365,7 +368,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                         variant="outline"
                         size="sm"
                         className="h-9"
-                        onClick={() => recorte.original && void lectura.leer(recorte.original)}
+                        onClick={() => recorte.fotoLigera && void lectura.leer(recorte.fotoLigera)}
                       >
                         <Sparkles className="mr-2 h-4 w-4" />
                         Leer etiqueta con IA
@@ -431,8 +434,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
               >
                 Cancelar
               </Button>
-              <Button type="submit" className="h-11 px-5" disabled={crearVino.isPending || isUploading || recorte.trabajando}>
-                {crearVino.isPending || isUploading ? "Guardando..." : recorte.trabajando ? "Recortando foto…" : "Guardar Vino"}
+              <Button type="submit" className="h-11 px-5" disabled={crearVino.isPending || isUploading || recorte.trabajando || recorte.faltaFondo}>
+                {crearVino.isPending || isUploading ? "Guardando..." : recorte.trabajando ? "Recortando foto…" : recorte.faltaFondo ? "Falta el fondo de la foto" : "Guardar Vino"}
               </Button>
             </div>
           </form>

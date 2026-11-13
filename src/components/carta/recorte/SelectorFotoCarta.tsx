@@ -4,8 +4,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { temasDisponibles } from "../composicionCarta";
 import { ESTILO_DAMERO, textoProgreso, type FotoCarta } from "./useRecorteVino";
-import { movilSinLocal, olvidarMovilSinLocal } from "./recorteMovil";
-import { useState } from "react";
 
 interface Props {
   recorte: FotoCarta;
@@ -20,7 +18,9 @@ const TEMAS_LISTA = temasDisponibles();
  * Foto de producto de la carta tras elegirla: se recorta sola, se enseña el
  * sticker sobre damero y debajo las muestras de FONDO (los temas de la carta);
  * al tocar una se ve al momento la foto con ese fondo. Selector «Sticker |
- * Con fondo», «Usar foto original» y «Repetir recorte».
+ * Con fondo», «Usar foto original» y «Repetir recorte». Si no se pudo quitar
+ * el fondo: el motivo, «Reintentar» y «Usar foto original» (13/11/2026: ya no
+ * se elige sola; sin una de las dos, el formulario no deja guardar).
  */
 export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del producto" }: Props) {
   const { estado, eleccion, vista, urls, tema, tipo } = recorte;
@@ -30,8 +30,9 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
   const usaCarta = listo && eleccion === "carta";
   const verSticker = usaCarta && (vista === "sticker" || !urls.carta);
   const src = usaCarta ? (verSticker ? urls.sticker : urls.carta) : urls.original;
-  /** Móvil que se quedó sin memoria recortando: usa el servidor (se puede volver a probar). */
-  const [sinLocal, setSinLocal] = useState(() => movilSinLocal());
+  const fallo = estado.fase === "fallo";
+  /** Falló y se ha elegido la foto tal cual a propósito. */
+  const originalElegida = eleccion === "original";
 
   return (
     <div className="space-y-2">
@@ -99,23 +100,6 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
         </div>
       )}
 
-      {sinLocal && (estado.fase === "trabajando" || listo || estado.fase === "fallo") && (
-        // Móvil que se quedó sin memoria recortando: el fondo lo quita el servidor.
-        <p className="mx-auto max-w-xs text-center text-xs text-muted-foreground" data-testid="aviso-sin-local">
-          Este móvil quita el fondo en el servidor (se quedó sin memoria al hacerlo él).{" "}
-          <button
-            type="button"
-            className="font-medium underline underline-offset-2"
-            onClick={() => {
-              olvidarMovilSinLocal();
-              setSinLocal(null);
-            }}
-          >
-            Probar otra vez en este móvil
-          </button>
-        </p>
-      )}
-
       {listo && (
         <div>
           <p className="mb-1 text-center text-xs font-medium text-muted-foreground">Fondo</p>
@@ -148,7 +132,7 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
         </div>
       )}
 
-      {estado.fase === "fallo" && (
+      {fallo && (
         // Visible y con el motivo: antes era una línea gris pequeña que nadie leía y el
         // vino se guardaba sin fondo (iPhone, 02-11-2026).
         <div
@@ -157,27 +141,32 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <div className="space-y-0.5">
-            <p className="font-semibold">No se ha podido quitar el fondo</p>
-            <p>{estado.aviso}</p>
+            <p className="font-semibold">{originalElegida ? "Se guardará la foto sin recortar" : "No se ha podido quitar el fondo"}</p>
+            <p>{originalElegida ? "Has elegido «Usar foto original». Para probar otra vez, pulsa «Reintentar»." : estado.aviso}</p>
           </div>
         </div>
       )}
 
-      {(listo || estado.fase === "fallo") && (
+      {(listo || fallo) && (
         <div className="flex flex-wrap justify-center gap-2">
+          {fallo ? (
+            <Button type="button" size="sm" className="h-10" variant={originalElegida ? "outline" : "default"} onClick={recorte.repetir}>
+              <RotateCw className="mr-1.5 h-4 w-4" />
+              Reintentar
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
             className="h-10"
-            variant={eleccion === "original" && listo ? "default" : "outline"}
-            aria-pressed={eleccion === "original"}
+            variant={originalElegida ? "default" : "outline"}
+            aria-pressed={originalElegida}
             onClick={() => recorte.setEleccion("original")}
-            disabled={!listo}
           >
             <ImageIcon className="mr-1.5 h-4 w-4" />
             Usar foto original
           </Button>
-          {!yaRecortada && (
+          {listo && !yaRecortada && (
             <Button type="button" size="sm" variant="outline" className="h-10" onClick={recorte.repetir}>
               <RotateCw className="mr-1.5 h-4 w-4" />
               Repetir recorte
