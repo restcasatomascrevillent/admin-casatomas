@@ -744,7 +744,7 @@ export function EditarPlatoModal({
               <Button
                 type="submit"
                 className="h-11 px-5"
-                disabled={actualizarPlato.isPending || isUploadingImage || fotoCarta.trabajando}
+                disabled={actualizarPlato.isPending || isUploadingImage || fotoCarta.trabajando || fotoCarta.faltaFondo}
               >
                 {actualizarPlato.isPending || isUploadingImage ? (
                   <>

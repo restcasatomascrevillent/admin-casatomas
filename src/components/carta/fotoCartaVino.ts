@@ -11,15 +11,16 @@
  *     guardado: no hay nada que deshacer).
  *   Cualquier ruta con `-carta` antes de la extensión cuenta como procesada.
  *
- * Quitar el fondo en el panel: GRATIS en el navegador (recorte/
- * quitarFondoNavegador.ts: isnet en un Web Worker con onnxruntime-web, WebGPU
- * si hay; el modelo se baja una vez y se cachea). Sin servicios de pago: el
- * recorte por Replicate se quitó el 02-11-2026 (decisión del dueño).
- *
- *   - Ordenador y móvil: se recorta en el formulario, antes de guardar.
- *   - Móvil y tablet: si el modelo no puede en el navegador, lo hace el
- *     SERVIDOR (api/recortar-foto.ts, recorte/quitarFondoMovil.ts); si también
- *     falla, se guarda la foto normal, se avisa y va a un ordenador.
+ * Quitar el fondo en el panel, siempre en el formulario y antes de guardar:
+ *   - Ordenador: GRATIS en el navegador (recorte/quitarFondoNavegador.ts:
+ *     isnet en un Web Worker con onnxruntime-web, WebGPU si hay; el modelo se
+ *     baja una vez y se cachea). Si el navegador no puede, el SERVIDOR.
+ *   - Móvil y tablet: siempre el SERVIDOR (api/recortar-foto.ts, mismo
+ *     modelo; recorte/quitarFondoMovil.ts). El modelo en el iPhone dejaba a
+ *     Safari sin memoria y recargaba la página (13/11/2026).
+ *   - Si todo falla, el formulario lo dice y deja «Reintentar» o «Usar foto
+ *     original»: nunca se guarda sola una foto sin recortar.
+ * Sin servicios de pago: el recorte por Replicate se quitó el 02-11-2026.
  * Las fotos ya subidas sin procesar se pueden homogeneizar con el script
  * local `scripts/fotos-vino/`.
  */
@@ -37,21 +38,32 @@ export interface ResultadoFotoCarta {
   foto: File;
   /** La botella recortada sin fondo (PNG con transparencia). */
   sticker: Blob;
-  /** Quién quitó el fondo: el navegador (ordenador o móvil) o, de respaldo en el móvil, el servidor. */
+  /** Quién quitó el fondo: el navegador (ordenador) o el servidor (móvil y tableta, o si el navegador del ordenador no puede). */
   metodo: "navegador" | "servidor";
 }
 
+/** El modelo no encontró nada que recortar: el servidor usa el mismo, no merece la pena probar allí. */
+const RE_SIN_PRODUCTO = /botella|producto/i;
+
 /**
- * Quita el fondo en el navegador. En el ordenador, con la foto tal cual; en el
- * móvil (quitarFondoMovil), reducida y, si el modelo no puede, en el servidor.
+ * Quita el fondo. En el ordenador, en su navegador con la foto tal cual y, si
+ * no puede, en el servidor; en el móvil y la tableta, siempre en el servidor
+ * (quitarFondoMovil, con la foto reducida).
  */
 export async function quitarFondo(
   foto: Blob,
   onProgreso?: (p: ProgresoMovil) => void,
 ): Promise<{ sticker: Blob; metodo: ResultadoFotoCarta["metodo"] }> {
-  if (recorteNavegadorSeguro()) return { sticker: await quitarFondoNavegador(foto, onProgreso), metodo: "navegador" };
   const { quitarFondoMovil } = await import("./recorte/quitarFondoMovil");
-  return quitarFondoMovil(foto, onProgreso);
+  if (!recorteNavegadorSeguro()) return quitarFondoMovil(foto, onProgreso);
+  try {
+    return { sticker: await quitarFondoNavegador(foto, onProgreso), metodo: "navegador" };
+  } catch (e) {
+    const mensaje = (e as { message?: string } | null)?.message ?? "";
+    if (RE_SIN_PRODUCTO.test(mensaje)) throw e;
+    console.warn("[recorte] el navegador no ha podido; se prueba en el servidor", e);
+    return quitarFondoMovil(foto, onProgreso);
+  }
 }
 
 /**
@@ -67,15 +79,15 @@ export async function hacerFotoCarta(foto: Blob, onProgreso?: (p: ProgresoMovil)
 }
 
 /**
- * Aviso corto cuando no se pudo aplicar el fondo de carta en el formulario
- * (ordenador): que se guarda la foto normal y qué hacer.
+ * Aviso corto cuando no se pudo quitar el fondo en el formulario: el motivo y
+ * qué hacer (13/11/2026: ya no se guarda sola la foto normal).
  */
 export function avisoSinFondoCarta(e: unknown): string {
   const err = e as { message?: string; causa?: string } | null;
   const motivo = err?.causa
     ? motivoFallo(e)
-    : /botella|producto/i.test(err?.message ?? "")
+    : RE_SIN_PRODUCTO.test(err?.message ?? "")
       ? "No se ha encontrado el producto en la foto."
       : "No se ha podido poner el fondo de carta.";
-  return `${motivo} Se guarda la foto normal. Pulsa «Repetir recorte» o, más tarde, abre la ficha y pulsa «Quitar fondo».`;
+  return `${motivo} Pulsa «Reintentar» o, si prefieres guardarla tal cual, «Usar foto original».`;
 }

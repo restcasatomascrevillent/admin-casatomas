@@ -454,7 +454,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
               </Button>
               <Button
                 type="submit"
-                disabled={crearCoctel.isPending || isUploading || fotoCarta.trabajando}
+                disabled={crearCoctel.isPending || isUploading || fotoCarta.trabajando || fotoCarta.faltaFondo}
               >
                 {(crearCoctel.isPending || isUploading) && (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

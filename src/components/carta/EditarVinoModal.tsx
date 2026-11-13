@@ -216,7 +216,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
   };
 
   // Foto que leería la IA: la nueva o, si no, la guardada (la de la web: el original ya no está en Supabase).
-  const fotoParaLeer: File | string | null = recorte.original ?? imagePreview;
+  const fotoParaLeer: File | string | null = recorte.fotoLigera ?? imagePreview;
 
   const clearImage = () => {
     lectura.cancelar();
@@ -444,7 +444,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               <Button type="button" variant="outline" className="h-11 px-5" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="h-11 px-5" disabled={actualizarVino.isPending || isUploadingImage || recorte.trabajando}>
+              <Button type="submit" className="h-11 px-5" disabled={actualizarVino.isPending || isUploadingImage || recorte.trabajando || recorte.faltaFondo}>
                 {actualizarVino.isPending || isUploadingImage ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

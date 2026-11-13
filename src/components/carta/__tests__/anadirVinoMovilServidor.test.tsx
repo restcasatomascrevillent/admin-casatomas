@@ -2,12 +2,12 @@
  * «Añadir vino» en el MÓVIL con lectura de la etiqueta por IA (fallo del
  * 03-11-2026 en producción v0.145: en el iPhone y en Android se guardaba la
  * foto y «no pasaba nada»). Ahora el móvil recorta EN EL FORMULARIO como el
- * portátil, en paralelo a la lectura: con el hook de la foto REAL
- * (useRecorteVino) y la lectura real.
- *   - foto → recorte (móvil o, de respaldo, servidor) + IA → Guardar → se sube
- *     la foto de carta compuesta;
- *   - si el móvil y el servidor fallan → se ve el motivo y, al guardar, la
- *     foto normal va a un ordenador.
+ * portátil: con el hook de la foto REAL (useRecorteVino) y la lectura real.
+ * Desde el 13/11/2026 («me ha echado» en el iPhone): primero la IA lee la
+ * etiqueta y DESPUÉS se quita el fondo en el servidor, uno detrás de otro.
+ *   - foto → IA → recorte (servidor) → Guardar → se sube la foto de carta;
+ *   - si el servidor falla → se ve el motivo y NO deja guardar hasta
+ *     «Reintentar» o «Usar foto original» (antes se subía sola la foto normal).
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -118,43 +118,55 @@ beforeEach(() => {
 });
 
 describe("«Añadir vino» en el móvil con lectura IA", () => {
-  it("recorta en el formulario a la vez que lee la etiqueta y guarda la foto de carta", async () => {
-    m.movil.mockResolvedValue({ sticker: new Blob(["s"], { type: "image/png" }), metodo: "navegador" });
+  it("primero lee la etiqueta y después quita el fondo en el formulario; guarda la foto de carta", async () => {
+    const orden: string[] = [];
+    m.leer.mockImplementation(async () => {
+      orden.push("leer:empieza");
+      await new Promise((r) => setTimeout(r, 20));
+      orden.push("leer:acaba");
+      return { datos: DATOS };
+    });
+    m.movil.mockImplementation(async () => {
+      orden.push("recorte");
+      return { sticker: new Blob(["s"], { type: "image/png" }), metodo: "servidor" };
+    });
     const onOpenChange = vi.fn();
     envolver(<VinoForm open onOpenChange={onOpenChange} />);
     const foto = new File(["foto"], "IMG_0001.JPG", { type: "image/jpeg" });
     await ponerFotoYRellenar(foto);
 
     // Antes de guardar: recortada en el formulario y compuesta con el fondo.
-    expect(m.movil).toHaveBeenCalledWith(foto, expect.any(Function));
-    await waitFor(() => expect(screen.getByTestId("foto").dataset.fase).toBe("listo"));
-    await waitFor(() => expect(m.componer).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Guardar Vino" })).not.toBeDisabled());
+    await waitFor(() => expect(m.movil).toHaveBeenCalledWith(foto, expect.any(Function)), { timeout: 5000 });
+    // Uno detrás de otro (memoria del iPhone): el recorte no empieza hasta acabar la lectura.
+    expect(orden).toEqual(["leer:empieza", "leer:acaba", "recorte"]);
+    await waitFor(() => expect(screen.getByTestId("foto").dataset.fase).toBe("listo"), { timeout: 5000 });
+    await waitFor(() => expect(m.componer).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Guardar Vino" })).not.toBeDisabled(), { timeout: 5000 });
 
     fireEvent.click(screen.getByRole("button", { name: "Guardar Vino" }));
-    await waitFor(() => expect(m.subir).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(m.subir).toHaveBeenCalledTimes(1), { timeout: 5000 });
     const archivos = m.subir.mock.calls[0][2];
     expect(archivos.original).toBe(foto);
     expect(archivos.compuesta).toBeInstanceOf(File);
     expect(m.noRecortar).not.toHaveBeenCalled();
-    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false), { timeout: 5000 });
   });
 
-  it("si el móvil y el servidor fallan: se ve el motivo antes de guardar y, al guardar, la foto normal va a un ordenador", async () => {
+  it("si el servidor falla: se ve el motivo y no deja guardar (ni sube la foto sin recortar ni la manda a un ordenador)", async () => {
     m.movil.mockRejectedValue(new ErrorRecorteServidor("Se ha alcanzado el tope mensual de recortes en el servidor", "tope", 429));
     envolver(<VinoForm open onOpenChange={vi.fn()} />);
     const foto = new File(["foto"], "IMG_0002.JPG", { type: "image/jpeg" });
     await ponerFotoYRellenar(foto);
 
     await waitFor(() => expect(screen.getByTestId("foto").dataset.fase).toBe("fallo"));
-    expect(screen.getByTestId("foto").textContent).toMatch(/tope mensual de recortes en el servidor.*se recortará en un ordenador/);
+    expect(screen.getByTestId("foto").textContent).toMatch(/tope mensual de recortes en el servidor.*«Reintentar».*«Usar foto original»/);
 
-    fireEvent.click(screen.getByRole("button", { name: "Guardar Vino" }));
-    await waitFor(() => expect(m.noRecortar).toHaveBeenCalledTimes(1));
-    expect(m.subir.mock.calls[0][2]).toEqual({ original: foto, compuesta: null });
-    expect(m.noRecortar).toHaveBeenCalledWith(
-      expect.objectContaining({ tabla: "Vinos", registroId: "v1", rutaOriginal: "v1.jpg" }),
-      "Se ha alcanzado el tope mensual de recortes en el servidor.",
-    );
+    const guardar = screen.getByRole("button", { name: "Falta el fondo de la foto" });
+    expect(guardar).toBeDisabled();
+    fireEvent.click(guardar);
+    await act(async () => {});
+    expect(m.crear).not.toHaveBeenCalled();
+    expect(m.subir).not.toHaveBeenCalled();
+    expect(m.noRecortar).not.toHaveBeenCalled();
   });
 });

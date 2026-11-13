@@ -634,7 +634,7 @@ export function PlatoForm({
               <Button
                 type="submit"
                 className="h-11 px-5"
-                disabled={crearPlato.isPending || isUploading || fotoCarta.trabajando}
+                disabled={crearPlato.isPending || isUploading || fotoCarta.trabajando || fotoCarta.faltaFondo}
               >
                 {crearPlato.isPending || isUploading
                   ? "Guardando..."

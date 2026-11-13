@@ -52,15 +52,21 @@ vi.mock("../recorte/useRecorteVino", async () => {
   return {
     useRecorteVino: () => {
       const [original, setOriginal] = React.useState<File | null>(null);
-      const iniciar = React.useCallback((f: File) => setOriginal(f), []);
+      // Como el de verdad: `opciones.antes` (leer la etiqueta) se hace con la foto.
+      const iniciar = React.useCallback((f: File, _previo?: unknown, opciones?: { antes?: (foto: File) => Promise<unknown> }) => {
+        setOriginal(f);
+        void opciones?.antes?.(f);
+      }, []);
       const limpiar = React.useCallback(() => setOriginal(null), []);
       return {
         original,
+        fotoLigera: original,
         estado: { fase: original ? "listo" : "nada" },
         archivoFinal: original,
         usaCarta: false,
         compuesta: null,
         trabajando: false,
+        faltaFondo: false,
         iniciar,
         limpiar,
       };
