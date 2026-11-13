@@ -43,6 +43,7 @@ import {
   Armchair,
   Clock,
   CheckCircle2,
+  CircleSlash,
   DoorOpen,
   LayoutGrid,
   List,
@@ -68,7 +69,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SidebarTrigger, useSidebarOpcional } from "@/components/ui/sidebar";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useMesas, type Mesa } from "@/hooks/useMesas";
-import { useAsignacionesMesa, type AsignacionConDetalles } from "@/hooks/useAsignacionesMesa";
+import { useAsignacionesMesa, useAsignarMesasReserva, type AsignacionConDetalles } from "@/hooks/useAsignacionesMesa";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAccionesModoServicio } from "@/hooks/useAccionesModoServicio";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
@@ -1636,6 +1637,8 @@ export function PanelReservaMovil({
   const [ocupado, setOcupado] = useState(false);
   const [pendiente, setPendiente] = useState<Pendiente | null>(null);
   const desplazar = useDesplazar(useAsignarConCambioLocal(fecha, mesas));
+  const asignarMesas = useAsignarMesasReserva();
+  const fijarMesa = useFijarMesa();
 
   const salaNombre = (id: string | null) => salas.find((s) => s.id === id)?.nombre ?? "Sin sala";
   const terminada = estaTerminada(reserva.estado);
@@ -1923,6 +1926,30 @@ export function PanelReservaMovil({
               >
                 {nombresMesa.length > 0 ? "Cambiar mesa" : "Elegir mesa"}
               </Button>
+              {/* «Anular mesa» (13/11/2026, petición del dueño): quita la mesa prevista (o fijada) y la reserva se queda en
+                  su sala sin mesa. Pide confirmación en la propia ficha; la reserva no se toca. */}
+              {nombresMesa.length > 0 && (
+                <Button
+                  variant="outline"
+                  className="h-12 text-base text-destructive hover:text-destructive"
+                  disabled={ocupado}
+                  data-testid="ficha-anular-mesa"
+                  onClick={() =>
+                    setPendiente({
+                      texto: `Se libera ${textoMesas(nombresMesa).toLowerCase()} y ${reserva.nombre || "la reserva"} se queda en ${salaNombre(reserva.espacio_id)} sin mesa. La reserva sigue en pie.`,
+                      boton: "Anular mesa",
+                      ejecutar: () =>
+                        ejecutar(async () => {
+                          // Si la tenía fijada, se quita también la fijación: sin mesa no hay nada que fijar.
+                          if (fijada) await fijarMesa(reserva, false, { silencioso: true });
+                          await asignarMesas.mutateAsync({ reserva_id: reserva.id, mesa_ids: [] });
+                        }),
+                    })
+                  }
+                >
+                  <CircleSlash className="mr-2 h-5 w-5" aria-hidden="true" /> Anular mesa
+                </Button>
+              )}
               {/* «Sentar fuera» (10/11/2026): fuera de las salas, sin mesa; queda apuntado dónde. */}
               <BotonSentarFuera reserva={reserva} disabled={ocupado} onHecho={onCerrar} />
             </div>
