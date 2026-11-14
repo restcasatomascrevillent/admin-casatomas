@@ -13,6 +13,7 @@ import { PestanaActividad } from "@/components/logs-web/PestanaActividad";
 import { PestanaIncidencias } from "@/components/logs-web/PestanaIncidencias";
 import { PestanaEstadisticas } from "@/components/logs-web/PestanaEstadisticas";
 import { PestanaConfiguracion } from "@/components/logs-web/PestanaConfiguracion";
+import { subpestanaConfig, type SubpestanaConfig } from "@/components/logs-web/subpestanasConfig";
 import { DetalleSesion } from "@/components/logs-web/DetalleSesion";
 import { DetalleIncidencia } from "@/components/logs-web/DetalleIncidencia";
 import { Interruptor } from "@/components/logs-web/Controles";
@@ -29,21 +30,31 @@ const AUTO_MS = 30_000;
  * Super Admin › Logs: actividad de la web (recorridos por sesión), errores e
  * incidencias (con su ticket en Linear) y estadísticas de comportamiento.
  * Ruta protegida por SuperAdminRoute; los datos, por la RLS (solo super admin).
- * Enlaces directos: ?tab=errores&incidencia=12 (el de los tickets) · ?sesion=<uuid>.
+ * Enlaces directos: ?tab=errores&incidencia=12 (el de los tickets) · ?sesion=<uuid> ·
+ * ?tab=configuracion&config=linear (subpestaña de Configuración).
  */
 export default function SuperAdminLogs() {
   const [params, setParams] = useSearchParams();
   const pestana: Pestana = (PESTANAS as readonly string[]).includes(params.get("tab") ?? "") ? (params.get("tab") as Pestana) : params.get("incidencia") ? "errores" : "actividad";
   const incidencia = Number(params.get("incidencia")) || null;
   const sesion = params.get("sesion");
+  const subConfig = subpestanaConfig(params.get("config"));
   const cambiarParam = useCallback((clave: string, valor: string | null) => {
     setParams((actual) => {
       const n = new URLSearchParams(actual);
       if (valor === null) n.delete(clave);
       else n.set(clave, valor);
       return n;
-    }, { replace: clave === "tab" });
+    }, { replace: clave === "tab" || clave === "config" });
   }, [setParams]);
+  // Configuración con cambios sin guardar: se pregunta antes de salir a otra pestaña (el borrador se perdería).
+  const [configSinGuardar, setConfigSinGuardar] = useState(false);
+  const cambiarPestana = useCallback((v: string) => {
+    if (pestana === "configuracion" && v !== "configuracion" && configSinGuardar
+        && !window.confirm("Tienes cambios sin guardar en Configuración. ¿Salir sin guardarlos?")) return;
+    cambiarParam("tab", v);
+  }, [pestana, configSinGuardar, cambiarParam]);
+  const cambiarSubConfig = useCallback((v: SubpestanaConfig) => cambiarParam("config", v), [cambiarParam]);
 
   const config = useConfigLogs();
   const [entorno, setEntorno] = useState<Entorno | null>(null);
@@ -105,7 +116,7 @@ export default function SuperAdminLogs() {
         ) : (
           <>
             <div className="shrink-0"><EstadoRecogidaAviso datos={estado.data} /></div>
-            <Tabs value={pestana} onValueChange={(v) => cambiarParam("tab", v)} className="flex min-h-0 flex-1 flex-col">
+            <Tabs value={pestana} onValueChange={cambiarPestana} className="flex min-h-0 flex-1 flex-col">
               <PestanasPagina
                 iconosSoloEscritorio
                 pestanas={[
@@ -131,7 +142,9 @@ export default function SuperAdminLogs() {
                 {pestana === "estadisticas" && <PestanaEstadisticas entorno={entorno} />}
               </TabsContent>
               <TabsContent value="configuracion" className={CONTENIDO}>
-                {pestana === "configuracion" && <PestanaConfiguracion estado={estado.data} />}
+                {pestana === "configuracion" && (
+                  <PestanaConfiguracion estado={estado.data} sub={subConfig} onSub={cambiarSubConfig} onCambiosSinGuardar={setConfigSinGuardar} />
+                )}
               </TabsContent>
             </Tabs>
           </>

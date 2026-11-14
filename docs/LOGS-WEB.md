@@ -173,14 +173,14 @@ El ticket de Linear empieza con el mismo resumen.
 
 ## Configuración (Logs › Configuración)
 
-- **Fuentes**: actividad, errores del navegador, peticiones, funciones, integraciones, despliegues.
-- **Entornos**: de cuáles se aceptan eventos y cuáles abren tickets. Por defecto se aceptan producción y demo, y solo producción abre tickets.
-- **Exclusiones**: rutas y patrones de error.
-- **Umbrales y reapertura.**
-- **Linear**: destino, equipo, proyecto, etiquetas y estado al reabrir.
-- **IA**: activada o no, y análisis por día.
-- **Retención**: actividad 90 días y errores 180 días.
-- **Límites de coste**: eventos por día (50.000), por sesión (400) y por IP y minuto (300).
+En subpestañas (petición del dueño, 14/11/2026: «sin scroll infinito»). La elegida va en la URL (`?tab=configuracion&config=linear`). Es **una sola configuración**: el borrador es uno, cada subpestaña marca con un punto si tiene cambios sin guardar y «Guardar configuración» lo guarda todo; al salir de Configuración con cambios, se pregunta.
+
+- **Recogida**: fuentes (actividad, errores del navegador, peticiones, funciones, integraciones, despliegues), de qué entornos se aceptan eventos (por defecto producción y demo) y exclusiones (rutas y patrones de error).
+- **Incidencias y avisos**: leyenda de colores, si los servicios externos abren ticket, umbrales, qué entornos abren tickets (por defecto solo producción) y reapertura.
+- **Linear**: cómo conectarlo, destino, equipo, proyecto, etiquetas, estado al reabrir y tickets nuevos por día.
+- **IA y costes**: activada o no, y llamadas por día.
+- **Retención y límites**: actividad 90 días y errores 180 días; eventos por día (50.000), por sesión (400) y por IP y minuto (300).
+- **Estado y cobertura**: proceso en segundo plano («Procesar ahora»), ingesta de los últimos días y qué se observa desde cuándo.
 
 Las credenciales nunca se guardan aquí: son secretos de las funciones.
 
