@@ -365,11 +365,27 @@ export function useConfigLogs() {
   });
 }
 
+/**
+ * Columnas de web_logs_config que el panel NO puede escribir (sin GRANT UPDATE
+ * para authenticated): las pone la base de datos. Si el UPDATE las lleva,
+ * PostgreSQL rechaza TODO con «permission denied for table web_logs_config»
+ * (14/11/2026: el borrador sale de `select("*")` y traía `id` y
+ * `actualizado_por`, que no están en el tipo pero sí en la fila).
+ */
+export const COLUMNAS_CONFIG_SOLO_LECTURA = ["id", "entorno_bd", "actualizado_en", "actualizado_por"] as const;
+
+/** Lo que se puede guardar de un borrador de configuración (sin las columnas de solo lectura). */
+export function cambiosGuardables(cambios: CambiosConfigLogs): CambiosConfigLogs {
+  const limpio: Record<string, unknown> = { ...cambios };
+  for (const c of COLUMNAS_CONFIG_SOLO_LECTURA) delete limpio[c];
+  return limpio as CambiosConfigLogs;
+}
+
 export function useGuardarConfigLogs() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cambios: CambiosConfigLogs) => {
-      const { error } = await sb.from("web_logs_config").update(cambios).eq("id", true);
+      const { error } = await sb.from("web_logs_config").update(cambiosGuardables(cambios)).eq("id", true);
       lanzar(error);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_LOGS }),
