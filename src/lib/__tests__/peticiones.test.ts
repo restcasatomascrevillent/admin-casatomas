@@ -28,7 +28,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 vi.mock("@/components/carta/redimensionarFoto", () => ({ redimensionarFoto: vi.fn() }));
 
-import { cambiarEstadoPeticion, crearPeticion, dispositivoActual, pedirAnalisis, prepararCaptura, subirCaptura } from "../peticiones";
+import { cambiarEstadoPeticion, crearPeticion, dispositivoActual, enviarALinear, pedirAnalisis, prepararCaptura, subirCaptura } from "../peticiones";
 
 const imagen = (tipo: string, bytes = 10) => new File([new Uint8Array(bytes)], `captura.${tipo.split("/")[1]}`, { type: tipo });
 
@@ -82,6 +82,15 @@ describe("subir y guardar", () => {
     await pedirAnalisis("p-1", true);
     expect(h.invoke).toHaveBeenNthCalledWith(1, "analizar-peticion", { body: { peticion_id: "p-1", forzar: false } });
     expect(h.invoke).toHaveBeenNthCalledWith(2, "analizar-peticion", { body: { peticion_id: "p-1", forzar: true } });
+  });
+
+  it("enviarALinear llama a la misma Edge Function con accion «enviar_linear» y lanza su error (con el motivo dentro)", async () => {
+    h.invoke.mockResolvedValue({ data: { ok: true, destino: "real", identificador: "CAS-12", url: "https://linear.app/x" }, error: null });
+    expect(await enviarALinear("p-1")).toMatchObject({ identificador: "CAS-12" });
+    expect(h.invoke).toHaveBeenLastCalledWith("analizar-peticion", { body: { accion: "enviar_linear", peticion_id: "p-1" } });
+    const error = new Error("Edge Function returned a non-2xx status code");
+    h.invoke.mockResolvedValue({ data: null, error });
+    await expect(enviarALinear("p-1")).rejects.toBe(error);
   });
 
   it("cambiar el estado: el motivo solo al descartar, y si la RLS no deja (0 filas) da error", async () => {

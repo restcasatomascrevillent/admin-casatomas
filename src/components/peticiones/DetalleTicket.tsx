@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Ban, CheckCircle2, ExternalLink, ImageOff, Send, ThumbsUp } from "lucide-react";
+import { Ban, CheckCircle2, ExternalLink, ImageOff, Loader2, Send, ThumbsUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
 import { mensajeErrorUsuarios } from "@/lib/errores-usuarios";
 import { urlCaptura, type Peticion } from "@/lib/peticiones";
-import { useAnalizarPeticion, useCambiarEstadoPeticion, useMarcarEnAnalisis } from "@/hooks/usePeticiones";
+import { useAnalizarPeticion, useCambiarEstadoPeticion, useEnviarALinear, useMarcarEnAnalisis } from "@/hooks/usePeticiones";
 import {
   MAX_MOTIVO_DESCARTE,
   caminoDeRuta,
@@ -87,12 +87,39 @@ function DialogoDescartar({ abierto, onCerrar, onConfirmar, guardando }: { abier
   );
 }
 
+function DialogoEnviarLinear({ abierto, onCerrar, onConfirmar, enviando, pasaAAceptada }: { abierto: boolean; onCerrar: () => void; onConfirmar: () => void; enviando: boolean; pasaAAceptada: boolean }) {
+  return (
+    <Dialog open={abierto} onOpenChange={(v) => !v && !enviando && onCerrar()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>¿Enviar este ticket a Linear?</DialogTitle>
+          <DialogDescription>
+            Se creará una tarea en Linear, en el equipo elegido en Logs › Configuración › Linear, con el resumen, la tarea propuesta,
+            los pasos y el prompt para la IA. De quien lo envió solo va su nombre.{pasaAAceptada ? " El ticket pasará a «Aceptada»." : ""}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" className="h-11" onClick={onCerrar} disabled={enviando}>Cancelar</Button>
+          <Button className="h-11 gap-2" disabled={enviando} onClick={onConfirmar} data-testid="confirmar-enviar-linear">
+            {enviando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
+            {enviando ? "Enviando…" : "Enviar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const ERROR_LINEAR = "No se ha podido enviar a Linear. Prueba otra vez en un momento.";
+
 /** Ficha de un ticket: lo que escribió el usuario, el análisis de la IA y las acciones del super admin. */
 export function DetalleTicket({ peticion, onCerrar }: Props) {
   const cambiar = useCambiarEstadoPeticion();
   const analizar = useAnalizarPeticion();
   const enAnalisis = useMarcarEnAnalisis();
+  const linear = useEnviarALinear();
   const [descartando, setDescartando] = useState(false);
+  const [confirmandoLinear, setConfirmandoLinear] = useState(false);
   const abiertoRef = useRef<string | null>(null);
 
   // Al abrir: «Recibida» pasa a «En análisis» y, si se quedó sin analizar (se cortó al guardar), se analiza.
@@ -128,8 +155,36 @@ export function DetalleTicket({ peticion, onCerrar }: Props) {
       },
     );
 
+  const enviarLinear = () =>
+    linear.mutate(p.id, {
+      onSuccess: (r) => {
+        setConfirmandoLinear(false);
+        if (!r.ok) {
+          toast.error(r.error || ERROR_LINEAR);
+          return;
+        }
+        if (r.destino === "prueba") {
+          toast.success(`Prueba hecha: guardado como ${r.identificador ?? "PRUEBA"}`, {
+            description: "Linear está en modo prueba: no se ha creado nada en Linear. Para crearlo de verdad, pon el modo real en Logs › Configuración › Linear.",
+          });
+          return;
+        }
+        const url = r.url;
+        toast.success(r.repetido ? `Ya estaba en Linear: ${r.identificador}` : `Enviado a Linear: ${r.identificador}`, {
+          description: r.aceptada ? "El ticket ha pasado a «Aceptada»." : undefined,
+          action: url ? { label: "Ver en Linear", onClick: () => window.open(url, "_blank", "noopener,noreferrer") } : undefined,
+        });
+      },
+      onError: async (e) => {
+        setConfirmandoLinear(false);
+        toast.error(await mensajeErrorUsuarios(e, ERROR_LINEAR));
+      },
+    });
+
   const camino = caminoDeRuta(p.ruta);
   const ocupado = cambiar.isPending;
+  // Mientras la IA analiza no se envía (la tarea saldría sin la tarea propuesta ni el prompt).
+  const iaAnalizando = analizar.isPending || p.analisis_estado === "analizando" || p.analisis_estado === "pendiente";
 
   return (
     <Sheet open onOpenChange={(v) => !v && onCerrar()}>
@@ -195,20 +250,34 @@ export function DetalleTicket({ peticion, onCerrar }: Props) {
             )}
             {p.linear_url ? (
               <Button variant="ghost" className="h-12 gap-2" asChild>
-                <a href={p.linear_url} target="_blank" rel="noreferrer">
-                  <ExternalLink className="h-4 w-4" aria-hidden="true" /> {p.linear_id ?? "Ver en Linear"}
+                <a href={p.linear_url} target="_blank" rel="noreferrer" title="Abrir en Linear (otra pestaña)" data-testid="en-linear">
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" /> {p.linear_id ? `En Linear: ${p.linear_id}` : "Ver en Linear"}
                 </a>
               </Button>
-            ) : (
-              // Se conecta en otra tarea (columnas linear_id / linear_url ya en la tabla).
-              <Button variant="ghost" className="h-12 gap-2" disabled title="Próximamente" data-testid="enviar-linear">
-                <Send className="h-4 w-4" aria-hidden="true" /> Enviar a Linear <span className="text-xs">(próximamente)</span>
+            ) : p.estado !== "descartada" ? (
+              <Button
+                variant="outline"
+                className="h-12 gap-2"
+                disabled={iaAnalizando || linear.isPending}
+                title={iaAnalizando ? "Espera a que la IA termine de analizarlo" : "Crear una tarea en Linear con este ticket"}
+                onClick={() => setConfirmandoLinear(true)}
+                data-testid="enviar-linear"
+              >
+                {linear.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
+                {linear.isPending ? "Enviando…" : "Enviar a Linear"}
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
 
         <DialogoDescartar abierto={descartando} onCerrar={() => setDescartando(false)} onConfirmar={(m) => ponerEstado("descartada", m)} guardando={ocupado} />
+        <DialogoEnviarLinear
+          abierto={confirmandoLinear}
+          onCerrar={() => setConfirmandoLinear(false)}
+          onConfirmar={enviarLinear}
+          enviando={linear.isPending}
+          pasaAAceptada={p.estado === "nueva" || p.estado === "en_analisis"}
+        />
       </SheetContent>
     </Sheet>
   );

@@ -16,6 +16,16 @@
 //   429 tope de análisis · 502 la IA falló (la petición queda con el motivo
 //   en analisis_error y se puede reintentar) · 503 sin clave o sin BD
 //
+//   POST { accion: "enviar_linear", peticion_id } — «Enviar a Linear» (SOLO
+//     super admin). Crea la incidencia en el equipo/proyecto de Logs ›
+//     Configuración › Linear (o en el destino de pruebas si linear_modo es
+//     «prueba»), sin duplicados aunque se repita, y guarda linear_id
+//     (identificador, p. ej. CAS-12) y linear_url. Lógica en linear.ts.
+//   200 { ok, destino: "real"|"prueba", identificador, url, repetido, aceptada }
+//   403 no es super admin · 404 no existe · 409 desactivado, sin equipo,
+//   analizando o descartada · 502 Linear falló (mensaje en español) ·
+//   503 sin LINEAR_API_KEY, sin BD o sin configuración
+//
 // - Auth: verify_jwt (config.toml) + usuario real (_shared/autorizacion.ts).
 //   La petición se lee con service role y se comprueba que es SUYA o que es
 //   super admin (is_super_admin con el id ya verificado, nunca del body).
@@ -34,6 +44,8 @@ import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { motivoErrorOpenAI } from "../_shared/error-openai.ts";
 import { configModeloFuncion, esErrorDeModelo, parametrosChat } from "../_shared/modelo-funcion.ts";
 import { AcumuladorUso, registrarUso, type UsageBruto } from "../_shared/registrar-uso-ia.ts";
+import { entornoDeSupabase } from "../_shared/logs-web/clasificacion.ts";
+import { enviarPeticionALinear, type ConfigLinearPeticiones, type PeticionParaLinear } from "./linear.ts";
 import { ESQUEMA_ANALISIS, FUNCION, interpretarRespuesta, MAX_TOKENS, mensajesAnalisis, MODELO_POR_DEFECTO, type PeticionParaIa } from "./prompt.ts";
 
 const createClient = clienteConAuditoria(createClientBase, FUNCION);
@@ -55,6 +67,55 @@ interface FilaPeticion extends PeticionParaIa {
   analisis_intentos: number;
 }
 const COLUMNAS = "id, creado_por, titulo, prioridad, modulo, descripcion, ruta, dispositivo, captura_path, analisis_estado, analisis, analisis_error, analisis_intentos";
+const COLUMNAS_LINEAR = "id, titulo, prioridad, modulo, descripcion, ruta, dispositivo, captura_path, creado_por_nombre, created_at, estado, analisis, analisis_estado, linear_id, linear_url";
+
+/** Panel del entorno (para el enlace de vuelta al ticket). */
+function urlPanel(): string {
+  return env("LOGS_WEB_URL_PANEL")
+    || (entornoDeSupabase(env("SUPABASE_URL")) === "produccion" ? "https://admin-casatomas.vercel.app" : "https://admin-casatomas-git-staging-casa-tomas.vercel.app");
+}
+
+/** «Enviar a Linear» (ya comprobado: super admin). Toda la lógica, en linear.ts. */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function enviarALinear(sb: any, id: string): Promise<Response> {
+  const { data: fila, error: errLeer } = await sb.from("peticiones").select(COLUMNAS_LINEAR).eq("id", id).maybeSingle();
+  if (errLeer) return json({ ok: false, error: "No se pudo leer la petición" }, 503);
+  if (!fila) return json({ ok: false, error: "Esa petición no existe" }, 404);
+  const r = await enviarPeticionALinear(fila as PeticionParaLinear, {
+    async leerConfig() {
+      const { data, error } = await sb.from("web_logs_config")
+        .select("linear_modo, linear_equipo_id, linear_proyecto_id, linear_etiquetas").eq("id", true).maybeSingle();
+      if (error) throw new Error(error.message);
+      return (data ?? null) as ConfigLinearPeticiones | null;
+    },
+    async guardarEnviado(v) {
+      const { error } = await sb.from("peticiones").update(v).eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    async aceptar() {
+      const { data, error } = await sb.from("peticiones").update({ estado: "aceptada" }).eq("id", id).in("estado", ["nueva", "en_analisis"]).select("id");
+      if (error) throw new Error(error.message);
+      return Array.isArray(data) && data.length > 0;
+    },
+    prueba: {
+      async buscarCreado(linearUuid) {
+        const { data } = await sb.from("web_linear_prueba").select("id").eq("linear_uuid", linearUuid).eq("operacion", "crear").limit(1);
+        return data?.[0] ?? null;
+      },
+      async insertar(v) {
+        const { data, error } = await sb.from("web_linear_prueba").insert(v).select("id").single();
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    },
+    apiKey: env("LINEAR_API_KEY"),
+    urlPanel: urlPanel(),
+    log: (m) => console.error(`[${FUNCION}] enviar_linear ${id}: ${m}`),
+  });
+  if (!r.ok) return json({ ok: false, error: r.error }, r.status);
+  return json(r);
+}
 
 /** Llama a OpenAI (modelo elegido y, si no existe, el de respaldo). Devuelve el texto o lanza un Error legible. */
 async function llamarIa(clave: string, peticion: PeticionParaIa, cliente: ReturnType<typeof createClient>, disparador: string): Promise<{ texto: string; modelo: string }> {
@@ -110,10 +171,12 @@ Deno.serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   const usuario = await exigirUsuario(req, { crearCliente: createClient, corsHeaders: cors });
   if (!usuario.ok) return usuario.response;
 
-  const cuerpo = await req.json().catch(() => null) as { peticion_id?: unknown; forzar?: unknown } | null;
+  const cuerpo = await req.json().catch(() => null) as { peticion_id?: unknown; forzar?: unknown; accion?: unknown } | null;
   const id = typeof cuerpo?.peticion_id === "string" ? cuerpo.peticion_id.trim() : "";
   const forzar = cuerpo?.forzar === true;
-  if (!UUID.test(id)) return json({ ok: false, error: "Falta la petición que hay que analizar" }, 400);
+  const accion = cuerpo?.accion ?? null;
+  if (accion !== null && accion !== "enviar_linear") return json({ ok: false, error: "Acción no válida" }, 400);
+  if (!UUID.test(id)) return json({ ok: false, error: accion ? "Falta el ticket que hay que enviar" : "Falta la petición que hay que analizar" }, 400);
 
   const url = env("SUPABASE_URL");
   const servicio = env("SUPABASE_SERVICE_ROLE_KEY");
@@ -128,6 +191,10 @@ Deno.serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   } catch (e) {
     console.error(`[${FUNCION}] no se pudo comprobar super admin:`, (e as Error)?.message ?? e);
     return json({ ok: false, error: "No se pudo comprobar tu permiso. No se ha analizado nada." }, 503);
+  }
+  if (accion === "enviar_linear") {
+    if (!esSuper) return json({ ok: false, error: "Solo el super admin puede enviar tickets a Linear" }, 403);
+    return enviarALinear(sb, id);
   }
   if (forzar && !esSuper) return json({ ok: false, error: "Solo el super admin puede volver a analizar una petición" }, 403);
 
