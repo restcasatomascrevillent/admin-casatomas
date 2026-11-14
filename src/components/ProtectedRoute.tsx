@@ -4,9 +4,11 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole, SectionKey } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { Loader2 } from "lucide-react";
-import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
+import { toast } from "sonner";
 import { esEntradaAlPanel, rutaDeInicio } from "@/lib/seccionInicio";
+import { destinoPermitido, moduloActivo, moduloDeRuta } from "@/lib/modulosPanel";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -40,19 +42,9 @@ const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
 // Destino al rechazar: la primera sección que el usuario sí puede ver, en el
 // orden del menú. Antes se mandaba siempre a /dashboard, y quien no tenía
 // permiso de dashboard (p. ej. solo carta y facturas) entraba en un bucle de
-// redirecciones infinito y no podía entrar al panel (10/10/2026).
-const DESTINOS_RECHAZO: { ruta: string; secciones: SectionKey[] }[] = [
-  { ruta: "/dashboard", secciones: ["dashboard"] },
-  { ruta: "/reservas", secciones: ["reservas"] },
-  { ruta: "/gestion-web", secciones: SECCIONES_GESTOR_WEB },
-  { ruta: "/marketing", secciones: ["marketing"] },
-  { ruta: "/cheques", secciones: ["cheques"] },
-  { ruta: "/tienda", secciones: ["tienda"] },
-  { ruta: "/facturas", secciones: ["facturas", "facturas_subida"] },
-  { ruta: "/rrss", secciones: ["instagram_agencia"] },
-  // Tipo de usuario «Albaranes» (10/11/2026): sin otras secciones, entra directo a subir fotos.
-  { ruta: "/albaranes", secciones: ["facturas_albaranes"] },
-];
+// redirecciones infinito y no podía entrar al panel (10/10/2026). Desde el
+// 14/11/2026 sale del catálogo de módulos (`destinoPermitido`) y se salta los
+// módulos desactivados en Control del Panel (si no, volvería a rebotar).
 
 /**
  * Pantallas por las que se entra al panel (Auth lleva a /dashboard). Quien no tiene Dashboard —el tipo
@@ -65,6 +57,9 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, permissions, loading: roleLoading, verificado: rolVerificado = true, seccionInicio } = useUserRole();
   const { isSuperAdmin, loading: superAdminLoading, verificado: superVerificado = true } = useSuperAdmin();
+  // Módulos apagados en Control del Panel (14/11/2026): capa por encima de los permisos. Mientras no se sabe
+  // (lectura en curso, sin red) se deja pasar, como con los permisos recordados: no se echa a nadie a ciegas.
+  const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
   // Rol y permisos pueden venir de lo recordado en el dispositivo (09/11/2026, `lib/cachePermisos.ts`):
   // sirven para DEJAR PASAR al momento, pero no para echar a nadie hasta confirmarlos con el servidor
   // (un permiso recién dado no estaría en la copia).
@@ -73,6 +68,8 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
   const location = useLocation();
 
   const denegado = useRef<string | null>(null);
+  // Entrada (location.key) en la que ya se avisó de que el módulo está desactivado: un aviso por intento.
+  const avisadoDesactivado = useRef<string | null>(null);
   // Entrada (location.key) en la que ya se decidió, con datos del servidor, quedarse: no se vuelve a mirar.
   const inicioDecidido = useRef<string | null>(null);
   const loading = authLoading || roleLoading || superAdminLoading;
@@ -84,7 +81,16 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
   const esMarco = Array.isArray(requiredSection) && requiredSection.length === 0;
   const enEntrada = !esMarco && esEntradaAlPanel(location.pathname, location.state) && inicioDecidido.current !== location.key;
   const esperandoInicio = enEntrada && seccionInicio === undefined && !verificado;
-  const destinoInicio = enEntrada && !esperandoInicio ? rutaDeInicio(seccionInicio, permissions, isSuperAdmin) : null;
+  // ¿Está apagado (y se sabe) el módulo de esta ruta? El super admin entra igual. El marco no decide.
+  const apagadoParaEquipo = (ruta: string) => {
+    if (isSuperAdmin || togglesLoading) return null;
+    const modulo = moduloDeRuta(ruta);
+    return modulo && !moduloActivo(modulo, isEnabled) ? modulo : null;
+  };
+  const moduloApagado = esMarco ? null : apagadoParaEquipo(location.pathname);
+  const inicioElegido = enEntrada && !esperandoInicio ? rutaDeInicio(seccionInicio, permissions, isSuperAdmin) : null;
+  // Una sección de inicio desactivada no se abre: lo de siempre.
+  const destinoInicio = inicioElegido && !apagadoParaEquipo(inicioElegido) ? inicioElegido : null;
   const vaAlInicio = destinoInicio !== null && destinoInicio !== location.pathname;
 
   useEffect(() => {
@@ -112,11 +118,10 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
     const required = requiredSection ?? ROUTE_TO_SECTION[location.pathname];
     const sectionKeys = Array.isArray(required) ? required : required ? [required] : [];
 
-    if (sectionKeys.length === 0) return; // Ruta no mapeada, permitir acceso
-
     // Los super admins tienen acceso a todo, pase lo que pase en la tabla de
-    // permisos (2026-09-26). Ser "admin" ya no basta: un admin ahora solo ve
-    // lo que le marquen sus permisos, salvo la sección de usuarios (abajo).
+    // permisos (2026-09-26), y también a los módulos desactivados para el equipo
+    // (14/11/2026). Ser "admin" ya no basta: un admin ahora solo ve lo que le
+    // marquen sus permisos.
     if (isSuperAdmin) return;
 
     const rechazar = () => {
@@ -125,24 +130,33 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
         denegado.current = key;
         void auditDeniedAccess(location.pathname);
       }
-      const destino = DESTINOS_RECHAZO.find(
-        (d) => d.ruta !== location.pathname
-          && d.secciones.some((key) => permissions.find((p) => p.section_key === key)?.can_view),
-      )?.ruta ?? "/ayuda"; // /ayuda no exige permisos: nunca rebota
-      navigate(destino, { replace: true });
+      // /ayuda no exige permisos ni se puede apagar: nunca rebota.
+      navigate(destinoPermitido(permissions, isEnabled, location.pathname), { replace: true });
     };
     // «Usuarios» se configura por permisos como las demás (06/11/2026; antes, rol admin).
 
     // Verificar permiso de visualización (basta con una de las secciones:
     // p. ej. el Gestor Web agrupa carta, contenido web y bot, y cada pestaña
-    // vuelve a comprobar la suya).
-    const puedeVer = sectionKeys.some(
+    // vuelve a comprobar la suya). Ruta sin secciones (Ayuda, Avisos…): sin permiso que mirar.
+    const puedeVer = sectionKeys.length === 0 || sectionKeys.some(
       (key) => permissions.find((p) => p.section_key === key)?.can_view,
     );
-    if (!puedeVer && verificado) {
-      rechazar();
+    if (!puedeVer) {
+      if (verificado) rechazar();
+      return;
     }
-  }, [user, loading, verificado, isAdmin, isSuperAdmin, permissions, location.pathname, location.key, requiredSection, navigate, enEntrada, esperandoInicio, vaAlInicio, destinoInicio]);
+
+    // Módulo desactivado en Control del Panel: al Dashboard (o a la primera sección que pueda ver), con aviso.
+    if (moduloApagado) {
+      if (avisadoDesactivado.current !== location.key) {
+        avisadoDesactivado.current = location.key;
+        toast.info(`«${moduloApagado.nombre}» está desactivado`, {
+          description: "El administrador lo ha desactivado en el panel. Te llevamos a otra sección.",
+        });
+      }
+      navigate(destinoPermitido(permissions, isEnabled, location.pathname), { replace: true });
+    }
+  }, [user, loading, verificado, isAdmin, isSuperAdmin, permissions, location.pathname, location.key, requiredSection, navigate, enEntrada, esperandoInicio, vaAlInicio, destinoInicio, moduloApagado, isEnabled]);
 
   if (loading || esperandoInicio || vaAlInicio) {
     return (
@@ -166,5 +180,7 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
       </div>
     );
   }
+  // Módulo desactivado: no se pinta mientras se lleva a otra sección.
+  if (moduloApagado) return null;
   return <>{children}</>;
 };

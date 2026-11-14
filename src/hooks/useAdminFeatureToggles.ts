@@ -1,75 +1,75 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
-import { leerToggles, tomarAdelantada } from "@/lib/precargaToggles";
+import {
+  aplicarFilasToggles,
+  estadoToggles,
+  leerTogglesCompartidos,
+  suscribirToggles,
+  type FilaToggle,
+} from "@/lib/precargaToggles";
+import { MODULOS_PANEL, valorInterruptor } from "@/lib/modulosPanel";
 
-export interface AdminFeatureToggle {
-  section_key: string;
-  label: string;
-  enabled: boolean;
-  /** Último cambio (Control del Panel lo enseña). */
-  updated_at?: string | null;
-}
+export type AdminFeatureToggle = FilaToggle;
 
+/**
+ * Interruptores de Control del Panel (`admin_feature_toggles`). La lectura es compartida
+ * (`lib/precargaToggles.ts`): menú, rutas y Control del Panel ven lo mismo.
+ */
 export function useAdminFeatureToggles() {
-  const [toggles, setToggles] = useState<AdminFeatureToggle[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchToggles = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await (tomarAdelantada() ?? leerToggles());
-
-    if (!error && data) {
-      setToggles(data);
-    }
-    setLoading(false);
-  }, []);
+  const { toggles, loading } = useSyncExternalStore(suscribirToggles, estadoToggles, estadoToggles);
 
   useEffect(() => {
-    fetchToggles();
-  }, [fetchToggles]);
+    void leerTogglesCompartidos();
+  }, []);
 
-  const isEnabled = useCallback(
-    (sectionKey: string) => {
-      const toggle = toggles.find((t) => t.section_key === sectionKey);
-      // Si aún no hay registro para la sección, se muestra por defecto.
-      return toggle ? toggle.enabled : true;
-    },
-    [toggles]
-  );
+  // Sin fila: el valor del módulo del que hereda (RRSS ← Newsletter, Subir albaranes ← Facturas) o activado.
+  const isEnabled = useCallback((sectionKey: string) => valorInterruptor(sectionKey, toggles), [toggles]);
 
   const setEnabled = async (sectionKey: string, label: string, enabled: boolean) => {
     const { data: userData } = await supabase.auth.getUser();
     const updatedAt = new Date().toISOString();
+    const updatedBy = userData.user?.id;
+
+    // RRSS y Subir albaranes iban con el interruptor de Newsletter y Facturas hasta el 14/11/2026. Mientras
+    // no tengan fila propia valen lo mismo que ellos: antes de cambiar Newsletter o Facturas se les guarda
+    // su valor de ahora, para que no cambien con él.
+    const herederos = MODULOS_PANEL.filter(
+      (m) => m.heredaDe === sectionKey && !toggles.some((t) => t.section_key === m.clave),
+    ).map((m) => ({
+      section_key: m.clave,
+      label: m.nombre,
+      enabled: valorInterruptor(m.clave, toggles),
+      updated_at: null,
+      updated_by: updatedBy,
+    }));
 
     const { error } = await supabase.from("admin_feature_toggles").upsert(
-      {
-        section_key: sectionKey,
-        label,
-        enabled,
-        updated_at: updatedAt,
-        updated_by: userData.user?.id,
-      },
-      { onConflict: "section_key" }
+      [{ section_key: sectionKey, label, enabled, updated_at: updatedAt, updated_by: updatedBy }, ...herederos],
+      { onConflict: "section_key" },
     );
 
     if (error) {
-      toast.error("Error al actualizar la funcionalidad: " + mensajeUsuario(error, "inténtalo de nuevo"));
+      toast.error("Error al actualizar el módulo: " + mensajeUsuario(error, "inténtalo de nuevo"));
       return false;
     }
 
-    setToggles((prev) => {
-      const exists = prev.some((t) => t.section_key === sectionKey);
-      if (exists) {
-        return prev.map((t) => (t.section_key === sectionKey ? { ...t, enabled, updated_at: updatedAt } : t));
-      }
-      return [...prev, { section_key: sectionKey, label, enabled, updated_at: updatedAt }];
-    });
+    aplicarFilasToggles([
+      { section_key: sectionKey, label, enabled, updated_at: updatedAt },
+      ...herederos.map(({ section_key, label: etiqueta, enabled: valor }) => ({
+        section_key,
+        label: etiqueta,
+        enabled: valor,
+        updated_at: null,
+      })),
+    ]);
 
-    toast.success(enabled ? "Funcionalidad activada" : "Funcionalidad desactivada");
+    toast.success(enabled ? `«${label}» activado para el equipo` : `«${label}» desactivado para el equipo`);
     return true;
   };
 
-  return { toggles, loading, isEnabled, setEnabled, refetch: fetchToggles };
+  const refetch = useCallback(() => leerTogglesCompartidos(true), []);
+
+  return { toggles, loading, isEnabled, setEnabled, refetch };
 }

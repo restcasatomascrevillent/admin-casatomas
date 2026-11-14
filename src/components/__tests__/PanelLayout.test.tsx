@@ -27,6 +27,8 @@ vi.mock("@/components/NavAutoCollapse", () => ({ NavAutoCollapse: () => null, de
 vi.mock("@/lib/audit-access", () => ({ auditDeniedAccess: vi.fn() }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" }, loading: false }) }));
 vi.mock("@/hooks/useSuperAdmin", () => ({ useSuperAdmin: () => ({ isSuperAdmin: false, loading: false }) }));
+// Interruptores de Control del Panel (ProtectedRoute los mira desde el 14/11/2026): todo activado, sin red.
+vi.mock("@/hooks/useAdminFeatureToggles", () => ({ useAdminFeatureToggles: () => ({ isEnabled: () => true, loading: false }) }));
 vi.mock("@/hooks/useUserRole", () => ({
   useUserRole: () => ({
     isAdmin: false,
