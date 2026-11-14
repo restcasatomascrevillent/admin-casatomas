@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   cambiarEstadoPeticion,
   crearPeticion,
+  enviarALinear,
   leerMisPeticiones,
   leerTickets,
   marcarEnAnalisis,
@@ -79,6 +80,28 @@ export function useAnalizarPeticion() {
     onMutate: ({ id }) => {
       // Se ve «Analizando…» al momento (y la lista empieza a refrescarse sola).
       qc.setQueryData<Peticion[]>(CLAVE_TICKETS, (prev) => prev?.map((p) => (p.id === id ? { ...p, analisis_estado: "analizando", analisis_error: null } : p)));
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: [CLAVE_PETICIONES] }),
+  });
+}
+
+/**
+ * «Enviar a Linear» (super admin). Si sale bien en modo real, la ficha enseña el enlace al momento (sin esperar a
+ * recargar la lista) y, si estaba «Recibida» o «En análisis», «Aceptada».
+ */
+export function useEnviarALinear() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => enviarALinear(id),
+    onSuccess: (r, id) => {
+      if (!r.ok || r.destino !== "real" || !r.url) return;
+      qc.setQueryData<Peticion[]>(CLAVE_TICKETS, (prev) =>
+        prev?.map((p) =>
+          p.id === id
+            ? { ...p, linear_id: r.identificador ?? p.linear_id, linear_url: r.url ?? p.linear_url, estado: r.aceptada ? "aceptada" : p.estado }
+            : p,
+        ),
+      );
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: [CLAVE_PETICIONES] }),
   });
