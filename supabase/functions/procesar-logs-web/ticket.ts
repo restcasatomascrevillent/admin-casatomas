@@ -18,6 +18,7 @@
 import { sanearPila, sanearTexto } from "../_shared/logs-web/saneado.ts";
 import { marcoPrincipal } from "../_shared/logs-web/huella.ts";
 import { causaConocida, type CausaConocida } from "../_shared/logs-web/causas.ts";
+import { explicacionOrigen, NOMBRE_ORIGEN, type OrigenVisible } from "../_shared/logs-web/origen.ts";
 import { afectaTrasPublicar, aQuienAfectaSencillo, conMayuscula, desdeCuandoSencillo, nombrePagina, queFalloGenerico, queHacerPorDefecto } from "../_shared/logs-web/sencillo.ts";
 
 export interface IncidenciaTicket {
@@ -47,6 +48,9 @@ export interface IncidenciaTicket {
   /** Ocurrencias de «versión antigua tras publicar» que se arreglaron solas / que se repitieron tras recargar. */
   ocurrencias_tras_publicar?: number;
   repetidas_tras_recargar?: number;
+  /** Origen (20261130100000): fallo de la web, servicio externo o no depende de la web. */
+  origen?: string | null;
+  origen_proveedor?: string | null;
 }
 
 export interface EventoTicket {
@@ -298,6 +302,10 @@ export function construirTicket(entrada: EntradaTicket): { titulo: string; descr
   l.push("");
   l.push("## Impacto");
   l.push(`- **Gravedad:** ${NOMBRE_GRAVEDAD[i.gravedad] ?? i.gravedad} · **Tipo:** ${NOMBRE_TIPO[i.tipo] ?? i.tipo} · **Fuente:** ${i.fuente}`);
+  if (i.origen && i.origen in NOMBRE_ORIGEN) {
+    const o = i.origen as OrigenVisible;
+    l.push(`- **Origen:** ${NOMBRE_ORIGEN[o]}${o === "externo" && i.origen_proveedor ? ` (${enLinea(i.origen_proveedor, 60)})` : ""}. ${explicacionOrigen(o, i.origen_proveedor ? i.origen_proveedor.replace(/[`*_[\]<>]/g, "") : null)}`);
+  }
   l.push(navegador
     ? `- **Frecuencia:** ${i.ocurrencias} ocurrencias (${i.ocurrencias_24h} en las últimas 24 h) en ${pct(i.sesiones_afectadas)} observadas.`
     : `- **Frecuencia:** ${i.ocurrencias} ocurrencias (${i.ocurrencias_24h} en las últimas 24 h). Error del servidor: no hay visitantes ni sesiones asociadas.`);

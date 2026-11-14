@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { ResultadoConexionLinear } from "../../supabase/functions/procesar-logs-web/linear";
+import type { GrupoOrigen, Origen, OrigenVisible } from "../../supabase/functions/_shared/logs-web/origen";
 
 export type { EquipoLinear, ResultadoConexionLinear } from "../../supabase/functions/procesar-logs-web/linear";
 
@@ -59,6 +60,8 @@ export interface EventoWeb {
   incidencia_id: number | null;
   /** Solo errores de «versión antigua tras publicar» (migración 20261129143000); undefined si aún no está aplicada. */
   tras_publicar?: "sin_impacto" | "sin_datos" | "sin_conexion" | "repetido" | null;
+  /** Solo errores: origen técnico (migración 20261130100000; undefined si no está, null si aún no se ha agrupado). */
+  origen?: Origen | null;
 }
 
 export interface SesionWeb {
@@ -88,6 +91,9 @@ export interface SesionWeb {
   es_interno: boolean;
   es_prueba: boolean;
   consentimiento: boolean;
+  /** Errores que son fallo de la web / de servicios externos (migración 20261130100000; null = aún sin clasificar). */
+  errores_web?: number | null;
+  errores_externos?: number | null;
 }
 
 export interface AnalisisIaIncidencia {
@@ -158,6 +164,10 @@ export interface IncidenciaWeb {
   explicacion_ia?: ExplicacionIaIncidencia | null;
   explicacion_ia_en?: string | null;
   explicacion_ia_error?: string | null;
+  // Migración 20261130100000 (opcionales: sin ella el panel funciona como antes).
+  origen?: OrigenVisible;
+  origen_proveedor?: string | null;
+  origen_prioridad?: number;
 }
 
 export interface ConfigLogsWeb {
@@ -191,6 +201,8 @@ export interface ConfigLogsWeb {
   linear_max_tickets_dia: number;
   ia_activada: boolean;
   ia_max_analisis_dia: number;
+  /** Los «Servicio externo» pueden abrir ticket (migración 20261130100000). */
+  linear_tickets_externos?: boolean;
   entorno_bd: Entorno;
   actualizado_en: string;
 }
@@ -248,6 +260,12 @@ export interface FiltrosActividad {
 
 export type OrdenIncidencias = "recientes" | "ocurrencias" | "sesiones";
 
+/**
+ * Filtro de origen: fallos de la web y externos (por defecto), solo uno de los
+ * tres grupos, o null = todos.
+ */
+export type FiltroOrigen = "web_externos" | "web" | "externo" | "no_depende";
+
 export interface FiltrosIncidencias {
   entorno: Entorno | null;
   estado: EstadoIncidencia | "activas" | null;
@@ -262,13 +280,20 @@ export interface FiltrosIncidencias {
    */
   ocultarRuido?: boolean;
   orden?: OrdenIncidencias;
+  /**
+   * Origen (migración 20261130100000). undefined = sin filtro de origen (como
+   * antes); null = todos; si no, el grupo. Con origen, lo de la web sale primero.
+   */
+  origen?: FiltroOrigen | null;
 }
 
 /** Filtros de la consulta de incidencias (exportado para las pruebas). */
 export interface ConsultaFiltrable {
   eq(c: string, v: unknown): ConsultaFiltrable;
+  neq(c: string, v: unknown): ConsultaFiltrable;
   in(c: string, v: unknown[]): ConsultaFiltrable;
   gt(c: string, v: unknown): ConsultaFiltrable;
+  lte(c: string, v: unknown): ConsultaFiltrable;
   or(f: string): ConsultaFiltrable;
 }
 
@@ -280,6 +305,14 @@ export function aplicarFiltrosIncidencias(q: ConsultaFiltrable, f: FiltrosIncide
   if (f.fuente) q = q.eq("fuente", f.fuente);
   if (f.tipo) q = q.eq("tipo", f.tipo);
   if (f.ocultarRuido) q = q.gt("ocurrencias", 0);
+  if (f.origen !== undefined) {
+    if (f.origen === "web" || f.origen === "externo") q = q.eq("origen", f.origen);
+    else if (f.origen === "web_externos") q = q.lte("origen_prioridad", 2);
+    else if (f.origen === "no_depende") q = q.eq("origen_prioridad", 3);
+    // «Ocultar las de solo bots y pruebas» también oculta las de origen «Bots y pruebas»
+    // (p. ej. solo tráfico interno: no son 0 ocurrencias, pero no son de clientes).
+    if (f.ocultarRuido && (f.origen === null || f.origen === "no_depende")) q = q.neq("origen", "bots");
+  }
   const texto = f.texto.trim().replace(/[%,()*]/g, " ").trim();
   if (texto) q = q.or(`titulo.ilike.%${texto}%,mensaje.ilike.%${texto}%,linear_identificador.ilike.%${texto}%,pila.ilike.%${texto}%`);
   return q;
@@ -288,6 +321,24 @@ export function aplicarFiltrosIncidencias(q: ConsultaFiltrable, f: FiltrosIncide
 const COLUMNA_ORDEN: Record<OrdenIncidencias, string> = { recientes: "ultima_vez", ocurrencias: "ocurrencias", sesiones: "sesiones_afectadas" };
 
 export const TAM_PAGINA = 25;
+
+/** Filtro de cada grupo de origen (para contarlos aparte). */
+const FILTRO_DE_GRUPO: Record<GrupoOrigen, FiltroOrigen> = { web: "web", externo: "externo", no_depende: "no_depende" };
+
+/** ¿Falta la columna de origen (migración 20261130100000 sin aplicar)? */
+export function esSinOrigen(error: unknown): boolean {
+  const e = error as { code?: string; message?: string } | null;
+  return !!e && /origen/.test(e.message ?? "") && (e.code === "42703" || /does not exist|could not find|schema cache/i.test(e.message ?? ""));
+}
+
+export interface ResultadoIncidencias {
+  filas: IncidenciaWeb[];
+  total: number;
+  /** Cuántas hay de cada grupo con los mismos filtros (sin el de origen). Solo si se piden y hay migración. */
+  conteos?: Record<GrupoOrigen, number>;
+  /** La migración del origen no está aplicada: se lista como antes, sin colores ni filtro de origen. */
+  sinOrigen?: boolean;
+}
 
 /** ¿El error dice que falta la migración (tabla o función inexistente)? */
 export function esSinMigracionLogs(error: unknown): boolean {
@@ -430,22 +481,44 @@ export function useSesion(sesionId: string | null) {
 }
 
 // ─── Incidencias ─────────────────────────────────────────────────────────────
-export function useIncidencias(f: FiltrosIncidencias, pagina: number, autoRefresco: number | false) {
+export function useIncidencias(f: FiltrosIncidencias, pagina: number, autoRefresco: number | false, opciones: { conteos?: boolean } = {}) {
   return useQuery({
-    queryKey: [...CLAVE_LOGS, "incidencias", f, pagina],
+    queryKey: [...CLAVE_LOGS, "incidencias", f, pagina, !!opciones.conteos],
     placeholderData: keepPreviousData,
     refetchInterval: autoRefresco,
     refetchIntervalInBackground: false,
     staleTime: 10_000,
-    queryFn: async (): Promise<{ filas: IncidenciaWeb[]; total: number }> => {
-      const base = sb.from("web_incidencias").select("*", { count: "exact" });
-      const q = aplicarFiltrosIncidencias(base as unknown as ConsultaFiltrable, f) as unknown as typeof base;
-      const columna = COLUMNA_ORDEN[f.orden ?? "recientes"];
-      let ordenada = q.order(columna, { ascending: false });
-      if (columna !== "ultima_vez") ordenada = ordenada.order("ultima_vez", { ascending: false });
-      const { data, error, count } = await ordenada.range(pagina * TAM_PAGINA, pagina * TAM_PAGINA + TAM_PAGINA - 1);
-      lanzar(error);
-      return { filas: (data ?? []) as IncidenciaWeb[], total: count ?? 0 };
+    queryFn: async (): Promise<ResultadoIncidencias> => {
+      const listar = async (filtros: FiltrosIncidencias) => {
+        const base = sb.from("web_incidencias").select("*", { count: "exact" });
+        const q = aplicarFiltrosIncidencias(base as unknown as ConsultaFiltrable, filtros) as unknown as typeof base;
+        const columna = COLUMNA_ORDEN[filtros.orden ?? "recientes"];
+        // Con origen, primero los fallos de la web, luego los externos y al final lo que no depende de la web.
+        let ordenada = filtros.origen !== undefined ? q.order("origen_prioridad", { ascending: true }).order(columna, { ascending: false }) : q.order(columna, { ascending: false });
+        if (columna !== "ultima_vez") ordenada = ordenada.order("ultima_vez", { ascending: false });
+        return ordenada.range(pagina * TAM_PAGINA, pagina * TAM_PAGINA + TAM_PAGINA - 1);
+      };
+      const contar = async (grupo: GrupoOrigen) => {
+        const base = sb.from("web_incidencias").select("id", { count: "exact", head: true });
+        const q = aplicarFiltrosIncidencias(base as unknown as ConsultaFiltrable, { ...f, origen: FILTRO_DE_GRUPO[grupo] }) as unknown as typeof base;
+        const { error, count } = await q;
+        lanzar(error);
+        return count ?? 0;
+      };
+      let r = await listar(f);
+      // Sin la migración del origen: como antes (sin filtro ni orden de origen) y la pantalla lo sabe.
+      if (r.error && f.origen !== undefined && esSinOrigen(r.error)) {
+        r = await listar({ ...f, origen: undefined });
+        lanzar(r.error);
+        return { filas: (r.data ?? []) as IncidenciaWeb[], total: r.count ?? 0, sinOrigen: true };
+      }
+      lanzar(r.error);
+      const salida: ResultadoIncidencias = { filas: (r.data ?? []) as IncidenciaWeb[], total: r.count ?? 0 };
+      if (opciones.conteos && f.origen !== undefined) {
+        const [web, externo, no_depende] = await Promise.all((["web", "externo", "no_depende"] as const).map(contar));
+        salida.conteos = { web, externo, no_depende };
+      }
+      return salida;
     },
   });
 }

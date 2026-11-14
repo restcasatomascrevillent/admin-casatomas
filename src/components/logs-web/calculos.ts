@@ -9,6 +9,9 @@ import { es } from "date-fns/locale";
 import type { EstadoRecogidaDatos, EventoWeb, IncidenciaWeb, SesionWeb } from "@/hooks/useLogsWeb";
 import { causaConocida, type CausaConocida } from "../../../supabase/functions/_shared/logs-web/causas";
 import {
+  explicacionOrigen, grupoDeOrigen, NOMBRE_ORIGEN, origenDeError, origenDeOcurrencia, proveedorExterno, puedeAbrirTicket, type OrigenVisible,
+} from "../../../supabase/functions/_shared/logs-web/origen";
+import {
   afectaTrasPublicar, listaTareas, nombrePagina, queFalloGenerico, resumirRecorrido, tareasDe, TEXTO_ACCION_RECARGA, TEXTO_TRAS_PUBLICAR,
 } from "../../../supabase/functions/_shared/logs-web/sencillo";
 
@@ -232,6 +235,42 @@ export function rangoEstadisticas(valor: string, hoy: Date): { desde: string; ha
 }
 
 
+// ─── Origen (fallo de la web / servicio externo / no depende de la web) ─────
+const ORIGENES_VALIDOS = new Set<string>(Object.keys(NOMBRE_ORIGEN));
+
+/**
+ * Origen de una incidencia: el que guardó el servidor (migración 20261130100000)
+ * o, sin ella, el que dicen las mismas reglas con el mensaje de la incidencia.
+ */
+export function origenDeFila(
+  i: Pick<IncidenciaWeb, "tipo" | "fuente" | "mensaje" | "pila" | "titulo" | "ocurrencias" | "origen" | "repetidas_tras_recargar">,
+): OrigenVisible {
+  if (i.origen && ORIGENES_VALIDOS.has(i.origen)) return i.origen;
+  if (i.ocurrencias === 0) return "bots";
+  const objetivo = i.titulo.split(" · ").slice(1).join(" · ") || null;
+  const o = origenDeError({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo });
+  // Versión antigua que alguna vez no se arregló al recargar: eso sí es de la web (como en el servidor).
+  return o === "version_antigua" && (i.repetidas_tras_recargar ?? 0) > 0 ? "web" : o;
+}
+
+/** Proveedor de una incidencia externa (guardado o calculado). */
+export function proveedorDeFila(i: Pick<IncidenciaWeb, "tipo" | "fuente" | "mensaje" | "pila" | "titulo" | "origen_proveedor">): string | null {
+  if (i.origen_proveedor) return i.origen_proveedor;
+  const objetivo = i.titulo.split(" · ").slice(1).join(" · ") || null;
+  return proveedorExterno({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo });
+}
+
+type EventoOrigen = Pick<EventoWeb, "tipo" | "fuente" | "mensaje" | "pila" | "objetivo" | "propiedades" | "accion"> &
+  Partial<Pick<EventoWeb, "tras_publicar" | "origen" | "es_bot" | "es_prueba" | "es_interno">>;
+
+/** Origen de UN evento de error (bots y pruebas aparte; el guardado o el calculado). */
+export function origenDeEvento(e: EventoOrigen): OrigenVisible {
+  return origenDeOcurrencia(e);
+}
+
+/** ¿Puede abrir ticket solo? (fallo de la web; externo con el interruptor). */
+export const ticketAutomatico = (o: OrigenVisible, ticketsExternos = false) => puedeAbrirTicket(o, ticketsExternos);
+
 /** Causa conocida de una incidencia del panel (el objetivo va en el título: «mensaje · objetivo»; las tareas, en las muestras). */
 export function causaDeFila(i: Pick<IncidenciaWeb, "tipo" | "fuente" | "mensaje" | "pila" | "titulo">, muestras?: Pick<EventoWeb, "propiedades">[]): CausaConocida | null {
   const objetivo = i.titulo.split(" · ").slice(1).join(" · ") || null;
@@ -274,6 +313,8 @@ export function explicacionIncidencia(
   const causa = causaDeFila(i, muestras);
   const exp = !causa ? i.explicacion_ia ?? null : null;
   const navegador = i.fuente === "navegador";
+  const origen = origenDeFila(i);
+  const grupo = grupoDeOrigen(origen);
   const pagina = navegador ? nombrePagina(i.rutas[0]?.ruta) : null;
   const tareas = listaTareas(tareasDe({ tareas: muestras.map((e) => String(e.propiedades?.tarea ?? "")).filter(Boolean), objetivo: i.titulo.split(" · ")[1] ?? null }));
 
@@ -310,6 +351,8 @@ export function explicacionIncidencia(
     afecta = `No se ve en la web: es del servidor. ${plural(i.ocurrencias_24h, "vez", "veces")} en las últimas 24 h (${i.ocurrencias} en total).${consecuencia ? ` Lo que se nota: ${consecuencia}.` : ""}`;
   } else if (i.sesiones_afectadas === 0) {
     afecta = "No: solo lo han provocado robots o pruebas automáticas.";
+  } else if (origen === "bots") {
+    afecta = "No: solo tráfico interno o pruebas automáticas, no clientes.";
   } else {
     const desde = inicioDeHoy(ahora);
     const deHoy = muestras.filter((e) => Date.parse(e.ocurrido_en) >= desde);
@@ -328,6 +371,8 @@ export function explicacionIncidencia(
   let queHacer = causa?.sencillo.queHacer ?? exp?.que_hacer ?? null;
   if (!queHacer) {
     if (navegador && i.sesiones_afectadas === 0) queHacer = "Nada: lo han provocado robots o pruebas.";
+    else if (grupo === "no_depende") queHacer = "Nada: no depende de la web.";
+    else if (grupo === "externo" && !ticket) queHacer = `No es un fallo de nuestro código: depende de ${proveedorDeFila(i) ?? "un servicio de fuera"}. Si se repite mucho, avisa al técnico para que lo mire con ese servicio.`;
     else if (ticket) queHacer = `${ticket} No hace falta hacer nada más.`;
     else queHacer = "Nada por ahora: si se repite en más visitantes, se abrirá un ticket solo. Si te parece importante, pulsa «Pedir ticket».";
   } else if (ticket) queHacer = `${queHacer} ${ticket}`;
@@ -335,7 +380,8 @@ export function explicacionIncidencia(
   return { queHizo, queFallo, afecta, queHacer, fuente };
 }
 
-type EventoSesion = Pick<EventoWeb, "id" | "tipo" | "categoria" | "accion" | "ruta" | "objetivo" | "valor" | "propiedades" | "mensaje" | "pila" | "fuente" | "incidencia_id" | "tras_publicar" | "ocurrido_en">;
+type EventoSesion = Pick<EventoWeb, "id" | "tipo" | "categoria" | "accion" | "ruta" | "objetivo" | "valor" | "propiedades" | "mensaje" | "pila" | "fuente" | "incidencia_id" | "tras_publicar" | "ocurrido_en">
+  & Partial<Pick<EventoWeb, "origen" | "es_bot" | "es_prueba" | "es_interno">>;
 // (accion: en los errores de carga, lo que decidió la web; ver TEXTO_ACCION_RECARGA.)
 
 /** Lo mismo para una sesión entera (Actividad › sesión). */
@@ -363,6 +409,9 @@ export function explicacionSesion(sesion: Pick<SesionWeb, "conversiones"> | null
   const queFallo = lista.length === 1 ? lista[0] : `Fallaron ${lista.length} cosas: ${lista.slice(0, 3).map((t, n) => `${n + 1}) ${t}`).join(" ")}${lista.length > 3 ? " …" : ""}`;
 
   const repetido = errores.some((e) => e.tras_publicar === "repetido");
+  const origenes = errores.map((e) => origenDeEvento(e));
+  const hayWeb = origenes.includes("web");
+  const externos = errores.filter((_, n) => origenes[n] === "externo");
   const ultimo = errores[errores.length - 1];
   const siguio = eventos.some((e) => e.categoria !== "error" && e.categoria !== "tecnico" && e.ocurrido_en > ultimo.ocurrido_en);
   let afecta: string;
@@ -372,6 +421,17 @@ export function explicacionSesion(sesion: Pick<SesionWeb, "conversiones"> | null
       ? "No: el visitante se quedó sin conexión; no es un fallo de la web."
       : "No: era una página antigua abierta durante una publicación; se recargó sola.";
     queHacer = todosSinConexion ? "Nada." : "Nada: se arregló solo.";
+  } else if (!hayWeb && !externos.length) {
+    // Ningún error depende de la web: conexión, navegador o extensión, versión antigua, bots y pruebas.
+    const distintos = [...new Set(origenes)];
+    afecta = distintos.length === 1
+      ? `No: ${explicacionOrigen(distintos[0]).replace(/^No depende de la web: /, "").replace(/ No hay que hacer nada.*$/, "")}`
+      : `No: ninguno depende de la web (${distintos.map((o) => NOMBRE_ORIGEN[o].toLowerCase()).join(", ")}).`;
+    queHacer = "Nada: no depende de la web.";
+  } else if (!hayWeb) {
+    const proveedores = [...new Set(externos.map((e) => proveedorExterno(e)).filter(Boolean))];
+    afecta = `Algo: falló un servicio de fuera (${proveedores.join(", ") || "de fuera"}); no es un fallo de nuestro código.`;
+    queHacer = "Nada, salvo que se repita mucho: entonces hay que mirarlo con ese servicio.";
   } else {
     if (repetido) afecta = "Sí: volvió a fallar después de recargar; a esta persona no le funcionó esa parte.";
     else if ((sesion?.conversiones ?? 0) > 0) afecta = "Poco: aun así terminó la reserva o el pago.";
@@ -387,7 +447,8 @@ export function explicacionSesion(sesion: Pick<SesionWeb, "conversiones"> | null
 /** Texto en llano de una incidencia para la lista (una línea). */
 export function sencilloDeFila(i: IncidenciaWeb): string | null {
   const causa = causaDeFila(i);
-  return causa?.sencillo.quePasa ?? i.explicacion_ia?.que_paso ?? null;
+  const origen = origenDeFila(i);
+  return causa?.sencillo.quePasa ?? i.explicacion_ia?.que_paso ?? (origen !== "web" ? explicacionOrigen(origen, proveedorDeFila(i)) : null);
 }
 
 /** Reparto «valor n %» de una lista (los 4 más frecuentes). */

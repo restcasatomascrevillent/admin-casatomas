@@ -13,6 +13,7 @@ import { PestanaActividad } from "@/components/logs-web/PestanaActividad";
 import { PestanaIncidencias } from "@/components/logs-web/PestanaIncidencias";
 import { PestanaEstadisticas } from "@/components/logs-web/PestanaEstadisticas";
 import { PestanaConfiguracion } from "@/components/logs-web/PestanaConfiguracion";
+import { subpestanaConfig, type SubpestanaConfig } from "@/components/logs-web/subpestanasConfig";
 import { DetalleSesion } from "@/components/logs-web/DetalleSesion";
 import { DetalleIncidencia } from "@/components/logs-web/DetalleIncidencia";
 import { Interruptor } from "@/components/logs-web/Controles";
@@ -29,21 +30,31 @@ const AUTO_MS = 30_000;
  * Super Admin › Logs: actividad de la web (recorridos por sesión), errores e
  * incidencias (con su ticket en Linear) y estadísticas de comportamiento.
  * Ruta protegida por SuperAdminRoute; los datos, por la RLS (solo super admin).
- * Enlaces directos: ?tab=errores&incidencia=12 (el de los tickets) · ?sesion=<uuid>.
+ * Enlaces directos: ?tab=errores&incidencia=12 (el de los tickets) · ?sesion=<uuid> ·
+ * ?tab=configuracion&config=linear (subpestaña de Configuración).
  */
 export default function SuperAdminLogs() {
   const [params, setParams] = useSearchParams();
   const pestana: Pestana = (PESTANAS as readonly string[]).includes(params.get("tab") ?? "") ? (params.get("tab") as Pestana) : params.get("incidencia") ? "errores" : "actividad";
   const incidencia = Number(params.get("incidencia")) || null;
   const sesion = params.get("sesion");
+  const subConfig = subpestanaConfig(params.get("config"));
   const cambiarParam = useCallback((clave: string, valor: string | null) => {
     setParams((actual) => {
       const n = new URLSearchParams(actual);
       if (valor === null) n.delete(clave);
       else n.set(clave, valor);
       return n;
-    }, { replace: clave === "tab" });
+    }, { replace: clave === "tab" || clave === "config" });
   }, [setParams]);
+  // Configuración con cambios sin guardar: se pregunta antes de salir a otra pestaña (el borrador se perdería).
+  const [configSinGuardar, setConfigSinGuardar] = useState(false);
+  const cambiarPestana = useCallback((v: string) => {
+    if (pestana === "configuracion" && v !== "configuracion" && configSinGuardar
+        && !window.confirm("Tienes cambios sin guardar en Configuración. ¿Salir sin guardarlos?")) return;
+    cambiarParam("tab", v);
+  }, [pestana, configSinGuardar, cambiarParam]);
+  const cambiarSubConfig = useCallback((v: SubpestanaConfig) => cambiarParam("config", v), [cambiarParam]);
 
   const config = useConfigLogs();
   const [entorno, setEntorno] = useState<Entorno | null>(null);
@@ -64,7 +75,11 @@ export default function SuperAdminLogs() {
   const autoRefresco = auto ? AUTO_MS : false;
 
   const estado = useEstadoRecogida(entorno, autoRefresco);
-  const activas = useIncidencias({ entorno, estado: "activas", gravedad: null, fuente: null, texto: "", ocultarRuido: true }, 0, autoRefresco);
+  // El número de la pestaña: solo los FALLOS DE LA WEB activos (en rojo). Los externos y lo que no depende
+  // de la web se cuentan aparte dentro de la pestaña. Sin la migración del origen, todas las activas (como antes).
+  const activas = useIncidencias({ entorno, estado: "activas", gravedad: null, fuente: null, texto: "", ocultarRuido: true, origen: "web" }, 0, autoRefresco);
+  const fallosWeb = activas.data?.total ?? 0;
+  const etiquetaFallos = activas.data?.sinOrigen ? `${fallosWeb} activas` : `${fallosWeb} ${fallosWeb === 1 ? "fallo de la web activo" : "fallos de la web activos"}`;
 
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA);
@@ -101,12 +116,12 @@ export default function SuperAdminLogs() {
         ) : (
           <>
             <div className="shrink-0"><EstadoRecogidaAviso datos={estado.data} /></div>
-            <Tabs value={pestana} onValueChange={(v) => cambiarParam("tab", v)} className="flex min-h-0 flex-1 flex-col">
+            <Tabs value={pestana} onValueChange={cambiarPestana} className="flex min-h-0 flex-1 flex-col">
               <PestanasPagina
                 iconosSoloEscritorio
                 pestanas={[
                   { valor: "actividad", etiqueta: "Actividad", icono: <MousePointerClick /> },
-                  { valor: "errores", etiqueta: "Errores e incidencias", etiquetaCorta: "Errores", icono: <AlertOctagon />, contador: activas.data?.total, tonoContador: "dorado", etiquetaContador: `${activas.data?.total ?? 0} activas` },
+                  { valor: "errores", etiqueta: "Errores e incidencias", etiquetaCorta: "Errores", icono: <AlertOctagon />, contador: activas.data?.total, tonoContador: activas.data?.sinOrigen ? "dorado" : "rojo", etiquetaContador: etiquetaFallos },
                   { valor: "estadisticas", etiqueta: "Estadísticas", icono: <BarChart3 /> },
                   { valor: "configuracion", etiqueta: "Configuración", icono: <Settings2 /> },
                 ]}
@@ -127,7 +142,9 @@ export default function SuperAdminLogs() {
                 {pestana === "estadisticas" && <PestanaEstadisticas entorno={entorno} />}
               </TabsContent>
               <TabsContent value="configuracion" className={CONTENIDO}>
-                {pestana === "configuracion" && <PestanaConfiguracion estado={estado.data} />}
+                {pestana === "configuracion" && (
+                  <PestanaConfiguracion estado={estado.data} sub={subConfig} onSub={cambiarSubConfig} onCambiosSinGuardar={setConfigSinGuardar} />
+                )}
               </TabsContent>
             </Tabs>
           </>
