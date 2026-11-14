@@ -113,7 +113,9 @@ describe("listaDesdeCompletos (carga de antes)", () => {
     expect(porId.get(1)!.n_lineas).toBe(2);
     const ficha = completos.get(3)!;
     expect(ficha.productos.map((p) => p.media_referencia)).toEqual([11, null]); // portes: sin media
-    expect(avisosFicha(ficha).map((a) => a.codigo)).toEqual(["precio_atipico_pagina"]);
+    expect(avisosFicha({ ...ficha, verificada: false }).map((a) => a.codigo)).toEqual(["precio_atipico_pagina"]);
+    // Revisada: sus avisos desaparecen también de la ficha (14/11/2026).
+    expect(avisosFicha(ficha)).toEqual([]);
   });
 });
 

@@ -70,8 +70,8 @@ describe("Dashboard › Márgenes de precio: reutiliza las cuentas de Facturas �
     expect(cifraMargen(vino)).toBe("×1,37");
     expect(umbralMargen(vino, DATOS)).toBe("mín. ×2,50");
     // 13/11/2026: el % de coste es de lo que se COBRA (precio de venta sin IVA), y se dice.
-    expect(cifraMargen(plato)).toBe("coste: 46 % de lo que cobras");
-    expect(umbralMargen(plato, DATOS)).toBe("máx. 35 % de lo que cobras");
+    expect(cifraMargen(plato)).toBe("46 % coste sobre venta");
+    expect(umbralMargen(plato, DATOS)).toBe("máx. 35 % coste sobre venta");
     expect(umbralMargen(peso, DATOS)).toBe("mín. ×2,00");
   });
 

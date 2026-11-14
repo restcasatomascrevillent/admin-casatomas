@@ -119,8 +119,21 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
     const onProgreso = (p: ProgresoMovil) => {
       if (turno.current === yo) setEstado({ fase: "trabajando", progreso: p });
     };
-    const promesa: Promise<StickerFoto> =
-      previo ?? (ordenador ? fotoParaRecorte(foto).then((b) => quitarFondo(b, onProgreso)) : quitarFondo(foto, onProgreso));
+    const quitar = async (): Promise<StickerFoto> => {
+      const base: Blob = ordenador ? await fotoParaRecorte(foto) : foto;
+      const r = await quitarFondo(base, onProgreso);
+      // Platos: el modelo a veces deja solo la comida (o medio plato); se busca
+      // el plato entero alrededor (14/11/2026, «el recortador de platos no funciona»).
+      if (tipo !== "plato") return r;
+      try {
+        const { completarPlato } = await import("./completarPlato");
+        return { ...r, sticker: await completarPlato(base, r.sticker) };
+      } catch (e) {
+        console.warn("[recorte] no se pudo completar el plato; se deja el recorte del modelo", e);
+        return r;
+      }
+    };
+    const promesa: Promise<StickerFoto> = previo ?? quitar();
     promesa.then(
       (r) => {
         if (turno.current === yo) setEstado({ fase: "listo", r: { sticker: r.sticker, metodo: r.metodo } });
@@ -133,7 +146,7 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
         setEstado({ fase: "fallo", aviso: avisoSinFondoCarta(e) });
       },
     );
-  }, []);
+  }, [tipo]);
 
   /**
    * Con el modelo. Móvil: reduce la foto una vez (vista previa y recorte salen

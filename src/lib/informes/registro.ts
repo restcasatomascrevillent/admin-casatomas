@@ -27,11 +27,13 @@ import { mesesSeleccionables as mesesTrafico, mesPorDefecto as mesPorDefectoTraf
 import { obtenerInformeFacturas } from "./fuentes/facturas";
 import { obtenerInformeVinoFavorito } from "./fuentes/vinoFavorito";
 import { obtenerInformeServicios } from "./fuentes/servicios";
+import { obtenerInformeAuditoria } from "./fuentes/auditoria";
+import { obtenerInformeAccionesWeb } from "./fuentes/accionesWeb";
 import { obtenerInformeCartaFacturas, type TipoCartaFacturas } from "./fuentes/cartaFacturas";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
-export type IdSeccionInforme = "web" | "rrss" | "facturas" | "carta" | "servicios" | "cheques";
+export type IdSeccionInforme = "web" | "rrss" | "facturas" | "carta" | "servicios" | "cheques" | "auditoria";
 
 export interface SeccionInforme {
   id: IdSeccionInforme;
@@ -46,6 +48,7 @@ export const SECCIONES_INFORME: SeccionInforme[] = [
   { id: "servicios", titulo: "Servicios" },
   { id: "cheques", titulo: "Cheques regalo" },
   { id: "carta", titulo: "Carta" },
+  { id: "auditoria", titulo: "Seguridad" },
 ];
 
 /**
@@ -145,6 +148,21 @@ export const INFORMES: DefinicionInforme[] = [
     generador: { tipo: "componente", cargar: () => import("@/components/informes/generadores/InformeTraficoGenerador") },
   },
   {
+    id: "acciones-web-mensual",
+    // 14/11/2026, petición del dueño: «lo que más hacen los clientes» en la web, comparado con el mes anterior.
+    titulo: "Informe mensual de lo que hacen los clientes en la web",
+    descripcion:
+      "Ranking de lo que más hacen los clientes (mirar la carta, abrir un vino, pulsar Reservar, llamar, WhatsApp, cómo llegar, comprar un cheque, buscar…): veces, % de visitas y comparación con el mes anterior. Solo cuenta a quien acepta cookies.",
+    seccion: "web",
+    permiso: { tipo: "superadmin" },
+    periodo: "mes",
+    formatos: ["pdf", "csv"],
+    origen: { etiqueta: "Tráfico web", ruta: "/super-admin/trafico-web" },
+    meses: (hoy) => mesesTrafico(hoy),
+    mesPorDefecto: mesPorDefectoTrafico,
+    generador: { tipo: "tabla", obtener: (periodo) => obtenerInformeAccionesWeb(periodo) },
+  },
+  {
     id: "rrss-mensual",
     titulo: "Informe mensual de redes sociales",
     descripcion: "Instagram (alcance, publicaciones y seguidores del mes, comparado con el anterior) y las visitas que las redes llevan a la web.",
@@ -187,6 +205,19 @@ export const INFORMES: DefinicionInforme[] = [
     formatos: ["pdf", "csv"],
     origen: { etiqueta: "Servicios › Costes", ruta: "/super-admin/servicios" },
     generador: { tipo: "tabla", obtener: (periodo) => obtenerInformeServicios(periodo) },
+  },
+  {
+    id: "auditoria-mensual",
+    // 14/11/2026, petición del dueño: quién usa el panel, qué toca y qué hace el sistema solo.
+    titulo: "Informe mensual de auditoría",
+    descripcion:
+      "Quién ha usado el panel en el mes: acciones, días que entró y dónde trabaja más; gráfico por días y horas; lo delicado (borrados, precios, permisos) y, aparte, lo que hace el sistema solo.",
+    seccion: "auditoria",
+    permiso: { tipo: "superadmin" },
+    periodo: "mes",
+    formatos: ["pdf", "csv"],
+    origen: { etiqueta: "Super Admin › Auditoría", ruta: "/super-admin/auditoria" },
+    generador: { tipo: "tabla", obtener: (periodo) => obtenerInformeAuditoria(periodo) },
   },
   {
     id: "cheques-mensual",

@@ -38,7 +38,7 @@ export function cifraMargen(a: ArticuloMargen): string {
 
 /** Umbral con el que se compara: «mín. ×2,00» o «máx. 35 % de lo que cobras». */
 export function umbralMargen(a: ArticuloMargen, d: Pick<MargenesCarta, "config">): string {
-  if (a.tipo === "plato") return `máx. ${fmt(d.config.costeMaxPlatoPct, 0)} % de lo que cobras`;
+  if (a.tipo === "plato") return `máx. ${fmt(d.config.costeMaxPlatoPct, 0)} % coste sobre venta`;
   return `mín. ×${fmt(a.tipo === "peso" ? d.config.multiplicadorMinPeso : d.config.multiplicadorMinVino, 2)}`;
 }
 
