@@ -21,6 +21,8 @@ vi.mock("@/hooks/useUserRole", async (original) => ({
   useUserRole: () => ({ isAdmin: false, role: "staff", loading: false, verificado: true, permissions: h.permisos, seccionInicio: h.seccionInicio }),
 }));
 vi.mock("@/hooks/useSuperAdmin", () => ({ useSuperAdmin: () => ({ isSuperAdmin: false, loading: false }) }));
+// Interruptores de Control del Panel (ProtectedRoute los mira desde el 14/11/2026): todo activado, sin red.
+vi.mock("@/hooks/useAdminFeatureToggles", () => ({ useAdminFeatureToggles: () => ({ isEnabled: () => true, loading: false }) }));
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 

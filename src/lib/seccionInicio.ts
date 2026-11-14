@@ -40,8 +40,9 @@ export interface OpcionInicio {
 }
 
 /**
- * Las entradas del menú lateral (`menuItems` de AppSidebar), en su orden y con los mismos
- * permisos. Si cambia el menú, cambiar también esta lista.
+ * Las entradas del menú lateral (módulos del catálogo `lib/modulosPanel.ts` con `enMenu`), en su orden y
+ * con los mismos permisos (lo comprueba `modulosPanel.test.ts`). Si cambia el menú, cambiar también esta
+ * lista. «Nueva petición» no está a propósito: no es una sección de trabajo para abrir al entrar.
  */
 export const OPCIONES_INICIO: readonly OpcionInicio[] = [
   { clave: "dashboard", titulo: "Dashboard", ruta: "/dashboard", secciones: ["dashboard"] },
