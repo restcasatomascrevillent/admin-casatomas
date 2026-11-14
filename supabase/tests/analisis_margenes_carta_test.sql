@@ -9,8 +9,10 @@ set client_encoding = 'UTF8';
 --      de 90 días en €/kg, sin albaranes facturados ni Touza; €/kg de hace 6
 --      meses; vino en €/l → botella de 0,75 l.
 --   T3 margenes_carta como usuario del panel con Facturas (si no hay sesiones,
---      se salta): plato de 100 g a 22 € con 100 g a 140 €/kg → venta 20 €,
---      coste 14 €, 70 % → coste_alto + sube_coste (100 → 140 €/kg); vino a
+--      se salta): plato de 100 g a 22 € con 100 g a 150 €/kg (desde
+--      20261128140000, la ÚLTIMA factura: la línea más nueva del 10/06; antes, la
+--      mediana de 140 €/kg) → venta 20 €, coste 15 €, 75 % → coste_alto +
+--      sube_coste (100 → 150 €/kg); vino a
 --      30 € con botella de 15 € → 2× → multiplicador_bajo; plato sin
 --      escandallo → sin_mapear con su motivo; < 1 s.
 --   T4 sin permiso: margenes_carta y margenes_guardar_escandallo dan 42501.
@@ -152,12 +154,13 @@ begin
     reset role;
     select x into p from jsonb_array_elements(j->'platos') x where x->>'id' = 'prueba-margenes-percebe';
     if p is null then raise exception 'FALLO T3: no sale el plato de prueba'; end if;
-    if (p->>'venta')::numeric <> 20 or (p->>'coste')::numeric <> 14 or (p->>'pct')::numeric <> 70
-       or (p->>'margen')::numeric <> 6 or (p->>'gramos_venta')::numeric <> 100 then
-      raise exception 'FALLO T3: plato venta % coste % pct % margen % (esperaba 20 / 14 / 70 / 6)',
+    if (p->>'venta')::numeric <> 20 or (p->>'coste')::numeric <> 15 or (p->>'pct')::numeric <> 75
+       or (p->>'margen')::numeric <> 5 or (p->>'gramos_venta')::numeric <> 100
+       or (p->>'coste_mediana')::numeric <> 14 then
+      raise exception 'FALLO T3: plato venta % coste % pct % margen % (esperaba 20 / 15 / 75 / 5, mediana 14)',
         p->>'venta', p->>'coste', p->>'pct', p->>'margen';
     end if;
-    if not (p->'banderas' ? 'coste_alto') or not (p->'banderas' ? 'sube_coste') or (p->>'variacion_pct')::numeric <> 40 then
+    if not (p->'banderas' ? 'coste_alto') or not (p->'banderas' ? 'sube_coste') or (p->>'variacion_pct')::numeric <> 50 then
       raise exception 'FALLO T3: banderas del plato %, variación %', p->'banderas', p->>'variacion_pct';
     end if;
     if p->>'principal' <> 'Pruebamarg Percebe' or p->>'origen' <> 'estimado' then
@@ -173,15 +176,15 @@ begin
     end if;
 
     -- T6 «Por peso» (20261115410000): 22 €/100 g = 220 €/kg en carta, 200 sin IVA;
-    -- compra 140 €/kg → ×1,43 < ×2 (por defecto) → multiplicador_bajo; 70 % de coste;
+    -- compra 150 €/kg (última factura) → ×1,33 < ×2 (por defecto) → multiplicador_bajo; 75 % de coste;
     -- última compra la factura de junio (no el albarán facturado ni Touza).
     if (j->'config'->>'multiplicador_min_peso') is null then
       raise exception 'FALLO T6: config sin multiplicador_min_peso';
     end if;
     select x into p from jsonb_array_elements(j->'peso') x where x->>'id' = 'prueba-margenes-percebe';
     if p is null then raise exception 'FALLO T6: el plato de 100 g no sale en peso'; end if;
-    if (p->>'venta_kg_iva')::numeric <> 220 or (p->>'venta_kg')::numeric <> 200 or (p->>'compra_kg')::numeric <> 140
-       or (p->>'multiplicador')::numeric <> 1.43 or (p->>'pct')::numeric <> 70 then
+    if (p->>'venta_kg_iva')::numeric <> 220 or (p->>'venta_kg')::numeric <> 200 or (p->>'compra_kg')::numeric <> 150
+       or (p->>'multiplicador')::numeric <> 1.33 or (p->>'pct')::numeric <> 75 or (p->>'compra_kg_mediana')::numeric <> 140 then
       raise exception 'FALLO T6: peso %', p;
     end if;
     if p->>'ultimo_proveedor' <> 'PRUEBA MARGENES SL' or p->>'ultima_fecha' <> '2031-06-10'
@@ -216,7 +219,8 @@ begin
       j := public.margenes_carta('2031-06-30');
       reset role;
       select x into p from jsonb_array_elements(j->'platos') x where x->>'id' = 'prueba-margenes-vacio';
-      if p->>'origen' <> 'manual' or (p->>'coste')::numeric <> 7 or p->>'motivo' is not null or not (p->>'revisado')::boolean then
+      -- 50 g a 150 €/kg (última factura, 20261128140000) = 7,50 €.
+      if p->>'origen' <> 'manual' or (p->>'coste')::numeric <> 7.5 or p->>'motivo' is not null or not (p->>'revisado')::boolean then
         raise exception 'FALLO T5: tras editar, origen % coste % motivo % revisado %', p->>'origen', p->>'coste', p->>'motivo', p->>'revisado';
       end if;
       select x into v from jsonb_array_elements(j->'vinos') x where x->>'id' = 'prueba-margenes-vino';
