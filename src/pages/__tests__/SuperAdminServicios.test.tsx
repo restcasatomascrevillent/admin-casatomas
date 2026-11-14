@@ -504,7 +504,8 @@ describe("Super Admin › Servicios › Servicios (tarjetas)", () => {
     const { cambios, proveedor } = h.updates[0];
     expect(proveedor).toBe("vercel");
     expect(Object.keys(cambios).sort()).toEqual([
-      "activo", "categoria", "ciclo", "cuenta", "fuente_precio", "limites", "moneda", "nombre", "notas", "orden", "panel_url", "plan", "por_confirmar", "precio_anual", "precio_mensual", "renovacion",
+      "activo", "categoria", "ciclo", "cuenta", "fuente_precio", "limites", "moneda", "nombre", "notas", "orden", "panel_url", "para_que", "plan", "plan_siguiente",
+      "por_confirmar", "precio_anual", "precio_confirmado_en", "precio_mensual", "precio_siguiente", "renovacion", "si_se_pasa",
     ]);
     expect(cambios).toMatchObject({ plan: "Pro", precio_mensual: 20, precio_anual: null, panel_url: "https://vercel.com/casa-tomas/~/usage", categoria: "alojamiento", orden: 10, activo: true });
     expect((cambios.limites as Record<string, { limite: number }>).peticiones_cdn.limite).toBe(10_000_000);
@@ -636,6 +637,133 @@ describe("Super Admin › Servicios › Costes", () => {
     const informe = screen.getByRole("region", { name: "Informe mensual" });
     expect(await within(informe).findByRole("alert")).toHaveTextContent(/sin ella no se puede hacer el informe/);
     expect(within(informe).getByRole("button", { name: "CSV" })).toBeDisabled();
+  });
+});
+
+describe("Super Admin › Servicios › Costes · precio de todo (13/11/2026)", () => {
+  it("este mes en euros: llevamos, previsión a fin de mes y el mes anterior; la IA va dentro de OpenAI", async () => {
+    const actual = mesDe(new Date());
+    const pasado = mesAnterior(actual);
+    h.rpc.mockImplementation(async (fn: string, args?: { p_mes?: string }) => {
+      if (fn !== "servicios_resumen_mes") return { data: [], error: null };
+      if (args?.p_mes === pasado) return { data: [{ proveedor: "openai", lecturas: 30, coste_variable: { importe: 10, moneda: "USD" } }], error: null };
+      return { data: [], error: null };
+    });
+    pintar("/super-admin/servicios?tab=costes");
+    const bloque = await screen.findByRole("region", { name: "Este mes, en euros" });
+    await waitFor(() => expect(t(within(bloque).getByTestId("resumen-llevamos").textContent)).toContain("12,15 €"));
+    expect(t(within(bloque).getByTestId("resumen-prevision").textContent)).toContain(`≈ ${eur(previsiones().mes)}`);
+    // Mes pasado: Hostinger 7,99 + OpenAI 10 US$ × 0,9 = 16,99.
+    await waitFor(() => expect(t(within(bloque).getByTestId("resumen-anterior").textContent)).toContain(`${textoMesCorto(pasado)}16,99 €`));
+    expect(bloque).toHaveTextContent("La inteligencia artificial ya va dentro de OpenAI: no se suma otra vez.");
+    expect(bloque).toHaveTextContent("Sin contar lo que no tiene precio apuntado: Loading.");
+  });
+
+  it("lo metido a mano para este mes manda en el gasto del mes (también en Estado) y Google Maps, sin lectura, se mete desde ahí", async () => {
+    const actual = mesDe(new Date());
+    h.servicios = [...SERVICIOS, servicio({ proveedor: "google", nombre: "Google Maps", plan: "Pago por uso", precio_mensual: null, ciclo: "por_uso", categoria: "mapas", orden: 70 })];
+    h.invoke.mockResolvedValue({ data: { lecturas: LECTURAS, sin_lector: ["loading", "google"], generado_en: AHORA }, error: null });
+    h.rpc.mockImplementation(async (fn: string, args?: { p_mes?: string }) => {
+      if (fn !== "servicios_resumen_mes") return { data: [], error: null };
+      if (args?.p_mes === actual) return { data: [{ proveedor: "stripe", lecturas: 3, manual_importe: "3.00", manual_moneda: "EUR", manual_nota: "Factura" }], error: null };
+      return { data: [], error: null };
+    });
+    pintar("/super-admin/servicios?tab=costes");
+    const bloque = await screen.findByRole("region", { name: "Coste de este mes por proveedor" });
+    // Stripe: 3,00 € metidos a mano en vez de 1,55 € leídos → 12,15 − 1,55 + 3 = 13,60.
+    await waitFor(() => expect(t(within(bloque).getByTestId("desglose-total").textContent)).toContain("Total este mes13,60 €"));
+    expect(t(within(bloque).getByTestId("desglose-total").textContent)).toContain("+ 3,00 € metido a mano");
+    expect(within(bloque.querySelector("[data-coste='stripe']") as HTMLElement).getByText(/metido a mano/)).toBeInTheDocument();
+    const sinLectura = within(bloque).getByTestId("desglose-sin-lectura");
+    fireEvent.click(within(sinLectura).getByRole("button", { name: /Google Maps: meter el gasto de/ }));
+    const dialogo = await screen.findByRole("dialog", { name: "Coste de Google Maps" });
+    fireEvent.change(within(dialogo).getByLabelText("Importe"), { target: { value: "1,20" } });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(h.upsertsCoste).toEqual([{ proveedor: "google", mes: actual, importe: 1.2, moneda: "USD", nota: null }]));
+    abrirPestana("Estado");
+    await waitFor(() => expect(t(screen.getByTestId("estado-gasto").textContent)).toContain("13,60 €"));
+  });
+
+  it("qué tenemos contratado: para qué, plan y precio; «Confirmar precio» guarda plan, precio y la fecha de hoy", async () => {
+    h.servicios = SERVICIOS.map((x) => (x.proveedor === "resend" ? { ...x, plan: "Free (por confirmar)", para_que: "Manda los correos", fuente_precio: "https://resend.com/pricing" } : x));
+    pintar("/super-admin/servicios?tab=costes");
+    const bloque = await screen.findByRole("region", { name: /Qué tenemos contratado: 3 precios por confirmar/ });
+    const tabla = within(bloque).getByRole("table");
+    const fila = (p: string) => tabla.querySelector(`[data-inventario='${p}']`) as HTMLElement;
+    expect([...tabla.querySelectorAll("[data-inventario]")].map((x) => [x.getAttribute("data-inventario"), x.getAttribute("data-estado")])).toEqual([
+      ["vercel", "confirmado"], ["supabase", "confirmado"], ["github", "confirmado"], ["resend", "por_confirmar"], ["stripe", "confirmado"], ["openai", "confirmado"],
+      ["hostinger", "por_confirmar"], ["loading", "sin_precio"],
+    ]);
+    expect(t(fila("resend").textContent)).toMatch(/Resend.*Manda los correos.*Free \(por confirmar\).*Gratis.*Por confirmar/);
+    expect(t(fila("hostinger").textContent)).toMatch(/7,99 €.*95,88 €/);
+    fireEvent.click(within(fila("resend")).getByRole("button", { name: /Confirmar precio/ }));
+    const dialogo = await screen.findByRole("dialog", { name: "Precio de Resend" });
+    expect(within(dialogo).getByLabelText("Plan")).toHaveValue("Free");
+    expect(within(dialogo).getByRole("link", { name: /Página de precios/ })).toHaveAttribute("href", "https://resend.com/pricing");
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Confirmar precio" }));
+    await waitFor(() => expect(h.updates).toHaveLength(1));
+    const hoy = new Date();
+    const dia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+    expect(h.updates[0]).toEqual({
+      proveedor: "resend",
+      cambios: { plan: "Free", ciclo: "gratuito", precio_mensual: 0, precio_anual: null, moneda: "USD", fuente_precio: "https://resend.com/pricing", por_confirmar: false, precio_confirmado_en: dia },
+    });
+    expect(h.toast.success).toHaveBeenCalledWith("Resend: precio confirmado");
+    await waitFor(() => expect(screen.getByRole("region", { name: /Qué tenemos contratado: 2 precios por confirmar/ })).toBeInTheDocument());
+  });
+
+  it("antes de pasar del plan gratis: el límite cerca, qué pasaría y el plan siguiente; lo que no se lee, aparte", async () => {
+    h.servicios = SERVICIOS.map((x) => (x.proveedor === "supabase"
+      ? { ...x, plan_siguiente: "Pro", precio_siguiente: 25, si_se_pasa: "Supabase puede limitar el proyecto.",
+          limites: { ...x.limites, egreso: { ...x.limites.egreso, fuente: "https://supabase.com/docs/x" }, bd_tamano: { ...x.limites.bd_tamano, si_se_pasa: "La base de datos pasa a solo lectura." } } }
+      : x));
+    pintar("/super-admin/servicios?tab=costes");
+    const bloque = await screen.findByRole("region", { name: "Planes gratis: 1 límite cerca" });
+    const aviso = bloque.querySelector("[data-aviso-plan='supabase:bd_tamano']") as HTMLElement;
+    expect(aviso).toHaveAttribute("data-nivel", "ambar");
+    expect(t(aviso.textContent)).toMatch(/Supabase · Tamaño de la base de datos.*80 %.*400 MB de 500 MB/);
+    expect(aviso).toHaveTextContent("Qué pasaría: La base de datos pasa a solo lectura.");
+    expect(t(aviso.textContent)).toContain("Plan siguiente: Pro: 25,00 US$ al mes (≈ 22,50 €)");
+    const sinDato = within(bloque).getByTestId("plan-gratis-sin-dato");
+    expect(sinDato).toHaveTextContent(/Supabase · Datos servidos \(límite 5 GB\).*Supabase no da este dato por API/);
+  });
+
+  it("cuánto cuesta cada cosa e IA función por función (con el aviso de las llamadas sin tarifa)", async () => {
+    h.rpc.mockImplementation(async (fn: string, args?: { p_desde?: string }) => {
+      if (fn !== "ia_coste_por_uso") return { data: [], error: null };
+      if (args?.p_desde !== `${mesDe(new Date()).slice(0, 7)}-01`) return { data: [], error: null };
+      return { data: [
+        { funcion: "ocr-trabajo", que_hace: "Lee las facturas", accion: "Leer una factura", unidad: "documento", orden: 25, llamadas: 586, usos: 316, usos_con_coste: 316,
+          coste_usd: "1.4360", filas_sin_tarifa: 0, modelos_sin_tarifa: [], mediana_usd: "0.0062", media_usd: "0.0045", servidor_propio: false },
+        { funcion: "chat-facturas", que_hace: "Contesta en el chat de Facturas", accion: "Contestar una pregunta en el chat de Facturas", unidad: "pregunta", orden: 30, llamadas: 144,
+          usos: 60, usos_con_coste: 36, coste_usd: "0.1038", filas_sin_tarifa: 24, modelos_sin_tarifa: ["gpt-6.1-terra"], mediana_usd: "0.002", media_usd: "0.0029", servidor_propio: false },
+        { funcion: "recortar-foto", que_hace: "Quita el fondo de las fotos", accion: "Recortar una foto", unidad: "foto", orden: 90, llamadas: 2, usos: 2, usos_con_coste: 2,
+          coste_usd: 0, filas_sin_tarifa: 0, modelos_sin_tarifa: [], mediana_usd: 0, media_usd: 0, servidor_propio: true },
+      ], error: null };
+    });
+    pintar("/super-admin/servicios?tab=costes");
+    const cosas = await screen.findByTestId("coste-cada-cosa");
+    const linea = (f: string) => cosas.querySelector(`[data-accion='${f}']`) as HTMLElement;
+    await waitFor(() => expect(t(linea("ocr-trabajo").textContent)).toMatch(/Leer una factura≈ 0,6 céntimosmediana de 316 documentos/));
+    expect(t(linea("extraer-vino-foto").textContent)).toContain("Leer la etiqueta de un vinosin usos todavía");
+    expect(t(linea("traducir-contenido").textContent)).toContain("Traducir un platosin usos todavía");
+    expect(t(linea("recortar-foto").textContent)).toContain("Recortar una fotogratis (en nuestro servidor)");
+    expect(t(linea("chat-facturas").textContent)).toContain("≈ 0,2 céntimos");
+    const ia = screen.getByRole("region", { name: "IA, función por función" });
+    expect(within(ia).getByRole("alert")).toHaveTextContent("24 llamadas de gpt-6.1-terra sin tarifa: su coste no está sumado.");
+    const filaIa = (f: string) => within(ia).getByRole("table").querySelector(`[data-ia-funcion='${f}']`) as HTMLElement;
+    expect(t(filaIa("ocr-trabajo").textContent)).toMatch(/Lee las facturas.*586.*316 documentos.*1,29 €.*0,6 céntimos por documento/);
+    expect(t(within(ia).getByTestId("ia-total").textContent)).toBe("1,39 €");
+  });
+
+  it("sin la migración 20261129153000: la IA por función lo dice y el resto de Costes sigue", async () => {
+    h.rpc.mockImplementation(async (fn: string) => fn === "ia_coste_por_uso"
+      ? { data: null, error: { code: "PGRST202", message: "Could not find the function public.ia_coste_por_uso" } }
+      : { data: [], error: null });
+    pintar("/super-admin/servicios?tab=costes");
+    const ia = await screen.findByRole("region", { name: "IA, función por función" });
+    expect(await within(ia).findByRole("alert")).toHaveTextContent("20261129153000_costes_servicios_ia");
+    expect(screen.getByRole("region", { name: "Coste de este mes por proveedor" })).toBeInTheDocument();
   });
 });
 
@@ -778,8 +906,10 @@ describe("Super Admin › Servicios · sin migraciones o con fallos", () => {
     h.servicios = SERVICIOS.slice(0, 5).map(({ categoria: _c, orden: _o, activo: _a, por_confirmar: _p, precio_anual: _pa, fuente_precio: _f, ...viejo }) => viejo);
     pintar("/super-admin/servicios?tab=servicios");
     await waitFor(() => tarjeta("Vercel"));
-    expect(h.selects.length).toBe(2);
-    expect(h.selects[1]).not.toContain("categoria");
+    // Con las columnas del inventario (20261129153000), con las de 20261103160000 y con las de siempre.
+    expect(h.selects.length).toBe(3);
+    expect(h.selects[0]).toContain("para_que");
+    expect(h.selects[2]).not.toContain("categoria");
     // Orden de siempre aunque no haya columna `orden`.
     expect(screen.getAllByRole("article").map((a) => a.getAttribute("aria-labelledby"))).toEqual(
       ["servicio-vercel", "servicio-supabase", "servicio-github", "servicio-resend", "servicio-stripe"],

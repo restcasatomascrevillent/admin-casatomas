@@ -25,6 +25,8 @@ export interface LimitePlan {
   fuente?: string;
   nota?: string;
   orden?: number;
+  /** Qué pasa si se pasa de este límite (si no, el `si_se_pasa` del servicio). 20261129153000. */
+  si_se_pasa?: string;
 }
 
 export type Categoria =
@@ -53,6 +55,16 @@ export interface ServicioContratado {
   /** Lo que se paga al año (ciclo «anual»). */
   precio_anual: number | null;
   fuente_precio: string | null;
+  // 20261129153000 (sin ella, `cargarServicios` las deja a null).
+  /** Para qué lo usa el restaurante, en palabras. */
+  para_que?: string | null;
+  /** Día (AAAA-MM-DD) en que se confirmó plan y precio. */
+  precio_confirmado_en?: string | null;
+  /** Plan al que habría que pasar si se acaba el actual, y su precio al mes (moneda del servicio). */
+  plan_siguiente?: string | null;
+  precio_siguiente?: number | null;
+  /** Qué pasa si se pasa de un límite del plan. */
+  si_se_pasa?: string | null;
 }
 
 /** Lo gastado por uso en el periodo de la lectura, en su moneda original. */
@@ -317,12 +329,17 @@ export interface FilaCoste {
   porConfirmar: boolean;
   /** La cuota o el variable está en una moneda que no se sabe pasar a euros. */
   monedaDesconocida: boolean;
+  /** Lo metido a mano para este mes (factura, cargo en la tarjeta), en euros: si está, manda sobre cuota + uso. */
+  manualEur: number | null;
 }
 
 export interface ResumenCostes {
   filas: FilaCoste[];
+  /** Cuotas y uso de los servicios SIN coste metido a mano este mes. */
   fijoMesEur: number;
   variableMesEur: number;
+  /** Lo metido a mano para este mes (no se proyecta: ya es la factura). */
+  manualMesEur: number;
   totalMesEur: number;
   /** Cuotas + el variable al ritmo de los días que van de mes (orientativo). */
   previsionMesEur: number;
@@ -345,12 +362,15 @@ function diasDelMes(hoy: Date): { total: number; pasados: number } {
 /**
  * Coste de los servicios EN USO: cuota fija al mes, lo gastado por uso este
  * mes (de las lecturas) y la previsión del año. Todo en euros con `eurPorUsd`.
+ * `manuales`: lo metido a mano para el mes en curso (Servicios › Costes, desde
+ * el 13/11/2026 también aquí): manda sobre cuota + uso y no se proyecta.
  */
 export function resumirCostes(
   servicios: ServicioContratado[],
   lecturas: Map<string, Pick<LecturaServicio, "coste_variable">> | Record<string, Pick<LecturaServicio, "coste_variable">>,
   eurPorUsd: number,
   hoy: Date = new Date(),
+  manuales: Map<string, Importe> = new Map(),
 ): ResumenCostes {
   const leer = (p: string) => (lecturas instanceof Map ? lecturas.get(p) : lecturas[p]) ?? null;
   const filas: FilaCoste[] = [];
@@ -367,32 +387,40 @@ export function resumirCostes(
     if (!fijo) sinPrecio.push(s.nombre);
     if (s.por_confirmar) porConfirmar.push(s.nombre);
     const variableEur = variableEurBruto ?? 0;
+    const manual = manuales.get(s.proveedor) ?? null;
+    const manualBruto = manual ? aEur(manual.importe, manual.moneda, eurPorUsd) : null;
     filas.push({
       proveedor: s.proveedor,
       nombre: s.nombre,
       categoria: s.categoria,
       fijoEur: fijoEur == null ? null : redondear2(fijoEur),
       variableEur: redondear2(variableEur),
-      totalEur: redondear2((fijoEur ?? 0) + variableEur),
+      totalEur: redondear2(manualBruto ?? (fijoEur ?? 0) + variableEur),
       fijo,
       variable,
       porConfirmar: !!s.por_confirmar,
-      monedaDesconocida: (fijo != null && fijoEur == null) || (variable != null && variableEurBruto == null),
+      monedaDesconocida: (fijo != null && fijoEur == null) || (variable != null && variableEurBruto == null) || (manual != null && manualBruto == null),
+      manualEur: manualBruto == null ? null : redondear2(manualBruto),
     });
   }
   filas.sort((a, b) => b.totalEur - a.totalEur || a.nombre.localeCompare(b.nombre, "es"));
-  const fijoMesEur = redondear2(filas.reduce((t, f) => t + (f.fijoEur ?? 0), 0));
-  const variableMesEur = redondear2(filas.reduce((t, f) => t + f.variableEur, 0));
+  const sinManual = filas.filter((f) => f.manualEur == null);
+  const fijoMesEur = redondear2(sinManual.reduce((t, f) => t + (f.fijoEur ?? 0), 0));
+  const variableMesEur = redondear2(sinManual.reduce((t, f) => t + f.variableEur, 0));
+  const manualMesEur = redondear2(filas.reduce((t, f) => t + (f.manualEur ?? 0), 0));
   const { total, pasados } = diasDelMes(hoy);
   const variableMesCompleto = variableMesEur * (total / pasados);
+  // El año: las cuotas de todos (también los metidos a mano) × 12.
+  const cuotasTodos = redondear2(filas.reduce((t, f) => t + (f.fijoEur ?? 0), 0));
   return {
     filas,
     fijoMesEur,
     variableMesEur,
-    totalMesEur: redondear2(fijoMesEur + variableMesEur),
-    previsionMesEur: redondear2(fijoMesEur + variableMesCompleto),
-    fijoAnioEur: redondear2(fijoMesEur * 12),
-    previsionAnioEur: redondear2((fijoMesEur + variableMesCompleto) * 12),
+    manualMesEur,
+    totalMesEur: redondear2(fijoMesEur + variableMesEur + manualMesEur),
+    previsionMesEur: redondear2(fijoMesEur + variableMesCompleto + manualMesEur),
+    fijoAnioEur: redondear2(cuotasTodos * 12),
+    previsionAnioEur: redondear2((fijoMesEur + variableMesCompleto + manualMesEur) * 12),
     sinPrecio,
     porConfirmar,
     hayUsd,
@@ -554,8 +582,19 @@ export function pendientesServicios(args: {
   ia?: { sinRegistro: number; modelosSinTarifa: number } | null;
   /** Costes de meses ya cerrados (o precios) que faltan por meter (Costes › «Costes por meter»). */
   costesPorMeter?: number;
+  /**
+   * Demo y previews: las claves de los proveedores solo están en producción, así
+   * que «falta la clave» no es algo que arreglar (13/11/2026): sale una sola
+   * línea informativa en vez del aviso.
+   */
+  clavesSoloEnProduccion?: boolean;
+  /**
+   * Límites de planes gratis que, al ritmo que van, se pasarían pronto aunque
+   * hoy estén por debajo del 80 % (Costes › «Planes gratis», 13/11/2026).
+   */
+  planes?: Array<Pick<Pendiente, "clave" | "gravedad" | "titulo" | "detalle">>;
 }): Pendiente[] {
-  const { servicios, lecturas, renovaciones, resumen, sinLector = new Set<string>(), ia, costesPorMeter = 0 } = args;
+  const { servicios, lecturas, renovaciones, resumen, sinLector = new Set<string>(), ia, costesPorMeter = 0, clavesSoloEnProduccion = false, planes = [] } = args;
   const enUso = servicios.filter((s) => s.activo !== false);
   const salida: Pendiente[] = [];
 
@@ -576,6 +615,8 @@ export function pendientesServicios(args: {
     });
   }
 
+  for (const p of planes) salida.push({ ...p, destino: { pestana: "costes" }, accion: "Ver en Costes" });
+
   for (const r of renovaciones) {
     if (r.dias > DIAS_RENOVACION_CERCANA) continue;
     salida.push({
@@ -592,9 +633,14 @@ export function pendientesServicios(args: {
 
   // Claves y errores de lectura: uno por tipo, con los servicios afectados.
   const porError = new Map<string, ServicioContratado[]>();
+  const sinClaveAqui: string[] = [];
   for (const s of enUso) {
     const e = lecturas.get(s.proveedor)?.error;
     if (!e || sinLector.has(s.proveedor)) continue;
+    if (e === "falta_secreto" && clavesSoloEnProduccion) {
+      sinClaveAqui.push(s.nombre);
+      continue;
+    }
     const tipo = e === "falta_secreto" || e === "credencial_rechazada" ? e : "lectura";
     porError.set(tipo, [...(porError.get(tipo) ?? []), s]);
   }
@@ -613,6 +659,17 @@ export function pendientesServicios(args: {
       titulo: lista.length === 1 ? `${lista[0].nombre}: ${t.uno}` : `${nombres(lista.map((s) => s.nombre))}: ${t.varios}`,
       detalle: t.detalle,
       destino: { pestana: "servicios", proveedor: lista.length === 1 ? lista[0].proveedor : undefined },
+      accion: "Ver",
+    });
+  }
+
+  if (sinClaveAqui.length > 0) {
+    salida.push({
+      clave: "entorno:sin-claves",
+      gravedad: "info",
+      titulo: `En la demo no se leen ${nombres(sinClaveAqui.map(sinAclaracion))}: sus claves solo están en producción`,
+      detalle: "No hay que hacer nada: en producción sí se leen.",
+      destino: { pestana: "servicios" },
       accion: "Ver",
     });
   }
@@ -858,6 +915,11 @@ export function servicioNuevo(orden = 100): ServicioContratado {
     por_confirmar: false,
     precio_anual: null,
     fuente_precio: null,
+    para_que: null,
+    precio_confirmado_en: null,
+    plan_siguiente: null,
+    precio_siguiente: null,
+    si_se_pasa: null,
   };
 }
 
@@ -880,6 +942,12 @@ export interface BorradorServicio {
   por_confirmar: boolean;
   fuente_precio: string;
   limites: Record<string, { limite: string; unidad: string }>;
+  // 20261129153000
+  para_que: string;
+  plan_siguiente: string;
+  /** Precio al mes del plan siguiente, en la moneda del servicio. */
+  precio_siguiente: string;
+  si_se_pasa: string;
 }
 
 const aTexto = (n: number | null | undefined) => (n == null ? "" : String(n).replace(".", ","));
@@ -902,6 +970,10 @@ export function borradorDe(s: ServicioContratado): BorradorServicio {
     activo: s.activo !== false,
     por_confirmar: !!s.por_confirmar,
     fuente_precio: s.fuente_precio ?? "",
+    para_que: s.para_que ?? "",
+    plan_siguiente: s.plan_siguiente ?? "",
+    precio_siguiente: aTexto(s.precio_siguiente),
+    si_se_pasa: s.si_se_pasa ?? "",
     limites: Object.fromEntries(Object.entries(s.limites ?? {}).map(([k, l]) => [k, {
       limite: typeof l.limite === "number" ? String(l.limite).replace(".", ",") : "",
       unidad: l.unidad ?? "",
@@ -923,8 +995,17 @@ export type ResultadoBorrador =
 
 const CATEGORIAS_VALIDAS = new Set<string>(CATEGORIAS.map((c) => c.valor));
 
-/** Valida el borrador (mismas reglas que la migración) y lo convierte en cambios. */
-export function cambiosDeBorrador(b: BorradorServicio, original: ServicioContratado): ResultadoBorrador {
+/** «2026-11-13» de una fecha (día local). */
+export function diaIso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Valida el borrador (mismas reglas que la migración) y lo convierte en cambios.
+ * Al quitar «por confirmar» se apunta hoy como día de la confirmación; al volver
+ * a marcarlo, se borra (13/11/2026).
+ */
+export function cambiosDeBorrador(b: BorradorServicio, original: ServicioContratado, hoy: Date = new Date()): ResultadoBorrador {
   const errores: Record<string, string> = {};
   const nombre = b.nombre.trim();
   if (!nombre || nombre.length > 80) errores.nombre = "Pon un nombre (máximo 80 letras).";
@@ -940,6 +1021,8 @@ export function cambiosDeBorrador(b: BorradorServicio, original: ServicioContrat
   if (orden == null || Number.isNaN(orden) || !Number.isInteger(orden) || orden > 10000) errores.orden = "Escribe un número entero de 0 a 10.000.";
   if (b.renovacion && !/^\d{4}-\d{2}-\d{2}$/.test(b.renovacion)) errores.renovacion = "Fecha no válida.";
   if (!/^[A-Z]{3}$/.test(b.moneda)) errores.moneda = "Moneda no válida.";
+  const precioSiguiente = leerNumero(b.precio_siguiente ?? "");
+  if (precioSiguiente != null && (Number.isNaN(precioSiguiente) || precioSiguiente > 100000)) errores.precio_siguiente = "Escribe un importe al mes (por ejemplo 20 o 19,99) o déjalo vacío.";
   const limites: Record<string, LimitePlan> = {};
   for (const [clave, original_l] of Object.entries(original.limites ?? {})) {
     const borrador = b.limites[clave];
@@ -974,6 +1057,11 @@ export function cambiosDeBorrador(b: BorradorServicio, original: ServicioContrat
       activo: b.activo,
       por_confirmar: b.por_confirmar,
       fuente_precio: fuente || null,
+      para_que: (b.para_que ?? "").trim().slice(0, 300) || null,
+      plan_siguiente: (b.plan_siguiente ?? "").trim().slice(0, 80) || null,
+      precio_siguiente: precioSiguiente,
+      si_se_pasa: (b.si_se_pasa ?? "").trim().slice(0, 500) || null,
+      precio_confirmado_en: b.por_confirmar ? null : original.por_confirmar ? diaIso(hoy) : (original.precio_confirmado_en ?? null),
     },
   };
 }
@@ -1122,8 +1210,10 @@ export function estadoInstalacion(args: {
   lecturas: Map<string, LecturaServicio>;
   renovaciones: Renovacion[];
   sinLector?: Set<string>;
+  /** Demo y previews: «falta la clave» no es un aviso (las claves solo están en producción). */
+  clavesSoloEnProduccion?: boolean;
 }): EstadoInstalacion {
-  const { servicios, lecturas, renovaciones, sinLector = new Set<string>() } = args;
+  const { servicios, lecturas, renovaciones, sinLector = new Set<string>(), clavesSoloEnProduccion = false } = args;
   const fichas: FichaEstado[] = [];
   servicios.filter((s) => s.activo !== false).forEach((s) => {
     const lectura = lecturas.get(s.proveedor) ?? null;
@@ -1152,7 +1242,8 @@ export function estadoInstalacion(args: {
       });
 
     let estado: EstadoServicio = "gris";
-    let motivo = sinLector.has(s.proveedor) ? "Se mira en su panel" : "Sin datos aún";
+    const sinClaveAqui = clavesSoloEnProduccion && lectura?.error === "falta_secreto";
+    let motivo = sinLector.has(s.proveedor) ? "Se mira en su panel" : sinClaveAqui ? "Clave solo en producción" : "Sin datos aún";
     const subir = (e: EstadoServicio, m: string) => {
       if (RANGO_ESTADO[e] > RANGO_ESTADO[estado]) {
         estado = e;
@@ -1162,7 +1253,7 @@ export function estadoInstalacion(args: {
 
     if (lectura && !lectura.error) subir("verde", "Bien");
     if (top?.semaforo === "rojo" || top?.semaforo === "ambar") subir(top.semaforo, `Al ${formatearPorcentaje(top.porcentaje!)}`);
-    if (lectura?.error && !sinLector.has(s.proveedor)) {
+    if (lectura?.error && !sinLector.has(s.proveedor) && !sinClaveAqui) {
       if (lectura.error === "credencial_rechazada") subir("rojo", "Clave rechazada");
       else if (lectura.error === "falta_secreto") subir("ambar", "Falta la clave");
       else subir("ambar", "No se pudo leer");

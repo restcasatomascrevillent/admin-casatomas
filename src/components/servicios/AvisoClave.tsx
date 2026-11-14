@@ -3,17 +3,30 @@ import { ChevronDown, ExternalLink, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AYUDA_SECRETOS, enlaceSecretosSupabase } from "@/lib/servicios";
+import { VERSION_APP } from "@/lib/version";
 
 const URL_SUPABASE = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+/** Demo y previews: las claves de los proveedores solo están en producción (13/11/2026). */
+const SOLO_EN_PRODUCCION = VERSION_APP.entorno === "demo" || VERSION_APP.entorno === "preview";
 
 /**
  * «Falta configurar la clave X: cómo hacerlo». Pasos sin tecnicismos, permisos
  * mínimos y dónde se pega (Supabase → proyecto → Edge Functions → Secrets).
  * `opcional`: la tarjeta ya enseña datos y la clave solo añade más.
  */
-export function AvisoClave({ secreto, opcional = false }: { secreto: string; opcional?: boolean }) {
+export function AvisoClave({ secreto, opcional = false, soloEnProduccion = SOLO_EN_PRODUCCION }: { secreto: string; opcional?: boolean; soloEnProduccion?: boolean }) {
   const [abierto, setAbierto] = useState(false);
   const ayuda = AYUDA_SECRETOS[secreto];
+  if (soloEnProduccion) {
+    return (
+      <p className="flex items-start gap-2 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground" data-clave-demo={secreto}>
+        <KeyRound className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="min-w-0 break-words">
+          En la demo no está la clave <code className="break-words font-mono text-[0.8rem]">{secreto}</code>: las claves de los servicios solo están en producción, así que aquí {opcional ? "salen menos datos" : "no se lee"}. No hace falta hacer nada.
+        </span>
+      </p>
+    );
+  }
   return (
     <Collapsible open={abierto} onOpenChange={setAbierto} className="rounded-md border border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3">
