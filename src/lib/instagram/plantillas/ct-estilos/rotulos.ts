@@ -8,8 +8,8 @@
  *                         baja hasta el plato. Subtítulo opcional.
  *   ct-rotulo-recuadro    variante «marco»: rectángulo blanco fino interior con
  *                         el nombre y un subtítulo pequeño (croquetas).
- *   ct-rotulo-titular     variante «titular grande»: palabra gruesa en
- *                         mayúsculas (ENSALADILLA, TATAKI DE CHULETA),
+ *   ct-rotulo-titular     variante «titular grande»: palabra gruesa y
+ *                         condensada (Oswald 600) en mayúsculas (ENSALADILLA, TATAKI DE CHULETA),
  *                         subtítulo pequeño en cursiva y el logo abajo.
  *   ct-rotulo-manuscrita  variante «manuscrita + caja»: «Tarta de queso» en la
  *                         manuscrita y «CON HELADO» en una caja con borde.
@@ -24,7 +24,7 @@
  * (en % del alto); el editor aún no tiene el campo (ver el informe).
  */
 import { esc, type ContextoPlantilla, type DatosPieza, type Plantilla } from "../../tipos.js";
-import { CSS_BASE, MANUSCRITA, SANS, fotoSangre, fuentes, velo, zona, type Cara } from "./base.js";
+import { CONDENSADA, CSS_BASE, MANUSCRITA, SANS, fotoSangre, fuentes, velo, zona, type Cara } from "./base.js";
 
 // ── Hilo ─────────────────────────────────────────────────────────────────────
 
@@ -98,7 +98,7 @@ function htmlRecuadro(datos: DatosPieza, ctx: ContextoPlantilla): string {
 
 // ── Titular grande ───────────────────────────────────────────────────────────
 
-export const CARAS_TITULAR: readonly Cara[] = ["sans-600"];
+export const CARAS_TITULAR: readonly Cara[] = ["condensada"];
 
 /**
  * Cuerpo de un titular que se ajusta: el mayor (entre min y max) con el que la
@@ -128,20 +128,20 @@ export function cuerpoAjustado(texto: string, o: { ancho: number; min: number; m
   return o.min;
 }
 
-/** Titular grande: Montserrat 600 en mayúsculas (≈ 0,74 em por letra), hasta 3 líneas. */
+/** Titular grande: Oswald 600 en mayúsculas (≈ 0,56 em por letra), hasta 3 líneas. */
 export function cuerpoTitularGrande(titular: string, ancho: number, min: number, max: number): number {
-  return cuerpoAjustado(titular, { ancho, min, max, lineas: 3, ratio: 0.74 });
+  return cuerpoAjustado(titular, { ancho, min, max, lineas: 3, ratio: 0.56 });
 }
 
 function htmlTitular(datos: DatosPieza, ctx: ContextoPlantilla): string {
   const story = datos.formato === "story";
   const ancho = 1080 - 2 * 88;
-  const cuerpo = cuerpoTitularGrande(datos.titular, ancho, story ? 76 : 70, story ? 150 : 132);
+  const cuerpo = cuerpoTitularGrande(datos.titular, ancho, story ? 84 : 76, story ? 176 : 156);
   const arriba = story ? 310 : 104;
   const sub = datos.cita ? `<p class="ctst__sub" data-campo="cita" data-ajuste>${esc(datos.cita)}</p>` : "";
   return `<style>${fuentes(ctx, CARAS_TITULAR)}${CSS_BASE}
 .ctst{position:absolute;left:88px;right:88px;top:${arriba}px}
-.ctst__titular{font-family:${SANS};font-weight:600;font-size:${cuerpo}px;line-height:.98;letter-spacing:-.012em;text-transform:uppercase;padding-block:.06em;max-height:calc(.98em * 3 + .12em + 2px);overflow-wrap:normal;text-wrap:balance}
+.ctst__titular{font-family:${CONDENSADA};font-weight:600;font-size:${cuerpo}px;line-height:1.02;letter-spacing:.005em;text-transform:uppercase;padding-block:.06em;max-height:calc(1.02em * 3 + .12em + 2px);overflow-wrap:normal;text-wrap:balance}
 .ctst__sub{margin-top:${story ? 18 : 14}px;font-style:italic;font-size:${story ? 36 : 32}px;line-height:1.3;max-height:calc(1.3em * 2 + 2px);max-width:720px;color:rgb(255 255 255 / .94)}
 .ctst__logo{position:absolute;left:50%;bottom:${story ? 286 : 72}px;width:${story ? 220 : 184}px;transform:translateX(-50%)}
 </style>
@@ -164,14 +164,14 @@ export const CARAS_MANUSCRITA: readonly Cara[] = ["manuscrita", "sans-400"];
 function htmlManuscrita(datos: DatosPieza, ctx: ContextoPlantilla): string {
   const story = datos.formato === "story";
   const arriba = story ? 320 : 112;
-  // Cursiva de Cormorant ≈ 0,48 em por letra (con los espacios); hasta 2 líneas en 740 px.
-  const cuerpo = cuerpoAjustado(datos.titular, { ancho: 740, min: story ? 76 : 70, max: story ? 112 : 100, lineas: 2, ratio: 0.48 });
+  // Great Vibes ≈ 0,42 em por letra (con los espacios); hasta 2 líneas en 740 px.
+  const cuerpo = cuerpoAjustado(datos.titular, { ancho: 740, min: story ? 80 : 72, max: story ? 124 : 110, lineas: 2, ratio: 0.42 });
   const caja = datos.cita ? `<p class="ctsm__caja" data-campo="cita" data-ajuste>${esc(datos.cita)}</p>` : "";
   return `<style>${fuentes(ctx, CARAS_MANUSCRITA)}${CSS_BASE}
 .ctsm{position:absolute;left:72px;right:72px;top:${arriba}px;display:flex;flex-direction:column;align-items:center;text-align:center}
 .ctsm__linea{display:flex;align-items:center;justify-content:center;gap:26px;width:100%}
 .ctsm__linea::before,.ctsm__linea::after{content:"";flex:0 0 52px;height:2px;background:rgb(255 255 255 / .85)}
-.ctsm__titular{font-family:${MANUSCRITA};font-style:italic;font-weight:400;font-size:${cuerpo}px;line-height:1.02;padding-block:.08em;max-width:740px;max-height:calc(1.02em * 2 + .16em + 2px);letter-spacing:.005em;text-wrap:balance;overflow-wrap:normal}
+.ctsm__titular{font-family:${MANUSCRITA};font-weight:400;font-size:${cuerpo}px;line-height:1.08;padding-block:.14em;max-width:740px;max-height:calc(1.08em * 2 + .28em + 2px);letter-spacing:0;text-wrap:balance;overflow-wrap:normal}
 .ctsm__caja{margin-top:${story ? 26 : 20}px;border:2px solid rgb(255 255 255 / .92);padding:14px 30px 12px calc(30px + .26em);font-family:${SANS};font-weight:400;font-size:${story ? 30 : 28}px;line-height:1.2;letter-spacing:.26em;text-transform:uppercase;white-space:nowrap;max-width:100%}
 </style>
 <div class="cts cts--${story ? "story" : "post"}">

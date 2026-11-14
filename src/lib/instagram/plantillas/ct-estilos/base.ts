@@ -1,6 +1,6 @@
 /**
  * Piezas comunes de los estilos de las stories de Casa Tomás (12/11/2026):
- * fuentes extra (Montserrat y la cursiva de Cormorant, que ya están en
+ * fuentes extra (Montserrat, Great Vibes y Oswald, autoalojadas en
  * public/instagram/fuentes), velos locales y el CSS base.
  *
  * Por qué fuentes extra: lo que publican hoy (referencias-actuales/
@@ -8,27 +8,33 @@
  * (Montserrat/Poppins) con una manuscrita como acento. El documento de una
  * pieza de Casa Tomás solo trae Libre Baskerville (tokens.ts → FUENTES), así
  * que cada plantilla declara las caras que usa, como ct-tapas-clasica. La
- * «manuscrita» es la cursiva de Cormorant Garamond: el repo no tiene una de
- * rasgo caligráfico (ver el informe del 12/11/2026).
+ * manuscrita (Great Vibes) y la condensada (Oswald 600) se añadieron a
+ * public/instagram/fuentes el 12/11/2026 para parecerse a las de ahora; el
+ * render del servidor las incluye con public/instagram/** (vercel.json).
  */
 import { UNICODE_LATIN, UNICODE_LATIN_EXT } from "../../tokens.js";
 import { esc, type ContextoPlantilla } from "../../tipos.js";
 import { degradado } from "../comun.js";
 
-export type Cara = "sans-300" | "sans-400" | "sans-500" | "sans-600" | "manuscrita";
+export type Cara = "sans-300" | "sans-400" | "sans-500" | "sans-600" | "manuscrita" | "condensada";
 
 const FICHEROS: Record<Cara, { familia: string; peso: number; estilo: "normal" | "italic"; ruta: (r: string) => string }> = {
   "sans-300": { familia: "CT Estilos Sans", peso: 300, estilo: "normal", ruta: (r) => `montserrat/montserrat-${r}-300-normal.woff2` },
   "sans-400": { familia: "CT Estilos Sans", peso: 400, estilo: "normal", ruta: (r) => `montserrat/montserrat-${r}-400-normal.woff2` },
   "sans-500": { familia: "CT Estilos Sans", peso: 500, estilo: "normal", ruta: (r) => `montserrat/montserrat-${r}-500-normal.woff2` },
   "sans-600": { familia: "CT Estilos Sans", peso: 600, estilo: "normal", ruta: (r) => `montserrat/montserrat-${r}-600-normal.woff2` },
-  manuscrita: { familia: "CT Estilos Manuscrita", peso: 400, estilo: "italic", ruta: (r) => `cormorant-garamond/cormorant-garamond-${r}-400-italic.woff2` },
+  // Great Vibes (OFL, @fontsource/great-vibes 5.3.0): la más parecida a «Tapas y cóctel» y «Tarta de queso».
+  manuscrita: { familia: "CT Estilos Manuscrita", peso: 400, estilo: "normal", ruta: (r) => `great-vibes/great-vibes-${r}-400-normal.woff2` },
+  // Oswald 600 (OFL, @fontsource/oswald 5.3.0): la condensada gruesa de «ENSALADILLA» y «TATAKI DE CHULETA».
+  condensada: { familia: "CT Estilos Condensada", peso: 600, estilo: "normal", ruta: (r) => `oswald/oswald-${r}-600-normal.woff2` },
 };
 
 /** Palo seco (Montserrat, la de las stories de ahora). */
 export const SANS = '"CT Estilos Sans", "Montserrat", sans-serif';
-/** La manuscrita de acento (cursiva de Cormorant Garamond). Una sola por pieza. */
-export const MANUSCRITA = '"CT Estilos Manuscrita", "Cormorant Garamond", serif';
+/** La manuscrita de acento (Great Vibes). Una sola por pieza. */
+export const MANUSCRITA = '"CT Estilos Manuscrita", "Great Vibes", cursive';
+/** Condensada gruesa del titular grande (Oswald 600). */
+export const CONDENSADA = '"CT Estilos Condensada", "Oswald", sans-serif';
 
 /** Caras @font-face que declara una pieza con estas fuentes (latin + latin-ext de cada una). */
 export function numeroDeCaras(caras: readonly Cara[]): number {

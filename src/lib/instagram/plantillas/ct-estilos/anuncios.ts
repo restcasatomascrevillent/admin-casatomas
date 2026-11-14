@@ -84,7 +84,7 @@ function htmlPoster(datos: DatosPieza, ctx: ContextoPlantilla): string {
 .ctsp__banda{position:absolute;left:0;right:0;top:470px;height:880px;background:linear-gradient(to bottom, ${banda})}
 .ctsp{position:absolute;left:72px;right:72px;top:640px;display:flex;flex-direction:column;align-items:center;text-align:center}
 .ctsp__ante{align-self:stretch;font-family:${SANS};font-weight:600;font-size:66px;line-height:1.2;letter-spacing:.3em;padding-left:.3em;text-transform:uppercase;white-space:nowrap}
-.ctsp__titular{margin-top:10px;font-family:${MANUSCRITA};font-style:italic;font-weight:400;font-size:150px;line-height:1;padding-block:.06em;color:var(--color-oro-claro);max-height:calc(1em * 2 + .12em + 2px);text-wrap:balance;overflow-wrap:normal}
+.ctsp__titular{margin-top:-4px;font-family:${MANUSCRITA};font-weight:400;font-size:150px;line-height:1.05;padding-block:.14em;color:var(--color-oro-claro);max-height:calc(1.05em * 2 + .28em + 2px);text-wrap:balance;overflow-wrap:normal}
 .ctsp__pie{align-self:stretch;margin-top:22px;font-family:${SANS};font-weight:400;font-size:32px;line-height:1.3;letter-spacing:.3em;padding-left:.3em;text-transform:uppercase;white-space:nowrap}
 .ctsp__logo{position:absolute;left:50%;bottom:290px;width:230px;transform:translateX(-50%)}
 </style>
