@@ -562,17 +562,17 @@ export const periodoMediana = (dias: number) => (dias % 30 === 0 ? (dias === 30 
  * «… 7,80 € (35 % de lo que cobras)» (plato). null si no hay mediana.
  */
 export function textoMediana(a: ArticuloMargen, config: ConfigMargenes = CONFIG_POR_DEFECTO): string | null {
-  const cab = `Mediana de ${periodoMediana(config.diasReferencia)}`;
+  const cab = `Lo normal en ${periodoMediana(config.diasReferencia)} (mediana)`;
   if (a.tipo === "peso") return a.compraKgMediana === null ? null : `${cab}: ${eurosKg(a.compraKgMediana, 2)}`;
   if (a.tipo === "vino") return a.costeMediana === null ? null : `${cab}: ${euros(a.costeMediana)} la botella`;
   if (a.costeMediana === null) return null;
-  return `${cab}: hacerlo costaría ${euros(a.costeMediana)}` + (a.pctMediana !== null ? ` (${porcentaje(a.pctMediana)} de lo que cobras)` : "");
+  return `${cab}: hacerlo costaría ${euros(a.costeMediana)}` + (a.pctMediana !== null ? ` (${textoPctCoste(a.pctMediana)})` : "");
 }
 
 /** Ingrediente: «Mediana de 3 meses: 20,10 €/kg». */
 export function textoMedianaIngrediente(i: Ingrediente, config: ConfigMargenes = CONFIG_POR_DEFECTO): string | null {
   if (i.eurMediana === null) return null;
-  return `Mediana de ${periodoMediana(config.diasReferencia)}: ${precioCompra({ ...i, eur: i.eurMediana })}`;
+  return `Lo normal en ${periodoMediana(config.diasReferencia)} (mediana): ${precioCompra({ ...i, eur: i.eurMediana })}`;
 }
 
 /**
@@ -588,8 +588,8 @@ export function avisoCompraMasNueva(f: FacturaUsada | null, ultima: string | nul
 // ─── El porqué (en sencillo) ──────────────────────────────────────────────
 /**
  * Lo que pasa con el artículo, para quien no sabe de márgenes:
- *   «Lo vendes a 24 € (21,82 € sin IVA). Hacerlo te cuesta 8,10 €. De cada 100 € que
- *    cobras, 37 € se van en ingredientes (máximo 35 €).»
+ *   «Lo vendes a 24 € (21,82 € sin IVA). Hacerlo te cuesta 8,10 €. De cada 10 € que
+ *    cobras, 3,70 € es lo que te cuesta en ingredientes (máximo 3,50 €).»
  * El % es SIEMPRE sobre el precio de venta sin IVA. El coste es el de la última factura.
  */
 export function explicacion(a: ArticuloMargen, config: ConfigMargenes = CONFIG_POR_DEFECTO): string {
@@ -603,24 +603,24 @@ export function explicacion(a: ArticuloMargen, config: ConfigMargenes = CONFIG_P
     return `No hay compras de ${a.tipo === "plato" ? "sus ingredientes" : a.producto ?? "la botella"} para saber lo que cuesta.`;
   }
   const frases: string[] = [];
-  // «De cada 100 € que cobras, X € se van en…»: el % de coste sobre la venta sin IVA
-  // (si no viene, sale del multiplicador: 100 ÷ ×).
-  const deCada100 = (pct: number | null, mult: number | null, en: string) => {
+  // «De cada 10 € que cobras, X € es lo que te cuesta…»: el % de coste sobre la venta sin IVA
+  // (si no viene, sale del multiplicador: 100 ÷ ×). 14/11/2026, dueño: «de cada 10 €».
+  const deCada10 = (pct: number | null, mult: number | null, en: string) => {
     const p = pct ?? (mult && mult > 0 ? 100 / mult : null);
-    return p === null ? null : `De cada 100 € que cobras, ${fmt(p, 0)} € se van en ${en}.`;
+    return p === null ? null : `${textoDeCada10(p)} ${en}.`;
   };
   const poner = (...xs: (string | null)[]) => frases.push(...xs.filter((x): x is string => !!x));
   if (a.tipo === "peso") {
     poner(
       `Lo vendes a ${eurosCarta(a.ventaKgIva)} el kilo (${euros(a.ventaKg)} sin IVA) y el kilo te cuesta ${euros(a.compraKg)}: ` +
         `cobras ${numero(a.multiplicador)} veces lo que pagas (mínimo ${numero(config.multiplicadorMinPeso)}).`,
-      deCada100(a.pct, a.multiplicador, "comprarlo"),
+      deCada10(a.pct, a.multiplicador, "comprarlo"),
     );
   } else if (a.tipo === "vino") {
     poner(
       `La botella te cuesta ${euros(a.coste)} y la vendes a ${eurosCarta(a.precio)} (${euros(a.venta)} sin IVA): ` +
         `cobras ${numero(a.multiplicador)} veces lo que pagas (mínimo ${numero(config.multiplicadorMinVino)}).`,
-      deCada100(a.pct, a.multiplicador, "pagar la botella"),
+      deCada10(a.pct, a.multiplicador, "la botella"),
     );
     if (a.banderas.includes("tienda_bajo")) {
       frases.push(
@@ -631,7 +631,7 @@ export function explicacion(a: ArticuloMargen, config: ConfigMargenes = CONFIG_P
   } else {
     poner(
       `Lo vendes a ${eurosCarta(a.precio)} (${euros(a.venta)} sin IVA). Hacerlo te cuesta ${euros(a.coste)}.`,
-      a.pct === null ? null : `De cada 100 € que cobras, ${fmt(a.pct, 0)} € se van en ingredientes (máximo ${numero(config.costeMaxPlatoPct)} €).`,
+      a.pct === null ? null : `${textoDeCada10(a.pct)} en ingredientes (máximo ${euros(config.costeMaxPlatoPct / 10)}).`,
     );
     if (a.principal && a.ingredientes.length > 1) frases.push(`Lo que más pesa: ${a.principal}.`);
   }
@@ -645,11 +645,23 @@ export function explicacion(a: ArticuloMargen, config: ConfigMargenes = CONFIG_P
 /** «Nombre: explicación» (la lista y los avisos de una línea). */
 export const razon = (a: ArticuloMargen, config: ConfigMargenes = CONFIG_POR_DEFECTO): string => `${a.nombre}: ${explicacion(a, config)}`;
 
-/** % de coste corto y claro: «coste: 37 % de lo que cobras». */
-export const textoPctCoste = (pct: number | null) => (pct === null ? "coste: —" : `coste: ${porcentaje(pct)} de lo que cobras`);
+/**
+ * % de coste corto y claro: «37 % coste sobre venta» (14/11/2026, dueño: que se vea
+ * que es un % del precio de VENTA sin IVA, no del coste).
+ */
+export const textoPctCoste = (pct: number | null) => (pct === null ? "coste sobre venta: —" : `${porcentaje(pct)} coste sobre venta`);
 
-/** Etiqueta larga del % de coste (fichas y umbrales). */
-export const ETIQUETA_PCT_COSTE = "% de coste sobre el precio de venta (sin IVA)";
+/** «De cada 10 € que cobras, 3,70 € es lo que te cuesta» (el % de coste sobre la venta, en euros). */
+export const textoDeCada10 = (pct: number) => `De cada 10 € que cobras, ${euros(pct / 10)} es lo que te cuesta`;
+
+/** Etiqueta del % de coste (fichas, umbrales y tooltips). */
+export const ETIQUETA_PCT_COSTE = "% coste sobre venta (sin IVA)";
+
+/** Explicación corta de la etiqueta: «de cada 10 € que cobras, X € es lo que te cuesta». */
+export const AYUDA_PCT_COSTE = "% coste sobre venta: de cada 10 € que cobras (sin IVA), cuántos euros es lo que te cuesta. 37 % = 3,70 € de cada 10 €. Cuanto más bajo, mejor.";
+
+/** Qué hacer si algo sale en rojo (ayuda de la pantalla y de la ficha). */
+export const QUE_HACER_EN_ROJO = "Si sale en rojo: sube el precio de la carta, busca un proveedor más barato (o pide mejor precio al tuyo) o pon un poco menos de cantidad en el plato.";
 
 /** «75 cl», «1,5 l». */
 export const litrosTexto = (l: number | null) =>

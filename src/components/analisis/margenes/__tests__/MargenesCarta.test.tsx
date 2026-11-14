@@ -91,10 +91,10 @@ describe("MargenesCarta", () => {
     expect(within(lista).getByTestId("ultima-factura")).toHaveTextContent("Última factura: CETAREA ANGELMAR S.L., 03/10 · 110,00 €/kg");
     expect(
       within(lista).getByText(
-        "Lo vendes a 190 € el kilo (172,73 € sin IVA) y el kilo te cuesta 110,00 €: cobras 1,57 veces lo que pagas (mínimo 2). De cada 100 € que cobras, 64 € se van en comprarlo.",
+        "Lo vendes a 190 € el kilo (172,73 € sin IVA) y el kilo te cuesta 110,00 €: cobras 1,57 veces lo que pagas (mínimo 2). De cada 10 € que cobras, 6,37 € es lo que te cuesta comprarlo.",
       ),
     ).toBeInTheDocument();
-    expect(within(lista).getByTestId("mediana")).toHaveTextContent("Mediana de 3 meses: 105,00 €/kg");
+    expect(within(lista).getByTestId("mediana")).toHaveTextContent("Lo normal en 3 meses (mediana): 105,00 €/kg");
     const fila = within(lista).getByTestId("ultima-factura").closest("li") as HTMLElement;
     expect(within(fila).getByText("Percebes")).toBeInTheDocument();
     expect(screen.getByTestId("como-se-lee")).toHaveTextContent("Es un % del precio de venta, no del coste");
@@ -127,7 +127,7 @@ describe("MargenesCarta", () => {
     const lista = screen.getByTestId("margenes-lista");
     expect(within(lista).getByText(/La botella te cuesta 80,40 € y la vendes a 110 € \(100,00 € sin IVA\): cobras 1,37 veces lo que pagas/)).toBeInTheDocument();
     expect(within(lista).getByTestId("ultima-factura")).toHaveTextContent("Última factura: VINOS DEL MUNDO, 20/09 · 482,40 € la caja (107,20 €/l)");
-    expect(within(lista).getByTestId("mediana")).toHaveTextContent("Mediana de 3 meses: 75,00 € la botella");
+    expect(within(lista).getByTestId("mediana")).toHaveTextContent("Lo normal en 3 meses (mediana): 75,00 € la botella");
   });
 
   it("Vinos: margen de la tienda (desactivada) e interruptor «Con IVA»", () => {
@@ -157,9 +157,9 @@ describe("MargenesCarta", () => {
     const bloque = within(detalle).getByTestId("detalle-ultima-factura");
     expect(bloque).toHaveTextContent("Última factura de Percebe");
     expect(bloque).toHaveTextContent("CETAREA ANGELMAR S.L., 03/10 · 110,00 €/kg");
-    expect(bloque).toHaveTextContent("Mediana de 3 meses: 105 €/kg");
+    expect(bloque).toHaveTextContent("Lo normal en 3 meses (mediana): 105 €/kg");
     expect(within(bloque).getByRole("button", { name: /Ver factura/ })).toBeInTheDocument();
-    expect(within(detalle).getByText("% de coste sobre el precio de venta (sin IVA)")).toBeInTheDocument();
+    expect(within(detalle).getByText("% coste sobre venta (sin IVA)")).toBeInTheDocument();
     expect(within(detalle).getByText("Te cuesta (última factura)")).toBeInTheDocument();
   });
 
@@ -170,7 +170,7 @@ describe("MargenesCarta", () => {
     const bloque = within(screen.getByTestId("detalle-margen")).getByTestId("detalle-ultima-factura");
     expect(bloque).toHaveTextContent("Última factura (de aquí sale lo que te cuesta)");
     expect(bloque).toHaveTextContent("VINOS DEL MUNDO, 20/09 · 482,40 € la caja (107,20 €/l)");
-    expect(bloque).toHaveTextContent("Mediana de 3 meses: 75,00 € la botella");
+    expect(bloque).toHaveTextContent("Lo normal en 3 meses (mediana): 75,00 € la botella");
   });
 
   it("el detalle deja cambiar los gramos y guardar el escandallo", () => {

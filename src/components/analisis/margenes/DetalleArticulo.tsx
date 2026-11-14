@@ -25,8 +25,10 @@ import { cn } from "@/lib/utils";
 import { VisorDocumento } from "@/components/facturas/analisis/VisorDocumento";
 import { useBuscarProductos, useComprasProducto, useEdicionMargenes, type IngredienteEditado } from "@/hooks/useMargenesCarta";
 import {
+  AYUDA_PCT_COSTE,
   ETIQUETA_BANDERA,
   ETIQUETA_PCT_COSTE,
+  QUE_HACER_EN_ROJO,
   avisoCompraMasNueva,
   cantidadTexto,
   euros,
@@ -309,7 +311,7 @@ export function DetalleArticulo({
                 <Dato etiqueta="Te cuesta (última factura)" valor={euros(a.coste)} />
                 {a.tipo === "vino" && <Dato etiqueta="Cobras × lo que pagas" valor={veces(a.multiplicador)} rojo={rojo} />}
                 <Dato etiqueta={ETIQUETA_PCT_COSTE} valor={porcentaje(a.pct)} rojo={rojo && a.tipo === "plato"} />
-                <Dato etiqueta="Te queda (margen bruto)" valor={euros(a.margen)} />
+                <Dato etiqueta="Te queda (antes de sueldos y gastos)" valor={euros(a.margen)} />
                 <Dato
                   etiqueta="Te costaba hace 6 meses (factura de entonces)"
                   valor={a.coste6m === null ? "—" : `${euros(a.coste6m)}${a.variacionPct !== null ? ` (${a.variacionPct > 0 ? "+" : ""}${porcentaje(a.variacionPct)})` : ""}`}
@@ -317,6 +319,8 @@ export function DetalleArticulo({
                 />
                 {conIva && <Dato etiqueta="Te cuesta con IVA" valor={euros(a.costeIva)} />}
               </dl>
+              <p className="text-xs text-muted-foreground" data-testid="ayuda-pct-coste">{AYUDA_PCT_COSTE}</p>
+              {rojo && <p className="text-xs font-medium text-destructive" data-testid="que-hacer-rojo">{QUE_HACER_EN_ROJO}</p>}
               {conIva && notaIva(a) && <p className="text-xs text-muted-foreground">{notaIva(a)}.</p>}
               {a.tipo === "vino" && a.formatoDistinto && (
                 <p className="text-xs text-muted-foreground" data-testid="nota-formato">
@@ -337,7 +341,7 @@ export function DetalleArticulo({
                       rojo={a.banderas.includes("tienda_bajo")}
                     />
                     <Dato etiqueta={ETIQUETA_PCT_COSTE} valor={porcentaje(a.pctTienda)} />
-                    <Dato etiqueta="Te queda (margen bruto)" valor={euros(a.margenTienda)} />
+                    <Dato etiqueta="Te queda (antes de sueldos y gastos)" valor={euros(a.margenTienda)} />
                   </dl>
                 </section>
               )}
