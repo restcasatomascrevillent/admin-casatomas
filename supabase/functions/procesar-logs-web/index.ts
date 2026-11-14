@@ -2,8 +2,10 @@
 // PROCESAR-LOGS-WEB — Edge Function (Super Admin › Logs, segundo plano)
 // ============================================================================
 // Agrupa errores en incidencias, aplica umbrales, crea/actualiza tickets en
-// Linear (o en el destino de pruebas), lee integraciones y despliegues y purga
-// lo caducado. Lógica en proceso.ts; contrato con Linear en linear.ts.
+// Linear (o en el destino de pruebas), explica en sencillo los errores sin
+// causa conocida (IA, una vez por incidencia), lee integraciones y
+// despliegues y purga lo caducado. Lógica en proceso.ts; contrato con Linear
+// en linear.ts; explicaciones en explicar.ts.
 //
 //   POST /functions/v1/procesar-logs-web
 //     · pg_cron cada 5 min con x-webhook-secret == LOGS_WEB_CRON_SECRET
@@ -50,6 +52,8 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
+
+const SIN_COLUMNA = /explicacion_ia\w* does not exist|column .*explicacion_ia|Could not find .*explicacion_ia/i;
 
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -151,6 +155,20 @@ function crearRepo(sb: any): RepoProceso {
       comprobar(r, "contar análisis");
       return r.count ?? 0;
     },
+    // Sin la migración 20261129143000 (columnas explicacion_ia*) no hay explicaciones, pero los tickets siguen.
+    async explicacionesDesde(desde) {
+      const r = await sb.from("web_incidencias").select("id", { count: "exact", head: true }).gte("explicacion_ia_en", desde.toISOString());
+      if (r.error && SIN_COLUMNA.test(r.error.message)) return 0;
+      comprobar(r, "contar explicaciones");
+      return r.count ?? 0;
+    },
+    async incidenciasSinExplicar(limite) {
+      const r = await sb.from("web_incidencias").select("*")
+        .is("explicacion_ia", null).lt("explicacion_ia_intentos", 2).neq("estado", "ignorada").gt("ocurrencias", 0)
+        .order("ultima_vez", { ascending: false }).limit(limite);
+      if (r.error && SIN_COLUMNA.test(r.error.message)) throw new Error("falta la migración 20261129143000_logs_web_legibles (columnas explicacion_ia)");
+      return comprobar(r, "leer incidencias sin explicar") ?? [];
+    },
     async ultimaPurga() {
       const d = comprobar(await sb.from("web_logs_estado").select("ultima_purga").eq("id", true).single(), "leer purga");
       return d?.ultima_purga ?? null;
@@ -209,6 +227,7 @@ Deno.serve(conAuditoriaDePeticion("procesar-logs-web", createClientBase, async (
       modo === "real" && !LINEAR_API_KEY ? MENSAJES_LINEAR.sinClave
         : modo === "real" && !config.linear_equipo_id ? "Falta elegir el equipo de Linear: Logs › Configuración › Linear › «Probar conexión con Linear» y elige el equipo." : null,
     ia: crearLlamadaIa("procesar-logs-web", sb),
+    iaExplicar: crearLlamadaIa("procesar-logs-web", sb, 400),
     despliegues: VERCEL_TOKEN ? (desdeMs) => leerDesplieguesVercel(VERCEL_TOKEN, desdeMs) : null,
     urlPanel: URL_PANEL,
     log: (m) => console.log(m),
