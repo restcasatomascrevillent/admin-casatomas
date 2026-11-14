@@ -38,6 +38,7 @@ const Albaranes = lazy(CARGADORES_SECCION["/albaranes"]);
 const Usuarios = lazy(CARGADORES_SECCION["/usuarios"]);
 const Ayuda = lazy(CARGADORES_SECCION["/ayuda"]);
 const Avisos = lazy(CARGADORES_SECCION["/avisos"]);
+const Peticiones = lazy(CARGADORES_SECCION["/peticiones"]);
 const GestorGasto = lazy(() => import("./pages/GestorGasto"));
 const GestionResenas = lazy(() => import("./pages/GestionResenas"));
 const TraficoWeb = lazy(() => import("./pages/TraficoWeb"));
@@ -49,6 +50,7 @@ const SuperAdminAuditoria = lazy(() => import("./pages/SuperAdminAuditoria"));
 const SuperAdminServicios = lazy(() => import("./pages/SuperAdminServicios"));
 const SuperAdminLogs = lazy(() => import("./pages/SuperAdminLogs"));
 const SuperAdminInformes = lazy(() => import("./pages/SuperAdminInformes"));
+const SuperAdminTickets = lazy(() => import("./pages/SuperAdminTickets"));
 
 /**
  * Valores por defecto pensados para la red mala del local (07/11/2026, «Hoy» desde el móvil):
@@ -207,6 +209,8 @@ const App = () => (
                     {/* Historial de avisos (campana): para todos los roles. */}
                     <Route path="/avisos" element={pagina(<Avisos />)} />
                     <Route path="/ayuda" element={pagina(<Ayuda />)} />
+                    {/* «Nueva petición» y «Mis peticiones» (13/11/2026): para todos los usuarios (sin sección de permisos). */}
+                    <Route path="/peticiones" element={pagina(<Peticiones />)} />
                   </Route>
                   {/* Redirecciones de rutas antiguas (fuera del marco, como antes). */}
                   {/* Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Se
@@ -241,6 +245,8 @@ const App = () => (
                   <Route path="/super-admin/auditoria" element={paginaSuperAdmin(<SuperAdminAuditoria />)} />
                   <Route path="/super-admin/servicios" element={paginaSuperAdmin(<SuperAdminServicios />)} />
                   <Route path="/super-admin/informes" element={paginaSuperAdmin(<SuperAdminInformes />)} />
+                  {/* Tickets (13/11/2026): las peticiones de los usuarios con el análisis de la IA. */}
+                  <Route path="/super-admin/tickets" element={paginaSuperAdmin(<SuperAdminTickets />)} />
                   <Route path="*" element={bajoDemanda(<NotFound />)} />
                 </Routes>
               </RouteErrorBoundary>

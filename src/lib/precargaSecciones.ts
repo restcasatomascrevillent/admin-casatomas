@@ -18,6 +18,8 @@ export const CARGADORES_SECCION = {
   "/usuarios": () => import("@/pages/Usuarios"),
   "/avisos": () => import("@/pages/Avisos"),
   "/ayuda": () => import("@/pages/Ayuda"),
+  // «Nueva petición» (13/11/2026): para todos los usuarios del panel.
+  "/peticiones": () => import("@/pages/Peticiones"),
 } as const;
 
 const yaPedidas = new Set<string>();

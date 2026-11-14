@@ -1,4 +1,4 @@
-import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Percent, Bot, CalendarClock, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, PieChart, Receipt, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
+import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Percent, Bot, CalendarClock, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, MessageSquareWarning, PieChart, Receipt, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { rutaAlerta, TIPOS_ALERTA_FACTURAS } from "@/lib/facturas/alertas";
 
@@ -25,6 +25,10 @@ export function rutaDeAviso(
   if (n.referencia_tipo === "facturas_original") return "/facturas?tab=compras";
   // Modelos de OpenAI nuevos, retirados o sin precio (20261107500000): solo super admin.
   if (n.referencia_tipo === "ia_modelos") return "/super-admin/servicios?tab=modelos";
+  // Petición urgente de un usuario (20261129100000): su ticket en Super Admin (solo lo ve el super admin).
+  if (n.referencia_tipo === "peticion") {
+    return n.referencia_id ? `/super-admin/tickets?ticket=${encodeURIComponent(n.referencia_id)}` : "/super-admin/tickets";
+  }
   // Encargos de Instagram (20261110100000): la ficha del encargo.
   // Story del jueves de tapas (20261127090000): sus ajustes y cómo va la de esta semana.
   if (n.referencia_tipo === "instagram_story_tapas") return "/rrss?red=instagram&tab=ajustes";
@@ -121,6 +125,8 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   ia_modelo_nuevo: Bot,
   ia_modelo_retirado: AlertTriangle,
   ia_modelo_sin_precio: Bot,
+  // Petición urgente de un usuario del panel (20261129100000): solo super admin.
+  peticion_urgente: MessageSquareWarning,
   sistema: Info,
 };
 

@@ -9,6 +9,7 @@ import {
   Shield,
   Settings,
   HelpCircle,
+  MessageSquarePlus,
   Share2,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
@@ -55,6 +56,8 @@ const menuItems: {
   toggleKey?: string;
   /** Solo con el permiso guardado (el super admin no lo ve por serlo). */
   soloConPermiso?: boolean;
+  /** Pasa la página actual (`state.desde`): «Nueva petición» la guarda y propone su módulo. */
+  conOrigen?: boolean;
 }[] = [
   {
     title: "Dashboard",
@@ -142,6 +145,9 @@ const menuItems: {
   },
   // «Avisos» ya no va aquí (06/11/2026, petición del dueño): cada sección tiene su botón rojo (BotonAvisosSeccion)
   // y la campana de arriba enlaza a /avisos con todos.
+  // «Nueva petición» (13/11/2026, petición del dueño): reportar errores, pedir mejoras o preguntar dudas, y
+  // ver cómo van. Para todos, sin permisos ni interruptor (como Ayuda). El super admin las ve en Super Admin › Tickets.
+  { title: "Nueva petición", url: "/peticiones", icon: MessageSquarePlus, conOrigen: true },
   { title: "Ayuda", url: "/ayuda", icon: HelpCircle },
 ];
 
@@ -244,6 +250,7 @@ export function AppSidebar() {
                   >
                     <NavLink
                       to={item.url}
+                      state={item.conOrigen && !isActive(item.url) ? { desde: `${currentPath}${location.search}` } : undefined}
                       aria-label={item.title}
                       // Al acercar el ratón o el dedo, empieza a bajar el fichero de la sección (07/11/2026).
                       onMouseEnter={() => precargarSeccion(item.url)}
