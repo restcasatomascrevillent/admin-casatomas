@@ -4,7 +4,8 @@
  *   · Crear: captura opcional al cubo privado «peticiones» (`<uid>/<uuid>.<ext>`, reducida a JPEG si se puede)
  *     y fila en `peticiones` (la BD pone autor, estado y análisis: migración 20261129100000).
  *   · Después de guardar, `pedirAnalisis` lanza la Edge Function `analizar-peticion` en segundo plano (una vez).
- *   · El super admin lee todas, cambia el estado y puede volver a analizar.
+ *   · El super admin lee todas, cambia el estado, puede volver a analizar y «Enviar a Linear» (la misma Edge
+ *     Function con `accion: "enviar_linear"`: crea la incidencia sin duplicados y guarda linear_id/linear_url).
  *
  * La lista de módulos, prioridades, estados y la lectura del análisis viven en
  * `supabase/functions/_shared/peticiones.ts` (las comparte la Edge Function).
@@ -129,6 +130,33 @@ export async function crearPeticion(d: NuevaPeticion, userId: string, deps: Deps
 export async function pedirAnalisis(id: string, forzar = false): Promise<{ ok: boolean; analisis_estado?: EstadoAnalisis; error?: string }> {
   const { data, error } = await supabase.functions.invoke<{ ok: boolean; analisis_estado?: EstadoAnalisis; error?: string }>("analizar-peticion", {
     body: { peticion_id: id, forzar },
+  });
+  if (error) throw error;
+  return data ?? { ok: false };
+}
+
+/** Respuesta de «Enviar a Linear». `destino: "prueba"` = Linear en modo prueba (no se ha creado nada en Linear). */
+export interface ResultadoEnvioLinear {
+  ok: boolean;
+  destino?: "real" | "prueba";
+  /** «CAS-12» (o «PRUEBA-3» en modo prueba). */
+  identificador?: string;
+  url?: string | null;
+  /** Ya estaba enviada: no se ha vuelto a crear. */
+  repetido?: boolean;
+  /** Ha pasado de «Recibida»/«En análisis» a «Aceptada». */
+  aceptada?: boolean;
+  error?: string;
+}
+
+/**
+ * Crea la incidencia en Linear (equipo y proyecto de Logs › Configuración › Linear). Solo super admin. Repetirla
+ * nunca duplica: la Edge Function usa un id fijo por petición. Si falla, lanza el error de `functions.invoke`
+ * (el mensaje legible va en su cuerpo: `mensajeErrorUsuarios`).
+ */
+export async function enviarALinear(id: string): Promise<ResultadoEnvioLinear> {
+  const { data, error } = await supabase.functions.invoke<ResultadoEnvioLinear>("analizar-peticion", {
+    body: { accion: "enviar_linear", peticion_id: id },
   });
   if (error) throw error;
   return data ?? { ok: false };

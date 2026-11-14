@@ -1,5 +1,5 @@
 // Super Admin › Tickets: el análisis en tres bloques (con «Copiar»), sus estados (pendiente, analizando, error)
-// y las acciones de la ficha (Aceptar, Marcar hecha, Descartar con motivo, Volver a analizar, Linear desactivado).
+// y las acciones de la ficha (Aceptar, Marcar hecha, Descartar con motivo, Volver a analizar, Enviar a Linear).
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +9,7 @@ const h = vi.hoisted(() => ({
   cambiar: vi.fn(),
   enAnalisis: vi.fn(),
   analizar: vi.fn(),
+  enviar: vi.fn(),
   urlCaptura: vi.fn(),
   toastOk: vi.fn(),
   toastError: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock("@/lib/peticiones", () => ({
   cambiarEstadoPeticion: h.cambiar,
   marcarEnAnalisis: h.enAnalisis,
   pedirAnalisis: h.analizar,
+  enviarALinear: h.enviar,
   urlCaptura: h.urlCaptura,
   crearPeticion: vi.fn(),
   leerMisPeticiones: vi.fn(),
@@ -67,6 +69,7 @@ beforeEach(() => {
   h.enAnalisis.mockResolvedValue(true);
   h.analizar.mockResolvedValue({ ok: true, analisis_estado: "hecho" });
   h.urlCaptura.mockResolvedValue("https://ejemplo/captura.jpg");
+  h.enviar.mockResolvedValue({ ok: true, destino: "real", identificador: "CAS-1", url: "https://linear.app/ct/issue/CAS-1", repetido: false, aceptada: false });
 });
 
 describe("AnalisisTicket", () => {
@@ -163,9 +166,82 @@ describe("DetalleTicket", () => {
     await waitFor(() => expect(h.toastOk).toHaveBeenCalledWith("Análisis actualizado"));
   });
 
-  it("«Enviar a Linear» está, pero desactivado (se conecta más adelante)", () => {
-    pintarDetalle();
-    expect(screen.getByTestId("enviar-linear")).toBeDisabled();
+  describe("Enviar a Linear", () => {
+    const abrirYConfirmar = async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Enviar a Linear" }));
+      expect(await screen.findByText("¿Enviar este ticket a Linear?")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("confirmar-enviar-linear"));
+    };
+
+    it("pide confirmación antes de enviar (y Cancelar no envía nada)", async () => {
+      pintarDetalle();
+      fireEvent.click(screen.getByRole("button", { name: "Enviar a Linear" }));
+      expect(await screen.findByText(/El ticket pasará a «Aceptada»/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+      await waitFor(() => expect(screen.queryByText("¿Enviar este ticket a Linear?")).not.toBeInTheDocument());
+      expect(h.enviar).not.toHaveBeenCalled();
+    });
+
+    it("al confirmar: «Enviando…» y aviso con el identificador y «Ver en Linear»", async () => {
+      let terminar: (v: unknown) => void = () => {};
+      h.enviar.mockReturnValue(new Promise((r) => { terminar = r; }));
+      const abrir = vi.spyOn(window, "open").mockReturnValue(null);
+      pintarDetalle();
+      await abrirYConfirmar();
+      await waitFor(() => expect(h.enviar).toHaveBeenCalledWith("t-1"));
+      expect(screen.getByTestId("confirmar-enviar-linear")).toHaveTextContent("Enviando…");
+      expect(screen.getByTestId("confirmar-enviar-linear")).toBeDisabled();
+      terminar({ ok: true, destino: "real", identificador: "CAS-12", url: "https://linear.app/ct/issue/CAS-12/x", repetido: false, aceptada: true });
+      await waitFor(() => expect(h.toastOk).toHaveBeenCalledWith("Enviado a Linear: CAS-12", expect.objectContaining({ description: "El ticket ha pasado a «Aceptada»." })));
+      const opciones = h.toastOk.mock.calls[0][1] as { action: { label: string; onClick: () => void } };
+      expect(opciones.action.label).toBe("Ver en Linear");
+      opciones.action.onClick();
+      expect(abrir).toHaveBeenCalledWith("https://linear.app/ct/issue/CAS-12/x", "_blank", "noopener,noreferrer");
+      await waitFor(() => expect(screen.queryByText("¿Enviar este ticket a Linear?")).not.toBeInTheDocument());
+      abrir.mockRestore();
+    });
+
+    it("ya enviado: enseña «En Linear: CAS-12» con el enlace en vez del botón", () => {
+      pintarDetalle({ linear_id: "CAS-12", linear_url: "https://linear.app/ct/issue/CAS-12/x", estado: "aceptada" });
+      const enlace = screen.getByRole("link", { name: /En Linear: CAS-12/ });
+      expect(enlace).toHaveAttribute("href", "https://linear.app/ct/issue/CAS-12/x");
+      expect(enlace).toHaveAttribute("target", "_blank");
+      expect(screen.queryByRole("button", { name: "Enviar a Linear" })).not.toBeInTheDocument();
+    });
+
+    it("modo prueba: lo dice claro (no se ha creado nada en Linear)", async () => {
+      h.enviar.mockResolvedValue({ ok: true, destino: "prueba", identificador: "PRUEBA-3", url: null });
+      pintarDetalle();
+      await abrirYConfirmar();
+      await waitFor(() => expect(h.toastOk).toHaveBeenCalledWith("Prueba hecha: guardado como PRUEBA-3", expect.objectContaining({ description: expect.stringMatching(/no se ha creado nada en Linear/) })));
+    });
+
+    it("si falla, el motivo legible que devuelve el servidor", async () => {
+      const respuesta = new Response(JSON.stringify({ ok: false, error: "Elige el equipo en Logs › Configuración › Linear." }), { status: 409 });
+      h.enviar.mockRejectedValue(Object.assign(new Error("Edge Function returned a non-2xx status code"), { context: respuesta }));
+      pintarDetalle();
+      await abrirYConfirmar();
+      await waitFor(() => expect(h.toastError).toHaveBeenCalledWith("Elige el equipo en Logs › Configuración › Linear."));
+      expect(screen.getByRole("button", { name: "Enviar a Linear" })).not.toBeDisabled();
+    });
+
+    it("un fallo sin motivo (red) da una frase sencilla, no el error técnico", async () => {
+      h.enviar.mockRejectedValue(new TypeError("Failed to fetch"));
+      pintarDetalle();
+      await abrirYConfirmar();
+      await waitFor(() => expect(h.toastError).toHaveBeenCalled());
+      expect(String(h.toastError.mock.calls[0][0])).not.toMatch(/Failed to fetch/);
+    });
+
+    it("mientras la IA analiza no se puede enviar", () => {
+      pintarDetalle({ analisis_estado: "analizando" });
+      expect(screen.getByTestId("enviar-linear")).toBeDisabled();
+    });
+
+    it("descartado: no aparece el botón", () => {
+      pintarDetalle({ estado: "descartada", motivo_descarte: "No procede." });
+      expect(screen.queryByTestId("enviar-linear")).not.toBeInTheDocument();
+    });
   });
 
   it("con captura, la enseña con un enlace temporal", async () => {
