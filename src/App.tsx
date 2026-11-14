@@ -39,6 +39,7 @@ const Usuarios = lazy(CARGADORES_SECCION["/usuarios"]);
 const Ayuda = lazy(CARGADORES_SECCION["/ayuda"]);
 const Avisos = lazy(CARGADORES_SECCION["/avisos"]);
 const Peticiones = lazy(CARGADORES_SECCION["/peticiones"]);
+const AplicarPrecio = lazy(() => import("./pages/AplicarPrecio"));
 const GestorGasto = lazy(() => import("./pages/GestorGasto"));
 const GestionResenas = lazy(() => import("./pages/GestionResenas"));
 const TraficoWeb = lazy(() => import("./pages/TraficoWeb"));
@@ -211,6 +212,8 @@ const App = () => (
                     <Route path="/ayuda" element={pagina(<Ayuda />)} />
                     {/* «Nueva petición» y «Mis peticiones» (13/11/2026): para todos los usuarios (sin sección de permisos). */}
                     <Route path="/peticiones" element={pagina(<Peticiones />)} />
+                    {/* Enlace del aviso de Telegram «Margen bajo» (14/11/2026): aplicar el precio sugerido. Pide «Carta» (la RPC exige editar). */}
+                    <Route path="/aplicar-precio/:avisoId" element={pagina(<AplicarPrecio />, "gestor_carta")} />
                   </Route>
                   {/* Redirecciones de rutas antiguas (fuera del marco, como antes). */}
                   {/* Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Se

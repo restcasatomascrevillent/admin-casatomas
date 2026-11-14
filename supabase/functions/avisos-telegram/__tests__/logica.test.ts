@@ -73,18 +73,53 @@ describe("avisos-telegram · pendientes (no reenviar)", () => {
 });
 
 describe("avisos-telegram · mensajes", () => {
-  it("usa texto_telegram y, si no hay, «Título: mensaje»", () => {
-    expect(fraseAviso(aviso({ datos: { texto_telegram: "  El vino ha bajado.\n Revisa. " } }))).toBe("El vino ha bajado. Revisa.");
-    expect(fraseAviso(aviso({ datos: null }))).toBe("Margen bajo en Ribera X: El vino ha bajado a 2,1×");
+  it("frase corta: la primera frase de texto_telegram o del mensaje", () => {
+    expect(fraseAviso(aviso({ datos: { texto_telegram: "  El vino ha bajado.\n Revisa. " } }))).toBe("El vino ha bajado.");
+    expect(fraseAviso(aviso({ datos: null }))).toBe("El vino ha bajado a 2,1×");
     expect(fraseAviso(aviso({ mensaje: null, datos: null }))).toBe("Margen bajo en Ribera X");
+    expect(fraseAviso(aviso({ tipo: "facturas_precio_sube", mensaje: "Bogavante ha subido un 12 %: de 25,00 a 28,00 €/kg. Con lo que compras, son unos 20 € más al mes." })))
+      .toBe("Bogavante ha subido un 12 %: de 25,00 a 28,00 €/kg.");
   });
   it("enlace al panel solo con PANEL_URL válida", () => {
-    const a = aviso({ datos: { texto_telegram: "Sube.", enlace: "?tab=compras&factura=12" } });
+    const a = aviso({ tipo: "facturas_precio_sube", titulo: "Sube el aceite", datos: { texto_telegram: "Sube.", enlace: "?tab=compras&factura=12" } });
     expect(rutaPanel(a)).toBe("/facturas?tab=compras&factura=12");
     expect(rutaPanel(aviso({ tipo: "reserva_nueva", referencia_tipo: "reserva" }))).toBe("/reservas?tab=reservas");
-    expect(mensajeAviso(a, "https://panel.example/")).toBe("Margen bajo\nSube.\nhttps://panel.example/facturas?tab=compras&factura=12");
-    expect(mensajeAviso(a, null)).toBe("Margen bajo\nSube.");
+    expect(mensajeAviso(a, "https://panel.example/")).toBe(
+      "Sube el aceite\nSube.\nQué hacer: mira si toca subir la carta o pedir otro precio.\nVer: https://panel.example/facturas?tab=compras&factura=12",
+    );
+    expect(mensajeAviso(a, null)).toBe("Sube el aceite\nSube.\nQué hacer: mira si toca subir la carta o pedir otro precio.");
     expect(enlacePanel("javascript:alert(1)", "/x")).toBeNull();
+  });
+  it("margen bajo de un plato: 4 líneas con números, precio sugerido y enlace para aplicarlo", () => {
+    const a = aviso({
+      id: "0000-aa",
+      datos: { canal: "plato", nombre: "Chuletón", valor: 41, limite: 35, producto: "Ternera", eur_antes: 18, eur: 21.5, enlace: "?tab=margenes&articulo=plato:1" },
+    });
+    const sug = { precio_actual: 22, precio_sugerido: 24.5 };
+    const m = mensajeAviso(a, "https://panel.example", sug);
+    expect(m).toBe(
+      "Margen bajo: Chuletón\n" +
+        "Los ingredientes ya son el 41 % de lo que cobras (máximo 35 %). Sube Ternera: de 18,00 € a 21,50 €.\n" +
+        "Qué hacer: sube la carta de 22,00 € a 24,50 € (con IVA).\n" +
+        "Aplicar el precio: https://panel.example/aplicar-precio/0000-aa",
+    );
+    expect(m.split("\n").length).toBeLessThanOrEqual(4);
+    // Ya aplicado o sin sugerencia: enlace normal a Márgenes.
+    expect(mensajeAviso(a, "https://panel.example", { ...sug, aplicado: { precio: 24.5 } })).toContain("Ver: https://panel.example/facturas?tab=margenes");
+    expect(mensajeAviso(a, "https://panel.example", null)).toContain("Qué hacer: revisa el precio en Facturas › Márgenes.");
+  });
+  it("margen bajo de un vino: veces que cobras lo que pagas", () => {
+    const a = aviso({ datos: { canal: "vino", nombre: "Ribera X", valor: 2.1, limite: 2.3, coste: 12, coste_antes: 10 } });
+    expect(fraseAviso(a)).toBe("Cobras 2,1 veces lo que pagas (mínimo 2,3). La botella te cuesta 12,00 € (antes 10,00 €).");
+  });
+  it("todos los avisos sueltos tienen entre 2 y 4 líneas", () => {
+    const tipos = ["reserva_nueva", "reserva_cancelada", "solicitud_pendiente", "facturas_precio_sube", "facturas_revision", "sistema", "facturas_margen_bajo"];
+    for (const tipo of tipos) {
+      const l = mensajeAviso(aviso({ tipo, mensaje: "Algo ha pasado con 3 cosas. Y una segunda frase larga que no debe salir." }), "https://panel.example").split("\n");
+      expect(l.length).toBeGreaterThanOrEqual(2);
+      expect(l.length).toBeLessThanOrEqual(4);
+      expect(l.join("\n")).not.toContain("segunda frase");
+    }
   });
   it("respeta el límite de 4.096 caracteres", () => {
     const largo = aviso({ datos: { texto_telegram: "x".repeat(10_000) } });
@@ -122,6 +157,7 @@ describe("avisos-telegram · resumen diario", () => {
     expect(texto).toContain("Últimas 24 h: 3 avisos.");
     expect(texto.indexOf("Reservas nuevas (2)")).toBeLessThan(texto.indexOf("Margen bajo (1)"));
     expect(texto).toContain("• Reserva de Luis");
+    expect(texto).toContain("• 4 personas");
     expect(texto).toContain("• El vino X ha bajado a 2,1×.");
     expect(texto).not.toContain("No sale");
     expect(texto).not.toContain("Tampoco");

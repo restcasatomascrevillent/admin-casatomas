@@ -95,7 +95,20 @@ function DiapositivaTabla({ pagina, numero, textoPeriodo }: { pagina: PaginaTabl
             {tabla.columnas.map((c) => (
               <th
                 key={c.id}
-                style={celda(alineadaDerecha(c.tipo), { fontSize: 13, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: COLOR.tenue })}
+                // 14/11/2026: el encabezado puede ir en dos líneas («Compra sin IVA (base)») en vez de cortarse con «…».
+                style={celda(alineadaDerecha(c.tipo), {
+                  height: "auto",
+                  minHeight: ALTO_FILA,
+                  padding: "6px 12px",
+                  whiteSpace: "normal",
+                  lineHeight: 1.2,
+                  verticalAlign: "bottom",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: COLOR.tenue,
+                })}
               >
                 {c.etiqueta}
               </th>
