@@ -105,10 +105,10 @@ const NORMALES: Record<string, Array<{ nombre: string; foto?: string; formatos?:
     { nombre: "ostras", foto: "drive:ostras", textos: { titular: "Ostras Gillardeau" } },
     { nombre: "gambas", foto: "drive:gambas", textos: { titular: "El mejor producto fresco", cita: "Gamba roja de Santa Pola" } },
   ],
-  "ct-rotulo-recuadro": [{ nombre: "steak", foto: "drive:steak-tartar", textos: { titular: "Steak tartar", cita: "Cortado a cuchillo y aliñado en la mesa" } }],
+  "ct-rotulo-recuadro": [{ nombre: "croquetas", foto: "drive:steak-tartar", textos: { titular: "Croquetas", cita: "Disfruta de los mejores sabores en Casa Tomás" } }],
   "ct-rotulo-titular": [
-    { nombre: "tartar", foto: "drive:tartar-atun", textos: { titular: "Tartar de atún", cita: "con aguacate y sésamo" } },
-    { nombre: "arroz", foto: "drive:arroz", textos: { titular: "Ensaladilla", cita: "de marisco" } },
+    { nombre: "tataki", foto: "drive:tartar-atun", textos: { titular: "Tataki de chuleta", cita: "con salsa de turrón y pimiento caramelizado" } },
+    { nombre: "ensaladilla", foto: "drive:arroz", textos: { titular: "Ensaladilla", cita: "de marisco" } },
   ],
   "ct-rotulo-manuscrita": [{ nombre: "postre", foto: "drive:postre-nudo", textos: { titular: "Tarta de queso", cita: "Con helado" } }],
   "ct-resena": [
@@ -120,7 +120,7 @@ const NORMALES: Record<string, Array<{ nombre: string; foto?: string; formatos?:
   "ct-vosotros-celebracion": [{ nombre: "copas", foto: "drive:mesa-copas", textos: { titular: "Vicente Muñoz y Vicente Menargues", cita: "celebrando su 75 cumpleaños" } }],
   "ct-vosotros-gracias": [{ nombre: "cecina", foto: "drive:cecina", textos: { titular: "Gracias por visitarnos", pie: "@tu.usuario" } }],
   "ct-reserva-mesa": [{ nombre: "salazones", foto: "drive:salazones", textos: { titular: "Reserva mesa", cita: "en tu restaurante favorito" } }],
-  "ct-touza-descubre": [{ nombre: "coctel", foto: "drive:web-touza-7", textos: { titular: "Descubre Touza", pie: "Cocktail bar · Crevillent" } }],
+  "ct-touza-descubre": [{ nombre: "coctel", foto: "drive:web-touza-7", textos: { titular: "Descubre Touza", pie: "Reserva tu mesa" } }],
   "ct-tapas-poster": [{ nombre: "alcachofas", foto: "drive:alcachofas", textos: { antetitulo: "Jueves de", titular: "Tapas y cóctel", pie: "¡Te esperamos!" } }],
   "ct-icono-destacada": ["Opináis", "Jueves de tapas", "Platos", "Vosotros", "Touza", "Vinos"].map((t) => ({ nombre: t, textos: { titular: t } })),
 };
@@ -141,15 +141,16 @@ describe("ct-estilos: contrato", () => {
   it("iconoPara reconoce las cinco destacadas y deja el resto al medallón", () => {
     expect(["Opináis", "Jueves de tapas", "Platos 🍽", "Vosotros", "TOUZA", "Vinos"].map(iconoPara)).toEqual(["opinais", "tapas", "platos", "vosotros", "touza", null]);
   });
-  it("la reseña: más larga, letra más pequeña; nunca por debajo de 24 px", () => {
+  it("la reseña: 38 px como la original y menos si es larga; nunca por debajo de 24 px", () => {
     const corta = cuerpoResena(RESENA_CORTA, true).cuerpo;
     const larga = cuerpoResena(RESENA_LARGA, true).cuerpo;
+    expect(corta).toBe(38);
     expect(corta).toBeGreaterThan(larga);
     expect(larga).toBeGreaterThanOrEqual(24);
     expect(cuerpoResena(RESENA_LARGA, false).cabe).toBe(true);
   });
   it("el punto de llegada del hilo se acota", () => {
-    expect(yLlegada(true)).toBe(960);
+    expect(yLlegada(true)).toBe(870); // el punto de platos-hilo-1 (869/1920)
     expect(yLlegada(true, 5)).toBe(Math.round(1920 * 0.32));
     expect(yLlegada(false, 99)).toBe(Math.round(1350 * 0.8));
   });
@@ -201,7 +202,7 @@ describe.skipIf(!chromiumInstalado)("ct-estilos: render real", () => {
       const { errores, avisos } = (await page.evaluate(CODIGO_COMPROBAR_MAQUETACION)) as { errores: string[]; avisos: string[] };
       const caras = (await page.evaluate("document.fonts.size")) as number;
       const hilo = (await page.evaluate(`(() => { const h = document.querySelector(".ctsh__hilo"); return h ? h.getBoundingClientRect().bottom : null; })()`)) as number | null;
-      const cuerpo = (await page.evaluate(`(() => { const t = document.querySelector(".ctsn__texto"); return t ? parseFloat(getComputedStyle(t).fontSize) : null; })()`)) as number | null;
+      const cuerpo = (await page.evaluate(`(() => { const t = document.querySelector(".ctsn__cita"); return t ? parseFloat(getComputedStyle(t).fontSize) : null; })()`)) as number | null;
       const png = await page.screenshot({ type: "png", clip: { x: 0, y: 0, width: ancho, height: alto } });
       return { fallos, errores, avisos, caras, hilo, cuerpo, png };
     } finally {

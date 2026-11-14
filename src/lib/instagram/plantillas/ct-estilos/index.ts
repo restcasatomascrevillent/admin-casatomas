@@ -23,7 +23,7 @@ import { CARAS_RESENA, PLANTILLAS_RESENA } from "./resena.js";
 import { CARAS_ROTULOS, PLANTILLAS_ROTULOS } from "./rotulos.js";
 import { CARAS_CELEBRACION, CARAS_GRACIAS, PLANTILLAS_VOSOTROS } from "./vosotros.js";
 
-export { htmlRotuloHilo, yLlegada, LLEGADA_HILO, cuerpoTitularGrande } from "./rotulos.js";
+export { htmlRotuloHilo, yLlegada, LLEGADA_HILO, cuerpoTitularGrande, cuerpoAjustado } from "./rotulos.js";
 export { cuerpoResena, TITULO_RESENA, MAX_RESENA } from "./resena.js";
 export { AVISO_STICKER, HUECO_STICKER } from "./anuncios.js";
 export { iconoPara, type IconoDestacada } from "./destacadas.js";
@@ -75,7 +75,7 @@ function ejemplos(): EjemploPieza[] {
     ["ct-vosotros-celebracion", "ct-carne-plato", { titular: "Vicente y Ana", cita: "celebrando su 75 cumpleaños" }],
     ["ct-vosotros-gracias", "ct-carne-plato", { titular: "Gracias por visitarnos", pie: "@cliente.ejemplo" }],
     ["ct-reserva-mesa", "ct-champan", { titular: "Reserva mesa", cita: "en tu restaurante favorito" }],
-    ["ct-touza-descubre", "ct-champan", { titular: "Descubre Touza", pie: "Cocktail bar · Crevillent" }],
+    ["ct-touza-descubre", "ct-champan", { titular: "Descubre Touza", pie: "Reserva tu mesa" }],
     ["ct-tapas-poster", "ct-lampara", { antetitulo: "Jueves de", titular: "Tapas y cóctel", pie: "¡Te esperamos!" }],
     ["ct-icono-destacada", "", { titular: "Opináis" }],
   ];

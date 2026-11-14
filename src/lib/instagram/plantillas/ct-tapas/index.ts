@@ -82,7 +82,7 @@ export function medidasLista(tapas: readonly string[], o: OpcionesMedidas): { cu
 /** Medidas de la lista en cada plantilla (las mismas que usa su html). */
 export function medidasTapas(plantilla: "ct-tapas" | "ct-tapas-clasica", tapas: readonly string[], conPie = false) {
   if (plantilla === "ct-tapas-clasica") {
-    return medidasLista(tapas, { ancho: LISTA_CLASICA.ancho, alto: LISTA_CLASICA.abajo - LISTA_CLASICA.arriba, ratio: 0.56, interlineado: 1.6, separacion: 0.55, min: 28, max: 42 });
+    return medidasLista(tapas, { ancho: LISTA_CLASICA.ancho, alto: Math.round((LISTA_CLASICA.abajo - LISTA_CLASICA.arriba) / 0.92), ratio: 0.5, interlineado: 1.73, separacion: tapas.length <= 7 ? 1.35 : 0.75, min: 28, max: 44 });
   }
   const finLista = conPie ? ABAJO - 92 : ABAJO;
   return medidasLista(tapas, { ancho: LISTA_MEJORADA.ancho, alto: finLista - LISTA_MEJORADA.arriba, ratio: 0.55, interlineado: 1.32, separacion: 0.62, min: 30, max: 54 });
@@ -110,13 +110,15 @@ const comun = {
 // ── Clásica ──────────────────────────────────────────────────────────────────
 
 /**
- * Medidas sacadas de la captura (739 px de ancho → ×1,461): logo de ~290 px,
- * «Jueves» de ~112 px, «DE TAPAS» de ~40 px, filete de 130×3, lista de ~40 px
- * con interlineado 1,6 y ~60 px entre tapas. Oro claro muestreado de la
- * captura (no es un token: es el que usan hoy). La lista arranca donde en la
- * captura y termina en el límite de la zona segura del motor (1670).
+ * Medidas CALCADAS de la original a tamaño real (13/11/2026, referencias-
+ * actuales/alta/jueves-3.jpg, 1080×1920; ver ct-estilos/MEDIDAS.md): logo de
+ * 315 px con el medallón en y = 119, «Jueves» de 101 px (mayúsculas desde
+ * y = 396), «DE TAPAS» de 33 px, filete de 167 × 2 en y = 585 y la lista en
+ * Montserrat 43 px, 76 px entre líneas y 58 px entre tapas, desde y = 698,
+ * sin equilibrar las líneas (como la original). Oro claro muestreado de la
+ * captura. La lista termina en el límite de la zona segura del motor (1670).
  */
-const LISTA_CLASICA = { arriba: 760, abajo: 1660, ancho: 900 };
+const LISTA_CLASICA = { arriba: 676, abajo: 1670, ancho: 860 };
 const ORO_CLASICA = "#d2bf8e";
 
 function cssClasica(ctx: ContextoPlantilla, cuerpo: number, separacion: number): string {
@@ -138,12 +140,12 @@ function cssClasica(ctx: ContextoPlantilla, cuerpo: number, separacion: number):
 .ctt-c{position:absolute;inset:0;overflow:hidden;background:#1b1d1f;font-family:"CT Tapas Montserrat","Montserrat",sans-serif;color:#fff;text-align:center}
 .ctt-c__foto{position:absolute;inset:-40px;width:calc(100% + 80px);height:calc(100% + 80px);object-fit:cover;filter:blur(7px) saturate(.85)}
 .ctt-c__velo{position:absolute;inset:0;background:rgb(18 20 22 / .58)}
-.ctt-c__logo{position:absolute;left:50%;top:170px;width:290px;transform:translateX(-50%)}
-.ctt-c__titular{position:absolute;left:72px;right:72px;top:470px;font-weight:400;font-size:112px;line-height:1;letter-spacing:-.005em;color:${ORO_CLASICA};text-shadow:0 2px 10px rgb(0 0 0 / .35);white-space:nowrap}
-.ctt-c__sub{position:absolute;left:72px;right:72px;top:590px;font-weight:400;font-size:40px;line-height:1.1;text-transform:uppercase;letter-spacing:.02em;color:${ORO_CLASICA};white-space:nowrap}
-.ctt-c__filete{position:absolute;left:50%;top:688px;width:130px;height:3px;margin-left:-65px;background:${ORO_CLASICA};opacity:.9}
+.ctt-c__logo{position:absolute;left:50%;top:108px;width:315px;transform:translateX(-50%)}
+.ctt-c__titular{position:absolute;left:72px;right:72px;top:380px;font-weight:400;font-size:101px;line-height:1;letter-spacing:-.045em;color:${ORO_CLASICA};text-shadow:0 2px 10px rgb(0 0 0 / .35);white-space:nowrap}
+.ctt-c__sub{position:absolute;left:72px;right:72px;top:488px;font-weight:400;font-size:33px;line-height:1.1;text-transform:uppercase;letter-spacing:.1em;color:${ORO_CLASICA};white-space:nowrap}
+.ctt-c__filete{position:absolute;left:50%;top:585px;width:167px;height:2px;margin-left:-83px;background:${ORO_CLASICA};opacity:.9}
 .ctt-c__lista{position:absolute;left:${(1080 - LISTA_CLASICA.ancho) / 2}px;width:${LISTA_CLASICA.ancho}px;top:${LISTA_CLASICA.arriba}px;height:${LISTA_CLASICA.abajo - LISTA_CLASICA.arriba}px;list-style:none;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;gap:${separacion}px}
-.ctt-c__tapa{font-weight:400;font-size:${cuerpo}px;line-height:1.6;text-shadow:0 1px 6px rgb(0 0 0 / .35);text-wrap:balance}
+.ctt-c__tapa{font-weight:400;font-size:${cuerpo}px;line-height:1.73;text-shadow:0 1px 6px rgb(0 0 0 / .35)}
 `;
 }
 
