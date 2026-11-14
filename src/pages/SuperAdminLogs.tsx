@@ -64,7 +64,11 @@ export default function SuperAdminLogs() {
   const autoRefresco = auto ? AUTO_MS : false;
 
   const estado = useEstadoRecogida(entorno, autoRefresco);
-  const activas = useIncidencias({ entorno, estado: "activas", gravedad: null, fuente: null, texto: "", ocultarRuido: true }, 0, autoRefresco);
+  // El número de la pestaña: solo los FALLOS DE LA WEB activos (en rojo). Los externos y lo que no depende
+  // de la web se cuentan aparte dentro de la pestaña. Sin la migración del origen, todas las activas (como antes).
+  const activas = useIncidencias({ entorno, estado: "activas", gravedad: null, fuente: null, texto: "", ocultarRuido: true, origen: "web" }, 0, autoRefresco);
+  const fallosWeb = activas.data?.total ?? 0;
+  const etiquetaFallos = activas.data?.sinOrigen ? `${fallosWeb} activas` : `${fallosWeb} ${fallosWeb === 1 ? "fallo de la web activo" : "fallos de la web activos"}`;
 
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA);
@@ -106,7 +110,7 @@ export default function SuperAdminLogs() {
                 iconosSoloEscritorio
                 pestanas={[
                   { valor: "actividad", etiqueta: "Actividad", icono: <MousePointerClick /> },
-                  { valor: "errores", etiqueta: "Errores e incidencias", etiquetaCorta: "Errores", icono: <AlertOctagon />, contador: activas.data?.total, tonoContador: "dorado", etiquetaContador: `${activas.data?.total ?? 0} activas` },
+                  { valor: "errores", etiqueta: "Errores e incidencias", etiquetaCorta: "Errores", icono: <AlertOctagon />, contador: activas.data?.total, tonoContador: activas.data?.sinOrigen ? "dorado" : "rojo", etiquetaContador: etiquetaFallos },
                   { valor: "estadisticas", etiqueta: "Estadísticas", icono: <BarChart3 /> },
                   { valor: "configuracion", etiqueta: "Configuración", icono: <Settings2 /> },
                 ]}

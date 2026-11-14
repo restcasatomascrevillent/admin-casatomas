@@ -129,6 +129,27 @@ Fuente única: `src/components/trafico-web/comportamiento/definiciones.ts`. El c
   - `desactivado`.
 - La automatización **solo detecta, analiza y crea o actualiza tickets**. Nunca ejecuta lo que digan los logs ni toca producción.
 
+## Origen: fallo de la web, servicio externo o no depende de la web
+
+Petición del dueño (14/11/2026): «En logs diferencia entre error web, error que no depende de la web, diferentes colores y se tratan diferente». La lista de la demo eran 17 «Error» en rojo, casi todas «Sin respuesta de rest:… (sin conexión)»: el móvil del visitante sin cobertura.
+
+Cada error (`web_eventos.origen`) y cada incidencia (`web_incidencias.origen`, `origen_proveedor`, `origen_prioridad`) se clasifican con **reglas fijas, sin IA** (migración 20261130100000, `web_logs_origen_error()`; espejo en `supabase/functions/_shared/logs-web/origen.ts`, con los mismos casos en `__tests__/logs-web-origen-casos.json` para el SQL y para TypeScript):
+
+| Color | Origen | Cuándo | Tickets |
+|---|---|---|---|
+| **Rojo** | Fallo de la web | JS de nuestro código, React, promesas que no son de red, 404 de nuestras páginas o ficheros, 5xx de nuestras funciones, despliegue fallido, falta una clave nuestra, versión antigua que **no** se arregló al recargar o sin versión nueva | Sí (umbrales). Cuenta en el número rojo de la pestaña |
+| **Ámbar** | Servicio externo | Google Maps, Mapbox, Instagram/Meta, Stripe, OpenAI, Google (IA, Drive, reseñas), Resend, Vercel, Telegram, Vapi, Google Fonts, YouTube, Supabase saturado (pg_cron) o un recurso de otro dominio | Solo si se activa «Los servicios externos también pueden abrir ticket» (Configuración › Incidencias y avisos). Se cuentan aparte («Externos: N») |
+| **Gris** | Conexión del visitante | Petición sin respuesta (estado 0, «Sin respuesta de…»), «Failed to fetch», «Load failed», «NetworkError», cancelada, sin conexión | Nunca |
+| **Gris** | Navegador o extensión | `chrome-extension://`, `moz-extension://`, `safari-web-extension://`…, scripts de los navegadores de las apps, «ResizeObserver loop», «Script error.», rastreadores bloqueados | Nunca |
+| **Gris** | Versión antigua (se arregló sola) | `tras_publicar` sin impacto o sin datos de después | Nunca |
+| **Gris** | Bots y pruebas | Solo ocurrencias de bots, pruebas automáticas o tráfico interno (si «No contar pruebas…» está activado) | Nunca |
+
+- **Incidencia**: basta una ocurrencia real de la web para que sea «Fallo de la web»; si no, externo; si no hay ninguna real, «Bots y pruebas»; si no, la que más se repite. Para los umbrales solo cuentan las ocurrencias de la web (y las externas con el interruptor).
+- **Tickets ya creados** de lo que ahora no depende de la web: no se cierran ni se tocan (no se reabren ni se comentan); solo se sigue leyendo su estado. Las pendientes que ya no pueden se devuelven a «sin ticket» con el motivo. **«Pedir ticket» a mano vale para cualquiera** (el motivo empieza siempre por «Pedido a mano» y el proceso lo respeta).
+- **Panel**: por defecto, «Errores e incidencias» enseña los fallos de la web y los externos (primero los de la web), con las cuentas de cada color, una leyenda y, abajo, «No dependen de la web (N)». Filtro «Origen: todos / Fallos de la web y externos / Fallo de la web / Externos / No dependen de la web». «Ocultar las de solo bots y pruebas» también quita las de origen «Bots y pruebas». Los mismos colores en el detalle (con una línea en llano de qué es y qué hacer), en la línea de tiempo de las sesiones, en los eventos sueltos y en los errores de cada sesión (`web_sesiones.errores_web`, `errores_externos`).
+- **IA**: lo que no depende de la web no se explica con IA (ya tiene su texto fijo).
+- **Sin la migración** el panel funciona como antes (calcula los colores con las mismas reglas, sin filtro ni cuentas por origen) y `procesar-logs-web` trata todas como antes.
+
 ## Explicación en sencillo (para el dueño)
 
 Cada incidencia y cada sesión empiezan con un bloque en español llano; lo técnico va debajo, plegado («Detalles técnicos», «Paso a paso y datos técnicos»):
@@ -214,6 +235,7 @@ La prueba la hace `procesar-logs-web` con `{ "accion": "probar_linear" }`, solo 
 
 ## Deshacer
 
+0. Solo el origen (colores y tickets por origen): `supabase/rollbacks/20261130100000_logs_web_origen_ROLLBACK.sql` (vuelve a la agrupación de 20261129143000).
 1. Quitar el job: `supabase/rollbacks/20261118100200_logs_web_cron_ROLLBACK.sql`.
 2. Quitar los triggers: `20261118100100_..._ROLLBACK.sql`.
 3. Borrar tablas y RPC: `20261118100000_..._ROLLBACK.sql`.

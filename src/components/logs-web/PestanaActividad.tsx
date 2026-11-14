@@ -17,7 +17,10 @@ import {
   type Gravedad,
 } from "@/hooks/useLogsWeb";
 import { NOMBRE_DISPOSITIVO, NOMBRE_ORIGEN } from "@/components/trafico-web/comportamiento/definiciones";
-import { describirEvento, fmtDuracion, fmtFechaHora, NOMBRE_CATEGORIA, NOMBRE_TIPO } from "./calculos";
+import { cn } from "@/lib/utils";
+import { describirEvento, fmtDuracion, fmtFechaHora, NOMBRE_CATEGORIA, NOMBRE_TIPO, origenDeEvento } from "./calculos";
+import { BadgeOrigen } from "./Origen";
+import { ESTILO_GRUPO, estiloDe } from "./origenEstilos";
 import { Buscador, FiltroSelect, Interruptor, Paginacion } from "./Controles";
 
 interface PestanaActividadProps {
@@ -144,7 +147,7 @@ export function PestanaActividad({ desde, hasta, entorno, autoRefresco, onAbrirS
                   <TableCell className="space-x-1">
                     {s.conversiones > 0 && <Badge className="gap-1 bg-emerald-600"><CheckCircle2 className="h-3 w-3" />{s.conversiones}</Badge>}
                     {s.inicio_operacion && s.conversiones === 0 && <Badge variant="outline">empezó y no terminó</Badge>}
-                    {s.errores > 0 && <Badge variant="destructive" className="gap-1"><AlertOctagon className="h-3 w-3" />{s.errores}</Badge>}
+                    <ErroresSesion s={s} />
                     {(s.es_interno || s.es_prueba || s.es_bot) && <Badge variant="outline">{s.es_bot ? "bot" : s.es_prueba ? "prueba" : "interno"}</Badge>}
                   </TableCell>
                 </TableRow>
@@ -166,11 +169,14 @@ export function PestanaActividad({ desde, hasta, entorno, autoRefresco, onAbrirS
             </TableRow>
           </TableHeader>
           <TableBody>
-            {eventos.data.filas.map((e) => (
-              <TableRow key={e.id} data-testid="fila-evento" className={e.categoria === "error" ? "bg-destructive/5" : undefined}>
+            {eventos.data.filas.map((e) => {
+              const origen = e.categoria === "error" ? origenDeEvento(e) : null;
+              return (
+              <TableRow key={e.id} data-testid="fila-evento" data-origen={origen ?? undefined} className={origen ? estiloDe(origen).fila : undefined}>
                 <TableCell className="whitespace-nowrap tabular-nums text-xs">{fmtFechaHora(e.ocurrido_en)}</TableCell>
-                <TableCell className="text-xs">
-                  <Badge variant={e.categoria === "error" ? "destructive" : "outline"} className="whitespace-nowrap">{NOMBRE_TIPO[e.tipo] ?? e.tipo}</Badge>
+                <TableCell className="space-y-1 text-xs">
+                  <Badge variant="outline" className={cn("whitespace-nowrap", origen && estiloDe(origen).insignia)}>{NOMBRE_TIPO[e.tipo] ?? e.tipo}</Badge>
+                  {origen && <BadgeOrigen origen={origen} className="flex w-fit px-1.5 py-0 text-[10px]" />}
                 </TableCell>
                 <TableCell className="max-w-[28rem] text-sm">
                   <span className="break-words">{describirEvento(e)}</span>
@@ -182,7 +188,8 @@ export function PestanaActividad({ desde, hasta, entorno, autoRefresco, onAbrirS
                 <TableCell className="hidden lg:table-cell text-xs">{e.ruta ?? "—"}</TableCell>
                 <TableCell className="hidden md:table-cell text-xs text-muted-foreground">{e.fuente}{e.entorno !== "produccion" ? ` · ${e.entorno}` : ""}</TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       ) : (
@@ -193,5 +200,25 @@ export function PestanaActividad({ desde, hasta, entorno, autoRefresco, onAbrirS
         <Paginacion pagina={pagina} tam={TAM_PAGINA} total={q.data?.total ?? 0} onCambio={setPagina} cargando={q.isFetching} />
       )}
     </div>
+  );
+}
+
+/**
+ * Errores de una sesión con el color de su origen: rojo los fallos de la web,
+ * ámbar los de servicios externos y gris el resto (no dependen de la web).
+ * Sin clasificar todavía (o sin la migración del origen), como antes: en rojo.
+ */
+function ErroresSesion({ s }: { s: { errores: number; errores_web?: number | null; errores_externos?: number | null } }) {
+  if (s.errores <= 0) return null;
+  if (s.errores_web == null) return <Badge variant="destructive" className="gap-1"><AlertOctagon className="h-3 w-3" />{s.errores}</Badge>;
+  const web = s.errores_web;
+  const externos = s.errores_externos ?? 0;
+  const resto = Math.max(s.errores - web - externos, 0);
+  return (
+    <>
+      {web > 0 && <Badge variant="outline" className={cn("gap-1", ESTILO_GRUPO.web.insignia)} title="Fallos de la web" data-testid="errores-sesion-web"><AlertOctagon className="h-3 w-3" />{web}</Badge>}
+      {externos > 0 && <Badge variant="outline" className={cn("gap-1", ESTILO_GRUPO.externo.insignia)} title="Servicios externos" data-testid="errores-sesion-externos"><AlertOctagon className="h-3 w-3" />{externos}</Badge>}
+      {resto > 0 && <Badge variant="outline" className={cn("gap-1", ESTILO_GRUPO.no_depende.insignia)} title="No dependen de la web" data-testid="errores-sesion-no-depende"><AlertOctagon className="h-3 w-3" />{resto}</Badge>}
+    </>
   );
 }

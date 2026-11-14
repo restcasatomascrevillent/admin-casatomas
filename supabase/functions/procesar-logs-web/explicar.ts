@@ -55,6 +55,8 @@ export function necesitaExplicacion(i: IncidenciaExplicable, muestras: EventoTic
   if (i.estado === "ignorada" || i.ocurrencias <= 0) return false;
   if (i.tipo === "error_404") return false; // «alguien abrió una dirección que no existe» ya se entiende sin IA
   if (i.fuente === "navegador" && i.sesiones_afectadas <= 0) return false; // solo bots o pruebas
+  // Lo que no depende de la web (conexión, navegador, versión antigua, bots) ya tiene su texto fijo (origen.ts).
+  if (i.origen && i.origen !== "web" && i.origen !== "externo") return false;
   const m = muestras[0];
   const tareas = muestras.map((e) => e.propiedades?.tarea).filter((t): t is string => typeof t === "string");
   return !causaConocida({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo: m?.objetivo ?? null, propiedades: m?.propiedades ?? null, tareas });
