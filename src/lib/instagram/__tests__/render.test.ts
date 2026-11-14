@@ -195,7 +195,8 @@ describe.skipIf(!!motivo)("render real con Chromium", () => {
     }, LENTO);
   }
 
-  for (const p of PLANTILLAS) {
+  // «Solo foto» no tiene titular (soloFoto.render.test.ts).
+  for (const p of PLANTILLAS.filter((x) => !x.sinTexto)) {
     for (const formato of p.formatos) {
       it(`${p.id} ${formato}: titular de 6 palabras larguísimas → error que nombra «titular»`, async () => {
         const e = [...EJEMPLOS, ...EJEMPLOS_V2].find((x) => x.json.plantilla === p.id && x.json.formato === formato);

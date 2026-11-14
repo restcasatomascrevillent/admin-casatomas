@@ -187,6 +187,7 @@ export function validarEntrada(valor: unknown): { ok: true; entrada: EntradaIA }
   const plantilla = plantillaIA(o.plantilla);
   if (!plantilla) return { ok: false, error: "plantilla desconocida" };
   if (plantilla.marca !== o.marca) return { ok: false, error: "la plantilla no es de esa marca" };
+  if (o.accion === "sugerir_rotulos" && plantilla.sinTexto) return { ok: false, error: "la plantilla «Solo foto» no lleva rótulos" };
   const tono = o.tono ?? "cercano";
   if (!TONOS.includes(tono as Tono)) return { ok: false, error: "tono debe ser «cercano», «elegante» o «retranca»" };
   if (o.indicaciones !== undefined && o.indicaciones !== null && typeof o.indicaciones !== "string") {

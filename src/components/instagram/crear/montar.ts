@@ -7,8 +7,9 @@
  * La IA solo propone: nada de aquí publica ni programa.
  */
 import { ErrorIA, llamar, type OpcionesLlamada } from "@/components/instagram/ia/api";
-import { cubreFormato, obtenerPlantilla, plantillaPara } from "@/lib/instagram";
+import { cubreFormato, obtenerPlantilla, plantillaPara, plantillasDe } from "@/lib/instagram";
 import {
+  ESTILO_FEED_POR_DEFECTO,
   MAX_FOTOS_CARRUSEL,
   type DiapositivaMontada,
   type FormatoMontado,
@@ -71,6 +72,7 @@ export async function montarPieza(p: EntradaMontar, opts?: OpcionesLlamada): Pro
     fotos: p.fotos,
     formato: p.formato ?? "auto",
     tono: p.tono,
+    estilo: p.estilo ?? ESTILO_FEED_POR_DEFECTO,
   };
   const indicacion = p.indicacion?.trim();
   if (indicacion) cuerpo.indicacion = indicacion.slice(0, 500);
@@ -118,7 +120,10 @@ export function crearMontadorSimulado(o: OpcionesMontadorSimulado = {}): Montado
     const formato: FormatoMontado = fotos.length > 1 ? "carrusel" : p.formato === "story" ? "story" : "post";
     const formatoImg = formato === "story" ? "story" : "post";
     const titulares = ["Recién llegado", "Del mar a la mesa", "Para compartir", "Hecho al momento", "Te esperamos"];
+    // Como el servidor: con el estilo «Solo foto» (por defecto), el feed va sin texto encima.
+    const soloFoto = formato !== "story" && (p.estilo ?? ESTILO_FEED_POR_DEFECTO) === "solo_foto" ? plantillasDe(p.marca, "post").find((x) => x.sinTexto) : undefined;
     const diapositivas: DiapositivaMontada[] = fotos.map((f, i) => {
+      if (soloFoto) return { foto: f.id, plantilla: soloFoto.id, datos: {}, altText: `Foto ${i + 1} de ${fotos.length} de la publicación.` };
       // Como el servidor: portada → platos → cierre, y enmarcada si la foto no cubre el lienzo (las de la carta, 1200×900).
       const noCubre = !!f.ancho && !!f.alto && !cubreFormato({ ancho: f.ancho, alto: f.alto }, formatoImg);
       const papel = formato !== "carrusel" || i === 0 ? "portada" : i === fotos.length - 1 ? "cierre" : "plato";

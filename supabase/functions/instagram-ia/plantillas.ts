@@ -22,10 +22,12 @@ export interface PlantillaIA extends PlantillaCampana {
    * piezas guardadas), pero montar_pieza y las campañas no la eligen.
    */
   clasica?: boolean;
+  /** «Solo foto» (12/11/2026): sin ningún texto; los rótulos no se piden ni se revisan. */
+  sinTexto?: boolean;
 }
 
 /** Papel de una plantilla v2 (src/lib/instagram/tipos.ts → PapelPlantilla). */
-export type PapelIA = "portada" | "plato" | "cierre" | "tipografica" | "anuncio";
+export type PapelIA = "portada" | "plato" | "cierre" | "tipografica" | "anuncio" | "foto";
 
 export const PLANTILLAS_IA: readonly PlantillaIA[] = [
   {
@@ -142,6 +144,19 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
   },
   // Story del jueves de tapas (12/11/2026): papel «anuncio», la montan su botón y su automático
   // (lista de tapas obligatoria): ni montar_pieza ni las campañas las eligen.
+  // «Solo foto» (12/11/2026): la foto limpia, sin texto; la de por defecto del feed en montar_pieza.
+  {
+    id: "ct-solo-foto",
+    marca: "casa-tomas",
+    campos: [],
+    limites: {},
+    formatos: ["post"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "foto",
+    sinTexto: true,
+    campanas: false,
+  },
   {
     id: "ct-tapas",
     marca: "casa-tomas",
@@ -288,6 +303,18 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     campanas: true,
   },
   {
+    id: "tz-solo-foto",
+    marca: "touza",
+    campos: [],
+    limites: {},
+    formatos: ["post"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "foto",
+    sinTexto: true,
+    campanas: false,
+  },
+  {
     id: "tz-tipografica",
     marca: "touza",
     campos: ["antetitulo", "titular", "pie"],
@@ -298,6 +325,11 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     campanas: false,
   },
 ];
+
+/** «Solo foto» de la marca (post), o null. */
+export function plantillaSoloFoto(marca: string): PlantillaIA | null {
+  return PLANTILLAS_IA.find((p) => p.marca === marca && p.sinTexto === true && p.formatos.includes("post")) ?? null;
+}
 
 export function plantillaIA(id: unknown): PlantillaIA | null {
   return PLANTILLAS_IA.find((p) => p.id === id) ?? null;

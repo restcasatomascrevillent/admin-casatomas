@@ -53,7 +53,8 @@ describe("registro estático de plantillas", () => {
     const clasicas = ["ct-foto-titular", "ct-marco", "ct-tipografica", "tz-foto-titular", "tz-marco"];
     const v2 = ["portada", "portada-marco", "plato", "plato-marco", "cierre", "cierre-marco", "cierre-marca", "frase"];
     // + las dos de la story del jueves de tapas (papel «anuncio», 12/11/2026).
-    const esperadas = [...clasicas, "tz-tipografica", "ct-tapas", "ct-tapas-clasica", ...v2.flatMap((x) => [`ct-${x}`, `tz-${x}`])].sort();
+    // + «Solo foto» (papel «foto», sin texto, 12/11/2026).
+    const esperadas = [...clasicas, "tz-tipografica", "ct-tapas", "ct-tapas-clasica", "ct-solo-foto", "tz-solo-foto", ...v2.flatMap((x) => [`ct-${x}`, `tz-${x}`])].sort();
     expect(PLANTILLAS.map((p) => p.id)).toEqual(esperadas);
     for (const p of PLANTILLAS) expect(problemasDePlantilla(p), p.id).toEqual([]);
     expect(PLANTILLAS.filter((p) => p.clasica).map((p) => p.id).sort()).toEqual(clasicas.sort());
@@ -68,6 +69,7 @@ describe("registro estático de plantillas", () => {
   });
   it("plantillasVisibles: sin clásicas, por papel; la clásica actual se añade al final", () => {
     expect(plantillasVisibles("casa-tomas", "post").map((p) => p.id)).toEqual([
+      "ct-solo-foto",
       "ct-portada",
       "ct-portada-marco",
       "ct-plato",

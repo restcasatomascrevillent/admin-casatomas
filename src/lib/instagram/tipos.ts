@@ -55,9 +55,15 @@ export interface DatosPieza {
   pie?: string;
   /** Solo plantillas con numeral (Touza tipográfica). Por defecto "01". */
   numeral?: string;
+  /**
+   * Punto de interés vertical de la foto, en % (0 arriba, 100 abajo; por
+   * defecto 50), como imagen_posicion_y de Platos. Lo usa «Solo foto» cuando
+   * la foto cubre el lienzo y hay que recortarla. No es un campo de texto.
+   */
+  posicionY?: number;
 }
 
-export type CampoPieza = Exclude<keyof DatosPieza, "marca" | "plantilla" | "formato">;
+export type CampoPieza = Exclude<keyof DatosPieza, "marca" | "plantilla" | "formato" | "posicionY">;
 
 /** Todos los campos de contenido de una pieza, en orden de formulario. */
 export const CAMPOS_PIEZA: readonly CampoPieza[] = ["foto", "antetitulo", "titular", "cita", "cta", "lista", "pie", "numeral"];
@@ -80,6 +86,8 @@ export interface ContextoPlantilla {
    * clásica del jueves de tapas va en Montserrat, como la que hacen ahora).
    */
   urlFuente?(fichero: string): string;
+  /** Medidas de una foto del catálogo (undefined si no está): «Solo foto» decide si recorta o enmarca. */
+  medidasFoto?(id: string): { ancho: number; alto: number } | undefined;
 }
 
 /**
@@ -105,9 +113,11 @@ export type EncajeFoto = "sangre" | "marco";
  * - "anuncio" (12/11/2026): pieza de un flujo propio con su lista (la story
  *   del jueves de tapas). No sale en los selectores ni la elige la IA: la
  *   montan su botón y su automático (src/lib/instagram/tapas.ts).
+ * - "foto" (12/11/2026): la foto limpia, sin texto (como el feed real de
+ *   @casatomascrevillent). Va primera en los selectores.
  */
-export type PapelPlantilla = "portada" | "plato" | "cierre" | "tipografica" | "anuncio";
-export const PAPELES: readonly PapelPlantilla[] = ["portada", "plato", "cierre", "tipografica", "anuncio"];
+export type PapelPlantilla = "portada" | "plato" | "cierre" | "tipografica" | "anuncio" | "foto";
+export const PAPELES: readonly PapelPlantilla[] = ["foto", "portada", "plato", "cierre", "tipografica", "anuncio"];
 
 export interface Plantilla {
   /** p. ej. "ct-foto-titular" */
@@ -139,6 +149,11 @@ export interface Plantilla {
    * selectores ni la elige la IA.
    */
   clasica?: boolean;
+  /**
+   * Sin ningún texto (12/11/2026, «Solo foto»): no pide titular ni admite
+   * rótulos; el texto va en el pie de la publicación.
+   */
+  sinTexto?: boolean;
   html(datos: DatosPieza, ctx: ContextoPlantilla): string;
 }
 

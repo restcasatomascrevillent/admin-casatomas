@@ -66,8 +66,9 @@ describe("estado de Crear", () => {
       avisos: [],
     });
     expect(r.fotos).toEqual([B, A, C]);
-    // Plantilla de Touza en Casa Tomás → la de por defecto (la portada a sangre).
-    expect(ajusteDe(r, B)).toEqual({ plantilla: "ct-portada", datos: { titular: "Portada" }, altText: "Una mesa" });
+    // Plantilla de Touza en Casa Tomás → la de por defecto («Solo foto», o la portada a sangre con «Con rótulos»).
+    expect(ajusteDe(r, B)).toEqual({ plantilla: "ct-solo-foto", datos: { titular: "Portada" }, altText: "Una mesa" });
+    expect(ajusteDe(aplicarMontaje({ ...e, estilo: "rotulos" }, { ...r, ok: true, formato: "carrusel", diapositivas: [{ foto: B, plantilla: "tz-foto-titular", datos: {}, altText: "" }] }), B).plantilla).toBe("ct-portada");
     expect(ajusteDe(r, A).datos).toEqual({ antetitulo: "Hoy", titular: "Segunda" });
     expect(r.hashtags).toEqual(["#Marisco", "#Crevillent"]);
     expect(r.avisos.join(" ")).toMatch(/no ha usado una foto/);
@@ -147,11 +148,17 @@ describe("Montar con IA (cliente)", () => {
 
   it("el montador simulado registra la petición y monta un carrusel", async () => {
     const m = crearMontadorSimulado({ horaSugerida: null });
-    const r = await m({ marca: "touza", fotos: [{ id: A, url: "a" }, { id: B, url: "b" }] });
+    const r = await m({ marca: "touza", fotos: [{ id: A, url: "a" }, { id: B, url: "b" }], estilo: "rotulos" });
     expect(m.peticiones).toHaveLength(1);
     expect(r.formato).toBe("carrusel");
-    // Como el servidor: portada y cierre.
+    // Como el servidor: con «Con rótulos», portada y cierre.
     expect(r.diapositivas.map((d) => d.plantilla)).toEqual(["tz-portada", "tz-cierre"]);
+    // Por defecto («Solo foto»): todas sin texto.
+    const sola = await m({ marca: "touza", fotos: [{ id: A, url: "a" }, { id: B, url: "b" }] });
+    expect(sola.diapositivas.map((d) => [d.plantilla, d.datos])).toEqual([
+      ["tz-solo-foto", {}],
+      ["tz-solo-foto", {}],
+    ]);
     expect(r.horaSugerida).toBeNull();
   });
 });
