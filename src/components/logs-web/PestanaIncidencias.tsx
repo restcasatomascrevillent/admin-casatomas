@@ -7,7 +7,7 @@ import { SelectorSubrayado } from "@/components/panel/SelectorSubrayado";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { TAM_PAGINA, useIncidencias, type Entorno, type FiltrosIncidencias, type Gravedad, type OrdenIncidencias } from "@/hooks/useLogsWeb";
-import { causaDeFila, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO } from "./calculos";
+import { causaDeFila, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO, sencilloDeFila } from "./calculos";
 import { Buscador, FiltroSelect, Interruptor, Paginacion } from "./Controles";
 
 const TIPOS_ERROR = Object.entries(NOMBRE_TIPO).filter(([t]) => t.startsWith("error_")).map(([valor, etiqueta]) => ({ valor, etiqueta }));
@@ -97,10 +97,14 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
                         <span className="line-clamp-2 break-words">{i.titulo}</span>
                       </span>
                       <span className="text-xs text-muted-foreground">{NOMBRE_TIPO[i.tipo] ?? i.tipo} · {i.fuente}{i.rutas[0] ? ` · ${i.rutas[0].ruta}` : ""}</span>
+                      {sencilloDeFila(i) && <span className="mt-0.5 block text-xs text-foreground/80 line-clamp-2" data-testid="sencillo-fila">{sencilloDeFila(i)}</span>}
                       {(causa || i.ocurrencias === 0) && (
                         <span className="mt-1 flex flex-wrap gap-1">
                           {causa && <Badge variant="outline" className="rounded-md whitespace-normal border-sky-500/50 text-left text-[11px] font-normal text-sky-800 dark:text-sky-300" data-testid="causa-conocida-fila">Causa conocida: {causa.titulo}</Badge>}
                           {i.ocurrencias === 0 && <Badge variant="outline" className="text-[11px] font-normal text-muted-foreground">solo bots o pruebas</Badge>}
+                          {causa?.id === "chunk_caducado" && (i.ocurrencias_tras_publicar ?? 0) > 0 && !(i.repetidas_tras_recargar ?? 0) && (
+                            <Badge variant="outline" className="border-emerald-500/50 text-[11px] font-normal text-emerald-700 dark:text-emerald-300" data-testid="sin-impacto-fila">esperado tras publicar · sin impacto</Badge>
+                          )}
                         </span>
                       )}
                     </TableCell>

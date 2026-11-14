@@ -29,6 +29,9 @@ interface DefinicionTipo {
 
 const ORIGEN = ["referente", "utm_source", "utm_medium", "utm_campaign", "qr"];
 
+/** Propiedades del error de carga que la web manda tras decidir si recargar (ver CATALOGO_NAVEGADOR). */
+const PROPS_RECARGA = ["recargado", "origen", "despliegue_anterior", "build_anterior"];
+
 export const CATALOGO_NAVEGADOR: Record<string, DefinicionTipo> = {
   pagina_vista: { categoria: "actividad", consentimiento: true, props: [...ORIGEN, "idioma", "vista_id", "navegacion"] },
   pagina_salida: { categoria: "actividad", consentimiento: true, props: ["scroll_max", "vista_id"], acciones: ["navegacion", "oculta", "cierre"] },
@@ -53,11 +56,14 @@ export const CATALOGO_NAVEGADOR: Record<string, DefinicionTipo> = {
   cheque_pagado: { categoria: "operacion", consentimiento: true, props: ["importe"], acciones: ["ok"] },
   carga_pagina: { categoria: "tecnico", consentimiento: true, props: ["ttfb", "dom", "carga", "lcp", "cls", "navegacion"] },
   peticion: { categoria: "tecnico", consentimiento: true, props: ["endpoint", "metodo", "status"] },
-  error_js: { categoria: "error", consentimiento: false, props: ["componente"] },
-  error_promesa: { categoria: "error", consentimiento: false, props: [] },
+  // recargado/origen/despliegue_anterior/build_anterior: el error de «versión antigua» que la web
+  // manda DESPUÉS de recargarse sola (web-casatomas, src/lib/recarga-por-version.ts). La decisión
+  // (recuperado_tras_recarga, recarga_sin_efecto, aviso_version_nueva…) llega en `accion`.
+  error_js: { categoria: "error", consentimiento: false, props: ["componente", ...PROPS_RECARGA] },
+  error_promesa: { categoria: "error", consentimiento: false, props: [...PROPS_RECARGA] },
   error_recurso: { categoria: "error", consentimiento: false, props: ["etiqueta"] },
   error_peticion: { categoria: "error", consentimiento: false, props: ["endpoint", "metodo", "status"] },
-  error_react: { categoria: "error", consentimiento: false, props: ["componente"] },
+  error_react: { categoria: "error", consentimiento: false, props: ["componente", ...PROPS_RECARGA] },
   error_404: { categoria: "error", consentimiento: false, props: ["referente_interno"] },
 };
 

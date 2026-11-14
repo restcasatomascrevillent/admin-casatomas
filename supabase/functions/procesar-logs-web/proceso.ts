@@ -7,7 +7,14 @@
 //    3. Agrupar errores (RPC con advisory lock, umbrales, reapertura).
 //    4. Tickets: crear (con análisis de IA), reabrir, actualizar por
 //       repeticiones y sincronizar el estado de Linear. Cada incidencia se
-//       reclama con un arrendamiento propio antes de tocarla.
+//       reclama con un arrendamiento propio antes de tocarla. Primero las más
+//       graves y con más visitantes (el tope diario se gasta en lo importante).
+//       Al pasar del destino de pruebas a Linear, las que tenían ticket de
+//       prueba y siguen repitiéndose pasan a «pendiente» con un id nuevo
+//       (acción «migrar»): las ya paradas no se mandan a Linear.
+//    4 bis. Explicación en sencillo (IA) de los errores sin causa conocida,
+//       una vez por incidencia (explicar.ts). Comparte el tope diario de IA
+//       con los análisis de los tickets y usa como mucho la mitad.
 //    5. Purga diaria y estado final.
 //  Si Linear o la IA fallan, la incidencia se queda «pendiente/error» con su
 //  próximo intento (espera exponencial, máx. 6 h); el id determinista impide
@@ -18,6 +25,7 @@
 import { ErrorLinear, prioridadLinear, type DestinoTickets } from "./linear.ts";
 import { construirActualizacion, construirReapertura, construirTicket, type AnalisisIa, type EventoTicket, type IncidenciaTicket } from "./ticket.ts";
 import { interpretarAnalisis, mensajesIncidencia, type MensajeChat } from "./ia.ts";
+import { interpretarExplicacion, mensajesExplicacion, necesitaExplicacion, type ExplicacionIa } from "./explicar.ts";
 import { eventosDeCron, eventosDeDespliegues, eventosDeSyncTrafico, type DespliegueVercel, type EstadoSyncTrafico, type FalloCron } from "./recolectores.ts";
 import type { EventoNormalizado } from "../_shared/logs-web/eventos.ts";
 import { sanearTexto } from "../_shared/logs-web/saneado.ts";
@@ -51,6 +59,8 @@ export interface IncidenciaFila extends IncidenciaTicket {
   ocurrencias_en_ticket: number;
   analisis_ia: AnalisisIa | null;
   analisis_ia_en: string | null;
+  explicacion_ia: ExplicacionIa | null;
+  explicacion_ia_intentos: number;
 }
 
 export interface RepoProceso {
@@ -69,8 +79,13 @@ export interface RepoProceso {
   muestras(id: number): Promise<EventoTicket[]>;
   ultimoErrorConSesion(id: number): Promise<number | null>;
   contexto(eventoId: number): Promise<EventoTicket[]>;
-  ticketsCreadosDesde(desde: Date): Promise<number>;
+  /** Tickets creados desde `desde` en ese destino (el tope diario es por destino). */
+  ticketsCreadosDesde(desde: Date, destino: DestinoTickets["tipo"]): Promise<number>;
   analisisDesde(desde: Date): Promise<number>;
+  /** Explicaciones en sencillo intentadas desde `desde` (cuentan para el tope diario de IA). */
+  explicacionesDesde(desde: Date): Promise<number>;
+  /** Incidencias sin explicación en sencillo, las más recientes primero. */
+  incidenciasSinExplicar(limite: number): Promise<IncidenciaFila[]>;
   ultimaPurga(): Promise<string | null>;
   purgar(): Promise<Record<string, unknown>>;
 }
@@ -81,13 +96,20 @@ export interface DependenciasProceso {
   destino: (modo: ConfigLogs["linear_modo"], config: ConfigLogs) => DestinoTickets | null;
   motivoSinDestino?: (modo: ConfigLogs["linear_modo"], config: ConfigLogs) => string | null;
   ia: ((mensajes: MensajeChat[]) => Promise<{ texto: string; modelo: string }>) | null;
+  /** IA corta para las explicaciones en sencillo (null = sin clave). */
+  iaExplicar?: ((mensajes: MensajeChat[], disparador: string) => Promise<{ texto: string; modelo: string }>) | null;
   despliegues: ((desdeMs: number) => Promise<DespliegueVercel[]>) | null;
   urlPanel: string;
   ahora?: () => Date;
   log?: (m: string) => void;
+  /** Id nuevo para un ticket (por defecto crypto.randomUUID). */
+  nuevoUuid?: () => string;
 }
 
-export const LIMITES = { crear: 5, actualizar: 10, sincronizar: 20, turnoMs: 4 * 60_000, reclamoMs: 5 * 60_000 };
+export const LIMITES = { crear: 5, actualizar: 10, sincronizar: 20, explicar: 3, turnoMs: 4 * 60_000, reclamoMs: 5 * 60_000 };
+
+/** Explicaciones en sencillo al día: como mucho la mitad del tope de IA (el resto queda para los tickets). */
+export const maxExplicacionesDia = (topeIa: number) => Math.floor(topeIa / 2);
 const SEIS_HORAS = 6 * 3_600_000;
 
 /** Espera hasta el siguiente intento: 5, 10, 20, 40… minutos, máximo 6 h. */
@@ -107,15 +129,26 @@ export function inicioDiaMadrid(ahora: Date): Date {
   return new Date(Date.UTC(+p.year, +p.month - 1, +p.day) - desfase);
 }
 
-export type Accion = "crear" | "reabrir" | "actualizar" | "sincronizar" | null;
+export type Accion = "crear" | "reabrir" | "actualizar" | "sincronizar" | "migrar" | null;
 
-/** Qué hay que hacer con el ticket de una incidencia ahora mismo. */
-export function accionPara(i: IncidenciaFila, ahora: Date): Accion {
+/**
+ * Qué hay que hacer con el ticket de una incidencia ahora mismo.
+ * `destino`: tipo del destino actual. Un ticket hecho en OTRO destino (p. ej.
+ * el de pruebas, tras activar Linear) no se comenta ni se consulta aquí: si la
+ * incidencia sigue viva, se «migra» (ticket nuevo en el destino actual).
+ */
+export function accionPara(i: IncidenciaFila, ahora: Date, destino?: DestinoTickets["tipo"]): Accion {
   if (i.estado === "ignorada") return null;
   if (i.linear_estado === "pendiente" || i.linear_estado === "error") {
+    // Resuelta antes de llegar a crear el ticket: no se abre (si vuelve, pasa a «reabierta» y entonces sí).
+    if (i.estado === "resuelta") return null;
     return !i.linear_proximo_intento || Date.parse(i.linear_proximo_intento) <= ahora.getTime() ? "crear" : null;
   }
   if (i.linear_estado !== "creado" || !i.linear_issue_id) return null;
+  if (destino && i.linear_destino && i.linear_destino !== destino) {
+    const sigueViva = i.linear_pendiente_reapertura || (i.estado !== "resuelta" && i.ocurrencias > i.ocurrencias_en_ticket);
+    return sigueViva ? "migrar" : null;
+  }
   if (i.linear_pendiente_reapertura) return "reabrir";
   const ultima = i.linear_ultima_sync ? Date.parse(i.linear_ultima_sync) : 0;
   const nuevas = i.ocurrencias - i.ocurrencias_en_ticket;
@@ -125,6 +158,33 @@ export function accionPara(i: IncidenciaFila, ahora: Date): Accion {
 }
 
 const mensajeError = (e: unknown) => sanearTexto(e instanceof Error ? e.message : String(e), 400) ?? "error";
+
+const RANGO_GRAVEDAD: Record<string, number> = { critico: 4, error: 3, aviso: 2, info: 1 };
+
+/** Orden de trabajo: reaperturas, luego lo más grave y con más visitantes afectados. */
+export function ordenPrioridad(a: IncidenciaFila, b: IncidenciaFila): number {
+  return Number(b.linear_pendiente_reapertura) - Number(a.linear_pendiente_reapertura)
+    || (RANGO_GRAVEDAD[b.gravedad] ?? 0) - (RANGO_GRAVEDAD[a.gravedad] ?? 0)
+    || b.sesiones_afectadas - a.sesiones_afectadas
+    || b.ocurrencias_24h - a.ocurrencias_24h
+    || a.id - b.id;
+}
+
+/** El ticket ya no existe en Linear: se suelta (si vuelve a cumplir los umbrales, se crea otro con id nuevo). */
+const soltarTicket = (inc: IncidenciaFila, ahora: Date, nuevoUuid: () => string) => ({
+  linear_estado: "sin_ticket",
+  linear_uuid: nuevoUuid(),
+  linear_issue_id: null,
+  linear_identificador: null,
+  linear_url: null,
+  linear_destino: null,
+  linear_estado_remoto: `Borrado en Linear (era ${inc.linear_identificador ?? "?"}); si vuelve a repetirse se abre otro`,
+  linear_pendiente_reapertura: false,
+  linear_ultima_sync: ahora.toISOString(),
+  linear_ultimo_error: null,
+  linear_bloqueo_hasta: null,
+  requiere_ticket: false,
+});
 
 export async function procesar(deps: DependenciasProceso): Promise<Record<string, unknown>> {
   const ahora = deps.ahora?.() ?? new Date();
@@ -179,7 +239,7 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
     resumen.agrupacion = await repo.agrupar();
 
     // ─── 4. Tickets ─────────────────────────────────────────────────────────
-    const tickets = { creados: 0, reabiertos: 0, actualizados: 0, sincronizados: 0, fallidos: 0, aplazados: 0 };
+    const tickets = { creados: 0, reabiertos: 0, actualizados: 0, sincronizados: 0, migrados: 0, fallidos: 0, aplazados: 0 };
     resumen.tickets = tickets;
     if (config.linear_modo !== "desactivado") {
       const destino = deps.destino(config.linear_modo, config);
@@ -187,17 +247,20 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
         errores.push(`linear: ${deps.motivoSinDestino?.(config.linear_modo, config) ?? "destino sin configurar"}`);
       } else {
         const hoy = inicioDiaMadrid(ahora);
-        let creadosHoy = await repo.ticketsCreadosDesde(hoy);
-        let analisisHoy = await repo.analisisDesde(hoy);
+        const nuevoUuid = deps.nuevoUuid ?? (() => crypto.randomUUID());
+        let creadosHoy = await repo.ticketsCreadosDesde(hoy, destino.tipo);
+        // El tope diario de IA es uno: análisis de tickets + explicaciones en sencillo.
+        let analisisHoy = (await repo.analisisDesde(hoy)) + (await repo.explicacionesDesde(hoy));
         const cupos = { crear: LIMITES.crear, actualizar: LIMITES.actualizar, sincronizar: LIMITES.sincronizar };
-        for (const inc of await repo.incidenciasConTicket(200)) {
-          const accion = accionPara(inc, ahora);
+        const lista = [...(await repo.incidenciasConTicket(200))].sort(ordenPrioridad);
+        for (const inc of lista) {
+          const accion = accionPara(inc, ahora, destino.tipo);
           if (!accion) continue;
           if (accion === "crear" && (cupos.crear <= 0 || creadosHoy >= config.linear_max_tickets_dia)) {
             tickets.aplazados++;
             continue;
           }
-          if (accion === "actualizar" || accion === "reabrir") {
+          if (accion === "actualizar" || accion === "reabrir" || accion === "migrar") {
             if (cupos.actualizar <= 0) continue;
           }
           if (accion === "sincronizar" && cupos.sincronizar <= 0) continue;
@@ -211,13 +274,24 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
                 creadosHoy++;
                 tickets.creados++;
               } else tickets.aplazados++;
+            } else if (accion === "migrar") {
+              cupos.actualizar--;
+              const antes = inc.linear_identificador ?? inc.linear_issue_id ?? "?";
+              await repo.actualizar(inc.id, {
+                linear_estado: "pendiente", linear_uuid: nuevoUuid(), linear_issue_id: null, linear_identificador: null, linear_url: null,
+                linear_estado_remoto: null, linear_destino: null, linear_intentos: 0, linear_ultimo_error: null, linear_proximo_intento: ahora.toISOString(),
+                linear_pendiente_reapertura: false, linear_bloqueo_hasta: null, requiere_ticket: true,
+                motivo_ticket: `${inc.motivo_ticket ? `${inc.motivo_ticket} · ` : ""}Sigue repitiéndose: pasa del destino de ${inc.linear_destino === "prueba" ? "pruebas" : "Linear"} (${antes}) al actual`.slice(0, 500),
+              });
+              tickets.migrados++;
             } else if (accion === "reabrir") {
               cupos.actualizar--;
-              await destino.comentar(inc.linear_issue_id!, construirReapertura(inc), inc.id);
-              await destino.reabrir(inc.linear_issue_id!, config.linear_estado_reabrir_id, inc.id);
+              // Primero el estado (repetirlo no duplica nada) y después el comentario.
+              const estadoNuevo = await destino.reabrir(inc.linear_issue_id!, config.linear_estado_reabrir_id, inc.id);
+              await destino.comentar(inc.linear_issue_id!, construirReapertura(inc, estadoNuevo), inc.id);
               await repo.actualizar(inc.id, {
                 linear_pendiente_reapertura: false, ocurrencias_en_ticket: inc.ocurrencias, linear_ultima_sync: ahora.toISOString(),
-                linear_ultimo_error: null, linear_bloqueo_hasta: null,
+                linear_ultimo_error: null, linear_bloqueo_hasta: null, ...(estadoNuevo ? { linear_estado_remoto: estadoNuevo } : {}),
               });
               tickets.reabiertos++;
             } else if (accion === "actualizar") {
@@ -230,7 +304,7 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
             } else if (accion === "sincronizar") {
               cupos.sincronizar--;
               const t = await destino.consultar(inc.linear_issue_id!);
-              const cambios: Record<string, unknown> = { linear_ultima_sync: ahora.toISOString(), linear_bloqueo_hasta: null };
+              const cambios: Record<string, unknown> = t ? { linear_ultima_sync: ahora.toISOString(), linear_bloqueo_hasta: null } : soltarTicket(inc, ahora, nuevoUuid);
               if (t) {
                 cambios.linear_estado_remoto = t.estadoNombre;
                 // Resuelto en Linear → resuelta aquí (si reaparece, se reabre sola). Cancelado/duplicado → ignorada.
@@ -244,6 +318,10 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
             tickets.fallidos++;
             const intentos = inc.linear_intentos + 1;
             log(`[procesar-logs-web] incidencia ${inc.id} (${accion}): ${mensajeError(e)}`);
+            if (accion !== "crear" && e instanceof ErrorLinear && e.codigo === "no_encontrado") {
+              await repo.actualizar(inc.id, soltarTicket(inc, ahora, nuevoUuid)).catch(() => {});
+              continue;
+            }
             await repo.actualizar(inc.id, {
               ...(accion === "crear" ? { linear_estado: "error", linear_intentos: intentos } : {}),
               linear_ultimo_error: mensajeError(e),
@@ -252,12 +330,41 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
               // Fallo de una actualización: se reintenta en la próxima ventana (no se pierde la cuenta).
               ...(accion !== "crear" ? { linear_ultima_sync: ahora.toISOString() } : {}),
             }).catch(() => {});
-            if (e instanceof ErrorLinear && !e.reintentable && /clave/.test(e.message)) {
+            if (e instanceof ErrorLinear && e.codigo === "clave") {
               errores.push(`linear: ${mensajeError(e)}`);
               break; // con la clave rechazada no tiene sentido seguir
             }
           }
         }
+      }
+    }
+
+    // ─── 4 bis. Explicación en sencillo ─────────────────────────────────────
+    const explicaciones = { hechas: 0, fallidas: 0 };
+    resumen.explicaciones = explicaciones;
+    if (config.ia_activada && deps.iaExplicar) {
+      try {
+        const hoy = inicioDiaMadrid(ahora);
+        const analisisHoy = await repo.analisisDesde(hoy);
+        let explicadasHoy = await repo.explicacionesDesde(hoy);
+        for (const inc of await repo.incidenciasSinExplicar(30)) {
+          if (explicaciones.hechas + explicaciones.fallidas >= LIMITES.explicar) break;
+          if (explicadasHoy >= maxExplicacionesDia(config.ia_max_analisis_dia) || analisisHoy + explicadasHoy >= config.ia_max_analisis_dia) break;
+          const muestras = await repo.muestras(inc.id);
+          if (!necesitaExplicacion(inc, muestras)) continue;
+          explicadasHoy++;
+          const intento = { explicacion_ia_intentos: inc.explicacion_ia_intentos + 1, explicacion_ia_en: ahora.toISOString() };
+          try {
+            const r = await deps.iaExplicar(mensajesExplicacion(inc, muestras), `explicacion:${inc.id}`);
+            await repo.actualizar(inc.id, { ...intento, explicacion_ia: { ...interpretarExplicacion(r.texto, inc), modelo: r.modelo }, explicacion_ia_error: null });
+            explicaciones.hechas++;
+          } catch (e) {
+            await repo.actualizar(inc.id, { ...intento, explicacion_ia_error: mensajeError(e) }).catch(() => {});
+            explicaciones.fallidas++;
+          }
+        }
+      } catch (e) {
+        errores.push(`explicaciones: ${mensajeError(e)}`);
       }
     }
 

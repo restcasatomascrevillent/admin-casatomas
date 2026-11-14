@@ -109,7 +109,7 @@ try {
       await pagina.goto(`${BASE}${p.ruta}`);
       await pagina.getByTestId("logs-web").waitFor({ timeout: 20_000 });
       if (p.nombre === "lista") await pagina.getByTestId("tabla-incidencias").or(pagina.getByTestId("sin-incidencias")).first().waitFor({ timeout: 20_000 });
-      else await pagina.getByTestId("detalle-incidencia").getByText("Ocurrencias", { exact: true }).first().waitFor({ timeout: 20_000 });
+      else await pagina.getByTestId("detalle-incidencia").getByTestId("explicacion-sencilla").waitFor({ timeout: 20_000 });
       await espera(600);
       const archivo = path.join(SALIDA, `${PREFIJO}${p.nombre}-${t.nombre}.png`);
       if (p.nombre === "lista") await pagina.screenshot({ path: archivo, fullPage: true });

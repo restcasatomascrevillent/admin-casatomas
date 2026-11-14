@@ -80,6 +80,18 @@ Fuente única: `src/components/trafico-web/comportamiento/definiciones.ts`. El c
   - por defecto, 3 ocurrencias y 2 sesiones distintas en 24 h;
   - los errores del servidor no exigen sesiones;
   - los **críticos** abren ticket a la primera: la petición de reserva o de cheque que falla, o una función de pago con 5xx.
+  - con «No contar pruebas automáticas…» (por defecto) tampoco cuenta el **tráfico interno** (`?ct_interno=1`): solo lo que afecta a clientes.
+  - **Versión antigua tras publicar** («Failed to fetch dynamically imported module», «Importing a module script failed», `vite:preloadError`…): quien tenía la web abierta durante una publicación pide ficheros que ya no existen. La web decide qué hacer y lo dice en `accion` (web-casatomas, `src/lib/recarga-por-version.ts`): `recuperado_tras_recarga`, `recarga_sin_efecto`, `aviso_version_nueva`, `sin_version_nueva` o `sin_conexion`. También añade una nota al final del mensaje, que no cuenta para la huella (`quitarNotaRecarga`). Cada ocurrencia se clasifica en `web_eventos.tras_publicar` (migración 20261129143000):
+
+    | Clase | Cuándo | ¿Cuenta para los umbrales? |
+    |---|---|---|
+    | «esperado tras publicar · sin impacto» | `recuperado_tras_recarga`; en eventos sin `accion`: `recargado`, o la sesión siguió con actividad | No |
+    | «sin datos de después» | sin `accion` ni nada después: visitante sin «Estadísticas», cuyo id cambia en cada carga, así que es lo normal | No |
+    | «sin conexión del visitante» | `sin_conexion` | No |
+    | «no se arregló al recargar · revisar» | `recarga_sin_efecto`, `aviso_version_nueva`; en eventos sin `accion`, volvió a fallar en la misma sesión tras recargar | **Sí** |
+    | (ninguna: error normal) | `sin_version_nueva` (red o fichero que falta de verdad) | **Sí** |
+
+    Los bots no se clasifican: llevan horas falsas y nunca cuentan. En la lista de errores y en cada ocurrencia se ve lo que decidió la web. La ingesta guarda `recargado`, `origen`, `despliegue_anterior` y `build_anterior` de esos errores. El patrón SQL es el mismo que `PATRON_CHUNK_CADUCADO` (`huella.ts`); las pruebas PGlite lo comprueban.
   - **Los 404 y los bots no abren tickets**: los 404 solo si lo activas, por encima de su umbral diario; los bots nunca cuentan.
   - Los patrones de ruido conocidos (`ResizeObserver`, extensiones del navegador…) dejan la incidencia como «ignorada».
 - **Sin duplicados**:
@@ -87,9 +99,15 @@ Fuente única: `src/components/trafico-web/comportamiento/definiciones.ts`. El c
   - un arrendamiento por incidencia antes de tocar su ticket;
   - el ticket se crea en Linear con un **id determinista** (`linear_uuid`): si una respuesta se pierde, el reintento recupera el ticket existente en vez de crear otro.
 - **Repeticiones**: se comenta el ticket con la frecuencia nueva cada 6 h, o antes si las ocurrencias se duplican.
-- **Reaparición de una resuelta** (configurable): reabrirla y avisar en el mismo ticket (por defecto), crear un ticket nuevo que enlaza el anterior, o dejarla resuelta.
-- **Estado de Linear**: si el ticket se cierra en Linear, la incidencia pasa a «resuelta» aquí, y si el error vuelve, se reabre. Si se cancela en Linear, pasa a «ignorada».
+- **Reaparición de una resuelta** (configurable): reabrirla y avisar en el mismo ticket (por defecto), crear un ticket nuevo que enlaza el anterior, o dejarla resuelta. Al reabrir, el ticket de Linear vuelve al estado elegido o, si no se elige, al primero «por hacer» de su equipo; si en Linear seguía abierto, solo se comenta (no se mueve de «En curso» a «Por hacer»).
+- **Estado de Linear**: si el ticket se cierra en Linear, la incidencia pasa a «resuelta» aquí, y si el error vuelve, se reabre. Si se cancela en Linear, pasa a «ignorada». Si se borra en Linear, se suelta: si el error vuelve a cumplir los umbrales, se abre otro (con id nuevo).
+- **Tope diario**: como mucho `linear_max_tickets_dia` tickets nuevos al día (hora de Madrid) en el destino actual. Se atienden primero los más graves y con más visitantes afectados; el resto espera.
+- **Resuelta antes de tener ticket**: no se crea (si vuelve, pasa a «reabierta» y entonces sí).
+- **Al pasar del destino de pruebas a Linear**: los tickets de prueba no se mandan a Linear. Si una de esas incidencias sigue repitiéndose, se crea su ticket en Linear (con id nuevo, dentro del tope diario); las que ya pararon se quedan como estaban.
+- **Errores de Linear legibles**: clave mala o caducada, sin permiso, equipo o ticket que no existe, límite de peticiones o Linear caído se guardan con una frase en español que dice qué hacer. Con la clave rechazada, la pasada se para (y se avisa) en vez de insistir con cada incidencia.
 - **Contenido del ticket**:
+  - **En pocas palabras** (arriba del todo, en lenguaje llano): qué pasa, a quién afecta, desde cuándo y qué hacer;
+  - debajo, los detalles técnicos:
   - título;
   - impacto;
   - entorno, versión y despliegue;
@@ -111,8 +129,20 @@ Fuente única: `src/components/trafico-web/comportamiento/definiciones.ts`. El c
   - `desactivado`.
 - La automatización **solo detecta, analiza y crea o actualiza tickets**. Nunca ejecuta lo que digan los logs ni toca producción.
 
+## Explicación en sencillo (para el dueño)
+
+Cada incidencia y cada sesión empiezan con un bloque en español llano; lo técnico va debajo, plegado («Detalles técnicos», «Paso a paso y datos técnicos»):
+
+- **Qué hizo el cliente**: del recorrido de su sesión («Entró en la carta, abrió 2 vinos y pulsó «Reservar»»). Sin consentimiento, lo dice en vez de inventarlo. En los errores del servidor: «Ningún cliente: lo hace una tarea automática…».
+- **Qué falló**: los errores conocidos tienen un texto fijo (`causas.ts`, campo `sencillo`). Por ejemplo, la versión antigua: «La página tenía una versión antigua abierta justo cuando publicamos; se recarga sola». Las tareas programadas se nombran en llano (`sencillo.ts`, `TAREAS`): «La tarea que retoma la lectura de facturas atascadas no arrancó a tiempo; las facturas pueden tardar más en leerse». Los errores nuevos llevan una **explicación de la IA escrita una vez por incidencia** y guardada en `web_incidencias.explicacion_ia`, marcada «Explicación de la IA · sin comprobar».
+- **¿Afecta?**: cuántos visitantes en total y hoy, veces en 24 h, si es grave, y en la versión antigua si se arregló sola o se repitió.
+- **Qué hacer**: qué tiene que hacer el dueño (casi siempre «nada» o «avisa al técnico»), y si ya hay ticket.
+
+El ticket de Linear empieza con el mismo resumen.
+
 ## IA
 
+- **Explicación en sencillo** (`procesar-logs-web/explicar.ts`): solo para incidencias reales sin causa conocida, como mucho 3 por pasada, 2 intentos por incidencia y la mitad del tope diario de IA (el tope es uno para todo: análisis de tickets + explicaciones). Solo ve la incidencia agrupada y saneada (sin datos personales) y lo que falla según las muestras. No ve visitas sueltas.
 - **Incidencias**: solo se analiza la incidencia agrupada (mensaje y pila saneados, reparto de navegadores y versiones, y el recorrido previo descrito en frases), nunca cada visita. Los logs van como datos, con la orden de ignorar instrucciones dentro de ellos. Si la IA cita un archivo que no aparece en las evidencias, se sustituye por «(archivo no presente en las evidencias)». Si falta contexto, lo tiene que decir. Tope diario configurable.
 - **Resumen del periodo** (Estadísticas y Tráfico web): solo con cifras agregadas, en cinco apartados.
   - Cada conclusión **tiene que citar una cifra del periodo**; si no, se descarta.
@@ -162,13 +192,14 @@ npx supabase db query --remote=sfonaclosuafvlhutkon -f supabase/migrations/20261
 
 Hasta entonces el aviso de Logs dice «El proceso en segundo plano todavía no ha terminado ninguna pasada». Con una sesión de super admin también se puede lanzar a mano con **Procesar ahora** (Configuración).
 
-**Linear real (cuando se quiera):**
+**Linear real (cuando se quiera)** — los mismos pasos salen en el panel (Logs › Configuración › Linear › «Cómo conectar Linear»):
 
-1. Crear una clave personal en Linear (*Settings › Security & access*).
-2. Guardarla como secreto: `npx supabase secrets set LINEAR_API_KEY=… --project-ref <ref>`.
-3. En Logs › Configuración, poner el id del equipo (y, si se quiere, proyecto y etiquetas) y cambiar el destino a «Linear».
+1. En Linear: *Settings › Security & access › Personal API keys › New API key* (nombre, por ejemplo, «Casa Tomás · Logs»).
+2. En Supabase: *Edge Functions › Secrets › Add new secret*, nombre `LINEAR_API_KEY` (o `npx supabase secrets set LINEAR_API_KEY=… --project-ref <ref>`). Primero en la demo.
+3. En Logs › Configuración › Linear, **«Probar conexión con Linear»**: dice si la clave funciona y el nombre del espacio de trabajo, y deja elegir en desplegables el equipo, el proyecto, las etiquetas y el estado al reabrir (ya no hace falta pegar ids; siguen en «Avanzado»). Sin clave, dice «Falta la clave de Linear» y remite a estos pasos.
+4. Cambiar «Destino de los tickets» a «Linear» y **Guardar configuración**.
 
-Las incidencias creadas en el destino de pruebas no se repiten en Linear. Para mandar una, usa «Reenviar al destino actual».
+La prueba la hace `procesar-logs-web` con `{ "accion": "probar_linear" }`, solo para super admin; no procesa nada y la clave nunca sale del servidor. Las incidencias del destino de pruebas solo pasan a Linear si siguen repitiéndose (ver «Al pasar del destino de pruebas a Linear»). Para mandar una a mano, «Reenviar al destino actual».
 
 **Producción (`haqmmdfdzzatdnrrcgez`)**: solo después de aceptar los PR y con el «sí» del dueño. Mismo orden: migraciones 100000 y 100100, las tres funciones, el secreto y Vault, y la migración del cron. La web empieza a mandar datos cuando se publica el PR de `web-casatomas`.
 
