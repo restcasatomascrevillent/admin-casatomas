@@ -1,0 +1,1271 @@
+set client_encoding = 'UTF8';
+-- ============================================================================
+-- 20261128150000_chatbot_ultima_factura — La IA de Facturas usa y remarca el
+-- precio de la ÚLTIMA factura (13/11/2026, petición del dueño)
+-- ----------------------------------------------------------------------------
+-- «En márgenes y en el chatbot de facturas, aunque se puedan mencionar más
+-- facturas, el precio que se debe utilizar y remarcar es el de la última factura
+-- registrada.» Requiere 20261128140000_margenes_ultima_factura (margenes_carta
+-- con la factura usada).
+--
+-- 1. json_delante_agente(delante, resto): el JSON con las claves de `delante`
+--    al principio (jsonb las ordena por longitud; el modelo lee en orden y un
+--    resultado largo se recorta por el final).
+-- 2. compras_producto_agente: ultima_factura (fecha, proveedor, número,
+--    documento_id, cantidad, unidad, precio) y como_leer, lo primero; por unidad
+--    y por proveedor, el precio y el número de su última factura; el «más
+--    barato» (orden precio, precio_comparable) por la última factura.
+-- 3. historial_precios_agente: ultima_factura y como_leer, lo primero; por
+--    proveedor, ultimo_precio, numero y ultima_compra (siempre), ordenado por la
+--    compra más nueva; mínimo, máximo y media quedan como contexto.
+-- 4. variacion_precios_agente: parámetro nuevo p_comparar (por defecto 'media':
+--    el panel sigue igual). chat-facturas manda 'anterior': la última factura
+--    frente a la ANTERIOR del MISMO proveedor (si no hay, la anterior de otro:
+--    cambio_proveedor), con número y documento_id; la media de 90 días va en
+--    «media», como contexto. Se borra la firma anterior (dos sobrecargas con
+--    DEFAULT darían «no se puede elegir la función» en PostgREST).
+-- 5. margenes_carta_agente: cada fila con ultima_factura y la mediana aparte;
+--    como_leer dice que el coste es el de la última factura y que pct_coste es un
+--    % del precio de VENTA sin IVA; la pantalla es Facturas > Márgenes.
+--
+-- Aplicar ANTES de desplegar la Edge Function chat-facturas nueva (manda
+-- p_comparar). La chat-facturas anterior sigue funcionando con esta migración.
+-- Cuerpos de partida: los de la demo (pg_get_functiondef, 13/11/2026), iguales a
+-- 20261124120000_chatbot_precio_unidad_compra y 20261116100000_chatbot_margenes_alertas.
+-- Rollback: supabase/rollbacks/20261128150000_chatbot_ultima_factura_ROLLBACK.sql
+-- Test:     supabase/tests/chatbot_ultima_factura_test.sql (contra la demo)
+-- ============================================================================
+set lock_timeout = '5s';
+begin;
+
+-- ─── 1. Claves delante ───────────────────────────────────────────────────────
+create or replace function public.json_delante_agente(p_delante jsonb, p_resto jsonb)
+returns json
+language sql
+immutable
+set search_path = public
+as $$
+  -- 20261128150000_chatbot_ultima_factura
+  select case
+    when p_resto is null or jsonb_typeof(p_resto) <> 'object' then p_resto::json
+    when p_delante is null or jsonb_typeof(p_delante) <> 'object' or p_delante = '{}'::jsonb then p_resto::json
+    when (p_resto - array(select jsonb_object_keys(p_delante))) = '{}'::jsonb then p_delante::json
+    else (left(p_delante::text, -1) || ', ' || substr((p_resto - array(select jsonb_object_keys(p_delante)))::text, 2))::json
+  end
+$$;
+revoke all on function public.json_delante_agente(jsonb, jsonb) from public, anon;
+grant execute on function public.json_delante_agente(jsonb, jsonb) to authenticated, service_role;
+
+-- La factura de margenes_carta, compacta para el modelo (número para el enlace).
+create or replace function public._factura_agente(f jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = public
+as $$
+  -- 20261128150000_chatbot_ultima_factura
+  select case when f is null or jsonb_typeof(f) <> 'object' then null else jsonb_strip_nulls(jsonb_build_object(
+    'fecha', f -> 'fecha', 'proveedor', f -> 'proveedor', 'numero', f -> 'numero_documento',
+    'precio', trim_scale(round((f ->> 'precio_unidad')::numeric, case when (f ->> 'precio_unidad')::numeric < 1 then 4 else 2 end)),
+    'unidad', f -> 'unidad_compra',
+    'eur_kg_o_l', case when f ->> 'unidad_compra' not in ('kg', 'l')
+                       then trim_scale(round((f ->> 'eur_base')::numeric, 2)) end)) end
+$$;
+revoke all on function public._factura_agente(jsonb) from public, anon, authenticated;
+grant execute on function public._factura_agente(jsonb) to service_role;
+
+-- ─── 2. compras_producto_agente ─────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.compras_producto_agente(p_texto text, p_desde date DEFAULT NULL::date, p_hasta date DEFAULT NULL::date, p_tipo text DEFAULT NULL::text, p_limite integer DEFAULT 10, p_orden text DEFAULT NULL::text, p_excluir text DEFAULT NULL::text, p_embedding vector DEFAULT NULL::vector, p_unidad text DEFAULT NULL::text, p_proveedor text DEFAULT NULL::text, p_base boolean DEFAULT true)
+ RETURNS json
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+-- 20261106140000_chatbot_gasto_como_el_panel: importe de línea = solo pf.total.
+-- 20261124120000_chatbot_precio_unidad_compra: p_base = false (chat-facturas) → precio tal como se compra; precio_comparable
+-- (€/kg, €/l) solo si mezcla formatos (unidades o contenidos distintos) para poder decir el más barato.
+-- 20261128150000_chatbot_ultima_factura: primero la ÚLTIMA factura (ultima_factura, con su número para el
+-- enlace) y como_leer; por unidad y por proveedor, el precio de su última factura (ultimo_precio, numero);
+-- «más barato» (orden precio y precio_comparable) por el precio de la última factura, no por la media.
+declare
+  c_max_variantes constant int := 15;
+  c_sim_semantica constant float8 := 0.5;   -- sugerencias por embedding: parecido mínimo
+  c_sim_texto     constant float8 := 0.5;   -- sugerencias por texto: frase y primera palabra
+  c_dif_variantes constant numeric := 1.15; -- precios de variantes «distintos»: más de un 15 %
+  v_lim    int := least(greatest(coalesce(p_limite, 10), 1), 50);
+  v_orden  text := lower(coalesce(nullif(trim(p_orden), ''), 'importe'));
+  v_uni    text := unidad_agente(p_unidad);
+  -- Palabras distintivas del proveedor pedido (sin «grupo», «distribuciones», «sl»…): todas deben
+  -- estar en su nombre. Sin proveedor, vacío = no filtra.
+  v_provw  text[] := coalesce((
+    select array_agg(w) from regexp_split_to_table(lower(coalesce(p_proveedor, '')), '[^a-z0-9áéíóúñü]+') w
+     where length(w) >= 3
+       and w <> all (array['grupo','distribuciones','distribuidora','hermanos','sociedad','limitada','srl','slu','del','los','las'])
+  ), '{}');
+  v_tipo   text;
+  v_pal    text[];
+  v_frase  text;
+  v_ids    bigint[];
+  v_met    text;
+  v_subs   text[];
+  v_aprox  boolean;
+  v_sug    jsonb;
+  v_sem    boolean;
+  resultado jsonb;
+begin
+  -- ── Argumentos ──
+  v_tipo := case
+    when nullif(trim(coalesce(p_tipo, '')), '') is null or lower(trim(p_tipo)) in ('ambos', 'todos', 'todo') then null
+    when lower(trim(p_tipo)) like 'factura%' then 'factura'
+    when lower(trim(p_tipo)) like 'albar%' then 'albaran'
+    else '?' end;
+  if v_tipo = '?' then
+    return json_build_object('error', 'tipo debe ser factura, albaran o null (ambos).');
+  end if;
+  if v_orden not in ('importe', 'cantidad', 'precio') then
+    return json_build_object('error', 'orden debe ser importe, cantidad o precio.');
+  end if;
+  if p_desde is not null and p_hasta is not null and p_desde > p_hasta then
+    return json_build_object('error', format('Rango invalido: desde (%s) es posterior a hasta (%s).', p_desde, p_hasta));
+  end if;
+
+  select h.ids, h.metodo, h.subproductos, h.palabras
+    into v_ids, v_met, v_subs, v_pal
+    from lineas_producto_agente(p_texto, p_excluir) h;
+  if coalesce(cardinality(v_pal), 0) = 0 then
+    return json_build_object('error', 'Falta el nombre del producto.');
+  end if;
+  v_frase := array_to_string(v_pal, ' ');
+  v_aprox := coalesce(v_met in ('derivada', 'aproximada'), false);
+
+  -- ── Nada: solo subproductos, o sugerencias (semánticas si hay embedding) ──
+  if v_ids is null then
+    if v_subs is not null then
+      return jsonb_build_object(
+        'buscado',      p_texto,
+        'coincidencia', 'solo_subproductos',
+        'sin_datos',    true,
+        'subproductos', to_jsonb(v_subs),
+        'nota', 'Solo hay subproductos con ese nombre (espinas, recortes...), no el producto: dilo y pregunta si es eso.')::json;
+    end if;
+    select jsonb_agg(nombre order by pri, s desc), coalesce(bool_or(pri = 1), false)
+      into v_sug, v_sem
+      from (
+        select min(nombre) as nombre, min(pri) as pri, max(s) as s
+          from (
+            select pf.nombre::text as nombre, 1 as pri, max(1 - (pf.embedding <=> p_embedding)) as s
+              from productos_factura pf
+             where p_embedding is not null and pf.embedding is not null
+             group by pf.nombre
+            having max(1 - (pf.embedding <=> p_embedding)) >= c_sim_semantica
+            union all
+            select pf.nombre::text, 2,
+                   max(extensions.strict_word_similarity(v_frase, array_to_string(palabras_producto_agente(pf.nombre), ' ')))
+              from productos_factura pf
+             group by pf.nombre
+            having max(extensions.strict_word_similarity(v_frase, array_to_string(palabras_producto_agente(pf.nombre), ' '))) >= c_sim_texto
+               and max(extensions.strict_word_similarity(v_pal[1], array_to_string(palabras_producto_agente(pf.nombre), ' '))) >= c_sim_texto
+          ) x
+         group by array_to_string(palabras_producto_agente(nombre), ' ')
+         order by min(pri), max(s) desc
+         limit 5
+      ) y;
+
+    return jsonb_strip_nulls(jsonb_build_object(
+      'buscado',      p_texto,
+      'coincidencia', case when v_sem then 'semantica' else 'ninguna' end,
+      'sin_datos',    true,
+      'sugerencias',  v_sug,
+      'nota',         case when v_sug is not null then
+                        'Ningun producto se llama asi; sugerencias = nombres parecidos, NO sumados: pregunta si es alguno.'
+                      else 'No hay compras de ese producto ni nada parecido: dilo asi, sin sugerir otros productos.' end
+    ))::json;
+  end if;
+
+  -- ── Agregación ──
+  with base0 as (
+    select pf.id, pf.nombre::text as nombre,
+           coalesce(pf.nombre_normalizado::text, lower(pf.nombre)) as nom_n,
+           pf.cantidad::numeric as cant,
+           unidad_agente(coalesce(nullif(btrim(pf.unidad::text), ''), 'ud')) as unidad,
+           pf.total::numeric as imp,   -- solo el importe leído: sin importe = sin_importe, sin precio
+           f.id as doc, f.tipo, f.fecha, f.numero_documento::text as numero,
+           coalesce(pv.nombre, f.proveedor)::text as proveedor,   -- nombre canónico
+           coalesce(nullif(f.proveedor_normalizado, ''), nullif(normalizar_proveedor(f.proveedor), ''), '?') as prov_n,
+           fecha_dudosa_agente(f.alertas_validacion) as fd,
+           palabras_producto_agente(pf.nombre) @> v_pal or palabras_producto_agente(pc.nombre) @> v_pal as exacta,
+           bl.unidad_base, bl.factor, bl.convertida as conv,
+           contenido_texto_agente(pf.unidad, k.cc, k.cu) as ctxt,
+           (f.tipo = 'albaran' and f.id in (select albaran_id from albaranes_facturados_agente())) as fact
+      from productos_factura pf
+      join facturas f on f.id = pf.factura_id
+      left join proveedores pv on pv.id = f.proveedor_id
+      left join productos_catalogo pc on pc.id = pf.producto_id
+      cross join lateral (select coalesce(pf.contenido_cantidad, pc.contenido_cantidad) as cc,
+                                 case when pf.contenido_cantidad is not null then pf.contenido_unidad else pc.contenido_unidad end as cu) k
+      cross join lateral base_linea_agente(pf.unidad, k.cc, k.cu) bl
+     where pf.id = any(v_ids)
+       and pf.total is distinct from 0   -- líneas a 0 €: fuera
+  ),
+  -- Albarán ya facturado (vínculo guardado o factura del proveedor que cita su número): fuera,
+  -- salvo que se pidan solo albaranes.
+  base as (
+    select * from base0 where not fact or v_tipo = 'albaran'
+  ),
+  filtrada as (
+    select * from base
+     where (p_desde is null or fecha >= p_desde)
+       and (p_hasta is null or fecha <= p_hasta)
+       and (v_tipo is null or tipo = v_tipo)
+       and (v_uni is null or unidad = v_uni)
+       and not exists (select 1 from unnest(v_provw) w where position(w in lower(proveedor)) = 0)
+  ),
+  -- Albaranes ya facturados que se han dejado fuera (solo para el aviso).
+  ya_facturados as (
+    select b.id from base0 b
+     where b.fact and v_tipo is null
+       and (p_desde is null or b.fecha >= p_desde)
+       and (p_hasta is null or b.fecha <= p_hasta)
+       and (v_uni is null or b.unidad = v_uni)
+  ),
+  c as (
+    select *, case when imp > 0 and cant > 0 then imp / cant end as pu
+      from filtrada
+  ),
+  -- Variantes con su propio precio (por unidad). «Distintas» = dos variantes de la misma
+  -- unidad con más de un 15 % de diferencia: entonces no se da una media global.
+  var_u as (
+    select mode() within group (order by nombre) as nombre, unidad,
+           sum(cant) as cant, sum(imp) as imp,
+           sum(imp) filter (where pu is not null) / nullif(sum(cant) filter (where pu is not null), 0) as precio,
+           (array_agg(pu order by fecha desc nulls last, doc desc) filter (where pu is not null))[1] as ult_precio,
+           count(distinct doc) as compras, max(fecha) as ultima,
+           (array_agg(proveedor order by fecha desc nulls last))[1] as proveedor
+      from c
+     group by array_to_string(palabras_producto_agente(nombre), ' '), unidad
+  ),
+  var_dist as (
+    select exists (select 1 from var_u a join var_u b on a.unidad = b.unidad
+                    and b.precio > 0 and a.precio > b.precio * c_dif_variantes) as ok
+  ),
+  var_pu as (
+    select prov_n, unidad, array_to_string(palabras_producto_agente(nombre), ' ') as k,
+           sum(imp) filter (where pu is not null) / nullif(sum(cant) filter (where pu is not null), 0) as precio
+      from c group by 1, 2, 3
+  ),
+  prov_multi as (
+    select a.prov_n, a.unidad from var_pu a join var_pu b
+      on a.prov_n = b.prov_n and a.unidad = b.unidad and b.precio > 0 and a.precio > b.precio * c_dif_variantes
+     group by 1, 2
+  ),
+  por_unidad as (
+    select unidad,
+           sum(cant) as cant,
+           sum(imp) as imp,
+           sum(imp) filter (where pu is not null) / nullif(sum(cant) filter (where pu is not null), 0) as precio,
+           (array_agg(pu order by fecha desc nulls last, doc desc, id desc) filter (where pu is not null))[1] as ult_precio,
+           (array_agg(proveedor order by fecha desc nulls last, doc desc, id desc) filter (where pu is not null))[1] as ult_prov,
+           max(fecha) filter (where pu is not null) as ultima,
+           count(*) as lineas,
+           count(distinct doc) as compras
+      from c
+     group by unidad
+  ),
+  por_prov as (
+    select prov_n, unidad,
+           (array_agg(proveedor order by fecha desc nulls last))[1] as proveedor,
+           sum(cant) as cant,
+           sum(imp) as imp,
+           sum(imp) filter (where pu is not null) / nullif(sum(cant) filter (where pu is not null), 0) as precio,
+           (array_agg(pu order by fecha desc nulls last, doc desc) filter (where pu is not null))[1] as ult_precio,
+           (array_agg(numero order by fecha desc nulls last, doc desc, id desc) filter (where pu is not null))[1] as ult_numero,
+           min(pu) as p_min,
+           max(pu) as p_max,
+           count(distinct doc) as compras,
+           min(fecha) as primera,
+           max(fecha) as ultima,
+           case when bool_and(tipo = 'albaran') then 'albaran'
+                when bool_or(tipo = 'albaran') then 'factura+albaran' end as tipo
+      from c
+     group by prov_n, unidad
+  ),
+  ordenada as (
+    select p.*,
+           exists (select 1 from prov_multi pm where pm.prov_n = p.prov_n and pm.unidad = p.unidad) as multi,
+           row_number() over (
+             order by u.imp desc nulls last, u.cant desc nulls last, p.unidad,
+                      case when v_orden = 'cantidad' then p.cant end desc nulls last,
+                      case when v_orden = 'precio' then coalesce(p.ult_precio, p.precio) end asc nulls last,
+                      p.imp desc nulls last, p.cant desc nulls last, p.proveedor) as rn,
+           count(*) over () as n
+      from por_prov p
+      join por_unidad u using (unidad)
+  ),
+  -- Variantes agrupadas por sus palabras («20% nata» = «20%nata»).
+  variantes as (
+    select mode() within group (order by nombre) as nombre,
+           count(*) as lineas, bool_and(exacta) as exacta, max(fecha) as ultima
+      from c
+     group by array_to_string(palabras_producto_agente(nombre), ' ')
+  ),
+  marco as (
+    select count(*) as lineas,
+           count(distinct doc) as compras,
+           count(distinct prov_n) as proveedores,
+           count(distinct unidad) as unidades,
+           sum(imp) as imp,
+           sum(imp) filter (where tipo = 'factura') as imp_fac,
+           sum(imp) filter (where tipo = 'albaran') as imp_alb,
+           count(*) filter (where imp is null) as sin_importe,
+           count(*) filter (where cant is null or cant = 0) as sin_cantidad,
+           count(distinct doc) filter (where fd) as fecha_dudosa,
+           count(*) filter (where tipo = 'albaran') as lin_alb,
+           coalesce(bool_and(exacta), false) as todas_exactas,
+           coalesce(bool_or(exacta), false) as alguna_exacta
+      from c
+  ),
+  -- Precio comparable: solo si TODAS las líneas con precio se pueden pasar a la
+  -- misma unidad base (kg, l, ud) y alguna es un envase (caja, cubo, bote...).
+  -- Con p_base = false, además, solo si hay formatos distintos que comparar.
+  cmp_marco as (
+    select min(unidad_base) as ub,
+           coalesce(bool_and(unidad_base is not null) and min(unidad_base) = max(unidad_base) and bool_or(conv)
+                    and (p_base or count(distinct unidad) > 1 or min(factor) <> max(factor)), false) as ok
+      from c
+     where pu is not null
+  ),
+  cmp_prov as (
+    select prov_n,
+           (array_agg(proveedor order by fecha desc nulls last))[1] as proveedor,
+           sum(imp) / nullif(sum(cant * factor), 0) as precio,
+           (array_agg(pu / factor order by fecha desc nulls last, doc desc))[1] as ult_precio,
+           min(pu / factor) as p_min,
+           max(pu / factor) as p_max,
+           count(distinct doc) as compras,
+           max(fecha) as ultima,
+           string_agg(distinct ctxt, ' / ') filter (where conv) as desde,
+           row_number() over (order by (array_agg(pu / factor order by fecha desc nulls last, doc desc))[1],
+                                       sum(imp) / nullif(sum(cant * factor), 0), (array_agg(proveedor))[1]) as rn
+      from c
+     where pu is not null
+     group by prov_n
+  )
+  select jsonb_strip_nulls(jsonb_build_object(
+    -- 20261128150000: la última factura (la más nueva con precio) y cómo leer el resultado.
+    'ultima_factura', (
+      select jsonb_strip_nulls(jsonb_build_object(
+               'fecha', x.fecha, 'proveedor', x.proveedor, 'numero', x.numero, 'documento_id', x.doc,
+               'tipo', x.tipo, 'producto', x.nombre, 'cantidad', trim_scale(round(x.cant, 3)), 'unidad', x.unidad,
+               'precio_unitario', trim_scale(round(x.pu, case when x.pu < 1 then 4 else 2 end)),
+               'fecha_dudosa', case when x.fd then true end))
+        from c x
+       where x.pu is not null
+       order by x.fecha desc nulls last, x.doc desc, x.id desc
+       limit 1),
+    'como_leer', (
+      select case when m.lineas > 0 then
+        'PRECIO DE REFERENCIA = ultima_factura (fecha, proveedor, numero: citalo para el enlace; precio_unitario por su unidad). '
+        || 'por_proveedor.ultimo_precio y numero = la ultima factura de cada proveedor; precio_medio, min y max solo despues, '
+        || 'como contexto. Mas barato = por ultimo_precio.' end
+        from marco m),
+    'buscado',  p_texto,
+    'excluido', nullif(trim(coalesce(p_excluir, '')), ''),
+    'proveedor_pedido', nullif(trim(coalesce(p_proveedor, '')), ''),
+    'unidad',   v_uni,
+    'periodo',  case when p_desde is not null or p_hasta is not null
+                     then jsonb_build_object('desde', p_desde, 'hasta', p_hasta)
+                     else to_jsonb('todo el historico'::text) end,
+    'tipo',     v_tipo,
+    'coincidencia', (
+      select case when v_aprox then 'aproximada'
+                  when m.lineas = 0 then null
+                  when m.todas_exactas then 'exacta'
+                  when m.alguna_exacta then 'exacta+raiz'
+                  else 'raiz' end
+        from marco m),
+    'productos_coincidentes', (
+      select jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+               'nombre', v.nombre,
+               'lineas', v.lineas,
+               'coincidencia', case when not v_aprox and m.alguna_exacta and not m.todas_exactas and not v.exacta
+                                    then 'raiz' end))
+             order by v.lineas desc, v.ultima desc nulls last, v.nombre)
+        from (select * from variantes order by lineas desc, ultima desc nulls last, nombre limit c_max_variantes) v
+       cross join marco m),
+    'variantes_total', (select case when count(*) > c_max_variantes then count(*) end from variantes),
+    'por_variante', (
+      select case when (select ok from var_dist) then (
+               select jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+                        'nombre',        v.nombre,
+                        'unidad',        v.unidad,
+                        'cantidad',      trim_scale(round(v.cant, 3)),
+                        'importe',       trim_scale(round(v.imp, 2)),
+                        'precio_medio',  trim_scale(round(v.precio, case when v.precio < 1 then 4 else 2 end)),
+                        'ultimo_precio', trim_scale(round(v.ult_precio, case when v.ult_precio < 1 then 4 else 2 end)),
+                        'compras',       v.compras,
+                        'ultima',        v.ultima,
+                        'proveedor',     v.proveedor))
+                      order by v.imp desc nulls last, v.nombre)
+                 from (select * from var_u order by imp desc nulls last, nombre limit 8) v) end),
+    'nota_variantes', (
+      select case when ok then 'Variantes con precios distintos: da CADA variante con su precio (por_variante), no una media.' end from var_dist),
+    'subproductos_excluidos', to_jsonb(v_subs),
+    'total', (
+      select case when m.lineas > 0 then jsonb_strip_nulls(jsonb_build_object(
+               'importe',     trim_scale(round(m.imp, 2)),
+               'en_facturas', case when m.lin_alb > 0 then trim_scale(round(coalesce(m.imp_fac, 0), 2)) end,
+               'en_albaranes_sin_factura', case when m.lin_alb > 0 then trim_scale(round(coalesce(m.imp_alb, 0), 2)) end,
+               'lineas',      m.lineas,
+               'compras',     m.compras,
+               'proveedores', m.proveedores)) end
+        from marco m),
+    'por_unidad', (
+      select jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+               'unidad',       u.unidad,
+               'cantidad',     trim_scale(round(u.cant, 3)),
+               'importe',      trim_scale(round(u.imp, 2)),
+               'precio_medio', case when (select ok from var_dist) then null
+                                    else trim_scale(round(u.precio, case when u.precio < 1 then 4 else 2 end)) end,
+               'ultimo_precio', case when (select ok from var_dist) then null
+                                     else trim_scale(round(u.ult_precio, case when u.ult_precio < 1 then 4 else 2 end)) end,
+               'ultima',       u.ultima,
+               'ultimo_proveedor', u.ult_prov,
+               'lineas',       u.lineas,
+               'compras',      u.compras))
+             order by u.imp desc nulls last, u.cant desc nulls last, u.unidad)
+        from por_unidad u),
+    'por_proveedor', (
+      select jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+               'proveedor',     o.proveedor,
+               'unidad',        o.unidad,
+               'cantidad',      trim_scale(round(o.cant, 3)),
+               'importe',       trim_scale(round(o.imp, 2)),
+               'precio_medio',  case when o.multi then null else trim_scale(round(o.precio, case when o.precio < 1 then 4 else 2 end)) end,
+               'ultimo_precio', case when o.multi then null else trim_scale(round(o.ult_precio, case when o.ult_precio < 1 then 4 else 2 end)) end,
+               'precio_min',    case when o.multi then null else trim_scale(round(o.p_min, case when o.p_min < 1 then 4 else 2 end)) end,
+               'precio_max',    case when o.multi then null else trim_scale(round(o.p_max, case when o.p_max < 1 then 4 else 2 end)) end,
+               'varias_variantes', case when o.multi then true end,
+               'compras',       o.compras,
+               'primera',       o.primera,
+               'ultima',        o.ultima,
+               'numero',        o.ult_numero,
+               'tipo',          o.tipo))
+             order by o.rn)
+        from ordenada o
+       where o.rn <= v_lim),
+    'precio_comparable', (
+      select case when cm.ok and not (select ok from var_dist) then jsonb_build_object(
+               'unidad_base', cm.ub,
+               'criterio', case when p_base then
+                             'Todo convertido a €/' || cm.ub || ' dividiendo el precio del envase por su contenido (convertido_desde). '
+                             || 'Compara con ESTOS precios y di de donde viene la conversion.'
+                           else 'Formatos distintos pasados a €/' || cm.ub || ' (convertido_desde) SOLO para decir cual sale mas barato; '
+                             || 'el precio de cada proveedor dalo en su formato (por_proveedor).' end,
+               'por_proveedor', (
+                 select jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+                          'proveedor',      p.proveedor,
+                          'precio_medio',   trim_scale(round(p.precio, case when p.precio < 1 then 4 else 2 end)),
+                          'ultimo_precio',  trim_scale(round(p.ult_precio, case when p.ult_precio < 1 then 4 else 2 end)),
+                          'precio_min',     trim_scale(round(p.p_min, case when p.p_min < 1 then 4 else 2 end)),
+                          'precio_max',     trim_scale(round(p.p_max, case when p.p_max < 1 then 4 else 2 end)),
+                          'compras',        p.compras,
+                          'ultima',         p.ultima,
+                          'convertido_desde', p.desde))
+                        order by p.rn)
+                   from cmp_prov p
+                  where p.rn <= v_lim)) end
+        from cmp_marco cm),
+    'una_compra',  (select case when m.compras = 1 then true end from marco m),
+    'truncado',    (select case when max(n) > v_lim then true end from ordenada),
+    'filas_total', (select case when max(n) > v_lim then max(n) end from ordenada),
+    'criterio', (
+      select case when m.lin_alb > 0 or exists (select 1 from ya_facturados) then
+        'Facturas + albaranes sin factura (lo recibido); el albaran ya facturado no cuenta. Precios SIN IVA.' end
+        from marco m),
+    'avisos', (
+      select nullif(jsonb_strip_nulls(jsonb_build_object(
+               'sin_importe',             nullif(m.sin_importe, 0),
+               'sin_cantidad',            nullif(m.sin_cantidad, 0),
+               'fecha_dudosa',            nullif(m.fecha_dudosa, 0),
+               'unidades_mezcladas',      case when m.unidades > 1 then true end,
+               'albaranes_ya_facturados', nullif((select count(*) from ya_facturados), 0))), '{}'::jsonb)
+        from marco m),
+    'sin_datos', (select case when m.lineas = 0 then true end from marco m),
+    'fuera_del_filtro', (
+      select case when m.lineas = 0 then (
+               select jsonb_strip_nulls(jsonb_build_object(
+                        'lineas',    count(*),
+                        'primera',   min(b.fecha),
+                        'ultima',    max(b.fecha),
+                        'tipos',     string_agg(distinct b.tipo, ','),
+                        'unidades',  string_agg(distinct b.unidad, ','),
+                        'productos', (select jsonb_agg(distinct b2.nombre) from (select nombre from base limit 5) b2)))
+                 from base b) end
+        from marco m),
+    -- Periodo/tipo/unidad sin nada pero sí hay histórico: la última compra.
+    'ultimo_dato', (
+      select case when m.lineas = 0 then (
+               select jsonb_strip_nulls(jsonb_build_object(
+                        'fecha',     u.fecha,
+                        'producto',  u.nombre,
+                        'cantidad',  trim_scale(round(u.cant, 3)),
+                        'unidad',    u.unidad,
+                        'proveedor', u.proveedor,
+                        'importe',   trim_scale(round(u.imp, 2)),
+                        'tipo',      u.tipo))
+                 from (select b.fecha, b.unidad, b.tipo, max(b.proveedor) as proveedor, min(b.nombre) as nombre,
+                              sum(b.cant) as cant, sum(b.imp) as imp
+                         from base b
+                        where b.doc = (select b2.doc from base b2 order by b2.fecha desc nulls last, b2.doc desc limit 1)
+                        group by b.fecha, b.unidad, b.tipo
+                        order by sum(b.imp) desc nulls last, sum(b.cant) desc nulls last
+                        limit 1) u) end
+        from marco m)
+  )) into resultado;
+
+  -- 20261128150000: la última factura y como_leer, lo primero del resultado (lo lee antes el modelo
+  -- y no se pierde si el resultado se recorta).
+  return json_delante_agente(
+    jsonb_strip_nulls(jsonb_build_object('como_leer', resultado -> 'como_leer', 'ultima_factura', resultado -> 'ultima_factura')),
+    resultado);
+end;
+$function$;
+revoke all on function public.compras_producto_agente(text, date, date, text, integer, text, text, vector, text, text, boolean) from public, anon;
+grant execute on function public.compras_producto_agente(text, date, date, text, integer, text, text, vector, text, text, boolean) to authenticated, service_role;
+
+-- ─── 3. historial_precios_agente ────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.historial_precios_agente(p_producto text, p_limite integer DEFAULT 30, p_base boolean DEFAULT true)
+ RETURNS json
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+-- 20261010170000_chatbot_ronda9 (cuerpo vigente) + 20261124120000_chatbot_precio_unidad_compra: con p_base = false (chat-facturas)
+-- no se convierte a €/kg, €/l: precio y unidad tal como se compraron.
+-- 20261128150000_chatbot_ultima_factura: primero la ÚLTIMA factura (ultima_factura, con su número) y
+-- como_leer; por proveedor, el precio y el número de su última factura (ultimo_precio, numero), con el
+-- mínimo, el máximo y la media solo como contexto.
+declare
+  resultado json;
+  r         jsonb;
+  v_limite  integer := least(greatest(coalesce(p_limite, 30), 1), 100);
+  h record;
+begin
+  select * into h from lineas_producto_agente(p_producto);
+  if coalesce(cardinality(h.palabras), 0) = 0 then
+    return json_build_object('error', 'Falta el nombre del producto.', 'compras', '[]'::json);
+  end if;
+  if h.ids is null then
+    return jsonb_strip_nulls(jsonb_build_object(
+      'producto_consultado', p_producto,
+      'compras_encontradas', 0,
+      'compras', '[]'::jsonb,
+      'subproductos', to_jsonb(h.subproductos),
+      'nota', case when h.subproductos is not null then
+                'Solo hay subproductos con ese nombre (espinas, recortes...), no el producto: dilo y pregunta si es eso.' end))::json;
+  end if;
+
+  with l0 as (
+    select pf.id,
+           coalesce(pc.nombre, pf.nombre::text) as producto,
+           coalesce('c' || pf.producto_id, array_to_string(palabras_producto_agente(pf.nombre), ' ')) as var,
+           coalesce(pv.nombre, f.proveedor)::text as proveedor,
+           coalesce(f.proveedor_id::text, nullif(f.proveedor_normalizado::text, ''), f.proveedor::text, '?') as prov_k,
+           f.tipo::text as tipo, f.numero_documento::text as numero, f.fecha,
+           fecha_dudosa_agente(f.alertas_validacion) as fd,
+           pf.cantidad,
+           unidad_agente(coalesce(nullif(btrim(pf.unidad::text), ''), 'ud')) as unidad,
+           round(coalesce(pf.precio_unitario, pf.total / nullif(pf.cantidad, 0))::numeric, 4) as precio,
+           pf.total,
+           bl.unidad_base, bl.factor, bl.convertida as conv,
+           contenido_texto_agente(pf.unidad, k.cc, k.cu) as ctxt
+      from productos_factura pf
+      join facturas f on f.id = pf.factura_id
+      left join proveedores pv on pv.id = f.proveedor_id
+      left join productos_catalogo pc on pc.id = pf.producto_id
+      cross join lateral (select coalesce(pf.contenido_cantidad, pc.contenido_cantidad) as cc,
+                                 case when pf.contenido_cantidad is not null then pf.contenido_unidad else pc.contenido_unidad end as cu) k
+      cross join lateral base_linea_agente(pf.unidad, k.cc, k.cu) bl
+     where pf.id = any(h.ids)
+       and not (f.tipo = 'albaran' and f.id in (select albaran_id from albaranes_facturados_agente()))
+  ),
+  l1 as (
+    select l0.*,
+           coalesce(bool_and(l0.unidad_base is not null) filter (where l0.precio > 0) over ()
+                    and min(l0.unidad_base) filter (where l0.precio > 0) over () = max(l0.unidad_base) filter (where l0.precio > 0) over ()
+                    and bool_or(l0.conv) filter (where l0.precio > 0) over ()
+                    and p_base, false) as ok
+      from l0
+  ),
+  l as (
+    select l1.id, l1.producto, l1.var, l1.proveedor, l1.prov_k, l1.tipo, l1.numero, l1.fecha, l1.fd,
+           case when l1.ok then l1.cantidad * l1.factor else l1.cantidad end as cantidad,
+           case when l1.ok then l1.unidad_base else l1.unidad end as unidad,
+           case when l1.ok then round(l1.precio / l1.factor, 4) else l1.precio end as precio,
+           l1.total,
+           case when l1.ok and l1.conv then l1.ctxt end as desde
+      from l1
+  ),
+  g as (   -- filas idénticas en una sola
+    select producto, var, proveedor, prov_k, tipo, numero, fecha, bool_or(fd) as fd, unidad, precio,
+           sum(cantidad) as cantidad, round(sum(total)::numeric, 2) as importe, count(*) as veces, min(id) as id,
+           max(desde) as desde
+      from l
+     where precio > 0
+     group by producto, var, proveedor, prov_k, tipo, numero, fecha, unidad, precio
+  ),
+  compras as (
+    select g.*, count(*) over () as lineas_totales
+      from g
+     order by fecha desc nulls last, id desc
+     limit v_limite
+  ),
+  marco as (
+    select count(*)::int                     as n,
+           coalesce(max(lineas_totales), 0)::int as lineas_totales,
+           min(fecha)                        as f_min,
+           max(fecha)                        as f_max,
+           count(distinct fecha)::int        as fechas_distintas,
+           count(distinct var)::int          as variantes,
+           count(distinct prov_k)::int       as proveedores,
+           count(distinct unidad)::int       as unidades
+      from compras
+  ),
+  extremos as (
+    select m.n, m.f_min, m.f_max, m.fechas_distintas, m.proveedores, m.unidades,
+           round(avg(c.precio) filter (where c.fecha = m.f_min), 4) as precio_inicial,
+           round(avg(c.precio) filter (where c.fecha = m.f_max), 4) as precio_actual
+      from compras c cross join marco m
+     group by m.n, m.f_min, m.f_max, m.fechas_distintas, m.proveedores, m.unidades
+  ),
+  -- Por proveedor y unidad: su propia evolución (primera frente a última fecha).
+  prov as (
+    select prov_k, unidad,
+           max(proveedor)              as proveedor,
+           count(*)                    as veces,
+           round(min(precio), 2)       as precio_min,
+           round(max(precio), 2)       as precio_max,
+           round(avg(precio), 2)       as precio_medio,
+           (array_agg(precio order by fecha desc nulls last, id desc))[1] as ultimo_precio,
+           (array_agg(numero order by fecha desc nulls last, id desc))[1] as ultimo_numero,
+           min(fecha)                  as primera_compra,
+           max(fecha)                  as ultima_compra,
+           count(distinct fecha)       as fechas
+      from compras
+     group by prov_k, unidad
+  ),
+  prov_var as (
+    select p.*,
+           case when p.fechas >= 2 then
+             (select round(avg(c.precio), 4) from compras c
+               where c.prov_k = p.prov_k and c.unidad = p.unidad and c.fecha = p.primera_compra) end as precio_primera,
+           case when p.fechas >= 2 then
+             (select round(avg(c.precio), 4) from compras c
+               where c.prov_k = p.prov_k and c.unidad = p.unidad and c.fecha = p.ultima_compra) end as precio_ultima
+      from prov p
+  ),
+  var_g as (   -- cada artículo con su precio (si mezcla varios)
+    select var, min(producto) as producto, unidad, count(*) as veces,
+           round(min(precio), 2) as precio_min, round(max(precio), 2) as precio_max,
+           (array_agg(precio order by fecha desc nulls last, id desc))[1] as ultimo_precio,
+           max(fecha) as ultima_compra
+      from compras
+     group by var, unidad
+  )
+  select (jsonb_strip_nulls(jsonb_build_object(
+    -- 20261128150000: la última factura (la compra más nueva) y cómo leer el resultado.
+    'ultima_factura', (
+      select jsonb_strip_nulls(jsonb_build_object(
+               'fecha', x.fecha, 'proveedor', x.proveedor, 'numero', x.numero, 'tipo', x.tipo,
+               'producto', x.producto, 'cantidad', trim_scale(x.cantidad), 'unidad', x.unidad,
+               'precio_unitario', trim_scale(x.precio), 'convertido_desde', x.desde,
+               'fecha_dudosa', case when x.fd then true end))
+        from compras x
+       order by x.fecha desc nulls last, x.id desc
+       limit 1),
+    'como_leer',
+      'PRECIO DE REFERENCIA = ultima_factura (fecha, proveedor, numero: citalo para el enlace). por_proveedor.ultimo_precio '
+      || 'y numero = la ultima factura de cada proveedor; precio_min, precio_max y precio_medio solo despues, como contexto.',
+    'producto_consultado', p_producto,
+    'coincidencia',        case when h.metodo in ('derivada', 'aproximada') then 'aproximada' end,
+    'compras_devueltas',   (select n from marco),
+    'compras_encontradas', (select lineas_totales from marco),
+    'truncado',            (select lineas_totales > n from marco),
+    'aviso', (
+      select case when m.lineas_totales > m.n then
+        'RESULTADO PARCIAL: hay ' || m.lineas_totales || ' compras de este producto y solo se devuelven las '
+        || m.n || ' MAS RECIENTES (desde ' || m.f_min || '). No es el historico completo.'
+      end from marco m),
+    'precios', 'precio unitario de linea, SIN IVA',
+    'convertido_a', (select max(unidad) from compras where desde is not null),
+    'variantes_distintas', (select case when variantes > 1 then variantes end from marco),
+    'por_variante', (
+      select case when m.variantes > 1 then (
+               select jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+                        'producto', x.producto, 'unidad', x.unidad, 'veces', x.veces,
+                        'precio_min', x.precio_min,
+                        'precio_max', case when x.precio_max <> x.precio_min then x.precio_max end,
+                        'ultimo_precio', trim_scale(x.ultimo_precio), 'ultima_compra', x.ultima_compra))
+                      order by x.veces desc, x.producto)
+               from (select * from var_g order by veces desc, producto limit 8) x) end
+        from marco m),
+    'nota_coincidencia', (
+      select case when m.variantes > 1 then
+        'Mezcla ' || m.variantes || ' articulos distintos: da cada uno con su precio (por_variante), no un unico precio medio.'
+      end from marco m),
+    'comparativa_entre_proveedores', (select case when proveedores > 1 then true end from marco),
+    'unidades_mezcladas', (select case when unidades > 1 then true end from marco),
+    'subproductos_excluidos', to_jsonb(h.subproductos),
+    'por_proveedor', (
+      select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+               'proveedor',      x.proveedor,
+               'unidad',         x.unidad,
+               'veces',          x.veces,
+               'precio_min',     x.precio_min,
+               'precio_max',     case when x.precio_max <> x.precio_min then x.precio_max end,
+               'precio_medio',   case when x.veces > 1 then x.precio_medio end,
+               'ultimo_precio',  trim_scale(round(x.ultimo_precio, case when x.ultimo_precio < 1 then 4 else 2 end)),
+               'numero',         x.ultimo_numero,
+               'primera_compra', x.primera_compra,
+               'ultima_compra',  x.ultima_compra,
+               'variacion_pct',  case when x.precio_primera is not null and x.precio_primera <> 0
+                                      then round((x.precio_ultima - x.precio_primera) / x.precio_primera * 100, 2) end))
+             order by x.unidad, x.ultima_compra desc nulls last, x.precio_medio), '[]'::jsonb)
+      from prov_var x),
+    'nota_variacion', (
+      select case
+        when e.n < 2 then
+          'Solo hay una compra: no hay evolucion de precio que medir.'
+        when e.unidades > 1 then
+          'Unidades distintas (caja, kg, ud...): no compares precios entre ellas; da el de cada proveedor en su unidad.'
+        when e.proveedores > 1 then
+          'Compras de ' || e.proveedores || ' proveedores: es una COMPARATIVA entre proveedores, NO una subida ni '
+          || 'una bajada. La evolucion de cada uno esta en por_proveedor.variacion_pct.'
+        when e.fechas_distintas < 2 then
+          'Todas las compras son de la misma fecha (' || e.f_min || '): no hay evolucion de precio.'
+      end from extremos e),
+    'compras', (
+      select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+               'producto',  producto,
+               'proveedor', proveedor,
+               'tipo',      tipo,
+               'numero',    numero,
+               'fecha',     fecha,
+               'fecha_dudosa', case when fd then true end,
+               'cantidad',  trim_scale(cantidad),
+               'unidad',    unidad,
+               'precio_unitario', trim_scale(precio),
+               'convertido_desde', desde,
+               'importe',   importe,
+               'veces',     case when veces > 1 then veces end))
+             order by fecha asc, id asc), '[]'::jsonb)
+      from compras)
+  ))
+  -- Variación global solo con UN proveedor y UNA unidad. Fuera del
+  -- strip_nulls: "variacion": null tiene que verse.
+  || jsonb_build_object(
+    'variacion', (
+      select case
+        when e.n < 2 or e.fechas_distintas < 2 or e.proveedores > 1 or e.unidades > 1 then null
+        else jsonb_build_object(
+          'precio_inicial', e.precio_inicial,
+          'fecha_inicial',  e.f_min,
+          'precio_actual',  e.precio_actual,
+          'fecha_actual',   e.f_max,
+          'diferencia',     round(e.precio_actual - e.precio_inicial, 4),
+          'variacion_pct',  case when e.precio_inicial is null or e.precio_inicial = 0 then null
+                                 else round((e.precio_actual - e.precio_inicial) / e.precio_inicial * 100, 2) end)
+        end
+      from extremos e)
+  )) into r;
+
+  resultado := json_delante_agente(
+    jsonb_strip_nulls(jsonb_build_object('como_leer', r -> 'como_leer', 'ultima_factura', r -> 'ultima_factura')), r);
+  return coalesce(resultado, json_build_object('compras_encontradas', 0, 'compras', '[]'::json));
+end;
+$function$;
+revoke all on function public.historial_precios_agente(text, integer, boolean) from public, anon;
+grant execute on function public.historial_precios_agente(text, integer, boolean) to authenticated, service_role;
+
+-- ─── 4. variacion_precios_agente (+ p_comparar) ─────────────────────────────
+drop function if exists public.variacion_precios_agente(date, date, numeric, text, text, integer, text, boolean);
+CREATE OR REPLACE FUNCTION public.variacion_precios_agente(p_desde date DEFAULT NULL::date, p_hasta date DEFAULT NULL::date, p_umbral_pct numeric DEFAULT 10, p_categoria text DEFAULT NULL::text, p_producto text DEFAULT NULL::text, p_limite integer DEFAULT 10, p_sentido text DEFAULT NULL::text, p_base boolean DEFAULT true, p_comparar text DEFAULT 'media'::text)
+ RETURNS json
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+-- 20261107200000_variacion_precios_rapida: por conjuntos (una pasada), mismos resultados.
+-- 20261124120000_chatbot_precio_unidad_compra: con p_base = false (chat-facturas) solo se convierte el producto que
+-- mezcla formatos (si no, no habría con qué comparar); el resto, en la unidad en que se compra.
+-- 20261128150000_chatbot_ultima_factura: p_comparar = 'anterior' (chat-facturas): la ÚLTIMA factura frente a la
+-- factura ANTERIOR del MISMO proveedor (si no hay, la anterior de otro: cambio_proveedor), con su número
+-- para el enlace; la media de 90 días va aparte (media), como contexto. 'media' (por defecto, el panel):
+-- como hasta ahora, la última compra frente a la media ponderada de 90 días.
+declare
+  v_lim     int := least(greatest(coalesce(p_limite, 10), 1), 50);
+  v_umbral  numeric := coalesce(p_umbral_pct, 10);
+  v_sentido text := lower(coalesce(nullif(trim(p_sentido), ''), 'subidas'));
+  v_cat     categorias_producto%rowtype;
+  v_prods   bigint[];
+  v_ids     bigint[];
+  v_subs    text[];
+  resultado jsonb;
+  v_ant     boolean;
+begin
+  v_ant := case lower(coalesce(nullif(trim(p_comparar), ''), 'media')) when 'anterior' then true when 'media' then false end;
+  if v_ant is null then
+    return json_build_object('error', 'comparar debe ser anterior o media.');
+  end if;
+  v_sentido := case when v_sentido like 'sub%' then 'subidas' when v_sentido like 'baj%' then 'bajadas'
+                    when v_sentido in ('ambas', 'ambos', 'todas', 'todo') then 'ambas' else '?' end;
+  if v_sentido = '?' then
+    return json_build_object('error', 'sentido debe ser subidas, bajadas o ambas.');
+  end if;
+  if v_umbral < 0 or v_umbral > 1000 then
+    return json_build_object('error', 'umbral_pct debe estar entre 0 y 1000.');
+  end if;
+  if p_desde is not null and p_hasta is not null and p_desde > p_hasta then
+    return json_build_object('error', format('Rango invalido: desde (%s) es posterior a hasta (%s).', p_desde, p_hasta));
+  end if;
+  if nullif(trim(coalesce(p_categoria, '')), '') is not null then
+    select * into v_cat from categorias_producto where id = categoria_agente(p_categoria);
+    if v_cat.id is null then
+      return json_build_object('error', format('No hay ninguna categoria "%s".', p_categoria));
+    end if;
+  end if;
+  if nullif(trim(coalesce(p_producto, '')), '') is not null then
+    select h.ids, h.subproductos into v_ids, v_subs from lineas_producto_agente(p_producto) h;
+    v_prods := array(select distinct pf.producto_id from productos_factura pf
+                      where pf.id = any(v_ids) and pf.producto_id is not null);
+    if cardinality(v_prods) = 0 then
+      return jsonb_strip_nulls(jsonb_build_object('buscado', p_producto, 'sin_datos', true,
+        'subproductos', to_jsonb(v_subs),
+        'nota', case when v_subs is not null
+                     then 'Solo hay subproductos con ese nombre (espinas, recortes...), no el producto.'
+                     else 'Ningun producto del catalogo se llama asi: prueba compras_producto o historial_precios.' end))::json;
+    end if;
+  end if;
+
+  with
+  -- Albaranes ya facturados (vínculo facturado_en_id, misma regla de fechas que
+  -- albaranes_facturados_agente).
+  fact as materialized (
+    select a.id
+      from facturas a
+      join facturas fx on fx.id = a.facturado_en_id and fx.tipo = 'factura'
+     where a.tipo = 'albaran'
+       and (a.facturado_origen = 'manual' or a.fecha is null or fx.fecha is null or a.fecha <= fx.fecha)
+  ),
+  -- Productos que entran (categoría / producto pedido / sin servicios).
+  prod as materialized (
+    select p.id, p.nombre, p.contenido_cantidad, p.contenido_unidad
+      from productos_catalogo p
+      left join categorias_producto c on c.id = p.categoria_id
+      left join categorias_producto m on m.id = c.padre_id
+     where (v_prods is null or p.id = any(v_prods))
+       and (v_cat.id is null or c.id = v_cat.id or c.padre_id = v_cat.id)
+       and (v_cat.id is not null or v_prods is not null or coalesce(m.clave, c.clave, '') <> 'servicios')
+  ),
+  -- unidad_agente una vez por unidad escrita distinta (no por línea).
+  um as materialized (
+    select d.u, unidad_agente(d.u) as ua
+      from (select distinct coalesce(nullif(btrim(pf.unidad::text), ''), 'ud') as u from productos_factura pf) d
+  ),
+  -- Líneas como lineas_precio_agente(null, null, true), solo de esos productos.
+  l0 as materialized (
+    select pf.id, pf.factura_id, pf.producto_id, pr.nombre as producto,
+           um.u as unidad, um.ua,
+           pf.cantidad,
+           coalesce(pf.precio_unitario, round(pf.total / nullif(pf.cantidad, 0), 4)) as precio,
+           f.fecha, f.tipo::text as tipo, f.proveedor::text as proveedor,
+           coalesce(nullif(f.proveedor_normalizado::text, ''), nullif(normalizar_proveedor(f.proveedor), ''), '?') as prov_n,
+           coalesce(pf.contenido_cantidad, pr.contenido_cantidad) as cc,
+           case when pf.contenido_cantidad is not null then pf.contenido_unidad else pr.contenido_unidad end as cu
+      from productos_factura pf
+      join prod pr on pr.id = pf.producto_id
+      join facturas f on f.id = pf.factura_id
+      join um on um.u = coalesce(nullif(btrim(pf.unidad::text), ''), 'ud')
+     where not (f.tipo = 'albaran' and f.id in (select id from fact))
+  ),
+  -- base_linea_agente / contenido_texto_agente escritas en línea.
+  lb as (
+    select l0.*,
+           case when l0.ua in ('kg', 'l') then l0.ua
+                when l0.ua <> 'm' and l0.cc > 0 and l0.cu in ('kg', 'l', 'ud') then l0.cu end as unidad_base,
+           case when l0.ua in ('kg', 'l') then 1::numeric
+                when l0.ua <> 'm' and l0.cc > 0 and l0.cu in ('kg', 'l', 'ud') then l0.cc end as factor,
+           l0.ua not in ('kg', 'l', 'm') and l0.cc > 0 and l0.cu in ('kg', 'l', 'ud') as conv,
+           case when l0.cc > 0 and l0.cu is not null then
+                  case when l0.ua = 'caja' then 'caja' else 'envase' end
+                  || ' de ' || trim_scale(l0.cc)::text || ' ' || l0.cu end as ctxt
+      from l0
+     where l0.precio > 0
+       -- Albarán repetido en una factura (mismo producto, unidad y cantidad, del
+       -- mismo proveedor, de 7 días antes a 75 después): cuenta la factura.
+       and not (l0.tipo = 'albaran' and exists (
+             select 1
+               from productos_factura x
+               join facturas fx on fx.id = x.factura_id
+              where fx.tipo = 'factura'
+                and x.producto_id = l0.producto_id
+                and coalesce(nullif(btrim(x.unidad::text), ''), 'ud') = l0.unidad
+                and x.cantidad = l0.cantidad
+                and fx.fecha between l0.fecha - 7 and l0.fecha + 75
+                and mismo_proveedor_agente(
+                      coalesce(nullif(fx.proveedor_normalizado::text, ''), nullif(normalizar_proveedor(fx.proveedor), ''), '?'),
+                      l0.prov_n)))
+  ),
+  -- Con base: si TODAS las líneas del producto pasan a la misma unidad base y
+  -- alguna es un envase, precio y cantidad van en esa unidad.
+  lk as (
+    select lb.*,
+           coalesce(bool_and(lb.unidad_base is not null) over w
+                    and min(lb.unidad_base) over w = max(lb.unidad_base) over w
+                    and bool_or(lb.conv) over w
+                    and (p_base or min(lb.ua) over w <> max(lb.ua) over w or min(lb.factor) over w <> max(lb.factor) over w), false) as ok
+      from lb
+    window w as (partition by lb.producto_id)
+  ),
+  l as materialized (
+    select lk.id, lk.factura_id, lk.producto_id, lk.producto,
+           case when lk.ok then lk.unidad_base else lk.unidad end as unidad,
+           case when lk.ok then lk.cantidad * lk.factor else lk.cantidad end as cantidad,
+           case when lk.ok then round(lk.precio / lk.factor, 4) else lk.precio end as precio,
+           lk.fecha, lk.tipo, lk.proveedor, lk.prov_n,
+           case when lk.ok and lk.conv then lk.ctxt end as convertido_desde
+      from lk
+  ),
+  -- Todo por ventanas sobre l, sin cruzar CTE entre sí (sobre un CTE el
+  -- planificador estima 1 fila y repite bucles anidados: 4-60 s).
+  -- a) Última compra de cada producto y unidad dentro del periodo (= DISTINCT ON
+  --    producto, unidad ORDER BY fecha DESC, factura_id DESC de antes).
+  ua as (
+    select l.*,
+           first_value(l.factura_id) over wu as u_fid,
+           first_value(l.fecha) over wu as u_fecha,
+           first_value(l.prov_n) over wu as u_prov,
+           bool_or(l.en_periodo) over (partition by l.producto_id, l.unidad) as hay
+      from (select l.*, coalesce((p_desde is null or l.fecha >= p_desde) and (p_hasta is null or l.fecha <= p_hasta), false) as en_periodo
+              from l) l
+    window wu as (partition by l.producto_id, l.unidad order by l.en_periodo desc, l.fecha desc, l.factura_id desc)
+  ),
+  -- b) Compras anteriores en otro documento (= precio_referencia_agente: misma
+  --    unidad, fecha anterior o mismo día con id menor).
+  ub as (
+    select ua.*,
+           ua.factura_id = ua.u_fid as es_ult,
+           coalesce(ua.factura_id <> ua.u_fid
+                    and (ua.fecha < ua.u_fecha or (ua.fecha = ua.u_fecha and ua.factura_id < ua.u_fid)), false) as es_ant,
+           -- 20261128150000: anterior del MISMO proveedor que la última.
+           coalesce(ua.factura_id <> ua.u_fid and ua.prov_n = ua.u_prov
+                    and (ua.fecha < ua.u_fecha or (ua.fecha = ua.u_fecha and ua.factura_id < ua.u_fid)), false) as es_ant_m
+      from ua
+     where ua.hay
+  ),
+  -- c) Documentos anteriores: orden (el más reciente = 1) y cuántos en 90 días.
+  uc as (
+    select ub.*,
+           dense_rank() over (partition by ub.producto_id, ub.unidad
+                              order by ub.es_ant desc, ub.fecha desc, ub.factura_id desc) as rn_doc,
+           dense_rank() over (partition by ub.producto_id, ub.unidad
+                              order by ub.es_ant_m desc, ub.fecha desc, ub.factura_id desc) as rn_m,
+           row_number() over (partition by ub.producto_id, ub.unidad, ub.factura_id order by ub.id) = 1 as pri_doc
+      from ub
+  ),
+  ud as (
+    select uc.*,
+           count(*) filter (where uc.es_ant and uc.pri_doc and uc.fecha >= uc.u_fecha - 90)
+             over (partition by uc.producto_id, uc.unidad) as n90
+      from uc
+  ),
+  -- d) Líneas de la referencia: media de 90 días si hay ≥ 2 documentos, si no
+  --    las 3 últimas compras.
+  ue as (
+    select ud.*,
+           ud.es_ant and case when ud.n90 >= 2 then ud.fecha >= ud.u_fecha - 90 else ud.rn_doc <= 3 end as es_ref,
+           case when ud.n90 >= 2 then 'media_90_dias' else 'ultimas_compras' end as metodo
+      from ud
+  ),
+  -- e) Proveedor de la referencia: el de más importe (empate: por nombre).
+  uf as (
+    select ue.*,
+           first_value(ue.proveedor) over (partition by ue.producto_id, ue.unidad
+                                           order by ue.es_ref desc, ue.peso desc nulls last, ue.proveedor) as ref_prov
+      from (select ue.*,
+                   sum(ue.precio * coalesce(nullif(ue.cantidad, 0), 1)) filter (where ue.es_ref)
+                     over (partition by ue.producto_id, ue.unidad, ue.proveedor) as peso
+              from ue) ue
+  ),
+  ult as (
+    select uf.producto_id, uf.unidad, uf.producto,
+           min(uf.u_fid) as factura_id,
+           min(uf.u_fecha) as fecha,
+           (array_agg(uf.tipo) filter (where uf.es_ult))[1] as tipo,
+           (array_agg(uf.proveedor) filter (where uf.es_ult))[1] as proveedor,
+           (array_agg(uf.prov_n) filter (where uf.es_ult))[1] as prov_n,
+           coalesce(sum(uf.precio * uf.cantidad) filter (where uf.es_ult and uf.cantidad > 0)
+                      / nullif(sum(uf.cantidad) filter (where uf.es_ult and uf.cantidad > 0), 0),
+                    avg(uf.precio) filter (where uf.es_ult)) as precio,
+           coalesce(sum(uf.precio * uf.cantidad) filter (where uf.es_ref and uf.cantidad > 0)
+                      / nullif(sum(uf.cantidad) filter (where uf.es_ref and uf.cantidad > 0), 0),
+                    avg(uf.precio) filter (where uf.es_ref)) as ref_precio,
+           nullif(count(distinct uf.factura_id) filter (where uf.es_ref), 0)::integer as ref_compras,
+           min(uf.fecha) filter (where uf.es_ref) as ref_desde,
+           max(uf.fecha) filter (where uf.es_ref) as ref_hasta,
+           (array_agg(uf.ref_prov) filter (where uf.es_ref))[1] as ref_proveedor,
+           array_agg(distinct uf.prov_n) filter (where uf.es_ref) as proveedores_n,
+           (array_agg(uf.metodo) filter (where uf.es_ref))[1] as metodo,
+           -- 20261128150000: la factura anterior del mismo proveedor (antm) y la anterior de cualquiera (anta).
+           coalesce(sum(uf.precio * uf.cantidad) filter (where uf.es_ant_m and uf.rn_m = 1 and uf.cantidad > 0)
+                      / nullif(sum(uf.cantidad) filter (where uf.es_ant_m and uf.rn_m = 1 and uf.cantidad > 0), 0),
+                    avg(uf.precio) filter (where uf.es_ant_m and uf.rn_m = 1)) as antm_precio,
+           max(uf.fecha) filter (where uf.es_ant_m and uf.rn_m = 1) as antm_fecha,
+           max(uf.factura_id) filter (where uf.es_ant_m and uf.rn_m = 1) as antm_fid,
+           coalesce(sum(uf.precio * uf.cantidad) filter (where uf.es_ant and uf.rn_doc = 1 and uf.cantidad > 0)
+                      / nullif(sum(uf.cantidad) filter (where uf.es_ant and uf.rn_doc = 1 and uf.cantidad > 0), 0),
+                    avg(uf.precio) filter (where uf.es_ant and uf.rn_doc = 1)) as anta_precio,
+           max(uf.fecha) filter (where uf.es_ant and uf.rn_doc = 1) as anta_fecha,
+           max(uf.factura_id) filter (where uf.es_ant and uf.rn_doc = 1) as anta_fid
+      from uf
+     group by uf.producto_id, uf.unidad, uf.producto
+  ),
+  cmp0 as (
+    select u.*,
+           case when u.antm_fid is not null then u.antm_precio else u.anta_precio end as ant_precio,
+           case when u.antm_fid is not null then u.antm_fecha else u.anta_fecha end as ant_fecha,
+           case when u.antm_fid is not null then u.antm_fid else u.anta_fid end as ant_fid,
+           case when u.ref_precio > 0 then round((u.precio / u.ref_precio - 1) * 100, 1) end as var_media
+      from ult u
+  ),
+  cmp as materialized (
+    select u.*,
+           case when v_ant then case when u.ant_precio > 0 then round((u.precio / u.ant_precio - 1) * 100, 1) end
+                else u.var_media end as var,
+           case when v_ant then u.antm_fid is null and u.anta_fid is not null
+                else u.ref_precio is not null and not (u.prov_n = any(u.proveedores_n)) end as cambio
+      from cmp0 u
+  ),
+  sel as materialized (
+    select c.*, row_number() over (
+             order by case when v_sentido = 'bajadas' then c.var end asc nulls last,
+                      case when v_sentido = 'ambas' then abs(c.var) end desc nulls last,
+                      c.var desc nulls last, c.producto) as rn,
+           count(*) over () as n
+      from cmp c
+     where c.var is not null
+       and (v_prods is not null
+            or (v_sentido = 'subidas' and c.var >= v_umbral)
+            or (v_sentido = 'bajadas' and c.var <= -v_umbral)
+            or (v_sentido = 'ambas' and abs(c.var) >= v_umbral))
+  )
+  select jsonb_strip_nulls(jsonb_build_object(
+    'criterio', case when v_ant then
+                  'Por producto y unidad: precio de la ULTIMA factura frente a la factura ANTERIOR del MISMO proveedor '
+                  || '(si no hay, la anterior de otro proveedor: cambio_proveedor). media = media ponderada de los 90 dias '
+                  || 'anteriores, solo como contexto. Precios de linea SIN IVA.'
+                else 'Por producto y unidad: precio de la ultima compra frente a la media ponderada de las compras de los '
+                  || '90 dias anteriores (o de las 3 ultimas compras anteriores si en 90 dias hay menos de 2). '
+                  || 'Precios de linea SIN IVA.' end
+                || case when v_prods is not null then ' Producto pedido: todas sus unidades, sin umbral.' else '' end,
+    'como_leer', case when v_ant then
+                   'Da primero precio, fecha, proveedor y numero (la ultima factura: cita el numero para el enlace) y su '
+                   || 'variacion_pct frente a anterior; media, despues y solo como contexto.' end,
+    'buscado',   p_producto,
+    'categoria', v_cat.nombre,
+    'periodo',   case when p_desde is not null or p_hasta is not null
+                      then jsonb_build_object('desde', p_desde, 'hasta', p_hasta)
+                      else to_jsonb('todo el historico'::text) end,
+    'sentido',   case when v_prods is null then v_sentido end,
+    'umbral_pct', case when v_prods is null then trim_scale(v_umbral) end,
+    'productos', coalesce((
+        select jsonb_agg(case when v_ant then jsonb_strip_nulls(jsonb_build_object(
+                 -- 20261128150000: la última factura, la anterior (mismo proveedor) y la media como contexto.
+                 'producto',       s.producto,
+                 'unidad',         s.unidad,
+                 'convertido_desde', (select string_agg(distinct x.convertido_desde, ' / ') from l x
+                                       where x.producto_id = s.producto_id and x.unidad = s.unidad),
+                 'precio',         trim_scale(round(s.precio, 4)),
+                 'fecha',          s.fecha,
+                 'proveedor',      coalesce((select pv.nombre from facturas f join proveedores pv on pv.id = f.proveedor_id
+                                              where f.id = s.factura_id), s.proveedor),
+                 'numero',         (select f.numero_documento::text from facturas f where f.id = s.factura_id),
+                 'documento_id',   s.factura_id,
+                 'tipo',           case when s.tipo = 'albaran' then 'albaran' end,
+                 'variacion_pct',  s.var,
+                 'anterior',       case when s.ant_fid is not null then jsonb_strip_nulls(jsonb_build_object(
+                                     'precio',    trim_scale(round(s.ant_precio, 4)),
+                                     'fecha',     s.ant_fecha,
+                                     'proveedor', (select coalesce(pv.nombre, f.proveedor::text) from facturas f
+                                                     left join proveedores pv on pv.id = f.proveedor_id where f.id = s.ant_fid),
+                                     'numero',    (select f.numero_documento::text from facturas f where f.id = s.ant_fid))) end,
+                 'cambio_proveedor', case when s.cambio then true end,
+                 'ref_antigua',    case when s.ant_fecha < s.fecha - 180 then true end,
+                 'media',          case when s.ref_precio is not null then jsonb_strip_nulls(jsonb_build_object(
+                                     'precio',        trim_scale(round(s.ref_precio, 4)),
+                                     'compras',       s.ref_compras,
+                                     'desde',         s.ref_desde,
+                                     'hasta',         case when s.ref_hasta <> s.ref_desde then s.ref_hasta end,
+                                     'variacion_pct', s.var_media)) end))
+               else jsonb_strip_nulls(jsonb_build_object(
+                 'producto',       s.producto,
+                 'unidad',         s.unidad,
+                 'convertido_desde', (select string_agg(distinct x.convertido_desde, ' / ') from l x
+                                       where x.producto_id = s.producto_id and x.unidad = s.unidad),
+                 'precio',         trim_scale(round(s.precio, 4)),
+                 'fecha',          s.fecha,
+                 'proveedor',      coalesce((select pv.nombre from facturas f join proveedores pv on pv.id = f.proveedor_id
+                                              where f.id = s.factura_id), s.proveedor),
+                 'tipo',           case when s.tipo = 'albaran' then 'albaran' end,
+                 'variacion_pct',  s.var,
+                 'ref_precio',     trim_scale(round(s.ref_precio, 4)),
+                 'ref_compras',    s.ref_compras,
+                 'ref_desde',      s.ref_desde,
+                 'ref_hasta',      case when s.ref_hasta <> s.ref_desde then s.ref_hasta end,
+                 'ref_proveedor',  case when s.cambio or s.ref_proveedor is distinct from s.proveedor then s.ref_proveedor end,
+                 'cambio_proveedor', case when s.cambio then true end,
+                 'pocas_compras',  case when s.ref_compras = 1 then true end,
+                 'ref_antigua',    case when s.metodo = 'ultimas_compras' and s.ref_hasta < s.fecha - 90 then true end)) end
+               order by s.rn)
+          from sel s where s.rn <= v_lim), '[]'::jsonb),
+    -- Producto pedido sin precio anterior con que comparar: su última compra
+    -- (una_compra = solo hay una: no hay subida ni bajada posible).
+    'sin_comparar', case when v_prods is not null then (
+        select jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+                 'producto',   c.producto,
+                 'unidad',     c.unidad,
+                 'precio',     trim_scale(round(c.precio, 4)),
+                 'fecha',      c.fecha,
+                 'proveedor',  coalesce((select pv.nombre from facturas f join proveedores pv on pv.id = f.proveedor_id
+                                          where f.id = c.factura_id), c.proveedor),
+                 'numero',     case when v_ant then (select f.numero_documento::text from facturas f where f.id = c.factura_id) end,
+                 'una_compra', case when (select count(distinct l2.factura_id) from l l2
+                                           where l2.producto_id = c.producto_id and l2.unidad = c.unidad) = 1 then true end))
+               order by c.fecha desc, c.producto)
+          from (select * from cmp where var is null order by fecha desc, producto limit v_lim) c) end,
+    'total_productos', (select coalesce(max(n), 0) from sel),
+    'truncado',  (select case when max(n) > v_lim then true end from sel),
+    'comparados', (select count(*) from cmp where var is not null),
+    'avisos', nullif(jsonb_strip_nulls(jsonb_build_object(
+        'sin_referencia', nullif((select count(*) from cmp where var is null), 0),
+        'pocas_compras',  case when not v_ant then nullif((select count(*) from sel where ref_compras = 1 and rn <= v_lim), 0) end,
+        'cambio_proveedor', nullif((select count(*) from sel where cambio and rn <= v_lim), 0),
+        'sin_clasificar', nullif((select count(*) from productos_factura pf join facturas f on f.id = pf.factura_id
+                                   where pf.producto_id is null
+                                     and not (f.tipo = 'albaran' and f.id in (select id from fact))
+                                     and (p_desde is null or f.fecha >= p_desde)
+                                     and (p_hasta is null or f.fecha <= p_hasta)), 0))), '{}'::jsonb),
+    'sin_datos', (select case when count(*) = 0 then true end from cmp)
+  )) into resultado;
+
+  return resultado::json;
+end;
+$function$;
+revoke all on function public.variacion_precios_agente(date, date, numeric, text, text, integer, text, boolean, text) from public, anon;
+grant execute on function public.variacion_precios_agente(date, date, numeric, text, text, integer, text, boolean, text) to authenticated, service_role;
+
+-- ─── 5. margenes_carta_agente ───────────────────────────────────────────────
+create or replace function public.margenes_carta_agente(
+  p_texto text default null, p_vista text default null,
+  p_solo_problemas boolean default false, p_limite integer default 15)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+-- 20261116100000_chatbot_margenes_alertas + 20261128150000_chatbot_ultima_factura: el coste es el de la
+-- ÚLTIMA factura (margenes_carta, 20261128140000): cada fila trae ultima_factura (fecha, proveedor, número,
+-- precio tal como se compró) y la mediana de 90 días aparte, como contexto.
+declare
+  m jsonb := public.margenes_carta();
+  c public.margenes_carta_config%rowtype;
+  v_min_peso numeric; v_min_vino numeric; v_max_pct numeric;
+  v_txt text := nullif(public._norm_agente(btrim(p_texto)), '');
+  v_lim int := least(greatest(coalesce(p_limite, 15), 1), 40);
+  v_vista text := nullif(lower(btrim(coalesce(p_vista, ''))), '');
+  v_solo boolean := coalesce(p_solo_problemas, false);
+begin
+  if v_vista is not null and v_vista not in ('peso', 'vinos', 'platos') then
+    return jsonb_build_object('error', 'vista debe ser peso, vinos, platos o null');
+  end if;
+  select * into c from public.margenes_carta_config where id;
+  v_min_peso := coalesce(c.multiplicador_min_peso, 2);
+  v_min_vino := coalesce(c.multiplicador_min_vino, 2.5);
+  v_max_pct  := coalesce(c.coste_max_plato_pct, 35);
+
+  return jsonb_strip_nulls(jsonb_build_object(
+    'umbrales', jsonb_build_object('multiplicador_min_peso', v_min_peso, 'multiplicador_min_vino', v_min_vino,
+                                   'coste_max_plato_pct', v_max_pct, 'iva_pct', coalesce(c.iva_pct, 10)),
+    'como_leer', 'El coste (compra_kg, coste_botella, coste) es el de la ULTIMA factura: da primero ultima_factura (fecha, proveedor, '
+                 || 'numero: citalo para el enlace; precio por su unidad); *_mediana = mediana de 90 dias, solo despues y como contexto. '
+                 || 'multiplicador = cuantas veces cobras lo que pagas (venta SIN IVA / compra SIN IVA; peso: euros/kg de carta frente a '
+                 || 'euros/kg comprado; vino: botella frente a botella). pct_coste = % del precio de VENTA sin IVA que se va en coste '
+                 || '(de cada 100 euros que cobras, X son coste); no es un % sobre el coste. Platos con revisado=false son ESTIMACIONES de '
+                 || 'escandallo: dilo y no las des como dato firme; sin texto solo salen platos revisados (resumen.platos dice cuantos hay). '
+                 || 'Pantalla: Facturas > Margenes.',
+    'resumen', jsonb_build_object(
+      'peso', (select jsonb_build_object('articulos', count(*),
+                 'por_debajo', count(*) filter (where (e ->> 'multiplicador')::numeric < v_min_peso),
+                 'sin_datos', count(*) filter (where e ->> 'multiplicador' is null),
+                 'mediana', round((percentile_cont(0.5) within group (order by (e ->> 'multiplicador')::numeric))::numeric, 2))
+               from jsonb_array_elements(m -> 'peso') e),
+      'vinos', (select jsonb_build_object('vinos', count(*), 'con_coste', count(e ->> 'multiplicador'),
+                 'por_debajo', count(*) filter (where (e ->> 'multiplicador')::numeric < v_min_vino),
+                 'mediana', round((percentile_cont(0.5) within group (order by (e ->> 'multiplicador')::numeric))::numeric, 2))
+               from jsonb_array_elements(m -> 'vinos') e),
+      'platos', (select jsonb_build_object('platos', count(*), 'con_escandallo', count(e ->> 'coste'),
+                 'revisados', count(*) filter (where (e ->> 'revisado')::boolean),
+                 'por_encima_pct', count(*) filter (where (e ->> 'pct')::numeric > v_max_pct))
+               from jsonb_array_elements(m -> 'platos') e)),
+    'peso', case when v_vista is null or v_vista = 'peso' then (
+      select coalesce(jsonb_agg(r.j order by r.mult nulls last), '[]'::jsonb) from (
+        select (e ->> 'multiplicador')::numeric as mult,
+               jsonb_build_object('nombre', e ->> 'nombre', 'precio_carta', e -> 'precio', 'unidad_carta', e ->> 'unidad',
+                 'venta_kg_sin_iva', e -> 'venta_kg', 'producto_comprado', e ->> 'producto', 'compra_kg', e -> 'compra_kg',
+                 'multiplicador', e -> 'multiplicador', 'por_debajo', (e ->> 'multiplicador')::numeric < v_min_peso,
+                 'variacion_coste_pct', e -> 'variacion_pct', 'ultima_factura', public._factura_agente(e -> 'factura'),
+                 'compra_kg_mediana', e -> 'compra_kg_mediana', 'lineas', e -> 'lineas', 'sin_datos', e ->> 'motivo') as j
+          from jsonb_array_elements(m -> 'peso') e
+         where (v_txt is null or public._norm_agente(e ->> 'nombre') like '%' || v_txt || '%'
+                              or public._norm_agente(e ->> 'producto') like '%' || v_txt || '%')
+           and (not v_solo or (e ->> 'multiplicador')::numeric < v_min_peso)
+         order by (e ->> 'multiplicador')::numeric nulls last limit v_lim) r) end,
+    'vinos', case when v_vista is null or v_vista = 'vinos' then (
+      select coalesce(jsonb_agg(r.j order by r.mult nulls last), '[]'::jsonb) from (
+        select (e ->> 'multiplicador')::numeric as mult,
+               jsonb_build_object('nombre', e ->> 'nombre', 'categoria', e ->> 'categoria', 'precio_carta', e -> 'precio',
+                 'precio_copa', e -> 'precio_copa', 'producto_comprado', e ->> 'producto', 'coste_botella', e -> 'coste',
+                 'multiplicador', e -> 'multiplicador', 'por_debajo', (e ->> 'multiplicador')::numeric < v_min_vino,
+                 'variacion_coste_pct', e -> 'variacion_pct', 'ultima_factura', public._factura_agente(e -> 'factura'),
+                 'coste_mediana', e -> 'coste_mediana', 'sin_datos', e ->> 'motivo') as j
+          from jsonb_array_elements(m -> 'vinos') e
+         where (v_txt is null or public._norm_agente(e ->> 'nombre') like '%' || v_txt || '%'
+                              or public._norm_agente(e ->> 'producto') like '%' || v_txt || '%')
+           and (not v_solo or (e ->> 'multiplicador')::numeric < v_min_vino)
+           and (v_txt is not null or e ->> 'multiplicador' is not null)
+         order by (e ->> 'multiplicador')::numeric nulls last limit v_lim) r) end,
+    'platos', case when v_vista is null or v_vista = 'platos' then (
+      select coalesce(jsonb_agg(r.j order by r.pct desc nulls last), '[]'::jsonb) from (
+        select (e ->> 'pct')::numeric as pct,
+               jsonb_build_object('nombre', e ->> 'nombre', 'categoria', e ->> 'categoria', 'precio_carta', e -> 'precio',
+                 'coste', e -> 'coste', 'pct_coste', e -> 'pct', 'margen', e -> 'margen',
+                 'ingrediente_principal', e ->> 'principal', 'revisado', e -> 'revisado', 'origen', e ->> 'origen',
+                 'variacion_coste_pct', e -> 'variacion_pct', 'ultima_factura', public._factura_agente(e -> 'factura'),
+                 'coste_mediana', e -> 'coste_mediana', 'pct_mediana', e -> 'pct_mediana', 'sin_datos', e ->> 'motivo') as j
+          from jsonb_array_elements(m -> 'platos') e
+         where (v_txt is null or public._norm_agente(e ->> 'nombre') like '%' || v_txt || '%'
+                              or public._norm_agente(e ->> 'principal') like '%' || v_txt || '%')
+           and (not v_solo or (e ->> 'pct')::numeric > v_max_pct)
+           -- Sin texto, solo escandallos revisados: los estimados (lata entera frente a la
+           -- ración) salían como «los peores» sin serlo. Por nombre sí salen, marcados.
+           and (v_txt is not null or (e ->> 'coste' is not null and (e ->> 'revisado')::boolean))
+         order by (e ->> 'pct')::numeric desc nulls last limit v_lim) r) end));
+end;
+$$;
+revoke all on function public.margenes_carta_agente(text, text, boolean, integer) from public, anon, authenticated;
+grant execute on function public.margenes_carta_agente(text, text, boolean, integer) to service_role;
+
+commit;
+
+select 'chatbot_ultima_factura: aplicada' as resultado;

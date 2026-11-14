@@ -40,6 +40,20 @@ export const PATRON_CHUNK_CADUCADO =
 export const PATRON_CRON_PLATAFORMA =
   /job startup timeout|could not start background process|out of background worker slots|too many (clients|connections)|remaining connection slots are reserved|the database system is (starting up|shutting down|in recovery mode)/i;
 
+/**
+ * Nota que la web añade al final del mensaje de un error de carga cuando
+ * decide recargar o no (web-casatomas, src/lib/recarga-por-version.ts,
+ * MARCAS): « · recuperado: la pestaña se recargó sola con la versión nueva
+ * (antes: v1.11.0 · build …)», « · sin conexión: no se recargó»… La decisión
+ * va también en `accion`. Para la huella se quita: si no, cada build daría
+ * una incidencia distinta del mismo fallo.
+ */
+export const NOTA_RECARGA =
+  /\s*·\s*(?:recuperado: la pestaña se recargó sola|se recargó sola pero siguió|sin segunda recarga: se le pidió|no había versión nueva|sin conexión: no se recargó)[\s\S]*$/i;
+
+export const quitarNotaRecarga = (mensaje: string | null | undefined): string | null | undefined =>
+  typeof mensaje === "string" ? mensaje.replace(NOTA_RECARGA, "") : mensaje;
+
 /** Mensaje normalizado: sin números, sin contenido entre comillas, sin URLs con consulta. */
 export function normalizarMensaje(mensaje: string | null | undefined): string {
   if (!mensaje) return "";
@@ -93,7 +107,8 @@ export interface DatosHuella {
 }
 
 /** Texto canónico que se resume en la huella (exportado para las pruebas). */
-export function textoHuella(d: DatosHuella): string {
+export function textoHuella(datos: DatosHuella): string {
+  const d = { ...datos, mensaje: quitarNotaRecarga(datos.mensaje) };
   const partes = [d.fuente, d.tipo];
   // Fichero caducado tras publicar: misma incidencia aunque cambien el fichero o el tipo.
   if (["error_js", "error_promesa", "error_react"].includes(d.tipo) && PATRON_CHUNK_CADUCADO.test(d.mensaje ?? "")) {

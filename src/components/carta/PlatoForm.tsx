@@ -17,6 +17,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -231,7 +232,8 @@ export function PlatoForm({
         alergenos_oficiales: todosAlergenos.length > 0 ? todosAlergenos : null,
       };
       // La traducción ya no se genera aquí: crearPlato (usePlatos.ts) llama a
-      // traducir-contenido internamente al guardar (ver informe, TAREA 2).
+      // traducir-contenido internamente al guardar (ver informe, TAREA 2). Si
+      // la descripción va vacía, esa misma llamada la redacta (tarea 2.2).
       const nuevoPlato = await crearPlato.mutateAsync(platoData);
 
       // 2. Si hay imagen, subirla a Storage
@@ -544,6 +546,10 @@ export function PlatoForm({
                           {...field}
                         />
                       </FormControl>
+                      {/* Tarea 2.2: crearPlato (usePlatos.ts) la pide a la IA en la misma traducción. */}
+                      <FormDescription>
+                        Si la dejas vacía, la escribe la IA al guardar a partir del nombre, los ingredientes y los alérgenos. Revísala después.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -628,7 +634,7 @@ export function PlatoForm({
               <Button
                 type="submit"
                 className="h-11 px-5"
-                disabled={crearPlato.isPending || isUploading || fotoCarta.trabajando}
+                disabled={crearPlato.isPending || isUploading || fotoCarta.trabajando || fotoCarta.faltaFondo}
               >
                 {crearPlato.isPending || isUploading
                   ? "Guardando..."

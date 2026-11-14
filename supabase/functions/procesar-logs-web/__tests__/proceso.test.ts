@@ -3,8 +3,8 @@
  * con un repositorio en memoria y destinos simulados.
  */
 import { describe, expect, it, vi } from "vitest";
-import { accionPara, inicioDiaMadrid, procesar, siguienteIntento, type ConfigLogs, type IncidenciaFila, type RepoProceso } from "../proceso";
-import { construirTicket, enLinea, pasosDesdeRecorrido, type EntradaTicket, type EventoTicket } from "../ticket";
+import { accionPara, inicioDiaMadrid, ordenPrioridad, procesar, siguienteIntento, ticketPermitido, type ConfigLogs, type IncidenciaFila, type RepoProceso } from "../proceso";
+import { construirTicket, enLinea, pasosDesdeRecorrido, resumenSencillo, type EntradaTicket, type EventoTicket } from "../ticket";
 import { interpretarAnalisis, mensajesIncidencia, quitarArchivosInventados } from "../ia";
 import { ErrorLinear, type DestinoTickets } from "../linear";
 import { eventosDeCron, eventosDeDespliegues, eventosDeSyncTrafico } from "../recolectores";
@@ -20,7 +20,7 @@ const incidencia = (o: Partial<IncidenciaFila> = {}): IncidenciaFila => ({
   pila: "TypeError: vino.precio is null\n at CartaVinos (https://web.es/assets/CartaVinos-B7x9Qa1c.js:1:2345)", motivo_ticket: "4 ocurrencias y 3 sesiones en 24 h (umbral 3 y 2)",
   reabierta_veces: 0, linear_estado: "pendiente", linear_uuid: "8f8b4e1c-3c2a-4b8e-9a51-1f2e3d4c5b6a", linear_issue_id: null, linear_identificador: null,
   linear_destino: null, linear_intentos: 0, linear_proximo_intento: null, linear_ultima_sync: null, linear_pendiente_reapertura: false,
-  ocurrencias_en_ticket: 0, analisis_ia: null, analisis_ia_en: null, ...o,
+  ocurrencias_en_ticket: 0, analisis_ia: null, analisis_ia_en: null, explicacion_ia: null, explicacion_ia_intentos: 0, ...o,
 });
 
 const recorrido: EventoTicket[] = [
@@ -58,6 +58,8 @@ function repoMemoria(incs: IncidenciaFila[], over: Partial<RepoProceso> = {}) {
     contexto: async () => recorrido,
     ticketsCreadosDesde: async () => 0,
     analisisDesde: async () => 0,
+    explicacionesDesde: async () => 0,
+    incidenciasSinExplicar: async () => [],
     ultimaPurga: async () => AHORA.toISOString(),
     purgar: async () => ({}),
     ...over,
@@ -107,6 +109,30 @@ describe("ticket", () => {
     expect(descripcion).toContain("← **aquí falla**");
     expect(descripcion).toContain("Primera detección");
   });
+  it("empieza por «En pocas palabras» (qué pasa, a quién afecta, desde cuándo, qué hacer) y debajo lo técnico", () => {
+    const { descripcion } = construirTicket(entrada());
+    const lineas = descripcion.split("\n");
+    expect(lineas[0]).toBe("## En pocas palabras");
+    expect(lineas[1]).toMatch(/^- \*\*Qué pasa:\*\* Un fallo en el código de la página en la carta de vinos\./);
+    expect(lineas[2]).toBe("- **A quién afecta:** A 3 visitantes (4 veces en total; 4 veces en las últimas 24 h).");
+    expect(lineas[3]).toMatch(/^- \*\*Desde cuándo:\*\* Desde el 08\/11\/2026, 11:00 \(versión 0\.40\)\. La última vez, el 08\/11\/2026, 12:50\./);
+    expect(lineas[4]).toMatch(/^- \*\*Qué hacer:\*\* Reproducirlo con los pasos de abajo/);
+    expect(descripcion.indexOf("## En pocas palabras")).toBeLessThan(descripcion.indexOf("## Impacto"));
+  });
+  it("en pocas palabras usa la causa conocida o la propuesta de la IA (marcada sin verificar)", () => {
+    const conIa = resumenSencillo(entrada({ analisis: { ...JSON.parse(RESPUESTA_IA), modelo: "m" } }));
+    expect(conIa.quePasa).toMatch(/Según la IA \(sin verificar\): Afecta a quien abre la ficha/);
+    expect(conIa.queHacer).toBe("Comprobar precio nulo antes de formatear _(propuesta de la IA, sin verificar)_");
+    const servidor = resumenSencillo(entrada({ incidencia: incidencia({ fuente: "servidor", tipo: "error_servidor", mensaje: "job startup timeout", titulo: "x", sesiones_afectadas: 0 }) }));
+    expect(servidor.aQuienAfecta).toMatch(/^No le sale a un cliente en pantalla: es del servidor/);
+    const robots = resumenSencillo(entrada({ incidencia: incidencia({ sesiones_afectadas: 0 }) }));
+    expect(robots.aQuienAfecta).toMatch(/A nadie de verdad/);
+    const critica = resumenSencillo(entrada({ incidencia: incidencia({ gravedad: "critico", rutas: [{ ruta: "/reservas", n: 1 }] }) }));
+    expect(critica.aQuienAfecta).toMatch(/puede impedir reservar o pagar/);
+    expect(critica.quePasa).toMatch(/en la página de reservas/);
+    const rara = resumenSencillo(entrada({ incidencia: incidencia({ rutas: [{ ruta: "/[pulsa](https://x)", n: 1 }] }) }));
+    expect(rara.quePasa).toContain("la página `/[pulsa](https://x)`"); // lo de los logs, como código
+  });
   it("sin análisis no inventa propuesta y lo dice", () => {
     expect(construirTicket(entrada()).descripcion).toContain("Sin propuesta concreta: falta contexto");
   });
@@ -155,6 +181,17 @@ describe("IA de incidencias", () => {
   });
 });
 
+describe("ticket con el origen", () => {
+  it("dice si es un fallo de la web o de un servicio externo, en llano", () => {
+    const base = { muestras: [], recorrido: [], eventoErrorId: null, analisis: null, motivoSinAnalisis: null, urlPanel: "https://p", ahora: AHORA };
+    const web = construirTicket({ ...base, incidencia: incidencia({ origen: "web" }) }).descripcion;
+    expect(web).toContain("- **Origen:** Fallo de la web. Fallo de la web: algo de nuestro código");
+    const ext = construirTicket({ ...base, incidencia: incidencia({ origen: "externo", origen_proveedor: "Google Maps" }) }).descripcion;
+    expect(ext).toContain("- **Origen:** Servicio externo (`Google Maps`). No es un fallo de nuestro código: depende de Google Maps.");
+    expect(construirTicket({ ...base, incidencia: incidencia() }).descripcion).not.toContain("**Origen:**"); // sin la migración
+  });
+});
+
 describe("decisiones", () => {
   it("qué hacer con cada incidencia", () => {
     expect(accionPara(incidencia(), AHORA)).toBe("crear");
@@ -167,6 +204,51 @@ describe("decisiones", () => {
     expect(accionPara(incidencia({ ...creada, linear_ultima_sync: "2026-11-08T05:00:00Z", ocurrencias: 5 }), AHORA)).toBe("actualizar");
     expect(accionPara(incidencia({ ...creada, linear_ultima_sync: "2026-11-08T05:00:00Z" }), AHORA)).toBe("sincronizar");
   });
+  it("resuelta antes de crear el ticket: no se crea (si vuelve, pasa a «reabierta» y entonces sí)", () => {
+    expect(accionPara(incidencia({ estado: "resuelta" }), AHORA)).toBeNull();
+    expect(accionPara(incidencia({ estado: "reabierta" }), AHORA)).toBe("crear");
+  });
+  it("ticket del destino de pruebas tras activar Linear: se migra solo si sigue repitiéndose", () => {
+    const dePrueba = { linear_estado: "creado", linear_issue_id: "x", linear_destino: "prueba", ocurrencias_en_ticket: 4, linear_ultima_sync: "2026-11-01T00:00:00Z" } as const;
+    expect(accionPara(incidencia({ ...dePrueba, ocurrencias: 4 }), AHORA, "real")).toBeNull(); // parada: no se manda a Linear
+    expect(accionPara(incidencia({ ...dePrueba, ocurrencias: 6 }), AHORA, "real")).toBe("migrar");
+    expect(accionPara(incidencia({ ...dePrueba, ocurrencias: 6, estado: "resuelta" }), AHORA, "real")).toBeNull();
+    expect(accionPara(incidencia({ ...dePrueba, linear_pendiente_reapertura: true }), AHORA, "real")).toBe("migrar");
+    expect(accionPara(incidencia({ ...dePrueba, ocurrencias: 6 }), AHORA, "prueba")).toBe("actualizar"); // mismo destino: lo de siempre
+  });
+  it("origen: solo los fallos de la web (y externos con el interruptor) crean o mueven tickets", () => {
+    for (const origen of ["conexion", "navegador", "version_antigua", "bots"]) {
+      expect(accionPara(incidencia({ origen }), AHORA)).toBeNull();
+      expect(accionPara(incidencia({ origen }), AHORA, "prueba", true)).toBeNull();
+    }
+    expect(accionPara(incidencia({ origen: "web" }), AHORA)).toBe("crear");
+    expect(accionPara(incidencia({ origen: "externo" }), AHORA)).toBeNull();
+    expect(accionPara(incidencia({ origen: "externo" }), AHORA, "prueba", true)).toBe("crear");
+    expect(accionPara(incidencia({ origen: undefined }), AHORA)).toBe("crear"); // sin la migración: como antes
+  });
+  it("origen: lo pedido a mano se crea igual (decisión de una persona)", () => {
+    const aMano = incidencia({ origen: "conexion", motivo_ticket: "Pedido a mano desde Super Admin › Logs · 3 ocurrencias…" });
+    expect(ticketPermitido(aMano)).toBe(true);
+    expect(accionPara(aMano, AHORA)).toBe("crear");
+  });
+  it("origen: el ticket ya creado de algo que no depende de la web no se reabre, ni se comenta, ni se migra; solo se sincroniza", () => {
+    const creada = { origen: "conexion", linear_estado: "creado", linear_issue_id: "x", linear_destino: "prueba", ocurrencias_en_ticket: 4, linear_ultima_sync: "2026-11-08T11:00:00Z" } as const;
+    expect(accionPara(incidencia({ ...creada, linear_pendiente_reapertura: true }), AHORA, "prueba")).toBeNull();
+    expect(accionPara(incidencia({ ...creada, ocurrencias: 9 }), AHORA, "prueba")).toBeNull();
+    expect(accionPara(incidencia({ ...creada, ocurrencias: 9 }), AHORA, "real")).toBeNull();
+    expect(accionPara(incidencia({ ...creada, linear_ultima_sync: "2026-11-08T05:00:00Z", ocurrencias: 9 }), AHORA, "prueba")).toBe("sincronizar");
+    expect(accionPara(incidencia({ ...creada, origen: "web", linear_pendiente_reapertura: true }), AHORA, "prueba")).toBe("reabrir");
+  });
+  it("orden de trabajo: reaperturas, luego críticas y con más visitantes", () => {
+    const l = [
+      incidencia({ id: 1, gravedad: "aviso", sesiones_afectadas: 50 }),
+      incidencia({ id: 2, gravedad: "error", sesiones_afectadas: 2 }),
+      incidencia({ id: 3, gravedad: "critico", sesiones_afectadas: 1 }),
+      incidencia({ id: 4, gravedad: "error", sesiones_afectadas: 9 }),
+      incidencia({ id: 5, gravedad: "aviso", linear_pendiente_reapertura: true }),
+    ].sort(ordenPrioridad);
+    expect(l.map((i) => i.id)).toEqual([5, 3, 4, 2, 1]);
+  });
   it("espera exponencial con tope de 6 h y día natural de Madrid", () => {
     expect(siguienteIntento(1, AHORA).getTime() - AHORA.getTime()).toBe(5 * 60_000);
     expect(siguienteIntento(3, AHORA).getTime() - AHORA.getTime()).toBe(20 * 60_000);
@@ -177,6 +259,20 @@ describe("decisiones", () => {
 });
 
 describe("procesar", () => {
+  it("una pendiente que no depende de la web no llega a Linear; la de la web sí; la externa solo con el interruptor", async () => {
+    const con = incidencia({ id: 1, origen: "conexion" });
+    const web = incidencia({ id: 2, origen: "web" });
+    const ext = incidencia({ id: 3, origen: "externo" });
+    const { repo, config } = repoMemoria([con, web, ext]);
+    const { d } = destinoSimulado();
+    let r = await procesar({ repo, destino: () => d, ia: null, despliegues: null, urlPanel: "https://p", ahora: () => AHORA });
+    expect(r.tickets).toMatchObject({ creados: 1 });
+    expect([con.linear_estado, web.linear_estado, ext.linear_estado]).toEqual(["pendiente", "creado", "pendiente"]);
+    config.linear_tickets_externos = true;
+    r = await procesar({ repo, destino: () => d, ia: null, despliegues: null, urlPanel: "https://p", ahora: () => AHORA });
+    expect([con.linear_estado, ext.linear_estado]).toEqual(["pendiente", "creado"]);
+    expect(d.crear).toHaveBeenCalledTimes(2);
+  });
   it("crea el ticket con análisis de IA y deja la incidencia «creado»", async () => {
     const inc = incidencia();
     const { repo } = repoMemoria([inc]);
@@ -213,12 +309,69 @@ describe("procesar", () => {
     expect(inc.linear_estado).toBe("creado");
     expect(creados[0]).toContain("la IA no respondió (OpenAI 500)");
   });
-  it("respeta el tope diario de tickets", async () => {
-    const { repo } = repoMemoria([incidencia()], { ticketsCreadosDesde: async () => 10 });
+  it("respeta el tope diario de tickets (contado en el destino actual)", async () => {
+    const contar = vi.fn(async () => 10);
+    const { repo } = repoMemoria([incidencia()], { ticketsCreadosDesde: contar });
     const { d } = destinoSimulado();
     const r = await procesar({ repo, destino: () => d, ia: null, despliegues: null, urlPanel: "https://p", ahora: () => AHORA });
     expect(r.tickets).toMatchObject({ creados: 0, aplazados: 1 });
     expect(d.crear).not.toHaveBeenCalled();
+    expect(contar).toHaveBeenCalledWith(inicioDiaMadrid(AHORA), "prueba");
+  });
+  it("con el tope casi lleno, el ticket es para la más grave (no para la primera de la lista)", async () => {
+    const leve = incidencia({ id: 1, gravedad: "aviso", linear_uuid: "u-1" });
+    const grave = incidencia({ id: 2, gravedad: "critico", linear_uuid: "u-2" });
+    const { repo } = repoMemoria([leve, grave], { ticketsCreadosDesde: async () => 9 });
+    const { d } = destinoSimulado();
+    const r = await procesar({ repo, destino: () => d, ia: null, despliegues: null, urlPanel: "https://p", ahora: () => AHORA });
+    expect(r.tickets).toMatchObject({ creados: 1, aplazados: 1 });
+    expect([grave.linear_estado, leve.linear_estado]).toEqual(["creado", "pendiente"]);
+  });
+  it("al activar Linear: lo que sigue vivo del destino de pruebas pasa a pendiente con id nuevo; lo parado se queda", async () => {
+    const dePrueba = { linear_estado: "creado", linear_issue_id: "u-viejo", linear_identificador: "PRUEBA-3", linear_destino: "prueba", ocurrencias_en_ticket: 4, linear_ultima_sync: "2026-11-01T00:00:00Z", estado: "abierta" } as const;
+    const viva = incidencia({ id: 1, ...dePrueba, ocurrencias: 9 });
+    const parada = incidencia({ id: 2, ...dePrueba, ocurrencias: 4 });
+    const { repo } = repoMemoria([viva, parada]);
+    const { d } = destinoSimulado({ tipo: "real" });
+    const r = await procesar({ repo, destino: () => d, ia: null, despliegues: null, urlPanel: "https://p", ahora: () => AHORA, nuevoUuid: () => "u-nuevo" });
+    expect(r.tickets).toMatchObject({ migrados: 1, sincronizados: 0, actualizados: 0 });
+    expect(viva).toMatchObject({ linear_estado: "pendiente", linear_uuid: "u-nuevo", linear_issue_id: null, linear_destino: null, requiere_ticket: true });
+    expect(viva.motivo_ticket).toMatch(/pasa del destino de pruebas \(PRUEBA-3\) al actual/);
+    expect(parada).toMatchObject({ linear_estado: "creado", linear_issue_id: "u-viejo" });
+    expect(d.consultar).not.toHaveBeenCalled(); // nunca se pregunta a Linear por un id del destino de pruebas
+    expect(d.comentar).not.toHaveBeenCalled();
+  });
+  it("ticket borrado en Linear: se suelta con id nuevo (si vuelve a cumplir umbrales, se abre otro)", async () => {
+    const inc = incidencia({ linear_estado: "creado", linear_issue_id: "iss", linear_identificador: "WEB-9", linear_destino: "real", ocurrencias_en_ticket: 4, linear_ultima_sync: "2026-11-08T01:00:00Z", estado: "abierta" });
+    const { repo } = repoMemoria([inc]);
+    const { d } = destinoSimulado({ tipo: "real", consultar: vi.fn(async () => null) });
+    await procesar({ repo, destino: () => d, ia: null, despliegues: null, urlPanel: "https://p", ahora: () => AHORA, nuevoUuid: () => "u-nuevo" });
+    expect(inc).toMatchObject({ linear_estado: "sin_ticket", linear_uuid: "u-nuevo", linear_issue_id: null, requiere_ticket: false });
+    expect(inc.linear_estado_remoto).toMatch(/Borrado en Linear \(era WEB-9\)/);
+  });
+  it("al reabrir: primero cambia el estado en Linear y después comenta (repetir no duplica)", async () => {
+    const orden: string[] = [];
+    const inc = incidencia({ linear_estado: "creado", linear_issue_id: "iss", linear_destino: "real", linear_pendiente_reapertura: true, reabierta_veces: 1, estado: "reabierta" });
+    const { repo } = repoMemoria([inc]);
+    const { d, comentarios } = destinoSimulado({
+      tipo: "real",
+      reabrir: vi.fn(async () => { orden.push("reabrir"); return "Por hacer"; }),
+      comentar: vi.fn(async (_i, c) => { orden.push("comentar"); comentarios.push(c); }),
+    });
+    await procesar({ repo, destino: () => d, ia: null, despliegues: null, urlPanel: "https://p", ahora: () => AHORA });
+    expect(orden).toEqual(["reabrir", "comentar"]);
+    expect(comentarios[0]).toMatch(/Ticket devuelto a «Por hacer»/);
+    expect(inc).toMatchObject({ linear_pendiente_reapertura: false, linear_estado_remoto: "Por hacer" });
+  });
+  it("clave rechazada: para la pasada y deja el aviso en español", async () => {
+    const a = incidencia({ id: 1, linear_uuid: "u-1" });
+    const b = incidencia({ id: 2, linear_uuid: "u-2" });
+    const { repo, estado } = repoMemoria([a, b]);
+    const { d } = destinoSimulado({ tipo: "real", crear: vi.fn(async () => { throw new ErrorLinear("Linear no acepta la clave guardada…", false, 400, "clave"); }) });
+    await procesar({ repo, destino: () => d, ia: null, despliegues: null, urlPanel: "https://p", ahora: () => AHORA });
+    expect(d.crear).toHaveBeenCalledTimes(1);
+    expect(estado.error).toMatch(/linear: Linear no acepta la clave/);
+    expect(a.linear_ultimo_error).toMatch(/no acepta la clave/);
   });
   it("reapertura y repeticiones comentan el ticket existente; Linear resuelto → resuelta aquí", async () => {
     const base = { linear_estado: "creado", linear_issue_id: "iss", ocurrencias_en_ticket: 4 } as const;
@@ -229,7 +382,7 @@ describe("procesar", () => {
     const { d, comentarios } = destinoSimulado();
     const r = await procesar({ repo, destino: () => d, ia: null, despliegues: null, urlPanel: "https://p", ahora: () => AHORA });
     expect(r.tickets).toMatchObject({ reabiertos: 1, actualizados: 1, sincronizados: 1 });
-    expect(comentarios[0]).toMatch(/Reaparecida tras marcarse como resuelta/);
+    expect(comentarios[0]).toMatch(/Ha vuelto a pasar después de darse por resuelto/);
     expect(comentarios[1]).toMatch(/12 ocurrencias en total \(\+8/);
     expect([reab.linear_pendiente_reapertura, rep.ocurrencias_en_ticket, sync.estado]).toEqual([false, 12, "resuelta"]);
     expect(d.crear).not.toHaveBeenCalled();

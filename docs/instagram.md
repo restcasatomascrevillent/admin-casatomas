@@ -3,6 +3,10 @@
 > **Desde el 08/11/2026** Instagram es la primera pestaña de la sección **RRSS**
 > (`/rrss?red=instagram`; `/instagram?…` redirige ahí con los mismos parámetros).
 > Todo lo de abajo sigue igual. Facebook y el editor IA: [rrss.md](rrss.md).
+>
+> **Story del jueves de tapas** (12/11/2026, plantillas `ct-tapas` y
+> `ct-tapas-clasica`, automático al guardar las tapas y pestaña «Ajustes»):
+> [instagram-tapas.md](instagram-tapas.md).
 
 Sección **Instagram** del menú lateral (ruta `/instagram`, justo debajo de
 Newsletter; desde el 05/11/2026 ya no es una pestaña de Newsletter). Mismo
@@ -506,3 +510,14 @@ instala Playwright (`npx playwright install chromium`; versión emparejada con
 `playwright-core` 1.63). `INSTAGRAM_CHROMIUM_PATH` permite usar otro
 ejecutable. Las versiones van juntas: `playwright-core` 1.63 ↔ Chromium 153 ↔
 `@sparticuz/chromium` 153.0.0; si se actualiza uno, actualizar los otros.
+
+## Referencias: lo que publicáis ahora (12/11/2026)
+
+Bloque «Lo que publicáis ahora» (`src/components/instagram/referencias/LoQuePublicais.tsx`): stories activas y últimas publicaciones de la cuenta de la marca, como referencia de estilo. Solo lectura; no llama a Meta al abrir la página, solo al pulsar «Cargar» / «Actualizar». Las URLs de Meta caducan: no se guardan.
+
+- **Petición:** `POST /functions/v1/instagram-estado` con `{ "accion": "referencias", "marca": "casa-tomas" | "touza" }` (por defecto `casa-tomas`), sesión del panel y «Ver» en Marketing. El `GET` (y un `POST` sin `accion`) siguen siendo «Comprobar conexión».
+- **Meta:** `GET /{ig-user-id}/media?fields=id,media_type,media_product_type,media_url,thumbnail_url,permalink,caption,timestamp,username&limit=30` y `GET /{ig-user-id}/stories?fields=id,media_type,media_url,thumbnail_url,permalink,timestamp`. Timeout 12 s por llamada, 1 reintento, 15 s en total.
+- **200:** `{ ok: true, marca, cuenta: { igUserId, username }, publicaciones: Medio[], stories: Medio[], avisos: string[] }` con `Medio = { id, tipo: "imagen"|"video"|"carrusel"|"reel"|"story", mediaUrl, miniaturaUrl, permalink, caption, fecha }`. IMAGE→imagen, VIDEO/REELS→reel, CAROUSEL_ALBUM→carrusel, stories→story; en vídeos `miniaturaUrl` es `thumbnail_url`. Si las stories fallan (p. ej. permisos), `stories: []` y un aviso.
+- **Errores:** 401 sin sesión · 403 sin Marketing · 400 marca desconocida · 503 faltan secretos de la cuenta de la marca (`faltan`, `comoArreglarlo`) · 502 error de Meta traducido (`tipo`, `comoArreglarlo`), siempre saneado (el token nunca sale).
+- **Producción:** necesita `IG_USER_ID_CASA_TOMAS` e `IG_ACCESS_TOKEN_CASA_TOMAS` (y los de Touza para Touza); sin ellos responde 503. Basta el permiso `instagram_basic` para leer media y stories. En la demo cae en `IG_USER_ID` / `IG_ACCESS_TOKEN` (cuenta de pruebas).
+- **Desplegar:** `npx supabase functions deploy instagram-estado --project-ref <ref>` (demo primero). Código: `supabase/functions/instagram-estado/referencias.ts`; pruebas: `__tests__/referencias.test.ts`.

@@ -8,8 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { SelectorSubrayado } from "@/components/panel/SelectorSubrayado";
 import { useTamanoElemento } from "@/hooks/useAlturaDisponible";
 import { cn } from "@/lib/utils";
-import { MARCAS, baseFotosPublica, baseRecursosPanel, construirDocumento, validarPieza, type DatosPieza, type MarcaId } from "@/lib/instagram";
-import { MAX_FOTOS_CARRUSEL, type FotoParaMontar } from "@/lib/instagram/montar";
+import { MARCAS, baseFotosPublica, baseRecursosPanel, construirDocumento, obtenerPlantilla, validarPieza, type DatosPieza, type MarcaId } from "@/lib/instagram";
+import { MAX_FOTOS_CARRUSEL, type EstiloFeed, type FotoParaMontar } from "@/lib/instagram/montar";
+import { useEstiloFeed } from "@/components/instagram/ajustes/estiloFeed";
 import { ErrorInstagram, textoError } from "@/components/marketing/instagram/api";
 import { MAX_CAPTION, MAX_HASHTAGS, resumenCaption } from "@/components/marketing/instagram/contadores";
 import { humanizarProblema } from "@/components/marketing/instagram/pieza";
@@ -93,6 +94,8 @@ export interface CrearInstagramProps {
   api?: ApiPublicacion;
   /** «Ver en el calendario» tras programar. */
   onVerCalendario?: () => void;
+  /** Estilo del feed; por defecto, el de RRSS › Instagram › Ajustes (en pruebas, fijo). */
+  estiloFeed?: EstiloFeed;
   className?: string;
 }
 
@@ -106,9 +109,15 @@ export interface CrearInstagramProps {
  * servidor publica o programa (prepararYPublicar). Historial y Conexión ya no
  * están aquí: van al Calendario y al indicador «● @cuenta» de la barra de pestañas.
  */
-export function CrearInstagram({ abrir = null, marcaInicial = "casa-tomas", montar = montarPieza, api = API_SERVIDOR, onVerCalendario, className }: CrearInstagramProps) {
+export function CrearInstagram({ abrir = null, marcaInicial = "casa-tomas", montar = montarPieza, api = API_SERVIDOR, onVerCalendario, estiloFeed, className }: CrearInstagramProps) {
   const qc = useQueryClient();
   const [e, setE] = useState<EstadoCrear>(() => estadoInicial(marcaInicial));
+  // Estilo del feed («Solo foto» por defecto): decide la plantilla de partida y lo que pide «Montar con IA».
+  const { estilo: estiloGuardado } = useEstiloFeed(estiloFeed === undefined);
+  const estilo = estiloFeed ?? estiloGuardado;
+  useEffect(() => {
+    if (e.estilo !== estilo) setE((prev) => ({ ...prev, estilo }));
+  }, [estilo, e.estilo]);
   const [actual, setActual] = useState(0);
   const [ajustarAbierto, setAjustarAbierto] = useState(false);
   const [montando, setMontando] = useState(false);
@@ -157,6 +166,8 @@ export function CrearInstagram({ abrir = null, marcaInicial = "casa-tomas", mont
 
   // Documento de la imagen que se ve (con un respiro al teclear).
   const fotoActual = e.fotos[indice];
+  // ¿La imagen que se ve va con «Solo foto» (sin texto encima)?
+  const sinTextoActual = !!fotoActual && obtenerPlantilla(ajusteDe(e, fotoActual).plantilla)?.sinTexto === true;
   const firmaActual = fotoActual ? JSON.stringify(piezas[indice]) : "";
   const firmaDiferida = useDiferido(firmaActual, ESPERA_VISTA_PREVIA);
   const { documento, motivoSinVista } = useMemo(() => {
@@ -221,6 +232,7 @@ export function CrearInstagram({ abrir = null, marcaInicial = "casa-tomas", mont
         formato: n === 1 && e.formatoUnaFoto === "story" ? "story" : "auto",
         indicacion: e.indicacion.trim() || undefined,
         tono: e.tono,
+        estilo,
       });
       setE((prev) => aplicarMontaje(prev, r));
       setActual(0);
@@ -398,6 +410,7 @@ export function CrearInstagram({ abrir = null, marcaInicial = "casa-tomas", mont
               }}
               onFormatoUnaFoto={(f) => cambiar((prev) => ({ ...prev, formatoUnaFoto: f, montado: prev.fotos.length > 0 || prev.montado }))}
               onAjuste={(foto, c) => cambiar((prev) => cambiarAjuste(prev, foto, c))}
+              urlFoto={(foto) => preparadas.listas[foto]?.preparada.url}
             />
           </div>
         </div>
@@ -409,7 +422,12 @@ export function CrearInstagram({ abrir = null, marcaInicial = "casa-tomas", mont
           <h2 id="titulo-asi-quedara" className="text-base font-semibold">
             Así quedará
           </h2>
-          {n > 0 && <span className="text-xs text-muted-foreground">{formato === "carrusel" ? `Carrusel · ${n} imágenes` : story ? "Story 9:16" : "Post 4:5"}</span>}
+          {n > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {formato === "carrusel" ? `Carrusel · ${n} imágenes` : story ? "Story 9:16" : "Post 4:5"}
+              {sinTextoActual ? " · solo foto" : ""}
+            </span>
+          )}
         </div>
         <div ref={setHuecoPrevia} className="relative min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3">
           <div data-testid="hueco-movil">
@@ -428,12 +446,17 @@ export function CrearInstagram({ abrir = null, marcaInicial = "casa-tomas", mont
                 <>
                   {catalogo.find((f) => f.id === fotoActual) && <MiniaturaFoto foto={catalogo.find((f) => f.id === fotoActual)!} baseFotos={BASE_FOTOS} />}
                   <p className="absolute inset-x-2 bottom-2 rounded-md bg-white/90 p-2 text-center text-xs text-neutral-800 shadow">
-                    Pulsa «Montar con IA» para ver la publicación terminada.
+                    {sinTextoActual ? "Irá sin texto encima. Pulsa «Montar con IA» para el texto de la publicación." : "Pulsa «Montar con IA» para ver la publicación terminada."}
                   </p>
                 </>
               )}
             </MarcoInstagram>
           </div>
+          {sinTextoActual && e.montado && (
+            <p className="text-xs text-muted-foreground" data-testid="aviso-solo-foto">
+              Sin texto encima, como vuestro feed: el nombre del plato y el gancho van en el texto de la publicación.
+            </p>
+          )}
 
           {e.montado && (problemasPorImagen[indice]?.length ?? 0) > 0 && (
             <ul className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive" aria-live="polite" data-testid="problemas-imagen">

@@ -22,6 +22,7 @@ import {
   peoresMargenes,
   subidasQueAfectan,
   tipoMargen,
+  ultimaFacturaCorta,
   umbralMargen,
 } from "@/lib/dashboard/margenesDashboard";
 import { cn } from "@/lib/utils";
@@ -76,6 +77,10 @@ export function MargenesPrecio() {
                             {a.banderas.includes("sube_coste") && a.variacionPct !== null && ` · coste +${fmt(a.variacionPct, 0)} %`}
                           </span>
                           {costeYVenta(a) && <span className="block truncate text-xs tabular-nums text-foreground/80">{costeYVenta(a)} (sin IVA)</span>}
+                          {/* 13/11/2026 (dueño): de qué factura sale el coste, siempre la última. */}
+                          {ultimaFacturaCorta(a, d.hoy) && (
+                            <span className="block truncate text-xs tabular-nums text-muted-foreground">{ultimaFacturaCorta(a, d.hoy)}</span>
+                          )}
                         </span>
                         <span className="shrink-0 text-sm font-semibold tabular-nums text-destructive">{cifraMargen(a)}</span>
                       </Link>

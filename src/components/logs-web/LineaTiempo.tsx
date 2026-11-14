@@ -2,7 +2,9 @@ import { AlertOctagon, CheckCircle2, MousePointerClick, FileText, Wrench } from 
 import { Badge } from "@/components/ui/badge";
 import type { EventoWeb } from "@/hooks/useLogsWeb";
 import { cn } from "@/lib/utils";
-import { describirEvento, desplazamiento, fmtHora, NOMBRE_CATEGORIA } from "./calculos";
+import { describirEvento, desplazamiento, fmtHora, NOMBRE_CATEGORIA, origenDeEvento } from "./calculos";
+import { BadgeOrigen } from "./Origen";
+import { estiloDe } from "./origenEstilos";
 
 const ICONO = { actividad: MousePointerClick, operacion: CheckCircle2, tecnico: Wrench, error: AlertOctagon } as const;
 const COLOR = {
@@ -31,22 +33,28 @@ export function LineaTiempo({ eventos, resaltado, onAbrirIncidencia, onAbrirSesi
       {eventos.map((e, i) => {
         const Icono = ICONO[e.categoria] ?? FileText;
         const esResaltado = resaltado === e.id;
+        // Errores con el color de su origen: rojo si es de la web, ámbar si es de fuera, gris si no depende de la web.
+        const origen = e.categoria === "error" ? origenDeEvento(e) : null;
+        const estilo = origen ? estiloDe(origen) : null;
         return (
           <li
             key={e.id}
             data-testid="evento-linea"
             data-tipo={e.tipo}
             data-secuencia={e.secuencia ?? undefined}
-            className={cn("relative rounded-md px-2 py-1 text-sm", esResaltado && "bg-destructive/10 ring-1 ring-destructive/40", e.categoria === "error" && !esResaltado && "bg-destructive/5")}
+            data-origen={origen ?? undefined}
+            className={cn("relative rounded-md px-2 py-1 text-sm", estilo && !esResaltado && estilo.fila,
+              esResaltado && (origen === "web" ? "bg-destructive/10 ring-1 ring-destructive/40" : cn(estilo?.fila, "ring-1 ring-border")))}
           >
-            <span className={cn("absolute -left-[1.4rem] top-1.5 rounded-full bg-background p-0.5", COLOR[e.categoria])}>
+            <span className={cn("absolute -left-[1.4rem] top-1.5 rounded-full bg-background p-0.5", estilo ? estilo.icono : COLOR[e.categoria])}>
               <Icono className="h-3.5 w-3.5" aria-label={NOMBRE_CATEGORIA[e.categoria]} />
             </span>
             <div className="flex flex-wrap items-baseline gap-x-2">
               <span className="tabular-nums text-xs text-muted-foreground" title={e.ocurrido_en}>
                 {fmtHora(e.ocurrido_en)} · {i === 0 ? "inicio" : desplazamiento(inicio, e.ocurrido_en)}
               </span>
-              <span className={cn("min-w-0 break-words", e.categoria === "error" && "text-destructive", e.categoria === "operacion" && "font-medium")}>{describirEvento(e)}</span>
+              {origen && <BadgeOrigen origen={origen} className="px-1.5 py-0 text-[10px]" />}
+              <span className={cn("min-w-0 break-words", estilo?.texto, e.categoria === "operacion" && "font-medium")}>{describirEvento(e)}</span>
               {e.ruta && e.tipo !== "pagina_vista" && e.tipo !== "pagina_salida" && <span className="text-xs text-muted-foreground">en {e.ruta}</span>}
               {e.incidencia_id && onAbrirIncidencia && (
                 <button type="button" className="text-xs text-primary underline underline-offset-2" onClick={() => onAbrirIncidencia(e.incidencia_id!)}>

@@ -33,6 +33,7 @@ import {
   type Plantilla,
 } from "..";
 import { plantillaPrueba } from "./fixtures/plantilla-prueba";
+import { carasExtraEstilos } from "../plantillas/ct-estilos/index.js";
 
 const LENTO = 120_000;
 const TITULAR_LARGO =
@@ -187,14 +188,17 @@ describe.skipIf(!!motivo)("render real con Chromium", () => {
       if (!v.ok) return;
       const r = await renderizar(v.datos);
       expect(r.fallosCarga).toEqual([]);
-      expect(r.caras).toBe(FUENTES[v.datos.marca].length);
+      // La story clásica del jueves de tapas trae además Montserrat 300 y 400 (latin y latin-ext).
+      // Los estilos de ct-estilos declaran además sus caras de Montserrat y Cormorant.
+      expect(r.caras).toBe(FUENTES[v.datos.marca].length + (v.datos.plantilla === "ct-tapas-clasica" ? 4 : 0) + carasExtraEstilos(v.datos.plantilla));
       expect(r.errores).toEqual([]);
       expect(r.avisos).toEqual([]);
       await comprobarImagen(r.png, v.datos.formato);
     }, LENTO);
   }
 
-  for (const p of PLANTILLAS) {
+  // «Solo foto» no tiene titular (soloFoto.render.test.ts).
+  for (const p of PLANTILLAS.filter((x) => !x.sinTexto)) {
     for (const formato of p.formatos) {
       it(`${p.id} ${formato}: titular de 6 palabras larguísimas → error que nombra «titular»`, async () => {
         const e = [...EJEMPLOS, ...EJEMPLOS_V2].find((x) => x.json.plantilla === p.id && x.json.formato === formato);

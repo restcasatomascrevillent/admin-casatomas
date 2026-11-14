@@ -41,6 +41,9 @@ export const EsquemaPieza = z.strictObject({
   lista: z.array(EsquemaElementoLista).min(1).optional(),
   pie: texto.min(1).optional(),
   numeral: texto.min(1).optional(),
+  // Encuadre de la foto en % («Solo foto», como imagen_posicion_y de Platos).
+  posicionX: z.number().min(0).max(100).optional(),
+  posicionY: z.number().min(0).max(100).optional(),
 });
 /** Forma del JSON de entrada (lo que guarda la UI en instagram_piezas.datos). */
 export type EntradaPieza = z.infer<typeof EsquemaPieza>;
@@ -99,12 +102,15 @@ function problemaZod(issue: z.core.$ZodIssue, entrada: unknown): string {
       for (const k of issue.path) valor = valor && typeof valor === "object" ? (valor as Record<PropertyKey, unknown>)[k] : undefined;
       if (valor === undefined) return campo ? `Falta el campo obligatorio «${campo}»` : "La pieza debe ser un objeto JSON";
       const tipo =
-        issue.expected === "string" ? "un texto" : issue.expected === "array" ? "una lista" : issue.expected === "object" ? "un objeto" : issue.expected;
+        issue.expected === "string" ? "un texto" : issue.expected === "number" ? "un número" : issue.expected === "array" ? "una lista" : issue.expected === "object" ? "un objeto" : issue.expected;
       return campo ? `«${campo}» debe ser ${tipo}` : "La pieza debe ser un objeto JSON";
     }
     case "invalid_value":
       return `«${campo}» debe ser uno de: ${issue.values.map(String).join(", ")}`;
     case "too_small":
+    case "too_big":
+      if (issue.origin === "number") return `«${campo}» debe ser un número entre 0 y 100`;
+      if (issue.code === "too_big") return `«${campo || "pieza"}»: ${issue.message}`;
       return issue.origin === "array" ? `«${campo}» no puede ser una lista vacía (quítala si no se usa)` : `«${campo}» está vacío (quítalo si no se usa)`;
     default:
       return `«${campo || "pieza"}»: ${issue.message}`;
@@ -129,6 +135,8 @@ const TEXTOS: ReadonlyArray<Exclude<CampoPieza, "lista">> = ["foto", "antetitulo
  */
 function problemaTitularAusente(d: { titular?: unknown; cita?: unknown }, plantilla: Plantilla | undefined): string | undefined {
   if (d.titular !== undefined) return undefined;
+  // «Solo foto»: sin ningún texto.
+  if (plantilla?.sinTexto) return undefined;
   if (plantilla?.titularOpcional) {
     if (d.cita !== undefined) return undefined;
     return `La plantilla «${plantilla.id}» necesita un «titular» o una «cita» (al menos uno de los dos)`;
@@ -175,6 +183,7 @@ export function problemasDePieza(d: EntradaPieza, plantilla: Plantilla | undefin
     if (!plantilla.formatos.includes(d.formato)) {
       p.push(`La plantilla «${plantilla.id}» no tiene formato ${d.formato} (sí: ${plantilla.formatos.join(", ")})`);
     }
+    if (plantilla.sinTexto && d.titular !== undefined) p.push(`La plantilla «${plantilla.id}» va sin texto: quita el «titular»`);
     for (const c of plantilla.obligatorios) {
       if (d[c] === undefined) p.push(`La plantilla «${plantilla.id}» necesita el campo «${c}»`);
     }
@@ -206,7 +215,10 @@ export function problemasDePieza(d: EntradaPieza, plantilla: Plantilla | undefin
         p.push(`La foto «${foto.id}» es de tipo «${foto.tipo}» y la plantilla «${plantilla.id}» solo admite: ${plantilla.tiposFoto.join(", ")}`);
       }
       const f = FORMATOS[d.formato as FormatoId];
-      if (plantilla && encajeDe(plantilla) === "marco") {
+      if (plantilla?.sinTexto) {
+        // «Solo foto»: siempre se recorta a sangre, aunque haya que ampliar; si el recorte
+        // se queda pequeño, la plantilla lo avisa (data-aviso), pero vale.
+      } else if (plantilla && encajeDe(plantilla) === "marco") {
         // Enmarcada: la foto va entera y sin ampliar; basta con que tenga resolución.
         if (!valeParaMarco(foto)) {
           p.push(
@@ -235,7 +247,7 @@ export function problemasDePieza(d: EntradaPieza, plantilla: Plantilla | undefin
 
 /**
  * Quita las claves undefined. Sin titular (solo posible si la plantilla tiene
- * titularOpcional y llega cita) → titular "".
+ * titularOpcional y llega cita, o es «Solo foto», sinTexto) → titular "".
  */
 function aDatos(d: EntradaPieza): DatosPieza {
   const datos: DatosPieza = { marca: d.marca, plantilla: d.plantilla, formato: d.formato, titular: d.titular ?? "" };
@@ -245,6 +257,8 @@ function aDatos(d: EntradaPieza): DatosPieza {
   if (d.cta !== undefined) datos.cta = d.cta;
   if (d.pie !== undefined) datos.pie = d.pie;
   if (d.numeral !== undefined) datos.numeral = d.numeral;
+  if (d.posicionX !== undefined) datos.posicionX = d.posicionX;
+  if (d.posicionY !== undefined) datos.posicionY = d.posicionY;
   if (d.lista !== undefined) {
     datos.lista = d.lista.map((e) => {
       const el: ElementoLista = { etiqueta: e.etiqueta };

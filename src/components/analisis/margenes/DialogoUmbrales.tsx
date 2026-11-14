@@ -8,15 +8,47 @@ import { Label } from "@/components/ui/label";
 import { useEdicionMargenes } from "@/hooks/useMargenesCarta";
 import type { ConfigMargenes } from "@/lib/analisis/margenesCarta";
 
+// 13/11/2026 (dueño: «explicado para tontos»; «el % coste en realidad es de venta»): cada
+// umbral con un ejemplo. El coste es el de la ÚLTIMA factura (20261128140000).
 const CAMPOS: { clave: keyof ConfigMargenes; etiqueta: string; ayuda: string; paso: string }[] = [
-  { clave: "multiplicadorMinPeso", etiqueta: "Al peso en rojo si el multiplicador baja de (×)", ayuda: "Precio del kilo en carta sin IVA entre lo que cuesta el kilo comprado sin IVA.", paso: "0.1" },
-  { clave: "costeMaxPlatoPct", etiqueta: "Plato en rojo si el coste pasa del (%)", ayuda: "Del precio sin IVA.", paso: "1" },
-  { clave: "multiplicadorMinVino", etiqueta: "Vino en rojo si el multiplicador baja de (×)", ayuda: "Precio de carta sin IVA entre el coste de la botella sin IVA. 2,3× equivale al antiguo 2,5× sobre el precio con IVA.", paso: "0.1" },
-  { clave: "multiplicadorMinTienda", etiqueta: "Vino de la tienda en rojo si el multiplicador baja de (×)", ayuda: "Precio de tienda (carta menos el descuento) sin IVA entre el coste de la botella sin IVA. 1,5× = 33 % de margen.", paso: "0.1" },
-  { clave: "subidaCostePct", etiqueta: "Avisar si el coste sube más del (%)", ayuda: "Frente a hace 6 meses, si el precio de la carta no se ha subido.", paso: "1" },
+  {
+    clave: "multiplicadorMinPeso",
+    etiqueta: "Al peso: en rojo si cobras menos de (veces lo que pagas)",
+    ayuda: "Precio del kilo en carta sin IVA entre lo que te cuesta el kilo (última factura, sin IVA). Con 2: si el kilo te cuesta 20 €, en rojo si lo vendes a menos de 40 € sin IVA.",
+    paso: "0.1",
+  },
+  {
+    clave: "costeMaxPlatoPct",
+    etiqueta: "Plato: en rojo si el % coste sobre venta pasa del",
+    ayuda: "De cada 10 € que cobras sin IVA, cuántos se pueden ir en ingredientes. Con 35: como mucho 3,50 € de cada 10 €; un plato que vendes a 22 € (20 € sin IVA) sale en rojo si hacerlo cuesta más de 7 €.",
+    paso: "1",
+  },
+  {
+    clave: "multiplicadorMinVino",
+    etiqueta: "Vino: en rojo si cobras menos de (veces lo que pagas)",
+    ayuda: "Precio de carta sin IVA entre lo que te cuesta la botella (última factura, sin IVA). 2,3 equivale al antiguo 2,5 sobre el precio con IVA: de cada 10 € que cobras, como mucho 4,35 € es lo que te cuesta la botella.",
+    paso: "0.1",
+  },
+  {
+    clave: "multiplicadorMinTienda",
+    etiqueta: "Vino de la tienda: en rojo si cobras menos de (veces lo que pagas)",
+    ayuda: "Precio de tienda (carta menos el descuento) sin IVA entre lo que te cuesta la botella sin IVA. Con 1,5: de cada 10 € que cobras, como mucho 6,67 € es lo que te cuesta la botella.",
+    paso: "0.1",
+  },
+  {
+    clave: "subidaCostePct",
+    etiqueta: "Avisar si lo que te cuesta sube más del (%)",
+    ayuda: "La última factura frente a la última que había hace 6 meses, si no has subido el precio de la carta desde entonces.",
+    paso: "1",
+  },
   { clave: "ivaPct", etiqueta: "IVA del restaurante (%)", ayuda: "Hostelería: 10 %. Se quita del precio de carta para calcular el margen.", paso: "1" },
   { clave: "ivaTiendaPct", etiqueta: "IVA de la tienda (%)", ayuda: "Venta de botellas para llevar: 21 %. Se quita del precio de tienda.", paso: "1" },
-  { clave: "diasReferencia", etiqueta: "Días de compras para el coste actual", ayuda: "Mediana de ese periodo; sin compras en él, las 3 últimas.", paso: "1" },
+  {
+    clave: "diasReferencia",
+    etiqueta: "Días para la mediana (solo de referencia)",
+    ayuda: "Lo que te cuesta cada cosa sale de su ÚLTIMA factura. La mediana de las compras de estos días se enseña al lado, como contexto (sin compras en ese tiempo, las 3 últimas).",
+    paso: "1",
+  },
 ];
 
 export function DialogoUmbrales({ abierto, config, puedeEditar, onCerrar }: { abierto: boolean; config: ConfigMargenes; puedeEditar: boolean; onCerrar: () => void }) {

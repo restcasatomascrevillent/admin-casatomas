@@ -10,6 +10,9 @@ import { FORMATOS, MARCAS, type FormatoId, type MarcaId } from "../tokens.js";
 import { CAMPOS_PIEZA, PAPELES, encajeDe, type CampoPieza, type EncajeFoto, type PapelPlantilla, type Plantilla } from "../tipos.js";
 import { PLANTILLAS_CT_EDITORIAL } from "./ct-editorial/index.js";
 import { PLANTILLAS_TZ_EDITORIAL } from "./tz-editorial/index.js";
+import { PLANTILLAS_CT_TAPAS } from "./ct-tapas/index.js";
+import { PLANTILLAS_SOLO_FOTO } from "./solo-foto/index.js";
+import { PLANTILLAS_CT_ESTILOS } from "./ct-estilos/index.js";
 import ctFotoTitular from "./ct-foto-titular/index.js";
 import ctMarco from "./ct-marco/index.js";
 import ctTipografica from "./ct-tipografica/index.js";
@@ -21,6 +24,12 @@ const TODAS: readonly Plantilla[] = [
   // Plantillas v2 (08/11/2026): un juego por marca con papeles (portada, plato, cierre, tipográfica).
   ...PLANTILLAS_CT_EDITORIAL,
   ...PLANTILLAS_TZ_EDITORIAL,
+  // Anuncios con flujo propio (12/11/2026): la story del jueves de tapas (no salen en los selectores).
+  ...PLANTILLAS_CT_TAPAS,
+  // «Solo foto» (12/11/2026): la foto limpia, sin texto; la de por defecto del feed (ct-solo-foto, tz-solo-foto).
+  ...PLANTILLAS_SOLO_FOTO,
+  // Estilos de las stories que publica hoy Casa Tomás (12/11/2026): rótulos, reseña, Vosotros, anuncios y portadas de destacadas.
+  ...PLANTILLAS_CT_ESTILOS,
   // Clásicas (salvo tz-tipografica): se siguen abriendo, pero no salen en los selectores.
   ctFotoTitular,
   ctMarco,
@@ -65,7 +74,8 @@ function orden(p: Plantilla): number {
  */
 export function plantillasVisibles(marca: MarcaId, formato?: FormatoId, incluir?: string): Plantilla[] {
   const visibles = plantillasDe(marca, formato)
-    .filter((p) => !esClasica(p))
+    // Las de «anuncio» (jueves de tapas) las montan su botón y su automático, no los selectores.
+    .filter((p) => !esClasica(p) && p.papel !== "anuncio")
     .sort((a, b) => orden(a) - orden(b) || a.id.localeCompare(b.id));
   const actual = incluir ? obtenerPlantilla(incluir) : undefined;
   if (actual && esClasica(actual) && actual.marca === marca && (!formato || actual.formatos.includes(formato))) visibles.push(actual);
@@ -159,6 +169,10 @@ export function problemasDePlantilla(p: unknown): string[] {
   if (o.encaje !== undefined && o.encaje !== "sangre" && o.encaje !== "marco") errores.push("«encaje» debe ser «sangre» o «marco»");
   if (o.papel !== undefined && !PAPELES.includes(o.papel as PapelPlantilla)) errores.push(`«papel» debe ser uno de: ${PAPELES.join(", ")}`);
   if (o.clasica !== undefined && typeof o.clasica !== "boolean") errores.push("«clasica» debe ser true o false");
+  if (o.sinTexto !== undefined && typeof o.sinTexto !== "boolean") errores.push("«sinTexto» debe ser true o false");
+  if (o.sinTexto === true && Array.isArray(o.admitidos) && (o.admitidos as string[]).some((c) => c !== "foto")) {
+    errores.push("con «sinTexto» la plantilla solo puede admitir «foto»");
+  }
   if (o.encaje !== undefined && Array.isArray(o.admitidos) && !(o.admitidos as string[]).includes("foto")) {
     errores.push("«encaje» solo tiene sentido en una plantilla con foto");
   }

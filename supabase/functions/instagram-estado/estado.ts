@@ -26,7 +26,8 @@
 import { comprobarEstado } from "../_shared/instagram/comprobacion.ts";
 import { comprobarDrive } from "../_shared/instagram/drive.ts";
 import { entornoDeno } from "../_shared/instagram/entorno.ts";
-import { json, jsonAuth, opciones } from "../_shared/instagram/http.ts";
+import { json, jsonAuth, leerJson, opciones } from "../_shared/instagram/http.ts";
+import { manejarReferencias } from "./referencias.ts";
 import { registro } from "../_shared/instagram/secretos.ts";
 import { autorizarMarketing } from "../_shared/instagram/supabase.ts";
 
@@ -47,6 +48,13 @@ export async function manejarEstado(request: Request, deps: DependenciasEstadoHt
   const env = deps.env ?? entornoDeno();
   const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch, permiso: "leer" });
   if ("motivo" in auth) return jsonAuth(auth.estado, auth.motivo);
+  // POST { accion: "referencias" }: últimas publicaciones y stories (referencias.ts).
+  if (request.method === "POST") {
+    const cuerpo = await leerJson(request);
+    if (cuerpo.ok && (cuerpo.valor as { accion?: unknown } | null)?.accion === "referencias") {
+      return manejarReferencias(cuerpo.valor, { env, fetch: deps.fetch, dormir: deps.dormir });
+    }
+  }
   try {
     const f = deps.fetch;
     const [r, drive] = await Promise.all([

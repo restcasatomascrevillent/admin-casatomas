@@ -22,10 +22,12 @@ export interface PlantillaIA extends PlantillaCampana {
    * piezas guardadas), pero montar_pieza y las campañas no la eligen.
    */
   clasica?: boolean;
+  /** «Solo foto» (12/11/2026): sin ningún texto; los rótulos no se piden ni se revisan. */
+  sinTexto?: boolean;
 }
 
 /** Papel de una plantilla v2 (src/lib/instagram/tipos.ts → PapelPlantilla). */
-export type PapelIA = "portada" | "plato" | "cierre" | "tipografica";
+export type PapelIA = "portada" | "plato" | "cierre" | "tipografica" | "anuncio" | "foto";
 
 export const PLANTILLAS_IA: readonly PlantillaIA[] = [
   {
@@ -139,6 +141,43 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     encaje: "marco",
     papel: "portada",
     campanas: true,
+  },
+  // Story del jueves de tapas (12/11/2026): papel «anuncio», la montan su botón y su automático
+  // (lista de tapas obligatoria): ni montar_pieza ni las campañas las eligen.
+  // «Solo foto» (12/11/2026): la foto limpia, sin texto; la de por defecto del feed en montar_pieza.
+  {
+    id: "ct-solo-foto",
+    marca: "casa-tomas",
+    campos: [],
+    limites: {},
+    formatos: ["post"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "foto",
+    sinTexto: true,
+    campanas: false,
+  },
+  {
+    id: "ct-tapas",
+    marca: "casa-tomas",
+    campos: ["antetitulo", "titular", "cita", "pie"],
+    limites: { antetitulo: 20, titular: 12, cita: 30, pie: 44 },
+    formatos: ["story"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "anuncio",
+    campanas: false,
+  },
+  {
+    id: "ct-tapas-clasica",
+    marca: "casa-tomas",
+    campos: ["antetitulo", "titular"],
+    limites: { antetitulo: 20, titular: 12 },
+    formatos: ["story"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "anuncio",
+    campanas: false,
   },
   {
     id: "ct-tipografica",
@@ -264,6 +303,18 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     campanas: true,
   },
   {
+    id: "tz-solo-foto",
+    marca: "touza",
+    campos: [],
+    limites: {},
+    formatos: ["post"],
+    conFoto: true,
+    encaje: "marco",
+    papel: "foto",
+    sinTexto: true,
+    campanas: false,
+  },
+  {
     id: "tz-tipografica",
     marca: "touza",
     campos: ["antetitulo", "titular", "pie"],
@@ -273,7 +324,27 @@ export const PLANTILLAS_IA: readonly PlantillaIA[] = [
     papel: "tipografica",
     campanas: false,
   },
+  // Estilos de las stories que publica hoy Casa Tomás (src/lib/instagram/plantillas/ct-estilos,
+  // 12/11/2026). Al FINAL a propósito: plantillaPara devuelve la primera que encaja, y tienen
+  // que seguir saliendo ct-portada, ct-plato, ct-cierre y sus «-marco».
+  { id: "ct-rotulo-hilo", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 40, cita: 60 }, formatos: ["post", "story"], conFoto: true, encaje: "sangre", papel: "plato", campanas: true },
+  { id: "ct-rotulo-recuadro", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 22, cita: 70 }, formatos: ["post", "story"], conFoto: true, encaje: "sangre", papel: "plato", campanas: true },
+  { id: "ct-rotulo-titular", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 28, cita: 50 }, formatos: ["post", "story"], conFoto: true, encaje: "sangre", papel: "portada", campanas: true },
+  { id: "ct-rotulo-manuscrita", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 18, cita: 12 }, formatos: ["post", "story"], conFoto: true, encaje: "sangre", papel: "plato", campanas: true },
+  { id: "ct-resena", marca: "casa-tomas", campos: ["antetitulo", "titular", "cita"], limites: { antetitulo: 28, titular: 34, cita: 560 }, titularOpcional: true, formatos: ["post", "story"], conFoto: false, papel: "tipografica", campanas: false },
+  { id: "ct-resena-foto", marca: "casa-tomas", campos: ["antetitulo", "titular", "cita"], limites: { antetitulo: 28, titular: 34, cita: 560 }, titularOpcional: true, formatos: ["post", "story"], conFoto: true, encaje: "marco", papel: "portada", campanas: false },
+  { id: "ct-vosotros-celebracion", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 48, cita: 40 }, formatos: ["story"], conFoto: true, encaje: "marco", papel: "portada", campanas: false },
+  { id: "ct-vosotros-gracias", marca: "casa-tomas", campos: ["titular", "pie"], limites: { titular: 24, pie: 32 }, formatos: ["story"], conFoto: true, encaje: "marco", papel: "portada", campanas: false },
+  { id: "ct-reserva-mesa", marca: "casa-tomas", campos: ["titular", "cita"], limites: { titular: 16, cita: 26 }, formatos: ["story"], conFoto: true, encaje: "sangre", papel: "cierre", campanas: true },
+  { id: "ct-touza-descubre", marca: "casa-tomas", campos: ["titular", "cita", "pie"], limites: { titular: 16, cita: 50, pie: 16 }, formatos: ["story"], conFoto: true, encaje: "sangre", papel: "portada", campanas: true },
+  { id: "ct-tapas-poster", marca: "casa-tomas", campos: ["antetitulo", "titular", "pie"], limites: { antetitulo: 10, titular: 16, pie: 16 }, formatos: ["story"], conFoto: true, encaje: "sangre", papel: "portada", campanas: true },
+  { id: "ct-icono-destacada", marca: "casa-tomas", campos: ["titular"], limites: { titular: 18 }, formatos: ["story"], conFoto: false, papel: "tipografica", campanas: false },
 ];
+
+/** «Solo foto» de la marca (post), o null. */
+export function plantillaSoloFoto(marca: string): PlantillaIA | null {
+  return PLANTILLAS_IA.find((p) => p.marca === marca && p.sinTexto === true && p.formatos.includes("post")) ?? null;
+}
 
 export function plantillaIA(id: unknown): PlantillaIA | null {
   return PLANTILLAS_IA.find((p) => p.id === id) ?? null;

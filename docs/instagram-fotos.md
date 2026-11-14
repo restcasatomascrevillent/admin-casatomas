@@ -167,6 +167,33 @@ y los reels con `reel-kit.jsx`). Un juego por marca, cada plantilla con un **pap
   papel). Con `INSTAGRAM_CAPTURAS_V2=<carpeta>` guarda los JPEG y `hoja-de-contacto.jpg`; las del
   08/11/2026 están en `instagram-studio/propuesta/evaluacion/plantillas-v2/`.
 
+## «Solo foto»: el feed sin texto (12/11/2026)
+
+El feed real de @casatomascrevillent son solo fotos de platos, **sin texto encima** (primeros
+planos, luz cálida, vertical 4:5); el texto va en el pie. Los rótulos solo los usan en las stories.
+Por eso `ct-solo-foto` y `tz-solo-foto` (`src/lib/instagram/plantillas/solo-foto/`), papel `foto`,
+`sinTexto: true`, solo **post** (también cada imagen del carrusel), primeras en los selectores:
+
+- Sin ningún texto ni logo. No piden titular (`validarPieza` lo acepta sin él y da error si llega
+  uno: «va sin texto: quita el «titular»»).
+- **Siempre a sangre** (decisión del dueño, 12/11/2026): la foto se recorta a 4:5 (`object-fit:
+  cover`) aunque haya que ampliarla, como su feed. Nada de foto entera sobre fondo.
+- **Encuadre**: `posicionX` y `posicionY` (0-100 %, por defecto 50; campos opcionales de la pieza,
+  no de texto). Las de la carta (1200×900) son apaisadas: el recorte es horizontal y manda
+  `posicionX`. Se elige arrastrando la foto dentro del marco 4:5 (o con dos deslizadores) en
+  «Ajustar a mano» (escritorio) y en «Encuadrar la foto» bajo la vista previa del móvil
+  (`src/components/instagram/EncuadreFoto.tsx`, `movil/EncuadreMovil.tsx`). Se guarda en los datos
+  de la pieza.
+- **Calidad**: vale cualquier foto (sin mínimo de tamaño), pero si el trozo que se ve mide menos de
+  600 px de ancho reales (`ctx.medidasFoto`, del catálogo), la plantilla pone `data-aviso` y
+  `comprobarMaquetacion` lo devuelve en `avisos`: «La foto es pequeña y puede verse blanda (se ven
+  N px de ancho…)». Una de la carta da 720 px: sin aviso.
+- Es la de por defecto del feed en «Montar con IA» (ver `docs/instagram-ia.md`, «Estilo del feed»).
+- Pruebas: `src/lib/instagram/__tests__/soloFoto.render.test.ts` (Chromium: vertical, carta
+  centrada y con `posicionX=30`, 640×480 con aviso) y `crear/__tests__/encuadre.test.ts`. Con
+  `INSTAGRAM_CAPTURAS_SOLO_FOTO=<carpeta>` guarda los JPEG; los del 12/11/2026 están en
+  `instagram-studio/propuesta/evaluacion/solo-foto/`.
+
 ## Vinos de la carta
 
 Desde el 05/11/2026 la biblioteca enseña también los **vinos de la carta** con foto (tabla `"Vinos"`, bucket público `vinos`), con el filtro **Vinos** y la etiqueta «Vino». Funciona igual que los platos:

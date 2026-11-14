@@ -16,33 +16,52 @@
 //     IVA 21 %), aunque la tienda esté desactivada (se avisa).
 //   · Sin scroll de página (regla del dueño): el bloque ocupa el alto que le da
 //     la página y solo la lista hace scroll por dentro.
+//   · 13/11/2026 (dueño: «que siempre salga la última factura… explicado para
+//     tontos»; migración 20261128140000): cada fila dice primero, destacada, la
+//     ÚLTIMA factura de la que sale el coste («Última factura: Makro, 03/11 · 21,50
+//     €/kg», con botón para abrir el original) y la mediana de 3 meses debajo, en
+//     pequeño. Textos en sencillo: «cobras 2,5 veces lo que pagas», «de cada 100 €
+//     que cobras, 37 € se van en ingredientes» (el % es del precio de VENTA sin IVA).
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChefHat, CircleSlash, Loader2, Scale, Settings2, Wine } from "lucide-react";
+import { AlertTriangle, ChefHat, CircleSlash, FileText, Loader2, Scale, Settings2, Wine } from "lucide-react";
 import { CartesianGrid, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMargenesCarta } from "@/hooks/useMargenesCarta";
+import { VisorDocumento } from "@/components/facturas/analisis/VisorDocumento";
 import {
+  AYUDA_PCT_COSTE,
   ETIQUETA_BANDERA,
+  ETIQUETA_PCT_COSTE,
+  QUE_HACER_EN_ROJO,
+  avisoCompraMasNueva,
   costeVisible,
   dominioLog,
   euros,
   eurosKg,
+  explicacion,
+  facturaDeArticulo,
   ivaSupuesto,
   marcasLog,
+  numero,
   pctDeMultiplicador,
   pctDeMultiplicadorPeso,
+  periodoMediana,
   platosBorrador,
   porcentaje,
   problemas,
   puntosDispersion,
-  razon,
   resumenFiable,
+  textoFactura,
+  textoMediana,
+  textoPctCoste,
   veces,
   type ArticuloMargen,
+  type FacturaUsada,
   type MargenesCarta as Datos,
 } from "@/lib/analisis/margenesCarta";
 import { DetalleArticulo } from "./DetalleArticulo";
@@ -70,22 +89,22 @@ function Resumen({ d }: { d: Datos }) {
   return (
     <div className="grid shrink-0 grid-cols-2 gap-2 md:grid-cols-4" data-testid="margenes-resumen">
       <Cifra
-        etiqueta="Al peso: multiplicador (mediana)"
+        etiqueta="Al peso: cuántas veces cobras lo que pagas"
         valor={veces(r.peso.multiplicadorMediana)}
-        detalle={`${porcentaje(r.peso.pctMediana)} de coste · ${r.peso.conDatos} de ${r.peso.total} artículos`}
+        detalle={`en el artículo normal (mediana) · ${textoPctCoste(r.peso.pctMediana)} · ${r.peso.conDatos} de ${r.peso.total} con datos`}
       />
       <Cifra
-        etiqueta="Multiplicador de vinos (mediana)"
+        etiqueta="Vinos: cuántas veces cobras lo que pagas"
         valor={veces(r.vinos.multiplicadorMediana)}
-        detalle={`${r.vinos.conDatos} de ${r.vinos.total} vinos · tienda ${veces(d.resumen.vinos.multiplicadorTiendaMediana)}${d.tienda.activa ? "" : " (desactivada)"}`}
+        detalle={`en el vino normal (mediana) · ${r.vinos.conDatos} de ${r.vinos.total} con datos · tienda ${veces(d.resumen.vinos.multiplicadorTiendaMediana)}${d.tienda.activa ? "" : " (desactivada)"}`}
       />
       <Cifra
-        etiqueta="Margen en rojo"
+        etiqueta="En rojo (ganas menos del mínimo)"
         valor={`${rojo}`}
         detalle={
-          `${r.peso.enRojo} al peso < ${veces(d.config.multiplicadorMinPeso)} · ${r.vinos.enRojo} vinos < ${veces(d.config.multiplicadorMinVino)}` +
-          ` · ${d.resumen.vinos.tiendaEnRojo} en tienda < ${veces(d.config.multiplicadorMinTienda)}` +
-          (r.borrador.enRojoRevisados ? ` · ${r.borrador.enRojoRevisados} platos revisados` : "")
+          `${r.peso.enRojo} al peso (mín. ${numero(d.config.multiplicadorMinPeso)}×) · ${r.vinos.enRojo} vinos (mín. ${numero(d.config.multiplicadorMinVino)}×)` +
+          ` · ${d.resumen.vinos.tiendaEnRojo} en tienda (mín. ${numero(d.config.multiplicadorMinTienda)}×)` +
+          (r.borrador.enRojoRevisados ? ` · ${r.borrador.enRojoRevisados} platos revisados (más del ${numero(d.config.costeMaxPlatoPct)} %)` : "")
         }
         tono={rojo > 0 ? "rojo" : "neutro"}
       />
@@ -100,7 +119,7 @@ function Resumen({ d }: { d: Datos }) {
 
 const formatoEje = (n: number) => `${n.toLocaleString("es-ES", { maximumFractionDigits: n < 1 ? 1 : 0 })} €`;
 
-function Dispersion({ lista, umbral, onElegir, eje, porKilo }: { lista: ArticuloMargen[]; umbral: number; onElegir: (id: string) => void; eje: string; porKilo: boolean }) {
+function Dispersion({ lista, umbral, onElegir, porKilo }: { lista: ArticuloMargen[]; umbral: number; onElegir: (id: string) => void; porKilo: boolean }) {
   const puntos = useMemo(() => puntosDispersion(lista, umbral), [lista, umbral]);
   const movil = useIsMobile();
   const rojos = puntos.filter((p) => p.rojo);
@@ -132,7 +151,7 @@ function Dispersion({ lista, umbral, onElegir, eje, porKilo }: { lista: Articulo
         <YAxis
           type="number"
           dataKey="pct"
-          name="% de coste"
+          name={ETIQUETA_PCT_COSTE}
           unit=" %"
           width={46}
           tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
@@ -142,7 +161,7 @@ function Dispersion({ lista, umbral, onElegir, eje, porKilo }: { lista: Articulo
           y={umbral}
           stroke="hsl(var(--destructive))"
           strokeDasharray="5 4"
-          label={{ value: `${eje} ${porcentaje(umbral)}`, position: "insideTopRight", fontSize: 11, fill: "hsl(var(--destructive))" }}
+          label={{ value: `Límite ${porcentaje(umbral)}`, position: "insideTopRight", fontSize: 11, fill: "hsl(var(--destructive))" }}
         />
         <Tooltip
           cursor={{ strokeDasharray: "3 3" }}
@@ -152,7 +171,7 @@ function Dispersion({ lista, umbral, onElegir, eje, porKilo }: { lista: Articulo
             return (
               <div className="rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow">
                 <p className="font-medium">{p.nombre}</p>
-                <p className="tabular-nums">{euros(p.precio)}{unidad} · {porcentaje(p.pct)} de coste</p>
+                <p className="tabular-nums">{euros(p.precio)}{unidad} · {textoPctCoste(p.pct)}</p>
               </div>
             );
           }}
@@ -194,14 +213,36 @@ function LineaConIva({ a }: { a: ArticuloMargen }) {
   );
 }
 
-function FilaArticulo({ a, d, conIva, onElegir }: { a: ArticuloMargen; d: Datos; conIva: boolean; onElegir: (id: string) => void }) {
+/** La factura de la fila: «Última factura (Langosta): Makro, 03/11 · 21,50 €/kg». */
+function etiquetaFactura(a: ArticuloMargen): string {
+  if (a.tipo === "peso" && a.compraKg === null) return "Última compra";
+  if (a.tipo === "plato" && a.principal) return `Última factura (${a.principal})`;
+  return "Última factura";
+}
+
+function FilaArticulo({
+  a,
+  d,
+  conIva,
+  onElegir,
+  onFactura,
+}: {
+  a: ArticuloMargen;
+  d: Datos;
+  conIva: boolean;
+  onElegir: (id: string) => void;
+  onFactura: (f: FacturaUsada) => void;
+}) {
   const rojo = a.banderas.includes("coste_alto") || a.banderas.includes("multiplicador_bajo");
+  const f = facturaDeArticulo(a);
+  const mediana = textoMediana(a, d.config);
+  const masNueva = a.tipo !== "plato" ? avisoCompraMasNueva(f, a.ultima, d.hoy) : null;
   return (
-    <li>
+    <li className="flex items-start gap-1">
       <button
         type="button"
         onClick={() => onElegir(a.id)}
-        className="flex w-full min-h-11 items-start gap-3 rounded-md px-2 py-2 text-left hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-11 min-w-0 flex-1 items-start gap-3 rounded-md px-2 py-2 text-left hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span
           className={cn(
@@ -212,18 +253,25 @@ function FilaArticulo({ a, d, conIva, onElegir }: { a: ArticuloMargen; d: Datos;
           {a.tipo === "plato" ? porcentaje(a.pct) : veces(a.multiplicador)}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block break-words text-sm leading-snug">{razon(a, d.config)}</span>
+          <span className="block break-words text-sm font-semibold leading-snug">{a.nombre}</span>
+          {/* Lo primero y destacado: la última factura (dueño, 13/11/2026). */}
+          {f && (
+            <span className="block break-words text-sm font-medium leading-snug text-foreground" data-testid="ultima-factura">
+              {etiquetaFactura(a)}: {textoFactura(f, d.hoy)}
+            </span>
+          )}
+          <span className="block break-words text-sm leading-snug text-muted-foreground">{explicacion(a, d.config)}</span>
+          {(mediana || masNueva) && (
+            <span className="block break-words text-xs text-muted-foreground" data-testid="mediana">
+              {[mediana, masNueva].filter(Boolean).join(" · ")}
+            </span>
+          )}
           {a.tipo === "vino" && a.multiplicadorTienda !== null && (
             <span className={cn("block text-xs tabular-nums", a.banderas.includes("tienda_bajo") ? "text-destructive" : "text-muted-foreground")}>
               Tienda: {veces(a.multiplicadorTienda)} (mín. {veces(d.config.multiplicadorMinTienda)}){d.tienda.activa ? "" : " · tienda desactivada"}
             </span>
           )}
           {conIva && costeVisible(a, false) !== null && <LineaConIva a={a} />}
-          {a.tipo === "peso" && a.ultimoProveedor && (
-            <span className="block break-words text-xs text-muted-foreground sm:truncate">
-              {a.producto} · última compra {fechaCorta(a.ultimaFecha)}, {a.ultimoProveedor}
-            </span>
-          )}
           <span className="mt-0.5 flex flex-wrap gap-1">
             {a.banderas.map((b) => (
               <span key={b} className="rounded border border-border/70 px-1 text-[11px] text-muted-foreground">
@@ -237,7 +285,49 @@ function FilaArticulo({ a, d, conIva, onElegir }: { a: ArticuloMargen; d: Datos;
           </span>
         </span>
       </button>
+      {f && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="mt-1 h-10 w-10 shrink-0"
+          onClick={() => onFactura(f)}
+          aria-label={`Abrir la última factura de ${a.nombre}`}
+          title="Abrir la última factura"
+        >
+          <FileText className="h-4 w-4" aria-hidden />
+        </Button>
+      )}
     </li>
+  );
+}
+
+/** «¿Cómo se lee?»: lo justo para entender la pantalla sin saber de márgenes. */
+function ComoSeLee({ d }: { d: Datos }) {
+  return (
+    <details className="shrink-0 rounded-lg border border-border/70 bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground" data-testid="como-se-lee">
+      <summary className="min-h-8 cursor-pointer select-none py-1 font-medium text-foreground">¿Cómo se lee esta pantalla? (explicado fácil)</summary>
+      <ul className="mb-1 mt-1 list-disc space-y-0.5 pl-4">
+        <li>
+          {d.costeDesde === "ultima_factura" ? (
+            <>Lo que te cuesta cada cosa sale de su <strong>última factura</strong> (sin IVA). </>
+          ) : (
+            <>Lo que te cuesta cada cosa sale de tus compras (sin IVA). </>
+          )}
+          Debajo, en pequeño, «lo normal en {periodoMediana(d.config.diasReferencia)}» (la mediana de esas compras), solo como referencia.
+        </li>
+        <li>
+          <strong>«2,5×»</strong>: cobras 2,5 veces lo que te cuesta. Ejemplo: el kilo te cuesta 20 € y lo vendes a 50 € sin IVA → 2,5×. Cuanto más, mejor.
+        </li>
+        <li>
+          <strong>«37 % coste sobre venta»</strong>: de cada 10 € que cobras (sin IVA), 3,70 € es lo que te cuesta. Es un % del{" "}
+          <strong>precio de venta</strong>, no del coste. Cuanto menos, mejor.
+        </li>
+        <li>
+          <strong>En rojo</strong>: ganas menos del mínimo que pones en «Umbrales». {QUE_HACER_EN_ROJO} Toca la fila para ver el detalle.
+        </li>
+        <li>«Sin datos»: no hay factura para saber lo que cuesta; asocia el producto de compra en su ficha.</li>
+      </ul>
+    </details>
   );
 }
 
@@ -269,6 +359,8 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
   }, [claveInicial]);
   const [umbrales, setUmbrales] = useState(false);
   const [conIva, setConIva] = useState(false);
+  const [factura, setFactura] = useState<FacturaUsada | null>(null);
+  const navigate = useNavigate();
 
   const d = q.data;
   const borrador = useMemo(() => (d ? platosBorrador(d) : []), [d]);
@@ -310,11 +402,14 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
   }
 
   const titulo =
-    filtro === "sin_datos" ? "Sin datos de coste" : filtro === "todos" ? (vista === "borrador" ? "Todos los platos" : "Todos, de peor a mejor") : "Donde no funciona el margen";
+    filtro === "sin_datos" ? "Sin datos de coste" : filtro === "todos" ? (vista === "borrador" ? "Todos los platos" : "Todos, de peor a mejor") : "Donde ganas poco (en rojo)";
+  // 14/11/2026 (dueño: «para tontos»): qué es cada eje y qué significa estar por encima de la línea roja.
   const textoEje =
     vista === "peso"
-      ? `Precio del kilo en carta (con IVA, escala logarítmica) frente a % de coste sin IVA · la línea es ${veces(d.config.multiplicadorMinPeso)}`
-      : `Precio de carta (escala logarítmica) frente a % de coste sin IVA${vista === "vinos" ? ` · la línea es ${veces(d.config.multiplicadorMinVino)}` : ""}`;
+      ? `Cada punto es un artículo. Abajo: precio del kilo en carta. A la izquierda: % coste sobre venta. Por encima de la línea roja: cobras menos de ${numero(d.config.multiplicadorMinPeso)} veces lo que pagas (mal)`
+      : vista === "vinos"
+        ? `Cada punto es un vino. Abajo: precio de carta. A la izquierda: % coste sobre venta. Por encima de la línea roja: cobras menos de ${numero(d.config.multiplicadorMinVino)} veces lo que pagas (mal)`
+        : `Cada punto es un plato. Abajo: precio de carta. A la izquierda: % coste sobre venta. Por encima de la línea roja: cuesta más del ${numero(d.config.costeMaxPlatoPct)} % de lo que cobras (mal)`;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 max-lg:overflow-y-auto max-lg:overscroll-contain sm:gap-3">
@@ -340,6 +435,7 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
           <Settings2 className="mr-1.5 h-4 w-4" aria-hidden /> Umbrales
         </Button>
       </div>
+      <ComoSeLee d={d} />
       {vista === "vinos" && !d.tienda.activa && (
         <p className="shrink-0 rounded-lg border border-border/70 bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground" role="note" data-testid="aviso-tienda">
           La tienda de vinos está desactivada. Su margen se calcula igualmente: precio de tienda = carta − {d.tienda.descuentoPct} %, sin IVA ({d.config.ivaTiendaPct} %).
@@ -354,20 +450,20 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
             Borrador: los gramos de cada plato son una <strong>estimación pendiente de revisar</strong>. No cuentan en las cifras de arriba ni en
-            «Donde no funciona el margen» hasta que marques el plato como «Revisado» en su detalle.
+            «Donde ganas poco» hasta que marques el plato como «Revisado» en su detalle.
             {" "}{borrador.filter((p) => p.revisado).length} de {borrador.length} revisados.
           </span>
         </p>
       )}
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(9rem,38%)_1fr] gap-2 max-lg:flex-none max-lg:grid-rows-[15rem_auto] lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-1 lg:gap-3">
-        <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-border/70 bg-card p-2" aria-label="Precio de venta frente a % de coste">
+        <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-border/70 bg-card p-2" aria-label="Precio de venta frente al coste (% del precio de venta)">
           {/* 11/11/2026: el título largo con `truncate` ensanchaba la columna de la rejilla y la gráfica se salía por la derecha. */}
-          <p className="shrink-0 line-clamp-2 break-words px-1 text-xs text-muted-foreground lg:truncate">{textoEje}</p>
+          <p className="shrink-0 line-clamp-2 break-words px-1 text-xs text-muted-foreground lg:line-clamp-2" title={`${textoEje}. ${AYUDA_PCT_COSTE}`}>{textoEje}</p>
           <div className="min-h-0 flex-1">
-            <Dispersion lista={lista} umbral={umbral} eje={vista === "borrador" ? "Máx." : "Mín."} porKilo={vista === "peso"} onElegir={elegir} />
+            <Dispersion lista={lista} umbral={umbral} porKilo={vista === "peso"} onElegir={elegir} />
           </div>
         </section>
-        <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-border/70 bg-card" aria-label="Donde no funciona el margen">
+        <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-border/70 bg-card" aria-label="Donde ganas poco">
           <p className="shrink-0 border-b border-border/70 px-3 py-2 text-sm font-medium">
             {titulo}
             <span className="ml-1 font-normal text-muted-foreground">({filas.length})</span>
@@ -379,13 +475,32 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
           ) : (
             <ul className="min-h-0 flex-1 divide-y divide-border/50 overflow-y-auto overscroll-contain px-1 max-lg:overflow-visible" data-testid="margenes-lista">
               {filas.map((a) => (
-                <FilaArticulo key={a.id} a={a} d={d} conIva={conIva} onElegir={elegir} />
+                <FilaArticulo key={a.id} a={a} d={d} conIva={conIva} onElegir={elegir} onFactura={setFactura} />
               ))}
             </ul>
           )}
         </section>
       </div>
-      <DetalleArticulo articulo={articulo} config={d.config} tiendaActiva={d.tienda.activa} conIva={conIva} puedeEditar={puedeEditar} onCerrar={() => setElegido(null)} />
+      <DetalleArticulo
+        articulo={articulo}
+        config={d.config}
+        hoy={d.hoy}
+        tiendaActiva={d.tienda.activa}
+        conIva={conIva}
+        puedeEditar={puedeEditar}
+        onCerrar={() => setElegido(null)}
+      />
+      {/* Solo montado con una factura elegida (el visor pide la URL firmada al abrirse). */}
+      {factura && (
+        <VisorDocumento
+          documentos={[factura]}
+          indice={0}
+          onIndice={() => undefined}
+          onCerrar={() => setFactura(null)}
+          total={1}
+          onAbrirEnCompras={(enlace) => navigate(`/facturas${enlace}`)}
+        />
+      )}
       <DialogoUmbrales abierto={umbrales} config={d.config} puedeEditar={puedeEditar} onCerrar={() => setUmbrales(false)} />
     </div>
   );

@@ -6,9 +6,12 @@
 // cron diario) cruzadas con los productos de compra de cada artículo.
 // Sin React: se prueba suelto.
 import {
+  facturaDeArticulo,
   fmt,
   platosBorrador,
   problemas,
+  textoFactura,
+  textoPctCoste,
   type ArticuloMargen,
   type MargenesCarta,
 } from "@/lib/analisis/margenesCarta";
@@ -24,15 +27,18 @@ export function peoresMargenes(d: MargenesCarta, limite = 5): ArticuloMargen[] {
   return problemas(articulosFiables(d), d.config).slice(0, limite);
 }
 
-/** Cifra corta de un artículo: «×1,58» (peso y vinos) o «42 % coste» (platos). */
+/**
+ * Cifra corta de un artículo: «×1,58» (peso y vinos) o «coste: 42 % de lo que cobras» (platos;
+ * 13/11/2026, dueño: el % de coste es sobre el precio de VENTA sin IVA, que se entienda).
+ */
 export function cifraMargen(a: ArticuloMargen): string {
-  if (a.tipo === "plato") return a.pct === null ? "—" : `${fmt(a.pct, 0)} % coste`;
+  if (a.tipo === "plato") return textoPctCoste(a.pct);
   return a.multiplicador === null ? "—" : `×${fmt(a.multiplicador, 2)}`;
 }
 
-/** Umbral con el que se compara: «mín. ×2,00» o «máx. 35 %». */
+/** Umbral con el que se compara: «mín. ×2,00» o «máx. 35 % de lo que cobras». */
 export function umbralMargen(a: ArticuloMargen, d: Pick<MargenesCarta, "config">): string {
-  if (a.tipo === "plato") return `máx. ${fmt(d.config.costeMaxPlatoPct, 0)} %`;
+  if (a.tipo === "plato") return `máx. ${fmt(d.config.costeMaxPlatoPct, 0)} % coste sobre venta`;
   return `mín. ×${fmt(a.tipo === "peso" ? d.config.multiplicadorMinPeso : d.config.multiplicadorMinVino, 2)}`;
 }
 
@@ -107,14 +113,21 @@ export function cuentasMargenes(d: MargenesCarta): { enRojo: number; subeCoste: 
 
 /**
  * Lo que cuesta y a cuánto se vende, sin IVA (11/11/2026, dueño: «añade algo más de información»):
- * «coste 12,50 € · carta 25,00 €» o, al peso, «compra 20,00 €/kg · venta 45,00 €/kg». `null` sin datos.
+ * «te cuesta 12,50 € · lo vendes a 25,00 €» o, al peso, «el kilo te cuesta 20,00 € · lo vendes a
+ * 45,00 €». El coste es el de la ÚLTIMA factura (20261128140000). `null` sin datos.
  */
 export function costeYVenta(a: ArticuloMargen): string | null {
   const e = (n: number) => `${fmt(n, 2)} €`;
   if (a.tipo === "peso") {
     if (a.compraKg === null || a.ventaKg === null) return null;
-    return `compra ${e(a.compraKg)}/kg · venta ${e(a.ventaKg)}/kg`;
+    return `el kilo te cuesta ${e(a.compraKg)} · lo vendes a ${e(a.ventaKg)}`;
   }
   if (a.coste === null || a.venta === null) return null;
-  return `coste ${e(a.coste)} · venta ${e(a.venta)}`;
+  return `te cuesta ${e(a.coste)} · lo vendes a ${e(a.venta)}`;
+}
+
+/** «Última factura: Makro, 03/11 · 21,50 €/kg» (para la fila del Dashboard). `null` si no hay. */
+export function ultimaFacturaCorta(a: ArticuloMargen, hoy: string | null = null): string | null {
+  const f = facturaDeArticulo(a);
+  return f ? `Última factura: ${textoFactura(f, hoy)}` : null;
 }

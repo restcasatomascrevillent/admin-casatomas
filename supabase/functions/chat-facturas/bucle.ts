@@ -417,10 +417,11 @@ async function referenciasDeNombrados(nombrados: DocNombrado[], supabase: Client
 }
 
 /**
- * variacion_precios no devuelve el id del documento (sin migracion): se
- * localiza con la misma regla de la RPC (ultima compra = producto + unidad +
- * fecha, el mayor factura_id) y se anade `numero` a cada fila para el modelo.
- * Si algo no cuadra, la fila queda sin referencia (nunca una inventada).
+ * variacion_precios: con 20261128150000_chatbot_ultima_factura cada fila trae ya
+ * `documento_id` y `numero` de su ultima factura (p_comparar = 'anterior'). Si no
+ * (BD sin migrar), se localiza con la misma regla de la RPC (ultima compra =
+ * producto + unidad + fecha, el mayor factura_id) y se anade `numero` a cada fila
+ * para el modelo. Si algo no cuadra, la fila queda sin referencia (nunca una inventada).
  */
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -431,6 +432,7 @@ async function referenciasVariacion(data: any, supabase: Cliente): Promise<DocRe
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const filas: any[] = data.productos.slice(0, 10);
     const ids = await Promise.all(filas.map(async (p) => {
+      if (Number.isInteger(p.documento_id)) return p.documento_id as number;
       if (!p.producto || !p.fecha) return null;
       const { data: prods } = await supabase.from("productos_catalogo").select("id").eq("nombre", p.producto).limit(3);
       let mejor: number | null = null;

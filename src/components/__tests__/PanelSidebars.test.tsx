@@ -156,6 +156,8 @@ describe("menú del Super Admin", () => {
     expect(screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"))).toEqual([
       "Control del Panel", "Usuarios", "Auditoría",
       "Informes",
+      // Tickets (13/11/2026): las peticiones de los usuarios, analizadas por la IA.
+      "Tickets",
       // «Costes» es una pestaña de Servicios desde el 2026-11-04: ya no tiene entrada propia.
       // «Gestor Gasto» está en «Más módulos» desde el 2026-11-10.
       "Servicios",
@@ -408,5 +410,23 @@ describe("menú del panel normal · Tienda (publicada también en producción, d
     const nombres = screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"));
     expect(nombres.indexOf("Tienda")).toBe(nombres.indexOf("Cheques") + 1);
     expect(nombres.indexOf("Facturas")).toBe(nombres.indexOf("Tienda") + 1);
+  });
+});
+
+describe("menú del panel normal · «Nueva petición» (13/11/2026)", () => {
+  it("la ve cualquier usuario, también sin ser super admin, justo antes de Ayuda; y lleva la página de origen", () => {
+    h.isSuperAdmin = false;
+    render(
+      <MemoryRouter initialEntries={["/reservas?tab=hoy"]}>
+        <SidebarProvider>
+          <AppSidebar />
+        </SidebarProvider>
+      </MemoryRouter>,
+    );
+    const enlace = screen.getByRole("link", { name: "Nueva petición" });
+    expect(enlace).toHaveAttribute("href", "/peticiones");
+    const nombres = screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"));
+    expect(nombres.indexOf("Ayuda")).toBe(nombres.indexOf("Nueva petición") + 1);
+    expect(nombres).toContain("Reservas");
   });
 });

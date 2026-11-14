@@ -81,13 +81,19 @@ describe("montaje simulado y vista previa", () => {
     const m = crearMontarSimulado();
     const uno = await m({ ...peticion, fotos: fotos.slice(0, 1) });
     expect(uno.formato).toBe("post");
-    const dos = await m(peticion);
+    const dos = await m({ ...peticion, estilo: "rotulos" });
     expect(dos.formato).toBe("carrusel");
     expect(dos.resumen).toMatch(/2 fotos/);
     expect(m.llamadas).toHaveLength(2);
     const html = documentoDiapositiva("casa-tomas", dos.formato, dos.diapositivas[0], fotos[0]);
     expect(html).toContain("https://x/a.jpg");
     expect(html).toContain(String(dos.diapositivas[0].datos.titular));
+    // Por defecto («Solo foto»): la foto limpia, sin ningún texto.
+    const sola = await m(peticion);
+    expect(sola.diapositivas.map((d) => d.plantilla)).toEqual(["ct-solo-foto", "ct-solo-foto"]);
+    const limpio = documentoDiapositiva("casa-tomas", sola.formato, sola.diapositivas[0], fotos[0])!;
+    expect(limpio).toContain("https://x/a.jpg");
+    expect(limpio).not.toContain("data-campo");
   });
 
   it("plantilla de otra marca: sin documento (se enseña la foto sola)", async () => {

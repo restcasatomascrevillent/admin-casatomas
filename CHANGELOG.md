@@ -2,6 +2,44 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.32.0] - 2026-11-14
+
+Objetivo: Fases 1-6 y cierre del 14/11: fotos y recorte en el móvil, PDF de facturas, Qué decidir y márgenes con la última factura, informes, peticiones, Linear, logs, costes, Control del Panel e Instagram
+
+### Añadido
+- Instagram: plantillas de story del jueves de tapas (la de siempre y mejorada) ([4b88261](https://github.com/restcasatomascrevillent/admin-casatomas/commit/4b882619b8fa9099a3d7ea7d20d90378955265ad))
+- Instagram: «Lo que publicáis ahora» con la acción referencias de instagram-estado ([c60ce9e](https://github.com/restcasatomascrevillent/admin-casatomas/commit/c60ce9e7bbe942bcc9497b46a5447cf0880e8eda))
+- Instagram: story automática del jueves de tapas ([aeb6a36](https://github.com/restcasatomascrevillent/admin-casatomas/commit/aeb6a3682516d02bb3124c85a96d7bdfe6fc31aa))
+- Instagram: «Solo foto» como estilo por defecto del feed ([a6eeb33](https://github.com/restcasatomascrevillent/admin-casatomas/commit/a6eeb33327e91f37528ccd75781724c6c5c6acec))
+- Instagram: «Solo foto» siempre a sangre con encuadre arrastrable ([6d9d082](https://github.com/restcasatomascrevillent/admin-casatomas/commit/6d9d08223eb8ca1896f6ffd9a0eec31a3eaca138))
+- Instagram: estilos de las stories de Casa Tomás como plantillas (ct-estilos) ([25f060b](https://github.com/restcasatomascrevillent/admin-casatomas/commit/25f060bcb1270914faa62563e2ced7fc6343f1c3))
+- Instagram: manuscrita Great Vibes y condensada Oswald en los estilos de Casa Tomás ([70b2c6f](https://github.com/restcasatomascrevillent/admin-casatomas/commit/70b2c6f99de9961a26cc15a6a3f07eab91838263))
+- Instagram: estilos de Casa Tomás calcados de las stories originales ([b7f8d5b](https://github.com/restcasatomascrevillent/admin-casatomas/commit/b7f8d5b0df0defd1ee7a01f1e80c1dd5baf8aed0))
+- Carta: la IA escribe la descripción de un plato nuevo que se crea sin ella ([#194](https://github.com/restcasatomascrevillent/admin-casatomas/pull/194))
+- Cheques regalo: botón «Reenviar correo al cliente» en la información de la compra ([#196](https://github.com/restcasatomascrevillent/admin-casatomas/pull/196))
+- Carta: si la página se recarga, «Añadir vino» recupera la foto y lo que leyó la IA ([#197](https://github.com/restcasatomascrevillent/admin-casatomas/pull/197))
+- Margenes: el coste sale de la última factura y los textos se explican en sencillo ([#198](https://github.com/restcasatomascrevillent/admin-casatomas/pull/198))
+- Chat-facturas: el precio de referencia es el de la última factura ([#199](https://github.com/restcasatomascrevillent/admin-casatomas/pull/199))
+- Logs: Linear listo para activar, con «Probar conexión» y tickets que se entienden ([#200](https://github.com/restcasatomascrevillent/admin-casatomas/pull/200))
+- Logs: explicación «para tontos» en incidencias y sesiones, y errores esperados tras publicar ([#202](https://github.com/restcasatomascrevillent/admin-casatomas/pull/202))
+- Servicios: el precio de todos los servicios y de las IAs en Costes ([#204](https://github.com/restcasatomascrevillent/admin-casatomas/pull/204))
+- Peticiones: «Nueva petición» para todos y «Tickets» con análisis de IA en Super Admin ([#203](https://github.com/restcasatomascrevillent/admin-casatomas/pull/203))
+- Logs: errores por origen en colores (fallo de la web / externo / no depende de la web) y Configuración en subpestañas ([#208](https://github.com/restcasatomascrevillent/admin-casatomas/pull/208))
+- Tickets: «Enviar a Linear» crea la tarea en Linear desde Super Admin › Tickets ([#209](https://github.com/restcasatomascrevillent/admin-casatomas/pull/209))
+- Detalles para cerrar (14/11): Qué decidir, márgenes, facturas, carta, Telegram e informes ([#210](https://github.com/restcasatomascrevillent/admin-casatomas/pull/210))
+
+### Cambiado
+- Instagram: el montaje automático no usa los estilos calcados ([c9a9d7c](https://github.com/restcasatomascrevillent/admin-casatomas/commit/c9a9d7c43f5f870c1e61589cbae5a975147d5493))
+- Facturas: sin el aviso «Leyendo documentos» al subir varias a la vez ([#191](https://github.com/restcasatomascrevillent/admin-casatomas/pull/191))
+- Facturas: el PDF del original se ve en el panel, hoja a hoja ([#192](https://github.com/restcasatomascrevillent/admin-casatomas/pull/192))
+- Sesion: con poca cobertura, el panel reintenta antes de mandarte a entrar ([#195](https://github.com/restcasatomascrevillent/admin-casatomas/pull/195))
+- Carta: en el móvil el fondo se quita en el servidor y nunca se sube una foto sin recortar ([#193](https://github.com/restcasatomascrevillent/admin-casatomas/pull/193))
+- Ia: las llamadas de un modelo sin tarifa ya no se quedan sin coste ([#201](https://github.com/restcasatomascrevillent/admin-casatomas/pull/201))
+- Migraciones: la de tarifas de IA pasa a 20261129143100 (versión repetida) ([#205](https://github.com/restcasatomascrevillent/admin-casatomas/pull/205))
+- Logs: «Probar conexión con Linear» ya no choca con el límite de complejidad de Linear ([#206](https://github.com/restcasatomascrevillent/admin-casatomas/pull/206))
+- Logs: «Guardar configuración» ya no falla con «permission denied for table web_logs_config» ([#207](https://github.com/restcasatomascrevillent/admin-casatomas/pull/207))
+- Control-panel: todos los módulos del panel con su interruptor, y apagarlos bloquea también su ruta ([#211](https://github.com/restcasatomascrevillent/admin-casatomas/pull/211))
+
 ## [1.31.0] - 2026-11-13
 
 Objetivo: Las reservas anuladas siguen en la lista del día con la etiqueta «Anulada» y el botón pasa a «Anular reserva»

@@ -14,6 +14,19 @@ import type { MarcaId } from "./tokens";
 /** Formatos que puede montar la IA. El reel va por su propio editor. */
 export type FormatoMontado = "post" | "carrusel" | "story";
 
+/**
+ * Estilo de las imágenes del FEED (post y carrusel) que monta la IA
+ * (12/11/2026, RRSS › Instagram › Ajustes «Estilo del feed»):
+ * - "solo_foto" (por defecto): la foto limpia, sin texto encima («Solo foto»,
+ *   ct-solo-foto / tz-solo-foto), como el feed real de la cuenta; el nombre
+ *   del plato y el gancho van en el texto de la publicación.
+ * - "rotulos": las plantillas con titular y rótulos (portada → plato → cierre).
+ * Las stories llevan siempre rótulos.
+ */
+export type EstiloFeed = "solo_foto" | "rotulos";
+export const ESTILOS_FEED: readonly EstiloFeed[] = ["solo_foto", "rotulos"];
+export const ESTILO_FEED_POR_DEFECTO: EstiloFeed = "solo_foto";
+
 /** Máximo de imágenes de un carrusel en Instagram. */
 export const MAX_FOTOS_CARRUSEL = 10;
 
@@ -37,6 +50,8 @@ export interface PeticionMontar {
   indicacion?: string;
   /** Tono: cercano | elegante | retranca. */
   tono?: "cercano" | "elegante" | "retranca";
+  /** Estilo de las imágenes del feed (por defecto «solo_foto»). No afecta a la story. */
+  estilo?: EstiloFeed;
 }
 
 /** Una imagen de la publicación montada (un post tiene 1; un carrusel, 2–10). */

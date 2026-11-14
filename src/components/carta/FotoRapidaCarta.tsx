@@ -217,7 +217,7 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
               type="button"
               className="h-11"
               onClick={guardar}
-              disabled={!fotoCarta.original || fotoCarta.trabajando || guardando}
+              disabled={!fotoCarta.original || fotoCarta.trabajando || fotoCarta.faltaFondo || guardando}
             >
               {guardando ? (
                 <>

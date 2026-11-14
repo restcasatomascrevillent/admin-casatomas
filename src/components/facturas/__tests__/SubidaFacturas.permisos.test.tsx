@@ -17,6 +17,7 @@ vi.mock("@/integrations/supabase/client", async () => {
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }), useUsuarioIdOpcional: () => "u1" }));
 const h = vi.hoisted(() => ({ permisos: {} as Record<string, { view?: boolean; edit?: boolean }> }));
 vi.mock("@/hooks/useUserRole", () => ({
+  useUserRole: () => ({ isAdmin: false, loading: false }),
   useCanAccessSection: (seccion: string, tipo: "view" | "edit" = "view") => ({ canAccess: !!h.permisos[seccion]?.[tipo], loading: false }),
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }) }));

@@ -114,7 +114,7 @@ describe("Crear (dos columnas)", () => {
   it("varias fotos → Montar con IA → carrusel navegable → Publicar ahora con progreso y enlace", async () => {
     const montar = crearMontadorSimulado();
     const { api, llamadas } = crearApiSimulada({ retraso: 30 });
-    pintar(<CrearInstagram montar={montar} api={api} />);
+    pintar(<CrearInstagram montar={montar} api={api} estiloFeed="rotulos" />);
     await elegir(3);
     expect(screen.getByTestId("contador-fotos")).toHaveTextContent("3 de 10");
     expect(within(screen.getByTestId("orden-fotos")).getAllByRole("listitem")).toHaveLength(3);
@@ -186,8 +186,27 @@ describe("Crear (dos columnas)", () => {
     expect(onVerCalendario).toHaveBeenCalled();
   });
 
+  it("estilo del feed «Solo foto» (por defecto): Montar con IA lo pide, la vista previa va sin texto y lo dice", async () => {
+    const montar = crearMontadorSimulado();
+    pintar(<CrearInstagram montar={montar} api={crearApiSimulada().api} estiloFeed="solo_foto" />);
+    await elegir(2);
+    expect(screen.getByText(/Irá sin texto encima/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Montar con IA/ }));
+    await screen.findByTestId("resumen-ia");
+    expect(montar.peticiones[0]).toMatchObject({ estilo: "solo_foto" });
+    await waitFor(() => expect(documento()).toContain('data-plantilla="ct-solo-foto"'));
+    expect(documento()).not.toContain("data-campo");
+    expect(screen.getByTestId("aviso-solo-foto")).toHaveTextContent("Sin texto encima");
+    await waitFor(() => expect(screen.getByRole("button", { name: /Publicar ahora/ })).toBeEnabled());
+    // En «Ajustar a mano» se puede volver a una plantilla con rótulos.
+    fireEvent.click(screen.getByRole("button", { name: /Ajustar a mano/ }));
+    const ajustes = await screen.findByTestId("ajustar-a-mano");
+    expect(within(ajustes).getByTestId("sin-rotulos")).toBeInTheDocument();
+    expect(within(ajustes).queryByLabelText("Titular")).toBeNull();
+  });
+
   it("«Ajustar a mano» cambia el rótulo de una imagen y la vista previa lo enseña", async () => {
-    pintar(<CrearInstagram montar={crearMontadorSimulado()} api={crearApiSimulada().api} />);
+    pintar(<CrearInstagram montar={crearMontadorSimulado()} api={crearApiSimulada().api} estiloFeed="rotulos" />);
     await elegir(2);
     fireEvent.click(screen.getByRole("button", { name: /Montar con IA/ }));
     await screen.findByTestId("resumen-ia");

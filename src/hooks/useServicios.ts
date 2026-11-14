@@ -17,14 +17,21 @@ export const CLAVE_RESUMEN_MES = ["super-admin", "servicios-resumen-mes"] as con
 const COLUMNAS_BASE: string = "proveedor, nombre, plan, precio_mensual, moneda, ciclo, renovacion, cuenta, panel_url, limites, notas, actualizado_en";
 /** Columnas de 20261103160000 (planes y coste). */
 const COLUMNAS: string = `${COLUMNAS_BASE}, categoria, orden, activo, por_confirmar, precio_anual, fuente_precio`;
+/** Columnas de 20261129153000 (para qué, precio confirmado y plan siguiente). */
+const CAMPOS_INVENTARIO = ["para_que", "precio_confirmado_en", "plan_siguiente", "precio_siguiente", "si_se_pasa"] as const;
+const COLUMNAS_INVENTARIO: string = `${COLUMNAS}, ${CAMPOS_INVENTARIO.join(", ")}`;
 
 /** Columnas que el super admin puede cambiar (las mismas que conceden las migraciones). */
 export type CambiosServicio = Partial<Pick<ServicioContratado,
   "nombre" | "plan" | "precio_mensual" | "moneda" | "ciclo" | "renovacion" | "cuenta" | "panel_url" | "limites" | "notas"
-  | "categoria" | "orden" | "activo" | "por_confirmar" | "precio_anual" | "fuente_precio">>;
+  | "categoria" | "orden" | "activo" | "por_confirmar" | "precio_anual" | "fuente_precio"
+  | "para_que" | "precio_confirmado_en" | "plan_siguiente" | "precio_siguiente" | "si_se_pasa">>;
 
-/** `costes`: false si falta 20261103160000 (sin categorías, coste variable ni tipo de cambio). */
-export type ResultadoServicios = { disponible: true; costes: boolean; servicios: ServicioContratado[] } | { disponible: false };
+/**
+ * `costes`: false si falta 20261103160000 (sin categorías, coste variable ni tipo de cambio).
+ * `inventario`: false si falta 20261129153000 (sin «para qué», precio confirmado ni plan siguiente).
+ */
+export type ResultadoServicios = { disponible: true; costes: boolean; inventario: boolean; servicios: ServicioContratado[] } | { disponible: false };
 
 /** Columna que no existe (base sin 20261103160000). */
 const esColumnaNueva = (e: { code?: string; message?: string } | null) =>
@@ -43,7 +50,12 @@ export function esSinMigracionServicios(error: unknown): boolean {
 
 export async function cargarServicios(): Promise<ResultadoServicios> {
   let costes = true;
-  let { data, error } = await sb.from("servicios_contratados").select(COLUMNAS).order("proveedor");
+  let inventario = true;
+  let { data, error } = await sb.from("servicios_contratados").select(COLUMNAS_INVENTARIO).order("proveedor");
+  if (error && esColumnaNueva(error) && !esSinMigracionServicios(error)) {
+    inventario = false;
+    ({ data, error } = await sb.from("servicios_contratados").select(COLUMNAS).order("proveedor"));
+  }
   if (error && esColumnaNueva(error) && !esSinMigracionServicios(error)) {
     costes = false;
     ({ data, error } = await sb.from("servicios_contratados").select(COLUMNAS_BASE).order("proveedor"));
@@ -62,8 +74,13 @@ export async function cargarServicios(): Promise<ResultadoServicios> {
     activo: s.activo !== false,
     por_confirmar: s.por_confirmar === true,
     fuente_precio: s.fuente_precio ?? null,
+    para_que: s.para_que ?? null,
+    precio_confirmado_en: typeof s.precio_confirmado_en === "string" ? s.precio_confirmado_en.slice(0, 10) : null,
+    plan_siguiente: s.plan_siguiente ?? null,
+    precio_siguiente: s.precio_siguiente == null ? null : Number(s.precio_siguiente),
+    si_se_pasa: s.si_se_pasa ?? null,
   }));
-  return { disponible: true, costes, servicios };
+  return { disponible: true, costes, inventario: costes && inventario, servicios };
 }
 
 export interface ConfigServicios {
@@ -182,12 +199,15 @@ export function useActualizarLecturas() {
 export function useGuardarServicio() {
   const cliente = useQueryClient();
   return useMutation({
-    mutationFn: async ({ proveedor, cambios, costes = true }: { proveedor: string; cambios: CambiosServicio; costes?: boolean }) => {
+    mutationFn: async ({ proveedor, cambios, costes = true, inventario = true }: { proveedor: string; cambios: CambiosServicio; costes?: boolean; inventario?: boolean }) => {
+      // Sin 20261129153000 no existen las columnas del inventario: no se mandan.
+      const sinInventario = (c: CambiosServicio): CambiosServicio =>
+        inventario && costes ? c : Object.fromEntries(Object.entries(c).filter(([k]) => !(CAMPOS_INVENTARIO as readonly string[]).includes(k)));
       // Sin 20261103160000 solo existen las columnas de la primera migración.
       // El precio al año se guarda entonces como precio al mes (pago anual).
-      const enviar: CambiosServicio = costes ? cambios : {
+      const enviar: CambiosServicio = costes ? sinInventario(cambios) : {
         ...Object.fromEntries(
-          Object.entries(cambios).filter(([k]) => !["categoria", "orden", "activo", "por_confirmar", "precio_anual", "fuente_precio"].includes(k)),
+          Object.entries(sinInventario(cambios)).filter(([k]) => !["categoria", "orden", "activo", "por_confirmar", "precio_anual", "fuente_precio"].includes(k)),
         ),
         ...(cambios.precio_anual != null ? { precio_mensual: Math.round((cambios.precio_anual / 12) * 100) / 100 } : {}),
       };
@@ -216,8 +236,9 @@ function mensajeAltaBaja(error: { code?: string; message?: string }, accion: "a�
 export function useCrearServicio() {
   const cliente = useQueryClient();
   return useMutation({
-    mutationFn: async (nuevo: CambiosServicio & Pick<ServicioContratado, "proveedor" | "nombre">) => {
-      const { data, error } = await sb.from("servicios_contratados").insert(nuevo).select(COLUMNAS);
+    mutationFn: async ({ inventario = true, ...nuevo }: CambiosServicio & Pick<ServicioContratado, "proveedor" | "nombre"> & { inventario?: boolean }) => {
+      const fila = inventario ? nuevo : Object.fromEntries(Object.entries(nuevo).filter(([k]) => !(CAMPOS_INVENTARIO as readonly string[]).includes(k)));
+      const { data, error } = await sb.from("servicios_contratados").insert(fila).select(COLUMNAS);
       if (error) throw new Error(mensajeAltaBaja(error, "añadir"));
       if (!data || data.length === 0) throw new Error("No se ha guardado: solo un super admin puede añadir servicios.");
       return data[0] as unknown as ServicioContratado;

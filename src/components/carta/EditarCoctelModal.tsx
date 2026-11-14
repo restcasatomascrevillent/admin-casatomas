@@ -517,7 +517,7 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
               <Button type="button" variant="outline" className="h-11 px-5" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="h-11 px-5" disabled={actualizarCoctel.isPending || isUploadingImage || fotoCarta.trabajando}>
+              <Button type="submit" className="h-11 px-5" disabled={actualizarCoctel.isPending || isUploadingImage || fotoCarta.trabajando || fotoCarta.faltaFondo}>
                 {actualizarCoctel.isPending || isUploadingImage ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

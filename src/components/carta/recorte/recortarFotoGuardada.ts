@@ -73,7 +73,15 @@ export async function recortarFotoGuardada(d: DatosRecorte, opts: OpcionesRecort
   const reducida = await reducirFotoRecorte(original, opts.lado ?? LADO_RECORTE_PC);
   original = null;
   const { quitarFondoNavegador } = await import("./quitarFondoNavegador");
-  const sticker = await quitarFondoNavegador(reducida, opts.onProgreso);
+  let sticker = await quitarFondoNavegador(reducida, opts.onProgreso);
+  if (TIPO_TABLA[d.tabla] === "plato") {
+    // El modelo a veces deja solo la comida: se busca el plato entero (completarPlato.ts).
+    try {
+      sticker = await (await import("./completarPlato")).completarPlato(reducida, sticker);
+    } catch (e) {
+      console.warn("[recorte] no se pudo completar el plato", e);
+    }
+  }
   const compuesta = await componerFotoCarta(sticker, { tipo: TIPO_TABLA[d.tabla], tema: d.tema as NombreTema });
   const rutaCarta = rutaCartaDesdeOriginal(d.rutaOriginal, extensionFoto(compuesta));
 

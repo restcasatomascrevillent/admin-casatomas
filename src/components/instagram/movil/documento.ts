@@ -22,6 +22,10 @@ export function documentoDiapositiva(marca: MarcaId, formato: FormatoMontado, d:
   const datos: Record<string, unknown> = { marca, formato: formatoPieza, plantilla: pl.id };
   for (const [k, v] of Object.entries(d.datos)) if (admitidos.has(k as CampoPieza) && k !== "foto" && v !== "" && v != null) datos[k] = v;
   if (datos.titular === undefined) datos.titular = "";
+  // «Solo foto»: el encuadre (posicionX / posicionY, en %).
+  if (pl.sinTexto) {
+    for (const k of ["posicionX", "posicionY"] as const) if (typeof d.datos[k] === "number") datos[k] = d.datos[k];
+  }
   const catalogo: Foto[] = [];
   if (admitidos.has("foto") && foto) {
     datos.foto = foto.id;

@@ -1,7 +1,15 @@
-// Análisis general › Márgenes de carta (RPC `margenes_carta`, migración
-// 20261115200000_analisis_margenes_carta). Aquí: tipos, normalización del jsonb
-// (defensiva: el panel no se cae si falta un campo), textos del «porqué» y orden
-// de la lista de «donde no funciona el margen». Sin React: se prueba suelto.
+// Facturas › Márgenes (RPC `margenes_carta`, migración 20261115200000_analisis_margenes_carta).
+// Aquí: tipos, normalización del jsonb (defensiva: el panel no se cae si falta un
+// campo), textos del «porqué» y orden de la lista de «donde no funciona el margen».
+// Sin React: se prueba suelto.
+//
+// 13/11/2026 (dueño: «que siempre salga la última factura… la sección de márgenes
+// es muy difícil de entender… explicado para tontos»; migración
+// 20261128140000_margenes_ultima_factura): el coste es el de la ÚLTIMA factura de
+// cada producto (`factura`: proveedor, fecha, precio tal como se compró y enlace al
+// original); la mediana de los últimos 90 días va aparte (`*Mediana`), como
+// contexto. Los textos dicen el % de coste como «de cada 100 € que cobras (sin
+// IVA), X € se van en…»: es un % del PRECIO DE VENTA sin IVA, no del coste.
 import type { DocumentoCifra } from "@/lib/facturas/documentosCifra";
 
 export type Bandera =
@@ -30,6 +38,24 @@ export const ETIQUETA_BANDERA: Record<Bandera, string> = {
 };
 
 export type UnidadEscandallo = "g" | "ml" | "ud";
+
+/**
+ * La factura de la que sale el coste (la ÚLTIMA de ese producto): sirve para
+ * enseñarla («Última factura: Makro, 03/11 · 21,50 €/kg») y para abrir su original
+ * en el visor de documentos.
+ */
+export interface FacturaUsada extends DocumentoCifra {
+  lineaId: number | null;
+  nombreLinea: string | null;
+  /** Unidad de compra normalizada: «kg», «l», «caja», «botella», «ud»… */
+  unidadCompra: string | null;
+  /** Precio por unidad de compra (importe de la línea ÷ cantidad), sin IVA. */
+  precioUnidad: number | null;
+  /** «kg» o «l» si la línea trae el peso o el volumen. */
+  medida: string | null;
+  /** € por kg o por litro, sin IVA (si la línea trae el peso o el volumen). */
+  eurBase: number | null;
+}
 
 export interface ConfigMargenes {
   costeMaxPlatoPct: number;
@@ -71,6 +97,17 @@ export interface Ingrediente {
   ivaOrigen: OrigenIva | null;
   eurIva: number | null;
   costeIva: number | null;
+  /** Mediana de los últimos `diasReferencia` días, misma unidad que `eur` (contexto). */
+  eurMediana: number | null;
+  costeMediana: number | null;
+  /** Precio de la factura anterior a la última, misma unidad que `eur`. */
+  eurAnterior: number | null;
+  fechaAnterior: string | null;
+  proveedorAnterior: string | null;
+  /** Fecha de la última factura que había hace 6 meses (la de `eur6m`). */
+  fecha6m: string | null;
+  /** La factura de la que sale `eur` (la última). */
+  factura: FacturaUsada | null;
 }
 
 export interface PlatoMargen {
@@ -93,6 +130,11 @@ export interface PlatoMargen {
   variacionPct: number | null;
   principal: string | null;
   principalCoste: number | null;
+  /** Coste y % con la mediana de cada ingrediente (contexto; null si a alguno le falta). */
+  costeMediana: number | null;
+  pctMediana: number | null;
+  /** Última factura del ingrediente que más pesa en el coste. */
+  factura: FacturaUsada | null;
   origen: "estimado" | "manual" | null;
   revisado: boolean;
   motivo: string | null;
@@ -115,9 +157,20 @@ export interface VinoMargen {
   /** Litros del producto comprado (null si no se sabe). */
   litrosProducto: number | null;
   formatoDistinto: boolean;
+  /** Lo que cuesta la botella (formato de la carta) según la ÚLTIMA factura, sin IVA. */
   coste: number | null;
+  /** Lo mismo con la última factura que había hace 6 meses. */
   coste6m: number | null;
   costeIva: number | null;
+  /** Con la mediana de los últimos días de referencia (contexto). */
+  costeMediana: number | null;
+  multiplicadorMediana: number | null;
+  /** Con la factura anterior a la última. */
+  costeAnterior: number | null;
+  fechaAnterior: string | null;
+  proveedorAnterior: string | null;
+  fecha6m: string | null;
+  factura: FacturaUsada | null;
   ivaCompraPct: number | null;
   ivaOrigen: OrigenIva | null;
   /** Venta SIN IVA ÷ coste sin IVA. */
@@ -161,14 +214,26 @@ export interface PesoMargen {
   ventaKg: number | null;
   productoId: number | null;
   producto: string | null;
-  /** Coste de compra €/kg sin IVA (mediana 90 días o 3 últimas compras). */
+  /** Coste de compra €/kg sin IVA de la ÚLTIMA factura con peso. */
   compraKg: number | null;
+  /** €/kg de la última factura que había hace 6 meses. */
   compraKg6m: number | null;
+  /** Mediana €/kg de los últimos días de referencia (contexto). */
+  compraKgMediana: number | null;
+  multiplicadorMediana: number | null;
+  compraKgAnterior: number | null;
+  fechaAnterior: string | null;
+  proveedorAnterior: string | null;
+  fecha6m: string | null;
+  /** La factura del €/kg (o, si ninguna compra trae el peso, la última compra). */
+  factura: FacturaUsada | null;
   /** Compra €/kg con el IVA de sus líneas (solo para enseñar). */
   compraKgIva: number | null;
   ivaCompraPct: number | null;
   ivaOrigen: OrigenIva | null;
   lineas: number | null;
+  /** Fecha de la compra más nueva del producto (aunque no traiga el peso). */
+  ultima: string | null;
   ultimoProveedor: string | null;
   ultimaFecha: string | null;
   /** ventaKg / compraKg. */
@@ -193,6 +258,8 @@ export interface ResumenMargenes {
 
 export interface MargenesCarta {
   hoy: string | null;
+  /** De dónde sale el coste: la última factura (20261128140000) o, sin la migración, la mediana. */
+  costeDesde: "ultima_factura" | "mediana";
   config: ConfigMargenes;
   /** Tienda de vinos (configuracion_tienda): el margen de tienda se calcula aunque esté desactivada. */
   tienda: { activa: boolean; descuentoPct: number };
@@ -217,6 +284,34 @@ const banderas = (v: unknown): Bandera[] => arr(v).filter((b): b is Bandera => t
 const origen = (v: unknown) => (v === "manual" ? "manual" : v === "estimado" ? "estimado" : null);
 const unidad = (v: unknown): UnidadEscandallo => (v === "ml" || v === "ud" ? v : "g");
 const origenIva = (v: unknown): OrigenIva | null => (v === "linea" || v === "factura" || v === "supuesto" ? v : null);
+
+/** La factura usada (jsonb `factura` de margenes_carta). null si no viene o no tiene id. */
+export function normalizarFactura(v: unknown): FacturaUsada | null {
+  const f = obj(v);
+  const id = num(f.id);
+  if (id === null) return null;
+  return {
+    id,
+    fecha: txt(f.fecha),
+    proveedor: txt(f.proveedor) ?? "Sin proveedor",
+    proveedorId: num(f.proveedor_id),
+    numero: txt(f.numero_documento),
+    tipo: f.tipo === "albaran" || f.tipo === "abono" ? f.tipo : "factura",
+    local: f.local === "touza" ? "touza" : "casa_tomas",
+    total: num(f.total),
+    aporta: num(f.importe) ?? 0,
+    cantidad: num(f.cantidad),
+    lineas: null,
+    driveUrl: txt(f.drive_url),
+    archivoPath: txt(f.archivo_path),
+    lineaId: num(f.linea_id),
+    nombreLinea: txt(f.nombre_linea),
+    unidadCompra: txt(f.unidad_compra),
+    precioUnidad: num(f.precio_unidad),
+    medida: txt(f.medida),
+    eurBase: num(f.eur_base),
+  };
+}
 
 export const CONFIG_POR_DEFECTO: ConfigMargenes = {
   costeMaxPlatoPct: 35,
@@ -254,6 +349,9 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
     variacionPct: num(p.variacion_pct),
     principal: txt(p.principal),
     principalCoste: num(p.principal_coste),
+    costeMediana: num(p.coste_mediana),
+    pctMediana: num(p.pct_mediana),
+    factura: normalizarFactura(p.factura),
     origen: origen(p.origen),
     revisado: p.revisado === true,
     motivo: txt(p.motivo),
@@ -278,6 +376,13 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
       ivaOrigen: origenIva(i.iva_origen),
       eurIva: num(i.eur_iva),
       costeIva: num(i.coste_iva),
+      eurMediana: num(i.eur_mediana),
+      costeMediana: num(i.coste_mediana),
+      eurAnterior: num(i.eur_anterior),
+      fechaAnterior: txt(i.fecha_anterior),
+      proveedorAnterior: txt(i.proveedor_anterior),
+      fecha6m: txt(i.fecha_6m),
+      factura: normalizarFactura(i.factura),
     })),
   }));
   const vinos: VinoMargen[] = arr(r.vinos).map(obj).filter((v) => txt(v.id)).map((v) => ({
@@ -296,6 +401,13 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
     coste: num(v.coste),
     coste6m: num(v.coste_6m),
     costeIva: num(v.coste_iva),
+    costeMediana: num(v.coste_mediana),
+    multiplicadorMediana: num(v.multiplicador_mediana),
+    costeAnterior: num(v.coste_anterior),
+    fechaAnterior: txt(v.fecha_anterior),
+    proveedorAnterior: txt(v.proveedor_anterior),
+    fecha6m: txt(v.fecha_6m),
+    factura: normalizarFactura(v.factura),
     ivaCompraPct: num(v.iva_compra_pct),
     ivaOrigen: origenIva(v.iva_origen),
     multiplicador: num(v.multiplicador),
@@ -330,10 +442,18 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
     producto: txt(x.producto),
     compraKg: num(x.compra_kg),
     compraKg6m: num(x.compra_kg_6m),
+    compraKgMediana: num(x.compra_kg_mediana),
+    multiplicadorMediana: num(x.multiplicador_mediana),
+    compraKgAnterior: num(x.compra_kg_anterior),
+    fechaAnterior: txt(x.fecha_anterior),
+    proveedorAnterior: txt(x.proveedor_anterior),
+    fecha6m: txt(x.fecha_6m),
+    factura: normalizarFactura(x.factura),
     compraKgIva: num(x.compra_kg_iva),
     ivaCompraPct: num(x.iva_compra_pct),
     ivaOrigen: origenIva(x.iva_origen),
     lineas: num(x.lineas),
+    ultima: txt(x.ultima),
     ultimoProveedor: txt(x.ultimo_proveedor),
     ultimaFecha: txt(x.ultima_fecha),
     multiplicador: num(x.multiplicador),
@@ -346,6 +466,7 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
   }));
   return {
     hoy: txt(r.hoy),
+    costeDesde: r.coste_desde === "ultima_factura" ? "ultima_factura" : "mediana",
     config: {
       costeMaxPlatoPct: num(c.coste_max_plato_pct) ?? CONFIG_POR_DEFECTO.costeMaxPlatoPct,
       multiplicadorMinVino: num(c.multiplicador_min_vino) ?? CONFIG_POR_DEFECTO.multiplicadorMinVino,
@@ -382,6 +503,11 @@ export const veces = (n: number | null) => (n === null ? "—" : `${fmt(n, 2)}×
 /** «190 €/kg», «172,73 €/kg». */
 export const eurosKg = (n: number | null, dec?: number) =>
   n === null ? "—" : `${fmt(n, dec ?? (Number.isInteger(n) ? 0 : 2))} €/kg`;
+/** Número sin ceros que sobran: 2 → «2», 2,3 → «2,3», 1,567 → «1,57». */
+export const numero = (n: number | null) =>
+  n === null ? "—" : n.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+/** Precio de carta: «24 €», «21,82 €» (sin «,00» que sobra). */
+export const eurosCarta = (n: number | null) => (n === null ? "—" : Number.isInteger(n) ? `${fmt(n, 0)} €` : euros(n));
 
 /** «140 €/kg», «20 €/l», «29,52 € la cubeta». */
 export function precioCompra(i: Pick<Ingrediente, "eur" | "unidad" | "medida" | "unidadCompra">): string {
@@ -395,54 +521,147 @@ export function precioCompra(i: Pick<Ingrediente, "eur" | "unidad" | "medida" | 
 export const cantidadTexto = (i: Pick<Ingrediente, "cantidad" | "unidad">) =>
   `${fmt(i.cantidad, Number.isInteger(i.cantidad) ? 0 : i.cantidad < 0.1 ? 3 : 2)} ${i.unidad}`;
 
-// ─── El porqué ────────────────────────────────────────────────────────────
+// ─── La última factura ────────────────────────────────────────────────────
+/** «03/11» si es del mismo año que `hoy` (o no se sabe `hoy`); si no, «03/11/25». */
+export function fechaFactura(fecha: string | null, hoy: string | null = null): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(fecha ?? "");
+  if (!m) return "sin fecha";
+  const mismoAno = !hoy || hoy.slice(0, 4) === m[1];
+  return mismoAno ? `${m[3]}/${m[2]}` : `${m[3]}/${m[2]}/${m[1].slice(2)}`;
+}
+
+/** «la caja», «la botella», «la unidad». */
+const laUnidad = (u: string | null) => (!u || u === "ud" ? "la unidad" : `la ${u}`);
+
 /**
- * Una frase que explica por qué falla (o por qué no se puede saber):
- *   «Percebes: cuesta 110 €/kg y se vende a 172,73 €/kg sin IVA → 64 % de coste»
- *   «Arroz meloso de langosta: el coste (15,14 €) es el 51 % de lo que se cobra sin IVA (29,55 €); lo que más pesa, Langosta»
+ * Precio de la factura en SU unidad, con el €/kg (o €/l) entre paréntesis cuando aporta:
+ * «21,50 €/kg», «29,52 € la caja (8,20 €/kg)», «12,00 € la botella (16,00 €/l)», «3,20 € la unidad».
  */
-export function razon(a: ArticuloMargen, config: ConfigMargenes = CONFIG_POR_DEFECTO): string {
-  if (a.banderas.includes("sin_precio")) return `${a.nombre}: no tiene precio en la carta.`;
-  if (a.banderas.includes("sin_mapear")) return `${a.nombre}: ${a.motivo ?? (a.tipo === "plato" ? "sin escandallo" : "sin producto de compra asociado")}.`;
-  if (a.banderas.includes("sin_datos")) {
-    if (a.tipo === "peso" && a.motivo) return `${a.nombre}: ${a.motivo}.`;
-    return `${a.nombre}: no hay compras de ${a.tipo === "plato" ? "sus ingredientes" : a.producto ?? "la botella"} para calcular el coste.`;
+export function precioFactura(f: Pick<FacturaUsada, "unidadCompra" | "precioUnidad" | "medida" | "eurBase">): string {
+  const u = f.unidadCompra;
+  if ((u === "kg" || u === "l") && (f.eurBase ?? f.precioUnidad) !== null) return `${euros(f.eurBase ?? f.precioUnidad)}/${u}`;
+  if (f.precioUnidad === null) return f.eurBase !== null && f.medida ? `${euros(f.eurBase)}/${f.medida}` : "—";
+  const base = f.eurBase !== null && f.medida ? ` (${euros(f.eurBase)}/${f.medida})` : "";
+  return `${euros(f.precioUnidad)} ${laUnidad(u)}${base}`;
+}
+
+/** «Makro, 03/11 · 21,50 €/kg». */
+export const textoFactura = (f: FacturaUsada, hoy: string | null = null) => `${f.proveedor}, ${fechaFactura(f.fecha, hoy)} · ${precioFactura(f)}`;
+
+/** La factura que manda en el coste: la del artículo (vino, al peso) o la del ingrediente que más pesa (plato). */
+export function facturaDeArticulo(a: ArticuloMargen): FacturaUsada | null {
+  return a.factura;
+}
+
+/** «3 meses» (90 días), «2 meses» (60), «45 días». */
+export const periodoMediana = (dias: number) => (dias % 30 === 0 ? (dias === 30 ? "1 mes" : `${dias / 30} meses`) : `${dias} días`);
+
+/**
+ * La mediana como contexto, en la misma unidad que el coste que se enseña:
+ * «Mediana de 3 meses: 20,10 €/kg» (al peso), «… 10,50 € la botella» (vino),
+ * «… 7,80 € (35 % de lo que cobras)» (plato). null si no hay mediana.
+ */
+export function textoMediana(a: ArticuloMargen, config: ConfigMargenes = CONFIG_POR_DEFECTO): string | null {
+  const cab = `Lo normal en ${periodoMediana(config.diasReferencia)} (mediana)`;
+  if (a.tipo === "peso") return a.compraKgMediana === null ? null : `${cab}: ${eurosKg(a.compraKgMediana, 2)}`;
+  if (a.tipo === "vino") return a.costeMediana === null ? null : `${cab}: ${euros(a.costeMediana)} la botella`;
+  if (a.costeMediana === null) return null;
+  return `${cab}: hacerlo costaría ${euros(a.costeMediana)}` + (a.pctMediana !== null ? ` (${textoPctCoste(a.pctMediana)})` : "");
+}
+
+/** Ingrediente: «Mediana de 3 meses: 20,10 €/kg». */
+export function textoMedianaIngrediente(i: Ingrediente, config: ConfigMargenes = CONFIG_POR_DEFECTO): string | null {
+  if (i.eurMediana === null) return null;
+  return `Lo normal en ${periodoMediana(config.diasReferencia)} (mediana): ${precioCompra({ ...i, eur: i.eurMediana })}`;
+}
+
+/**
+ * Si la compra más nueva del producto es posterior a la factura usada (esa compra no
+ * trae el peso o la unidad que hace falta), se dice: «Hay una compra más nueva (05/11)
+ * sin precio por kilo: se usa esta».
+ */
+export function avisoCompraMasNueva(f: FacturaUsada | null, ultima: string | null, hoy: string | null = null): string | null {
+  if (!f?.fecha || !ultima || ultima <= f.fecha) return null;
+  return `Hay una compra más nueva (${fechaFactura(ultima, hoy)}) que no trae ${f.medida === "l" ? "el volumen" : f.medida === "kg" ? "el peso" : "la misma unidad"}: se usa esta`;
+}
+
+// ─── El porqué (en sencillo) ──────────────────────────────────────────────
+/**
+ * Lo que pasa con el artículo, para quien no sabe de márgenes:
+ *   «Lo vendes a 24 € (21,82 € sin IVA). Hacerlo te cuesta 8,10 €. De cada 10 € que
+ *    cobras, 3,70 € es lo que te cuesta en ingredientes (máximo 3,50 €).»
+ * El % es SIEMPRE sobre el precio de venta sin IVA. El coste es el de la última factura.
+ */
+export function explicacion(a: ArticuloMargen, config: ConfigMargenes = CONFIG_POR_DEFECTO): string {
+  if (a.banderas.includes("sin_precio")) return "No tiene precio en la carta.";
+  if (a.banderas.includes("sin_mapear")) {
+    const m = a.motivo ?? (a.tipo === "plato" ? "Sin escandallo (no se sabe qué lleva)" : "Sin producto de compra asociado");
+    return `${m.charAt(0).toUpperCase()}${m.slice(1)}.`;
   }
-  const partes: string[] = [];
+  if (a.banderas.includes("sin_datos")) {
+    if (a.tipo === "peso" && a.motivo) return `${a.motivo}.`;
+    return `No hay compras de ${a.tipo === "plato" ? "sus ingredientes" : a.producto ?? "la botella"} para saber lo que cuesta.`;
+  }
+  const frases: string[] = [];
+  // «De cada 10 € que cobras, X € es lo que te cuesta…»: el % de coste sobre la venta sin IVA
+  // (si no viene, sale del multiplicador: 100 ÷ ×). 14/11/2026, dueño: «de cada 10 €».
+  const deCada10 = (pct: number | null, mult: number | null, en: string) => {
+    const p = pct ?? (mult && mult > 0 ? 100 / mult : null);
+    return p === null ? null : `${textoDeCada10(p)} ${en}.`;
+  };
+  const poner = (...xs: (string | null)[]) => frases.push(...xs.filter((x): x is string => !!x));
   if (a.tipo === "peso") {
-    partes.push(
-      `${a.nombre}: lo compras a ${eurosKg(a.compraKg, 2)} y lo vendes a ${eurosKg(a.ventaKg, 2)} sin IVA (${eurosKg(a.ventaKgIva)} en carta)` +
-        ` → ×${a.multiplicador === null ? "—" : fmt(a.multiplicador, 2)}, ${porcentaje(a.pct)} de coste`,
+    poner(
+      `Lo vendes a ${eurosCarta(a.ventaKgIva)} el kilo (${euros(a.ventaKg)} sin IVA) y el kilo te cuesta ${euros(a.compraKg)}: ` +
+        `cobras ${numero(a.multiplicador)} veces lo que pagas (mínimo ${numero(config.multiplicadorMinPeso)}).`,
+      deCada10(a.pct, a.multiplicador, "comprarlo"),
     );
   } else if (a.tipo === "vino") {
-    partes.push(
-      `${a.nombre}: la botella cuesta ${euros(a.coste)} y se vende a ${euros(a.venta)} sin IVA (${euros(a.precio)} en carta) → ${veces(a.multiplicador)} (mínimo ${veces(config.multiplicadorMinVino)})`,
+    poner(
+      `La botella te cuesta ${euros(a.coste)} y la vendes a ${eurosCarta(a.precio)} (${euros(a.venta)} sin IVA): ` +
+        `cobras ${numero(a.multiplicador)} veces lo que pagas (mínimo ${numero(config.multiplicadorMinVino)}).`,
+      deCada10(a.pct, a.multiplicador, "la botella"),
     );
     if (a.banderas.includes("tienda_bajo")) {
-      partes.push(
-        `en la tienda, a ${euros(a.precioTienda)} (${euros(a.ventaTienda)} sin IVA) → ${veces(a.multiplicadorTienda)} (mínimo ${veces(config.multiplicadorMinTienda)})`,
+      frases.push(
+        `En la tienda la vendes a ${euros(a.precioTienda)} (${euros(a.ventaTienda)} sin IVA): cobras ${numero(a.multiplicadorTienda)} veces lo que pagas (mínimo ${numero(config.multiplicadorMinTienda)}).`,
       );
     }
-    if (a.formatoDistinto) partes.push(`coste estimado desde la botella de ${litrosTexto(a.litrosProducto)}`);
+    if (a.formatoDistinto) frases.push(`Coste calculado desde la botella de ${litrosTexto(a.litrosProducto)} (en la carta es de ${litrosTexto(a.litros)}).`);
   } else {
-    const unico = a.ingredientes.length === 1 ? a.ingredientes[0] : null;
-    if (unico && unico.unidad !== "ud" && a.gramosVenta && unico.eur !== null && a.venta !== null && unico.cantidad === a.gramosVenta) {
-      const ventaKg = (a.venta / a.gramosVenta) * 1000;
-      const m = unico.medida ?? "kg";
-      partes.push(`${a.nombre}: cuesta ${precioCompra(unico)} y se vende a ${euros(ventaKg)}/${m} sin IVA → ${porcentaje(a.pct)} de coste`);
-    } else {
-      partes.push(
-        `${a.nombre}: el coste (${euros(a.coste)}) es el ${porcentaje(a.pct)} de lo que se cobra sin IVA (${euros(a.venta)})` +
-          (a.principal && a.ingredientes.length > 1 ? `; lo que más pesa, ${a.principal}` : ""),
-      );
-    }
+    poner(
+      `Lo vendes a ${eurosCarta(a.precio)} (${euros(a.venta)} sin IVA). Hacerlo te cuesta ${euros(a.coste)}.`,
+      a.pct === null ? null : `${textoDeCada10(a.pct)} en ingredientes (máximo ${euros(config.costeMaxPlatoPct / 10)}).`,
+    );
+    if (a.principal && a.ingredientes.length > 1) frases.push(`Lo que más pesa: ${a.principal}.`);
   }
   if (a.banderas.includes("sube_coste") && a.variacionPct !== null) {
-    partes.push(`el coste ha subido un ${porcentaje(a.variacionPct)} en 6 meses y la carta sigue igual`);
+    frases.push(`Te cuesta un ${porcentaje(a.variacionPct)} más que hace 6 meses (de factura a factura) y el precio de la carta sigue igual.`);
   }
-  if (a.banderas.includes("incompleto")) partes.push("falta el coste de algún ingrediente");
-  return partes.join("; ") + ".";
+  if (a.banderas.includes("incompleto")) frases.push("Falta el precio de algún ingrediente: en realidad cuesta más.");
+  return frases.join(" ");
 }
+
+/** «Nombre: explicación» (la lista y los avisos de una línea). */
+export const razon = (a: ArticuloMargen, config: ConfigMargenes = CONFIG_POR_DEFECTO): string => `${a.nombre}: ${explicacion(a, config)}`;
+
+/**
+ * % de coste corto y claro: «37 % coste sobre venta» (14/11/2026, dueño: que se vea
+ * que es un % del precio de VENTA sin IVA, no del coste).
+ */
+export const textoPctCoste = (pct: number | null) => (pct === null ? "coste sobre venta: —" : `${porcentaje(pct)} coste sobre venta`);
+
+/** «De cada 10 € que cobras, 3,70 € es lo que te cuesta» (el % de coste sobre la venta, en euros). */
+export const textoDeCada10 = (pct: number) => `De cada 10 € que cobras, ${euros(pct / 10)} es lo que te cuesta`;
+
+/** Etiqueta del % de coste (fichas, umbrales y tooltips). */
+export const ETIQUETA_PCT_COSTE = "% coste sobre venta (sin IVA)";
+
+/** Explicación corta de la etiqueta: «de cada 10 € que cobras, X € es lo que te cuesta». */
+export const AYUDA_PCT_COSTE = "% coste sobre venta: de cada 10 € que cobras (sin IVA), cuántos euros es lo que te cuesta. 37 % = 3,70 € de cada 10 €. Cuanto más bajo, mejor.";
+
+/** Qué hacer si algo sale en rojo (ayuda de la pantalla y de la ficha). */
+export const QUE_HACER_EN_ROJO = "Si sale en rojo: sube el precio de la carta, busca un proveedor más barato (o pide mejor precio al tuyo) o pon un poco menos de cantidad en el plato.";
 
 /** «75 cl», «1,5 l». */
 export const litrosTexto = (l: number | null) =>

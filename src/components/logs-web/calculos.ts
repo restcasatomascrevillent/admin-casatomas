@@ -6,8 +6,16 @@
  */
 import { format, formatDistanceStrict, parseISO, subDays } from "date-fns";
 import { es } from "date-fns/locale";
-import type { EstadoRecogidaDatos, EventoWeb, IncidenciaWeb } from "@/hooks/useLogsWeb";
+import type { EstadoRecogidaDatos, EventoWeb, IncidenciaWeb, SesionWeb } from "@/hooks/useLogsWeb";
 import { causaConocida, type CausaConocida } from "../../../supabase/functions/_shared/logs-web/causas";
+import {
+  explicacionOrigen, grupoDeOrigen, NOMBRE_ORIGEN, origenDeError, origenDeOcurrencia, proveedorExterno, puedeAbrirTicket, type OrigenVisible,
+} from "../../../supabase/functions/_shared/logs-web/origen";
+import {
+  afectaTrasPublicar, listaTareas, nombrePagina, queFalloGenerico, resumirRecorrido, tareasDe, TEXTO_ACCION_RECARGA, TEXTO_TRAS_PUBLICAR,
+} from "../../../supabase/functions/_shared/logs-web/sencillo";
+
+export { TEXTO_ACCION_RECARGA, TEXTO_TRAS_PUBLICAR };
 
 export type NivelRecogida = "ok" | "sin_actividad" | "parada" | "sin_datos_aun" | "aviso";
 
@@ -190,7 +198,11 @@ export function describirEvento(e: Pick<EventoWeb, "tipo" | "accion" | "ruta" | 
     case "carga_pagina": return `Carga: ${p.carga ?? "?"} ms${p.lcp ? ` · LCP ${p.lcp} ms` : ""}`;
     case "peticion": return `Petición ${p.endpoint ?? "?"} → ${p.status ?? "?"} en ${Math.round(e.valor ?? 0)} ms`;
     default:
-      if (e.tipo.startsWith("error_")) return `${NOMBRE_TIPO[e.tipo] ?? e.tipo}: ${e.mensaje ?? obj}`;
+      if (e.tipo.startsWith("error_")) {
+        // Errores de carga: qué decidió la web (recargó, avisó, sin conexión…).
+        const decision = e.accion && TEXTO_ACCION_RECARGA[e.accion] ? ` [${TEXTO_ACCION_RECARGA[e.accion]}]` : "";
+        return `${NOMBRE_TIPO[e.tipo] ?? e.tipo}: ${e.mensaje ?? obj}${decision}`;
+      }
       return `${NOMBRE_TIPO[e.tipo] ?? e.tipo} ${obj}`.trim();
   }
 }
@@ -223,10 +235,220 @@ export function rangoEstadisticas(valor: string, hoy: Date): { desde: string; ha
 }
 
 
-/** Causa conocida de una incidencia del panel (el objetivo va en el título: «mensaje · objetivo»). */
-export function causaDeFila(i: Pick<IncidenciaWeb, "tipo" | "fuente" | "mensaje" | "pila" | "titulo">): CausaConocida | null {
+// ─── Origen (fallo de la web / servicio externo / no depende de la web) ─────
+const ORIGENES_VALIDOS = new Set<string>(Object.keys(NOMBRE_ORIGEN));
+
+/**
+ * Origen de una incidencia: el que guardó el servidor (migración 20261130100000)
+ * o, sin ella, el que dicen las mismas reglas con el mensaje de la incidencia.
+ */
+export function origenDeFila(
+  i: Pick<IncidenciaWeb, "tipo" | "fuente" | "mensaje" | "pila" | "titulo" | "ocurrencias" | "origen" | "repetidas_tras_recargar">,
+): OrigenVisible {
+  if (i.origen && ORIGENES_VALIDOS.has(i.origen)) return i.origen;
+  if (i.ocurrencias === 0) return "bots";
   const objetivo = i.titulo.split(" · ").slice(1).join(" · ") || null;
-  return causaConocida({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo });
+  const o = origenDeError({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo });
+  // Versión antigua que alguna vez no se arregló al recargar: eso sí es de la web (como en el servidor).
+  return o === "version_antigua" && (i.repetidas_tras_recargar ?? 0) > 0 ? "web" : o;
+}
+
+/** Proveedor de una incidencia externa (guardado o calculado). */
+export function proveedorDeFila(i: Pick<IncidenciaWeb, "tipo" | "fuente" | "mensaje" | "pila" | "titulo" | "origen_proveedor">): string | null {
+  if (i.origen_proveedor) return i.origen_proveedor;
+  const objetivo = i.titulo.split(" · ").slice(1).join(" · ") || null;
+  return proveedorExterno({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo });
+}
+
+type EventoOrigen = Pick<EventoWeb, "tipo" | "fuente" | "mensaje" | "pila" | "objetivo" | "propiedades" | "accion"> &
+  Partial<Pick<EventoWeb, "tras_publicar" | "origen" | "es_bot" | "es_prueba" | "es_interno">>;
+
+/** Origen de UN evento de error (bots y pruebas aparte; el guardado o el calculado). */
+export function origenDeEvento(e: EventoOrigen): OrigenVisible {
+  return origenDeOcurrencia(e);
+}
+
+/** ¿Puede abrir ticket solo? (fallo de la web; externo con el interruptor). */
+export const ticketAutomatico = (o: OrigenVisible, ticketsExternos = false) => puedeAbrirTicket(o, ticketsExternos);
+
+/** Causa conocida de una incidencia del panel (el objetivo va en el título: «mensaje · objetivo»; las tareas, en las muestras). */
+export function causaDeFila(i: Pick<IncidenciaWeb, "tipo" | "fuente" | "mensaje" | "pila" | "titulo">, muestras?: Pick<EventoWeb, "propiedades">[]): CausaConocida | null {
+  const objetivo = i.titulo.split(" · ").slice(1).join(" · ") || null;
+  const tareas = [...new Set((muestras ?? []).map((e) => e.propiedades?.tarea).filter((t): t is string => typeof t === "string"))];
+  return causaConocida({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo, tareas });
+}
+
+// ─── Explicación en sencillo (para el dueño) ────────────────────────────────
+export interface ExplicacionSencilla {
+  queHizo: string;
+  queFallo: string;
+  afecta: string;
+  queHacer: string;
+  /** De dónde sale «Qué falló»: catálogo fijo, IA (sin comprobar) o texto genérico. */
+  fuente: "conocida" | "ia" | "generica";
+}
+
+const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+const inicioDeHoy = (ahora: Date) => new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()).getTime();
+
+/** Quién lo provoca cuando no es un cliente. */
+function queHizoServidor(fuente: string): string {
+  if (fuente === "integracion") return "Ningún cliente: lo hace una tarea automática del panel, sin que nadie pulse nada.";
+  if (fuente === "hosting") return "Nadie de fuera: es la publicación de la web en Vercel.";
+  return "Ningún cliente directamente: es una función del servidor (la puede llamar la web o el panel).";
+}
+
+/**
+ * «Qué hizo el cliente, qué falló, ¿afecta? y qué hacer» de una incidencia.
+ * `recorrido`: los eventos de la sesión alrededor de la ocurrencia elegida;
+ * `errorId`, el error dentro de ese recorrido (lo de antes es lo que hizo).
+ */
+export function explicacionIncidencia(
+  i: IncidenciaWeb,
+  muestras: EventoWeb[] = [],
+  recorrido: EventoWeb[] | null = null,
+  errorId: number | null = null,
+  ahora: Date = new Date(),
+): ExplicacionSencilla {
+  const causa = causaDeFila(i, muestras);
+  const exp = !causa ? i.explicacion_ia ?? null : null;
+  const navegador = i.fuente === "navegador";
+  const origen = origenDeFila(i);
+  const grupo = grupoDeOrigen(origen);
+  const pagina = navegador ? nombrePagina(i.rutas[0]?.ruta) : null;
+  const tareas = listaTareas(tareasDe({ tareas: muestras.map((e) => String(e.propiedades?.tarea ?? "")).filter(Boolean), objetivo: i.titulo.split(" · ")[1] ?? null }));
+
+  // Qué hizo el cliente
+  let queHizo: string;
+  if (!navegador) queHizo = queHizoServidor(i.fuente);
+  else {
+    const idx = recorrido && errorId !== null ? recorrido.findIndex((e) => e.id === errorId) : -1;
+    const antes = recorrido ? (idx >= 0 ? recorrido.slice(0, idx) : recorrido) : [];
+    const texto = resumirRecorrido(antes);
+    queHizo = texto
+      ? `${texto} Y entonces falló.`
+      : `${pagina ? `Estaba en ${pagina}. ` : ""}No se sabe qué hizo antes: no aceptó las estadísticas, así que solo llega el error.`;
+  }
+
+  // Qué falló
+  const fuente: ExplicacionSencilla["fuente"] = causa ? "conocida" : exp?.que_paso ? "ia" : "generica";
+  const queFallo = causa?.sencillo.quePasa
+    ?? exp?.que_paso
+    ?? queFalloGenerico({ tipo: i.tipo, fuente: i.fuente, rutas: i.rutas, objetivo: i.titulo.split(" · ")[1] ?? null, tareas: tareas.map((t) => t.nombre) });
+
+  // ¿Afecta?
+  let afecta: string;
+  const tras = i.ocurrencias_tras_publicar ?? 0;
+  if (causa?.id === "chunk_caducado" && tras + (i.repetidas_tras_recargar ?? 0) > 0) {
+    const repetidas = i.repetidas_tras_recargar ?? 0;
+    afecta = afectaTrasPublicar(tras, repetidas, {
+      sinDatos: muestras.filter((e) => e.tras_publicar === "sin_datos").length,
+      sinConexion: muestras.filter((e) => e.tras_publicar === "sin_conexion").length,
+      otras: Math.max(i.ocurrencias - tras - repetidas, 0),
+    });
+  } else if (!navegador) {
+    const consecuencia = tareas.find((t) => t.consecuencia)?.consecuencia;
+    afecta = `No se ve en la web: es del servidor. ${plural(i.ocurrencias_24h, "vez", "veces")} en las últimas 24 h (${i.ocurrencias} en total).${consecuencia ? ` Lo que se nota: ${consecuencia}.` : ""}`;
+  } else if (i.sesiones_afectadas === 0) {
+    afecta = "No: solo lo han provocado robots o pruebas automáticas.";
+  } else if (origen === "bots") {
+    afecta = "No: solo tráfico interno o pruebas automáticas, no clientes.";
+  } else {
+    const desde = inicioDeHoy(ahora);
+    const deHoy = muestras.filter((e) => Date.parse(e.ocurrido_en) >= desde);
+    const visitantesHoy = new Set(deHoy.map((e) => e.sesion_id ?? `sin-${e.id}`)).size;
+    const almenos = muestras.length >= 50 && deHoy.length === muestras.length ? "al menos " : "";
+    const hoy = visitantesHoy > 0 ? `hoy, ${almenos}${plural(visitantesHoy, "visitante", "visitantes")}` : "hoy, ninguno";
+    afecta = `Sí: a ${plural(i.sesiones_afectadas, "visitante distinto", "visitantes distintos")} en total; ${hoy}. ${plural(i.ocurrencias_24h, "vez", "veces")} en las últimas 24 h.`;
+    if (i.gravedad === "critico") afecta += " Es grave: puede impedir reservar o pagar.";
+  }
+  if (exp?.a_quien_afecta) afecta += ` Según la IA: ${exp.a_quien_afecta}`;
+
+  // Qué hacer
+  const ticket = i.linear_estado === "creado" && i.linear_identificador
+    ? `Ya hay un ticket para el técnico (${i.linear_identificador}${i.linear_destino === "prueba" ? ", en el destino de pruebas" : ""}).`
+    : i.linear_estado === "pendiente" || i.linear_estado === "error" ? "Se está preparando un ticket para el técnico." : null;
+  let queHacer = causa?.sencillo.queHacer ?? exp?.que_hacer ?? null;
+  if (!queHacer) {
+    if (navegador && i.sesiones_afectadas === 0) queHacer = "Nada: lo han provocado robots o pruebas.";
+    else if (grupo === "no_depende") queHacer = "Nada: no depende de la web.";
+    else if (grupo === "externo" && !ticket) queHacer = `No es un fallo de nuestro código: depende de ${proveedorDeFila(i) ?? "un servicio de fuera"}. Si se repite mucho, avisa al técnico para que lo mire con ese servicio.`;
+    else if (ticket) queHacer = `${ticket} No hace falta hacer nada más.`;
+    else queHacer = "Nada por ahora: si se repite en más visitantes, se abrirá un ticket solo. Si te parece importante, pulsa «Pedir ticket».";
+  } else if (ticket) queHacer = `${queHacer} ${ticket}`;
+
+  return { queHizo, queFallo, afecta, queHacer, fuente };
+}
+
+type EventoSesion = Pick<EventoWeb, "id" | "tipo" | "categoria" | "accion" | "ruta" | "objetivo" | "valor" | "propiedades" | "mensaje" | "pila" | "fuente" | "incidencia_id" | "tras_publicar" | "ocurrido_en">
+  & Partial<Pick<EventoWeb, "origen" | "es_bot" | "es_prueba" | "es_interno">>;
+// (accion: en los errores de carga, lo que decidió la web; ver TEXTO_ACCION_RECARGA.)
+
+/** Lo mismo para una sesión entera (Actividad › sesión). */
+export function explicacionSesion(sesion: Pick<SesionWeb, "conversiones"> | null, eventos: EventoSesion[]): ExplicacionSencilla & { incidencias: number[] } {
+  const queHizo = resumirRecorrido(eventos, 10) ?? "No hay actividad registrada: el visitante no aceptó las estadísticas, así que solo llegan sus errores.";
+  const errores = eventos.filter((e) => e.categoria === "error");
+  const incidencias = [...new Set(errores.map((e) => e.incidencia_id).filter((x): x is number => x !== null))];
+  if (!errores.length) return { queHizo, queFallo: "Nada: no hubo ningún error en esta visita.", afecta: "No.", queHacer: "Nada.", fuente: "generica", incidencias };
+
+  const textos = new Map<string, string>();
+  let todosSinImpacto = true;
+  let todosSinConexion = true;
+  for (const e of errores) {
+    const causa = causaConocida({ tipo: e.tipo, fuente: e.fuente, mensaje: e.mensaje, pila: e.pila, objetivo: e.objetivo, propiedades: e.propiedades, accion: e.accion });
+    // Sin impacto: la clase del servidor si la hay; si no (sin la migración), la causa.
+    const sinImpacto = e.tras_publicar !== undefined && e.tras_publicar !== null
+      ? e.tras_publicar !== "repetido"
+      : causa?.id === "chunk_caducado" || causa?.id === "carga_sin_conexion";
+    if (!sinImpacto) todosSinImpacto = false;
+    if (!(e.tras_publicar === "sin_conexion" || causa?.id === "carga_sin_conexion")) todosSinConexion = false;
+    const clave = e.incidencia_id !== null ? `i${e.incidencia_id}` : `${e.tipo}:${e.mensaje ?? ""}`;
+    if (!textos.has(clave)) textos.set(clave, causa?.sencillo.quePasa ?? queFalloGenerico({ tipo: e.tipo, fuente: e.fuente, rutas: e.ruta ? [{ ruta: e.ruta }] : [], objetivo: e.objetivo }));
+  }
+  const lista = [...textos.values()];
+  const queFallo = lista.length === 1 ? lista[0] : `Fallaron ${lista.length} cosas: ${lista.slice(0, 3).map((t, n) => `${n + 1}) ${t}`).join(" ")}${lista.length > 3 ? " …" : ""}`;
+
+  const repetido = errores.some((e) => e.tras_publicar === "repetido");
+  const origenes = errores.map((e) => origenDeEvento(e));
+  const hayWeb = origenes.includes("web");
+  const externos = errores.filter((_, n) => origenes[n] === "externo");
+  const ultimo = errores[errores.length - 1];
+  const siguio = eventos.some((e) => e.categoria !== "error" && e.categoria !== "tecnico" && e.ocurrido_en > ultimo.ocurrido_en);
+  let afecta: string;
+  let queHacer: string;
+  if (todosSinImpacto && !repetido) {
+    afecta = todosSinConexion
+      ? "No: el visitante se quedó sin conexión; no es un fallo de la web."
+      : "No: era una página antigua abierta durante una publicación; se recargó sola.";
+    queHacer = todosSinConexion ? "Nada." : "Nada: se arregló solo.";
+  } else if (!hayWeb && !externos.length) {
+    // Ningún error depende de la web: conexión, navegador o extensión, versión antigua, bots y pruebas.
+    const distintos = [...new Set(origenes)];
+    afecta = distintos.length === 1
+      ? `No: ${explicacionOrigen(distintos[0]).replace(/^No depende de la web: /, "").replace(/ No hay que hacer nada.*$/, "")}`
+      : `No: ninguno depende de la web (${distintos.map((o) => NOMBRE_ORIGEN[o].toLowerCase()).join(", ")}).`;
+    queHacer = "Nada: no depende de la web.";
+  } else if (!hayWeb) {
+    const proveedores = [...new Set(externos.map((e) => proveedorExterno(e)).filter(Boolean))];
+    afecta = `Algo: falló un servicio de fuera (${proveedores.join(", ") || "de fuera"}); no es un fallo de nuestro código.`;
+    queHacer = "Nada, salvo que se repita mucho: entonces hay que mirarlo con ese servicio.";
+  } else {
+    if (repetido) afecta = "Sí: volvió a fallar después de recargar; a esta persona no le funcionó esa parte.";
+    else if ((sesion?.conversiones ?? 0) > 0) afecta = "Poco: aun así terminó la reserva o el pago.";
+    else if (siguio) afecta = "Algo: tuvo el error, pero siguió navegando.";
+    else afecta = "Sí, probablemente: se fue justo después del error.";
+    queHacer = incidencias.length
+      ? `Mira ${incidencias.length === 1 ? `la incidencia #${incidencias[0]}` : `las incidencias ${incidencias.map((n) => `#${n}`).join(", ")}`} (botón «Ver incidencia», justo debajo): ahí se explica y se lleva el seguimiento.`
+      : "Nada por ahora: el error se agrupa en su incidencia en unos minutos.";
+  }
+  return { queHizo, queFallo, afecta, queHacer, fuente: "generica", incidencias };
+}
+
+/** Texto en llano de una incidencia para la lista (una línea). */
+export function sencilloDeFila(i: IncidenciaWeb): string | null {
+  const causa = causaDeFila(i);
+  const origen = origenDeFila(i);
+  return causa?.sencillo.quePasa ?? i.explicacion_ia?.que_paso ?? (origen !== "web" ? explicacionOrigen(origen, proveedorDeFila(i)) : null);
 }
 
 /** Reparto «valor n %» de una lista (los 4 más frecuentes). */

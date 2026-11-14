@@ -35,6 +35,11 @@
  *   (plantillaPara) aunque la IA diga otra; el botón solo va en la última
  *   imagen del carrusel (en las demás se quita y se avisa) y un cierre sin
  *   texto lleva el lema de la marca. Las plantillas clásicas no se eligen.
+ * - Estilo del feed (12/11/2026, `estilo`: «solo_foto» por defecto | «rotulos»):
+ *   como el feed real de @casatomascrevillent, los posts y carruseles van con
+ *   «Solo foto» (ct-solo-foto / tz-solo-foto) en TODAS las imágenes, sin
+ *   rótulos, y la IA pone en el texto el nombre del plato y el gancho. Con
+ *   «rotulos», los papeles de arriba. La story lleva siempre rótulos.
  * - Validadores: los de sugerir_texto para el texto (precios, alérgenos,
  *   platos, datos personales, TOUZA sin reservas…), los de sugerir_rotulos para
  *   los rótulos de cada imagen con los límites de SU plantilla, plantillas que
@@ -62,7 +67,15 @@ import {
   type PlatoContexto,
   type Rotulos,
 } from "../_shared/instagram/validar-ia.ts";
-import { MAX_FOTOS_CARRUSEL, type DiapositivaMontada, type FormatoMontado, type FotoParaMontar } from "../_shared/instagram/montar.ts";
+import {
+  ESTILO_FEED_POR_DEFECTO,
+  ESTILOS_FEED,
+  MAX_FOTOS_CARRUSEL,
+  type DiapositivaMontada,
+  type EstiloFeed,
+  type FormatoMontado,
+  type FotoParaMontar,
+} from "../_shared/instagram/montar.ts";
 import { hoyMadrid, leerContexto, type ContextoBD } from "./campanas.ts";
 import {
   cab,
@@ -85,7 +98,7 @@ import {
   type Mensaje,
   type ParteMensaje,
 } from "./ia.ts";
-import { PLANTILLAS_IA, plantillaIA, plantillaPara, type PapelIA, type PlantillaIA } from "./plantillas.ts";
+import { PLANTILLAS_IA, plantillaIA, plantillaPara, plantillaSoloFoto, type PapelIA, type PlantillaIA } from "./plantillas.ts";
 import { DESCRIPCION_TONO, NOMBRE_MARCA, REGLAS_COMUNES, REGLAS_ESTILO, REGLAS_MARCA, REGLAS_REDACCION, TONOS, type Tono } from "./prompts.ts";
 import { rutaBucketDeUrl, rutaTmpDeUrl, urlPublica, vinoParaModelo, type FilaVino } from "./vision.ts";
 
@@ -130,6 +143,8 @@ export interface EntradaMontar {
   formato: FormatoMontado | "auto";
   indicacion: string;
   tono: Tono;
+  /** Estilo de las imágenes del feed (post y carrusel); la story lleva siempre rótulos. */
+  estilo: EstiloFeed;
 }
 
 type ResultadoEntrada = { ok: true; entrada: EntradaMontar } | { ok: false; error: string; tipo?: string };
@@ -153,6 +168,8 @@ export function validarEntradaMontar(valor: unknown, supabaseUrl: string): Resul
   if (!FORMATOS.includes(formato)) return { ok: false, error: "formato debe ser «auto», «post», «carrusel» o «story»" };
   const tono = (o.tono ?? "cercano") as Tono;
   if (!TONOS.includes(tono)) return { ok: false, error: "tono debe ser «cercano», «elegante» o «retranca»" };
+  const estilo = (o.estilo ?? ESTILO_FEED_POR_DEFECTO) as EstiloFeed;
+  if (!ESTILOS_FEED.includes(estilo)) return { ok: false, error: "estilo debe ser «solo_foto» o «rotulos»" };
   if (o.indicacion !== undefined && o.indicacion !== null && typeof o.indicacion !== "string") return { ok: false, error: "indicacion debe ser texto" };
   if (typeof o.indicacion === "string" && [...o.indicacion].length > MAX_INDICACION) return { ok: false, error: `indicacion: máximo ${MAX_INDICACION} caracteres` };
   if (!Array.isArray(o.fotos) || o.fotos.length < 1 || o.fotos.length > MAX_FOTOS_CARRUSEL) {
@@ -169,7 +186,7 @@ export function validarEntradaMontar(valor: unknown, supabaseUrl: string): Resul
   if (formato === "carrusel" && fotos.length < 2) return { ok: false, error: "Un carrusel necesita al menos 2 fotos" };
   return {
     ok: true,
-    entrada: { marca: o.marca, fotos, formato, indicacion: anonimizar(typeof o.indicacion === "string" ? o.indicacion.trim() : ""), tono },
+    entrada: { marca: o.marca, fotos, formato, indicacion: anonimizar(typeof o.indicacion === "string" ? o.indicacion.trim() : ""), tono, estilo },
   };
 }
 
@@ -182,10 +199,42 @@ export function formatoFinal(pedido: FormatoMontado | "auto", nFotos: number): F
 /** Formato de cada imagen: el carrusel es una serie de «post» (4:5). */
 const formatoImagen = (f: FormatoMontado): "post" | "story" => (f === "story" ? "story" : "post");
 
-/** Plantillas v2 (no clásicas) de la marca con foto y papel que admiten el formato de imagen. */
-export function plantillasMontar(marca: MarcaIA, formato: FormatoMontado): PlantillaIA[] {
+/** ¿Van las imágenes con «Solo foto»? Post y carrusel con el estilo «solo_foto» (la story, nunca). */
+export function vaSoloFoto(formato: FormatoMontado, estilo: EstiloFeed = ESTILO_FEED_POR_DEFECTO): boolean {
+  return formato !== "story" && estilo === "solo_foto";
+}
+
+/**
+ * Plantillas que puede usar el montaje: con «Solo foto», solo esa; si no, las
+ * v2 (no clásicas) de la marca con foto y papel de rótulos que admiten el formato de imagen.
+ */
+/**
+ * Estilos calcados de las stories de Casa Tomás (12/11/2026): se eligen a mano en
+ * «Ajustar a mano»; el montaje automático no los usa (cada uno pide textos propios:
+ * reseña, nombres, @ del cliente…).
+ */
+export const PLANTILLAS_SOLO_A_MANO: ReadonlySet<string> = new Set([
+  "ct-rotulo-hilo", "ct-rotulo-recuadro", "ct-rotulo-titular", "ct-rotulo-manuscrita",
+  "ct-resena", "ct-resena-foto", "ct-vosotros-celebracion", "ct-vosotros-gracias",
+  "ct-reserva-mesa", "ct-touza-descubre", "ct-tapas-poster", "ct-icono-destacada",
+]);
+
+export function plantillasMontar(marca: MarcaIA, formato: FormatoMontado, estilo: EstiloFeed = ESTILO_FEED_POR_DEFECTO): PlantillaIA[] {
+  if (vaSoloFoto(formato, estilo)) {
+    const sola = plantillaSoloFoto(marca);
+    if (sola) return [sola];
+  }
   return PLANTILLAS_IA.filter(
-    (p) => p.marca === marca && !p.clasica && p.conFoto && !!p.papel && p.papel !== "tipografica" && p.formatos.includes(formatoImagen(formato)),
+    (p) =>
+      p.marca === marca &&
+      !p.clasica &&
+      !PLANTILLAS_SOLO_A_MANO.has(p.id) &&
+      p.conFoto &&
+      !!p.papel &&
+      p.papel !== "tipografica" &&
+      p.papel !== "anuncio" &&
+      p.papel !== "foto" &&
+      p.formatos.includes(formatoImagen(formato)),
   );
 }
 
@@ -201,7 +250,7 @@ export const LEMA_CIERRE: Record<MarcaIA, string> = {
   touza: "Touza no es solo un bar; es una declaración de intenciones.",
 };
 
-const NOMBRE_PAPEL: Record<PapelIA, string> = { portada: "portada", plato: "imagen del medio", cierre: "cierre", tipografica: "tipográfica" };
+const NOMBRE_PAPEL: Record<PapelIA, string> = { portada: "portada", plato: "imagen del medio", cierre: "cierre", tipografica: "tipográfica", anuncio: "anuncio", foto: "solo foto" };
 
 // ── Prompt y esquema ────────────────────────────────────────────────────────
 
@@ -234,13 +283,32 @@ export const ESQUEMA_MONTAR = {
   },
 } as const;
 
-export function promptSistemaMontar(marca: MarcaIA, formato: FormatoMontado, plantillas: PlantillaIA[], nFotos: number): string {
+/** Instrucciones del montaje con «Solo foto»: imágenes sin texto y todo lo que se contaría en un rótulo, al texto. */
+function papelesSoloFoto(plantilla: PlantillaIA, carrusel: boolean): string[] {
+  return [
+    `Las imágenes van SIN NINGÚN TEXTO encima, como el feed de la cuenta: en TODAS, «plantilla» = «${plantilla.id}» y «antetitulo», «titular», «cita», «cta» y «pie» vacíos ("").`,
+    carrusel
+      ? "  El orden cuenta la serie: la PRIMERA foto es la que más engancha (la portada) y la ÚLTIMA cierra."
+      : "  Elige la foto que más entre por los ojos.",
+    "  Lo que irías a poner en un rótulo va en el TEXTO: la primera línea es el gancho y en el texto sale el NOMBRE DEL PLATO (o de los platos, del cóctel o del vino) tal cual en DATOS.carta, DATOS.vinos o DATOS.fotos_carta, si lo reconoces con seguridad.",
+  ];
+}
+
+export function promptSistemaMontar(
+  marca: MarcaIA,
+  formato: FormatoMontado,
+  plantillas: PlantillaIA[],
+  nFotos: number,
+  estilo: EstiloFeed = ESTILO_FEED_POR_DEFECTO,
+): string {
+  const soloFoto = vaSoloFoto(formato, estilo) ? plantillas.find((p) => p.sinTexto) : undefined;
   const ORDEN: PapelIA[] = ["portada", "plato", "cierre", "tipografica"];
   const lista = [...plantillas]
     .sort((x, y) => ORDEN.indexOf(x.papel ?? "portada") - ORDEN.indexOf(y.papel ?? "portada"))
-    .map(
-      (p) =>
-        `- «${p.id}» (${NOMBRE_PAPEL[p.papel ?? "portada"]}, ${p.encaje === "marco" ? "Foto enmarcada: la foto entera, sin ampliar" : "foto a sangre: la amplía hasta cubrir"}): ${p.campos.map((c) => `${c} (máx. ${p.limites[c] ?? 60}${c === "titular" ? ", 6 palabras" : ""})`).join(", ")}`,
+    .map((p) =>
+      p.sinTexto
+        ? `- «${p.id}» (solo foto: la foto limpia, sin ningún texto ni logo, recortada a 4:5 a sangre): sin rótulos`
+        : `- «${p.id}» (${NOMBRE_PAPEL[p.papel ?? "portada"]}, ${p.encaje === "marco" ? "Foto enmarcada: la foto entera, sin ampliar" : "foto a sangre: la amplía hasta cubrir"}): ${p.campos.map((c) => `${c} (máx. ${p.limites[c] ?? 60}${c === "titular" ? ", 6 palabras" : ""})`).join(", ")}`,
     )
     .join("\n");
   const marco = plantillas.find((p) => p.encaje === "marco" && p.papel === "portada") ?? plantillas.find((p) => p.encaje === "marco");
@@ -248,7 +316,9 @@ export function promptSistemaMontar(marca: MarcaIA, formato: FormatoMontado, pla
   const cuantas = carrusel
     ? `un CARRUSEL con las ${nFotos} fotos (cada foto una vez, ninguna fuera), ordenadas para contar algo: la PRIMERA es la portada, la que más engancha, y la ÚLTIMA cierra.`
     : `un ${formato === "story" ? "STORY" : "POST"} de UNA imagen: elige la mejor foto de las ${nFotos}.`;
-  const papeles = carrusel
+  const papeles = soloFoto
+    ? papelesSoloFoto(soloFoto, carrusel)
+    : carrusel
     ? [
         "Cada imagen tiene un papel, como en los reels de la marca (intro, planos con rótulo y cierre), y la plantilla va según el papel:",
         "  - Imagen 1, PORTADA (plantilla de portada): el titular cuenta la idea de toda la serie (no el nombre de un plato); «antetitulo» solo si aporta (p. ej. «Nuevo», «Esta semana»); «cita», una frase corta o \"\". Sin «cta».",
@@ -265,12 +335,14 @@ export function promptSistemaMontar(marca: MarcaIA, formato: FormatoMontado, pla
     "- «diapositivas»: en el orden de publicación. Cada una con «foto» (el número de la foto), «plantilla» (SOLO una de esta lista), sus rótulos y «alt_text».",
     lista,
     ...papeles,
-    ...(marco
+    ...(marco && !soloFoto
       ? [
           `  Si una foto tiene «cubre»: false en DATOS.fotos (las de la carta, 1200×900, o cualquiera apaisada o pequeña), usa SOLO plantillas «Foto enmarcada» (como «${marco.id}»): una a sangre la ampliaría y se vería borrosa. Si no sabes el nombre del plato, "".`,
         ]
       : []),
-    "  Rótulos en tipo frase, concretos, CORTOS y sobre lo que se ve en ESA foto: menos es más, nada de relleno. La «cta» solo de DATOS.guia.ctas, o \"\". Los campos que la plantilla no usa van vacíos (\"\").",
+    ...(soloFoto
+      ? []
+      : ["  Rótulos en tipo frase, concretos, CORTOS y sobre lo que se ve en ESA foto: menos es más, nada de relleno. La «cta» solo de DATOS.guia.ctas, o \"\". Los campos que la plantilla no usa van vacíos (\"\")."]),
     "  «alt_text»: UNA frase literal de esa foto (qué hay, sobre qué, el fondo), sin adjetivos de venta.",
     "- «gancho» y «caption» (SIN hashtags, empieza por el gancho, de 150 a 350 caracteres; en un carrusel puede llegar a 500 si hace falta contar la serie).",
     "- «hashtags»: de 3 a 5, concretos y locales. Nada de genéricos (#foodie, #instafood, #restaurante).",
@@ -313,10 +385,13 @@ export function revisarMontaje(
   formato: FormatoMontado,
   ctx: ContextoValidacion,
   ahora: Date,
+  estilo: EstiloFeed = ESTILO_FEED_POR_DEFECTO,
 ): RevisionMontaje {
   const correcciones: string[] = [];
   const errores: string[] = [];
-  const validas = plantillasMontar(ctx.marca, formato);
+  const validas = plantillasMontar(ctx.marca, formato, estilo);
+  // «Solo foto» (estilo del feed por defecto): todas las imágenes sin texto, con la misma plantilla.
+  const soloFoto = vaSoloFoto(formato, estilo) ? (validas.find((p) => p.sinTexto) ?? null) : null;
   const fImg = formatoImagen(formato);
   const usadas = new Set<string>();
 
@@ -345,6 +420,12 @@ export function revisarMontaje(
   // 2.ª pasada: plantilla según el papel (la posición) y el encaje (si la foto cubre).
   const diapositivas: DiapositivaMontada[] = [];
   elegidas.forEach(({ n, foto, d }, i) => {
+    if (soloFoto) {
+      const alt = quitarEmoji(textoDe(d.alt_text, MAX_ALT_TEXT)).replace(/\s+/g, " ").trim();
+      errores.push(...erroresDatosPersonales(alt, ctx.cuentasPropias).map((x) => `Foto ${n} (texto alternativo): ${x}`));
+      diapositivas.push({ foto: foto.id, plantilla: soloFoto.id, datos: {}, altText: alt });
+      return;
+    }
     const papel = papelDe(i, elegidas.length, formato);
     const cubre = fotoCubre(foto, fImg);
     const encaje = cubre ? "sangre" : "marco";
@@ -485,7 +566,7 @@ export async function manejarMontar(valor: unknown, m: ContextoMontar): Promise<
     return json(502, { ok: false, error: "No se pudo leer el contexto de la base de datos" });
   }
 
-  const plantillas = plantillasMontar(e.marca, formato);
+  const plantillas = plantillasMontar(e.marca, formato, e.estilo);
   const nombresVinos = vinos.map((x) => (x.nombre ?? "").trim()).filter(Boolean);
   const ctx: ContextoValidacion = {
     marca: e.marca,
@@ -535,7 +616,7 @@ export async function manejarMontar(valor: unknown, m: ContextoMontar): Promise<
     ]),
   ];
   const mensajes: Mensaje[] = [
-    { role: "system", content: promptSistemaMontar(e.marca, formato, plantillas, e.fotos.length) },
+    { role: "system", content: promptSistemaMontar(e.marca, formato, plantillas, e.fotos.length, e.estilo) },
     { role: "user", content: partes },
   ];
 
@@ -547,7 +628,7 @@ export async function manejarMontar(valor: unknown, m: ContextoMontar): Promise<
     const descartadas: Array<{ motivos: string[] }> = [];
     for (let intento = 0; intento < MAX_INTENTOS && !buena; intento++) {
       const { datos: d, bruto } = await pedirModelo(f, clave, modelo, mensajes, ESQUEMA_MONTAR, uso, 3000);
-      const r = revisarMontaje(d, e.fotos, formato, ctx, ahora);
+      const r = revisarMontaje(d, e.fotos, formato, ctx, ahora, e.estilo);
       if (r.ok) buena = r;
       else {
         descartadas.push({ motivos: r.errores });
@@ -576,7 +657,7 @@ export async function manejarMontar(valor: unknown, m: ContextoMontar): Promise<
       tipo: "montar_pieza",
       marca: e.marca,
       pieza_id: null,
-      entrada: { accion: "montar_pieza", marca: e.marca, formato: e.formato, tono: e.tono, indicacion: e.indicacion, fotos: e.fotos.map((x) => x.id) },
+      entrada: { accion: "montar_pieza", marca: e.marca, formato: e.formato, tono: e.tono, estilo: e.estilo, indicacion: e.indicacion, fotos: e.fotos.map((x) => x.id) },
       salida: respuesta ?? { descartadas, avisos },
       modelo,
       version_guia: guia.version,

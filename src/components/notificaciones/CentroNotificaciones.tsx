@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { AjustesAvisosEnVivo } from "@/components/notificaciones/AvisosEnVivo";
 import { useEstadoAvisosEnVivo } from "@/hooks/useAvisosEnVivo";
 import { avisosEnVivo } from "@/lib/avisosEnVivo/preferencias";
+import { AccionesAvisoStoryTapas, datosAvisoStoryTapas } from "@/components/instagram/tapas/AvisoStoryTapas";
 
 function timeAgo(dateStr: string): string {
   const now = new Date();
@@ -157,9 +158,11 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
             <div className="divide-y">
               {notificaciones.map((notif) => {
                 const Icon = TIPO_ICON[notif.tipo] || Info;
+                // Story del jueves de tapas: «Ver», «Publicar ahora», «Cambiar hora» y «Cancelar» debajo.
+                const storyTapas = datosAvisoStoryTapas(notif);
                 return (
+                  <div key={notif.id}>
                   <div
-                    key={notif.id}
                     className={cn(
                       "group flex items-stretch gap-1 transition-colors hover:bg-muted/50",
                       !notif.leida && "bg-primary/5"
@@ -232,6 +235,8 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
+                  </div>
+                  {storyTapas && <AccionesAvisoStoryTapas datos={storyTapas} />}
                   </div>
                 );
               })}

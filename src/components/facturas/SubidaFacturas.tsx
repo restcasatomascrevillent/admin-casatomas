@@ -36,6 +36,7 @@ import { SustituirFacturaDialog } from "./SustituirFacturaDialog";
 import { CorregirDocumentoDialog } from "./CorregirDocumentoDialog";
 import { useCorreccionDocumento, usePermisosFacturas } from "@/hooks/usePermisosFacturas";
 import { useDecisionDuplicado } from "./useDecisionDuplicado";
+import { CalendarioSubidas } from "./CalendarioSubidas";
 
 /** Título del aviso de un fichero que no se admite. */
 const TITULO_RECHAZO: Record<CausaRechazo, string> = {
@@ -160,6 +161,8 @@ export function SubidaFacturas() {
         anadir(e.dataTransfer.files);
       }}
     >
+      {/* Archivos subidos en los últimos 7 días (una fila; el detalle de cada día en una ventanita). */}
+      <CalendarioSubidas version={terminados.length} conEnlace={permisos.consultar} />
       {compacta ? (
         // Con algo en la cola: una fila ligera para añadir más.
         <div

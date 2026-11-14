@@ -16,6 +16,8 @@ interface Props {
   onCerrar: () => void;
   /** false si falta 20261103160000: no se enseñan los campos nuevos. */
   costes?: boolean;
+  /** false si falta 20261129153000: sin «para qué», plan siguiente ni «qué pasa si se pasa». */
+  inventario?: boolean;
   /**
    * Alta (Configurar › «Añadir servicio»): `servicio` es una ficha vacía
    * (`servicioNuevo`) y al guardar se da de alta con una clave sacada del
@@ -33,7 +35,7 @@ function MensajeError({ id, texto }: { id: string; texto?: string }) {
  * Edición (o alta, con `nuevo`) de plan, precio, renovación, cuenta, enlaces,
  * categoría, «lo usamos», notas y límites del plan.
  */
-export function DialogoEditarServicio({ servicio, onCerrar, costes = true, nuevo = false, existentes = [] }: Props) {
+export function DialogoEditarServicio({ servicio, onCerrar, costes = true, inventario = false, nuevo = false, existentes = [] }: Props) {
   const [b, setB] = useState<BorradorServicio | null>(null);
   const [errores, setErrores] = useState<Record<string, string>>({});
   const guardar = useGuardarServicio();
@@ -64,10 +66,10 @@ export function DialogoEditarServicio({ servicio, onCerrar, costes = true, nuevo
     setErrores({});
     try {
       if (nuevo) {
-        await crear.mutateAsync({ proveedor: proveedorDeNombre(r.cambios.nombre, existentes), ...r.cambios });
+        await crear.mutateAsync({ proveedor: proveedorDeNombre(r.cambios.nombre, existentes), ...r.cambios, inventario: costes && inventario });
         toast.success(`${r.cambios.nombre}: añadido`);
       } else {
-        await guardar.mutateAsync({ proveedor: servicio.proveedor, cambios: r.cambios, costes });
+        await guardar.mutateAsync({ proveedor: servicio.proveedor, cambios: r.cambios, costes, inventario: costes && inventario });
         toast.success(`${r.cambios.nombre}: cambios guardados`);
       }
       onCerrar();
@@ -168,6 +170,12 @@ export function DialogoEditarServicio({ servicio, onCerrar, costes = true, nuevo
               </>
             )}
           </div>
+          {costes && inventario && (
+            <div className="min-w-0 space-y-1">
+              <Label htmlFor={id("para-que")}>Para qué lo usamos</Label>
+              <Input id={id("para-que")} value={b.para_que} maxLength={300} placeholder="Por ejemplo: manda los correos de las reservas" onChange={(e) => cambiar("para_que", e.target.value)} />
+            </div>
+          )}
           <div className="min-w-0 space-y-1">
             <Label htmlFor={id("cuenta")}>Cuenta o equipo</Label>
             <Input id={id("cuenta")} value={b.cuenta} maxLength={300} onChange={(e) => cambiar("cuenta", e.target.value)} />
@@ -183,6 +191,26 @@ export function DialogoEditarServicio({ servicio, onCerrar, costes = true, nuevo
               <Input id={id("fuente-precio")} type="url" inputMode="url" value={b.fuente_precio} placeholder="https://" onChange={(e) => cambiar("fuente_precio", e.target.value)} aria-invalid={!!errores.fuente_precio} aria-describedby={errores.fuente_precio ? id("fuente-precio-error") : undefined} />
               <MensajeError id={id("fuente-precio-error")} texto={errores.fuente_precio} />
             </div>
+          )}
+          {costes && inventario && (
+            <fieldset className="min-w-0 space-y-3 rounded-md border p-3">
+              <legend className="px-1 text-sm font-semibold">Si se acaba el plan</legend>
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                <div className="min-w-0 space-y-1">
+                  <Label htmlFor={id("plan-siguiente")}>Plan siguiente</Label>
+                  <Input id={id("plan-siguiente")} value={b.plan_siguiente} maxLength={80} placeholder="Por ejemplo: Pro" onChange={(e) => cambiar("plan_siguiente", e.target.value)} />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <Label htmlFor={id("precio-siguiente")}>Su precio al mes ({b.moneda})</Label>
+                  <Input id={id("precio-siguiente")} value={b.precio_siguiente} inputMode="decimal" placeholder="Vacío si no se sabe" onChange={(e) => cambiar("precio_siguiente", e.target.value)} aria-invalid={!!errores.precio_siguiente} aria-describedby={errores.precio_siguiente ? id("precio-siguiente-error") : undefined} />
+                  <MensajeError id={id("precio-siguiente-error")} texto={errores.precio_siguiente} />
+                </div>
+              </div>
+              <div className="min-w-0 space-y-1">
+                <Label htmlFor={id("si-se-pasa")}>Qué pasa si se pasa de un límite</Label>
+                <Textarea id={id("si-se-pasa")} value={b.si_se_pasa} maxLength={500} rows={2} onChange={(e) => cambiar("si_se_pasa", e.target.value)} />
+              </div>
+            </fieldset>
           )}
           <div className="min-w-0 space-y-1">
             <Label htmlFor={id("notas")}>Notas</Label>

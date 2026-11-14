@@ -1,7 +1,11 @@
 // Detalle de un plato o vino de «Márgenes de carta» (panel lateral).
 //
-//   · Arriba, el porqué y las cifras: precio, sin IVA, coste, % / multiplicador,
-//     margen bruto y coste de hace 6 meses.
+//   · Arriba, el porqué en sencillo y, lo primero y destacado, la ÚLTIMA factura
+//     de la que sale el coste (13/11/2026, dueño: «que siempre salga la última
+//     factura»): proveedor, fecha, precio tal como se compró (y €/kg), botón para
+//     abrir el original; debajo, en pequeño, la mediana de 3 meses y la factura
+//     anterior. Luego las cifras: precio, sin IVA, coste, «cobras × lo que pagas»,
+//     % de coste sobre el precio de venta (sin IVA), lo que te queda y hace 6 meses.
 //   · Plato: escandallo editable (producto, cantidad en g/ml/ud de compra, nota),
 //     añadir o quitar ingredientes y «Guardar» (pasa a 'manual').
 //     Vino: el producto de compra que es su botella; cambiarlo o quitarlo.
@@ -21,15 +25,25 @@ import { cn } from "@/lib/utils";
 import { VisorDocumento } from "@/components/facturas/analisis/VisorDocumento";
 import { useBuscarProductos, useComprasProducto, useEdicionMargenes, type IngredienteEditado } from "@/hooks/useMargenesCarta";
 import {
+  AYUDA_PCT_COSTE,
   ETIQUETA_BANDERA,
+  ETIQUETA_PCT_COSTE,
+  QUE_HACER_EN_ROJO,
+  avisoCompraMasNueva,
   cantidadTexto,
   euros,
+  explicacion,
+  fechaFactura,
   litrosTexto,
   notaIva,
   porcentaje,
   precioCompra,
-  razon,
+  textoFactura,
+  textoMediana,
+  textoMedianaIngrediente,
   veces,
+  type FacturaUsada,
+  type Ingrediente,
   type PlatoMargen,
   type VinoMargen,
   type ConfigMargenes,
@@ -84,7 +98,7 @@ function ComprasProducto({ productoId, onCerrar }: { productoId: number; onCerra
   return (
     <div className="space-y-1 rounded-md border border-border/70 bg-muted/20 p-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium">Últimas compras (las que cuentan: Casa Tomás, sin IVA, sin albaranes facturados)</p>
+        <p className="text-xs font-medium">Compras, de la más nueva a la más vieja (la primera es la que da el coste; Casa Tomás, sin IVA, sin albaranes facturados)</p>
         <Button variant="ghost" size="icon" onClick={onCerrar} aria-label="Cerrar las compras"><X className="h-4 w-4" /></Button>
       </div>
       {q.isLoading && <p className="text-xs text-muted-foreground">Cargando…</p>}
@@ -93,10 +107,18 @@ function ComprasProducto({ productoId, onCerrar }: { productoId: number; onCerra
       <ul className="max-h-56 overflow-y-auto text-xs">
         {filas.map((c, i) => (
           <li key={c.lineaId}>
-            <button type="button" className="flex w-full min-h-10 items-center gap-2 rounded px-1 text-left hover:bg-muted/60" onClick={() => setVisor(i)} title="Abrir el documento">
+            <button
+              type="button"
+              className={cn("flex w-full min-h-10 items-center gap-2 rounded px-1 text-left hover:bg-muted/60", i === 0 && "font-semibold")}
+              onClick={() => setVisor(i)}
+              title="Abrir el documento"
+            >
               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               <span className="w-16 shrink-0 tabular-nums">{fechaCorta(c.fecha)}</span>
-              <span className="min-w-0 flex-1 truncate">{c.proveedor} · {c.nombreLinea}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {i === 0 && <span className="mr-1 rounded bg-primary/10 px-1 text-[11px] text-primary">Última</span>}
+                {c.proveedor} · {c.nombreLinea}
+              </span>
               <span className="shrink-0 tabular-nums">
                 {c.eurBase !== null ? `${euros(c.eurBase)}/${c.medida}` : `${euros(c.eurUd)}/${c.unidad ?? "ud"}`}
               </span>
@@ -116,9 +138,55 @@ function ComprasProducto({ productoId, onCerrar }: { productoId: number; onCerra
   );
 }
 
+/**
+ * La última factura, destacada: «Makro, 03/11 · 21,50 €/kg», qué línea es y el botón
+ * para abrir el original. Debajo, en pequeño, el contexto (mediana, anterior…).
+ */
+function BloqueFactura({
+  titulo,
+  f,
+  hoy,
+  contexto,
+  onVer,
+}: {
+  titulo: string;
+  f: FacturaUsada;
+  hoy: string | null;
+  contexto: (string | null)[];
+  onVer: (f: FacturaUsada) => void;
+}) {
+  const lineas = contexto.filter((x): x is string => !!x);
+  return (
+    <div className="space-y-0.5 rounded-md border border-primary/30 bg-primary/5 p-2" data-testid="detalle-ultima-factura">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground">{titulo}</p>
+          <p className="break-words text-sm font-semibold tabular-nums">{textoFactura(f, hoy)}</p>
+          <p className="break-words text-xs text-muted-foreground">
+            {[f.nombreLinea, f.numero ? `${f.tipo === "albaran" ? "albarán" : "factura"} nº ${f.numero}` : null].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" className="min-h-10 shrink-0" onClick={() => onVer(f)}>
+          <FileText className="mr-1 h-4 w-4" aria-hidden /> Ver factura
+        </Button>
+      </div>
+      {lineas.map((l) => (
+        <p key={l} className="text-xs text-muted-foreground">{l}</p>
+      ))}
+    </div>
+  );
+}
+
+/** «Factura anterior: 130,00 €/kg (MARISCOS D, 03/11)». */
+function textoAnteriorIngrediente(i: Ingrediente, hoy: string | null): string | null {
+  if (i.eurAnterior === null) return null;
+  return `Factura anterior: ${precioCompra({ ...i, eur: i.eurAnterior })} (${[i.proveedorAnterior, fechaFactura(i.fechaAnterior, hoy)].filter(Boolean).join(", ")})`;
+}
+
 export function DetalleArticulo({
   articulo,
   config,
+  hoy = null,
   tiendaActiva = false,
   conIva = false,
   puedeEditar,
@@ -126,6 +194,8 @@ export function DetalleArticulo({
 }: {
   articulo: PlatoMargen | VinoMargen | null;
   config: ConfigMargenes;
+  /** Fecha del cálculo (para escribir «03/11» o «03/11/25»). */
+  hoy?: string | null;
   /** configuracion_tienda.activa: el margen de tienda se enseña igual, avisando si está desactivada. */
   tiendaActiva?: boolean;
   /** Interruptor «Con IVA» de la pantalla: enseña también el coste con el IVA de las compras. */
@@ -138,6 +208,8 @@ export function DetalleArticulo({
   const [cambiado, setCambiado] = useState(false);
   const [buscando, setBuscando] = useState<"nuevo" | number | "vino" | null>(null);
   const [compras, setCompras] = useState<number | null>(null);
+  const [visorFactura, setVisorFactura] = useState<FacturaUsada | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setBuscando(null);
@@ -197,28 +269,62 @@ export function DetalleArticulo({
               </div>
             </SheetHeader>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
-              <p className={cn("text-sm", rojo && "text-destructive")}>{razon(a, config)}</p>
+              {/* Lo primero: de qué factura sale el coste. */}
+              {a.tipo === "vino" && a.factura && (
+                <BloqueFactura
+                  titulo="Última factura (de aquí sale lo que te cuesta)"
+                  f={a.factura}
+                  hoy={hoy}
+                  onVer={setVisorFactura}
+                  contexto={[
+                    textoMediana(a, config),
+                    a.costeAnterior !== null
+                      ? `Factura anterior: ${euros(a.costeAnterior)} la botella (${[a.proveedorAnterior, fechaFactura(a.fechaAnterior, hoy)].filter(Boolean).join(", ")})`
+                      : null,
+                    avisoCompraMasNueva(a.factura, a.ultima, hoy),
+                  ]}
+                />
+              )}
+              {a.tipo === "plato" && a.ingredientes.some((i) => i.factura) && (
+                <section className="space-y-1.5" aria-label="Últimas facturas de los ingredientes">
+                  {a.ingredientes.flatMap((i) =>
+                    i.factura
+                      ? [
+                          <BloqueFactura
+                            key={i.productoId}
+                            titulo={`Última factura de ${i.producto}${a.ingredientes.length > 1 ? ` (${cantidadTexto(i)} → ${euros(i.coste)})` : ""}`}
+                            f={i.factura}
+                            hoy={hoy}
+                            onVer={setVisorFactura}
+                            contexto={[textoMedianaIngrediente(i, config), textoAnteriorIngrediente(i, hoy)]}
+                          />,
+                        ]
+                      : [],
+                  )}
+                  {textoMediana(a, config) && <p className="text-xs text-muted-foreground">{textoMediana(a, config)}.</p>}
+                </section>
+              )}
+              <p className={cn("text-sm", rojo && "text-destructive")}>{explicacion(a, config)}</p>
               <dl className="grid grid-cols-3 gap-2 text-sm">
                 <Dato etiqueta="Precio de carta" valor={euros(a.precio)} />
                 <Dato etiqueta={`Sin IVA (${config.ivaPct} %)`} valor={euros(a.venta)} />
-                <Dato etiqueta="Coste actual" valor={euros(a.coste)} />
-                {a.tipo === "vino" ? (
-                  <Dato etiqueta="Multiplicador" valor={veces(a.multiplicador)} rojo={rojo} />
-                ) : (
-                  <Dato etiqueta="% de coste" valor={porcentaje(a.pct)} rojo={rojo} />
-                )}
-                <Dato etiqueta="Margen bruto" valor={euros(a.margen)} />
+                <Dato etiqueta="Te cuesta (última factura)" valor={euros(a.coste)} />
+                {a.tipo === "vino" && <Dato etiqueta="Cobras × lo que pagas" valor={veces(a.multiplicador)} rojo={rojo} />}
+                <Dato etiqueta={ETIQUETA_PCT_COSTE} valor={porcentaje(a.pct)} rojo={rojo && a.tipo === "plato"} />
+                <Dato etiqueta="Te queda (antes de sueldos y gastos)" valor={euros(a.margen)} />
                 <Dato
-                  etiqueta="Coste hace 6 meses"
+                  etiqueta="Te costaba hace 6 meses (factura de entonces)"
                   valor={a.coste6m === null ? "—" : `${euros(a.coste6m)}${a.variacionPct !== null ? ` (${a.variacionPct > 0 ? "+" : ""}${porcentaje(a.variacionPct)})` : ""}`}
                   rojo={a.banderas.includes("sube_coste")}
                 />
-                {conIva && <Dato etiqueta="Coste con IVA" valor={euros(a.costeIva)} />}
+                {conIva && <Dato etiqueta="Te cuesta con IVA" valor={euros(a.costeIva)} />}
               </dl>
+              <p className="text-xs text-muted-foreground" data-testid="ayuda-pct-coste">{AYUDA_PCT_COSTE}</p>
+              {rojo && <p className="text-xs font-medium text-destructive" data-testid="que-hacer-rojo">{QUE_HACER_EN_ROJO}</p>}
               {conIva && notaIva(a) && <p className="text-xs text-muted-foreground">{notaIva(a)}.</p>}
               {a.tipo === "vino" && a.formatoDistinto && (
                 <p className="text-xs text-muted-foreground" data-testid="nota-formato">
-                  Coste estimado desde la botella de {litrosTexto(a.litrosProducto)}: la carta es de {litrosTexto(a.litros)}.
+                  Coste calculado desde la botella de {litrosTexto(a.litrosProducto)}: la de la carta es de {litrosTexto(a.litros)}.
                 </p>
               )}
               {a.tipo === "vino" && a.enTienda && (
@@ -230,11 +336,12 @@ export function DetalleArticulo({
                     <Dato etiqueta="Precio de tienda" valor={euros(a.precioTienda)} />
                     <Dato etiqueta={`Sin IVA (${config.ivaTiendaPct} %)`} valor={euros(a.ventaTienda)} />
                     <Dato
-                      etiqueta={`Multiplicador (mín. ${veces(config.multiplicadorMinTienda)})`}
+                      etiqueta={`Cobras × lo que pagas (mín. ${veces(config.multiplicadorMinTienda)})`}
                       valor={veces(a.multiplicadorTienda)}
                       rojo={a.banderas.includes("tienda_bajo")}
                     />
-                    <Dato etiqueta="Margen bruto" valor={euros(a.margenTienda)} />
+                    <Dato etiqueta={ETIQUETA_PCT_COSTE} valor={porcentaje(a.pctTienda)} />
+                    <Dato etiqueta="Te queda (antes de sueldos y gastos)" valor={euros(a.margenTienda)} />
                   </dl>
                 </section>
               )}
@@ -255,6 +362,7 @@ export function DetalleArticulo({
                             <p className="min-w-0 flex-1 text-sm font-medium leading-snug">{x.producto}</p>
                             {orig && (
                               <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                                {orig.factura ? "última factura: " : ""}
                                 {precioCompra(orig)} → <span className="font-medium text-foreground">{euros(orig.coste)}</span>
                               </span>
                             )}
@@ -360,6 +468,17 @@ export function DetalleArticulo({
                 </section>
               )}
             </div>
+            {/* Solo montado con una factura elegida (el visor pide la URL firmada al abrirse). */}
+            {visorFactura && (
+              <VisorDocumento
+                documentos={[visorFactura]}
+                indice={0}
+                onIndice={() => undefined}
+                onCerrar={() => setVisorFactura(null)}
+                total={1}
+                onAbrirEnCompras={(enlace) => navigate(`/facturas${enlace}`)}
+              />
+            )}
             <footer className="flex shrink-0 flex-wrap items-center gap-3 border-t border-border/70 px-4 py-3">
               <label className={cn("flex min-h-10 items-center gap-2 text-sm", !puedeEditar && "opacity-60")}>
                 <Checkbox

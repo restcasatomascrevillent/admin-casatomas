@@ -55,9 +55,16 @@ export interface DatosPieza {
   pie?: string;
   /** Solo plantillas con numeral (Touza tipográfica). Por defecto "01". */
   numeral?: string;
+  /**
+   * Encuadre de la foto al recortarla a sangre, en % (0 izquierda/arriba, 100
+   * derecha/abajo; por defecto 50, el centro), como imagen_posicion_y de
+   * Platos. Lo usa «Solo foto». No son campos de texto.
+   */
+  posicionX?: number;
+  posicionY?: number;
 }
 
-export type CampoPieza = Exclude<keyof DatosPieza, "marca" | "plantilla" | "formato">;
+export type CampoPieza = Exclude<keyof DatosPieza, "marca" | "plantilla" | "formato" | "posicionX" | "posicionY">;
 
 /** Todos los campos de contenido de una pieza, en orden de formulario. */
 export const CAMPOS_PIEZA: readonly CampoPieza[] = ["foto", "antetitulo", "titular", "cita", "cta", "lista", "pie", "numeral"];
@@ -73,6 +80,15 @@ export interface ContextoPlantilla {
   urlFoto(id: string): string;
   /** URL de un logo (PNG en public/instagram/logos del panel, baseRecursos). */
   urlLogo(pieza: string, color: string): string;
+  /**
+   * URL de un fichero de fuente de public/instagram/fuentes (p. ej.
+   * "montserrat/montserrat-latin-400-normal.woff2"), para la plantilla que
+   * necesita una familia que no es la de su marca (12/11/2026: la story
+   * clásica del jueves de tapas va en Montserrat, como la que hacen ahora).
+   */
+  urlFuente?(fichero: string): string;
+  /** Medidas de una foto del catálogo (undefined si no está): «Solo foto» avisa si el recorte se queda pequeño. */
+  medidasFoto?(id: string): { ancho: number; alto: number } | undefined;
 }
 
 /**
@@ -95,9 +111,14 @@ export type EncajeFoto = "sangre" | "marco";
  *   plato pequeño. Sin logo ni botón.
  * - "cierre": la última imagen: logo, lema y botón.
  * - "tipografica": sin foto, una frase o un anuncio.
+ * - "anuncio" (12/11/2026): pieza de un flujo propio con su lista (la story
+ *   del jueves de tapas). No sale en los selectores ni la elige la IA: la
+ *   montan su botón y su automático (src/lib/instagram/tapas.ts).
+ * - "foto" (12/11/2026): la foto limpia, sin texto (como el feed real de
+ *   @casatomascrevillent). Va primera en los selectores.
  */
-export type PapelPlantilla = "portada" | "plato" | "cierre" | "tipografica";
-export const PAPELES: readonly PapelPlantilla[] = ["portada", "plato", "cierre", "tipografica"];
+export type PapelPlantilla = "portada" | "plato" | "cierre" | "tipografica" | "anuncio" | "foto";
+export const PAPELES: readonly PapelPlantilla[] = ["foto", "portada", "plato", "cierre", "tipografica", "anuncio"];
 
 export interface Plantilla {
   /** p. ej. "ct-foto-titular" */
@@ -129,6 +150,11 @@ export interface Plantilla {
    * selectores ni la elige la IA.
    */
   clasica?: boolean;
+  /**
+   * Sin ningún texto (12/11/2026, «Solo foto»): no pide titular ni admite
+   * rótulos; el texto va en el pie de la publicación.
+   */
+  sinTexto?: boolean;
   html(datos: DatosPieza, ctx: ContextoPlantilla): string;
 }
 

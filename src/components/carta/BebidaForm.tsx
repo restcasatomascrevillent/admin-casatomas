@@ -328,7 +328,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
               >
                 Cancelar
               </Button>
-              <Button type="submit" className="h-11 px-5" disabled={crearBebida.isPending || isUploading || fotoCarta.trabajando}>
+              <Button type="submit" className="h-11 px-5" disabled={crearBebida.isPending || isUploading || fotoCarta.trabajando || fotoCarta.faltaFondo}>
                 {crearBebida.isPending || isUploading ? "Guardando..." : "Guardar Bebida"}
               </Button>
             </div>

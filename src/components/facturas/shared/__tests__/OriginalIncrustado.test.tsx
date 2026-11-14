@@ -16,7 +16,19 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+// pdf.js no corre en jsdom: se simula el pintado de las hojas (ver pintarPdf.ts).
+const pdf = vi.hoisted(() => ({ pintar: vi.fn() }));
+vi.mock("@/lib/facturas/pintarPdf", () => ({ pintarHojasPdf: (...a: unknown[]) => pdf.pintar(...a) }));
+
 import { OriginalIncrustado } from "../OriginalIncrustado";
+import { nombrePdf } from "@/lib/facturas/nombrePdf";
+
+type OpcionesPintar = { alHoja?: (url: string, i: number, total: number) => void };
+const pintarDosHojas = async (_datos: ArrayBuffer, o: OpcionesPintar = {}) => {
+  o.alHoja?.("blob:hoja-1", 0, 2);
+  o.alHoja?.("blob:hoja-2", 1, 2);
+  return { hojas: ["blob:hoja-1", "blob:hoja-2"], total: 2 };
+};
 
 function montar(props: { driveUrl: string | null; archivoPath: string | null; documentoId?: number }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -33,6 +45,8 @@ describe("OriginalIncrustado", () => {
     base.firmar.mockResolvedValue({ data: { signedUrl: "https://x.test/firmada" }, error: null });
     URL.createObjectURL = vi.fn(() => "blob:original");
     URL.revokeObjectURL = vi.fn();
+    pdf.pintar.mockReset();
+    pdf.pintar.mockImplementation(pintarDosHojas);
   });
   afterEach(() => vi.unstubAllGlobals());
 
@@ -59,10 +73,38 @@ describe("OriginalIncrustado", () => {
     expect(base.firmar).not.toHaveBeenCalled();
   });
 
-  it("Drive con id y PDF: <object> con el blob", async () => {
+  it("Drive con id y PDF: todas las hojas como imágenes (sin <object> ni <iframe>, que bloquea la CSP) y «Descargar PDF»", async () => {
     servidor(() => new Response("%PDF-1.4", { status: 200, headers: { "Content-Type": "application/pdf" } }));
     const { container } = montar({ driveUrl: DRIVE, archivoPath: null, documentoId: 7 });
-    await waitFor(() => expect(container.querySelector('object[type="application/pdf"]')).toHaveAttribute("data", "blob:original"));
+    expect(await screen.findByAltText("Factura F-1 · hoja 1")).toHaveAttribute("src", "blob:hoja-1");
+    expect(screen.getByAltText("Factura F-1 · hoja 2")).toHaveAttribute("src", "blob:hoja-2");
+    expect(container.querySelector("object, embed, iframe")).toBeNull();
+    // pdf.js recibe los bytes del Blob, no el blob URL (connect-src no deja leerlo).
+    const [datos] = pdf.pintar.mock.calls[0];
+    expect(new TextDecoder().decode(datos as ArrayBuffer)).toBe("%PDF-1.4");
+    const descargar = screen.getByRole("link", { name: /descargar pdf/i });
+    expect(descargar).toHaveAttribute("href", "blob:original");
+    expect(descargar).toHaveAttribute("download", "Factura F-1.pdf");
+    expect(screen.getByRole("link", { name: /abrir en drive/i })).toHaveAttribute("href", DRIVE);
+  });
+
+  it("PDF: tocar una hoja la abre a pantalla completa con zoom", async () => {
+    servidor(() => new Response("%PDF-1.4", { status: 200, headers: { "Content-Type": "application/pdf" } }));
+    montar({ driveUrl: DRIVE, archivoPath: null, documentoId: 7 });
+    fireEvent.click(await screen.findByRole("button", { name: "Ampliar la hoja 2 de 2" }));
+    const visor = await screen.findByTestId("visor-original");
+    expect(visor.querySelector("img")).toHaveAttribute("src", "blob:hoja-2");
+  });
+
+  it("PDF que pdf.js no sabe pintar: aviso con «Reintentar», que lo vuelve a intentar", async () => {
+    servidor(() => new Response("%PDF-1.4", { status: 200, headers: { "Content-Type": "application/pdf" } }));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    pdf.pintar.mockRejectedValueOnce(new Error("PDF roto"));
+    montar({ driveUrl: DRIVE, archivoPath: null, documentoId: 7 });
+    expect(await screen.findByText(/No se ha podido enseñar el PDF aquí/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /reintentar/i }));
+    expect(await screen.findByAltText("Factura F-1 · hoja 1")).toBeInTheDocument();
+    expect(pdf.pintar).toHaveBeenCalledTimes(2);
   });
 
   it("Drive con id que falla: aviso claro con el motivo, «Reintentar» y «Abrir en Drive»", async () => {
@@ -99,10 +141,18 @@ describe("OriginalIncrustado", () => {
     await waitFor(() => expect(base.firmar).toHaveBeenCalledTimes(2));
   });
 
-  it("pdf: vista previa en <object> y enlace «Abrir PDF»", async () => {
+  it("pdf de Storage: descarga la URL firmada, enseña sus hojas y deja el enlace «Abrir PDF»", async () => {
+    const f = servidor(() => new Response("%PDF-1.7", { status: 200, headers: { "Content-Type": "application/pdf" } }));
     const { container } = montar({ driveUrl: null, archivoPath: "facturas/1.pdf" });
     expect(await screen.findByRole("link", { name: /abrir pdf/i })).toHaveAttribute("href", "https://x.test/firmada");
-    expect(container.querySelector('object[type="application/pdf"]')).toHaveAttribute("data", "https://x.test/firmada");
+    expect(await screen.findByAltText("Factura F-1 · hoja 1")).toBeInTheDocument();
+    expect(f).toHaveBeenCalledWith("https://x.test/firmada");
+    expect(container.querySelector("object, embed, iframe")).toBeNull();
+  });
+
+  it("nombrePdf: nombre de fichero limpio para «Descargar PDF»", () => {
+    expect(nombrePdf("Factura 12/3 · Makro")).toBe("Factura 12 3 · Makro.pdf");
+    expect(nombrePdf("  ")).toBe("original.pdf");
   });
 
   it("Drive sin id: vista previa incrustada (/preview) con «Abrir en Drive», sin pedir nada a Storage", () => {

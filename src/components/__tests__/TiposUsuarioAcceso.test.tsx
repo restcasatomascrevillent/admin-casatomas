@@ -71,9 +71,9 @@ beforeEach(() => {
 });
 
 describe("tipo «Albaranes»", () => {
-  it("el menú enseña solo «Subir albaranes» (y Ayuda)", () => {
+  it("el menú enseña solo «Subir albaranes» (y Nueva petición y Ayuda, que son de todos)", () => {
     h.permisos = permisosDe("albaranes");
-    expect(menu()).toEqual(["/albaranes", "/ayuda"]);
+    expect(menu()).toEqual(["/albaranes", "/peticiones", "/ayuda"]);
   });
 
   it("al entrar (/dashboard) va directo a /albaranes, sin apuntarlo como acceso denegado", async () => {
@@ -94,9 +94,9 @@ describe("tipo «Albaranes»", () => {
 });
 
 describe("tipo «Reservas»", () => {
-  it("el menú enseña solo Reservas (y Ayuda)", () => {
+  it("el menú enseña solo Reservas (y Nueva petición y Ayuda, que son de todos)", () => {
     h.permisos = permisosDe("reservas");
-    expect(menu()).toEqual(["/reservas", "/ayuda"]);
+    expect(menu()).toEqual(["/reservas", "/peticiones", "/ayuda"]);
   });
 
   it("al entrar (/dashboard) va directo a /reservas, sin apuntarlo como acceso denegado", async () => {

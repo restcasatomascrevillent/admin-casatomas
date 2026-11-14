@@ -552,7 +552,7 @@ export function TableroCompras({
       vista: "gasto",
       etiqueta: `Gasto de ${nombreMesActual}`,
       valor: indMes ? formasImporte(indMes.gasto) : ["…"],
-      detalle: indMes ? `con IVA · ${plural(indMes.facturas, "factura subida", "facturas subidas")}` : "Cargando…",
+      detalle: indMes ? `con IVA · ${plural(indMes.facturas, "factura de este mes", "facturas de este mes")} (por fecha de la factura)` : "Cargando…",
       // Punto de aviso si el mes en curso está marcado como incompleto (faltan facturas por subir).
       aviso: !!tableroMes.data?.mesesIncompletos?.length,
       listo: true,
@@ -604,7 +604,7 @@ export function TableroCompras({
               decision={dec}
               pendiente={pendiente}
               onIrA={onIrA}
-              onVerFamilia={(f) => docsFamilia(f)}
+              local={local}
               onVerPrecio={(id) => {
                 setPrecioElegido(`a:${id}`);
                 irAVista("precios");

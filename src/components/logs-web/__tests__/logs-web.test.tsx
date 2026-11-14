@@ -20,6 +20,27 @@ const estadoBase = (o: Partial<EstadoRecogidaDatos> = {}): EstadoRecogidaDatos =
   vercel_ultimo_dia: { fecha: "2026-11-07", visitas: 40 }, ...o,
 });
 
+describe("línea de tiempo con el color del origen", () => {
+  it("rojo los fallos de la web, ámbar los externos y gris lo que no depende de la web", () => {
+    render(
+      <LineaTiempo
+        eventos={[
+          ev({ id: 1, tipo: "error_js", categoria: "error", mensaje: "TypeError: x is null", ocurrido_en: "2026-11-08T11:00:00Z", secuencia: 1, origen: "web" }),
+          ev({ id: 2, tipo: "error_js", categoria: "error", mensaje: "Google Maps JavaScript API error", ocurrido_en: "2026-11-08T11:00:01Z", secuencia: 2 }),
+          ev({ id: 3, tipo: "error_peticion", categoria: "error", mensaje: "Sin respuesta de rest:tapas (sin conexión)", propiedades: { status: 0 }, ocurrido_en: "2026-11-08T11:00:02Z", secuencia: 3 }),
+          ev({ id: 4, tipo: "pagina_vista", ruta: "/", ocurrido_en: "2026-11-08T11:00:03Z", secuencia: 4 }),
+        ]}
+      />,
+    );
+    const filas = screen.getAllByTestId("evento-linea");
+    expect(filas.map((f) => f.getAttribute("data-origen"))).toEqual(["web", "externo", "conexion", null]);
+    expect(filas[0].className).toMatch(/destructive/);
+    expect(filas[1].className).toMatch(/amber/);
+    expect(filas[2].className).toMatch(/slate/);
+    expect(within(filas[2]).getByTestId("badge-origen")).toHaveTextContent("Conexión del visitante");
+  });
+});
+
 describe("estadoRecogida: «no hay actividad» ≠ «la recogida se ha parado»", () => {
   it("sin ningún evento todavía: lo dice y no inventa históricos", () => {
     const e = estadoRecogida(estadoBase({ primer_evento: null }));

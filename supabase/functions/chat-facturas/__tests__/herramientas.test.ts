@@ -43,7 +43,7 @@ import {
  * El prompt va en cache (≈5.600 de 8.200 tokens de entrada, 0,10 $/M en
  * gpt-4.1-mini): ~+90 tokens ≈ +0,00001 $ por ronda.
  */
-const LIMITE_PROMPT = 6_650; // + regla 19 «como_leer» (16/11/2026) + precio tal como se compra en la 14 (11/11/2026)
+const LIMITE_PROMPT = 6_850; // + «Precio de referencia = la ULTIMA factura» (13/11/2026) + regla 19 «como_leer» (16/11/2026) + precio tal como se compra en la 14 (11/11/2026)
 
 // deno-lint-ignore no-explicit-any
 type Esquema = any;
@@ -243,7 +243,7 @@ describe("systemPrompt", () => {
   });
 
   it("compras de un producto: compras_producto, unidad, periodo, variantes y albaranes (07/10/2026)", () => {
-    expect(p).toMatch(/compras_producto: cuanto se compro de UN producto, a quien y a que precio medio/);
+    expect(p).toMatch(/compras_producto: cuanto se compro de UN producto, a quien y a que precio \(tambien el proveedor mas barato\)/);
     expect(p).toMatch(/12\. compras_producto: di unidad, periodo y variantes contadas \(productos_coincidentes\); nunca sumes unidades distintas/);
     expect(p).toMatch(/"aproximada": avisa de que no es el nombre exacto/);
     expect(p).toMatch(/sin_datos: dilo y da ultimo_dato \(fecha, cantidad, proveedor\) si viene; con sugerencias pregunta si es alguna/);
@@ -260,8 +260,9 @@ describe("systemPrompt", () => {
     expect(p).toMatch(/gasto_por_categoria: gasto en vinos, marisco, limpieza\.\.\. o reparto por categorias/);
     expect(p).toMatch(/variacion_precios: que ha subido o bajado de precio/);
     expect(p).toMatch(/13\. gasto_por_categoria: di periodo, base SIN IVA y sin_clasificar/);
-    expect(p).toMatch(/cambio_proveedor = otro proveedor, no subida del mismo: dilo/);
-    expect(p).toMatch(/pocas_compras\/ref_antigua: comparacion debil/);
+    // 13/11/2026: la última factura frente a la anterior del mismo proveedor (cambio_proveedor = la anterior es de otro).
+    expect(p).toMatch(/cambio_proveedor = la anterior es de otro proveedor: dilo/);
+    expect(p).toMatch(/ref_antigua: comparacion debil/);
     const g = TOOLS.find((t) => t.function.name === "gasto_por_categoria")!.function;
     expect(g.description).toMatch(/categoria null/);
     expect((g.parameters as Esquema).properties.agrupar.enum).toEqual(["mes", "proveedor", null]);
@@ -440,7 +441,7 @@ describe("prepararLlamada", () => {
       rpc: "variacion_precios_agente",
       params: {
         p_desde: null, p_hasta: "2026-10-07", p_umbral_pct: 5, p_categoria: "pescado", p_producto: null,
-        p_limite: LIMITES.variacion_precios, p_sentido: "bajadas", p_base: false,
+        p_limite: LIMITES.variacion_precios, p_sentido: "bajadas", p_base: false, p_comparar: "anterior",
       },
       limite: null,
     });
@@ -994,5 +995,27 @@ describe("precio tal como se compra (11/11/2026)", () => {
     expect(p).toMatch(/Precio de un producto: tal como se compra y con su formato \(«botella 75 cl a 12,40 €», «magnum 1,5 l», «paquete 500 g»\)/);
     expect(p).toMatch(/€\/l o €\/kg solo si lo piden o va a granel/);
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT);
+  });
+});
+
+describe("precio de referencia = la ULTIMA factura (dueño, 13/11/2026)", () => {
+  const p = systemPrompt("2026-11-13");
+  it("el prompt manda usar y remarcar la última factura; medias y medianas solo de contexto", () => {
+    expect(p).toMatch(
+      /Precio de referencia = el de la ULTIMA factura \(fecha y proveedor, con su numero para el enlace\); medias, medianas u otras facturas solo despues, como contexto\./,
+    );
+    expect(p).not.toMatch(/a que precio medio/);
+    expect(p).toMatch(/variacion_precios: da precio \(ultima factura\) frente a anterior \(la del mismo proveedor; media solo contexto\)/);
+    expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT);
+  });
+  it("compras_producto e historial_precios: la nota de respuesta pide la última factura primero", () => {
+    expect(NOTA_RESPUESTA_PRECIO_COMPRA).toMatch(/^Primero el precio de la ULTIMA factura \(ultima_factura: fecha, proveedor y numero\)/);
+    expect(prepararLlamada("historial_precios", { producto: "percebe" })).toMatchObject({ notaRespuesta: NOTA_RESPUESTA_PRECIO_COMPRA });
+  });
+  it("variacion_precios compara la última factura con la anterior del mismo proveedor (p_comparar)", () => {
+    expect(prepararLlamada("variacion_precios", { producto: "percebe" })).toMatchObject({
+      rpc: "variacion_precios_agente",
+      params: { p_producto: "percebe", p_comparar: "anterior" },
+    });
   });
 });

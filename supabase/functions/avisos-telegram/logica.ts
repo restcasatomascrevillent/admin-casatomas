@@ -124,14 +124,115 @@ export function recortar(texto: string, max: number): string {
 
 const limpio = (s: unknown): string => (typeof s === "string" ? s.replace(/\s+/g, " ").trim() : "");
 
-/** Frase del aviso: datos.texto_telegram o «Título: mensaje» corto. */
+// ─── Plantillas cortas (14/11/2026) ─────────────────────────────────────────
+//  Dueño: «todos los avisos deben ser concisos y claros: 2-4 líneas, qué ha pasado con
+//  números, y qué hacer». Cada aviso suelto sale así:
+//    1. Título (qué es)                         «Margen bajo: Chuletón»
+//    2. Qué ha pasado, con números (una frase)  «Los ingredientes ya son el 41 % de lo que cobras (máximo 35 %).»
+//    3. Qué hacer                               «Qué hacer: sube la carta de 22,00 € a 24,50 € (con IVA).»
+//    4. Enlace                                  «Aplicar el precio: https://…/aplicar-precio/<id>»
+//  El resumen diario usa solo la línea 2 de cada aviso.
+
+/** Largo máximo de la línea «qué ha pasado». */
+export const MAX_FRASE = 220;
+
+const n2 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const n1 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const n0 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
+const numero = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const x = Number(v);
+  return Number.isFinite(x) ? x : null;
+};
+const eur = (v: number) => `${n2.format(v)} €`;
+
+/** Precio sugerido para un aviso «Margen bajo» (RPC avisos_precio_sugerido, 20261130160000). */
+export interface Sugerencia {
+  precio_actual: number | null;
+  precio_sugerido: number | null;
+  aplicado?: unknown;
+}
+
+/** Primera frase de un texto (hasta el primer «. » seguido de mayúscula), recortada a `max`. */
+export function primeraFrase(texto: string, max = MAX_FRASE): string {
+  const t = limpio(texto);
+  const m = t.match(/^(.+?[.!?])\s+(?=[A-ZÁÉÍÓÚÑ¿¡«])/);
+  return recortar(m ? m[1] : t, max);
+}
+
+/** «Qué ha pasado» de un aviso «Margen bajo», con los números de datos. null si faltan datos. */
+function fraseMargenBajo(d: Record<string, unknown>): string | null {
+  const canal = d.canal;
+  const valor = numero(d.valor);
+  const limite = numero(d.limite);
+  if (valor === null || limite === null) return null;
+  if (canal === "plato") {
+    const antes = numero(d.eur_antes);
+    const ahora = numero(d.eur);
+    const prod = limpio(d.producto);
+    const sube = prod && antes !== null && ahora !== null && ahora > antes ? ` Sube ${prod}: de ${eur(antes)} a ${eur(ahora)}.` : "";
+    return `Los ingredientes ya son el ${n0.format(valor)} % de lo que cobras (máximo ${n0.format(limite)} %).${sube}`;
+  }
+  if (canal === "vino" || canal === "tienda" || canal === "peso") {
+    const coste = numero(d.coste);
+    const antes = numero(d.coste_antes);
+    const que = canal === "peso" ? "el kilo" : "la botella";
+    const cuesta = coste !== null ? ` ${que[0].toUpperCase()}${que.slice(1)} te cuesta ${eur(coste)}${antes !== null ? ` (antes ${eur(antes)})` : ""}.` : "";
+    return `Cobras ${n1.format(valor)} veces lo que pagas (mínimo ${n1.format(limite)})${canal === "tienda" ? " en la tienda" : ""}.${cuesta}`;
+  }
+  return null;
+}
+
+/** Línea 2: qué ha pasado, con números (una frase corta). También es la frase del resumen. */
 export function fraseAviso(a: Aviso): string {
+  if (a.tipo === "facturas_margen_bajo" && a.datos) {
+    const f = fraseMargenBajo(a.datos);
+    if (f) return recortar(f, MAX_FRASE);
+  }
   const tg = limpio(a.datos?.texto_telegram);
-  if (tg) return recortar(tg, 600);
+  if (tg) return primeraFrase(tg);
   const titulo = limpio(a.titulo);
   const mensaje = limpio(a.mensaje);
-  return recortar(mensaje && mensaje !== titulo ? `${titulo}: ${mensaje}` : titulo || etiquetaTipo(a.tipo), 300);
+  if (mensaje && mensaje !== titulo) return primeraFrase(mensaje);
+  return recortar(titulo || etiquetaTipo(a.tipo), MAX_FRASE);
 }
+
+/** Línea 3: qué hacer, por tipo (null si no hay nada que hacer, p. ej. una reserva nueva). */
+const QUE_HACER: Record<string, string> = {
+  reserva_cancelada: "la mesa queda libre; no hace falta hacer nada.",
+  solicitud_pendiente: "llama al cliente y resuélvela en Reservas.",
+  facturas_subida: "revisa lo subido en Facturas.",
+  subida_precio: "mira si toca subir la carta o buscar otro proveedor.",
+  original_sin_drive: "vuelve a subir el original en Facturas.",
+  facturas_precio_sube: "mira si toca subir la carta o pedir otro precio.",
+  facturas_precio_mejor: "pide precio a ese proveedor (comprueba que es la misma calidad).",
+  facturas_familia_gasto: "revisa las compras de ese mes.",
+  facturas_albaran_sin_factura: "pide la factura al proveedor o vincúlala si ya la tienes.",
+  facturas_proveedor_nuevo: "comprueba que no sea un proveedor repetido.",
+  facturas_importe_inusual: "comprueba que el importe esté bien leído.",
+  facturas_revision: "revísalos y márcalos como verificados.",
+  facturas_precio_baja: "buen momento para comprar más.",
+  facturas_precio_proveedor: "habla con el proveedor o busca otro.",
+  facturas_precio_pactado: "reclama el precio pactado al proveedor.",
+  facturas_margen_bajo: "revisa el precio en Facturas › Márgenes.",
+  instagram_encargo: "míralo en RRSS › Encargos.",
+};
+
+/** ¿Hay un precio sugerido que se pueda aplicar (y no se ha aplicado ya)? */
+export const sugerenciaAplicable = (s: Sugerencia | null | undefined): s is Sugerencia & { precio_sugerido: number } =>
+  !!s && typeof s.precio_sugerido === "number" && s.precio_sugerido > 0 && !s.aplicado;
+
+export function queHacer(a: Aviso, sug?: Sugerencia | null): string | null {
+  if (a.tipo === "facturas_margen_bajo" && sugerenciaAplicable(sug)) {
+    return sug.precio_actual !== null && sug.precio_actual > 0
+      ? `sube la carta de ${eur(sug.precio_actual)} a ${eur(sug.precio_sugerido)} (con IVA).`
+      : `pon en la carta ${eur(sug.precio_sugerido)} (con IVA).`;
+  }
+  return QUE_HACER[a.tipo] ?? null;
+}
+
+/** Ruta del panel para aplicar el precio sugerido de un aviso (pide sesión y permiso de carta). */
+export const rutaAplicarPrecio = (avisoId: string) => `/aplicar-precio/${encodeURIComponent(avisoId)}`;
 
 /** Ruta del panel para un aviso (subconjunto de rutaDeAviso en src/lib/avisos.ts). */
 export function rutaPanel(a: Pick<Aviso, "tipo" | "referencia_tipo" | "datos">): string {
@@ -149,11 +250,27 @@ export function enlacePanel(base: string | null | undefined, ruta: string): stri
   return `${b}${ruta.startsWith("/") ? ruta : `/${ruta}`}`;
 }
 
-/** Texto de un aviso suelto (al momento), con el enlace al panel si se puede. */
-export function mensajeAviso(a: Aviso, panelUrl?: string | null): string {
-  const url = enlacePanel(panelUrl, rutaPanel(a));
-  const pie = url ? `\n${url}` : "";
-  return recortar(`${etiquetaTipo(a.tipo)}\n${fraseAviso(a)}`, LIMITE_TELEGRAM - pie.length) + pie;
+/** Línea 1: el título del aviso (corto); en «Margen bajo», «Margen bajo: <nombre>». */
+export function tituloAviso(a: Aviso): string {
+  const nombre = limpio(a.datos?.nombre);
+  if (a.tipo === "facturas_margen_bajo" && nombre) return recortar(`Margen bajo: ${nombre}`, 90);
+  return recortar(limpio(a.titulo) || etiquetaTipo(a.tipo), 90);
+}
+
+/**
+ * Texto de un aviso suelto (al momento): 2-4 líneas (título, qué ha pasado, qué hacer y enlace).
+ * Con un precio sugerido aplicable, el enlace es el de «Aplicar el precio» (pantalla del panel
+ * que pide sesión, permiso de carta y confirmación).
+ */
+export function mensajeAviso(a: Aviso, panelUrl?: string | null, sug?: Sugerencia | null): string {
+  const aplicar = a.tipo === "facturas_margen_bajo" && sugerenciaAplicable(sug) ? enlacePanel(panelUrl, rutaAplicarPrecio(a.id)) : null;
+  const url = aplicar ?? enlacePanel(panelUrl, rutaPanel(a));
+  const pie = url ? `\n${aplicar ? "Aplicar el precio" : "Ver"}: ${url}` : "";
+  const titulo = tituloAviso(a);
+  const frase = fraseAviso(a);
+  const hacer = queHacer(a, sug);
+  const lineas = [titulo, ...(frase && frase !== titulo ? [frase] : []), ...(hacer ? [`Qué hacer: ${hacer}`] : [])];
+  return recortar(lineas.join("\n"), LIMITE_TELEGRAM - pie.length) + pie;
 }
 
 /**
@@ -192,9 +309,9 @@ export function construirResumen(avisos: Aviso[], ahora: Date, panelUrl?: string
     .filter((a) => !tipoExcluido(a.tipo))
     .filter((a) => !a.caduca_en || Date.parse(a.caduca_en) > ahora.getTime())
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-  const cabecera = `Resumen de avisos de Casa Tomás · ${fechaCorta(ahora)}`;
+  const cabecera = `Avisos de Casa Tomás · ${fechaCorta(ahora)}`;
   const url = enlacePanel(panelUrl, "/avisos");
-  const pie = url ? `\n\nVer en el panel: ${url}` : "";
+  const pie = url ? `\n\nVer todo: ${url}` : "";
   if (validos.length === 0) {
     return { texto: `${cabecera}\nSin avisos en las últimas 24 h.${pie}`, total: 0 };
   }
@@ -206,7 +323,7 @@ export function construirResumen(avisos: Aviso[], ahora: Date, panelUrl?: string
   const avisoCorte = "\n\n(No cabe todo: el resto, en el panel.)";
   for (let g = 0; g < ordenados.length; g++) {
     const [tipo, lista] = ordenados[g];
-    const frases = lista.slice(0, FRASES_POR_TIPO).map((a) => `• ${recortar(fraseAviso(a), 400)}`);
+    const frases = lista.slice(0, FRASES_POR_TIPO).map((a) => `• ${fraseAviso(a)}`);
     const resto = lista.length - frases.length;
     const bloque = `\n\n${etiquetaTipo(tipo)} (${lista.length})\n${frases.join("\n")}${resto > 0 ? `\n…y ${resto} más.` : ""}`;
     const reserva = (g < ordenados.length - 1 ? avisoCorte.length : 0) + pie.length;

@@ -1,20 +1,23 @@
 /**
  * Super Admin › Logs › Errores e incidencias: filtros (ocultar bots y pruebas,
- * tipo, búsqueda en la pila), causa conocida y texto para copiar.
+ * tipo, búsqueda en la pila, origen), colores por origen, cuentas aparte,
+ * causa conocida y texto para copiar.
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConsultaFiltrable, EventoWeb, FiltrosIncidencias, IncidenciaWeb } from "@/hooks/useLogsWeb";
 
 const llamadas: FiltrosIncidencias[] = [];
 let filas: IncidenciaWeb[] = [];
+let conteos: { web: number; externo: number; no_depende: number } | undefined;
+let sinOrigen = false;
 vi.mock("@/hooks/useLogsWeb", async (original) => {
   const real = await original<typeof import("@/hooks/useLogsWeb")>();
   return {
     ...real,
     useIncidencias: (f: FiltrosIncidencias) => {
       llamadas.push(f);
-      return { data: { filas, total: filas.length }, isLoading: false, isError: false, isFetching: false, refetch: vi.fn() };
+      return { data: { filas, total: filas.length, conteos, sinOrigen }, isLoading: false, isError: false, isFetching: false, refetch: vi.fn() };
     },
   };
 });
@@ -37,8 +40,10 @@ function consultaFalsa() {
   const pasos: string[] = [];
   const q: ConsultaFiltrable = {
     eq: (c, v) => (pasos.push(`eq ${c}=${v}`), q),
+    neq: (c, v) => (pasos.push(`neq ${c}=${v}`), q),
     in: (c, v) => (pasos.push(`in ${c}=${v.join(",")}`), q),
     gt: (c, v) => (pasos.push(`gt ${c}>${v}`), q),
+    lte: (c, v) => (pasos.push(`lte ${c}<=${v}`), q),
     or: (f) => (pasos.push(`or ${f}`), q),
   };
   return { q, pasos };
@@ -61,11 +66,34 @@ describe("filtros de incidencias", () => {
     aplicarFiltrosIncidencias(q, { entorno: null, estado: null, gravedad: null, fuente: null, texto: "  " });
     expect(pasos).toEqual([]);
   });
+  it("origen: por defecto fallos de la web y externos; cada grupo; todos", () => {
+    const pasos = (origen: FiltrosIncidencias["origen"], ocultarRuido = false) => {
+      const c = consultaFalsa();
+      aplicarFiltrosIncidencias(c.q, { entorno: null, estado: null, gravedad: null, fuente: null, texto: "", origen, ocultarRuido });
+      return c.pasos;
+    };
+    expect(pasos("web_externos")).toEqual(["lte origen_prioridad<=2"]);
+    expect(pasos("web")).toEqual(["eq origen=web"]);
+    expect(pasos("externo")).toEqual(["eq origen=externo"]);
+    expect(pasos("no_depende")).toEqual(["eq origen_prioridad=3"]);
+    expect(pasos(null)).toEqual([]);
+    expect(pasos(undefined)).toEqual([]);
+  });
+  it("«Ocultar las de solo bots y pruebas» también quita las de origen «Bots y pruebas»", () => {
+    const c = consultaFalsa();
+    aplicarFiltrosIncidencias(c.q, { entorno: null, estado: null, gravedad: null, fuente: null, texto: "", origen: "no_depende", ocultarRuido: true });
+    expect(c.pasos).toEqual(["gt ocurrencias>0", "eq origen_prioridad=3", "neq origen=bots"]);
+    const d = consultaFalsa();
+    aplicarFiltrosIncidencias(d.q, { entorno: null, estado: null, gravedad: null, fuente: null, texto: "", origen: "web_externos", ocultarRuido: true });
+    expect(d.pasos).toEqual(["gt ocurrencias>0", "lte origen_prioridad<=2"]);
+  });
 });
 
 describe("pestaña de incidencias", () => {
   beforeEach(() => {
     llamadas.length = 0;
+    conteos = undefined;
+    sinOrigen = false;
     filas = [inc(), inc({ id: 20, titulo: "Página no encontrada", tipo: "error_404", fuente: "navegador", ocurrencias: 0, mensaje: "Página no encontrada" })];
   });
   it("por defecto oculta lo de solo bots/pruebas y se puede ver", () => {
@@ -77,7 +105,73 @@ describe("pestaña de incidencias", () => {
   it("marca la causa conocida y las de solo bots", () => {
     render(<PestanaIncidencias desde="a" hasta="b" entorno="produccion" autoRefresco={false} onAbrirIncidencia={vi.fn()} onAbrirSesion={vi.fn()} />);
     expect(screen.getByTestId("causa-conocida-fila")).toHaveTextContent(/pg_cron no pudo arrancar/);
-    expect(screen.getByText("solo bots o pruebas")).toBeInTheDocument();
+    expect(screen.getAllByTestId("badge-origen").map((b) => b.textContent)).toEqual(["Servicio externo · Supabase", "Bots y pruebas"]);
+  });
+});
+
+describe("colores y cuentas por origen", () => {
+  const captura = (id: number, endpoint: string) => inc({
+    id, titulo: `Sin respuesta de ${endpoint} (sin conexión) · ${endpoint}`, tipo: "error_peticion", fuente: "navegador", mensaje: `Sin respuesta de ${endpoint} (sin conexión)`,
+    ocurrencias: 1, sesiones_afectadas: 1, rutas: [{ ruta: "/", n: 1 }], linear_estado: "sin_ticket", linear_identificador: null, linear_destino: null, origen: "conexion",
+  });
+  beforeEach(() => {
+    llamadas.length = 0;
+    sinOrigen = false;
+    conteos = { web: 1, externo: 1, no_depende: 4 };
+    filas = [
+      inc({ id: 1, titulo: "TypeError: vino.precio is null", tipo: "error_js", fuente: "navegador", mensaje: "TypeError: vino.precio is null", origen: "web", gravedad: "critico" }),
+      inc({ id: 2, titulo: "Google Maps JavaScript API error", tipo: "error_js", fuente: "navegador", mensaje: "Google Maps JavaScript API error", origen: "externo", origen_proveedor: "Google Maps" }),
+      ...["rest:novedades", "rest:configuracion_web", "rest:tapas", "rest:menus_diarios"].map((e, n) => captura(30 + n, e)),
+    ];
+  });
+  const pintar = () => render(<PestanaIncidencias desde="a" hasta="b" entorno="demo" autoRefresco={false} onAbrirIncidencia={vi.fn()} onAbrirSesion={vi.fn()} />);
+
+  it("por defecto pide fallos de la web y externos, con las cuentas de cada color", () => {
+    pintar();
+    expect(llamadas.at(-1)?.origen).toBe("web_externos");
+    expect(screen.getByTestId("conteo-web")).toHaveTextContent("Fallos de la web: 1");
+    expect(screen.getByTestId("conteo-externo")).toHaveTextContent("Externos: 1");
+    expect(screen.getByTestId("conteo-no_depende")).toHaveTextContent("No dependen de la web: 4");
+    expect(screen.getByTestId("leyenda-origen")).toHaveTextContent(/Fallos de la web:.*Externos:.*No dependen de la web:/);
+  });
+  it("cada fila con su color: rojo la de la web, ámbar la externa, gris las de conexión (las de la captura)", () => {
+    pintar();
+    const insignias = screen.getAllByTestId("badge-origen");
+    expect(insignias.map((b) => [b.dataset.origen, b.dataset.grupo])).toEqual([
+      ["web", "web"], ["externo", "externo"], ["conexion", "no_depende"], ["conexion", "no_depende"], ["conexion", "no_depende"], ["conexion", "no_depende"],
+    ]);
+    expect(insignias[0].className).toMatch(/destructive/);
+    expect(insignias[1].className).toMatch(/amber/);
+    expect(insignias[2].className).toMatch(/slate/);
+    expect(insignias[1]).toHaveTextContent("Servicio externo · Google Maps");
+    expect(insignias[2]).toHaveTextContent("Conexión del visitante");
+    // «Crítica» en rojo solo para un fallo de la web; las de conexión ya no llevan «Error» en rojo.
+    expect(screen.getAllByText("Crítica")).toHaveLength(1);
+    const filasTabla = screen.getAllByTestId("fila-incidencia");
+    expect(within(filasTabla[2]).getByTestId("sencillo-fila")).toHaveTextContent(/Casi siempre es la conexión del visitante/);
+    expect(within(filasTabla[1]).getByTestId("sencillo-fila")).toHaveTextContent("No es un fallo de nuestro código: depende de Google Maps.");
+  });
+  it("las cuentas filtran por su color y el filtro de origen tiene «todos»", () => {
+    pintar();
+    fireEvent.click(screen.getByTestId("conteo-no_depende"));
+    expect(llamadas.at(-1)?.origen).toBe("no_depende");
+    expect(screen.getByTestId("conteo-no_depende")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByTestId("conteo-no_depende")); // otra vez: vuelve al de siempre
+    expect(llamadas.at(-1)?.origen).toBe("web_externos");
+    expect(screen.getByRole("combobox", { name: "Origen" })).toBeInTheDocument();
+  });
+  it("debajo, plegadas: «No dependen de la web (N)» lleva a verlas", () => {
+    pintar();
+    fireEvent.click(screen.getByTestId("ver-no-dependen"));
+    expect(llamadas.at(-1)?.origen).toBe("no_depende");
+  });
+  it("sin la migración del origen: sin filtro ni cuentas de origen (como antes)", () => {
+    sinOrigen = true;
+    conteos = undefined;
+    pintar();
+    expect(screen.queryByTestId("resumen-origenes")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Origen" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ver-no-dependen")).not.toBeInTheDocument();
   });
 });
 
