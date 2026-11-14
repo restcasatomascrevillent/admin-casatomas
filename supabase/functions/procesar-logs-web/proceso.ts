@@ -16,6 +16,11 @@
 //       una vez por incidencia (explicar.ts). Comparte el tope diario de IA
 //       con los análisis de los tickets y usa como mucho la mitad.
 //    5. Purga diaria y estado final.
+//  Origen (20261130100000): solo los «Fallo de la web» (y los «Servicio
+//  externo» con linear_tickets_externos) crean, reabren, comentan o migran
+//  tickets; el SQL ya no los pide para el resto, y esto es la segunda barrera.
+//  Los tickets que ya existen de lo que no depende de la web no se tocan (solo
+//  se sincroniza su estado); los pedidos a mano («Pedido a mano…») sí siguen.
 //  Si Linear o la IA fallan, la incidencia se queda «pendiente/error» con su
 //  próximo intento (espera exponencial, máx. 6 h); el id determinista impide
 //  duplicar el ticket en el reintento. El proceso NUNCA ejecuta nada de lo que
@@ -29,6 +34,7 @@ import { interpretarExplicacion, mensajesExplicacion, necesitaExplicacion, type 
 import { eventosDeCron, eventosDeDespliegues, eventosDeSyncTrafico, type DespliegueVercel, type EstadoSyncTrafico, type FalloCron } from "./recolectores.ts";
 import type { EventoNormalizado } from "../_shared/logs-web/eventos.ts";
 import { sanearTexto } from "../_shared/logs-web/saneado.ts";
+import { puedeAbrirTicket } from "../_shared/logs-web/origen.ts";
 
 export interface ConfigLogs {
   linear_modo: "desactivado" | "prueba" | "real";
@@ -43,6 +49,8 @@ export interface ConfigLogs {
   recoger_hosting: boolean;
   entorno_bd: "produccion" | "demo" | "local";
   entornos_aceptados: string[];
+  /** Los «Servicio externo» pueden abrir ticket (20261130100000; sin la migración, undefined = no). */
+  linear_tickets_externos?: boolean;
 }
 
 export interface IncidenciaFila extends IncidenciaTicket {
@@ -61,6 +69,8 @@ export interface IncidenciaFila extends IncidenciaTicket {
   analisis_ia_en: string | null;
   explicacion_ia: ExplicacionIa | null;
   explicacion_ia_intentos: number;
+  /** web | externo | conexion | navegador | version_antigua | bots (20261130100000; undefined sin la migración). */
+  origen?: string | null;
 }
 
 export interface RepoProceso {
@@ -137,22 +147,39 @@ export type Accion = "crear" | "reabrir" | "actualizar" | "sincronizar" | "migra
  * el de pruebas, tras activar Linear) no se comenta ni se consulta aquí: si la
  * incidencia sigue viva, se «migra» (ticket nuevo en el destino actual).
  */
-export function accionPara(i: IncidenciaFila, ahora: Date, destino?: DestinoTickets["tipo"]): Accion {
+/** ¿La pidió una persona con «Pedir ticket»? (web_incidencia_pedir_ticket pone siempre este principio). */
+export const pedidoAMano = (i: Pick<IncidenciaFila, "motivo_ticket">) => (i.motivo_ticket ?? "").startsWith("Pedido a mano");
+
+/**
+ * ¿Puede esta incidencia crear o mover su ticket? Fallo de la web sí; servicio
+ * externo solo con el interruptor; lo que no depende de la web, no (salvo que
+ * lo pidiera una persona). Sin la migración del origen, como antes.
+ */
+export function ticketPermitido(i: Pick<IncidenciaFila, "origen" | "motivo_ticket">, ticketsExternos = false): boolean {
+  return puedeAbrirTicket(i.origen, ticketsExternos) || pedidoAMano(i);
+}
+
+export function accionPara(i: IncidenciaFila, ahora: Date, destino?: DestinoTickets["tipo"], ticketsExternos = false): Accion {
   if (i.estado === "ignorada") return null;
+  const permitido = ticketPermitido(i, ticketsExternos);
   if (i.linear_estado === "pendiente" || i.linear_estado === "error") {
     // Resuelta antes de llegar a crear el ticket: no se abre (si vuelve, pasa a «reabierta» y entonces sí).
     if (i.estado === "resuelta") return null;
+    // No depende de la web (o externo sin el interruptor): no se crea (el SQL la devuelve a «sin ticket»).
+    if (!permitido) return null;
     return !i.linear_proximo_intento || Date.parse(i.linear_proximo_intento) <= ahora.getTime() ? "crear" : null;
   }
   if (i.linear_estado !== "creado" || !i.linear_issue_id) return null;
   if (destino && i.linear_destino && i.linear_destino !== destino) {
     const sigueViva = i.linear_pendiente_reapertura || (i.estado !== "resuelta" && i.ocurrencias > i.ocurrencias_en_ticket);
-    return sigueViva ? "migrar" : null;
+    return sigueViva && permitido ? "migrar" : null;
   }
-  if (i.linear_pendiente_reapertura) return "reabrir";
+  // Ticket ya creado de algo que no depende de la web: se deja como está (ni se reabre ni se comenta),
+  // pero se sigue leyendo su estado en Linear para que el panel lo enseñe al día.
+  if (i.linear_pendiente_reapertura && permitido) return "reabrir";
   const ultima = i.linear_ultima_sync ? Date.parse(i.linear_ultima_sync) : 0;
   const nuevas = i.ocurrencias - i.ocurrencias_en_ticket;
-  if (nuevas > 0 && (ahora.getTime() - ultima >= SEIS_HORAS || i.ocurrencias >= 2 * Math.max(i.ocurrencias_en_ticket, 1))) return "actualizar";
+  if (permitido && nuevas > 0 && (ahora.getTime() - ultima >= SEIS_HORAS || i.ocurrencias >= 2 * Math.max(i.ocurrencias_en_ticket, 1))) return "actualizar";
   if (ahora.getTime() - ultima >= SEIS_HORAS && i.estado !== "resuelta") return "sincronizar";
   return null;
 }
@@ -254,7 +281,7 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
         const cupos = { crear: LIMITES.crear, actualizar: LIMITES.actualizar, sincronizar: LIMITES.sincronizar };
         const lista = [...(await repo.incidenciasConTicket(200))].sort(ordenPrioridad);
         for (const inc of lista) {
-          const accion = accionPara(inc, ahora, destino.tipo);
+          const accion = accionPara(inc, ahora, destino.tipo, config.linear_tickets_externos === true);
           if (!accion) continue;
           if (accion === "crear" && (cupos.crear <= 0 || creadosHoy >= config.linear_max_tickets_dia)) {
             tickets.aplazados++;

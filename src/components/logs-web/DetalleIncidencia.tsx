@@ -19,14 +19,22 @@ import {
   type EventoWeb,
   type IncidenciaWeb,
 } from "@/hooks/useLogsWeb";
-import { causaDeFila, explicacionIncidencia, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO, repartoTexto, TEXTO_ACCION_RECARGA, TEXTO_TRAS_PUBLICAR, textoParaCopiar } from "./calculos";
+import {
+  causaDeFila, explicacionIncidencia, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO, origenDeEvento, origenDeFila, proveedorDeFila,
+  repartoTexto, TEXTO_ACCION_RECARGA, TEXTO_TRAS_PUBLICAR, textoParaCopiar,
+} from "./calculos";
 import { ExplicacionSencilla } from "./ExplicacionSencilla";
+import { AvisoOrigen, BadgeOrigen } from "./Origen";
+import { grupoDeOrigen, type OrigenVisible } from "../../../supabase/functions/_shared/logs-web/origen";
 import { datosClave, objetivosAfectados } from "../../../supabase/functions/procesar-logs-web/ticket";
 import { LineaTiempo } from "./LineaTiempo";
 import { Paginacion } from "./Controles";
 
-function Ticket({ i }: { i: IncidenciaWeb }) {
+function Ticket({ i, origen }: { i: IncidenciaWeb; origen: OrigenVisible }) {
   const pedir = usePedirTicket();
+  const grupo = grupoDeOrigen(origen);
+  // Lo que no es un fallo de la web no abre ticket solo; a mano se puede pedir igualmente.
+  const sinTicketSolo = grupo !== "web" && i.linear_estado !== "creado";
   const envios = useEnviosPrueba(i.linear_destino === "prueba" ? i.id : null);
   const [verEnvio, setVerEnvio] = useState(false);
   return (
@@ -45,6 +53,16 @@ function Ticket({ i }: { i: IncidenciaWeb }) {
         {i.linear_estado_remoto && <span className="text-xs text-muted-foreground">estado en Linear: {i.linear_estado_remoto}</span>}
       </div>
       {i.motivo_ticket && <p className="text-xs text-muted-foreground">{i.motivo_ticket}</p>}
+      {sinTicketSolo && (
+        <p className="text-xs text-muted-foreground" data-testid="sin-ticket-origen">
+          {grupo === "externo"
+            ? "No abre ticket solo: es un servicio externo. Si quieres que estos también lo abran, actívalo en Configuración › Incidencias y avisos."
+            : "No abre ticket: no depende de la web."}
+        </p>
+      )}
+      {grupo !== "web" && i.linear_estado === "creado" && (
+        <p className="text-xs text-muted-foreground">Este ticket se abrió antes de clasificar el origen: se deja como está (no se cierra), pero ya no se reabre ni se actualiza solo.</p>
+      )}
       {i.linear_ultimo_error && (
         <p className="text-xs text-destructive">
           Último fallo: {i.linear_ultimo_error}. {i.linear_proximo_intento ? `Próximo intento: ${fmtFechaHora(i.linear_proximo_intento)}.` : ""} El trabajo no se pierde: se reintenta sin duplicar el ticket.
@@ -54,7 +72,7 @@ function Ticket({ i }: { i: IncidenciaWeb }) {
         {(i.linear_estado === "sin_ticket" || i.linear_estado === "no_aplica" || (i.linear_estado === "creado" && i.linear_destino === "prueba")) && (
           <Button variant="outline" className="h-11 gap-2" disabled={pedir.isPending}
             onClick={() => pedir.mutate(i.id, { onSuccess: () => toast.success("Ticket pedido: se crea en la próxima pasada (máx. 5 min) o con «Procesar ahora»."), onError: (e) => toast.error(e.message) })}>
-            <Send className="h-4 w-4" /> {i.linear_estado === "creado" ? "Reenviar al destino actual" : "Pedir ticket"}
+            <Send className="h-4 w-4" /> {i.linear_estado === "creado" ? "Reenviar al destino actual" : sinTicketSolo ? "Pedir ticket igualmente" : "Pedir ticket"}
           </Button>
         )}
         {i.linear_destino === "prueba" && (envios.data?.length ?? 0) > 0 && (
@@ -185,6 +203,7 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
   const cambiar = useCambiarIncidencia();
   const [nota, setNota] = useState("");
   const i = q.data;
+  const origen = i ? origenDeFila(i) : null;
 
   useEffect(() => {
     setPagina(0);
@@ -218,8 +237,9 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
           <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando…</p>
         ) : (
           <div className="mt-4 space-y-4">
+            {origen && <AvisoOrigen origen={origen} proveedor={origen === "externo" ? proveedorDeFila(i) : null} />}
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={i.gravedad === "critico" || i.gravedad === "error" ? "destructive" : "outline"}>{NOMBRE_GRAVEDAD[i.gravedad]}</Badge>
+              <Badge variant={origen === "web" && (i.gravedad === "critico" || i.gravedad === "error") ? "destructive" : "outline"}>{NOMBRE_GRAVEDAD[i.gravedad]}</Badge>
               <Badge variant="outline">{NOMBRE_ESTADO[i.estado]}</Badge>
               {i.reabierta_veces > 0 && <Badge variant="outline">reabierta {i.reabierta_veces}×</Badge>}
               <div className="ml-auto flex flex-wrap gap-2">
@@ -229,7 +249,7 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
               </div>
             </div>
             <ExplicacionSencilla explicacion={explicacionIncidencia(i, muestras.data ?? [], contexto.data ?? null, eventoContexto)} />
-            <Ticket i={i} />
+            <Ticket i={i} origen={origen ?? "web"} />
             <details className="rounded-md border p-3" data-testid="detalles-tecnicos">
               <summary className="cursor-pointer select-none text-sm font-semibold">Detalles técnicos (para quien lo arregle)</summary>
               <div className="mt-3 space-y-4">
@@ -267,6 +287,9 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
                           {e.accion && TEXTO_ACCION_RECARGA[e.accion] ? <span data-testid="accion-recarga"> · {TEXTO_ACCION_RECARGA[e.accion]}</span> : null}
                         </span>
                         {(e.es_bot || e.es_prueba) && <Badge variant="outline" className="text-[10px] font-normal">{e.es_bot ? "bot" : "prueba"}</Badge>}
+                        {origen && !(e.es_bot || e.es_prueba) && origenDeEvento(e) !== origen && (
+                          <BadgeOrigen origen={origenDeEvento(e)} className="px-1.5 py-0 text-[10px]" />
+                        )}
                         {e.tras_publicar && (
                           <Badge variant="outline" data-testid="tras-publicar" data-clase={e.tras_publicar}
                             className={e.tras_publicar === "repetido" ? "border-destructive/60 text-[10px] font-normal text-destructive" : "border-emerald-500/50 text-[10px] font-normal text-emerald-700 dark:text-emerald-300"}>

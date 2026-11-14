@@ -143,3 +143,50 @@ describe("detalle de la incidencia", () => {
     expect(within(tecnico).getAllByTestId("accion-recarga").map((x) => x.textContent)).toEqual([" · se recargó pero siguió con la misma versión", " · se recargó sola con la versión nueva"]);
   });
 });
+
+describe("origen en el detalle y en las sesiones", () => {
+  it("la cabecera del detalle dice el origen con su color y una línea en llano (la de la captura: gris)", () => {
+    incidencia = inc({ titulo: "Sin respuesta de rest:novedades (sin conexión) · rest:novedades", tipo: "error_peticion", mensaje: "Sin respuesta de rest:novedades (sin conexión)", origen: "conexion" });
+    ocurrencias = [];
+    contexto = [];
+    render(<DetalleIncidencia id={34} onCerrar={vi.fn()} onAbrirSesion={vi.fn()} />);
+    const aviso = screen.getByTestId("aviso-origen");
+    expect(aviso).toHaveAttribute("data-origen", "conexion");
+    expect(within(aviso).getByTestId("badge-origen")).toHaveTextContent("Conexión del visitante");
+    expect(aviso).toHaveTextContent("No depende de la web: el móvil del visitante se quedó sin cobertura (o cambió de página) mientras cargaba. No hay que hacer nada salvo que se repita mucho.");
+    expect(screen.getByTestId("sin-ticket-origen")).toHaveTextContent("No abre ticket: no depende de la web.");
+    expect(screen.getByRole("button", { name: /Pedir ticket igualmente/ })).toBeInTheDocument();
+    // La gravedad ya no sale en rojo si no es un fallo de la web.
+    expect(screen.getByText("Error").className).not.toMatch(/destructive/);
+  });
+  it("servicio externo: ámbar, nombra al proveedor y explica cómo activar sus tickets", () => {
+    incidencia = inc({ titulo: "Google Maps JavaScript API error", mensaje: "Google Maps JavaScript API error", origen: "externo", origen_proveedor: "Google Maps" });
+    render(<DetalleIncidencia id={2} onCerrar={vi.fn()} onAbrirSesion={vi.fn()} />);
+    const aviso = screen.getByTestId("aviso-origen");
+    expect(aviso.className).toMatch(/amber/);
+    expect(aviso).toHaveTextContent("No es un fallo de nuestro código: depende de Google Maps.");
+    expect(screen.getByTestId("sin-ticket-origen")).toHaveTextContent(/Configuración › Incidencias y avisos/);
+  });
+  it("fallo de la web: rojo y sin aviso de «no abre ticket»", () => {
+    incidencia = inc({ origen: "web" });
+    render(<DetalleIncidencia id={3} onCerrar={vi.fn()} onAbrirSesion={vi.fn()} />);
+    expect(screen.getByTestId("aviso-origen").className).toMatch(/destructive/);
+    expect(screen.queryByTestId("sin-ticket-origen")).not.toBeInTheDocument();
+  });
+  it("sin la migración, el origen se calcula con las mismas reglas", () => {
+    const sinColumna = inc({ titulo: "Sin respuesta de rest:tapas (sin conexión) · rest:tapas", tipo: "error_peticion", mensaje: "Sin respuesta de rest:tapas (sin conexión)" });
+    expect(explicacionIncidencia(sinColumna, [], null, null, AHORA).queHacer).toMatch(/^Nada si son pocos casos/); // la causa conocida manda
+    const ext = explicacionIncidencia(inc({ mensaje: "Google Maps JavaScript API error", titulo: "Google Maps JavaScript API error" }), [], null, null, AHORA);
+    expect(ext.queHacer).toMatch(/^No es un fallo de nuestro código: depende de Google Maps/);
+  });
+  it("sesión con errores que no dependen de la web: «No» y nada que hacer", () => {
+    const e = explicacionSesion(null, [ev("pagina_vista"),
+      ev("error_peticion", { categoria: "error", mensaje: "Sin respuesta de rest:tapas (sin conexión)", objetivo: "rest:tapas", propiedades: { status: 0 }, origen: "conexion" })]);
+    expect([e.afecta, e.queHacer]).toEqual(["No: el móvil del visitante se quedó sin cobertura (o cambió de página) mientras cargaba.", "Nada: no depende de la web."]);
+    const ext = explicacionSesion(null, [ev("error_js", { categoria: "error", mensaje: "Google Maps JavaScript API error: X", origen: "externo" })]);
+    expect(ext.afecta).toBe("Algo: falló un servicio de fuera (Google Maps); no es un fallo de nuestro código.");
+    const mezcla = explicacionSesion(null, [ev("error_js", { categoria: "error", mensaje: "ResizeObserver loop limit exceeded", origen: "navegador" }),
+      ev("error_peticion", { categoria: "error", mensaje: "Sin respuesta de rest:tapas", propiedades: { status: 0 }, origen: "conexion" })]);
+    expect(mezcla.afecta).toBe("No: ninguno depende de la web (navegador o extensión, conexión del visitante).");
+  });
+});

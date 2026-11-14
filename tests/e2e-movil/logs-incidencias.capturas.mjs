@@ -7,6 +7,8 @@
 //   node tests/e2e-movil/logs-incidencias.capturas.mjs [carpeta] [prefijo]
 //
 // Saca la lista y dos detalles en 375×812 y 1280×800. No entra en `npm test`.
+// Desde el 14/11/2026 cada incidencia lleva su ORIGEN (20261130100000_logs_web_origen): la lista por defecto
+// enseña los fallos de la web y externos, y las cuentas de cada color; la de solo conexión sale en «No dependen».
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -32,19 +34,22 @@ const incidencias = [
   { ...base, id: 21, huella: "a1".repeat(16), titulo: "job startup timeout · cron:*", tipo: "error_integracion", fuente: "integracion", proyecto: "supabase",
     gravedad: "error", estado: "abierta", primera_vez: "2026-11-08T16:20:00Z", ultima_vez: "2026-11-08T21:53:00Z", ocurrencias: 94, sesiones_afectadas: 0,
     mensaje: "job startup timeout", version_primera: null, version_ultima: null, linear_estado: "creado", linear_identificador: "PRUEBA-8", linear_destino: "prueba",
-    motivo_ticket: "94 ocurrencias y 0 sesiones en 24 h (umbral 3 y 2)" },
+    motivo_ticket: "94 ocurrencias y 0 sesiones en 24 h (umbral 3 y 2)", origen: "externo", origen_proveedor: "Supabase", origen_prioridad: 2 },
   { ...base, id: 22, huella: "b2".repeat(16), titulo: "TypeError: Failed to fetch dynamically imported module: https://restaurante.example/assets/NovedadesSection.js · novedades",
     tipo: "error_react", fuente: "navegador", gravedad: "error", primera_vez: "2026-11-10T01:26:53Z", ultima_vez: "2026-11-10T02:45:35Z", ocurrencias: 2, sesiones_afectadas: 2,
     rutas: [{ ruta: "/en", n: 1 }, { ruta: "/", n: 1 }], mensaje: "TypeError: Failed to fetch dynamically imported module: https://restaurante.example/assets/NovedadesSection-D-0lW2q6.js",
-    pila: "TypeError: Failed to fetch dynamically imported module: https://restaurante.example/assets/NovedadesSection-D-0lW2q6.js\nat Lazy\nat Suspense\nat uD (https://restaurante.example/assets/app-CNgJpX6V.js:158:[num])" },
+    pila: "TypeError: Failed to fetch dynamically imported module: https://restaurante.example/assets/NovedadesSection-D-0lW2q6.js\nat Lazy\nat Suspense\nat uD (https://restaurante.example/assets/app-CNgJpX6V.js:158:[num])",
+    origen: "version_antigua", origen_proveedor: null, origen_prioridad: 3 },
   { ...base, id: 23, huella: "c3".repeat(16), titulo: "TypeError: Cannot read properties of null (reading 'precio')", tipo: "error_js", fuente: "navegador", gravedad: "error",
     primera_vez: "2026-11-09T18:00:00Z", ultima_vez: "2026-11-10T09:12:00Z", ocurrencias: 7, sesiones_afectadas: 5, ocurrencias_24h: 4, rutas: [{ ruta: "/carta/vinos", n: 7 }],
     mensaje: "TypeError: Cannot read properties of null (reading 'precio')", pila: "TypeError: Cannot read properties of null (reading 'precio')\nat CartaVinos (https://restaurante.example/assets/CartaVinos-B7x9Qa1c.js:1:2345)",
-    linear_estado: "pendiente", motivo_ticket: "4 ocurrencias y 3 sesiones en 24 h (umbral 3 y 2)" },
+    linear_estado: "pendiente", motivo_ticket: "4 ocurrencias y 3 sesiones en 24 h (umbral 3 y 2)", origen: "web", origen_proveedor: null, origen_prioridad: 1 },
   { ...base, id: 24, huella: "d4".repeat(16), titulo: "Sin respuesta de rest:menus_diarios · rest:menus_diarios", tipo: "error_peticion", fuente: "navegador", gravedad: "error",
-    primera_vez: "2026-11-10T00:00:04Z", ultima_vez: "2026-11-10T00:00:04Z", ocurrencias: 0, sesiones_afectadas: 0, mensaje: "Sin respuesta de rest:menus_diarios" },
+    primera_vez: "2026-11-10T00:00:04Z", ultima_vez: "2026-11-10T00:00:04Z", ocurrencias: 1, sesiones_afectadas: 1, mensaje: "Sin respuesta de rest:menus_diarios (sin conexión)",
+    origen: "conexion", origen_proveedor: null, origen_prioridad: 3 },
   { ...base, id: 25, huella: "e5".repeat(16), titulo: "Página no encontrada", tipo: "error_404", fuente: "navegador", gravedad: "aviso",
-    primera_vez: "2026-11-09T21:51:33Z", ultima_vez: "2026-11-09T21:51:33Z", ocurrencias: 0, sesiones_afectadas: 0, mensaje: "Página no encontrada" },
+    primera_vez: "2026-11-09T21:51:33Z", ultima_vez: "2026-11-09T21:51:33Z", ocurrencias: 0, sesiones_afectadas: 0, mensaje: "Página no encontrada",
+    origen: "bots", origen_proveedor: null, origen_prioridad: 3 },
 ];
 
 const ev = (id, incidencia_id, o) => ({
@@ -55,12 +60,12 @@ const ev = (id, incidencia_id, o) => ({
 });
 const tareas = ["reanudar-trabajos-ocr", "reanudar-trabajos-ocr", "instagram-programador", "clasificar-productos", "facturas-originales-drive", "reservas-aviso-sin-asignar", "emails-reserva-reintentar-fallidos"];
 const eventos = [
-  ...tareas.map((t, n) => ev(100 + n, 21, { tipo: "error_integracion", fuente: "integracion", proyecto: "supabase", objetivo: "cron:*", propiedades: { tarea: t },
+  ...tareas.map((t, n) => ev(100 + n, 21, { origen: "externo", tipo: "error_integracion", fuente: "integracion", proyecto: "supabase", objetivo: "cron:*", propiedades: { tarea: t },
     mensaje: "job startup timeout", ocurrido_en: `2026-11-08T21:${String(53 - n).padStart(2, "0")}:00Z` })),
-  ev(200, 22, { tipo: "error_react", ruta: "/en", objetivo: "novedades", propiedades: { componente: "novedades" }, navegador: "Chrome", so: "Android", dispositivo: "movil", version: "1.1.1",
+  ev(200, 22, { origen: "version_antigua", tipo: "error_react", ruta: "/en", objetivo: "novedades", propiedades: { componente: "novedades" }, navegador: "Chrome", so: "Android", dispositivo: "movil", version: "1.1.1",
     sesion_id: "11111111-1111-4111-8111-111111111111", mensaje: incidencias[1].mensaje, pila: incidencias[1].pila, ocurrido_en: "2026-11-10T01:26:53Z" }),
   ev(201, 22, { tipo: "error_react", ruta: "/", objetivo: "espacios", propiedades: { componente: "espacios" }, navegador: "Chrome", so: "Windows", dispositivo: "escritorio", version: "1.1.1",
-    sesion_id: "22222222-2222-4222-8222-222222222222", mensaje: "Error: Unable to preload CSS for /assets/EspaciosGallery-CmTTVDlw.css",
+    sesion_id: "22222222-2222-4222-8222-222222222222", mensaje: "Error: Unable to preload CSS for /assets/EspaciosGallery-CmTTVDlw.css", origen: "version_antigua",
     pila: "Error: Unable to preload CSS for /assets/EspaciosGallery-CmTTVDlw.css\nat HTMLLinkElement.<anonymous> (https://restaurante.example/assets/app-CNgJpX6V.js:69:8659)", ocurrido_en: "2026-11-10T02:45:35Z" }),
 ];
 

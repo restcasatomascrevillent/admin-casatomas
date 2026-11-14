@@ -3,7 +3,7 @@
  * con un repositorio en memoria y destinos simulados.
  */
 import { describe, expect, it, vi } from "vitest";
-import { accionPara, inicioDiaMadrid, ordenPrioridad, procesar, siguienteIntento, type ConfigLogs, type IncidenciaFila, type RepoProceso } from "../proceso";
+import { accionPara, inicioDiaMadrid, ordenPrioridad, procesar, siguienteIntento, ticketPermitido, type ConfigLogs, type IncidenciaFila, type RepoProceso } from "../proceso";
 import { construirTicket, enLinea, pasosDesdeRecorrido, resumenSencillo, type EntradaTicket, type EventoTicket } from "../ticket";
 import { interpretarAnalisis, mensajesIncidencia, quitarArchivosInventados } from "../ia";
 import { ErrorLinear, type DestinoTickets } from "../linear";
@@ -181,6 +181,17 @@ describe("IA de incidencias", () => {
   });
 });
 
+describe("ticket con el origen", () => {
+  it("dice si es un fallo de la web o de un servicio externo, en llano", () => {
+    const base = { muestras: [], recorrido: [], eventoErrorId: null, analisis: null, motivoSinAnalisis: null, urlPanel: "https://p", ahora: AHORA };
+    const web = construirTicket({ ...base, incidencia: incidencia({ origen: "web" }) }).descripcion;
+    expect(web).toContain("- **Origen:** Fallo de la web. Fallo de la web: algo de nuestro código");
+    const ext = construirTicket({ ...base, incidencia: incidencia({ origen: "externo", origen_proveedor: "Google Maps" }) }).descripcion;
+    expect(ext).toContain("- **Origen:** Servicio externo (`Google Maps`). No es un fallo de nuestro código: depende de Google Maps.");
+    expect(construirTicket({ ...base, incidencia: incidencia() }).descripcion).not.toContain("**Origen:**"); // sin la migración
+  });
+});
+
 describe("decisiones", () => {
   it("qué hacer con cada incidencia", () => {
     expect(accionPara(incidencia(), AHORA)).toBe("crear");
@@ -205,6 +216,29 @@ describe("decisiones", () => {
     expect(accionPara(incidencia({ ...dePrueba, linear_pendiente_reapertura: true }), AHORA, "real")).toBe("migrar");
     expect(accionPara(incidencia({ ...dePrueba, ocurrencias: 6 }), AHORA, "prueba")).toBe("actualizar"); // mismo destino: lo de siempre
   });
+  it("origen: solo los fallos de la web (y externos con el interruptor) crean o mueven tickets", () => {
+    for (const origen of ["conexion", "navegador", "version_antigua", "bots"]) {
+      expect(accionPara(incidencia({ origen }), AHORA)).toBeNull();
+      expect(accionPara(incidencia({ origen }), AHORA, "prueba", true)).toBeNull();
+    }
+    expect(accionPara(incidencia({ origen: "web" }), AHORA)).toBe("crear");
+    expect(accionPara(incidencia({ origen: "externo" }), AHORA)).toBeNull();
+    expect(accionPara(incidencia({ origen: "externo" }), AHORA, "prueba", true)).toBe("crear");
+    expect(accionPara(incidencia({ origen: undefined }), AHORA)).toBe("crear"); // sin la migración: como antes
+  });
+  it("origen: lo pedido a mano se crea igual (decisión de una persona)", () => {
+    const aMano = incidencia({ origen: "conexion", motivo_ticket: "Pedido a mano desde Super Admin › Logs · 3 ocurrencias…" });
+    expect(ticketPermitido(aMano)).toBe(true);
+    expect(accionPara(aMano, AHORA)).toBe("crear");
+  });
+  it("origen: el ticket ya creado de algo que no depende de la web no se reabre, ni se comenta, ni se migra; solo se sincroniza", () => {
+    const creada = { origen: "conexion", linear_estado: "creado", linear_issue_id: "x", linear_destino: "prueba", ocurrencias_en_ticket: 4, linear_ultima_sync: "2026-11-08T11:00:00Z" } as const;
+    expect(accionPara(incidencia({ ...creada, linear_pendiente_reapertura: true }), AHORA, "prueba")).toBeNull();
+    expect(accionPara(incidencia({ ...creada, ocurrencias: 9 }), AHORA, "prueba")).toBeNull();
+    expect(accionPara(incidencia({ ...creada, ocurrencias: 9 }), AHORA, "real")).toBeNull();
+    expect(accionPara(incidencia({ ...creada, linear_ultima_sync: "2026-11-08T05:00:00Z", ocurrencias: 9 }), AHORA, "prueba")).toBe("sincronizar");
+    expect(accionPara(incidencia({ ...creada, origen: "web", linear_pendiente_reapertura: true }), AHORA, "prueba")).toBe("reabrir");
+  });
   it("orden de trabajo: reaperturas, luego críticas y con más visitantes", () => {
     const l = [
       incidencia({ id: 1, gravedad: "aviso", sesiones_afectadas: 50 }),
@@ -225,6 +259,20 @@ describe("decisiones", () => {
 });
 
 describe("procesar", () => {
+  it("una pendiente que no depende de la web no llega a Linear; la de la web sí; la externa solo con el interruptor", async () => {
+    const con = incidencia({ id: 1, origen: "conexion" });
+    const web = incidencia({ id: 2, origen: "web" });
+    const ext = incidencia({ id: 3, origen: "externo" });
+    const { repo, config } = repoMemoria([con, web, ext]);
+    const { d } = destinoSimulado();
+    let r = await procesar({ repo, destino: () => d, ia: null, despliegues: null, urlPanel: "https://p", ahora: () => AHORA });
+    expect(r.tickets).toMatchObject({ creados: 1 });
+    expect([con.linear_estado, web.linear_estado, ext.linear_estado]).toEqual(["pendiente", "creado", "pendiente"]);
+    config.linear_tickets_externos = true;
+    r = await procesar({ repo, destino: () => d, ia: null, despliegues: null, urlPanel: "https://p", ahora: () => AHORA });
+    expect([con.linear_estado, ext.linear_estado]).toEqual(["pendiente", "creado"]);
+    expect(d.crear).toHaveBeenCalledTimes(2);
+  });
   it("crea el ticket con análisis de IA y deja la incidencia «creado»", async () => {
     const inc = incidencia();
     const { repo } = repoMemoria([inc]);

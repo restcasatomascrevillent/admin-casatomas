@@ -28,8 +28,8 @@ export interface PestanaPagina {
   icono?: ReactNode;
   /** Número a la derecha del texto (no se pinta si es 0 o `undefined`). */
   contador?: number;
-  /** Color del contador: «primario» (por defecto) o «dorado». */
-  tonoContador?: "primario" | "dorado";
+  /** Color del contador: «primario» (por defecto), «dorado» o «rojo» (fallos que hay que arreglar, p. ej. Logs). */
+  tonoContador?: "primario" | "dorado" | "rojo";
   /** Nombre accesible del contador (p. ej. «3 procesando»). */
   etiquetaContador?: string;
   /** Ya no hace nada (Fase 3): el contador se ve SIEMPRE. Se mantiene para no romper a quien lo pasa. */
@@ -116,12 +116,13 @@ const DEBAJO = {
 const CLASE_PESTANA_NIVEL_2 =
   "group flex h-9 items-center gap-1.5 rounded-full border border-transparent bg-transparent px-3.5 text-sm text-foreground/80 shadow-none transition-colors hover:bg-muted hover:text-foreground pointer-coarse:h-11 data-[state=active]:border-primary/40 data-[state=active]:bg-primary/15 data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-none shrink-0";
 
-const TONO_CONTADOR_NIVEL_2 = { primario: "bg-primary/10 text-primary", dorado: "bg-gold/10 text-gold-strong" } as const;
+const TONO_CONTADOR_NIVEL_2 = { primario: "bg-primary/10 text-primary", dorado: "bg-gold/10 text-gold-strong", rojo: "bg-destructive/10 text-destructive" } as const;
 
 const TONO_CONTADOR = {
   // En la pestaña activa (rellena) el contador pasa a blanco translúcido para seguir leyéndose.
   primario: "bg-primary/10 text-primary group-data-[state=active]:bg-primary-foreground/20 group-data-[state=active]:text-primary-foreground",
   dorado: "bg-gold/10 text-gold-strong group-data-[state=active]:bg-gold group-data-[state=active]:text-white",
+  rojo: "bg-destructive/10 text-destructive group-data-[state=active]:bg-destructive group-data-[state=active]:text-destructive-foreground",
 } as const;
 
 /**
