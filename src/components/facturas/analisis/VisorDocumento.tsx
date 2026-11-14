@@ -122,6 +122,7 @@ export function VisorDocumento({
   onCerrar,
   onAbrirEnCompras,
   total,
+  notas,
 }: {
   documentos: DocumentoCifra[];
   indice: number | null;
@@ -130,6 +131,8 @@ export function VisorDocumento({
   onAbrirEnCompras?: (enlace: string) => void;
   /** Cuántos hay en total (la lista puede no estar cargada entera). */
   total: number;
+  /** «Comparar» (14/11/2026): qué factura es («Factura nueva» / «Factura anterior») y la línea del producto, resaltada. */
+  notas?: ({ etiqueta: string; linea: string } | null)[];
 }) {
   const doc = indice !== null ? documentos[indice] : undefined;
   const abierto = !!doc;
@@ -140,6 +143,7 @@ export function VisorDocumento({
   const haySiguiente = indice !== null && indice < documentos.length - 1;
   // Al cerrar, el foco vuelve al documento de la lista que lo abrió.
   const focoAlCerrar = useFocoAlCerrar(abierto);
+  const nota = indice !== null ? (notas?.[indice] ?? null) : null;
   const titulo = doc ? `${ETIQUETA_TIPO[doc.tipo]} ${doc.numero ?? "sin número"} · ${doc.proveedor}` : "";
 
   const teclas = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -166,6 +170,11 @@ export function VisorDocumento({
             <header className="flex shrink-0 flex-col gap-2 border-b border-border/70 px-3 py-2 pr-14 sm:px-4 sm:pr-16">
               <div className="min-w-0">
                 <DialogTitle className="truncate text-base font-semibold leading-tight sm:text-lg" title={titulo}>
+                  {nota && (
+                    <span className="mr-2 inline-block rounded-md bg-primary px-2 py-0.5 align-middle text-xs font-semibold text-primary-foreground" data-testid="visor-etiqueta">
+                      {nota.etiqueta}
+                    </span>
+                  )}
                   {doc.proveedor}
                 </DialogTitle>
                 <DialogDescription className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground sm:text-sm">
@@ -209,6 +218,11 @@ export function VisorDocumento({
                   </span>
                 )}
               </div>
+              {nota && (
+                <p className="rounded-md border border-amber-500/50 bg-amber-200/60 px-2 py-1 text-sm font-medium text-amber-950 dark:bg-amber-500/20 dark:text-amber-100" data-testid="visor-linea">
+                  Línea del producto: {nota.linea}
+                </p>
+              )}
             </header>
             <div className="flex min-h-0 flex-1 flex-col bg-muted/20">
               <Original doc={doc} titulo={titulo} />

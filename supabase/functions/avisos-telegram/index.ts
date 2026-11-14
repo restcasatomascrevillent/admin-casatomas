@@ -5,7 +5,7 @@ import { exigirSuperAdmin } from "../_shared/autorizacion.ts";
 import { compararTiempoConstante } from "../_shared/tiempo-constante.ts";
 import {
   type Accion, agruparEnMensajes, type Aviso, type ConfigTelegram, construirResumen, cuerpoSendMessage, diaMadrid, type Envio, errorSaneado, esAccion,
-  mensajeAviso, pendientesDeEnvio, SIN_CONFIGURAR, silencioAhora, TEXTO_PRUEBA,
+  mensajeAviso, pendientesDeEnvio, SIN_CONFIGURAR, silencioAhora, type Sugerencia, TEXTO_PRUEBA,
 } from "./logica.ts";
 const createClient = clienteConAuditoria(createClientBase, "avisos-telegram");
 
@@ -23,6 +23,9 @@ const createClient = clienteConAuditoria(createClientBase, "avisos-telegram");
 //
 //  Secretos: TELEGRAM_BOT_TOKEN (sin él no envía nada, responde y registra
 //  «Telegram sin configurar»); PANEL_URL opcional (enlace al panel en cada aviso).
+//  14/11/2026: mensajes de 2-4 líneas (título, qué ha pasado, qué hacer, enlace). En
+//  «Margen bajo» con precio sugerido (RPC avisos_precio_sugerido), el enlace abre
+//  /aplicar-precio/<aviso> en el panel: sesión + permiso de carta + confirmación.
 //  La llaman: pg_cron (avisos-telegram-pendientes cada 5 min y
 //  avisos-telegram-resumen cada hora, x-ocr-secret = Vault «ocr_trabajos_secret»)
 //  y un SUPER ADMIN con su JWT desde Super Admin › Servicios › Configurar.
@@ -146,7 +149,14 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
       envios = (data ?? []) as Envio[];
     }
     const pendientes = pendientesDeEnvio((avisos ?? []) as Aviso[], envios, cfg, ahora).slice(0, 50);
-    const mensajes = agruparEnMensajes(pendientes.map((a) => mensajeAviso(a, PANEL_URL)));
+    // Margen bajo: el precio sugerido (20261130160000) para «Qué hacer» y el enlace «Aplicar el precio».
+    const sugerencias = new Map<string, Sugerencia | null>();
+    for (const a of pendientes.filter((x) => x.tipo === "facturas_margen_bajo")) {
+      const { data, error } = await sb.rpc("avisos_precio_sugerido", { p_aviso: a.id });
+      if (error) console.warn("[avisos-telegram] precio sugerido:", error.message);
+      sugerencias.set(a.id, (data as Sugerencia | null) ?? null);
+    }
+    const mensajes = agruparEnMensajes(pendientes.map((a) => mensajeAviso(a, PANEL_URL, sugerencias.get(a.id))));
     let enviados = 0;
     const errores: string[] = [];
     for (const m of mensajes) {

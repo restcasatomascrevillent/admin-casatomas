@@ -92,7 +92,7 @@ describe("Super Admin › Informes", () => {
   it("lista todos los informes por sección y pide elegir uno", () => {
     pintar();
     const lista = screen.getByRole("navigation", { name: "Informes disponibles" });
-    expect(within(lista).getAllByRole("heading").map((h) => h.textContent)).toEqual(["Web", "Redes sociales", "Facturas", "Servicios", "Cheques regalo", "Carta"]);
+    expect(within(lista).getAllByRole("heading").map((h) => h.textContent)).toEqual(["Web", "Redes sociales", "Facturas", "Servicios", "Cheques regalo", "Carta", "Seguridad"]);
     expect(within(lista).getByRole("button", { name: /Informe mensual de tráfico web/ })).toBeInTheDocument();
     expect(within(lista).getByRole("button", { name: /Gasto por proveedor/ })).toBeInTheDocument();
     expect(screen.getByText("Elige un informe")).toBeInTheDocument();

@@ -70,10 +70,13 @@ const nombreMes = (mes: string) => mesCorto(mes, false);
 export function useVisor(onIrA?: (enlace: string) => void) {
   const [docs, setDocs] = useState<DocumentoCifra[]>([]);
   const [indice, setIndice] = useState<number | null>(null);
-  const abrir = (d: (DocumentoCifra | null)[]) => {
-    const lista = d.filter((x): x is DocumentoCifra => !!x);
-    if (lista.length === 0) return;
-    setDocs(lista);
+  const [notas, setNotas] = useState<({ etiqueta: string; linea: string } | null)[]>([]);
+  /** notas (opcional, en el mismo orden que d): la etiqueta y la línea resaltada de cada documento. */
+  const abrir = (d: (DocumentoCifra | null)[], n?: ({ etiqueta: string; linea: string } | null)[]) => {
+    const pares = d.map((x, i) => [x, n?.[i] ?? null] as const).filter((p): p is readonly [DocumentoCifra, { etiqueta: string; linea: string } | null] => !!p[0]);
+    if (pares.length === 0) return;
+    setDocs(pares.map((p) => p[0]));
+    setNotas(pares.map((p) => p[1]));
     setIndice(0);
   };
   const visor = (
@@ -84,6 +87,7 @@ export function useVisor(onIrA?: (enlace: string) => void) {
       onCerrar={() => setIndice(null)}
       onAbrirEnCompras={onIrA}
       total={docs.length}
+      notas={notas}
     />
   );
   return { abrir, visor };

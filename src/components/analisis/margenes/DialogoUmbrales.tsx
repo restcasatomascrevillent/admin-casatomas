@@ -19,20 +19,20 @@ const CAMPOS: { clave: keyof ConfigMargenes; etiqueta: string; ayuda: string; pa
   },
   {
     clave: "costeMaxPlatoPct",
-    etiqueta: "Plato: en rojo si el coste pasa del (% del precio de venta sin IVA)",
-    ayuda: "De cada 100 € que cobras sin IVA, cuántos se pueden ir en ingredientes. Con 35: un plato que vendes a 22 € (20 € sin IVA) sale en rojo si hacerlo cuesta más de 7 €.",
+    etiqueta: "Plato: en rojo si el % coste sobre venta pasa del",
+    ayuda: "De cada 10 € que cobras sin IVA, cuántos se pueden ir en ingredientes. Con 35: como mucho 3,50 € de cada 10 €; un plato que vendes a 22 € (20 € sin IVA) sale en rojo si hacerlo cuesta más de 7 €.",
     paso: "1",
   },
   {
     clave: "multiplicadorMinVino",
     etiqueta: "Vino: en rojo si cobras menos de (veces lo que pagas)",
-    ayuda: "Precio de carta sin IVA entre lo que te cuesta la botella (última factura, sin IVA). 2,3 equivale al antiguo 2,5 sobre el precio con IVA: de cada 100 € que cobras, como mucho 43 € se van en la botella.",
+    ayuda: "Precio de carta sin IVA entre lo que te cuesta la botella (última factura, sin IVA). 2,3 equivale al antiguo 2,5 sobre el precio con IVA: de cada 10 € que cobras, como mucho 4,35 € es lo que te cuesta la botella.",
     paso: "0.1",
   },
   {
     clave: "multiplicadorMinTienda",
     etiqueta: "Vino de la tienda: en rojo si cobras menos de (veces lo que pagas)",
-    ayuda: "Precio de tienda (carta menos el descuento) sin IVA entre lo que te cuesta la botella sin IVA. Con 1,5: de cada 100 € que cobras, como mucho 67 € se van en la botella.",
+    ayuda: "Precio de tienda (carta menos el descuento) sin IVA entre lo que te cuesta la botella sin IVA. Con 1,5: de cada 10 € que cobras, como mucho 6,67 € es lo que te cuesta la botella.",
     paso: "0.1",
   },
   {

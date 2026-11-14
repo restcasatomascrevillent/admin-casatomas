@@ -77,12 +77,12 @@ describe("razon (en sencillo, 13/11/2026)", () => {
   const d = normalizarMargenes(RPC);
   it("plato: a cuánto lo vendes, lo que cuesta hacerlo y «de cada 100 € que cobras» (el % es de la venta sin IVA)", () => {
     expect(razon(d.platos[0], d.config)).toBe(
-      "Percebes: Lo vendes a 19 € (17,27 € sin IVA). Hacerlo te cuesta 10,95 €. De cada 100 € que cobras, 63 € se van en ingredientes (máximo 35 €).",
+      "Percebes: Lo vendes a 19 € (17,27 € sin IVA). Hacerlo te cuesta 10,95 €. De cada 10 € que cobras, 6,34 € es lo que te cuesta en ingredientes (máximo 3,50 €).",
     );
   });
   it("el ejemplo del dueño: 24 € en carta, 8,10 € de coste → 37 € de cada 100", () => {
     const p = normalizarMargenes({ platos: [{ id: "x", nombre: "Arroz", precio: 24, venta: 21.8182, coste: 8.1, pct: 37.13, banderas: [], ingredientes: [] }] }).platos[0];
-    expect(explicacion(p)).toBe("Lo vendes a 24 € (21,82 € sin IVA). Hacerlo te cuesta 8,10 €. De cada 100 € que cobras, 37 € se van en ingredientes (máximo 35 €).");
+    expect(explicacion(p)).toBe("Lo vendes a 24 € (21,82 € sin IVA). Hacerlo te cuesta 8,10 €. De cada 10 € que cobras, 3,71 € es lo que te cuesta en ingredientes (máximo 3,50 €).");
   });
   it("sube el coste sin subir la carta: de factura a factura", () => {
     expect(razon(d.platos[1], d.config)).toContain("Te cuesta un 13 % más que hace 6 meses (de factura a factura) y el precio de la carta sigue igual.");
@@ -90,10 +90,10 @@ describe("razon (en sencillo, 13/11/2026)", () => {
   it("sin mapear: el motivo", () => {
     expect(razon(d.platos[2], d.config)).toBe("Santiaguiño gallego: No hay compras de santiaguiño.");
   });
-  it("vino: lo que cuesta la botella, cuántas veces cobras lo que pagas y de cada 100 €", () => {
+  it("vino: lo que cuesta la botella, cuántas veces cobras lo que pagas y de cada 10 €", () => {
     expect(razon(d.vinos[0], d.config)).toBe(
       "Laurent‑Perrier Millésimé: La botella te cuesta 80,40 € y la vendes a 110 € (100,00 € sin IVA): cobras 1,37 veces lo que pagas (mínimo 2,5). " +
-        "De cada 100 € que cobras, 80 € se van en pagar la botella.",
+        "De cada 10 € que cobras, 8,04 € es lo que te cuesta la botella.",
     );
   });
   it("vino con la tienda por debajo y comprado en otro formato", () => {
@@ -108,7 +108,7 @@ describe("razon (en sencillo, 13/11/2026)", () => {
     // Sin «pct» en los datos: el «de cada 100 €» sale del multiplicador (100 ÷ 1,13 = 88).
     expect(razon(v, { ...CONFIG_POR_DEFECTO })).toBe(
       "Godeval (Magnum): La botella te cuesta 33,70 € y la vendes a 42 € (38,18 € sin IVA): cobras 1,13 veces lo que pagas (mínimo 2,3). " +
-        "De cada 100 € que cobras, 88 € se van en pagar la botella. " +
+        "De cada 10 € que cobras, 8,85 € es lo que te cuesta la botella. " +
         "En la tienda la vendes a 29,40 € (24,30 € sin IVA): cobras 0,72 veces lo que pagas (mínimo 1,5). " +
         "Coste calculado desde la botella de 75 cl (en la carta es de 1,5 l).",
     );
@@ -179,7 +179,7 @@ describe("Por peso", () => {
   it("el porqué en €/kg, con el precio de carta", () => {
     expect(razon(d.peso[0], d.config)).toBe(
       "Percebes: Lo vendes a 190 € el kilo (172,73 € sin IVA) y el kilo te cuesta 110,00 €: cobras 1,57 veces lo que pagas (mínimo 2). " +
-        "De cada 100 € que cobras, 64 € se van en comprarlo.",
+        "De cada 10 € que cobras, 6,37 € es lo que te cuesta comprarlo.",
     );
   });
   it("sin datos: el motivo (pieza sin peso, sin compras)", () => {
@@ -254,17 +254,17 @@ describe("última factura", () => {
     expect(d.vinos[0]).toMatchObject({ costeMediana: 10.5, multiplicadorMediana: 2.86, costeAnterior: 9, factura: { id: 501 } });
     expect(d.peso[0]).toMatchObject({ compraKgMediana: 20.1, multiplicadorMediana: 2.1, ultima: "2026-11-05", factura: { id: 501 } });
     // La mediana, en pequeño y en la misma unidad que el coste.
-    expect(textoMediana(d.peso[0])).toBe("Mediana de 3 meses: 20,10 €/kg");
-    expect(textoMediana(d.vinos[0])).toBe("Mediana de 3 meses: 10,50 € la botella");
-    expect(textoMediana(d.platos[0])).toBe("Mediana de 3 meses: hacerlo costaría 6,00 € (30 % de lo que cobras)");
-    expect(textoMediana(d.peso[0], { ...CONFIG_POR_DEFECTO, diasReferencia: 45 })).toBe("Mediana de 45 días: 20,10 €/kg");
-    expect(textoMedianaIngrediente(d.platos[0].ingredientes[0])).toBe("Mediana de 3 meses: 20,10 €/kg");
+    expect(textoMediana(d.peso[0])).toBe("Lo normal en 3 meses (mediana): 20,10 €/kg");
+    expect(textoMediana(d.vinos[0])).toBe("Lo normal en 3 meses (mediana): 10,50 € la botella");
+    expect(textoMediana(d.platos[0])).toBe("Lo normal en 3 meses (mediana): hacerlo costaría 6,00 € (30 % coste sobre venta)");
+    expect(textoMediana(d.peso[0], { ...CONFIG_POR_DEFECTO, diasReferencia: 45 })).toBe("Lo normal en 45 días (mediana): 20,10 €/kg");
+    expect(textoMedianaIngrediente(d.platos[0].ingredientes[0])).toBe("Lo normal en 3 meses (mediana): 20,10 €/kg");
     // Una compra más nueva que no trae el peso: se dice cuál se usa.
     expect(avisoCompraMasNueva(d.peso[0].factura, d.peso[0].ultima, "2026-11-13")).toBe("Hay una compra más nueva (05/11) que no trae el peso: se usa esta");
     expect(avisoCompraMasNueva(d.peso[0].factura, "2026-11-03")).toBeNull();
   });
-  it("el % de coste dicho en corto: «coste: 37 % de lo que cobras»", () => {
-    expect(textoPctCoste(37.2)).toBe("coste: 37 % de lo que cobras");
-    expect(textoPctCoste(null)).toBe("coste: —");
+  it("el % de coste dicho en corto: «37 % coste sobre venta»", () => {
+    expect(textoPctCoste(37.2)).toBe("37 % coste sobre venta");
+    expect(textoPctCoste(null)).toBe("coste sobre venta: —");
   });
 });

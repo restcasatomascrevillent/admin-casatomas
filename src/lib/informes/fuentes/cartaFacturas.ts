@@ -23,6 +23,10 @@
 //  13/11/2026: el coste de Facturas › Márgenes es el de la ÚLTIMA factura (migración
 //  20261128140000), como la columna «Compra» de este informe.
 //    · Platos sin escandallo: «Falta el escandallo» en lugar del ingrediente.
+//  14/11/2026 (dueño): además del precio de la carta (con IVA), el de venta sin IVA
+//  y la compra «sin IVA (base)» y «con IVA» (IVA de la línea; si no lo trae, 21 %
+//  en vinos y 10 % en platos). Fuera la columna «Categoría» (el rótulo largo tipo
+//  «VINOS TINTOS — RIBERA DEL DUERO»): las filas siguen ordenadas por categoría.
 // ============================================================================
 import { supabase } from "@/integrations/supabase/client";
 import { fmt, normalizarMargenes } from "@/lib/analisis/margenesCarta";
@@ -58,6 +62,8 @@ export interface LineaCompra {
   cantidad: number | string | null;
   unidad: string | null;
   total: number | string | null;
+  /** IVA de la línea (%). */
+  iva_pct?: number | string | null;
   facturas: { fecha: string | null; tipo: string | null; local: string | null; total: number | string | null; facturado_en_id: number | null } | null;
 }
 
@@ -66,6 +72,8 @@ export interface UltimaCompra {
   eurUd: number;
   /** Unidad en que se compra («botella», «caja», «kg»…). */
   unidad: string;
+  /** IVA de la línea (%), si la factura lo trae. */
+  ivaPct: number | null;
   /** `YYYY-MM-DD`. */
   fecha: string;
 }
@@ -101,6 +109,7 @@ export function ultimasCompras(lineas: readonly LineaCompra[]): Map<number, Ulti
     res.set(producto, {
       eurUd: Math.round(((num(l.total) as number) / (num(l.cantidad) as number)) * 10000) / 10000,
       unidad: l.unidad?.trim().toLowerCase() || "ud",
+      ivaPct: num(l.iva_pct),
       fecha: (l.facturas!.fecha as string).slice(0, 10),
     });
   }
@@ -117,21 +126,32 @@ const TEXTOS: Record<TipoCartaFacturas, { titulo: string; singular: string; plur
   platos: { titulo: "Platos: facturas y carta", singular: "plato", plural: "platos", columna: "Plato" },
 };
 
-/** Columnas: nombre, categoría, (ingrediente), carta, compra, (margen), unidad, fecha, activo y foto. Anchos para que quepan en la diapositiva. */
+/** IVA supuesto de la compra cuando la línea no lo trae: vino 21 %, comida 10 %. */
+export const IVA_COMPRA_SUPUESTO: Record<TipoCartaFacturas, number> = { vinos: 21, platos: 10 };
+/** IVA de la carta si no se puede leer de Facturas › Márgenes. */
+export const IVA_CARTA_POR_DEFECTO = 10;
+
+/**
+ * Columnas: nombre, (ingrediente), carta con y sin IVA, compra sin y con IVA, (margen), unidad, fecha,
+ * activo y foto. Sin «Categoría» (14/11/2026). Anchos para que quepan en la diapositiva.
+ */
 export function columnasCartaFacturas(tipo: TipoCartaFacturas): ColumnaInforme[] {
   return [
     { id: "nombre", etiqueta: TEXTOS[tipo].columna, tipo: "texto" },
-    { id: "categoria", etiqueta: "Categoría", tipo: "texto", ancho: tipo === "vinos" ? 170 : 150 },
     ...(tipo === "platos" ? [{ id: "producto", etiqueta: "Ingrediente", tipo: "texto" as const, ancho: 170 }] : []),
-    { id: "precio", etiqueta: "Carta", tipo: "precio", ancho: 105 },
-    { id: "compra", etiqueta: "Compra", tipo: "precio", ancho: 105 },
-    ...(tipo === "vinos" ? [{ id: "margen", etiqueta: "Margen", tipo: "texto" as const, ancho: 160 }] : []),
-    { id: "unidad", etiqueta: "Unidad", tipo: "texto", ancho: 90 },
-    { id: "fecha", etiqueta: "Fecha", tipo: "fecha", ancho: 120 },
-    { id: "activo", etiqueta: "Activo", tipo: "texto", ancho: 85 },
-    { id: "foto", etiqueta: "Foto", tipo: "texto", ancho: 70 },
+    { id: "precio", etiqueta: "Carta con IVA", tipo: "precio", ancho: 100 },
+    { id: "venta", etiqueta: "Venta sin IVA", tipo: "precio", ancho: 100 },
+    { id: "compra", etiqueta: "Compra sin IVA (base)", tipo: "precio", ancho: 105 },
+    { id: "compra_iva", etiqueta: "Compra con IVA", tipo: "precio", ancho: 100 },
+    ...(tipo === "vinos" ? [{ id: "margen", etiqueta: "Margen (lo que ganas)", tipo: "texto" as const, ancho: 150 }] : []),
+    { id: "unidad", etiqueta: "Unidad", tipo: "texto", ancho: 85 },
+    { id: "fecha", etiqueta: "Fecha", tipo: "fecha", ancho: 110 },
+    { id: "activo", etiqueta: "Activo", tipo: "texto", ancho: 75 },
+    { id: "foto", etiqueta: "Foto", tipo: "texto", ancho: 65 },
   ];
 }
+
+const redondear2 = (n: number) => Math.round(n * 100) / 100;
 
 /** El producto que cuenta de cada vino o plato: el de menor orden (a igualdad, el que llega antes). */
 export function vinculosPrincipales(vinculos: readonly VinculoCompra[]): Map<string, VinculoCompra> {
@@ -169,6 +189,7 @@ export function filasCartaFacturas(
   vinculos: readonly VinculoCompra[],
   compras: ReadonlyMap<number, UltimaCompra>,
   margenes: MargenesVinos = new Map(),
+  ivaCartaPct: number = IVA_CARTA_POR_DEFECTO,
 ): FilaInforme[] {
   const principal = vinculosPrincipales(vinculos);
   const porNombre = (x: string, y: string) => x.localeCompare(y, "es", { sensitivity: "base" });
@@ -182,13 +203,16 @@ export function filasCartaFacturas(
     .map((a) => {
       const v = principal.get(a.id);
       const c = v ? compras.get(v.productoId) : undefined;
+      const precio = num(a.precio_eur);
+      const ivaCompra = c ? (c.ivaPct ?? IVA_COMPRA_SUPUESTO[tipo]) : null;
       return {
         nombre: a.nombre?.trim() || "(sin nombre)",
-        categoria: a.categoria?.trim() || null,
         // Sin ningún producto en su escandallo, se dice (antes, «—» sin explicar por qué).
         ...(tipo === "platos" ? { producto: v ? v.producto : FALTA_ESCANDALLO } : {}),
-        precio: num(a.precio_eur),
+        precio,
+        venta: precio !== null && precio > 0 ? redondear2(precio / (1 + ivaCartaPct / 100)) : null,
         compra: c ? c.eurUd : null,
+        compra_iva: c && ivaCompra !== null ? redondear2(c.eurUd * (1 + ivaCompra / 100)) : null,
         ...(tipo === "vinos" ? { margen: textoMargen(margenes.get(a.id)) } : {}),
         unidad: c ? c.unidad : null,
         fecha: c ? fechaCorta(c.fecha) : null,
@@ -204,13 +228,15 @@ export interface DatosCartaFacturas {
   compras: ReadonlyMap<number, UltimaCompra>;
   /** Solo vinos: multiplicador de Facturas › Márgenes por id de vino. */
   margenes?: MargenesVinos;
+  /** IVA de la carta (%), el de Facturas › Márgenes. */
+  ivaCartaPct?: number;
 }
 
 /** El informe como tabla. Función pura (se prueba sin Supabase). */
 export function informeCartaFacturas(tipo: TipoCartaFacturas, datos: DatosCartaFacturas, ctx: ContextoInforme): ResultadoInformeTabla {
   const t = TEXTOS[tipo];
   if (datos.articulos.length === 0) return { vacio: true, motivo: `No hay ${t.plural} en la carta.` };
-  const filas = filasCartaFacturas(tipo, datos.articulos, datos.vinculos, datos.compras, datos.margenes);
+  const filas = filasCartaFacturas(tipo, datos.articulos, datos.vinculos, datos.compras, datos.margenes, datos.ivaCartaPct);
   const conCompra = filas.filter((f) => f.compra !== null).length;
   const sinEscandallo = tipo === "platos" ? filas.filter((f) => f.producto === FALTA_ESCANDALLO).length : 0;
   const activos = filas.filter((f) => f.activo === "Sí").length;
@@ -231,7 +257,9 @@ export function informeCartaFacturas(tipo: TipoCartaFacturas, datos: DatosCartaF
         columnas: columnasCartaFacturas(tipo),
         filas,
         nota:
-          "Compra: última factura o albarán de Casa Tomás, sin IVA, por la unidad en que se compra. «—»: sin compra vinculada (se vincula en Facturas › Márgenes)." +
+          `Carta con IVA: lo que paga el cliente. Venta sin IVA: lo que te queda al quitar el IVA (${fmt(datos.ivaCartaPct ?? IVA_CARTA_POR_DEFECTO, 0)} %). ` +
+          `Compra: última factura o albarán de Casa Tomás, por la unidad en que se compra, sin IVA (base) y con IVA (el de la factura; si no lo dice, ${IVA_COMPRA_SUPUESTO[tipo]} %). ` +
+          "«—»: sin compra vinculada (se vincula en Facturas › Márgenes)." +
           (tipo === "vinos"
             ? " Margen: el de Facturas › Márgenes con la última factura: cuántas veces cobras lo que pagas (venta sin IVA ÷ coste sin IVA, en el formato de la carta) y el beneficio, en % del precio de venta sin IVA."
             : " «Falta el escandallo»: el plato no tiene ingredientes; se añaden en Facturas › Márgenes."),
@@ -287,7 +315,7 @@ async function leerLineasCompra(productos: number[]): Promise<LineaCompra[]> {
     const desde = pagina * POR_PAGINA;
     const { data, error } = await supabase
       .from("productos_factura")
-      .select("id, producto_id, cantidad, unidad, total, facturas!inner(fecha, tipo, local, total, facturado_en_id)")
+      .select("id, producto_id, cantidad, unidad, total, iva_pct, facturas!inner(fecha, tipo, local, total, facturado_en_id)")
       .in("producto_id", productos)
       .gt("total", 0)
       .gt("cantidad", 0)
@@ -306,24 +334,24 @@ async function leerLineasCompra(productos: number[]): Promise<LineaCompra[]> {
  * Multiplicador de cada vino según Facturas › Márgenes (RPC `margenes_carta`, la misma cuenta). Si falla, el informe
  * sale igual con «—» en «Margen»: no se pierde el resto por esto.
  */
-async function leerMargenesVinos(): Promise<MargenesVinos> {
+async function leerMargenes(): Promise<{ vinos: MargenesVinos; ivaCartaPct: number }> {
+  const vacio = { vinos: new Map() as MargenesVinos, ivaCartaPct: IVA_CARTA_POR_DEFECTO };
   try {
     const llamar = supabase.rpc as unknown as (this: typeof supabase, fn: string, a?: Record<string, unknown>) => PromiseLike<Respuesta>;
     const { data, error } = await llamar.call(supabase, "margenes_carta", { p_hoy: null });
-    if (error) return new Map();
-    return new Map(normalizarMargenes(data).vinos.map((v) => [v.id, v.multiplicador]));
+    if (error) return vacio;
+    const m = normalizarMargenes(data);
+    const iva = m.config.ivaPct;
+    return { vinos: new Map(m.vinos.map((v) => [v.id, v.multiplicador])), ivaCartaPct: Number.isFinite(iva) && iva >= 0 ? iva : IVA_CARTA_POR_DEFECTO };
   } catch {
-    return new Map();
+    return vacio;
   }
 }
 
 export async function obtenerInformeCartaFacturas(tipo: TipoCartaFacturas, ctx: ContextoInforme): Promise<ResultadoInformeTabla> {
-  const [articulos, vinculos, margenes] = await Promise.all([
-    leerArticulos(tipo),
-    leerVinculos(tipo),
-    tipo === "vinos" ? leerMargenesVinos() : Promise.resolve(new Map() as MargenesVinos),
-  ]);
+  const [articulos, vinculos, m] = await Promise.all([leerArticulos(tipo), leerVinculos(tipo), leerMargenes()]);
+  const margenes = tipo === "vinos" ? m.vinos : (new Map() as MargenesVinos);
   // Solo las compras de los productos que cuentan (en platos, el ingrediente principal).
   const lineas = await leerLineasCompra([...new Set([...vinculosPrincipales(vinculos).values()].map((v) => v.productoId))]);
-  return informeCartaFacturas(tipo, { articulos, vinculos, compras: ultimasCompras(lineas), margenes }, ctx);
+  return informeCartaFacturas(tipo, { articulos, vinculos, compras: ultimasCompras(lineas), margenes, ivaCartaPct: m.ivaCartaPct }, ctx);
 }

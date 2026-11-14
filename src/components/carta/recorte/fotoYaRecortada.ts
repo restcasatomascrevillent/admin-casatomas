@@ -16,7 +16,8 @@
  * elegidos desde «Archivos» («Guardar en Archivos» → «Explorar»).
  */
 import { bitmapReducido } from "../medidasFoto";
-import { exigirFotoValida } from "@/lib/validarFoto";
+import { esHeic, exigirFotoValida, MAX_FOTO_BYTES, tipoPorFirma } from "@/lib/validarFoto";
+import { reducirFotoRecorte } from "./reducirFotoRecorte";
 import { aceptarFoto } from "@/lib/aceptarFoto";
 
 /** Alfa por debajo de esto cuenta como transparente. */
@@ -228,5 +229,41 @@ export async function aceptarFotoCarta(file: File, input?: HTMLInputElement | nu
       /* que lo diga aceptarFoto con el archivo original */
     }
   }
-  return (await aceptarFoto(file, input)) ? file : null;
+  const ligera = await aligerarFotoGrande(file);
+  return (await aceptarFoto(ligera, input)) ? ligera : null;
+}
+
+/** Lado mayor al que se reduce una foto de cámara que pasa de 5 MB (o una HEIC) al elegirla. */
+export const LADO_FOTO_GRANDE = 2400;
+/** Por encima de esto ni se intenta (no es una foto normal de móvil). */
+const BYTES_MAXIMOS_ELEGIR = 60 * 1024 * 1024;
+
+/**
+ * Foto de cámara de más de 5 MB (iPhone de 48 MP) o HEIC que el navegador sabe
+ * abrir (Safari) → JPEG de 2400 px, hecho en el propio móvil y sin decodificar
+ * la foto entera si se puede (14/11/2026: antes salía «La foto pesa demasiado»
+ * o «Las fotos HEIC no se pueden subir»). Si no se puede, la foto tal cual: la
+ * validación dirá el motivo.
+ */
+export async function aligerarFotoGrande(file: File): Promise<File> {
+  if (file.size === 0 || file.size > BYTES_MAXIMOS_ELEGIR) return file;
+  let cabecera: Uint8Array;
+  try {
+    cabecera = new Uint8Array(await new Response(file.slice(0, 16)).arrayBuffer());
+  } catch {
+    return file;
+  }
+  const tipo = tipoPorFirma(cabecera);
+  const heic = !tipo && esHeic(cabecera);
+  if (!heic && !(tipo && file.size > MAX_FOTO_BYTES)) return file;
+  try {
+    const reducida = await reducirFotoRecorte(file, LADO_FOTO_GRANDE);
+    if (reducida === file || reducida.size === 0 || reducida.size > MAX_FOTO_BYTES) return file;
+    const base = file.name.replace(/\.[^.]+$/, "") || "foto";
+    console.info("[foto] reducida al elegirla", { antes: file.size, despues: reducida.size, heic });
+    return new File([reducida], `${base}.jpg`, { type: "image/jpeg" });
+  } catch (e) {
+    console.warn("[foto] no se pudo reducir al elegirla", e);
+    return file;
+  }
 }

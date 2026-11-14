@@ -107,7 +107,9 @@ interface EstadoDocumentoProps {
 const INSIGNIA_TACTIL = `${INSIGNIA} relative h-7 text-xs before:absolute before:-inset-x-1 before:-inset-y-3 before:content-['']`;
 
 export function EstadoDocumento({ alertas, verificada, origen = null, onRevisar, compacto = true, enLinea = false }: EstadoDocumentoProps) {
-  const lista = alertas ?? [];
+  // Verificada = sus avisos ya están revisados: no se enseñan (14/11/2026, «al
+  // verificar, que desaparezcan sus avisos»). Siguen guardados en el documento.
+  const lista = verificada ? [] : (alertas ?? []);
   const graves = lista.filter((a) => a.severidad === "alta");
   // Repetidos juntos («Línea mal ×2»). En la tabla solo cabe una insignia de
   // aviso; el resto se resume en "+N".

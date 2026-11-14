@@ -46,14 +46,27 @@ describe("EstadoDocumento", () => {
           { codigo: "descuadre_linea", severidad: "media", mensaje: "a" },
           { codigo: "descuadre_linea", severidad: "media", mensaje: "b" },
         ]}
-        verificada
-        origen="manual"
+        verificada={false}
         onRevisar={vi.fn()}
         compacto={false}
       />,
     );
     const insignia = screen.getByRole("button", { name: "Línea mal (2): ver el aviso completo" });
     expect(insignia).toHaveTextContent("Línea mal×2");
+  });
+
+  it("verificada: sus avisos desaparecen y queda «Revisada»", () => {
+    render(
+      <EstadoDocumento
+        alertas={[{ codigo: "descuadre_linea", severidad: "media", mensaje: "a" }]}
+        verificada
+        origen="manual"
+        onRevisar={vi.fn()}
+        compacto={false}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /ver el aviso completo/ })).toBeNull();
+    expect(screen.getByText("Revisada")).toBeInTheDocument();
   });
 
   it("sin permiso de edición (sin onRevisar), «Sin revisar» es una marca y no un botón (QA C-09)", () => {
