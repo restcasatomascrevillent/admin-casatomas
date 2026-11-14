@@ -58,19 +58,36 @@ function recorteSimulado(parcial: Partial<FotoCarta>): FotoCarta {
 }
 
 describe("SelectorFotoCarta ante un recorte fallido", () => {
-  it("enseña el aviso como alerta visible (no como línea gris) y deja repetir el recorte", () => {
+  it("enseña el aviso como alerta visible (no como línea gris), con «Reintentar» y «Usar foto original» (no se elige sola)", () => {
     const repetir = vi.fn();
-    const aviso = "Quitar el fondo ha tardado demasiado. Se guarda la foto normal. Pulsa «Repetir recorte».";
+    const setEleccion = vi.fn();
+    const aviso = "El servidor tardó demasiado en quitar el fondo. Pulsa «Reintentar» o, si prefieres guardarla tal cual, «Usar foto original».";
     render(
       <SelectorFotoCarta
-        recorte={recorteSimulado({ original: new File(["x"], "f.jpg"), estado: { fase: "fallo", aviso }, eleccion: "original", repetir })}
+        recorte={recorteSimulado({ original: new File(["x"], "f.jpg"), estado: { fase: "fallo", aviso }, eleccion: "carta", repetir, setEleccion })}
       />,
     );
     const alerta = screen.getByRole("alert");
     expect(alerta).toHaveTextContent(aviso);
     expect(alerta).toHaveTextContent("No se ha podido quitar el fondo");
-    fireEvent.click(screen.getByRole("button", { name: /Repetir recorte/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Reintentar/ }));
     expect(repetir).toHaveBeenCalled();
+    const usar = screen.getByRole("button", { name: /Usar foto original/ });
+    expect(usar).toBeEnabled();
+    expect(usar).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(usar);
+    expect(setEleccion).toHaveBeenCalledWith("original");
+  });
+
+  it("tras un fallo, con «Usar foto original» elegido, lo dice y deja reintentar", () => {
+    render(
+      <SelectorFotoCarta
+        recorte={recorteSimulado({ original: new File(["x"], "f.jpg"), estado: { fase: "fallo", aviso: "x" }, eleccion: "original" })}
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("Se guardará la foto sin recortar");
+    expect(screen.getByRole("button", { name: /Usar foto original/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Reintentar/ })).toBeInTheDocument();
   });
 
   it("sin fallo no hay alerta", () => {

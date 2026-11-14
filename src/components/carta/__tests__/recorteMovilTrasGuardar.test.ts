@@ -52,47 +52,23 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("quitarFondoMovil: primero en el móvil y, si falla, en el servidor", () => {
-  it("reduce la foto a 1200 y, si el móvil puede, no llama al servidor y suelta la memoria del modelo", async () => {
-    let marcaDurante: unknown = null;
-    const local = vi.fn(async () => {
-      marcaDurante = leerMarcaRecorte();
-      return STICKER;
-    });
-    const servidor = vi.fn();
-    const liberar = vi.fn();
-    expect(await quitarFondoMovil(FOTO, undefined, { local, servidor, liberar })).toEqual({ sticker: STICKER, metodo: "navegador" });
+describe("quitarFondoMovil: siempre en el servidor (13/11/2026)", () => {
+  it("reduce la foto a 1200 y la manda al servidor; no carga el modelo en el móvil ni deja marcas", async () => {
+    const servidor = vi.fn(async () => STICKER);
+    expect(await quitarFondoMovil(FOTO, undefined, { servidor })).toEqual({ sticker: STICKER, metodo: "servidor" });
     expect(mocks.reducir).toHaveBeenCalledWith(FOTO, LADO_RECORTE_MOVIL);
-    expect(marcaDurante).toMatchObject({ pestana: ID_PESTANA });
+    expect(servidor).toHaveBeenCalledTimes(1);
     expect(leerMarcaRecorte()).toBeNull();
-    expect(servidor).not.toHaveBeenCalled();
-    expect(liberar).toHaveBeenCalled();
-  });
-
-  it("sin memoria en el móvil: servidor, el móvil queda marcado y la siguiente va directa al servidor", async () => {
-    const local = vi.fn(async () => {
-      throw new RangeError("Out of memory");
-    });
-    const servidor = vi.fn(async () => STICKER);
-    const deps = { local, servidor, liberar: vi.fn() };
-    expect((await quitarFondoMovil(FOTO, undefined, deps)).metodo).toBe("servidor");
-    expect(movilSinLocal()?.motivo).toMatch(/memoria/);
-    await quitarFondoMovil(FOTO, undefined, deps);
-    expect(local).toHaveBeenCalledTimes(1);
-    expect(servidor).toHaveBeenCalledTimes(2);
-  });
-
-  it("otro fallo en el móvil (descarga, etc.): servidor, sin marcar el móvil", async () => {
-    const local = vi.fn(async () => {
-      throw new Error("No se pudo descargar el recortador (Load failed)");
-    });
-    const servidor = vi.fn(async () => STICKER);
-    expect((await quitarFondoMovil(FOTO, undefined, { local, servidor, liberar: vi.fn() })).metodo).toBe("servidor");
     expect(movilSinLocal()).toBeNull();
   });
 
-  it("si el servidor también falla, lanza su error (el formulario enseña el motivo)", async () => {
-    marcarMovilSinLocal("prueba");
+  it("el módulo ya no importa el recorte en el navegador (el iPhone se quedaba sin memoria)", () => {
+    const fuente = readFileSync(join(process.cwd(), "src/components/carta/recorte/quitarFondoMovil.ts"), "utf8");
+    expect(fuente).not.toMatch(/import\(["']\.\/quitarFondoNavegador["']\)/);
+    expect(fuente).not.toMatch(/quitarFondoNavegador\(/);
+  });
+
+  it("si el servidor falla, lanza su error (el formulario enseña el motivo y deja «Reintentar»)", async () => {
     const servidor = vi.fn(async () => {
       throw new ErrorRecorteServidor("caído", "servidor", 500);
     });
@@ -190,30 +166,21 @@ describe("servidor (fetch simulado)", () => {
 describe("trasGuardarFotoCarta (solo queda el caso del fallo)", () => {
   const original = new File(["x"], "foto.JPEG", { type: "image/jpeg" });
 
-  it("móvil (falló en el móvil y en el servidor): la foto normal va a un ordenador con el motivo", async () => {
+  it("falló y se eligió «Usar foto original»: avisa de cómo ponerle el fondo, sin trabajo para un ordenador", () => {
     const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
     configurarAlNoRecortar(alNo);
     trasGuardarFotoCarta(
-      {
-        estado: {
-          fase: "fallo",
-          aviso: "Se ha alcanzado el tope mensual de recortes en el servidor. Al guardar se guarda la foto normal y se recortará en un ordenador.",
-          aOrdenador: true,
-        },
-        original,
-        tema: "carbon",
-        eleccion: "original",
-      },
+      { estado: { fase: "fallo", aviso: "Se ha alcanzado el tope mensual de recortes en el servidor." }, original, tema: "carbon", eleccion: "original" },
       { tabla: "Platos", id: "p9", nombre: " Arroz " },
     );
-    await vi.waitFor(() => expect(alNo).toHaveBeenCalled());
-    expect(alNo).toHaveBeenCalledWith(
-      { tabla: "Platos", registroId: "p9", nombre: "Arroz", rutaOriginal: "p9.jpeg", tema: "carbon" },
-      "Se ha alcanzado el tope mensual de recortes en el servidor.",
+    expect(alNo).not.toHaveBeenCalled();
+    expect(mocks.warning).toHaveBeenCalledWith(
+      expect.stringMatching(/Guardado con la foto normal/),
+      expect.objectContaining({ description: expect.stringContaining("Quitar fondo") }),
     );
   });
 
-  it("ordenador con recorte fallido: solo avisa (como antes)", () => {
+  it("recorte fallido: solo avisa", () => {
     trasGuardarFotoCarta({ estado: { fase: "fallo", aviso: "x" }, original, tema: "arena", eleccion: "original" }, { tabla: "Vinos", id: "v1" });
     expect(mocks.warning).toHaveBeenCalledTimes(1);
   });

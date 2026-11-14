@@ -83,10 +83,17 @@ afterEach(() => {
 const fotoNueva = () =>
   new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])], "foto.png", { type: "image/png" });
 
+/**
+ * En jsdom no se puede quitar el fondo (sin canvas): desde el 13/11/2026 eso
+ * NO deja guardar solo la foto normal; hay que elegir «Usar foto original».
+ */
 async function elegirFoto(input: HTMLInputElement) {
   await act(async () => {
     fireEvent.change(input, { target: { files: [fotoNueva()] } });
   });
+  const usarOriginal = await screen.findByRole("button", { name: /Usar foto original/ });
+  expect(screen.getByRole("button", { name: "Guardar" })).toBeDisabled();
+  fireEvent.click(usarOriginal);
   await waitFor(() => expect(screen.getByRole("button", { name: "Guardar" })).toBeEnabled());
 }
 
@@ -133,12 +140,12 @@ describe("Tarjeta de plato", () => {
     );
     expect(mocks.subir).toHaveBeenCalledWith("platos", "p1", { original: expect.any(File), compuesta: null });
     expect(mocks.borrar).toHaveBeenCalledWith({ tabla: "Platos", bucket: "platos", ruta: "p1.jpg", excluirId: "p1" });
-    // Este «dispositivo» no recorta: al guardar se avisa de que se queda la foto normal.
+    // No se pudo quitar el fondo y se eligió la foto normal: al guardar se avisa de cómo ponérselo.
     const { toast } = await import("sonner");
     await waitFor(() =>
       expect(toast.warning).toHaveBeenCalledWith(
         expect.stringMatching(/Guardado con la foto normal/),
-        expect.objectContaining({ description: expect.stringContaining("desde un ordenador") }),
+        expect.objectContaining({ description: expect.stringContaining("Quitar fondo") }),
       ),
       { timeout: 5000 },
     );
