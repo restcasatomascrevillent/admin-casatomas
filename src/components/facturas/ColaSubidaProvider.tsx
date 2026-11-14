@@ -65,8 +65,8 @@ interface Props {
  *
  *  · Un documento suelto: toast con el resultado y botón «Ver».
  *  · Una tanda de VARIOS (07/11/2026, «se llena de avisos al subir los
- *    albaranes»): UN solo toast que se va actualizando («Leyendo 4 de 12») y
- *    al final resume la tanda; sin un aviso ni un pop-up por documento. Los
+ *    albaranes»): UN solo toast al final, con el resumen de la tanda; sin un
+ *    aviso ni un pop-up por documento, y sin toast de avance (13/11/2026). Los
  *    duplicados quedan en «Cargar» para decidir, como el resto de detalles.
  *  · Al terminar la tanda: una entrada en la campana (si el usuario no estaba
  *    mirando «Cargar») — una por tanda, no una por documento, para no llenarla.
@@ -119,20 +119,13 @@ export function ColaSubidaProvider({ children, deps }: Props) {
       }
       const temporal = r?.archivoEstado === "temporal" ? " · original pendiente de subir a Drive (se subirá solo)" : "";
       if (clase === "pendiente") queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
-      // Tanda de varios documentos: un solo toast con el avance (el resumen, en alAcabarTanda).
+      // Tanda de varios documentos: ningún toast por documento ni de avance
+      // (13/11/2026, «quitar la notificación de leyendo documentos»: el toast
+      // «Leyendo documentos: X de Y» no se cerraba solo y, si la lista se
+      // limpiaba a mitad, se quedaba colgado). El avance ya se ve en «Cargar»
+      // y en el indicador del menú; el resumen sale en alAcabarTanda.
       const deLaTanda = e.tanda > 0 ? (colaRef.current?.getEstado().elementos ?? []).filter((x) => x.tanda === e.tanda) : [];
-      if (deLaTanda.length > 1) {
-        const hechos = deLaTanda.filter((x) => x.fase === "terminado").length;
-        if (hechos < deLaTanda.length) {
-          toast.loading(`Leyendo documentos: ${hechos} de ${deLaTanda.length}`, {
-            id: idToastTanda(e.tanda),
-            description: "Al terminar verás un resumen. El detalle de cada uno está en «Cargar».",
-            action: irACargar,
-            ...pos,
-          });
-        }
-        return;
-      }
+      if (deLaTanda.length > 1) return;
       switch (clase) {
         case "guardada":
           toast.success(`${doc} ${guardado}`, { description: `${e.nombre}${temporal}`, action: ver, ...pos });

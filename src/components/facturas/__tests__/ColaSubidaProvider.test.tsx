@@ -56,7 +56,7 @@ const elegir = (nombre: string) =>
   });
 
 describe("ColaSubidaProvider · tanda de varios documentos: un solo aviso (07/11/2026)", () => {
-  it("3 albaranes: ningún toast por documento ni pop-up; un toast que avanza y un resumen al final", async () => {
+  it("3 albaranes: ningún toast por documento, de avance ni pop-up; solo el resumen al final", async () => {
     const sinTotal = (nombre: string): ResultadoProcesamiento => ({
       nombre, success: true, tipo: "albaran", archivoGuardado: true, duplicado: false,
       // Lo normal en un albarán: no cuenta como aviso.
@@ -70,7 +70,8 @@ describe("ColaSubidaProvider · tanda de varios documentos: un solo aviso (07/11
     await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Subida terminada: 3 documentos", expect.objectContaining({ id: "subida-tanda-1", description: "3 guardadas" })));
     expect(toastMock.success).toHaveBeenCalledTimes(1);
     expect(toastMock.warning).not.toHaveBeenCalled();
-    expect(toastMock.loading.mock.calls.every(([, o]) => o.id === "subida-tanda-1")).toBe(true);
+    // Sin «Leyendo documentos: X de Y» (13/11/2026): se quedaba colgado.
+    expect(toastMock.loading).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
