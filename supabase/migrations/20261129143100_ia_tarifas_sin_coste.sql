@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- 20261129143000_ia_tarifas_sin_coste — IA: las llamadas de un modelo sin
+-- 20261129143100_ia_tarifas_sin_coste — IA: las llamadas de un modelo sin
 -- tarifa ya no se quedan «sin coste» para siempre
 -- ===========================================================================
 -- Encargo del dueño (13/11/2026, «Pasos para saber el precio de todos los
@@ -43,7 +43,7 @@ set client_encoding = 'UTF8';
 -- APLICAR (una a una, nunca `db push`): demo primero (sfonaclosuafvlhutkon),
 -- producción (haqmmdfdzzatdnrrcgez) solo tras aceptar el PR de la release y
 -- con el «sí» del dueño. Idempotente. No hace falta desplegar ninguna función.
--- Deshacer: supabase/rollbacks/20261129143000_ia_tarifas_sin_coste_ROLLBACK.sql
+-- Deshacer: supabase/rollbacks/20261129143100_ia_tarifas_sin_coste_ROLLBACK.sql
 -- Pruebas: npm run test:ia-tarifas:db (PGlite).
 -- ===========================================================================
 
