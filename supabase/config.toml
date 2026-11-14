@@ -370,3 +370,9 @@ verify_jwt = true
 # con su JWT (exigirSuperAdmin). Ver supabase/functions/avisos-telegram/index.ts.
 [functions.avisos-telegram]
 verify_jwt = false
+
+# Peticiones del panel → Tickets del Super Admin (20261129100000_peticiones.sql): la llama el panel con el
+# JWT del usuario justo después de guardar, y el super admin con «Volver a analizar» (exigirUsuario + la
+# petición es suya o es super admin; forzar solo super admin).
+[functions.analizar-peticion]
+verify_jwt = true
