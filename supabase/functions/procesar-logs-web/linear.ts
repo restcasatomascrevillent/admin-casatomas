@@ -282,27 +282,41 @@ export type ResultadoConexionLinear =
   | { ok: true; estado: "ok"; mensaje: string; usuario: string | null; espacio: { nombre: string; urlKey: string | null } | null; equipos: EquipoLinear[] }
   | { ok: false; estado: "sin_clave" | "clave_mal" | "sin_permiso" | "sin_respuesta" | "error"; mensaje: string };
 
-const QUERY_CONEXION = `query ProbarConexion {
+/*
+ * Cuatro consultas planas en vez de una anidada (14/11/2026): Linear limita la
+ * «complejidad» de cada consulta a 10.000 y la anterior (equipos × estados ×
+ * proyectos, más etiquetas) daba 21.482 → «The query is too complex». Cada
+ * conexión multiplica por su `first`, así que ninguna va dentro de otra grande.
+ */
+export const QUERIES_CONEXION = {
+  cuenta: `query ProbarConexionCuenta {
   viewer { name }
   organization { name urlKey }
-  teams(first: 100) {
-    nodes {
-      id name key
-      states(first: 50) { nodes { id name type position } }
-      projects(first: 100) { nodes { id name completedAt canceledAt } }
-    }
-  }
+  teams(first: 100) { nodes { id name key } }
+}`,
+  estados: `query ProbarConexionEstados {
+  workflowStates(first: 250) { nodes { id name type position team { id } } }
+}`,
+  proyectos: `query ProbarConexionProyectos {
+  projects(first: 100) { nodes { id name completedAt canceledAt teams(first: 10) { nodes { id } } } }
+}`,
+  etiquetas: `query ProbarConexionEtiquetas {
   issueLabels(first: 250) { nodes { id name team { id } } }
-}`;
+}`,
+} as const;
 
-interface RespuestaConexion {
+interface RespuestaCuenta {
   viewer?: { name?: string } | null;
   organization?: { name?: string; urlKey?: string } | null;
-  teams?: { nodes?: Array<{
-    id: string; name: string; key?: string;
-    states?: { nodes?: Array<{ id: string; name: string; type: string; position?: number }> };
-    projects?: { nodes?: Array<{ id: string; name: string; completedAt?: string | null; canceledAt?: string | null }> };
-  }> } | null;
+  teams?: { nodes?: Array<{ id: string; name: string; key?: string }> } | null;
+}
+interface RespuestaEstados {
+  workflowStates?: { nodes?: Array<{ id: string; name: string; type: string; position?: number; team?: { id: string } | null }> } | null;
+}
+interface RespuestaProyectos {
+  projects?: { nodes?: Array<{ id: string; name: string; completedAt?: string | null; canceledAt?: string | null; teams?: { nodes?: Array<{ id: string }> } | null }> } | null;
+}
+interface RespuestaEtiquetas {
   issueLabels?: { nodes?: Array<{ id: string; name: string; team?: { id: string } | null }> } | null;
 }
 
@@ -316,16 +330,27 @@ export async function probarConexion(opts: Omit<OpcionesCliente, "apiKey"> & { a
   if (!opts.apiKey) return { ok: false, estado: "sin_clave", mensaje: MENSAJES_LINEAR.sinClave };
   const gql = crearClienteLinear({ ...opts, apiKey: opts.apiKey, intentos: opts.intentos ?? 2, timeoutMs: opts.timeoutMs ?? 12_000 });
   try {
-    const d = await gql<RespuestaConexion>(QUERY_CONEXION);
-    const etiquetas = d?.issueLabels?.nodes ?? [];
+    // La de la cuenta primero: si la clave está mal, falla ahí y no se lanzan las demás.
+    const d = await gql<RespuestaCuenta>(QUERIES_CONEXION.cuenta);
+    const [rEstados, rProyectos, rEtiquetas] = await Promise.all([
+      gql<RespuestaEstados>(QUERIES_CONEXION.estados),
+      gql<RespuestaProyectos>(QUERIES_CONEXION.proyectos),
+      gql<RespuestaEtiquetas>(QUERIES_CONEXION.etiquetas),
+    ]);
+    const etiquetas = rEtiquetas?.issueLabels?.nodes ?? [];
+    const estadosTodos = rEstados?.workflowStates?.nodes ?? [];
+    const proyectosTodos = rProyectos?.projects?.nodes ?? [];
     const equipos: EquipoLinear[] = (d?.teams?.nodes ?? []).map((t) => {
-      const estadosBrutos = t.states?.nodes ?? [];
+      const estadosBrutos = estadosTodos.filter((s) => s.team?.id === t.id);
       const reabrir = estadoParaReabrir(estadosBrutos);
       return {
         id: t.id,
         nombre: t.name,
         clave: t.key ?? null,
-        proyectos: (t.projects?.nodes ?? []).filter((p) => !p.completedAt && !p.canceledAt).map((p) => ({ id: p.id, nombre: p.name })).sort(porNombre),
+        proyectos: proyectosTodos
+          .filter((p) => !p.completedAt && !p.canceledAt && (p.teams?.nodes ?? []).some((x) => x.id === t.id))
+          .map((p) => ({ id: p.id, nombre: p.name }))
+          .sort(porNombre),
         estados: [...estadosBrutos].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((s) => ({ id: s.id, nombre: s.name, tipo: s.type })),
         // Etiquetas del equipo y las de todo el espacio de trabajo (sin equipo).
         etiquetas: etiquetas.filter((l) => !l.team || l.team.id === t.id).map((l) => ({ id: l.id, nombre: l.name })).sort(porNombre),
