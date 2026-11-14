@@ -7,7 +7,7 @@
  * `baseFotos` (bucket «instagram»). Ver recursos.ts.
  */
 import { FORMATOS, MARGEN, generarCss, type FormatoId, type MarcaId } from "./tokens.js";
-import { urlFoto, urlLogo } from "./recursos.js";
+import { urlFoto, urlLogo, urlRecurso } from "./recursos.js";
 import type { Foto } from "./fotos.js";
 import { obtenerPlantilla } from "./plantillas/index.js";
 import { esc, type ContextoPlantilla, type DatosPieza, type Plantilla } from "./tipos.js";
@@ -38,6 +38,7 @@ export function crearContexto(marca: MarcaId, formato: FormatoId, bases: Pick<Op
     margen: MARGEN,
     urlFoto: (id) => urlFoto(bases.baseFotos, id, bases.fotos),
     urlLogo: (pieza, color) => urlLogo(bases.baseRecursos, marca, pieza, color),
+    urlFuente: (fichero) => urlRecurso(bases.baseRecursos, `fuentes/${fichero}`),
   };
 }
 

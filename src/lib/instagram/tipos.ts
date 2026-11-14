@@ -73,6 +73,13 @@ export interface ContextoPlantilla {
   urlFoto(id: string): string;
   /** URL de un logo (PNG en public/instagram/logos del panel, baseRecursos). */
   urlLogo(pieza: string, color: string): string;
+  /**
+   * URL de un fichero de fuente de public/instagram/fuentes (p. ej.
+   * "montserrat/montserrat-latin-400-normal.woff2"), para la plantilla que
+   * necesita una familia que no es la de su marca (12/11/2026: la story
+   * clásica del jueves de tapas va en Montserrat, como la que hacen ahora).
+   */
+  urlFuente?(fichero: string): string;
 }
 
 /**
@@ -95,9 +102,12 @@ export type EncajeFoto = "sangre" | "marco";
  *   plato pequeño. Sin logo ni botón.
  * - "cierre": la última imagen: logo, lema y botón.
  * - "tipografica": sin foto, una frase o un anuncio.
+ * - "anuncio" (12/11/2026): pieza de un flujo propio con su lista (la story
+ *   del jueves de tapas). No sale en los selectores ni la elige la IA: la
+ *   montan su botón y su automático (src/lib/instagram/tapas.ts).
  */
-export type PapelPlantilla = "portada" | "plato" | "cierre" | "tipografica";
-export const PAPELES: readonly PapelPlantilla[] = ["portada", "plato", "cierre", "tipografica"];
+export type PapelPlantilla = "portada" | "plato" | "cierre" | "tipografica" | "anuncio";
+export const PAPELES: readonly PapelPlantilla[] = ["portada", "plato", "cierre", "tipografica", "anuncio"];
 
 export interface Plantilla {
   /** p. ej. "ct-foto-titular" */

@@ -58,7 +58,8 @@ try {
 }
 if (!chromiumInstalado) console.warn("[instagram editorial.render.test] SE SALTA: no está el Chromium de Playwright");
 
-const V2 = PLANTILLAS.filter((p) => !esClasica(p) && p.papel && p.id !== "tz-tipografica");
+// Las de «anuncio» (story del jueves de tapas) tienen su propia prueba (tapas.render.test.ts).
+const V2 = PLANTILLAS.filter((p) => !esClasica(p) && p.papel && p.papel !== "anuncio" && p.id !== "tz-tipografica");
 
 // ── Fotos ────────────────────────────────────────────────────────────────────
 interface FuenteFoto {
@@ -134,7 +135,7 @@ function servidor(fotos: Map<string, Buffer>): Promise<{ url: string; pagina(htm
 type Textos = Partial<Record<"antetitulo" | "titular" | "cita" | "cta" | "pie", string>>;
 
 /** Textos normales por papel y marca (solo se usan los campos que admite la plantilla). */
-const NORMALES: Record<MarcaId, Record<PapelPlantilla, Textos>> = {
+const NORMALES: Record<MarcaId, Partial<Record<PapelPlantilla, Textos>>> = {
   "casa-tomas": {
     portada: { antetitulo: "Nuevo", titular: "Zamburiñas con tuétano", cita: "El sabor del mar y la tierra, en un plato del norte.", cta: "Reservar mesa" },
     plato: { antetitulo: "Para compartir", titular: "Gambas a la plancha", cita: "Con sal gorda y limón" },
@@ -271,7 +272,7 @@ describe.skipIf(!chromiumInstalado)("plantillas v2: render real", () => {
   for (const p of V2) {
     for (const formato of ["post", "story"] as const) {
       it(`${p.id} ${formato}: textos normales y al límite sin errores; más largos, error con el campo`, async () => {
-        const normal = await renderizar(pieza(p.id, formato, fotoPara(p.id), NORMALES[p.marca][p.papel!]));
+        const normal = await renderizar(pieza(p.id, formato, fotoPara(p.id), NORMALES[p.marca][p.papel!] ?? {}));
         expect(normal.fallos).toEqual([]);
         expect(normal.errores).toEqual([]);
         expect(normal.avisos).toEqual([]);

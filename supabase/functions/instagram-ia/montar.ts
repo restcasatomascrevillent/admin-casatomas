@@ -185,7 +185,7 @@ const formatoImagen = (f: FormatoMontado): "post" | "story" => (f === "story" ? 
 /** Plantillas v2 (no clásicas) de la marca con foto y papel que admiten el formato de imagen. */
 export function plantillasMontar(marca: MarcaIA, formato: FormatoMontado): PlantillaIA[] {
   return PLANTILLAS_IA.filter(
-    (p) => p.marca === marca && !p.clasica && p.conFoto && !!p.papel && p.papel !== "tipografica" && p.formatos.includes(formatoImagen(formato)),
+    (p) => p.marca === marca && !p.clasica && p.conFoto && !!p.papel && p.papel !== "tipografica" && p.papel !== "anuncio" && p.formatos.includes(formatoImagen(formato)),
   );
 }
 
@@ -201,7 +201,7 @@ export const LEMA_CIERRE: Record<MarcaIA, string> = {
   touza: "Touza no es solo un bar; es una declaración de intenciones.",
 };
 
-const NOMBRE_PAPEL: Record<PapelIA, string> = { portada: "portada", plato: "imagen del medio", cierre: "cierre", tipografica: "tipográfica" };
+const NOMBRE_PAPEL: Record<PapelIA, string> = { portada: "portada", plato: "imagen del medio", cierre: "cierre", tipografica: "tipográfica", anuncio: "anuncio" };
 
 // ── Prompt y esquema ────────────────────────────────────────────────────────
 
