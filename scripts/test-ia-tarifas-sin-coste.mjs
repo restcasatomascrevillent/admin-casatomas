@@ -16,8 +16,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 
-const MIGRACION = await readFile("supabase/migrations/20261129143000_ia_tarifas_sin_coste.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261129143000_ia_tarifas_sin_coste_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261129143100_ia_tarifas_sin_coste.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261129143100_ia_tarifas_sin_coste_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
