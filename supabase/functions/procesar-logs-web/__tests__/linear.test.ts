@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
-  clasificarErrorLinear, crearDestinoLinear, crearDestinoPrueba, ErrorLinear, estadoParaReabrir, MENSAJES_LINEAR, prioridadLinear, probarConexion,
+  clasificarErrorLinear, crearDestinoLinear, crearDestinoPrueba, ErrorLinear, estadoParaReabrir, MENSAJES_LINEAR, prioridadLinear, probarConexion, QUERIES_CONEXION,
   type DatosCrear, type RepoPrueba,
 } from "../linear";
 
@@ -65,23 +65,28 @@ function linearSimulado(opciones: { fallos?: Array<"429" | "500" | "red" | "perd
       if (!i) return new Response(JSON.stringify({ errors: [{ message: "Entity not found: Issue", extensions: { code: "INVALID_INPUT" } }] }), { status: 400 });
       return json({ issue: query.includes("team {") ? { ...i, team: { states: { nodes: ESTADOS } } } : i });
     }
-    if (query.includes("ProbarConexion")) {
+    if (query.includes("ProbarConexionCuenta")) {
       return json({
         viewer: { name: "Tomás" },
         organization: { name: "Casa Tomás", urlKey: "casatomas" },
-        teams: { nodes: [
-          { id: "eq-web", name: "Web", key: "WEB", states: { nodes: ESTADOS }, projects: { nodes: [
-            { id: "pr-1", name: "Logs", completedAt: null, canceledAt: null },
-            { id: "pr-viejo", name: "Antiguo", completedAt: "2026-01-01", canceledAt: null },
-          ] } },
-          { id: "eq-alm", name: "Almacén", key: "ALM", states: { nodes: [] }, projects: { nodes: [] } },
-        ] },
-        issueLabels: { nodes: [
-          { id: "et-bug", name: "Bug", team: null },
-          { id: "et-web", name: "Web", team: { id: "eq-web" } },
-          { id: "et-alm", name: "Stock", team: { id: "eq-alm" } },
-        ] },
+        teams: { nodes: [{ id: "eq-web", name: "Web", key: "WEB" }, { id: "eq-alm", name: "Almacén", key: "ALM" }] },
       });
+    }
+    if (query.includes("ProbarConexionEstados")) {
+      return json({ workflowStates: { nodes: ESTADOS.map((e) => ({ ...e, team: { id: "eq-web" } })) } });
+    }
+    if (query.includes("ProbarConexionProyectos")) {
+      return json({ projects: { nodes: [
+        { id: "pr-1", name: "Logs", completedAt: null, canceledAt: null, teams: { nodes: [{ id: "eq-web" }] } },
+        { id: "pr-viejo", name: "Antiguo", completedAt: "2026-01-01", canceledAt: null, teams: { nodes: [{ id: "eq-web" }] } },
+      ] } });
+    }
+    if (query.includes("ProbarConexionEtiquetas")) {
+      return json({ issueLabels: { nodes: [
+        { id: "et-bug", name: "Bug", team: null },
+        { id: "et-web", name: "Web", team: { id: "eq-web" } },
+        { id: "et-alm", name: "Stock", team: { id: "eq-alm" } },
+      ] } });
     }
     return new Response("?", { status: 400 });
   });
@@ -204,6 +209,24 @@ describe("errores de Linear legibles", () => {
 });
 
 describe("probar la conexión (botón del panel)", () => {
+  it("ninguna consulta supera el límite de complejidad de Linear (10.000; la anterior daba 21.482)", () => {
+    // Estimación como la de Linear: cada campo cuenta 1 multiplicado por el `first` de las conexiones que lo contienen.
+    const complejidad = (q: string) => {
+      const pila: number[] = [1];
+      let total = 0;
+      let pendiente = 1;
+      for (const tok of q.replace(/query \w+/, "").match(/first:\s*\d+|\{|\}|[A-Za-z_]\w*/g) ?? []) {
+        if (tok.startsWith("first")) pendiente = Number(tok.split(":")[1]);
+        else if (tok === "{") { pila.push(pila[pila.length - 1] * pendiente); pendiente = 1; }
+        else if (tok === "}") pila.pop();
+        else if (tok !== "nodes") total += pila[pila.length - 1];
+      }
+      return total;
+    };
+    for (const [nombre, q] of Object.entries(QUERIES_CONEXION)) {
+      expect(complejidad(q), nombre).toBeLessThan(5000);
+    }
+  });
   it("sin clave: lo dice en español con los pasos y no llama a Linear", async () => {
     const l = linearSimulado();
     const r = await probarConexion({ apiKey: "", fetchFn: l.fetchFn });
