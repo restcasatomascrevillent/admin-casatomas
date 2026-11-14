@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertCircle, CalendarDays, Edit2, Eye, Loader2, RefreshCw, Trash2, UtensilsCrossed } from "lucide-react";
+import { AlertCircle, CalendarDays, Edit2, Eye, Instagram, Loader2, RefreshCw, Trash2, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 import { EditorSeccionesMenu } from "@/components/gestion-web/EditorSeccionesMenu";
@@ -59,6 +59,12 @@ import {
   type VarianteIdioma,
 } from "@/lib/menu-dia";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+
+// Story de Instagram del jueves de tapas (12/11/2026): se descarga solo al abrirla.
+const DialogoCrearStoryTapas = lazy(() =>
+  import("@/components/instagram/tapas/DialogoCrearStoryTapas").then((m) => ({ default: m.DialogoCrearStoryTapas })),
+);
 
 // ---------------------------------------------------------------------------
 // Menús diarios y tapas (tablas `menus_diarios` y `tapas`)
@@ -249,6 +255,8 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   const [claveFormulario, setClaveFormulario] = useState(0);
   const [verAnteriores, setVerAnteriores] = useState(false);
   const [vistaPreviaAbierta, setVistaPreviaAbierta] = useState(false);
+  const [storyAbierta, setStoryAbierta] = useState(false);
+  const { canAccess: veMarketing } = useCanAccessSection("marketing");
   const formRef = useRef<HTMLDivElement>(null);
 
   // La carta solo hace falta en el editor de menú (para elegir platos y para
@@ -523,6 +531,14 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         config.origenRebuild,
         editandoFecha || choqueFecha ? "Cambios guardados" : "Guardado",
       );
+
+      // Story automática del jueves de tapas (12/11/2026): sin esperar; avisa ella con un toast.
+      // Solo si se ve Marketing (sin permiso no se puede generar ni programar).
+      if (!esMenu && veMarketing) {
+        void import("@/components/instagram/tapas/automatico")
+          .then((m) => m.storyTapasAlGuardar(fecha, tapas))
+          .catch((e) => console.error("Story de tapas:", e));
+      }
 
       resetForm();
       await cargarDatos();
@@ -851,6 +867,18 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                     placeholder={"Ensaladilla rusa\nCroquetas de jamón\nPulpo a feira"}
                     className="min-h-40 text-base md:text-base"
                   />
+                  {veMarketing && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11"
+                      disabled={!fecha || lineas(tapasTexto).length === 0}
+                      onClick={() => setStoryAbierta(true)}
+                    >
+                      <Instagram className="w-4 h-4 mr-1.5" />
+                      Crear story de Instagram
+                    </Button>
+                  )}
                 </div>
               )}
 
@@ -894,6 +922,12 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
           {vistaPrevia}
         </aside>
       </div>
+
+      {storyAbierta && (
+        <Suspense fallback={null}>
+          <DialogoCrearStoryTapas open={storyAbierta} onOpenChange={setStoryAbierta} fecha={fecha} tapas={lineas(tapasTexto)} />
+        </Suspense>
+      )}
 
       {/* ---------------------------------------------- Vista previa (por debajo de xl) */}
       <Dialog open={vistaPreviaAbierta} onOpenChange={setVistaPreviaAbierta}>

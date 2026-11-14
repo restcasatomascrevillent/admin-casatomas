@@ -47,7 +47,22 @@ export function InterruptorMenuTapas({ boton }: { boton: BotonMenuTapas }) {
           <Label htmlFor={id} className="cursor-pointer">Mostrar «{nombre}» en la web de Casa Tomás</Label>
           <Switch id={id} checked={mostrarBotonesMenuTapas[boton]}
             disabled={isLoading || isError || !botonesMenuTapasDisponibles || cambiarBotonMenuTapas.isPending}
-            onCheckedChange={(mostrar) => cambiarBotonMenuTapas.mutate({ boton, mostrar })} />
+            onCheckedChange={(mostrar) =>
+              cambiarBotonMenuTapas.mutate(
+                { boton, mostrar },
+                {
+                  // Encender «Tapas» deja el menú de tapas activo: la story automática del jueves (12/11/2026).
+                  // Sin permiso de Marketing no hace nada (no puede leer sus ajustes) y no avisa.
+                  onSuccess: () => {
+                    if (boton === "tapas" && mostrar) {
+                      void import("@/components/instagram/tapas/automatico")
+                        .then((m) => m.storyTapasAlActivar())
+                        .catch((e) => console.error("Story de tapas:", e));
+                    }
+                  },
+                },
+              )
+            } />
         </div>
         {aviso && <p className="text-xs text-muted-foreground">{aviso}</p>}
 
