@@ -140,10 +140,10 @@ export function columnasCartaFacturas(tipo: TipoCartaFacturas): ColumnaInforme[]
     { id: "nombre", etiqueta: TEXTOS[tipo].columna, tipo: "texto" },
     ...(tipo === "platos" ? [{ id: "producto", etiqueta: "Ingrediente", tipo: "texto" as const, ancho: 170 }] : []),
     { id: "precio", etiqueta: "Carta con IVA", tipo: "precio", ancho: 100 },
-    { id: "venta", etiqueta: "Carta sin IVA", tipo: "precio", ancho: 100 },
+    { id: "venta", etiqueta: "Venta sin IVA", tipo: "precio", ancho: 100 },
     { id: "compra", etiqueta: "Compra sin IVA (base)", tipo: "precio", ancho: 105 },
     { id: "compra_iva", etiqueta: "Compra con IVA", tipo: "precio", ancho: 100 },
-    ...(tipo === "vinos" ? [{ id: "margen", etiqueta: "Margen", tipo: "texto" as const, ancho: 150 }] : []),
+    ...(tipo === "vinos" ? [{ id: "margen", etiqueta: "Margen (lo que ganas)", tipo: "texto" as const, ancho: 150 }] : []),
     { id: "unidad", etiqueta: "Unidad", tipo: "texto", ancho: 85 },
     { id: "fecha", etiqueta: "Fecha", tipo: "fecha", ancho: 110 },
     { id: "activo", etiqueta: "Activo", tipo: "texto", ancho: 75 },
@@ -257,7 +257,7 @@ export function informeCartaFacturas(tipo: TipoCartaFacturas, datos: DatosCartaF
         columnas: columnasCartaFacturas(tipo),
         filas,
         nota:
-          `Carta con IVA: lo que paga el cliente. Carta sin IVA: lo que te queda al quitar el IVA (${fmt(datos.ivaCartaPct ?? IVA_CARTA_POR_DEFECTO, 0)} %). ` +
+          `Carta con IVA: lo que paga el cliente. Venta sin IVA: lo que te queda al quitar el IVA (${fmt(datos.ivaCartaPct ?? IVA_CARTA_POR_DEFECTO, 0)} %). ` +
           `Compra: última factura o albarán de Casa Tomás, por la unidad en que se compra, sin IVA (base) y con IVA (el de la factura; si no lo dice, ${IVA_COMPRA_SUPUESTO[tipo]} %). ` +
           "«—»: sin compra vinculada (se vincula en Facturas › Márgenes)." +
           (tipo === "vinos"

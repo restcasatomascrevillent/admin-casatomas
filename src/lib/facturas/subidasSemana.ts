@@ -17,6 +17,8 @@ export interface ArchivoSubido {
   subido: string;
   estado: string;
   facturaId: number | null;
+  /** Quién lo subió (id de usuario; `ocr_trabajos.creado_por`). */
+  creadoPor?: string | null;
 }
 
 export interface DiaSubidas {

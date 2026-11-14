@@ -5,6 +5,8 @@ import { CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { agruparPorDia, inicioSemana, textoEstado, type ArchivoSubido, type DiaSubidas } from "@/lib/facturas/subidasSemana";
 
 const DIA_CORTO = new Intl.DateTimeFormat("es-ES", { weekday: "short" });
@@ -29,7 +31,7 @@ function useArchivosSemana(version: number) {
     queryFn: async (): Promise<ArchivoSubido[]> => {
       const { data, error } = await supabase
         .from("ocr_trabajos")
-        .select("id, nombre_original, created_at, estado, factura_id")
+        .select("id, nombre_original, created_at, estado, factura_id, creado_por")
         .gte("created_at", desde)
         .order("created_at", { ascending: false })
         .limit(1000);
@@ -40,7 +42,28 @@ function useArchivosSemana(version: number) {
         subido: t.created_at,
         estado: t.estado,
         facturaId: t.factura_id,
+        creadoPor: t.creado_por,
       }));
+    },
+  });
+}
+
+/** Nombres de quien sube (solo los puede leer un administrador; el resto ve «Tú» en lo suyo). */
+function useNombresUsuarios(activo: boolean) {
+  return useQuery({
+    queryKey: ["facturas-nombres-usuarios"],
+    enabled: activo,
+    staleTime: 10 * 60_000,
+    retry: false,
+    queryFn: async (): Promise<Map<string, string>> => {
+      const mapa = new Map<string, string>();
+      try {
+        const r = await supabase.functions.invoke<{ users?: Array<{ id: string; email: string | null; display_name: string | null }> }>("list-users");
+        for (const u of r.data?.users ?? []) mapa.set(u.id, u.display_name || u.email || "");
+      } catch {
+        /* sin nombres: se enseña «Otra persona» */
+      }
+      return mapa;
     },
   });
 }
@@ -55,6 +78,10 @@ function useArchivosSemana(version: number) {
  */
 export function CalendarioSubidas({ version = 0, conEnlace = true }: { version?: number; conEnlace?: boolean }) {
   const q = useArchivosSemana(version);
+  const { user } = useAuth();
+  const { isAdmin } = useUserRole();
+  const nombres = useNombresUsuarios(isAdmin).data;
+  const quien = (id?: string | null) => (!id ? "" : id === user?.id ? "Tú" : nombres?.get(id) || "Otra persona");
   const dias = useMemo(() => agruparPorDia(q.data ?? []), [q.data]);
   const total = dias.reduce((n, d) => n + d.archivos.length, 0);
 
@@ -67,7 +94,7 @@ export function CalendarioSubidas({ version = 0, conEnlace = true }: { version?:
       <ol className="grid min-w-0 flex-1 grid-cols-7 gap-1 sm:max-w-md">
         {dias.map((d) => (
           <li key={d.clave}>
-            <Dia dia={d} cargando={q.isLoading} conEnlace={conEnlace} />
+            <Dia dia={d} cargando={q.isLoading} conEnlace={conEnlace} quien={quien} />
           </li>
         ))}
       </ol>
@@ -76,7 +103,7 @@ export function CalendarioSubidas({ version = 0, conEnlace = true }: { version?:
   );
 }
 
-function Dia({ dia, cargando, conEnlace }: { dia: DiaSubidas; cargando: boolean; conEnlace: boolean }) {
+function Dia({ dia, cargando, conEnlace, quien }: { dia: DiaSubidas; cargando: boolean; conEnlace: boolean; quien: (id?: string | null) => string }) {
   const [abierto, setAbierto] = useState(false);
   const n = dia.archivos.length;
   const nombreDia = dia.esHoy ? "Hoy" : DIA_CORTO.format(dia.fecha).replace(".", "");
@@ -109,20 +136,23 @@ function Dia({ dia, cargando, conEnlace }: { dia: DiaSubidas; cargando: boolean;
             {dia.archivos.map((a) => {
               const e = textoEstado(a.estado);
               return (
-                <li key={a.id} className="flex items-baseline gap-2 py-1.5 text-sm">
+                <li key={a.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-1.5 text-sm">
                   <span className="shrink-0 tabular-nums text-xs text-muted-foreground">{HORA.format(new Date(a.subido))}</span>
                   <span className="min-w-0 flex-1 break-all">{a.nombre}</span>
-                  {a.facturaId && conEnlace ? (
-                    <Link
-                      to={`/facturas?tab=compras&modo=documentos&doc=${a.facturaId}`}
-                      onClick={() => setAbierto(false)}
-                      className={cn("shrink-0 text-xs underline-offset-2 hover:underline", TONO[e.tono])}
-                    >
-                      {e.texto} · Ver
-                    </Link>
-                  ) : (
-                    <span className={cn("shrink-0 text-xs", TONO[e.tono])}>{e.texto}</span>
-                  )}
+                  <span className="flex w-full items-baseline justify-between gap-2 pl-10 text-xs text-muted-foreground">
+                    <span>{a.creadoPor ? `Subido por ${quien(a.creadoPor)}` : ""}</span>
+                    {a.facturaId && conEnlace ? (
+                      <Link
+                        to={`/facturas?tab=compras&modo=documentos&doc=${a.facturaId}`}
+                        onClick={() => setAbierto(false)}
+                        className={cn("shrink-0 underline underline-offset-2", TONO[e.tono])}
+                      >
+                        {e.texto} · Ver factura
+                      </Link>
+                    ) : (
+                      <span className={cn("shrink-0", TONO[e.tono])}>{e.texto}</span>
+                    )}
+                  </span>
                 </li>
               );
             })}
