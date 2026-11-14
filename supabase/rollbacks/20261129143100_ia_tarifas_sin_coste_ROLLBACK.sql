@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- ROLLBACK de 20261129143000_ia_tarifas_sin_coste.sql: quita el trigger de
+-- ROLLBACK de 20261129143100_ia_tarifas_sin_coste.sql: quita el trigger de
 -- ia_precios y las dos funciones. Se quedan, a propósito, las tarifas dadas de
 -- alta y los costes ya recalculados en ia_uso: son datos correctos (la tarifa
 -- oficial y la cuenta de ia_registrar_uso) y quitarlos volvería a dejar las
