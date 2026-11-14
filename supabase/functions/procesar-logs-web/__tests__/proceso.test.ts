@@ -20,7 +20,7 @@ const incidencia = (o: Partial<IncidenciaFila> = {}): IncidenciaFila => ({
   pila: "TypeError: vino.precio is null\n at CartaVinos (https://web.es/assets/CartaVinos-B7x9Qa1c.js:1:2345)", motivo_ticket: "4 ocurrencias y 3 sesiones en 24 h (umbral 3 y 2)",
   reabierta_veces: 0, linear_estado: "pendiente", linear_uuid: "8f8b4e1c-3c2a-4b8e-9a51-1f2e3d4c5b6a", linear_issue_id: null, linear_identificador: null,
   linear_destino: null, linear_intentos: 0, linear_proximo_intento: null, linear_ultima_sync: null, linear_pendiente_reapertura: false,
-  ocurrencias_en_ticket: 0, analisis_ia: null, analisis_ia_en: null, ...o,
+  ocurrencias_en_ticket: 0, analisis_ia: null, analisis_ia_en: null, explicacion_ia: null, explicacion_ia_intentos: 0, ...o,
 });
 
 const recorrido: EventoTicket[] = [
@@ -58,6 +58,8 @@ function repoMemoria(incs: IncidenciaFila[], over: Partial<RepoProceso> = {}) {
     contexto: async () => recorrido,
     ticketsCreadosDesde: async () => 0,
     analisisDesde: async () => 0,
+    explicacionesDesde: async () => 0,
+    incidenciasSinExplicar: async () => [],
     ultimaPurga: async () => AHORA.toISOString(),
     purgar: async () => ({}),
     ...over,
