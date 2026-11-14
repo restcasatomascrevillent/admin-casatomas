@@ -19,7 +19,8 @@ import {
   type EventoWeb,
   type IncidenciaWeb,
 } from "@/hooks/useLogsWeb";
-import { causaDeFila, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO, repartoTexto, textoParaCopiar } from "./calculos";
+import { causaDeFila, explicacionIncidencia, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO, repartoTexto, TEXTO_ACCION_RECARGA, TEXTO_TRAS_PUBLICAR, textoParaCopiar } from "./calculos";
+import { ExplicacionSencilla } from "./ExplicacionSencilla";
 import { datosClave, objetivosAfectados } from "../../../supabase/functions/procesar-logs-web/ticket";
 import { LineaTiempo } from "./LineaTiempo";
 import { Paginacion } from "./Controles";
@@ -98,12 +99,12 @@ function Analisis({ i }: { i: IncidenciaWeb }) {
   );
 }
 
-function CausaConocidaAviso({ i }: { i: IncidenciaWeb }) {
-  const causa = causaDeFila(i);
+function CausaConocidaAviso({ i, muestras }: { i: IncidenciaWeb; muestras?: EventoWeb[] }) {
+  const causa = causaDeFila(i, muestras);
   if (!causa) return null;
   return (
     <section className="space-y-1 rounded-md border border-sky-500/40 bg-sky-50 p-3 text-sm text-sky-950 dark:bg-sky-950/30 dark:text-sky-100" data-testid="causa-conocida">
-      <h3 className="flex items-start gap-1.5 text-sm font-semibold"><Lightbulb className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> Causa conocida: {causa.titulo}</h3>
+      <h3 className="flex items-start gap-1.5 text-sm font-semibold"><Lightbulb className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> Causa conocida (para el técnico): {causa.titulo}</h3>
       <p>{causa.explicacion}</p>
       <ul className="list-disc pl-5">{causa.acciones.map((a) => <li key={a}>{a}</li>)}</ul>
       {causa.ruidoSiAislado && <p className="text-xs opacity-80">Si se queda en pocas sesiones, se puede ignorar.</p>}
@@ -227,62 +228,75 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
                 {(i.estado === "resuelta" || i.estado === "ignorada") && <Button variant="outline" className="h-11" onClick={() => cambiarEstado("abierta")} disabled={cambiar.isPending}>Reabrir</Button>}
               </div>
             </div>
-            <TiraCifras
-              cifras={[
-                { etiqueta: "Ocurrencias", valor: i.ocurrencias, detalle: `${i.ocurrencias_24h} en 24 h` },
-                { etiqueta: "Sesiones afectadas", valor: i.sesiones_afectadas, detalle: "distintas, con o sin consentimiento" },
-                { etiqueta: "Primera vez", valor: fmtFechaHora(i.primera_vez) },
-                { etiqueta: "Última vez", valor: fmtFechaHora(i.ultima_vez) },
-                { etiqueta: "Versión", valor: i.version_ultima ?? "—", detalle: i.version_primera && i.version_primera !== i.version_ultima ? `desde ${i.version_primera}` : undefined },
-              ]}
-            />
-            {i.rutas.length > 0 && <p className="text-xs text-muted-foreground">Páginas: {i.rutas.map((r) => `${r.ruta} (${r.n})`).join(" · ")}</p>}
-            <CausaConocidaAviso i={i} />
-            {muestras.data && <Contexto i={i} muestras={muestras.data} />}
+            <ExplicacionSencilla explicacion={explicacionIncidencia(i, muestras.data ?? [], contexto.data ?? null, eventoContexto)} />
             <Ticket i={i} />
-            <Analisis i={i} />
-            <section>
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">Evidencias (depuradas)</h3>
-                <Button variant="ghost" className="h-9 gap-1 px-2 text-xs" onClick={() => copiar(textoParaCopiar(i, ocurrencias.data?.filas[0]))} data-testid="copiar-incidencia">
-                  <Copy className="h-3.5 w-3.5" /> Copiar para el informe
-                </Button>
+            <details className="rounded-md border p-3" data-testid="detalles-tecnicos">
+              <summary className="cursor-pointer select-none text-sm font-semibold">Detalles técnicos (para quien lo arregle)</summary>
+              <div className="mt-3 space-y-4">
+                <TiraCifras
+                  cifras={[
+                    { etiqueta: "Ocurrencias", valor: i.ocurrencias, detalle: `${i.ocurrencias_24h} en 24 h` },
+                    { etiqueta: "Sesiones afectadas", valor: i.sesiones_afectadas, detalle: "distintas, con o sin consentimiento" },
+                    { etiqueta: "Primera vez", valor: fmtFechaHora(i.primera_vez) },
+                    { etiqueta: "Última vez", valor: fmtFechaHora(i.ultima_vez) },
+                    { etiqueta: "Versión", valor: i.version_ultima ?? "—", detalle: i.version_primera && i.version_primera !== i.version_ultima ? `desde ${i.version_primera}` : undefined },
+                  ]}
+                />
+                {i.rutas.length > 0 && <p className="text-xs text-muted-foreground">Páginas: {i.rutas.map((r) => `${r.ruta} (${r.n})`).join(" · ")}</p>}
+                <CausaConocidaAviso i={i} muestras={muestras.data} />
+                {muestras.data && <Contexto i={i} muestras={muestras.data} />}
+                <Analisis i={i} />
+                <section>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold">Evidencias (depuradas)</h3>
+                    <Button variant="ghost" className="h-9 gap-1 px-2 text-xs" onClick={() => copiar(textoParaCopiar(i, ocurrencias.data?.filas[0]))} data-testid="copiar-incidencia">
+                      <Copy className="h-3.5 w-3.5" /> Copiar para el informe
+                    </Button>
+                  </div>
+                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/60 p-2 text-xs">{[i.mensaje, i.pila].filter(Boolean).join("\n\n") || "(sin mensaje)"}</pre>
+                </section>
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold">Ocurrencias</h3>
+                  <ul className="space-y-1 text-sm">
+                    {ocurrencias.data?.filas.map((e) => (
+                      <li key={e.id} className="flex flex-wrap items-center gap-2">
+                        <span className="tabular-nums text-xs">{fmtFechaHora(e.ocurrido_en)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {i.fuente === "navegador" ? `${e.ruta ?? ""} · ${e.navegador ?? "?"} ${e.so ?? ""} · v${e.version ?? "?"}` : (e.objetivo ?? e.tipo)}
+                          {e.propiedades?.status !== undefined ? ` · estado ${String(e.propiedades.status)}` : ""}
+                          {e.accion && TEXTO_ACCION_RECARGA[e.accion] ? <span data-testid="accion-recarga"> · {TEXTO_ACCION_RECARGA[e.accion]}</span> : null}
+                        </span>
+                        {(e.es_bot || e.es_prueba) && <Badge variant="outline" className="text-[10px] font-normal">{e.es_bot ? "bot" : "prueba"}</Badge>}
+                        {e.tras_publicar && (
+                          <Badge variant="outline" data-testid="tras-publicar" data-clase={e.tras_publicar}
+                            className={e.tras_publicar === "repetido" ? "border-destructive/60 text-[10px] font-normal text-destructive" : "border-emerald-500/50 text-[10px] font-normal text-emerald-700 dark:text-emerald-300"}>
+                            {TEXTO_TRAS_PUBLICAR[e.tras_publicar]}
+                          </Badge>
+                        )}
+                        {e.sesion_id ? (
+                          <>
+                            <Button variant={eventoContexto === e.id ? "secondary" : "ghost"} className="h-9 px-2 text-xs" onClick={() => setEventoContexto(e.id)}>contexto</Button>
+                            <Button variant="ghost" className="h-9 px-2 text-xs" onClick={() => onAbrirSesion(e.sesion_id!)}>sesión completa</Button>
+                          </>
+                        ) : <span className="text-xs italic text-muted-foreground">{i.fuente === "navegador" ? "sin sesión (sin consentimiento)" : "del servidor (sin sesión)"}</span>}
+                        <DetalleOcurrencia i={i} e={e} />
+                      </li>
+                    ))}
+                  </ul>
+                  <Paginacion pagina={pagina} tam={10} total={ocurrencias.data?.total ?? 0} onCambio={setPagina} cargando={ocurrencias.isFetching} />
+                </section>
+                <section className="space-y-2" data-testid="contexto-error">
+                  <h3 className="text-sm font-semibold">Antes y después del fallo</h3>
+                  {eventoContexto === null ? (
+                    <p className="text-xs text-muted-foreground">Ninguna ocurrencia tiene sesión: no hay recorrido disponible (falta contexto).</p>
+                  ) : contexto.isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <LineaTiempo eventos={contexto.data ?? []} resaltado={eventoContexto} />
+                  )}
+                </section>
               </div>
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/60 p-2 text-xs">{[i.mensaje, i.pila].filter(Boolean).join("\n\n") || "(sin mensaje)"}</pre>
-            </section>
-            <section className="space-y-2">
-              <h3 className="text-sm font-semibold">Ocurrencias</h3>
-              <ul className="space-y-1 text-sm">
-                {ocurrencias.data?.filas.map((e) => (
-                  <li key={e.id} className="flex flex-wrap items-center gap-2">
-                    <span className="tabular-nums text-xs">{fmtFechaHora(e.ocurrido_en)}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {i.fuente === "navegador" ? `${e.ruta ?? ""} · ${e.navegador ?? "?"} ${e.so ?? ""} · v${e.version ?? "?"}` : (e.objetivo ?? e.tipo)}
-                      {e.propiedades?.status !== undefined ? ` · estado ${String(e.propiedades.status)}` : ""}
-                    </span>
-                    {(e.es_bot || e.es_prueba) && <Badge variant="outline" className="text-[10px] font-normal">{e.es_bot ? "bot" : "prueba"}</Badge>}
-                    {e.sesion_id ? (
-                      <>
-                        <Button variant={eventoContexto === e.id ? "secondary" : "ghost"} className="h-9 px-2 text-xs" onClick={() => setEventoContexto(e.id)}>contexto</Button>
-                        <Button variant="ghost" className="h-9 px-2 text-xs" onClick={() => onAbrirSesion(e.sesion_id!)}>sesión completa</Button>
-                      </>
-                    ) : <span className="text-xs italic text-muted-foreground">{i.fuente === "navegador" ? "sin sesión (sin consentimiento)" : "del servidor (sin sesión)"}</span>}
-                    <DetalleOcurrencia i={i} e={e} />
-                  </li>
-                ))}
-              </ul>
-              <Paginacion pagina={pagina} tam={10} total={ocurrencias.data?.total ?? 0} onCambio={setPagina} cargando={ocurrencias.isFetching} />
-            </section>
-            <section className="space-y-2" data-testid="contexto-error">
-              <h3 className="text-sm font-semibold">Antes y después del fallo</h3>
-              {eventoContexto === null ? (
-                <p className="text-xs text-muted-foreground">Ninguna ocurrencia tiene sesión: no hay recorrido disponible (falta contexto).</p>
-              ) : contexto.isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <LineaTiempo eventos={contexto.data ?? []} resaltado={eventoContexto} />
-              )}
-            </section>
+            </details>
             <section className="space-y-2">
               <h3 className="text-sm font-semibold">Nota interna</h3>
               <Textarea value={nota} onChange={(e) => setNota(e.target.value)} maxLength={2000} rows={2} aria-label="Nota interna" />

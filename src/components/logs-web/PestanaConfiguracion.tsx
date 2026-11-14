@@ -23,6 +23,7 @@ import {
 } from "@/hooks/useLogsWeb";
 import { fmtFechaHora, NOMBRE_CATEGORIA, NOMBRE_TIPO } from "./calculos";
 import { Interruptor } from "./Controles";
+import { ConexionLinear } from "./ConexionLinear";
 
 const ENTORNOS: Entorno[] = ["produccion", "demo", "local"];
 const NOMBRE_ENTORNO: Record<Entorno, string> = { produccion: "Producción", demo: "Demo", local: "Local" };
@@ -192,7 +193,7 @@ export function PestanaConfiguracion({ estado }: { estado: EstadoRecogidaDatos |
         </div>
         <div className="grid gap-x-6 sm:grid-cols-2">
           <Interruptor id="u-404s" etiqueta="Los 404 pueden abrir ticket (si superan su umbral)" valor={b.tickets_404} onCambio={(v) => set("tickets_404", v)} />
-          <Interruptor id="u-prueba" etiqueta="No contar pruebas automáticas para los umbrales" valor={b.excluir_pruebas_tickets} onCambio={(v) => set("excluir_pruebas_tickets", v)} />
+          <Interruptor id="u-prueba" etiqueta="No contar pruebas automáticas ni tráfico interno para los umbrales" valor={b.excluir_pruebas_tickets} onCambio={(v) => set("excluir_pruebas_tickets", v)} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Si reaparece una incidencia resuelta</Label>
@@ -205,49 +206,22 @@ export function PestanaConfiguracion({ estado }: { estado: EstadoRecogidaDatos |
             </SelectContent>
           </Select>
         </div>
-        <p className="text-xs text-muted-foreground">Los errores críticos (p. ej. la petición de reserva que falla) abren ticket con la primera ocurrencia.</p>
+        <p className="text-xs text-muted-foreground">Los errores críticos (p. ej. la petición de reserva que falla) abren ticket con la primera ocurrencia. Los de «página antigua tras publicar» no cuentan, salvo que vuelvan a fallar después de recargar.</p>
       </Seccion>
 
       <Seccion titulo="Linear">
-        <div className="flex flex-wrap gap-6">
-          <div className="space-y-1">
-            <Label className="text-xs">Destino de los tickets</Label>
-            <Select value={b.linear_modo} onValueChange={(v) => set("linear_modo", v as ConfigLogsWeb["linear_modo"])}>
-              <SelectTrigger className="h-11 w-72"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="prueba">Destino de pruebas (no toca Linear)</SelectItem>
-                <SelectItem value="real">Linear (necesita LINEAR_API_KEY)</SelectItem>
-                <SelectItem value="desactivado">Desactivado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="l-eq" className="text-xs">Equipo (id)</Label>
-            <Input id="l-eq" className="h-11 w-72" value={b.linear_equipo_id ?? ""} onChange={(e) => set("linear_equipo_id", e.target.value.trim() || null)} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="l-pr" className="text-xs">Proyecto (id, opcional)</Label>
-            <Input id="l-pr" className="h-11 w-72" value={b.linear_proyecto_id ?? ""} onChange={(e) => set("linear_proyecto_id", e.target.value.trim() || null)} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="l-et" className="text-xs">Etiquetas (ids, separadas por comas)</Label>
-            <Input id="l-et" className="h-11 w-72" value={b.linear_etiquetas.join(", ")} onChange={(e) => set("linear_etiquetas", e.target.value.split(",").map((x) => x.trim()).filter(Boolean))} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="l-re" className="text-xs">Estado al reabrir (id, opcional)</Label>
-            <Input id="l-re" className="h-11 w-72" value={b.linear_estado_reabrir_id ?? ""} onChange={(e) => set("linear_estado_reabrir_id", e.target.value.trim() || null)} />
-          </div>
-          <Numero id="l-max" etiqueta="Tickets nuevos por día (máx.)" valor={b.linear_max_tickets_dia} min={0} max={500} onCambio={(n) => set("linear_max_tickets_dia", n)} />
-        </div>
-        <p className="text-xs text-muted-foreground">La clave de Linear es un secreto de la función en Supabase: nunca se guarda aquí ni llega al navegador.</p>
+        <ConexionLinear valores={b} onCambio={(c) => setBorrador({ ...b, ...c })} />
+        <Numero id="l-max" etiqueta="Tickets nuevos por día (máx.)" valor={b.linear_max_tickets_dia} min={0} max={500} onCambio={(n) => set("linear_max_tickets_dia", n)}
+          ayuda="Primero los más graves y con más visitantes afectados; el resto espera al día siguiente." />
       </Seccion>
 
       <Seccion titulo="IA, retención y límites de coste">
         <div className="grid gap-x-6 sm:grid-cols-2">
-          <Interruptor id="ia-on" etiqueta="Análisis de IA de las incidencias" valor={b.ia_activada} onCambio={(v) => set("ia_activada", v)} />
+          <Interruptor id="ia-on" etiqueta="IA en las incidencias (análisis para el ticket y explicación en sencillo)" valor={b.ia_activada} onCambio={(v) => set("ia_activada", v)} />
         </div>
         <div className="flex flex-wrap gap-6">
-          <Numero id="ia-max" etiqueta="Análisis de IA por día" valor={b.ia_max_analisis_dia} min={0} max={500} onCambio={(n) => set("ia_max_analisis_dia", n)} />
+          <Numero id="ia-max" etiqueta="Llamadas de IA por día" valor={b.ia_max_analisis_dia} min={0} max={500} onCambio={(n) => set("ia_max_analisis_dia", n)}
+            ayuda="Análisis de tickets + explicaciones en sencillo (estas, como mucho la mitad). Cada incidencia se explica una sola vez." />
           <Numero id="r-act" etiqueta="Retención de actividad (días)" valor={b.retencion_actividad_dias} min={7} max={400} onCambio={(n) => set("retencion_actividad_dias", n)} />
           <Numero id="r-err" etiqueta="Retención de errores (días)" valor={b.retencion_errores_dias} min={7} max={730} onCambio={(n) => set("retencion_errores_dias", n)} />
           <Numero id="l-dia" etiqueta="Eventos por día (máx.)" valor={b.limite_eventos_dia} min={100} max={2000000} onCambio={(n) => set("limite_eventos_dia", n)} />
