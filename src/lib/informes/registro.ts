@@ -28,6 +28,7 @@ import { obtenerInformeFacturas } from "./fuentes/facturas";
 import { obtenerInformeVinoFavorito } from "./fuentes/vinoFavorito";
 import { obtenerInformeServicios } from "./fuentes/servicios";
 import { obtenerInformeAuditoria } from "./fuentes/auditoria";
+import { obtenerInformeAccionesWeb } from "./fuentes/accionesWeb";
 import { obtenerInformeCartaFacturas, type TipoCartaFacturas } from "./fuentes/cartaFacturas";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
@@ -145,6 +146,21 @@ export const INFORMES: DefinicionInforme[] = [
     meses: (hoy) => mesesTrafico(hoy),
     mesPorDefecto: mesPorDefectoTrafico,
     generador: { tipo: "componente", cargar: () => import("@/components/informes/generadores/InformeTraficoGenerador") },
+  },
+  {
+    id: "acciones-web-mensual",
+    // 14/11/2026, petición del dueño: «lo que más hacen los clientes» en la web, comparado con el mes anterior.
+    titulo: "Informe mensual de lo que hacen los clientes en la web",
+    descripcion:
+      "Ranking de lo que más hacen los clientes (mirar la carta, abrir un vino, pulsar Reservar, llamar, WhatsApp, cómo llegar, comprar un cheque, buscar…): veces, % de visitas y comparación con el mes anterior. Solo cuenta a quien acepta cookies.",
+    seccion: "web",
+    permiso: { tipo: "superadmin" },
+    periodo: "mes",
+    formatos: ["pdf", "csv"],
+    origen: { etiqueta: "Tráfico web", ruta: "/super-admin/trafico-web" },
+    meses: (hoy) => mesesTrafico(hoy),
+    mesPorDefecto: mesPorDefectoTrafico,
+    generador: { tipo: "tabla", obtener: (periodo) => obtenerInformeAccionesWeb(periodo) },
   },
   {
     id: "rrss-mensual",
