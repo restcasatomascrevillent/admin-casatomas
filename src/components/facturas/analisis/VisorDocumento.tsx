@@ -4,7 +4,9 @@
 //       drive_url    → lo descarga el servidor (Edge Function facturas-original)
 //                      con la cuenta del restaurante: no hace falta sesión de
 //                      Google en el navegador (12/11/2026);
-//       archivo_path → URL firmada de Storage (PDF en <iframe>, foto con zoom).
+//       archivo_path → URL firmada de Storage (foto con zoom).
+//     Los PDF, hoja a hoja con pdf.js (VisorPdf, 13/11/2026): incrustados en
+//     un <iframe> no se veían (CSP) y en el iPad solo salía la primera hoja.
 //     Si no se puede incrustar, quedan los botones para abrirlo.
 //   · Cabecera: proveedor, nº, fecha, tipo, local y total; «Abrir en Drive»
 //     (pestaña nueva) y «Abrir en Compras» (su ficha).
@@ -16,6 +18,8 @@ import { ChevronLeft, ChevronRight, ExternalLink, FileSearch, FileX2, Loader2 } 
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ImagenZoom } from "@/components/facturas/shared/ImagenZoom";
+import { VisorPdf } from "@/components/facturas/shared/VisorPdf";
+import { EnlaceDescargarPdf } from "@/components/facturas/shared/OriginalIncrustado";
 import { formatCurrency, formatEntero, formatImporte } from "@/components/facturas/shared/formatters";
 import { cn } from "@/lib/utils";
 import { urlSegura } from "@/lib/url-segura";
@@ -65,8 +69,14 @@ function OriginalDrive({ doc, titulo }: { doc: DocumentoCifra; titulo: string })
         <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> Cargando el original…
       </div>
     );
+  // PDF hoja a hoja con pdf.js (13/11/2026): el <iframe> con el blob lo bloqueaba la CSP.
   return q.data?.type === "application/pdf" ? (
-    <iframe key={doc.id} src={url} title={`Original: ${titulo}`} className="h-full w-full border-0 bg-muted/30" />
+    <div className="flex min-h-0 flex-1 flex-col gap-1 p-2">
+      <div className="flex shrink-0 justify-end">
+        <EnlaceDescargarPdf url={url} titulo={titulo} />
+      </div>
+      <VisorPdf key={doc.id} fuente={q.data} titulo={`Original: ${titulo}`} className="min-h-0 flex-1" />
+    </div>
   ) : (
     <ImagenZoom key={doc.id} src={url} alt={`Original: ${titulo}`} className="h-full min-h-0 w-full rounded-none border-0" />
   );
@@ -90,7 +100,9 @@ function Original({ doc, titulo }: { doc: DocumentoCifra; titulo: string }) {
         </div>
       );
     return esPdf(doc.archivoPath) ? (
-      <iframe key={doc.id} src={firmada.data} title={`Original: ${titulo}`} className="h-full w-full border-0 bg-muted/30" />
+      <div className="flex min-h-0 flex-1 flex-col p-2">
+        <VisorPdf key={doc.id} fuente={firmada.data} titulo={`Original: ${titulo}`} className="min-h-0 flex-1" />
+      </div>
     ) : (
       <ImagenZoom key={doc.id} src={firmada.data} alt={`Original: ${titulo}`} className="h-full min-h-0 w-full rounded-none border-0" />
     );
