@@ -231,5 +231,5 @@ export function cuerpoSendMessage(chatId: string, texto: string): Record<string,
   return { chat_id: chatId, text: recortar(texto, LIMITE_TELEGRAM), link_preview_options: { is_disabled: true } };
 }
 
-export type Accion = "pendientes" | "resumen" | "probar";
-export const esAccion = (v: unknown): v is Accion => v === "pendientes" || v === "resumen" || v === "probar";
+export type Accion = "pendientes" | "resumen" | "probar" | "fallos";
+export const esAccion = (v: unknown): v is Accion => v === "pendientes" || v === "resumen" || v === "probar" || v === "fallos";
