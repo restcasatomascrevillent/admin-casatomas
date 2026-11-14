@@ -3,17 +3,20 @@ import { describe, expect, it } from "vitest";
 import { normalizarDecision } from "../decision";
 import {
   decisionesDeHoy,
+  enPeriodo,
   explicarAhorro,
   fraseAhorro,
   geometriaPrecio,
   mesesHasta,
   nombreMes,
+  notasComparar,
   partesFraseAhorro,
   proveedorCorto,
   textoDecision,
   VISTA_DE_MODULO,
   VISTAS,
   vistaInicial,
+  type MargenDecision,
 } from "../vistasAnalisis";
 import { MODULOS } from "../widgetsTablero";
 import { RESPUESTA } from "./decisionRespuesta";
@@ -42,38 +45,72 @@ describe("vistas", () => {
 });
 
 describe("Qué decidir hoy", () => {
-  it("las que más dinero mueven, mezcladas y ordenadas por € al mes; sin datos o con menos de 3 €/mes no salen", () => {
-    const l = decisionesDeHoy(dec());
-    // Congelados: +428 € en el mes; percebe 62 €/mes; berberecho 117 €/90 días = 39 €/mes.
-    // Fuera: «Pluma» (sin precios) y el melón (2 €/mes).
-    expect(l.map((x) => x.tipo)).toEqual(["familia", "sube", "mejor"]);
-    expect(l[0]).toMatchObject({ tipo: "familia", exceso: 428 });
-    expect(Math.round(l[2].eurosMes)).toBe(39);
-    expect(decisionesDeHoy(dec(), 2)).toHaveLength(2);
+  const margen = (extra: Partial<MargenDecision> = {}): MargenDecision => ({
+    id: "mg1", canal: "plato", nombre: "Chuletón", valor: 41, limite: 35, coste: 9.8, fecha: "2026-09-20", local: "casa_tomas",
+    precioActual: 26, precioSugerido: 30.5, aplicado: false, enlaceMargenes: "?tab=margenes&articulo=plato:12", ...extra,
+  });
+
+  it("solo subidas, más barato en otro proveedor y poco margen (sin familias); por € al mes y con 10 €/mes como mínimo", () => {
+    const l = decisionesDeHoy(dec(), [margen()]);
+    // Percebe 62 €/mes; berberecho 117 €/90 días = 39 €/mes; el chuletón (margen) al final.
+    // Fuera: «Pluma» (sin precios), el melón (2 €/mes) y la familia de congelados.
+    expect(l.map((x) => x.tipo)).toEqual(["sube", "mejor", "margen"]);
+    expect(Math.round(l[1].eurosMes)).toBe(39);
+    expect(decisionesDeHoy(dec(), [], 1)).toHaveLength(1);
+    // Un margen ya aplicado no sale.
+    expect(decisionesDeHoy(dec(), [margen({ aplicado: true })]).map((x) => x.tipo)).toEqual(["sube", "mejor"]);
+  });
+
+  it("subida de 10 % o menos, o de menos de 10 €/mes: no sale", () => {
+    const d = dec();
+    const s1 = d.cambios.sube[0];
+    const poca = { ...s1, alerta: { ...s1.alerta, datos: { ...s1.alerta.datos, precio: 110, precioRef: 100 } } };
+    const barata = { ...s1, impactoMes: 9.5 };
+    expect(decisionesDeHoy({ ...d, cambios: { ...d.cambios, sube: [poca] } }).map((x) => x.tipo)).toEqual(["mejor"]);
+    expect(decisionesDeHoy({ ...d, cambios: { ...d.cambios, sube: [barata] } }).map((x) => x.tipo)).toEqual(["mejor"]);
   });
 
   it("una subida sin la factura anterior con que compararla (regla de antes: mediana) no sale", () => {
     const d = dec();
     const s1 = d.cambios.sube[0];
     const vieja = { ...s1, alerta: { ...s1.alerta, datos: { ...s1.alerta.datos, fechaRef: null } } };
-    expect(decisionesDeHoy({ ...d, cambios: { ...d.cambios, sube: [vieja] } }).map((x) => x.tipo)).toEqual(["familia", "mejor"]);
+    expect(decisionesDeHoy({ ...d, cambios: { ...d.cambios, sube: [vieja] } }).map((x) => x.tipo)).toEqual(["mejor"]);
   });
 
-  it("textos para todos: qué ha pasado (con la factura y la anterior), por qué importa y qué hacer", () => {
-    const [fam, sube, mejor] = decisionesDeHoy(dec());
-    const ts = textoDecision(sube, null);
-    expect(ts.titulo).toBe("Percebe ha subido un 29 % en Cetárea Angelmar");
-    expect(ts.quePasa).toBe("En la factura del 03/10 lo pagaste a 140,00 €/kg. En la anterior (19/09) estaba a 108,50 €/kg: 31,50 € más por cada kilo.");
-    expect(ts.porQue).toBe("Compras unos 2,3 kg al mes: te cuesta unos 62 € más al mes.");
-    expect(ts.queHacer).toMatch(/^Pregunta a Cetárea Angelmar por qué ha subido/);
+  it("el filtro de fechas cambia TODA la lista: lo de fuera del periodo no sale", () => {
+    const d = dec();
+    const oct = { ...d, periodo: { ...d.periodo, desde: "2026-10-01", hasta: "2026-10-31" } };
+    expect(decisionesDeHoy(oct, [margen()])).toEqual([]);
+    expect(enPeriodo(null, oct.periodo)).toBe(true);
+  });
+
+  it("el mismo producto sale una vez (el aviso que más dinero mueve), aunque venga en otra unidad", () => {
+    const d = dec();
+    const s1 = d.cambios.sube[0];
+    const otraUnidad = { ...s1, impactoMes: 20, alerta: { ...s1.alerta, id: "s1b", datos: { ...s1.alerta.datos, medida: "ud" } } };
+    const l = decisionesDeHoy({ ...d, cambios: { ...d.cambios, sube: [otraUnidad, s1] } });
+    expect(l.filter((x) => x.tipo === "sube").map((x) => x.id)).toEqual(["s1"]);
+  });
+
+  it("cada aviso en tres líneas: qué pasa / la factura frente a la anterior / cuánto al mes; la media de 90 días, aparte", () => {
+    const [sube, mejor, mg] = decisionesDeHoy(dec(), [margen()]);
+    const ts = textoDecision(sube);
+    expect(ts.titulo).toBe("Percebe te ha subido un 29 % en Cetárea Angelmar.");
+    expect(ts.detalle).toBe("Factura del 26/09: 140,00 €/kg. En la anterior (12/09) lo pagabas a 108,50 €/kg.");
+    expect(ts.cuanto).toBe("Son unos 62 € más al mes.");
+    expect(ts.contexto).toBe("Lo normal en los últimos 90 días: 112,00 €/kg.");
+    expect(ts.sinRevisar).toBe(true);
     expect(ts.euros).toBe("+62 €/mes");
-    const tm = textoDecision(mejor, null);
-    expect(tm.titulo).toBe("Berberecho: Casimiro Pérez te lo vende más barato");
-    expect(tm.quePasa).toBe("En tu última factura de Cetárea Angelmar (10/10) lo pagaste a 35,50 €/kg. Casimiro Pérez, en su última factura (29/09), te lo cobró a 29,00 €/kg: 6,50 € menos por cada kilo.");
-    expect(tm.porQue).toBe("En los últimos 90 días compraste unos 18 kg: habrías ahorrado unos 117 €.");
-    const tf = textoDecision(fam, "septiembre");
-    expect(tf.titulo).toBe("Congelados: gastas más de lo normal");
-    expect(tf.quePasa).toMatch(/^En septiembre has gastado .* € en congelados\. Lo normal \(la media de los meses anteriores\) es .* €: son 428 € más/);
+    const tm = textoDecision(mejor);
+    expect(tm.titulo).toBe("Berberecho: Casimiro Pérez te lo vende más barato.");
+    expect(tm.detalle).toBe("Cetárea Angelmar (28/09): 35,50 €/kg. Casimiro Pérez (20/09): 29,00 €/kg.");
+    expect(tm.cuanto).toMatch(/^Ahorrarías unos 39 € al mes/);
+    expect(tm.sinRevisar).toBe(false);
+    const tg = textoDecision(mg);
+    expect(tg.titulo).toBe("El plato «Chuletón» te deja poco margen.");
+    expect(tg.cuanto).toBe("Para volver a tu límite, ponlo a 30,50 € en la carta.");
+    expect(notasComparar(sube)?.map((n) => n.etiqueta)).toEqual(["Factura nueva", "Factura anterior"]);
+    expect(notasComparar(sube)?.[1].linea).toBe("PERCEBE GALLEGO G: 108,50 €/kg");
   });
 
   it("el nombre del proveedor sin «S.L.U.», «S.A.»…", () => {
@@ -84,11 +121,9 @@ describe("Qué decidir hoy", () => {
     expect(proveedorCorto(null)).toBe("el proveedor");
   });
 
-  it("con «Año» (último mes completo) la familia se cuenta por mes, no dividida por todo el año", () => {
+  it("«comparado» de la RPC (Año, Todo) se sigue leyendo", () => {
     const d = normalizarDecision({ ...RESPUESTA, periodo: { ...RESPUESTA.periodo, meses_equivalentes: 10, comparado: { modo: "ultimo_mes", desde: "2026-09-01", hasta: "2026-09-30" } } });
     expect(d.periodo.comparado).toEqual({ modo: "ultimo_mes", desde: "2026-09-01", hasta: "2026-09-30" });
-    expect(decisionesDeHoy(d)[0]).toMatchObject({ tipo: "familia", eurosMes: 428 });
-    // Sin «comparado» (RPC de antes): null.
     expect(dec().periodo.comparado).toBeNull();
   });
 });

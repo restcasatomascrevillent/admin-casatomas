@@ -78,6 +78,10 @@ export interface DatosAlerta {
   /** Más barato en otro proveedor: el más barato y su precio. */
   proveedorOtro: string | null;
   precioOtro: number | null;
+  /** 20261130200000: mediana de 90 días (solo contexto, en pequeño). */
+  precioContexto: number | null;
+  /** 20261130200000: la factura del aviso ya está revisada (null = no se sabe). */
+  facturaVerificada: boolean | null;
 }
 
 export interface AlertaFacturas {
@@ -150,6 +154,8 @@ export function normalizarAlertas(data: unknown): AlertaFacturas[] {
         ahorro: num(d.ahorro),
         proveedorOtro: txt(d.proveedor_otro),
         precioOtro: num(d.precio_otro),
+        precioContexto: num(d.precio_contexto),
+        facturaVerificada: typeof d.factura_verificada === "boolean" ? d.factura_verificada : null,
       },
     });
   }

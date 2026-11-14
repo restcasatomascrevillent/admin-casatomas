@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 
 /**
  * «Aplicar el precio sugerido» (14/11/2026, petición del dueño): el aviso de Telegram «Margen bajo» trae un
@@ -96,7 +97,9 @@ export default function AplicarPrecio() {
       if (error) throw new Error(error.message);
       return data as { nombre: string; antes: number | null; precio: number };
     },
-    onSuccess: () => {
+    onSuccess: (r) => {
+      // 14/11/2026: el precio nuevo se publica también en la web (como al guardar en la carta).
+      notificarGuardadoYPublicacion(s?.canal === "vino" ? "vino" : "plato", `«${r.nombre}» ya cuesta ${eur(r.precio)} en la carta`);
       void qc.invalidateQueries({ queryKey: ["aviso-precio-sugerido", avisoId] });
     },
     onSettled: () => setConfirmando(false),

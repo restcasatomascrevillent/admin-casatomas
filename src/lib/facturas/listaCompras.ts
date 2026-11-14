@@ -180,7 +180,7 @@ export function listaDesdeCompletos(facturas: Factura[], albaranes: Factura[]): 
 /**
  * Avisos de una fila de la lista: los guardados más el de precio atípico (para contarlos y filtrar).
  * Un documento VERIFICADO no tiene avisos pendientes (08/11/2026): quien lo verifica ya los ha
- * visto; la ficha los sigue enseñando por si hay que volver a ellos.
+ * visto. Tampoco en la FICHA (14/11/2026, dueño: «al marcarla Revisada desaparecen y no vuelven»).
  */
 export function avisosCabecera(
   d: Pick<CabeceraDocumento, "alertas" | "precio_atipico"> & { verificada?: boolean },
@@ -191,6 +191,7 @@ export function avisosCabecera(
 
 /** Avisos de la FICHA (documento completo): los guardados y, si alguna línea pasa del doble de su media, el de precio. */
 export function avisosFicha(doc: Factura): AlertaValidacion[] {
+  if (doc.verificada) return [];
   return avisosDocumento(doc, [], (d) => d.productos.some((p) => precioAnomalo(p.precio_unitario, p.media_referencia ?? undefined)));
 }
 

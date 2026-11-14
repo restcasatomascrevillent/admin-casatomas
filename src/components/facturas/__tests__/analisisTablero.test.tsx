@@ -878,23 +878,25 @@ describe("Análisis en una pantalla: vistas con las gráficas de decisión", () 
     expect(screen.queryByRole("button", { name: /añadir o quitar módulos/i })).not.toBeInTheDocument();
   });
 
-  it("«Qué decidir hoy» (por defecto): las 5 que más dinero mueven, con sus botones; «Ver precio» abre «Precios» con esa subida", async () => {
+  it("«Qué decidir hoy» (por defecto): subidas y más barato en otro proveedor (sin familias), en tres líneas y con sus botones; «Ver precio» abre «Precios» con esa subida", async () => {
     montar();
     const lista5 = await screen.findByRole("list", { name: "Decisiones, de más a menos dinero" });
     expect(screen.getByTestId("caja-decidir")).toContainElement(lista5);
     const filas = within(lista5).getAllByRole("listitem");
-    expect(filas.map((f) => f.dataset.decision)).toEqual(["familia", "sube", "mejor"]);
-    expect(filas[0]).toHaveTextContent(/Congelados: gastas más de lo normal/);
-    expect(filas[0]).toHaveTextContent("+428 €");
-    expect(filas[1]).toHaveTextContent(/Percebe ha subido un 29 % en Cetárea Angelmar/);
-    expect(filas[1]).toHaveTextContent(/Qué ha pasado: En la factura del 03\/10 lo pagaste a 140,00 €\/kg\. En la anterior \(19\/09\) estaba a 108,50 €\/kg/);
-    expect(filas[1]).toHaveTextContent(/Por qué importa: .*62 € más al mes.*Qué puedes hacer: Pregunta a Cetárea Angelmar/);
-    expect(filas[1]).toHaveTextContent("+62 €/mes");
-    expect(filas[2]).toHaveTextContent(/Berberecho: Casimiro Pérez te lo vende más barato.*6,50 € menos por cada kilo.*ahorras 117 €/);
-    expect(within(filas[0]).getByRole("button", { name: "Ver qué se compró" })).toBeInTheDocument();
-    expect(within(filas[2]).getByRole("button", { name: "Comparar facturas" })).toBeInTheDocument();
-    expect(within(filas[2]).getByRole("button", { name: "No es lo mismo" })).toBeInTheDocument();
-    fireEvent.click(within(filas[1]).getByRole("button", { name: "Ver precio" }));
+    expect(filas.map((f) => f.dataset.decision)).toEqual(["sube", "mejor"]);
+    expect(filas[0]).toHaveTextContent(/Percebe te ha subido un 29 % en Cetárea Angelmar\./);
+    expect(filas[0]).toHaveTextContent(/Factura del 26\/09: 140,00 €\/kg\. En la anterior \(12\/09\) lo pagabas a 108,50 €\/kg\./);
+    expect(filas[0]).toHaveTextContent(/Son unos 62 € más al mes\./);
+    expect(filas[0]).toHaveTextContent(/Lo normal en los últimos 90 días: 112,00 €\/kg/);
+    expect(filas[0]).toHaveTextContent("+62 €/mes");
+    // Viene de una factura sin revisar: lo dice y deja revisarla.
+    expect(within(filas[0]).getByTestId("sin-revisar")).toBeInTheDocument();
+    expect(within(filas[0]).getByRole("button", { name: "Revisar factura" })).toBeInTheDocument();
+    expect(filas[1]).toHaveTextContent(/Berberecho: Casimiro Pérez te lo vende más barato\..*Ahorrarías unos 39 € al mes/);
+    expect(within(filas[1]).queryByRole("button", { name: "Revisar factura" })).not.toBeInTheDocument();
+    expect(within(filas[1]).getByRole("button", { name: "Ver las dos facturas" })).toBeInTheDocument();
+    expect(within(filas[1]).getByRole("button", { name: "No es lo mismo" })).toBeInTheDocument();
+    fireEvent.click(within(filas[0]).getByRole("button", { name: "Ver precio" }));
     const vistas = screen.getByRole("group", { name: "Vista del análisis" });
     expect(within(vistas).getByRole("button", { name: "Precios" })).toHaveAttribute("aria-pressed", "true");
     expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Precios que han subido/ })).toHaveAttribute("aria-pressed", "true");
@@ -925,7 +927,7 @@ describe("Análisis en una pantalla: vistas con las gráficas de decisión", () 
     });
     montar();
     const lista5 = await screen.findByRole("list", { name: "Decisiones, de más a menos dinero" });
-    fireEvent.click(within(within(lista5).getAllByRole("listitem")[1]).getByRole("button", { name: "Ver precio" }));
+    fireEvent.click(within(within(lista5).getAllByRole("listitem")[0]).getByRole("button", { name: "Ver precio" }));
     fireEvent.click(screen.getByRole("button", { name: "Lo más comprado" }));
     const det = screen.getByTestId("caja-precio-detalle");
     expect(within(det).getByTestId("precio-un-solo-mes")).toHaveTextContent(/Solo 1 mes con compras: 203,98 €\/barril en septiembre 2026 en Catral\. Sin IVA/);
@@ -973,13 +975,18 @@ describe("Análisis en una pantalla: vistas con las gráficas de decisión", () 
     doble.rpcs.facturas_decision = () => ({ ...RESPUESTA, cambios: { ...RESPUESTA.cambios, sube: [{ ...s1, doc_otro: anterior }, ...resto] } });
     montar();
     const lista5 = await screen.findByRole("list", { name: "Decisiones, de más a menos dinero" });
-    const fila = within(lista5).getAllByRole("listitem")[1];
-    expect(fila).toHaveTextContent(/Percebe ha subido/);
+    const fila = within(lista5).getAllByRole("listitem")[0];
+    expect(fila).toHaveTextContent(/Percebe te ha subido/);
     expect(within(fila).queryByRole("button", { name: "Ver factura" })).not.toBeInTheDocument();
-    fireEvent.click(within(fila).getByRole("button", { name: "Comparar facturas" }));
+    fireEvent.click(within(fila).getByRole("button", { name: "Ver las dos facturas" }));
     const visor = await screen.findByTestId("visor-documento");
     expect(within(visor).getByText("1 de 2")).toBeInTheDocument();
     expect(within(visor).getByTitle(/^Factura 260401/)).toBeInTheDocument();
+    // Cada una marcada, con la línea del producto resaltada.
+    expect(within(visor).getByTestId("visor-etiqueta")).toHaveTextContent("Factura anterior");
+    expect(within(visor).getByTestId("visor-linea")).toHaveTextContent("PERCEBE GALLEGO G: 108,50 €/kg");
+    fireEvent.click(within(visor).getByRole("button", { name: "Documento siguiente" }));
+    expect(within(visor).getByTestId("visor-etiqueta")).toHaveTextContent("Factura nueva");
   });
 
   it("bug del dueño: con «Año» sin meses anteriores, «¿En qué se va el dinero?» compara el último mes completo y lo explica", async () => {

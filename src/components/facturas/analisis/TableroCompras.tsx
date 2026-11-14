@@ -604,7 +604,7 @@ export function TableroCompras({
               decision={dec}
               pendiente={pendiente}
               onIrA={onIrA}
-              onVerFamilia={(f) => docsFamilia(f)}
+              local={local}
               onVerPrecio={(id) => {
                 setPrecioElegido(`a:${id}`);
                 irAVista("precios");

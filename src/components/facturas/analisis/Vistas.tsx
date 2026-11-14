@@ -1,5 +1,5 @@
 // Piezas nuevas de Facturas › Análisis en una pantalla (maqueta del dueño, 07/11/2026):
-//   · QueDecidirHoy        las 5 decisiones que más dinero mueven (vista por defecto);
+//   · QueDecidirHoy        subidas, más barato en otro proveedor y poco margen (vista por defecto);
 //   · PreciosMaestroDetalle lista de subidas / bajadas / pactados / lo más comprado a la
 //                          izquierda y la gráfica del precio del elegido a la derecha;
 //   · AhorroExplicado      «¿Dónde puedo ahorrar?» con las dos barras y la frase;
@@ -11,12 +11,14 @@ import { AlertTriangle, ArrowUp, Check, Euro, FileText, Handshake, LineChart, X 
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatEntero, plural } from "@/components/facturas/shared/formatters";
 import { resumenCortoAlerta, tituloCortoAlerta } from "@/lib/facturas/alertas";
-import { textoPctCorto, type CambioPrecio, type DecisionFacturas, type FamiliaDecision, type ProductoTop } from "@/lib/facturas/decision";
-import { decisionesDeHoy, explicarAhorro, geometriaPrecio, nombreMes, partesFraseAhorro, mesesHasta, textoDecision, type PuntoPrecio, type TextoDecision } from "@/lib/facturas/vistasAnalisis";
+import { textoPctCorto, type CambioPrecio, type DecisionFacturas, type ProductoTop } from "@/lib/facturas/decision";
+import { decisionesDeHoy, explicarAhorro, geometriaPrecio, nombreMes, notasComparar, partesFraseAhorro, mesesHasta, textoDecision, type MargenDecision, type PuntoPrecio, type TextoDecision } from "@/lib/facturas/vistasAnalisis";
 import { FILTROS_VACIOS, parametrosExplorar, type LocalRpc } from "@/lib/facturas/explorador";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
 import { useExplorarCompras } from "@/hooks/useExplorarCompras";
 import { useAccionDecision } from "@/hooks/useDecisionFacturas";
+import { useCambiarPrecioCarta, useMargenesDecidir } from "@/hooks/useMargenesDecidir";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { usePuedeEditarFacturas } from "./edicionFacturas";
 import { BOTON, Chip, useVisor } from "./Decision";
 import { FOCO, SinDatos } from "./piezas";
@@ -63,73 +65,85 @@ export function Caja({
   );
 }
 
+// ─── Qué decidir hoy ────────────────────────────────────────────────────────
+
 const ICONO_TONO = {
   sube: "bg-red-500/10 text-red-700 dark:text-red-400",
   mejor: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  familia: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
+  margen: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
 } as const;
 
-// ─── Qué decidir hoy ────────────────────────────────────────────────────────
+const enlaceRevisar = (id: number) => `?tab=compras&modo=documentos&doc=${id}`;
 
 export function QueDecidirHoy({
   decision,
   pendiente,
   onVerPrecio,
-  onVerFamilia,
   onIrA,
+  local = null,
 }: {
   decision: DecisionFacturas;
   pendiente?: boolean;
   /** Lleva a la vista «Precios» con esa subida elegida. */
   onVerPrecio: (idAlerta: string) => void;
-  /** Los documentos de esa familia en el tramo comparado. */
-  onVerFamilia: (f: FamiliaDecision) => void;
   onIrA?: (enlace: string) => void;
+  /** Casa Tomás y Touza por separado: los avisos de margen son de la carta de Casa Tomás. */
+  local?: "casa_tomas" | "touza" | null;
 }) {
   const puedeEditar = usePuedeEditarFacturas();
   const accion = useAccionDecision();
+  const margenesQ = useMargenesDecidir(local !== "touza");
+  const cambiarPrecio = useCambiarPrecioCarta();
+  const [confirmar, setConfirmar] = useState<MargenDecision | null>(null);
   const { abrir, visor } = useVisor(onIrA);
-  const lista = useMemo(() => decisionesDeHoy(decision), [decision]);
-  const ocupado = pendiente || accion.isPending;
-  const mesComparado = decision.periodo.comparado?.modo === "ultimo_mes" ? nombreMes(decision.periodo.comparado.desde) : null;
+  const lista = useMemo(() => decisionesDeHoy(decision, local === "touza" ? [] : (margenesQ.data ?? [])), [decision, local, margenesQ.data]);
+  const ocupado = pendiente || accion.isPending || cambiarPrecio.isPending;
   return (
     <Caja
       titulo="Qué decidir hoy"
-      subtitulo="Las 5 cosas que más dinero te mueven. Cada precio se compara con la última factura. Precios sin IVA."
+      subtitulo="Lo que más dinero te mueve en las fechas elegidas: precios que suben, cosas más baratas en otro proveedor y platos o vinos con poco margen. Precios de compra sin IVA."
       testId="caja-decidir"
     >
       {lista.length === 0 ? (
-        <SinDatos>Nada que decidir hoy: en las últimas facturas ningún precio ha subido de más, nada sale más barato en otro proveedor que ya usas y el gasto va como siempre.</SinDatos>
+        <SinDatos>Nada que decidir: en estas fechas ningún precio ha subido de más, nada sale más barato en otro proveedor que ya usas y la carta va bien de margen.</SinDatos>
       ) : (
         <ol aria-label="Decisiones, de más a menos dinero">
           {lista.map((x) => {
-            const t = textoDecision(x, mesComparado);
-            if (x.tipo === "familia") {
-              const f = x.familia;
+            const t = textoDecision(x);
+            if (x.tipo === "margen") {
+              const m = x.margen;
               return (
-                <Fila key={x.id} tipo="familia" texto={t}>
-                  {!pendiente && f.id !== null && (
-                    <button type="button" className={cn(BOTON, FOCO)} onClick={() => onVerFamilia(f)}>
-                      <FileText className="h-3.5 w-3.5" aria-hidden /> Ver qué se compró
+                <Fila key={x.id} tipo="margen" texto={t}>
+                  {!pendiente && m.precioSugerido !== null && (
+                    <button type="button" className={cn(BOTON, FOCO)} disabled={ocupado} onClick={() => setConfirmar(m)}>
+                      <Euro className="h-3.5 w-3.5" aria-hidden /> Cambiar precio en carta
                     </button>
                   )}
-                  {!pendiente && puedeEditar && f.alerta && (
-                    <button type="button" className={cn(BOTON, FOCO)} disabled={ocupado} onClick={() => accion.mutate({ tipo: "es_normal", id: f.alerta!.id })}>
-                      <X className="h-3.5 w-3.5" aria-hidden /> Es normal
+                  {!pendiente && onIrA && m.enlaceMargenes && (
+                    <button type="button" className={cn(BOTON, FOCO)} onClick={() => onIrA(m.enlaceMargenes!)}>
+                      <LineChart className="h-3.5 w-3.5" aria-hidden /> Ver en Márgenes
                     </button>
                   )}
                 </Fila>
               );
             }
             const c = x.cambio;
+            const notas = notasComparar(x);
+            const docRevisar = t.sinRevisar ? (c.doc?.id ?? c.alerta.datos.facturaId) : null;
+            const revisar = !pendiente && docRevisar !== null && onIrA && (
+              <button type="button" className={cn(BOTON, FOCO)} onClick={() => onIrA(enlaceRevisar(docRevisar))}>
+                <Check className="h-3.5 w-3.5" aria-hidden /> Revisar factura
+              </button>
+            );
             if (x.tipo === "mejor") {
               return (
                 <Fila key={x.id} tipo="mejor" texto={t}>
                   {!pendiente && (c.doc || c.docOtro) && (
-                    <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc, c.docOtro])}>
-                      <FileText className="h-3.5 w-3.5" aria-hidden /> Comparar facturas
+                    <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc, c.docOtro], notas ?? undefined)}>
+                      <FileText className="h-3.5 w-3.5" aria-hidden /> Ver las dos facturas
                     </button>
                   )}
+                  {revisar}
                   {!pendiente && puedeEditar && (
                     <button type="button" className={cn(BOTON, FOCO)} disabled={ocupado} onClick={() => accion.mutate({ tipo: "es_normal", id: c.alerta.id })}>
                       <X className="h-3.5 w-3.5" aria-hidden /> No es lo mismo
@@ -141,16 +155,18 @@ export function QueDecidirHoy({
             return (
               <Fila key={x.id} tipo="sube" texto={t}>
                 {!pendiente && c.doc && c.docOtro ? (
-                  <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.docOtro, c.doc])}>
-                    <FileText className="h-3.5 w-3.5" aria-hidden /> Comparar facturas
+                  <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.docOtro, c.doc], notas ? [notas[1], notas[0]] : undefined)}>
+                    <FileText className="h-3.5 w-3.5" aria-hidden /> Ver las dos facturas
                   </button>
                 ) : (
-                  !pendiente && c.doc && (
-                    <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc])}>
+                  !pendiente &&
+                  c.doc && (
+                    <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc], notas ? [notas[0]] : undefined)}>
                       <FileText className="h-3.5 w-3.5" aria-hidden /> Ver factura
                     </button>
                   )
                 )}
+                {revisar}
                 {!pendiente && (
                   <button type="button" className={cn(BOTON, FOCO)} onClick={() => onVerPrecio(c.alerta.id)}>
                     <LineChart className="h-3.5 w-3.5" aria-hidden /> Ver precio
@@ -167,33 +183,49 @@ export function QueDecidirHoy({
         </ol>
       )}
       {visor}
+      <AlertDialog open={!!confirmar} onOpenChange={(o) => !o && setConfirmar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cambiar el precio en la carta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmar &&
+                `«${confirmar.nombre}» pasará de ${confirmar.precioActual !== null ? `${precio2(confirmar.precioActual)} €` : "su precio de ahora"} a ${precio2(confirmar.precioSugerido)} € (con IVA, lo que paga el cliente). Queda apuntado en el historial de precios y se publica en la web.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmar) cambiarPrecio.mutate(confirmar);
+                setConfirmar(null);
+              }}
+            >
+              Sí, cambiar el precio
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Caja>
   );
 }
 
-function Fila({ tipo, texto, children }: { tipo: "sube" | "mejor" | "familia"; texto: TextoDecision; children: ReactNode }) {
+function Fila({ tipo, texto, children }: { tipo: "sube" | "mejor" | "margen"; texto: TextoDecision; children: ReactNode }) {
   const Icono = tipo === "sube" ? ArrowUp : tipo === "mejor" ? Euro : AlertTriangle;
   return (
     <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 border-t border-border/60 py-2.5 first:border-t-0 first:pt-0" data-decision={tipo}>
       <span className={cn("grid h-7 w-7 place-items-center rounded-lg", ICONO_TONO[tipo])} aria-hidden>
         <Icono className="h-3.5 w-3.5" />
       </span>
-      <div className="min-w-0">
-        <p className="text-sm font-medium leading-snug [overflow-wrap:anywhere]">{texto.titulo}</p>
-        <dl className="mt-1 space-y-0.5 text-xs leading-snug text-muted-foreground [overflow-wrap:anywhere]">
-          <div>
-            <dt className="inline font-medium text-foreground/80">Qué ha pasado: </dt>
-            <dd className="inline">{texto.quePasa}</dd>
-          </div>
-          <div>
-            <dt className="inline font-medium text-foreground/80">Por qué importa: </dt>
-            <dd className="inline">{texto.porQue}</dd>
-          </div>
-          <div>
-            <dt className="inline font-medium text-foreground/80">Qué puedes hacer: </dt>
-            <dd className="inline">{texto.queHacer}</dd>
-          </div>
-        </dl>
+      <div className="min-w-0 [overflow-wrap:anywhere]">
+        <p className="text-sm font-medium leading-snug">{texto.titulo}</p>
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{texto.detalle}</p>
+        <p className="text-xs font-medium leading-snug text-foreground/90">{texto.cuanto}</p>
+        {texto.contexto && <p className="text-[11px] leading-snug text-muted-foreground/80">{texto.contexto}</p>}
+        {texto.sinRevisar && (
+          <p className="mt-0.5 text-[11px] font-medium leading-snug text-amber-700 dark:text-amber-400" data-testid="sin-revisar">
+            Viene de una factura sin revisar: compruébala antes de decidir.
+          </p>
+        )}
       </div>
       <span className="whitespace-nowrap text-right text-sm font-medium tabular-nums">{texto.euros}</span>
       <div className="col-start-2 col-end-4 flex flex-wrap gap-1.5">{children}</div>

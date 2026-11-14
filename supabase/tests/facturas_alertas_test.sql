@@ -21,6 +21,8 @@ set client_encoding = 'UTF8';
 --   T4 activas: sin permiso de Facturas, nada; con un usuario del panel con
 --      permiso, las vigentes con su enlace; filtro de periodo y de local.
 --   T5 rendimiento: candidatas sobre los datos reales en < 3 s (en la demo ~0,5 s).
+--   T6 20261130200000: marca de recálculo y cron; Casa Tomás y Touza por separado;
+--      factura_verificada; un revisado no es «posible duplicado»; revisar quita la marca.
 begin;
 
 do $$
@@ -220,6 +222,51 @@ begin
     raise notice 'T4: no hay ninguna sesión de un usuario con permiso de Facturas; parte de usuario saltada';
   end if;
   perform set_config('request.jwt.claims', null, true);
+
+  -- T6 20261130200000_decidir_hoy_recalculo ───────────────────────────────
+  -- Cambiar facturas o líneas deja la marca para recalcular (y el cron espera a que acaben).
+  if not exists (select 1 from facturas_alertas_recalculo_cola) then
+    raise exception 'FALLO T6: insertar facturas no deja la marca de recálculo';
+  end if;
+  if (public.facturas_alertas_recalcular_pendiente(interval '1 hour') ->> 'motivo') is distinct from 'esperando' then
+    raise exception 'FALLO T6: recalcula sin esperar a que acaben de cargar';
+  end if;
+  if (select count(*) from cron.job where jobname = 'facturas-alertas-recalculo') <> 1 then
+    raise exception 'FALLO T6: el cron facturas-alertas-recalculo no está instalado una vez';
+  end if;
+  -- Vuelve la subida de la merluza (13 €) y Touza compra merluza a 10 € después: no se mezclan.
+  update productos_factura set precio_unitario = 13, total = 26 where factura_id = v_fsub and nombre = 'PRUEBA MERLUZA ALERTAS';
+  insert into facturas (tipo, proveedor, cif, proveedor_id, numero_documento, fecha, subtotal, iva, total, local)
+  values ('factura', 'PRUEBA ALERTAS MAYORISTA', 'B00000731', v_p1, 'ALR-TOUZA-1', '2031-03-22', 20, 0, 20, 'touza') returning id into v_f;
+  insert into productos_factura (factura_id, nombre, cantidad, unidad, precio_unitario, total)
+  values (v_f, 'PRUEBA MERLUZA ALERTAS', 2, 'kg', 10, 20);
+  drop table if exists _c6;
+  create temp table _c6 on commit drop as select * from public.facturas_alertas_candidatas('2031-03-25');
+  if not exists (select 1 from _c6 where tipo = 'facturas_precio_sube' and datos ->> 'producto' = 'PRUEBA MERLUZA ALERTAS'
+                  and datos ->> 'local' = 'casa_tomas' and (datos ->> 'factura_id')::bigint = v_fsub
+                  and datos ->> 'factura_verificada' = 'false') then
+    raise exception 'FALLO T6: la compra de Touza tapa la subida de Casa Tomás (o falta factura_verificada): %',
+      (select jsonb_agg(to_jsonb(c)) from _c6 c where c.tipo = 'facturas_precio_sube');
+  end if;
+  -- Mismo día y total, uno sin número: posible duplicado; revisado uno, ya no.
+  insert into facturas (tipo, proveedor, cif, proveedor_id, numero_documento, fecha, total, local)
+  values ('factura', 'PRUEBA ALERTAS NUEVO', 'B00000732', v_p2, 'DUP-777', '2031-03-11', 70, 'casa_tomas'),
+         ('factura', 'PRUEBA ALERTAS NUEVO', 'B00000732', v_p2, '', '2031-03-11', 70, 'casa_tomas');
+  v_n := coalesce((select (datos ->> 'cuantos')::int from public.facturas_alertas_candidatas('2031-03-25') where clave like 'duplicados:%'), 0);
+  if v_n < 1 then
+    raise exception 'FALLO T6: no sale el posible duplicado';
+  end if;
+  update facturas set verificada = true, verificacion_origen = 'manual' where proveedor_id = v_p2 and numero_documento = '' and fecha = '2031-03-11' and total = 70;
+  if coalesce((select (datos ->> 'cuantos')::int from public.facturas_alertas_candidatas('2031-03-25') where clave like 'duplicados:%'), 0) <> v_n - 1 then
+    raise exception 'FALLO T6: un documento revisado sigue contando como posible duplicado';
+  end if;
+  -- Al revisar la factura de la subida: el aviso se queda, sin la marca «sin revisar».
+  perform public.facturas_generar_alertas('2031-03-25');
+  update facturas set verificada = true, verificacion_origen = 'manual' where id = v_fsub;
+  if not exists (select 1 from notificaciones_dashboard where tipo = 'facturas_precio_sube' and (datos ->> 'factura_id')::bigint = v_fsub
+                  and (caduca_en is null or caduca_en > now()) and datos ->> 'factura_verificada' = 'true') then
+    raise exception 'FALLO T6: al revisar la factura, la subida desaparece o sigue «sin revisar»';
+  end if;
 
   -- T5 rendimiento ─────────────────────────────────────────────────────────
   v_t := clock_timestamp();
