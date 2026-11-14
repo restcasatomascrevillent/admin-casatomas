@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, Bot, Coins, Loader2 } from "lucide-react";
 import { useCostePorUso } from "@/hooks/useCostePorUso";
 import { type FilaCostePorUso, costesPorAccion, plural, textoCosteUso, totalesIa, ventanasIa } from "@/lib/costesServicios";
-import { textoMes } from "@/lib/informeServicios";
+import { textoMes, textoMesCorto } from "@/lib/informeServicios";
 import { formatearEur } from "@/lib/servicios";
 import { cn } from "@/lib/utils";
 import { Bloque } from "./Bloque";
@@ -19,11 +19,11 @@ function Aviso({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** «0,6 céntimos por documento», «gratis por foto», «sin datos». */
+/** «0,6 céntimos por documento», «gratis (en nuestro servidor)», «sin datos». */
 function costePorUso(f: FilaCostePorUso, eurPorUsd: number): string {
   if (f.usosConCoste === 0) return "sin datos";
   const texto = textoCosteUso(f.medianaUsd, eurPorUsd, f.servidorPropio).replace(/^≈ /, "");
-  return `${texto} por ${f.unidad}`;
+  return (f.medianaUsd ?? 0) <= 0 ? texto : `${texto} por ${f.unidad}`;
 }
 
 interface Props {
@@ -137,7 +137,7 @@ export function IaPorFuncion({ eurPorUsd, hoy: hoyProp }: Props) {
                         <th scope="col" className="px-3 py-2 text-left font-medium">Qué hace</th>
                         <th scope="col" className="px-3 py-2 text-right font-medium">Llamadas este mes</th>
                         <th scope="col" className="px-3 py-2 text-right font-medium">Coste</th>
-                        <th scope="col" className="px-3 py-2 text-right font-medium">{mesAnteriorTexto.replace(/ de \d{4}$/, "")}</th>
+                        <th scope="col" className="px-3 py-2 text-right font-medium">{textoMesCorto(v.anterior.mes).replace(/ \d{4}$/, "")}</th>
                         <th scope="col" className="px-3 py-2 text-right font-medium">Coste por uso</th>
                       </tr>
                     </thead>
@@ -169,7 +169,7 @@ export function IaPorFuncion({ eurPorUsd, hoy: hoyProp }: Props) {
                         <th scope="row" className="px-3 py-2 text-left font-semibold">Total</th>
                         <td className="px-3 py-2 text-right tabular-nums">{entero(totales.llamadas)}</td>
                         <td className="px-3 py-2 text-right font-bold tabular-nums" data-testid="ia-total">{formatearEur(totales.costeUsd * eurPorUsd)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{anterior ? formatearEur(totalesIa(anterior).costeUsd * eurPorUsd) : "—"}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{anterior?.length ? formatearEur(totalesIa(anterior).costeUsd * eurPorUsd) : "—"}</td>
                         <td />
                       </tr>
                     </tfoot>

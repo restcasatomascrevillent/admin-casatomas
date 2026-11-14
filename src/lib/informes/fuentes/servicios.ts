@@ -41,7 +41,11 @@ function tablasIa(ia: FilaCostePorUso[], iaAnterior: FilaCostePorUso[] | null, e
   if (ia.length === 0) return [];
   const t = totalesIa(ia);
   const porUso = (f: FilaCostePorUso) =>
-    f.usosConCoste === 0 ? null : `${textoCosteUso(f.medianaUsd, eurPorUsd, f.servidorPropio).replace(/^≈ /, "")} por ${f.unidad}`;
+    f.usosConCoste === 0
+      ? null
+      : (f.medianaUsd ?? 0) <= 0
+        ? textoCosteUso(f.medianaUsd, eurPorUsd, f.servidorPropio)
+        : `${textoCosteUso(f.medianaUsd, eurPorUsd, f.servidorPropio).replace(/^≈ /, "")} por ${f.unidad}`;
   const mesLargo = textoMesLargo(`${mes}-01`);
   const acciones = costesPorAccion({ actual: ia, anterior: iaAnterior, eurPorUsd, textoMes: mesLargo, textoMesAnterior: textoMesLargo(mesAnterior(`${mes}-01`)) });
   return [
