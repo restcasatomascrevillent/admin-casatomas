@@ -18,7 +18,7 @@
 import { sanearPila, sanearTexto } from "../_shared/logs-web/saneado.ts";
 import { marcoPrincipal } from "../_shared/logs-web/huella.ts";
 import { causaConocida, type CausaConocida } from "../_shared/logs-web/causas.ts";
-import { aQuienAfectaSencillo, conMayuscula, desdeCuandoSencillo, nombrePagina, queHacerPorDefecto, TIPO_SENCILLO } from "../_shared/logs-web/sencillo.ts";
+import { afectaTrasPublicar, aQuienAfectaSencillo, conMayuscula, desdeCuandoSencillo, nombrePagina, queFalloGenerico, queHacerPorDefecto } from "../_shared/logs-web/sencillo.ts";
 
 export interface IncidenciaTicket {
   id: number;
@@ -42,6 +42,11 @@ export interface IncidenciaTicket {
   pila: string | null;
   motivo_ticket: string | null;
   reabierta_veces: number;
+  /** Explicación en sencillo de la IA (explicar.ts), si ya la hay. */
+  explicacion_ia?: { que_paso: string; a_quien_afecta: string; que_hacer: string } | null;
+  /** Ocurrencias de «versión antigua tras publicar» que se arreglaron solas / que se repitieron tras recargar. */
+  ocurrencias_tras_publicar?: number;
+  repetidas_tras_recargar?: number;
 }
 
 export interface EventoTicket {
@@ -165,7 +170,8 @@ export function datosClave(muestras: EventoTicket[]): Array<{ clave: string; val
 /** Causa conocida de la incidencia (mira el mensaje, la pila y la muestra más reciente). */
 export function causaDeIncidencia(i: IncidenciaTicket, muestras: EventoTicket[]): CausaConocida | null {
   const m = muestras[0];
-  return causaConocida({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo: m?.objetivo ?? null, propiedades: m?.propiedades ?? null });
+  const tareas = muestras.map((e) => e.propiedades?.tarea).filter((t): t is string => typeof t === "string");
+  return causaConocida({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo: m?.objetivo ?? null, propiedades: m?.propiedades ?? null, tareas: [...new Set(tareas)] });
 }
 
 /** Una línea legible de un evento del recorrido (sin datos personales: todo viene saneado). */
@@ -228,28 +234,38 @@ export interface ResumenSencillo {
 }
 
 /**
- * «En pocas palabras» del ticket. Lo de los logs (endpoint, tarea, página
- * desconocida) va como `código`; lo de la IA, marcado «IA · sin verificar».
+ * «En pocas palabras» del ticket. Primero la causa conocida (texto fijo en
+ * llano), si no la explicación de la IA en sencillo, y si no un texto
+ * genérico. Lo de los logs (endpoint, tarea, página desconocida) va como
+ * `código`; lo de la IA, marcado «sin verificar».
  */
 export function resumenSencillo(entrada: EntradaTicket): ResumenSencillo {
   const { incidencia: i, muestras, analisis } = entrada;
   const causa = causaDeIncidencia(i, muestras);
+  const exp = i.explicacion_ia ?? null;
   const objetivo = objetivosAfectados(muestras)[0]?.objetivo ?? null;
   const ruta = i.rutas[0]?.ruta ?? null;
-  const pagina = esDeNavegador(i) && ruta ? (nombrePagina(ruta) ?? `la página ${enLinea(ruta, 80)}`) : null;
   let quePasa: string;
   if (causa) {
-    quePasa = `${causa.titulo}. ${causa.explicacion}`;
+    quePasa = causa.sencillo.quePasa;
+  } else if (exp?.que_paso) {
+    quePasa = `${textoIa(exp.que_paso, 300)} _(explicación de la IA, sin verificar)_`;
   } else {
-    const base = conMayuscula(TIPO_SENCILLO[i.tipo] ?? "un fallo de la web");
-    const donde = pagina ? ` en ${pagina}` : "";
-    const que = objetivo ? ` (afecta a ${enLinea(objetivo, 80)})` : "";
-    quePasa = `${base}${donde}${que}.`;
+    const generico = queFalloGenerico({ tipo: i.tipo, fuente: i.fuente, rutas: i.rutas, objetivo, tareas: muestras.map((e) => String(e.propiedades?.tarea ?? "")).filter(Boolean) });
+    // Página desconocida: se nombra como código (viene de los logs).
+    const paginaRara = esDeNavegador(i) && ruta && !nombrePagina(ruta) ? ` en la página ${enLinea(ruta, 80)}` : "";
+    const que = objetivo && i.tipo !== "error_integracion" ? ` (afecta a ${enLinea(objetivo, 80)})` : "";
+    quePasa = `${generico.replace(/\.$/, "")}${paginaRara}${que}.`;
     if (analisis?.impacto) quePasa += ` Según la IA (sin verificar): ${textoIa(analisis.impacto, 240)}`;
   }
-  const queHacer = causa?.acciones[0]
+  const tras = i.ocurrencias_tras_publicar ?? 0;
+  const aQuienAfecta = causa?.id === "chunk_caducado" && tras > 0
+    ? afectaTrasPublicar(tras, i.repetidas_tras_recargar ?? 0, { otras: Math.max(i.ocurrencias - tras - (i.repetidas_tras_recargar ?? 0), 0) })
+    : exp?.a_quien_afecta && !causa ? `${aQuienAfectaSencillo(i)} ${textoIa(exp.a_quien_afecta, 240)} _(IA)_` : aQuienAfectaSencillo(i);
+  const queHacer = causa?.sencillo.queHacer
+    ?? (exp?.que_hacer ? `${textoIa(exp.que_hacer, 240)} _(IA, sin verificar)_` : null)
     ?? (analisis?.propuesta[0] ? `${textoIa(analisis.propuesta[0], 240)} _(propuesta de la IA, sin verificar)_` : queHacerPorDefecto(i));
-  return { quePasa, aQuienAfecta: aQuienAfectaSencillo(i), desdeCuando: desdeCuandoSencillo(i, fecha), queHacer };
+  return { quePasa, aQuienAfecta, desdeCuando: desdeCuandoSencillo(i, fecha), queHacer };
 }
 
 export function construirTitulo(i: IncidenciaTicket): string {

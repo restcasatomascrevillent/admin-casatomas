@@ -12,6 +12,9 @@
 //       Al pasar del destino de pruebas a Linear, las que tenían ticket de
 //       prueba y siguen repitiéndose pasan a «pendiente» con un id nuevo
 //       (acción «migrar»): las ya paradas no se mandan a Linear.
+//    4 bis. Explicación en sencillo (IA) de los errores sin causa conocida,
+//       una vez por incidencia (explicar.ts). Comparte el tope diario de IA
+//       con los análisis de los tickets y usa como mucho la mitad.
 //    5. Purga diaria y estado final.
 //  Si Linear o la IA fallan, la incidencia se queda «pendiente/error» con su
 //  próximo intento (espera exponencial, máx. 6 h); el id determinista impide
@@ -22,6 +25,7 @@
 import { ErrorLinear, prioridadLinear, type DestinoTickets } from "./linear.ts";
 import { construirActualizacion, construirReapertura, construirTicket, type AnalisisIa, type EventoTicket, type IncidenciaTicket } from "./ticket.ts";
 import { interpretarAnalisis, mensajesIncidencia, type MensajeChat } from "./ia.ts";
+import { interpretarExplicacion, mensajesExplicacion, necesitaExplicacion, type ExplicacionIa } from "./explicar.ts";
 import { eventosDeCron, eventosDeDespliegues, eventosDeSyncTrafico, type DespliegueVercel, type EstadoSyncTrafico, type FalloCron } from "./recolectores.ts";
 import type { EventoNormalizado } from "../_shared/logs-web/eventos.ts";
 import { sanearTexto } from "../_shared/logs-web/saneado.ts";
@@ -55,6 +59,8 @@ export interface IncidenciaFila extends IncidenciaTicket {
   ocurrencias_en_ticket: number;
   analisis_ia: AnalisisIa | null;
   analisis_ia_en: string | null;
+  explicacion_ia: ExplicacionIa | null;
+  explicacion_ia_intentos: number;
 }
 
 export interface RepoProceso {
@@ -76,6 +82,10 @@ export interface RepoProceso {
   /** Tickets creados desde `desde` en ese destino (el tope diario es por destino). */
   ticketsCreadosDesde(desde: Date, destino: DestinoTickets["tipo"]): Promise<number>;
   analisisDesde(desde: Date): Promise<number>;
+  /** Explicaciones en sencillo intentadas desde `desde` (cuentan para el tope diario de IA). */
+  explicacionesDesde(desde: Date): Promise<number>;
+  /** Incidencias sin explicación en sencillo, las más recientes primero. */
+  incidenciasSinExplicar(limite: number): Promise<IncidenciaFila[]>;
   ultimaPurga(): Promise<string | null>;
   purgar(): Promise<Record<string, unknown>>;
 }
@@ -86,6 +96,8 @@ export interface DependenciasProceso {
   destino: (modo: ConfigLogs["linear_modo"], config: ConfigLogs) => DestinoTickets | null;
   motivoSinDestino?: (modo: ConfigLogs["linear_modo"], config: ConfigLogs) => string | null;
   ia: ((mensajes: MensajeChat[]) => Promise<{ texto: string; modelo: string }>) | null;
+  /** IA corta para las explicaciones en sencillo (null = sin clave). */
+  iaExplicar?: ((mensajes: MensajeChat[], disparador: string) => Promise<{ texto: string; modelo: string }>) | null;
   despliegues: ((desdeMs: number) => Promise<DespliegueVercel[]>) | null;
   urlPanel: string;
   ahora?: () => Date;
@@ -94,7 +106,10 @@ export interface DependenciasProceso {
   nuevoUuid?: () => string;
 }
 
-export const LIMITES = { crear: 5, actualizar: 10, sincronizar: 20, turnoMs: 4 * 60_000, reclamoMs: 5 * 60_000 };
+export const LIMITES = { crear: 5, actualizar: 10, sincronizar: 20, explicar: 3, turnoMs: 4 * 60_000, reclamoMs: 5 * 60_000 };
+
+/** Explicaciones en sencillo al día: como mucho la mitad del tope de IA (el resto queda para los tickets). */
+export const maxExplicacionesDia = (topeIa: number) => Math.floor(topeIa / 2);
 const SEIS_HORAS = 6 * 3_600_000;
 
 /** Espera hasta el siguiente intento: 5, 10, 20, 40… minutos, máximo 6 h. */
@@ -234,7 +249,8 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
         const hoy = inicioDiaMadrid(ahora);
         const nuevoUuid = deps.nuevoUuid ?? (() => crypto.randomUUID());
         let creadosHoy = await repo.ticketsCreadosDesde(hoy, destino.tipo);
-        let analisisHoy = await repo.analisisDesde(hoy);
+        // El tope diario de IA es uno: análisis de tickets + explicaciones en sencillo.
+        let analisisHoy = (await repo.analisisDesde(hoy)) + (await repo.explicacionesDesde(hoy));
         const cupos = { crear: LIMITES.crear, actualizar: LIMITES.actualizar, sincronizar: LIMITES.sincronizar };
         const lista = [...(await repo.incidenciasConTicket(200))].sort(ordenPrioridad);
         for (const inc of lista) {
@@ -320,6 +336,35 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
             }
           }
         }
+      }
+    }
+
+    // ─── 4 bis. Explicación en sencillo ─────────────────────────────────────
+    const explicaciones = { hechas: 0, fallidas: 0 };
+    resumen.explicaciones = explicaciones;
+    if (config.ia_activada && deps.iaExplicar) {
+      try {
+        const hoy = inicioDiaMadrid(ahora);
+        const analisisHoy = await repo.analisisDesde(hoy);
+        let explicadasHoy = await repo.explicacionesDesde(hoy);
+        for (const inc of await repo.incidenciasSinExplicar(30)) {
+          if (explicaciones.hechas + explicaciones.fallidas >= LIMITES.explicar) break;
+          if (explicadasHoy >= maxExplicacionesDia(config.ia_max_analisis_dia) || analisisHoy + explicadasHoy >= config.ia_max_analisis_dia) break;
+          const muestras = await repo.muestras(inc.id);
+          if (!necesitaExplicacion(inc, muestras)) continue;
+          explicadasHoy++;
+          const intento = { explicacion_ia_intentos: inc.explicacion_ia_intentos + 1, explicacion_ia_en: ahora.toISOString() };
+          try {
+            const r = await deps.iaExplicar(mensajesExplicacion(inc, muestras), `explicacion:${inc.id}`);
+            await repo.actualizar(inc.id, { ...intento, explicacion_ia: { ...interpretarExplicacion(r.texto, inc), modelo: r.modelo }, explicacion_ia_error: null });
+            explicaciones.hechas++;
+          } catch (e) {
+            await repo.actualizar(inc.id, { ...intento, explicacion_ia_error: mensajeError(e) }).catch(() => {});
+            explicaciones.fallidas++;
+          }
+        }
+      } catch (e) {
+        errores.push(`explicaciones: ${mensajeError(e)}`);
       }
     }
 

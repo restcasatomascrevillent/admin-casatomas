@@ -195,6 +195,15 @@ describe("normalizarLote", () => {
     expect(r.eventos[1].propiedades).toEqual({ id: "123", modo: "ficha" });
     expect(r.eventos[2].propiedades).toEqual({});
   });
+  it("el error de versión antigua que la web manda tras recargarse conserva «recargado» (y la misma huella)", async () => {
+    const mensaje = "TypeError: Failed to fetch dynamically imported module: https://w/assets/Carta-AbCd1234.js";
+    const r = await normalizarLote({ contexto: { consentimiento: false }, eventos: [
+      { id: id(), tipo: "error_promesa", ruta: "/carta", error: { mensaje }, props: { recargado: true, origen: "lazy", nombre: "Ana" } },
+      { id: id(), tipo: "error_promesa", ruta: "/carta", error: { mensaje } },
+    ] }, ctx);
+    expect(r.eventos[0].propiedades).toEqual({ recargado: true, origen: "lazy" });
+    expect(r.eventos[0].huella).toBe(r.eventos[1].huella);
+  });
   it("como mucho 50 por lote", async () => {
     const r = await normalizarLote({ contexto: { consentimiento: true }, eventos: Array.from({ length: 60 }, () => ({ id: id(), tipo: "clic", objetivo: "x" })) }, ctx);
     expect([r.eventos.length, r.rechazados]).toEqual([50, 10]);

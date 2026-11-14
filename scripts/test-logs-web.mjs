@@ -1,6 +1,7 @@
 // Super Admin › Logs: migraciones 20261118100000 (tablas, RLS, ingesta,
-// agrupación, estadísticas, retención) y 20261118100100 (operaciones de la BD)
-// contra un Postgres en memoria (PGlite). Nunca toca Supabase.
+// agrupación, estadísticas, retención), 20261118100100 (operaciones de la BD)
+// y 20261129143000 (errores «tras publicar» y explicación en sencillo) contra
+// un Postgres en memoria (PGlite). Nunca toca Supabase.
 //
 //   npm run test:logs-web:db
 //
@@ -12,7 +13,9 @@
 // ignorados, reapertura (reabrir y nuevo ticket); estadísticas que cuadran con
 // los eventos y embudo con operaciones completadas; contexto antes/después;
 // salud de la recogida; purga; triggers de reservas/cheques que no rompen la
-// operación; y los rollbacks.
+// operación; errores de versión antigua tras publicar (no cuentan salvo que se
+// repitan tras recargar), tráfico interno fuera de los umbrales y la vuelta
+// atrás de las incidencias pendientes; y los rollbacks.
 import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -22,6 +25,10 @@ const MIGRACION = await readFile("supabase/migrations/20261118100000_logs_web.sq
 const OPERACIONES = await readFile("supabase/migrations/20261118100100_logs_web_operaciones_bd.sql", "utf8");
 const ROLLBACK = await readFile("supabase/rollbacks/20261118100000_logs_web_ROLLBACK.sql", "utf8");
 const ROLLBACK_OP = await readFile("supabase/rollbacks/20261118100100_logs_web_operaciones_bd_ROLLBACK.sql", "utf8");
+const LEGIBLES = await readFile("supabase/migrations/20261129143000_logs_web_legibles.sql", "utf8");
+const ROLLBACK_LEGIBLES = await readFile("supabase/rollbacks/20261129143000_logs_web_legibles_ROLLBACK.sql", "utf8");
+// El patrón de «versión antigua» del SQL tiene que ser el mismo que el de huella.ts.
+const HUELLA_TS = await readFile("supabase/functions/_shared/logs-web/huella.ts", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
@@ -97,6 +104,8 @@ await db.exec(MIGRACION);
 await db.exec(MIGRACION); // idempotente
 await db.exec(OPERACIONES);
 await db.exec(OPERACIONES); // idempotente
+await db.exec(LEGIBLES);
+await db.exec(LEGIBLES); // idempotente
 comprobaciones++;
 
 const q = (sql, params) => db.query(sql, params);
@@ -369,13 +378,149 @@ const purga = await como(null, async () => (await q("select public.web_logs_purg
 igual(purga.eventos, 20, "purga de actividad fuera de retención (90 días)");
 ok((await q("select count(*)::int n from public.web_eventos where sesion_id = $1", [S3])).rows[0].n === 1, "los errores tienen su propia retención");
 
+
+// ─── 9 bis. Errores «tras publicar» y explicación en sencillo ──────────────
+{
+  // Mismo patrón que PATRON_CHUNK_CADUCADO (huella.ts).
+  const fuenteTs = /PATRON_CHUNK_CADUCADO =\s*\/(.+)\/i;/.exec(HUELLA_TS)?.[1];
+  ok(fuenteTs, "huella.ts sigue definiendo PATRON_CHUNK_CADUCADO");
+  const reTs = new RegExp(fuenteTs, "i");
+  const muestras = [
+    ["error_promesa", "TypeError: Failed to fetch dynamically imported module: https://w/assets/Carta-AbCd1234.js", null],
+    ["error_js", "TypeError: Importing a module script failed.", null],
+    ["error_react", "Error: Unable to preload CSS for /assets/x-AbCd1234.css", null],
+    ["error_js", "ChunkLoadError: Loading chunk 12 failed.", null],
+    ["error_js", "TypeError: 'text/html' is not a valid JavaScript MIME type.", null],
+    ["error_js", "TypeError: vino.precio is null", null],
+    ["error_promesa", "TypeError: Failed to fetch", null],
+  ];
+  for (const [tipo, mensaje] of muestras) {
+    const sql = (await q("select public.web_logs_es_version_antigua($1, $2, null, null) r", [tipo, mensaje])).rows[0].r;
+    igual(sql, reTs.test(mensaje), `SQL y huella.ts opinan igual de «${mensaje}»`);
+  }
+  igual((await q("select public.web_logs_es_version_antigua('error_recurso', null, null, 'https://w/assets/index-AbCd_123.js') r")).rows[0].r, true, "recurso de un despliegue");
+  igual((await q("select public.web_logs_es_version_antigua('error_recurso', null, null, 'https://w/fotos/plato.jpg') r")).rows[0].r, false, "una foto no es un fichero de versión");
+
+  await q("update public.web_logs_config set umbral_ocurrencias = 3, umbral_sesiones = 2");
+  const HC = "1e".repeat(16);
+  const MSG = "TypeError: Failed to fetch dynamically imported module: https://w/assets/Carta-AbCd1234.js";
+  const chunk = (o) => ev({ tipo: "error_promesa", categoria: "error", gravedad: "error", huella: HC, ruta: "/carta", mensaje: MSG, ...o });
+  const [A, B, C, D, E, F] = Array.from({ length: 6 }, () => randomUUID());
+  await ingerir([
+    // A: mandado por la página ya recargada (props.recargado) → sin impacto.
+    chunk({ sesion_id: A, secuencia: 1, ocurrido_en: iso(9_000), propiedades: { recargado: true, origen: "lazy" } }),
+    // B: sesión con consentimiento que sigue navegando después → sin impacto.
+    chunk({ sesion_id: B, secuencia: 1, ocurrido_en: iso(9_000) }),
+    ev({ tipo: "pagina_vista", sesion_id: B, secuencia: 2, ocurrido_en: iso(8_000), ruta: "/carta", propiedades: { navegacion: "inicial" } }),
+    // C: sin consentimiento, nada después → sin datos.
+    chunk({ sesion_id: C, secuencia: 1, consentimiento: false, ocurrido_en: iso(9_000) }),
+    // D: recargó (aviso «recargado») y volvió a fallar en la misma carga → repetido.
+    chunk({ sesion_id: D, secuencia: 1, consentimiento: false, ocurrido_en: iso(9_000), propiedades: { recargado: true } }),
+    chunk({ sesion_id: D, secuencia: 2, consentimiento: false, ocurrido_en: iso(8_000) }),
+  ]);
+  await agrupar();
+  const clase = async (sesion) => (await q("select tras_publicar t from public.web_eventos where sesion_id = $1 and categoria = 'error' order by ocurrido_en", [sesion])).rows.map((x) => x.t);
+  igual(await clase(A), ["sin_impacto"], "recargada sola: sin impacto");
+  igual(await clase(B), ["sin_impacto"], "siguió navegando: sin impacto");
+  igual(await clase(C), ["sin_datos"], "sin datos de después");
+  igual(await clase(D), ["sin_impacto", "repetido"], "falla otra vez tras recargar: repetido");
+  let ic = (await q("select * from public.web_incidencias where huella = $1", [HC])).rows[0];
+  igual([ic.ocurrencias, ic.ocurrencias_tras_publicar, ic.repetidas_tras_recargar, ic.ocurrencias_ventana, ic.sesiones_ventana], [5, 4, 1, 1, 1],
+        "cifras: solo la repetida cuenta para los umbrales");
+  igual(ic.linear_estado, "sin_ticket", "5 ocurrencias de versión antigua en 4 sesiones no abren ticket");
+
+  // E: con consentimiento, falla, recarga entera (pagina_vista inicial) y vuelve a fallar → repetido; otra sesión igual → umbral.
+  await ingerir([
+    chunk({ sesion_id: E, secuencia: 1, ocurrido_en: iso(7_000) }),
+    ev({ tipo: "pagina_vista", sesion_id: E, secuencia: 2, ocurrido_en: iso(6_500), ruta: "/carta", propiedades: { navegacion: "inicial" } }),
+    chunk({ sesion_id: E, secuencia: 3, ocurrido_en: iso(6_000) }),
+    chunk({ sesion_id: F, secuencia: 1, consentimiento: false, ocurrido_en: iso(5_000), propiedades: { recargado: true } }),
+    chunk({ sesion_id: F, secuencia: 2, consentimiento: false, ocurrido_en: iso(4_000) }),
+  ]);
+  await agrupar();
+  igual(await clase(E), ["sin_impacto", "repetido"], "recarga completa entre medias: la segunda es repetida");
+  ic = (await q("select * from public.web_incidencias where huella = $1", [HC])).rows[0];
+  igual([ic.repetidas_tras_recargar, ic.ocurrencias_ventana, ic.sesiones_ventana, ic.linear_estado], [3, 3, 3, "pendiente"],
+        "se repite tras recargar en 3 sesiones: ahora sí pide ticket");
+
+  // Con la marca de la web (`accion`, web-casatomas recarga-por-version.ts): es la señal principal.
+  const HA = "1a".repeat(16);
+  const marca = (accion, o = {}) => chunk({ huella: HA, accion, sesion_id: randomUUID(), secuencia: 1, consentimiento: false, ocurrido_en: iso(4_500), ...o });
+  const [G, Hs, I, J, K, L, M] = Array.from({ length: 7 }, () => randomUUID());
+  await ingerir([
+    marca("recuperado_tras_recarga", { sesion_id: G, propiedades: { recargado: true } }),
+    marca("recarga_sin_efecto", { sesion_id: Hs, propiedades: { recargado: true } }), // recargado, pero NO se arregló
+    marca("aviso_version_nueva", { sesion_id: I }),
+    marca("sin_conexion", { sesion_id: J }),
+    marca("sin_version_nueva", { sesion_id: K }),
+    // «Load failed» no es el patrón de versión antigua, pero la web lo marcó: manda la marca.
+    marca("recuperado_tras_recarga", { sesion_id: M, mensaje: "TypeError: Load failed · recuperado: la pestaña se recargó sola con la versión nueva (antes: v1.11.0)" }),
+    // Un bot (horas falsas): no se clasifica ni cuenta.
+    marca(null, { sesion_id: L, es_bot: true, ocurrido_en: "2099-01-01T00:00:00Z" }),
+  ]);
+  await agrupar();
+  const unaClase = async (sesion) => (await q("select tras_publicar t from public.web_eventos where sesion_id = $1", [sesion])).rows[0].t;
+  igual([await unaClase(G), await unaClase(Hs), await unaClase(I), await unaClase(J), await unaClase(K), await unaClase(M), await unaClase(L)],
+        ["sin_impacto", "repetido", "repetido", "sin_conexion", null, "sin_impacto", null], "la marca de la web decide la clase; el bot no se clasifica");
+  const ia = (await q("select * from public.web_incidencias where huella = $1", [HA])).rows[0];
+  igual([ia.ocurrencias, ia.ocurrencias_tras_publicar, ia.repetidas_tras_recargar, ia.ocurrencias_ventana, ia.sesiones_ventana, ia.linear_estado],
+        [6, 3, 2, 3, 3, "pendiente"], "cuentan «recargar no lo arregló» y «no había versión nueva»; no cuentan recuperadas, sin conexión ni bots");
+
+  // Tráfico interno: no cuenta para los umbrales (con «no contar pruebas»).
+  const HI = "1f".repeat(16);
+  await ingerir(Array.from({ length: 4 }, (_, i) => ev({ tipo: "error_js", categoria: "error", gravedad: "error", huella: HI, mensaje: "Error interno",
+    sesion_id: randomUUID(), secuencia: 1, es_interno: true, ocurrido_en: iso(3_000 - i) })));
+  await agrupar();
+  let ii = (await q("select ocurrencias, ocurrencias_ventana, linear_estado from public.web_incidencias where huella = $1", [HI])).rows[0];
+  igual([ii.ocurrencias, ii.ocurrencias_ventana, ii.linear_estado], [4, 0, "sin_ticket"], "el tráfico interno no abre tickets");
+  await q("update public.web_logs_config set excluir_pruebas_tickets = false");
+  await q("update public.web_eventos set ocurrido_en = ocurrido_en where huella = $1", [HI]);
+  await agrupar();
+  ii = (await q("select ocurrencias_ventana, linear_estado from public.web_incidencias where huella = $1", [HI])).rows[0];
+  igual([ii.ocurrencias_ventana, ii.linear_estado], [4, "pendiente"], "si se quiere contar el tráfico interno, se configura");
+  await q("update public.web_logs_config set excluir_pruebas_tickets = true");
+
+  // Al aplicar la migración: las pendientes que solo tenían errores esperados vuelven a «sin ticket» (no las pedidas a mano).
+  const HV = "19".repeat(16);
+  const HM = "18".repeat(16);
+  await ingerir([chunk({ huella: HV, sesion_id: randomUUID(), secuencia: 1, consentimiento: false, ocurrido_en: iso(2_000) }),
+                 chunk({ huella: HM, sesion_id: randomUUID(), secuencia: 1, consentimiento: false, ocurrido_en: iso(2_000) })]);
+  await agrupar();
+  await q("update public.web_incidencias set linear_estado = 'pendiente', requiere_ticket = true, motivo_ticket = '3 ocurrencias…' where huella = $1", [HV]);
+  await q("update public.web_incidencias set linear_estado = 'pendiente', requiere_ticket = true, motivo_ticket = 'Pedido a mano desde Super Admin › Logs' where huella = $1", [HM]);
+  await db.exec(LEGIBLES);
+  const vuelta = (await q("select huella, linear_estado from public.web_incidencias where huella in ($1, $2) order by huella", [HM, HV])).rows;
+  igual(vuelta.map((x) => x.linear_estado), ["pendiente", "sin_ticket"], "vuelve a «sin ticket» la automática; la pedida a mano, no");
+  igual((await q("select linear_estado from public.web_incidencias where huella = $1", [HC])).rows[0].linear_estado, "pendiente",
+        "la que se repite tras recargar sigue pendiente");
+
+  // Explicación de la IA: la escribe el servidor; el super admin la lee, nadie más la escribe desde el panel.
+  await q("update public.web_incidencias set explicacion_ia = $2::jsonb, explicacion_ia_en = now() where huella = $1",
+          [HI, JSON.stringify({ que_paso: "x", a_quien_afecta: "y", que_hacer: "z", gravedad: "baja" })]);
+  igual((await sa("select explicacion_ia ->> 'que_paso' t from public.web_incidencias where huella = $1", [HI])).rows[0].t, "x", "el super admin lee la explicación");
+  await rechaza(U.SA, `update public.web_incidencias set explicacion_ia = '{}'::jsonb`, /permission denied/, "la explicación no se edita desde el panel");
+  await rechaza(null, `update public.web_incidencias set explicacion_ia = '"texto"'::jsonb where huella = '${HI}'`, /check/, "la explicación es un objeto", "service_role");
+  await rechaza(U.SA, "select public.web_logs_clasificar_tras_publicar(now())", /permission denied/, "clasificar es solo del servidor");
+
+  // Vuelta atrás de esta migración: agrupación anterior y sin columnas nuevas; y se puede volver a aplicar.
+  await db.exec(ROLLBACK_LEGIBLES);
+  igual((await q("select count(*)::int n from information_schema.columns where table_name = 'web_eventos' and column_name = 'tras_publicar'")).rows[0].n, 0, "el rollback quita la clasificación");
+  await agrupar();
+  ok(true, "la agrupación anterior funciona tras el rollback");
+  await db.exec(LEGIBLES);
+  igual((await q("select tras_publicar t from public.web_eventos where sesion_id = $1 order by ocurrido_en", [D])).rows.map((x) => x.t), ["sin_impacto", "repetido"],
+        "al volver a aplicarla, reclasifica lo guardado");
+}
+
 // ─── 10. Rollbacks ──────────────────────────────────────────────────────────
+await db.exec(ROLLBACK_LEGIBLES);
 await db.exec(ROLLBACK_OP);
 await db.exec(ROLLBACK);
 igual((await q("select to_regclass('public.web_eventos') t")).rows[0].t, null, "el rollback borra las tablas");
 await q("insert into public.reservas (canal, estado, numero_comensales) values ('web', 'pendiente', 2)");
 await db.exec(MIGRACION);
 await db.exec(OPERACIONES);
+await db.exec(LEGIBLES);
 ok((await q("select count(*)::int n from public.web_logs_config")).rows[0].n === 1, "se puede volver a aplicar tras el rollback");
 
 console.log(`✓ Logs web: ${comprobaciones} comprobaciones`);

@@ -57,6 +57,8 @@ export interface EventoWeb {
   mensaje: string | null;
   pila: string | null;
   incidencia_id: number | null;
+  /** Solo errores de «versión antigua tras publicar» (migración 20261129143000); undefined si aún no está aplicada. */
+  tras_publicar?: "sin_impacto" | "sin_datos" | "sin_conexion" | "repetido" | null;
 }
 
 export interface SesionWeb {
@@ -96,6 +98,15 @@ export interface AnalisisIaIncidencia {
   propuesta: string[];
   validacion: string[];
   falta_contexto: string[];
+  modelo?: string;
+}
+
+/** Explicación en sencillo de la IA (procesar-logs-web/explicar.ts). Sin comprobar. */
+export interface ExplicacionIaIncidencia {
+  que_paso: string;
+  a_quien_afecta: string;
+  que_hacer: string;
+  gravedad: "baja" | "media" | "alta";
   modelo?: string;
 }
 
@@ -141,6 +152,12 @@ export interface IncidenciaWeb {
   resuelta_en: string | null;
   reabierta_veces: number;
   nota: string | null;
+  // Migración 20261129143000 (opcionales: el panel funciona sin ella).
+  ocurrencias_tras_publicar?: number;
+  repetidas_tras_recargar?: number;
+  explicacion_ia?: ExplicacionIaIncidencia | null;
+  explicacion_ia_en?: string | null;
+  explicacion_ia_error?: string | null;
 }
 
 export interface ConfigLogsWeb {
@@ -438,7 +455,7 @@ export function useMuestrasIncidencia(incidenciaId: number | null) {
     staleTime: 30_000,
     queryFn: async (): Promise<EventoWeb[]> => {
       const { data, error } = await sb.from("web_eventos")
-        .select("id, tipo, categoria, accion, ruta, objetivo, valor, ocurrido_en, secuencia, navegador, so, dispositivo, version, despliegue, propiedades, mensaje, es_prueba")
+        .select("id, tipo, categoria, accion, ruta, objetivo, valor, ocurrido_en, secuencia, navegador, so, dispositivo, version, despliegue, propiedades, mensaje, es_prueba, sesion_id, consentimiento, tras_publicar")
         .eq("incidencia_id", incidenciaId).eq("es_bot", false).order("ocurrido_en", { ascending: false }).limit(50);
       lanzar(error);
       return (data ?? []) as EventoWeb[];

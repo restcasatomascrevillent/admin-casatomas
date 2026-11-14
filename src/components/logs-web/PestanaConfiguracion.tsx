@@ -193,7 +193,7 @@ export function PestanaConfiguracion({ estado }: { estado: EstadoRecogidaDatos |
         </div>
         <div className="grid gap-x-6 sm:grid-cols-2">
           <Interruptor id="u-404s" etiqueta="Los 404 pueden abrir ticket (si superan su umbral)" valor={b.tickets_404} onCambio={(v) => set("tickets_404", v)} />
-          <Interruptor id="u-prueba" etiqueta="No contar pruebas automáticas para los umbrales" valor={b.excluir_pruebas_tickets} onCambio={(v) => set("excluir_pruebas_tickets", v)} />
+          <Interruptor id="u-prueba" etiqueta="No contar pruebas automáticas ni tráfico interno para los umbrales" valor={b.excluir_pruebas_tickets} onCambio={(v) => set("excluir_pruebas_tickets", v)} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Si reaparece una incidencia resuelta</Label>
@@ -206,7 +206,7 @@ export function PestanaConfiguracion({ estado }: { estado: EstadoRecogidaDatos |
             </SelectContent>
           </Select>
         </div>
-        <p className="text-xs text-muted-foreground">Los errores críticos (p. ej. la petición de reserva que falla) abren ticket con la primera ocurrencia.</p>
+        <p className="text-xs text-muted-foreground">Los errores críticos (p. ej. la petición de reserva que falla) abren ticket con la primera ocurrencia. Los de «página antigua tras publicar» no cuentan, salvo que vuelvan a fallar después de recargar.</p>
       </Seccion>
 
       <Seccion titulo="Linear">
@@ -217,10 +217,11 @@ export function PestanaConfiguracion({ estado }: { estado: EstadoRecogidaDatos |
 
       <Seccion titulo="IA, retención y límites de coste">
         <div className="grid gap-x-6 sm:grid-cols-2">
-          <Interruptor id="ia-on" etiqueta="Análisis de IA de las incidencias" valor={b.ia_activada} onCambio={(v) => set("ia_activada", v)} />
+          <Interruptor id="ia-on" etiqueta="IA en las incidencias (análisis para el ticket y explicación en sencillo)" valor={b.ia_activada} onCambio={(v) => set("ia_activada", v)} />
         </div>
         <div className="flex flex-wrap gap-6">
-          <Numero id="ia-max" etiqueta="Análisis de IA por día" valor={b.ia_max_analisis_dia} min={0} max={500} onCambio={(n) => set("ia_max_analisis_dia", n)} />
+          <Numero id="ia-max" etiqueta="Llamadas de IA por día" valor={b.ia_max_analisis_dia} min={0} max={500} onCambio={(n) => set("ia_max_analisis_dia", n)}
+            ayuda="Análisis de tickets + explicaciones en sencillo (estas, como mucho la mitad). Cada incidencia se explica una sola vez." />
           <Numero id="r-act" etiqueta="Retención de actividad (días)" valor={b.retencion_actividad_dias} min={7} max={400} onCambio={(n) => set("retencion_actividad_dias", n)} />
           <Numero id="r-err" etiqueta="Retención de errores (días)" valor={b.retencion_errores_dias} min={7} max={730} onCambio={(n) => set("retencion_errores_dias", n)} />
           <Numero id="l-dia" etiqueta="Eventos por día (máx.)" valor={b.limite_eventos_dia} min={100} max={2000000} onCambio={(n) => set("limite_eventos_dia", n)} />
