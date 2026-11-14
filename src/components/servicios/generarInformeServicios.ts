@@ -11,12 +11,15 @@
  */
 import { cargarConfigServicios, cargarResumenMes, cargarServicios } from "@/hooks/useServicios";
 import { type InformeMes, informeCsv, informeMes, mesAnterior, nombreArchivoInforme, textoMesCorto } from "@/lib/informeServicios";
-import { ordenarServicios } from "@/lib/servicios";
+import { type ServicioContratado, ordenarServicios } from "@/lib/servicios";
 
 export type ResultadoInformeServicios =
   | {
       disponible: true;
       informe: InformeMes;
+      /** Los servicios (todos, en orden), por si el informe quiere más que el gasto (precios por confirmar…). */
+      servicios: ServicioContratado[];
+      eurPorUsd: number;
       titulo: string;
       nombreArchivo: string;
       csv: () => Blob;
@@ -38,9 +41,10 @@ export async function generarInformeServicios(mes: string, opciones: { hoy?: Dat
   ]);
   if (!servicios.disponible) return { disponible: false, motivo: "Falta aplicar en Supabase la migración de Servicios (20261103120000_servicios_contratados)." };
   if (!actual.disponible) return { disponible: false, motivo: "Falta aplicar en Supabase la migración 20261122153000_servicios_costes_mes." };
+  const ordenados = ordenarServicios(servicios.servicios);
   const informe = informeMes({
     mes: primero,
-    servicios: ordenarServicios(servicios.servicios),
+    servicios: ordenados,
     resumen: actual.filas,
     resumenAnterior: anterior.disponible ? anterior.filas : null,
     eurPorUsd: config.eurPorUsd,
@@ -49,6 +53,8 @@ export async function generarInformeServicios(mes: string, opciones: { hoy?: Dat
   return {
     disponible: true,
     informe,
+    servicios: ordenados,
+    eurPorUsd: config.eurPorUsd,
     titulo: `Informe de servicios · ${textoMesCorto(primero)}`,
     nombreArchivo: nombreArchivoInforme(primero),
     csv: () => csvInformeServicios(informe),
