@@ -62,6 +62,17 @@ export interface DatosAlerta {
   /** false = solo en Análisis, no en la campana (20261115100000). */
   campana: boolean;
   fecha: string | null;
+  /**
+   * 20261130120000: la factura con la que se compara una subida o bajada (la ANTERIOR a
+   * la última, que es la referencia) y su fecha. Sin ellas, el aviso es de la regla de
+   * antes (mediana de 90 días) y «Qué decidir hoy» no lo enseña.
+   */
+  fechaRef: string | null;
+  facturaRefId: number | null;
+  /** Lo comprado en 90 días, en la medida del precio (kg, l, ud…). */
+  cantidad90: number | null;
+  /** Más barato en otro proveedor: fecha de la última factura del otro. */
+  fechaOtro: string | null;
   /** Ahorro en 90 días (más barato en otro proveedor). */
   ahorro: number | null;
   /** Más barato en otro proveedor: el más barato y su precio. */
@@ -132,6 +143,10 @@ export function normalizarAlertas(data: unknown): AlertaFacturas[] {
         impactoMes: num(d.impacto_mes),
         campana: d.campana !== false,
         fecha: txt(d.fecha),
+        fechaRef: txt(d.fecha_ref),
+        facturaRefId: num(d.factura_ref_id),
+        cantidad90: num(d.cantidad_90),
+        fechaOtro: txt(d.fecha_otro),
         ahorro: num(d.ahorro),
         proveedorOtro: txt(d.proveedor_otro),
         precioOtro: num(d.precio_otro),

@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatEntero, plural } from "@/components/facturas/shared/formatters";
 import { resumenCortoAlerta, tituloCortoAlerta } from "@/lib/facturas/alertas";
 import { textoPctCorto, type CambioPrecio, type DecisionFacturas, type FamiliaDecision, type ProductoTop } from "@/lib/facturas/decision";
-import { decisionesDeHoy, explicarAhorro, geometriaPrecio, nombreMes, partesFraseAhorro, mesesHasta, type PuntoPrecio } from "@/lib/facturas/vistasAnalisis";
+import { decisionesDeHoy, explicarAhorro, geometriaPrecio, nombreMes, partesFraseAhorro, mesesHasta, textoDecision, type PuntoPrecio, type TextoDecision } from "@/lib/facturas/vistasAnalisis";
 import { FILTROS_VACIOS, parametrosExplorar, type LocalRpc } from "@/lib/facturas/explorador";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
 import { useExplorarCompras } from "@/hooks/useExplorarCompras";
@@ -95,24 +95,19 @@ export function QueDecidirHoy({
   return (
     <Caja
       titulo="Qué decidir hoy"
-      subtitulo="Lo 5 que más dinero mueve, de todo el análisis. Lo demás está en su vista."
+      subtitulo="Las 5 cosas que más dinero te mueven. Cada precio se compara con la última factura. Precios sin IVA."
       testId="caja-decidir"
     >
       {lista.length === 0 ? (
-        <SinDatos>Nada que decidir: ningún precio sube de más, nada sale más barato en otro proveedor y las familias están en su media.</SinDatos>
+        <SinDatos>Nada que decidir hoy: en las últimas facturas ningún precio ha subido de más, nada sale más barato en otro proveedor que ya usas y el gasto va como siempre.</SinDatos>
       ) : (
         <ol aria-label="Decisiones, de más a menos dinero">
           {lista.map((x) => {
+            const t = textoDecision(x, mesComparado);
             if (x.tipo === "familia") {
               const f = x.familia;
               return (
-                <Fila
-                  key={x.id}
-                  tipo="familia"
-                  titulo={`${f.familia} gasta un ${formatEntero(Math.abs(f.variacionPct ?? 0))} % más de lo normal`}
-                  detalle={`${formatCurrency(f.importe)}${mesComparado ? ` en ${mesComparado}` : " en el periodo"} frente a ${formatCurrency(f.referencia ?? 0)} de media`}
-                  euros={`+${formatEntero(x.exceso)} €`}
-                >
+                <Fila key={x.id} tipo="familia" texto={t}>
                   {!pendiente && f.id !== null && (
                     <button type="button" className={cn(BOTON, FOCO)} onClick={() => onVerFamilia(f)}>
                       <FileText className="h-3.5 w-3.5" aria-hidden /> Ver qué se compró
@@ -127,17 +122,9 @@ export function QueDecidirHoy({
               );
             }
             const c = x.cambio;
-            const d = c.alerta.datos;
             if (x.tipo === "mejor") {
-              const a = explicarAhorro(c);
               return (
-                <Fila
-                  key={x.id}
-                  tipo="mejor"
-                  titulo={`${a.producto}: ${a.proveedorOtro ?? "otro proveedor"} te lo deja ${a.precio !== null && a.precioOtro !== null ? `${precio2(a.precio - a.precioOtro)} €/${a.medida} ` : ""}más barato`}
-                  detalle={`Pagas ${precio2(a.precio)} €/${a.medida}${a.proveedor ? ` en ${a.proveedor}` : ""} · ${a.proveedorOtro ?? "el otro"} lo vende a ${precio2(a.precioOtro)} €/${a.medida}`}
-                  euros={`−${formatEntero(a.ahorro)} € / 90 días`}
-                >
+                <Fila key={x.id} tipo="mejor" texto={t}>
                   {!pendiente && (c.doc || c.docOtro) && (
                     <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc, c.docOtro])}>
                       <FileText className="h-3.5 w-3.5" aria-hidden /> Comparar facturas
@@ -152,13 +139,7 @@ export function QueDecidirHoy({
               );
             }
             return (
-              <Fila
-                key={x.id}
-                tipo="sube"
-                titulo={`${d.producto ?? tituloCortoAlerta(c.alerta)} ha subido ${d.variacionPct !== null ? `un ${formatEntero(Math.abs(d.variacionPct))} %` : ""}`.trim()}
-                detalle={`${d.proveedor ? `${d.proveedor} · ` : ""}${resumenCortoAlerta(c.alerta)}`}
-                euros={`+${formatEntero(x.eurosMes)} €/mes`}
-              >
+              <Fila key={x.id} tipo="sube" texto={t}>
                 {!pendiente && c.doc && c.docOtro ? (
                   <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.docOtro, c.doc])}>
                     <FileText className="h-3.5 w-3.5" aria-hidden /> Comparar facturas
@@ -190,7 +171,7 @@ export function QueDecidirHoy({
   );
 }
 
-function Fila({ tipo, titulo, detalle, euros, children }: { tipo: "sube" | "mejor" | "familia"; titulo: string; detalle: string; euros: string; children: ReactNode }) {
+function Fila({ tipo, texto, children }: { tipo: "sube" | "mejor" | "familia"; texto: TextoDecision; children: ReactNode }) {
   const Icono = tipo === "sube" ? ArrowUp : tipo === "mejor" ? Euro : AlertTriangle;
   return (
     <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 border-t border-border/60 py-2.5 first:border-t-0 first:pt-0" data-decision={tipo}>
@@ -198,10 +179,23 @@ function Fila({ tipo, titulo, detalle, euros, children }: { tipo: "sube" | "mejo
         <Icono className="h-3.5 w-3.5" />
       </span>
       <div className="min-w-0">
-        <p className="text-sm font-medium leading-snug [overflow-wrap:anywhere]">{titulo}</p>
-        <p className="text-xs leading-snug text-muted-foreground [overflow-wrap:anywhere]">{detalle}</p>
+        <p className="text-sm font-medium leading-snug [overflow-wrap:anywhere]">{texto.titulo}</p>
+        <dl className="mt-1 space-y-0.5 text-xs leading-snug text-muted-foreground [overflow-wrap:anywhere]">
+          <div>
+            <dt className="inline font-medium text-foreground/80">Qué ha pasado: </dt>
+            <dd className="inline">{texto.quePasa}</dd>
+          </div>
+          <div>
+            <dt className="inline font-medium text-foreground/80">Por qué importa: </dt>
+            <dd className="inline">{texto.porQue}</dd>
+          </div>
+          <div>
+            <dt className="inline font-medium text-foreground/80">Qué puedes hacer: </dt>
+            <dd className="inline">{texto.queHacer}</dd>
+          </div>
+        </dl>
       </div>
-      <span className="whitespace-nowrap text-right text-sm font-medium tabular-nums">{euros}</span>
+      <span className="whitespace-nowrap text-right text-sm font-medium tabular-nums">{texto.euros}</span>
       <div className="col-start-2 col-end-4 flex flex-wrap gap-1.5">{children}</div>
     </li>
   );

@@ -10,6 +10,8 @@ set client_encoding = 'UTF8';
 --      · subida: 4 compras a 10 €/kg y una a 50 €/kg (atípica) → la de 13 €/kg avisa
 --        (+30 %, alta); otro producto a +5 % no avisa.
 --      · un portes a +100 % no avisa (no es producto).
+--      · 20261130120000: la subida se compara con la factura ANTERIOR; la piña, a 1,80 €
+--        en las dos últimas (mediana 1,50 €), no avisa.
 --      · albarán sin factura de oct-2030 → aviso; el ya facturado no.
 --      · proveedor nuevo (primer documento el 10/03/2031) → aviso.
 --      · importe inusual (500 € frente a 100 € de media) → aviso; la factura que
@@ -68,10 +70,10 @@ begin
 
   -- Mayorista: compras de merluza (kg), aceite (l) y portes. Referencia: ene-mar 2031.
   for rec in select * from (values
-      ('2031-01-05'::date, 10.0, 20.0, 5.0), ('2031-01-20', 10.0, 20.0, 5.0),
-      ('2031-02-05', 50.0, 20.0, 5.0),      -- merluza atípica (> 3× la mediana): no cuenta
-      ('2031-02-20', 10.0, 20.0, 5.0), ('2031-03-01', 10.0, 20.0, 5.0),
-      ('2031-03-20', 13.0, 21.0, 10.0)) as t(fecha, merluza, aceite, portes) loop
+      ('2031-01-05'::date, 10.0, 20.0, 5.0, 1.40), ('2031-01-20', 10.0, 20.0, 5.0, 1.50),
+      ('2031-02-05', 50.0, 20.0, 5.0, 1.50),      -- merluza atípica (> 3× la mediana): no cuenta
+      ('2031-02-20', 10.0, 20.0, 5.0, 1.50), ('2031-03-01', 10.0, 20.0, 5.0, 1.80),
+      ('2031-03-20', 13.0, 21.0, 10.0, 1.80)) as t(fecha, merluza, aceite, portes, pina) loop
     insert into facturas (tipo, proveedor, cif, proveedor_id, numero_documento, fecha, subtotal, iva, total, local)
     values ('factura', 'PRUEBA ALERTAS MAYORISTA', 'B00000731', v_p1, 'ALR-' || to_char(rec.fecha, 'YYYYMMDD'), rec.fecha,
             rec.merluza * 2 + rec.aceite + rec.portes, 0, rec.merluza * 2 + rec.aceite + rec.portes, 'casa_tomas')
@@ -79,7 +81,8 @@ begin
     insert into productos_factura (factura_id, nombre, cantidad, unidad, precio_unitario, total) values
       (v_f, 'PRUEBA MERLUZA ALERTAS', 2, 'kg', rec.merluza, rec.merluza * 2),
       (v_f, 'PRUEBA ACEITE ALERTAS', 1, 'l', rec.aceite, rec.aceite),
-      (v_f, 'PORTES', 1, 'ud', rec.portes, rec.portes);
+      (v_f, 'PORTES', 1, 'ud', rec.portes, rec.portes),
+      (v_f, 'PRUEBA PINA ALERTAS', 10, 'kg', rec.pina, rec.pina * 10);
     if rec.fecha = '2031-03-20' then v_fsub := v_f; end if;
   end loop;
 
@@ -107,6 +110,15 @@ begin
                   and (datos ->> 'factura_id')::bigint = v_fsub and datos ->> 'medida' = 'kg' and datos ->> 'mes' = '2031-03') then
     raise exception 'FALLO T2: no sale la subida de la merluza (+30 %% sobre 10 €/kg): %',
       (select jsonb_agg(to_jsonb(c)) from _c c where c.tipo = 'facturas_precio_sube' and c.datos ->> 'proveedor_id' = v_p1::text);
+  end if;
+  -- 20261130120000: la referencia es la factura ANTERIOR (10 € el 01/03), no la mediana.
+  if not exists (select 1 from _c where tipo = 'facturas_precio_sube' and datos ->> 'producto' = 'PRUEBA MERLUZA ALERTAS'
+                  and datos ->> 'fecha_ref' = '2031-03-01' and (datos ->> 'factura_otro_id')::bigint = (datos ->> 'factura_ref_id')::bigint) then
+    raise exception 'FALLO T2: la subida no se compara con la factura anterior';
+  end if;
+  -- Piña a 1,80 € en las dos últimas facturas: no ha subido (con la mediana de 1,50 € salía «+20 %»).
+  if exists (select 1 from _c where tipo = 'facturas_precio_sube' and datos ->> 'producto' = 'PRUEBA PINA ALERTAS') then
+    raise exception 'FALLO T2: avisa de la piña, que cuesta lo mismo que en la factura anterior';
   end if;
   if exists (select 1 from _c where tipo = 'facturas_precio_sube' and datos ->> 'producto' in ('PRUEBA ACEITE ALERTAS', 'PORTES')) then
     raise exception 'FALLO T2: avisa del aceite (+5 %%) o de los portes';

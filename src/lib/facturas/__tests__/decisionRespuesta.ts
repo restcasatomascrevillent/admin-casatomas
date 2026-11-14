@@ -13,18 +13,18 @@ export const RESPUESTA = {
     sube: [
       {
         id: "s1", tipo: "facturas_precio_sube", prioridad: "alta", titulo: "Sube Percebe: +29,0 %", mensaje: "largo", campana: true, impacto_mes: 62.42,
-        datos: { producto: "PERCEBE GALLEGO G", proveedor: "Cetárea Angelmar", precio: 140, precio_ref: 108.5, variacion_pct: 29, medida: "kg", fecha: "2026-10-03", impacto_mes: 62.42, factura_id: 7 },
+        datos: { producto: "PERCEBE GALLEGO G", proveedor: "Cetárea Angelmar", precio: 140, precio_ref: 108.5, variacion_pct: 29, medida: "kg", fecha: "2026-10-03", fecha_ref: "2026-09-19", factura_ref_id: 70, cantidad_90: 7, impacto_mes: 62.42, factura_id: 7 },
         doc: { id: 7, fecha: "2026-10-03", proveedor: "Cetárea Angelmar", numero: "260489", tipo: "factura", local: "casa_tomas", total: 900, drive_url: "https://drive.google.com/file/d/abc/view", archivo_path: null },
       },
       {
         id: "s2", tipo: "facturas_precio_sube", prioridad: "normal", titulo: "Sube Melón piel de sapo: +52,0 %", mensaje: "largo", campana: false, impacto_mes: 2.09,
-        datos: { producto: "MELON PIEL SAPO", proveedor: "Francisco José", precio: 0.95, precio_ref: 0.625, variacion_pct: 52, medida: "kg", fecha: "2026-10-02", impacto_mes: 2.09, campana: false },
+        datos: { producto: "MELON PIEL SAPO", proveedor: "Francisco José", precio: 0.95, precio_ref: 0.625, variacion_pct: 52, medida: "kg", fecha: "2026-10-02", fecha_ref: "2026-09-18", impacto_mes: 2.09, campana: false },
       },
     ],
     mejor: [
       {
         id: "m1", tipo: "facturas_precio_mejor", prioridad: "normal", titulo: "Berberecho: 18 % más barato en CASIMIRO", mensaje: "x",
-        datos: { producto: "Berberecho", proveedor: "Cetárea Angelmar", proveedor_otro: "Casimiro Pérez", precio: 35.5, precio_otro: 29, ahorro: 117, medida: "kg" },
+        datos: { producto: "Berberecho", proveedor: "Cetárea Angelmar", proveedor_otro: "Casimiro Pérez", precio: 35.5, precio_otro: 29, ahorro: 117, medida: "kg", fecha: "2026-10-10", fecha_otro: "2026-09-29", cantidad_90: 18 },
         doc: { id: 8, total: 100 }, doc_otro: { id: 9, total: -20 },
       },
       {

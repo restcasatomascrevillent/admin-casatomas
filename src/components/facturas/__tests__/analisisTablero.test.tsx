@@ -883,11 +883,14 @@ describe("Análisis en una pantalla: vistas con las gráficas de decisión", () 
     const lista5 = await screen.findByRole("list", { name: "Decisiones, de más a menos dinero" });
     expect(screen.getByTestId("caja-decidir")).toContainElement(lista5);
     const filas = within(lista5).getAllByRole("listitem");
-    expect(filas.map((f) => f.dataset.decision)).toEqual(["familia", "sube", "mejor", "mejor", "sube"]);
-    expect(filas[0]).toHaveTextContent(/Congelados gasta un 30 % más de lo normal/);
+    expect(filas.map((f) => f.dataset.decision)).toEqual(["familia", "sube", "mejor"]);
+    expect(filas[0]).toHaveTextContent(/Congelados: gastas más de lo normal/);
     expect(filas[0]).toHaveTextContent("+428 €");
-    expect(filas[1]).toHaveTextContent(/PERCEBE GALLEGO G ha subido un 29 %.*\+62 €\/mes/);
-    expect(filas[2]).toHaveTextContent(/Berberecho: Casimiro Pérez te lo deja 6,50 €\/kg más barato.*−117 € \/ 90 días/);
+    expect(filas[1]).toHaveTextContent(/Percebe ha subido un 29 % en Cetárea Angelmar/);
+    expect(filas[1]).toHaveTextContent(/Qué ha pasado: En la factura del 03\/10 lo pagaste a 140,00 €\/kg\. En la anterior \(19\/09\) estaba a 108,50 €\/kg/);
+    expect(filas[1]).toHaveTextContent(/Por qué importa: .*62 € más al mes.*Qué puedes hacer: Pregunta a Cetárea Angelmar/);
+    expect(filas[1]).toHaveTextContent("+62 €/mes");
+    expect(filas[2]).toHaveTextContent(/Berberecho: Casimiro Pérez te lo vende más barato.*6,50 € menos por cada kilo.*ahorras 117 €/);
     expect(within(filas[0]).getByRole("button", { name: "Ver qué se compró" })).toBeInTheDocument();
     expect(within(filas[2]).getByRole("button", { name: "Comparar facturas" })).toBeInTheDocument();
     expect(within(filas[2]).getByRole("button", { name: "No es lo mismo" })).toBeInTheDocument();
@@ -971,7 +974,7 @@ describe("Análisis en una pantalla: vistas con las gráficas de decisión", () 
     montar();
     const lista5 = await screen.findByRole("list", { name: "Decisiones, de más a menos dinero" });
     const fila = within(lista5).getAllByRole("listitem")[1];
-    expect(fila).toHaveTextContent(/PERCEBE GALLEGO G ha subido/);
+    expect(fila).toHaveTextContent(/Percebe ha subido/);
     expect(within(fila).queryByRole("button", { name: "Ver factura" })).not.toBeInTheDocument();
     fireEvent.click(within(fila).getByRole("button", { name: "Comparar facturas" }));
     const visor = await screen.findByTestId("visor-documento");
