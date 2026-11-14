@@ -41,7 +41,8 @@ export const EsquemaPieza = z.strictObject({
   lista: z.array(EsquemaElementoLista).min(1).optional(),
   pie: texto.min(1).optional(),
   numeral: texto.min(1).optional(),
-  // Punto de interés vertical de la foto en % («Solo foto», como imagen_posicion_y de Platos).
+  // Encuadre de la foto en % («Solo foto», como imagen_posicion_y de Platos).
+  posicionX: z.number().min(0).max(100).optional(),
   posicionY: z.number().min(0).max(100).optional(),
 });
 /** Forma del JSON de entrada (lo que guarda la UI en instagram_piezas.datos). */
@@ -214,7 +215,10 @@ export function problemasDePieza(d: EntradaPieza, plantilla: Plantilla | undefin
         p.push(`La foto «${foto.id}» es de tipo «${foto.tipo}» y la plantilla «${plantilla.id}» solo admite: ${plantilla.tiposFoto.join(", ")}`);
       }
       const f = FORMATOS[d.formato as FormatoId];
-      if (plantilla && encajeDe(plantilla) === "marco") {
+      if (plantilla?.sinTexto) {
+        // «Solo foto»: siempre se recorta a sangre, aunque haya que ampliar; si el recorte
+        // se queda pequeño, la plantilla lo avisa (data-aviso), pero vale.
+      } else if (plantilla && encajeDe(plantilla) === "marco") {
         // Enmarcada: la foto va entera y sin ampliar; basta con que tenga resolución.
         if (!valeParaMarco(foto)) {
           p.push(
@@ -253,6 +257,7 @@ function aDatos(d: EntradaPieza): DatosPieza {
   if (d.cta !== undefined) datos.cta = d.cta;
   if (d.pie !== undefined) datos.pie = d.pie;
   if (d.numeral !== undefined) datos.numeral = d.numeral;
+  if (d.posicionX !== undefined) datos.posicionX = d.posicionX;
   if (d.posicionY !== undefined) datos.posicionY = d.posicionY;
   if (d.lista !== undefined) {
     datos.lista = d.lista.map((e) => {

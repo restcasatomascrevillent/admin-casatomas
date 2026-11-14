@@ -295,7 +295,7 @@ export function promptSistemaMontar(
     .sort((x, y) => ORDEN.indexOf(x.papel ?? "portada") - ORDEN.indexOf(y.papel ?? "portada"))
     .map((p) =>
       p.sinTexto
-        ? `- «${p.id}» (solo foto: la foto limpia, sin ningún texto ni logo; recortada a 4:5 o, si no cubre, entera sobre su propio color): sin rótulos`
+        ? `- «${p.id}» (solo foto: la foto limpia, sin ningún texto ni logo, recortada a 4:5 a sangre): sin rótulos`
         : `- «${p.id}» (${NOMBRE_PAPEL[p.papel ?? "portada"]}, ${p.encaje === "marco" ? "Foto enmarcada: la foto entera, sin ampliar" : "foto a sangre: la amplía hasta cubrir"}): ${p.campos.map((c) => `${c} (máx. ${p.limites[c] ?? 60}${c === "titular" ? ", 6 palabras" : ""})`).join(", ")}`,
     )
     .join("\n");

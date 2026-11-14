@@ -22,6 +22,17 @@ export interface AjusteImagen {
   plantilla: string;
   datos: Partial<Record<CampoRotulo, string>>;
   altText: string;
+  /** Encuadre de «Solo foto» en % (posicionX / posicionY de la pieza; sin él, el centro). */
+  encuadre?: { x: number; y: number };
+}
+
+const numero = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : undefined);
+
+/** Encuadre guardado en los datos de una pieza (posicionX / posicionY), o undefined. */
+export function encuadreDeDatos(d: Record<string, unknown> | null | undefined): AjusteImagen["encuadre"] {
+  const x = numero(d?.posicionX);
+  const y = numero(d?.posicionY);
+  return x === undefined && y === undefined ? undefined : { x: x ?? 50, y: y ?? 50 };
 }
 
 export interface EstadoCrear {
@@ -129,7 +140,14 @@ export function piezaDeImagen(e: EstadoCrear, foto: string): Record<string, unkn
   const a = ajusteDe(e, foto);
   const base = borradorVacio(e.marca, a.plantilla, formato);
   const b = borradorDesdeDatos({ ...a.datos, marca: e.marca, plantilla: a.plantilla, formato, foto } as never, base);
-  return piezaDesdeBorrador(b, obtenerPlantilla(a.plantilla));
+  const plantilla = obtenerPlantilla(a.plantilla);
+  const pieza = piezaDesdeBorrador(b, plantilla);
+  // «Solo foto»: el encuadre elegido (qué parte de la foto se ve al recortarla a 4:5).
+  if (plantilla?.sinTexto && a.encuadre) {
+    pieza.posicionX = a.encuadre.x;
+    pieza.posicionY = a.encuadre.y;
+  }
+  return pieza;
 }
 
 // ─── Fotos ────────────────────────────────────────────────────────────────
@@ -206,10 +224,13 @@ export function aplicarMontaje(e: EstadoCrear, r: RespuestaMontar): EstadoCrear 
       const v = texto(d.datos?.[c]).trim();
       if (v) datos[c] = v;
     }
+    // El encuadre que ya se hubiera elegido para esa foto se conserva.
+    const encuadre = e.ajustes[d.foto]?.encuadre ?? encuadreDeDatos(d.datos);
     ajustes[d.foto] = {
       plantilla: plantillaValida(d.plantilla, e.marca, formato) ? d.plantilla : ajusteBase(e.marca, formato, e.estilo).plantilla,
       datos,
       altText: texto(d.altText).trim(),
+      ...(encuadre ? { encuadre } : {}),
     };
   }
   const avisos = [...r.avisos];
@@ -312,7 +333,8 @@ export function estadoDesdePieza(p: PiezaParaAbrir): EstadoCrear {
   }
   const foto = texto(p.datos?.foto).trim();
   const formatoUnaFoto: EstadoCrear["formatoUnaFoto"] = p.formato === "story" ? "story" : "post";
-  const ajuste: AjusteImagen = { plantilla: p.plantilla, datos, altText: texto(p.alt_text).trim() };
+  const encuadre = encuadreDeDatos(p.datos);
+  const ajuste: AjusteImagen = { plantilla: p.plantilla, datos, altText: texto(p.alt_text).trim(), ...(encuadre ? { encuadre } : {}) };
   const caption = texto(p.caption);
   // Los hashtags del final del texto pasan a sus fichas.
   const m = /(?:\n\s*)?((?:#[\p{L}\p{N}_]+\s*)+)$/u.exec(caption.trim());

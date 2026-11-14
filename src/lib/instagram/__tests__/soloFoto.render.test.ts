@@ -1,12 +1,11 @@
 // @vitest-environment node
 //
 // «Solo foto» (ct-solo-foto / tz-solo-foto, 12/11/2026), con Chromium de verdad:
-//  - una foto vertical buena se recorta a 1080×1350 (cubre), sin ningún texto
-//    ni logo, con el punto de interés vertical (posicionY);
-//  - una de la carta (1200×900) va ENTERA, centrada, con margen fino y NUNCA
-//    ampliada, sobre un fondo del color de la propia foto;
-//  - una pequeña (900×700) se queda en su tamaño natural.
-// Y la validación: sin titular vale; con titular, error; < 800 px, no vale.
+//  - la foto SIEMPRE se recorta a 4:5 a sangre (decisión del dueño), sin texto
+//    ni logo: una vertical buena, una de la carta (1200×900) centrada y con
+//    posicionX=30 (recorte horizontal);
+//  - una pequeña (640×480) sigue valiendo, con el aviso «puede verse blanda».
+// Y la validación: sin titular vale; con titular, en story o encuadre fuera de 0-100, no.
 //
 // Fotos de instagram-studio/assets (como marco.render.test.ts); si no están,
 // sintéticas. Se SALTA sin el Chromium de Playwright. Con
@@ -23,6 +22,7 @@ import {
   CODIGO_ESPERAR_RECURSOS,
   baseRecursosPanel,
   construirDocumento,
+  esAptaPara,
   obtenerPlantilla,
   plantillaPara,
   plantillasVisibles,
@@ -31,7 +31,7 @@ import {
   type DatosPieza,
   type Foto,
 } from "..";
-import { MARGEN_SOLO_FOTO, modoSoloFoto } from "../plantillas/solo-foto";
+import { RECORTE_MINIMO, anchoRecorte } from "../plantillas/solo-foto";
 
 const LENTO = 120_000;
 const PANEL = path.resolve(process.cwd(), "public");
@@ -88,8 +88,7 @@ const foto = (id: string, marca: Foto["marca"], ancho: number, alto: number): Fo
 const FOTOS = {
   vertical: { foto: foto("drive:vertical", "casa-tomas", 1281, 1920), origen: ASSETS ? path.join(ASSETS, "fotos", "casa-tomas", "champan.png") : null, color: "#5a4632" },
   carta: { foto: foto("carta:chuleta", "casa-tomas", 1200, 900), origen: ASSETS ? path.join(ASSETS, "fotos", "casa-tomas", "carne-plato.png") : null, color: "#3a2a22" },
-  pequena: { foto: foto("carta:pequena", "casa-tomas", 900, 700), origen: ASSETS ? path.join(ASSETS, "fotos", "casa-tomas", "carne-plato.png") : null, color: "#3a2a22" },
-  touza: { foto: foto("carta:vermut", "touza", 1200, 900), origen: ASSETS ? path.join(ASSETS, "fotos", "touza", "touza-2.webp") : null, color: "#1c140c" },
+  pequena: { foto: foto("carta:pequena", "casa-tomas", 640, 480), origen: ASSETS ? path.join(ASSETS, "fotos", "casa-tomas", "carne-plato.png") : null, color: "#3a2a22" },
 } as const;
 const CATALOGO = Object.values(FOTOS).map((f) => f.foto);
 
@@ -98,42 +97,41 @@ describe("«Solo foto»: registro y validación", () => {
     for (const id of ["ct-solo-foto", "tz-solo-foto"]) {
       const p = obtenerPlantilla(id)!;
       expect(problemasDePlantilla(p)).toEqual([]);
-      expect(p).toMatchObject({ nombre: "Solo foto", formatos: ["post"], admitidos: ["foto"], papel: "foto", sinTexto: true, encaje: "marco" });
+      expect(p).toMatchObject({ nombre: "Solo foto", formatos: ["post"], admitidos: ["foto"], papel: "foto", sinTexto: true });
     }
     expect(plantillasVisibles("casa-tomas", "post")[0].id).toBe("ct-solo-foto");
     expect(plantillasVisibles("touza", "post")[0].id).toBe("tz-solo-foto");
     expect(plantillasVisibles("casa-tomas", "story").some((p) => p.sinTexto)).toBe(false);
     expect(plantillaPara("casa-tomas", "post", "foto")?.id).toBe("ct-solo-foto");
-    // La portada enmarcada sigue siendo la de siempre.
     expect(plantillaPara("casa-tomas", "post", "portada", "marco")?.id).toBe("ct-portada-marco");
   });
 
-  it("sin titular vale (vertical, carta y pequeña de 900×700); con titular o con foto de < 800 px, no", () => {
-    for (const f of [FOTOS.vertical, FOTOS.carta, FOTOS.pequena]) {
+  it("sin titular vale con cualquier foto (también una de 640×480); con titular, en story o encuadre fuera de 0-100, no", () => {
+    for (const f of Object.values(FOTOS)) {
       const r = validarPieza({ marca: "casa-tomas", plantilla: "ct-solo-foto", formato: "post", foto: f.foto.id }, { fotos: CATALOGO });
       expect(r.ok ? [] : r.problemas).toEqual([]);
       expect(r.datos?.titular).toBe("");
+      expect(esAptaPara(f.foto, "post", obtenerPlantilla("ct-solo-foto"))).toBe(true);
     }
     const conTitular = validarPieza({ marca: "casa-tomas", plantilla: "ct-solo-foto", formato: "post", foto: "carta:chuleta", titular: "Chuleta" }, { fotos: CATALOGO });
     expect(conTitular.problemas?.join(" ")).toMatch(/va sin texto: quita el «titular»/);
     const story = validarPieza({ marca: "casa-tomas", plantilla: "ct-solo-foto", formato: "story", foto: "carta:chuleta" }, { fotos: CATALOGO });
     expect(story.problemas?.join(" ")).toMatch(/no tiene formato story/);
-    const diminuta = { ...FOTOS.carta.foto, id: "carta:diminuta", ancho: 640, alto: 480 };
-    const r = validarPieza({ marca: "casa-tomas", plantilla: "ct-solo-foto", formato: "post", foto: "carta:diminuta" }, { fotos: [diminuta] });
-    expect(r.problemas?.join(" ")).toMatch(/demasiado pequeña.*800 px/);
-    const fuera = validarPieza({ marca: "casa-tomas", plantilla: "ct-solo-foto", formato: "post", foto: "drive:vertical", posicionY: 140 }, { fotos: CATALOGO });
-    expect(fuera.problemas).toEqual(["«posicionY» debe ser un número entre 0 y 100"]);
-    const bien = validarPieza({ marca: "casa-tomas", plantilla: "ct-solo-foto", formato: "post", foto: "drive:vertical", posicionY: 30 }, { fotos: CATALOGO });
-    expect(bien.datos?.posicionY).toBe(30);
+    const fuera = validarPieza({ marca: "casa-tomas", plantilla: "ct-solo-foto", formato: "post", foto: "carta:chuleta", posicionX: -5, posicionY: 140 }, { fotos: CATALOGO });
+    expect(fuera.problemas).toEqual(["«posicionX» debe ser un número entre 0 y 100", "«posicionY» debe ser un número entre 0 y 100"]);
+    const bien = validarPieza({ marca: "casa-tomas", plantilla: "ct-solo-foto", formato: "post", foto: "carta:chuleta", posicionX: 30, posicionY: 45 }, { fotos: CATALOGO });
+    expect([bien.datos?.posicionX, bien.datos?.posicionY]).toEqual([30, 45]);
   });
 
-  it("modo: recorta si cubre (≤ 5 %), si no entera y sin ampliar dentro del margen", () => {
-    expect(modoSoloFoto({ ancho: 1281, alto: 1920 }, 1080, 1350)).toEqual({ modo: "cubre" });
-    expect(modoSoloFoto(undefined, 1080, 1350)).toEqual({ modo: "cubre" });
-    expect(modoSoloFoto({ ancho: 1200, alto: 900 }, 1080, 1350)).toEqual({ modo: "marco", ancho: 1080 - 2 * MARGEN_SOLO_FOTO, alto: 738 });
-    expect(modoSoloFoto({ ancho: 900, alto: 700 }, 1080, 1350)).toEqual({ modo: "marco", ancho: 900, alto: 700 });
+  it("ancho real del recorte: vertical 1281, carta 720, 640×480 → 384 (< 600: aviso)", () => {
+    expect(anchoRecorte({ ancho: 1281, alto: 1920 }, 1080, 1350)).toBe(1281);
+    expect(anchoRecorte({ ancho: 1200, alto: 900 }, 1080, 1350)).toBe(720);
+    expect(anchoRecorte({ ancho: 640, alto: 480 }, 1080, 1350)).toBe(384);
+    expect(anchoRecorte(undefined, 1080, 1350)).toBeNull();
+    expect(RECORTE_MINIMO).toBe(600);
   });
 });
+
 
 function servidor(fotos: Map<string, Buffer>): Promise<{ url: string; pagina(html: string): string; cerrar(): Promise<void> }> {
   const paginas = new Map<string, string>();
@@ -180,6 +178,7 @@ interface Caja {
   objectPosition: string;
 }
 
+
 describe.skipIf(!chromiumInstalado)("render real de «Solo foto»", () => {
   let navegador: Browser;
   let srv: Awaited<ReturnType<typeof servidor>>;
@@ -205,20 +204,16 @@ describe.skipIf(!chromiumInstalado)("render real de «Solo foto»", () => {
       const { errores, avisos } = (await page.evaluate(CODIGO_COMPROBAR_MAQUETACION)) as { errores: string[]; avisos: string[] };
       const medidas = (await page.evaluate(`(() => {
         const l = document.querySelector(".lienzo").getBoundingClientRect();
-        const caja = (img) => {
-          if (!img) return null;
-          const r = img.getBoundingClientRect();
-          return { x: r.left - l.left, y: r.top - l.top, w: r.width, h: r.height, naturalW: img.naturalWidth, naturalH: img.naturalHeight, objectPosition: getComputedStyle(img).objectPosition };
-        };
+        const img = document.querySelector(".sf__foto");
+        const r = img.getBoundingClientRect();
+        const cs = getComputedStyle(img);
         return {
-          modo: document.querySelector(".sf").getAttribute("data-modo"),
-          foto: caja(document.querySelector(".sf__foto") || document.querySelector(".sf__entera")),
-          fondo: caja(document.querySelector(".sf__fondo")),
+          foto: { x: r.left - l.left, y: r.top - l.top, w: r.width, h: r.height, naturalW: img.naturalWidth, naturalH: img.naturalHeight, objectPosition: cs.objectPosition, objectFit: cs.objectFit },
+          imagenes: document.images.length,
           textos: document.querySelectorAll("[data-campo]").length,
           letras: document.body.innerText.trim().length,
-          logos: Array.from(document.images).filter((i) => !i.className.startsWith("sf__")).length,
         };
-      })()`)) as { modo: string; foto: Caja; fondo: Caja | null; textos: number; letras: number; logos: number };
+      })()`)) as { foto: Caja & { objectFit: string }; imagenes: number; textos: number; letras: number };
       const png = await page.screenshot({ type: "png", clip: { x: 0, y: 0, width: 1080, height: 1350 } });
       return { fallos, errores, avisos, medidas, png };
     } finally {
@@ -232,68 +227,63 @@ describe.skipIf(!chromiumInstalado)("render real de «Solo foto»", () => {
     fs.writeFileSync(path.join(CAPTURAS, nombre), jpg);
   }
 
-  const pieza = (marca: DatosPieza["marca"], fotoId: string, extra: Partial<DatosPieza> = {}): DatosPieza => {
-    const v = validarPieza({ marca, plantilla: marca === "touza" ? "tz-solo-foto" : "ct-solo-foto", formato: "post", foto: fotoId, ...extra }, { fotos: CATALOGO });
+  const pieza = (fotoId: string, extra: Partial<DatosPieza> = {}): DatosPieza => {
+    const v = validarPieza({ marca: "casa-tomas", plantilla: "ct-solo-foto", formato: "post", foto: fotoId, ...extra }, { fotos: CATALOGO });
     expect(v.ok ? [] : v.problemas).toEqual([]);
     return v.datos!;
   };
 
+  /** Siempre a sangre: la foto ocupa todo el lienzo, sin texto ni logo, con object-fit cover. */
+  function aSangre(r: Awaited<ReturnType<typeof renderizar>>) {
+    expect(r.fallos).toEqual([]);
+    expect(r.errores).toEqual([]);
+    expect(r.medidas).toMatchObject({ imagenes: 1, textos: 0, letras: 0 });
+    const f = r.medidas.foto;
+    expect([f.x, f.y, f.w, f.h, f.objectFit]).toEqual([0, 0, 1080, 1350, "cover"]);
+  }
+
   it(
-    "foto vertical buena (1281×1920): recortada a 1080×1350, sin texto ni logo, centrada en posicionY",
+    "foto vertical buena (1281×1920): a sangre, sin aviso, encuadre vertical 40 %",
     async () => {
-      const r = await renderizar(pieza("casa-tomas", "drive:vertical", { posicionY: 40 }));
-      expect(r.fallos).toEqual([]);
-      expect(r.errores).toEqual([]);
+      const r = await renderizar(pieza("drive:vertical", { posicionY: 40 }));
+      aSangre(r);
       expect(r.avisos).toEqual([]);
-      expect(r.medidas.modo).toBe("cubre");
-      expect(r.medidas).toMatchObject({ textos: 0, letras: 0, logos: 0, fondo: null });
-      const f = r.medidas.foto;
-      expect([f.x, f.y, f.w, f.h]).toEqual([0, 0, 1080, 1350]);
-      expect(f.objectPosition).toBe("50% 40%");
+      expect(r.medidas.foto.objectPosition).toBe("50% 40%");
       await guardar(r.png, "ct-solo-foto-vertical.jpg");
     },
     LENTO,
   );
 
-  for (const [clave, marca, nombre] of [
-    ["carta", "casa-tomas", "ct-solo-foto-carta-1200x900.jpg"],
-    ["touza", "touza", "tz-solo-foto-carta-1200x900.jpg"],
-  ] as const) {
-    it(
-      `${marca}: foto de la carta 1200×900 entera, centrada, con margen fino y sin ampliar, sobre su propio color`,
-      async () => {
-        const r = await renderizar(pieza(marca, FOTOS[clave].foto.id));
-        expect(r.fallos).toEqual([]);
-        expect(r.errores).toEqual([]);
-        expect(r.medidas.modo).toBe("marco");
-        expect(r.medidas).toMatchObject({ textos: 0, letras: 0, logos: 0 });
-        const f = r.medidas.foto;
-        expect([f.naturalW, f.naturalH]).toEqual([1200, 900]);
-        // Entera (misma proporción), nunca ampliada, centrada y con el margen fino a los lados.
-        expect(Math.abs(f.w / f.h - 1200 / 900)).toBeLessThan(0.01);
-        expect(f.w).toBeLessThanOrEqual(1200);
-        expect(Math.round(f.x)).toBe(MARGEN_SOLO_FOTO);
-        expect(Math.abs(f.y + f.h / 2 - 675)).toBeLessThan(1);
-        // El fondo es la propia foto (desenfocada) y cubre todo el lienzo.
-        expect(r.medidas.fondo?.naturalW).toBe(1200);
-        expect(r.medidas.fondo!.w).toBeGreaterThanOrEqual(1080);
-        // El fondo no es el de la marca: toma el color de la foto (la esquina no es blanca ni el papel).
-        const { data } = await sharp(r.png).extract({ left: 4, top: 4, width: 8, height: 8 }).raw().toBuffer({ resolveWithObject: true });
-        expect(Math.min(data[0], data[1], data[2])).toBeLessThan(235);
-        await guardar(r.png, nombre);
-      },
-      LENTO,
-    );
-  }
+  it(
+    "foto de la carta (1200×900): recortada a 4:5 a sangre y centrada; con posicionX=30 se ve más de la izquierda",
+    async () => {
+      const centrada = await renderizar(pieza("carta:chuleta"));
+      aSangre(centrada);
+      expect(centrada.avisos).toEqual([]); // 720 px reales de ancho: vale
+      expect(centrada.medidas.foto.objectPosition).toBe("50% 50%");
+      expect(centrada.medidas.foto.naturalW).toBe(1200);
+      const izquierda = await renderizar(pieza("carta:chuleta", { posicionX: 30 }));
+      aSangre(izquierda);
+      expect(izquierda.medidas.foto.objectPosition).toBe("30% 50%");
+      // Otro trozo de la foto: las capturas no son iguales.
+      const a = await sharp(centrada.png).resize(54, 68).raw().toBuffer();
+      const b = await sharp(izquierda.png).resize(54, 68).raw().toBuffer();
+      let diferencia = 0;
+      for (let i = 0; i < a.length; i++) diferencia += Math.abs(a[i] - b[i]);
+      expect(diferencia / a.length).toBeGreaterThan(3);
+      await guardar(centrada.png, "ct-solo-foto-carta-1200x900-centrada.jpg");
+      await guardar(izquierda.png, "ct-solo-foto-carta-1200x900-x30.jpg");
+    },
+    LENTO,
+  );
 
   it(
-    "foto pequeña (900×700): se queda en su tamaño natural, centrada",
+    "foto pequeña (640×480): sigue valiendo, a sangre, con el aviso «puede verse blanda»",
     async () => {
-      const r = await renderizar(pieza("casa-tomas", "carta:pequena"));
-      expect(r.errores).toEqual([]);
-      const f = r.medidas.foto;
-      expect([f.w, f.h]).toEqual([900, 700]);
-      expect(Math.abs(f.x + f.w / 2 - 540)).toBeLessThan(1);
+      const r = await renderizar(pieza("carta:pequena"));
+      aSangre(r);
+      expect(r.avisos).toHaveLength(1);
+      expect(r.avisos[0]).toMatch(/^La foto es pequeña y puede verse blanda \(se ven 384 px de ancho/);
     },
     LENTO,
   );

@@ -410,6 +410,7 @@ export function CrearInstagram({ abrir = null, marcaInicial = "casa-tomas", mont
               }}
               onFormatoUnaFoto={(f) => cambiar((prev) => ({ ...prev, formatoUnaFoto: f, montado: prev.fotos.length > 0 || prev.montado }))}
               onAjuste={(foto, c) => cambiar((prev) => cambiarAjuste(prev, foto, c))}
+              urlFoto={(foto) => preparadas.listas[foto]?.preparada.url}
             />
           </div>
         </div>

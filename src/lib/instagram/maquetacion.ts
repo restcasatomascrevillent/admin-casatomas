@@ -9,7 +9,9 @@
  *  (b) todo data-campo dentro del margen de 72 px y, en story, dentro de la
  *      zona segura (250 px arriba y abajo);
  *  (c) ningún data-campo vacío;
- *  (d) aviso (no error) si el titular pasa de 3 líneas.
+ *  (d) aviso (no error) si el titular pasa de 3 líneas;
+ *  (e) avisos que pone la propia plantilla en data-aviso (p. ej. «Solo foto»
+ *      con una foto pequeña que puede verse blanda).
  *
  * AUTOCONTENIDAS A PROPÓSITO: comprobarMaquetacion y esperarRecursos no usan
  * nada de fuera (ni imports, ni constantes del módulo, ni funciones auxiliares
@@ -167,6 +169,14 @@ export function comprobarMaquetacion(doc: Document, formato: FormatoId, avisos?:
     }
     if (lineas.length > MAX_LINEAS_TITULAR) {
       avisos.push(`El titular ocupa ${lineas.length} líneas (recomendado ≤ ${MAX_LINEAS_TITULAR})`);
+    }
+  }
+
+  // (e) Avisos de la plantilla (data-aviso).
+  if (avisos) {
+    for (const el of Array.from(doc.querySelectorAll("[data-aviso]"))) {
+      const texto = (el.getAttribute("data-aviso") || "").trim();
+      if (texto && !avisos.includes(texto)) avisos.push(texto);
     }
   }
   return errores;

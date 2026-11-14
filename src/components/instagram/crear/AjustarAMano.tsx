@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SelectorSubrayado } from "@/components/panel/SelectorSubrayado";
 import { cn } from "@/lib/utils";
+import { EncuadreFoto } from "@/components/instagram/EncuadreFoto";
 import { MARCAS_IDS, obtenerPlantilla, type MarcaId } from "@/lib/instagram";
 import { AYUDA_CAMPO, NOMBRE_CAMPO } from "@/components/marketing/instagram/pieza";
 import { NOMBRE_MARCA_CORTO } from "@/components/marketing/instagram/HistorialPiezas";
@@ -31,13 +32,15 @@ interface Props {
   onMarca: (m: MarcaId) => void;
   onFormatoUnaFoto: (f: "post" | "story") => void;
   onAjuste: (foto: string, cambio: Partial<AjusteImagen>) => void;
+  /** URL de la foto (la copia preparada) para encuadrar «Solo foto»; undefined mientras se prepara. */
+  urlFoto?: (foto: string) => string | undefined;
 }
 
 /**
  * «Ajustar a mano», plegado: marca, formato y, por imagen, plantilla, rótulos
  * y texto alternativo. Para quien quiera retocar lo que ha montado la IA.
  */
-export function AjustarAMano({ estado, abierto, onAbierto, actual, onActual, onMarca, onFormatoUnaFoto, onAjuste }: Props) {
+export function AjustarAMano({ estado, abierto, onAbierto, actual, onActual, onMarca, onFormatoUnaFoto, onAjuste, urlFoto }: Props) {
   const formato = formatoEfectivo(estado);
   const formatoPieza = formatoImagen(formato);
   const n = estado.fotos.length;
@@ -132,6 +135,17 @@ export function AjustarAMano({ estado, abierto, onAbierto, actual, onActual, onM
                 Esta plantilla va sin texto encima: el nombre del plato y el gancho van en el texto de la publicación.
               </p>
             )}
+            {plantilla?.sinTexto &&
+              (urlFoto?.(foto) ? (
+                <EncuadreFoto
+                  key={foto}
+                  src={urlFoto(foto)!}
+                  valor={ajuste.encuadre ?? { x: 50, y: 50 }}
+                  onCambio={(encuadre) => onAjuste(foto, { encuadre })}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">Preparando la foto para encuadrarla…</p>
+              ))}
 
             {campos.map((c) => (
               <CampoRotuloInput key={`${foto}-${c}`} campo={c} valor={ajuste.datos[c] ?? ""} limite={plantilla?.limites?.[c]} onCambio={(v) => onAjuste(foto, { datos: { [c]: v } })} />
