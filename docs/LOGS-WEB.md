@@ -87,9 +87,15 @@ Fuente única: `src/components/trafico-web/comportamiento/definiciones.ts`. El c
   - un arrendamiento por incidencia antes de tocar su ticket;
   - el ticket se crea en Linear con un **id determinista** (`linear_uuid`): si una respuesta se pierde, el reintento recupera el ticket existente en vez de crear otro.
 - **Repeticiones**: se comenta el ticket con la frecuencia nueva cada 6 h, o antes si las ocurrencias se duplican.
-- **Reaparición de una resuelta** (configurable): reabrirla y avisar en el mismo ticket (por defecto), crear un ticket nuevo que enlaza el anterior, o dejarla resuelta.
-- **Estado de Linear**: si el ticket se cierra en Linear, la incidencia pasa a «resuelta» aquí, y si el error vuelve, se reabre. Si se cancela en Linear, pasa a «ignorada».
+- **Reaparición de una resuelta** (configurable): reabrirla y avisar en el mismo ticket (por defecto), crear un ticket nuevo que enlaza el anterior, o dejarla resuelta. Al reabrir, el ticket de Linear vuelve al estado elegido o, si no se elige, al primero «por hacer» de su equipo; si en Linear seguía abierto, solo se comenta (no se mueve de «En curso» a «Por hacer»).
+- **Estado de Linear**: si el ticket se cierra en Linear, la incidencia pasa a «resuelta» aquí, y si el error vuelve, se reabre. Si se cancela en Linear, pasa a «ignorada». Si se borra en Linear, se suelta: si el error vuelve a cumplir los umbrales, se abre otro (con id nuevo).
+- **Tope diario**: como mucho `linear_max_tickets_dia` tickets nuevos al día (hora de Madrid) en el destino actual. Se atienden primero los más graves y con más visitantes afectados; el resto espera.
+- **Resuelta antes de tener ticket**: no se crea (si vuelve, pasa a «reabierta» y entonces sí).
+- **Al pasar del destino de pruebas a Linear**: los tickets de prueba no se mandan a Linear. Si una de esas incidencias sigue repitiéndose, se crea su ticket en Linear (con id nuevo, dentro del tope diario); las que ya pararon se quedan como estaban.
+- **Errores de Linear legibles**: clave mala o caducada, sin permiso, equipo o ticket que no existe, límite de peticiones o Linear caído se guardan con una frase en español que dice qué hacer. Con la clave rechazada, la pasada se para (y se avisa) en vez de insistir con cada incidencia.
 - **Contenido del ticket**:
+  - **En pocas palabras** (arriba del todo, en lenguaje llano): qué pasa, a quién afecta, desde cuándo y qué hacer;
+  - debajo, los detalles técnicos:
   - título;
   - impacto;
   - entorno, versión y despliegue;
@@ -162,13 +168,14 @@ npx supabase db query --remote=sfonaclosuafvlhutkon -f supabase/migrations/20261
 
 Hasta entonces el aviso de Logs dice «El proceso en segundo plano todavía no ha terminado ninguna pasada». Con una sesión de super admin también se puede lanzar a mano con **Procesar ahora** (Configuración).
 
-**Linear real (cuando se quiera):**
+**Linear real (cuando se quiera)** — los mismos pasos salen en el panel (Logs › Configuración › Linear › «Cómo conectar Linear»):
 
-1. Crear una clave personal en Linear (*Settings › Security & access*).
-2. Guardarla como secreto: `npx supabase secrets set LINEAR_API_KEY=… --project-ref <ref>`.
-3. En Logs › Configuración, poner el id del equipo (y, si se quiere, proyecto y etiquetas) y cambiar el destino a «Linear».
+1. En Linear: *Settings › Security & access › Personal API keys › New API key* (nombre, por ejemplo, «Casa Tomás · Logs»).
+2. En Supabase: *Edge Functions › Secrets › Add new secret*, nombre `LINEAR_API_KEY` (o `npx supabase secrets set LINEAR_API_KEY=… --project-ref <ref>`). Primero en la demo.
+3. En Logs › Configuración › Linear, **«Probar conexión con Linear»**: dice si la clave funciona y el nombre del espacio de trabajo, y deja elegir en desplegables el equipo, el proyecto, las etiquetas y el estado al reabrir (ya no hace falta pegar ids; siguen en «Avanzado»). Sin clave, dice «Falta la clave de Linear» y remite a estos pasos.
+4. Cambiar «Destino de los tickets» a «Linear» y **Guardar configuración**.
 
-Las incidencias creadas en el destino de pruebas no se repiten en Linear. Para mandar una, usa «Reenviar al destino actual».
+La prueba la hace `procesar-logs-web` con `{ "accion": "probar_linear" }`, solo para super admin; no procesa nada y la clave nunca sale del servidor. Las incidencias del destino de pruebas solo pasan a Linear si siguen repitiéndose (ver «Al pasar del destino de pruebas a Linear»). Para mandar una a mano, «Reenviar al destino actual».
 
 **Producción (`haqmmdfdzzatdnrrcgez`)**: solo después de aceptar los PR y con el «sí» del dueño. Mismo orden: migraciones 100000 y 100100, las tres funciones, el secreto y Vault, y la migración del cron. La web empieza a mandar datos cuando se publica el PR de `web-casatomas`.
 
