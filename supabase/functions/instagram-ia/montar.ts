@@ -208,6 +208,17 @@ export function vaSoloFoto(formato: FormatoMontado, estilo: EstiloFeed = ESTILO_
  * Plantillas que puede usar el montaje: con «Solo foto», solo esa; si no, las
  * v2 (no clásicas) de la marca con foto y papel de rótulos que admiten el formato de imagen.
  */
+/**
+ * Estilos calcados de las stories de Casa Tomás (12/11/2026): se eligen a mano en
+ * «Ajustar a mano»; el montaje automático no los usa (cada uno pide textos propios:
+ * reseña, nombres, @ del cliente…).
+ */
+export const PLANTILLAS_SOLO_A_MANO: ReadonlySet<string> = new Set([
+  "ct-rotulo-hilo", "ct-rotulo-recuadro", "ct-rotulo-titular", "ct-rotulo-manuscrita",
+  "ct-resena", "ct-resena-foto", "ct-vosotros-celebracion", "ct-vosotros-gracias",
+  "ct-reserva-mesa", "ct-touza-descubre", "ct-tapas-poster", "ct-icono-destacada",
+]);
+
 export function plantillasMontar(marca: MarcaIA, formato: FormatoMontado, estilo: EstiloFeed = ESTILO_FEED_POR_DEFECTO): PlantillaIA[] {
   if (vaSoloFoto(formato, estilo)) {
     const sola = plantillaSoloFoto(marca);
@@ -217,6 +228,7 @@ export function plantillasMontar(marca: MarcaIA, formato: FormatoMontado, estilo
     (p) =>
       p.marca === marca &&
       !p.clasica &&
+      !PLANTILLAS_SOLO_A_MANO.has(p.id) &&
       p.conFoto &&
       !!p.papel &&
       p.papel !== "tipografica" &&
