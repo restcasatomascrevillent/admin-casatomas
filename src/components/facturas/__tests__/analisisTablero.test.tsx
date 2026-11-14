@@ -241,7 +241,7 @@ describe("tablero: sale hecho al abrir la pestaña", () => {
     montar();
     const ind = await screen.findByLabelText("Indicadores del periodo");
     // 13/11/2026: la primera tarjeta es el gasto del mes en curso y las facturas subidas (el doble responde lo mismo).
-    await waitFor(() => expect(ind).toHaveTextContent(/Gasto de noviembre1\.362\.491,57\s€con IVA · 1\.844 facturas subidas/));
+    await waitFor(() => expect(ind).toHaveTextContent(/Gasto de noviembre1\.362\.491,57\s€con IVA · 1\.844 facturas de este mes \(por fecha de la factura\)/));
     expect(ind).toHaveTextContent(/Precios que han subido/);
     expect(ind).toHaveTextContent(/Puedes ahorrar/);
     expect(ind).toHaveTextContent(/Por revisar40albaranes sin factura/);

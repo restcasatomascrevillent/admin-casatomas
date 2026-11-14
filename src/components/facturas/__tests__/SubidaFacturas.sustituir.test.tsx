@@ -9,6 +9,7 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }), use
 // Con permiso de edición en Facturas (sin él no se ofrece sustituir ni añadir página).
 vi.mock("@/hooks/useUserRole", async (orig) => ({
   ...(await orig<typeof import("@/hooks/useUserRole")>()),
+  useUserRole: () => ({ isAdmin: false, loading: false }),
   useCanAccessSection: () => ({ canAccess: true, isLoading: false }),
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }) }));
