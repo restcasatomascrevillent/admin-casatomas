@@ -28,6 +28,11 @@
 //     20261106500000). Novedades, menús, tapas y el modo campos siguen igual
 //     para gestion_web: con «Ver» basta (el Gestor Web no cambia).
 // Clave por `claveOpenAI("otros")` y cada llamada deja su fila en ia_uso.
+//
+// Descripción de platos nuevos (tarea 2.2, 13/11/2026): con
+// `{tipo: "plato", datos, redactar_descripcion: true}` y la descripción vacía,
+// la MISMA llamada redacta también la descripción en español
+// (`translations.descripcion_es`) además de sus traducciones.
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { buildPromptSpec, type TipoContenido } from "./prompts.ts";
@@ -248,8 +253,15 @@ async function atender(
     return json({ error: `Demasiado texto para traducir (${tamano} > ${MAX_CARACTERES_DATOS} caracteres)` }, 400);
   }
 
+  // Redactar la descripción de un plato nuevo que llega sin ella (tarea 2.2):
+  // solo si el panel lo pide (crearPlato), y en ESTA misma llamada y con el
+  // mismo modelo; no hay segunda llamada. La respuesta trae entonces
+  // `descripcion_es` junto a descripcion_en/fr (ver prompts.ts). Sin la marca,
+  // todo sigue igual que antes (editar, bulk, otros tipos).
+  const redactarDescripcion = tipo === "plato" && payload.redactar_descripcion === true;
+
   try {
-    const spec = buildPromptSpec(tipo, datos);
+    const spec = buildPromptSpec(tipo, datos, { redactarDescripcion });
     const raw = await callOpenAI(spec.system, spec.userMessage);
     const translations = spec.mapResponse(raw);
     return json({ ok: true, tipo, translations });

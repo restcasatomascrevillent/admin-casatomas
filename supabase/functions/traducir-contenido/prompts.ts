@@ -10,7 +10,9 @@
 // NOVEDAD_SYSTEM) y NOVEDAD_SYSTEM (reescrito: el original pedía "reescribir"
 // y el modelo cambiaba el sentido; ver su constante).
 // COCTEL_SYSTEM es nuevo: el switch de n8n nunca tuvo una rama "coctel" (por
-// eso hoy hay 0/13 cócteles traducidos).
+// eso hoy hay 0/13 cócteles traducidos). PLATO_REDACCION_SYSTEM también es
+// nuevo (tarea 2.2): redacta la descripción de un plato nuevo que llega sin
+// ella, en la misma llamada de traducción.
 
 export type TipoContenido =
   | "plato"
@@ -124,6 +126,79 @@ Fuera de este glosario, traduce el resto de los términos de cocina de forma pro
 export const PLATO_SYSTEM = `Eres un experto en traducción gastronómica profesional. Devuelve únicamente JSON válido, sin markdown, sin \`\`\`json, sin texto adicional. Con los datos de entrada (nombre, descripcion, categoria, alergenos) genera exactamente este objeto con este esquema y estas claves: {"nombre": string, "descripcion": string|null, "traducciones": {"en": {"name": string, "description": string|null, "category": string, "allergens": string[]}, "fr": {"name": string, "description": string|null, "category": string, "allergens": string[]}}}. Debes traducir SIEMPRE el nombre a inglés y francés en traducciones.en.name y traducciones.fr.name, y si descripcion no es null también traducirla en traducciones.en.description y traducciones.fr.description. La categoría debe ser exactamente una de estas en inglés: Rice Dishes, Meats, Salads, Hot Starters, Cold Starters, Shellfish, Today's Specials, Fish, Desserts, Salt-cured Fish, Snacks, y en francés la correspondiente exacta: Plats de riz, Viandes, Salades, Entrées chaudes, Entrées froides, Fruits de mer, Suggestions du jour, Poissons, Desserts, Salaisons, Snacks. No inventes ingredientes ni alérgenos; usa los alérgenos de entrada y tradúcelos solo si ya vienen traducidos en el input, y si el alérgeno Gluten aparece en cualquier idioma debe escribirse exactamente como gluten tanto en inglés como en francés sin traducirlo ni cambiar mayúsculas.
 
 ${GLOSARIO_COCINA}`;
+
+// ---------------------------------------------------------------------------
+// Redacción de la descripción de un plato nuevo — NUEVO (tarea 2.2, 13/11/2026).
+//
+// Petición del dueño: si al crear un plato no se escribe descripción, que la
+// escriba la IA «sin consumir un modelo extra». Por eso NO es otra llamada ni
+// otro modelo: este bloque se añade al final de PLATO_SYSTEM en la MISMA
+// llamada de traducción que ya se hace al crear el plato (gpt-4.1-mini), y
+// solo cuando el panel lo pide (`redactar_descripcion: true`, que solo manda
+// crearPlato con la descripción vacía). Editar un plato, el modo bulk y el
+// resto de tipos no cambian.
+//
+// Las reglas siguen la misma línea que el glosario: en una carta con alérgenos
+// es inaceptable inventar ingredientes (ver GLOSARIO_COCINA), así que la
+// descripción solo puede contar lo que dicen el nombre, los ingredientes, la
+// categoría y los alérgenos. Tono: el de las descripciones que ya hay en la
+// carta (una frase corta y concreta; mediana de 69 caracteres en producción).
+// ---------------------------------------------------------------------------
+
+/** Lo que se pide al modelo (una frase de hasta 140 caracteres). */
+export const LARGO_DESCRIPCION_IA = 140;
+/** A partir de aquí la descripción redactada se descarta (no ha seguido las
+ * instrucciones) y el plato se guarda sin descripción, como antes. */
+export const MAX_DESCRIPCION_IA = 250;
+/** Lo mismo para sus traducciones (el francés ocupa más que el español). */
+export const MAX_TRADUCCION_DESCRIPCION_IA = 375;
+
+export const PLATO_REDACCION_SYSTEM = `REDACCIÓN DE LA DESCRIPCIÓN (solo en esta petición): el plato llega SIN descripción. Además de traducir, escribe tú una descripción breve en español para la carta y devuélvela en la clave adicional "descripcion_es" del objeto raíz (el resto del esquema no cambia). Tradúcela también al inglés en traducciones.en.description y al francés en traducciones.fr.description.
+
+Cómo tiene que ser:
+- Una sola frase, de ${LARGO_DESCRIPCION_IA} caracteres como máximo, con punto final.
+- Tono de carta de restaurante tradicional español: apetitosa pero sobria y concreta. Sin adjetivos grandilocuentes ("exquisito", "delicioso", "espectacular", "irresistible", "el mejor"...), sin exclamaciones, sin emojis, sin precios y sin el nombre del restaurante.
+- Usa SOLO lo que dicen el nombre, los ingredientes, la categoría y los alérgenos de la entrada. No añadas ningún ingrediente, guarnición, salsa, aliño ni acompañamiento que no esté ahí.
+- No afirmes como hecho una técnica de cocción, un punto, un origen o una procedencia que no diga o implique claramente el nombre o los ingredientes (no escribas "a la brasa", "a baja temperatura", "casero", "de lonja", "del día", "de Galicia"... si no viene dado).
+- Puedes explicar qué es el producto principal si es un dato general y seguro (por ejemplo, que la corvina es un pescado blanco), pero nunca atribuyas al plato nada que no esté en los datos.
+- Los alérgenos solo sirven para no contradecirlos: no los enumeres y no menciones nada que lleve un alérgeno que no esté en la lista (por ejemplo, mantequilla, nata o queso sin lácteos; pan, harina o rebozado sin gluten; huevo o mayonesa sin huevos).
+- No copies el nombre del plato tal cual: cuenta en qué consiste con lo que se sabe. Si los datos solo permiten decir lo que ya dice el nombre, reformúlalo con sencillez, sin rellenar.
+- Si no puedes escribir nada sin inventar, devuelve "descripcion_es": null y deja description en null en los dos idiomas.
+- Las traducciones de esta descripción siguen las mismas reglas que las del nombre, incluido el glosario de arriba.`;
+
+/** Opciones de `buildPromptSpec`. */
+export interface OpcionesPrompt {
+  /** Solo platos: si la descripción viene vacía, el modelo la redacta (ver PLATO_REDACCION_SYSTEM). */
+  redactarDescripcion?: boolean;
+}
+
+/** ¿Hay que pedir al modelo que redacte la descripción? Solo en platos, solo
+ * si el panel lo pide y solo si la descripción en español viene vacía: una
+ * descripción escrita por el usuario nunca se sustituye. */
+export function debeRedactarDescripcion(
+  tipo: TipoContenido,
+  datos: Record<string, unknown>,
+  opciones: OpcionesPrompt = {},
+): boolean {
+  return tipo === "plato" && opciones.redactarDescripcion === true && toStr(datos.descripcion).trim() === "";
+}
+
+/**
+ * Deja una descripción redactada por el modelo lista para guardar, o null si
+ * no sirve: no es texto, está vacía, dice "null" o pasa del máximo (no ha
+ * seguido las instrucciones). Junta saltos de línea y espacios y quita las
+ * comillas que a veces pone alrededor.
+ */
+export function limpiarDescripcionRedactada(valor: unknown, max = MAX_DESCRIPCION_IA): string | null {
+  if (typeof valor !== "string") return null;
+  const texto = valor
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^["'«“]+|["'»”]+$/g, "")
+    .trim();
+  if (!texto || texto.toLowerCase() === "null" || texto.length > max) return null;
+  return texto;
+}
 
 // ---------------------------------------------------------------------------
 // Novedades — REESCRITO el 2026-10-01 (antes: nodo "Novedades" de n8n, verbatim).
@@ -329,7 +404,11 @@ export interface PromptSpec {
   mapResponse: (raw: unknown) => Record<string, unknown>;
 }
 
-export function buildPromptSpec(tipo: TipoContenido, datos: Record<string, unknown>): PromptSpec {
+export function buildPromptSpec(
+  tipo: TipoContenido,
+  datos: Record<string, unknown>,
+  opciones: OpcionesPrompt = {},
+): PromptSpec {
   switch (tipo) {
     case "vino": {
       const userMessage = `Nombre:${toStr(datos.nombre)}\nDescripción:${toStr(datos.descripcion)}\nCategoria:${toStr(datos.categoria)}\nUbicacion_pais:${toStr(datos.ubicacion_pais)}\nUbicación_region:${toStr(datos.ubicacion_region)}\nALergenos: ${toStr(datos.alergenos_notas)}`;
@@ -381,9 +460,17 @@ export function buildPromptSpec(tipo: TipoContenido, datos: Record<string, unkno
 
     case "plato": {
       const alergenos = normalizarAlergenos(datos.alergenos ?? datos.alergenos_oficiales);
-      const userMessage = `Nombre: ${toStr(datos.nombre)}\nDescripción: ${toStr(datos.descripcion)}\nCategoria:  ${toStr(datos.categoria)}\nAlergenos: ${alergenos.join(", ")}`;
+      const base = `Nombre: ${toStr(datos.nombre)}\nDescripción: ${toStr(datos.descripcion)}\nCategoria:  ${toStr(datos.categoria)}\nAlergenos: ${alergenos.join(", ")}`;
+      // Sin redacción, el mensaje y el system son EXACTAMENTE los de siempre.
+      // Con redacción se añaden los ingredientes (la traducción no los usa:
+      // Platos no tiene ingredientes_en/fr) y el bloque PLATO_REDACCION_SYSTEM.
+      const redactar = debeRedactarDescripcion(tipo, datos, opciones);
+      const ingredientes = toStr(datos.ingredientes).trim();
+      const userMessage = redactar
+        ? `${base}\nIngredientes: ${ingredientes || "(no indicados)"}\nDescripción en español: vacía; redáctala según las instrucciones y devuélvela en "descripcion_es".`
+        : base;
       return {
-        system: PLATO_SYSTEM,
+        system: redactar ? `${PLATO_SYSTEM}\n\n${PLATO_REDACCION_SYSTEM}` : PLATO_SYSTEM,
         userMessage,
         mapResponse: (raw) => {
           const r = (raw ?? {}) as Record<string, any>;
@@ -391,7 +478,7 @@ export function buildPromptSpec(tipo: TipoContenido, datos: Record<string, unkno
           const fr = r.traducciones?.fr ?? {};
           const allergensEn = strArray(en.allergens);
           const allergensFr = strArray(fr.allergens);
-          return {
+          const columnas: Record<string, unknown> = {
             nombre_en: nullIfEmpty(en.name),
             categoria_en: nullIfEmpty(en.category),
             descripcion_en: nullIfEmpty(en.description),
@@ -401,6 +488,18 @@ export function buildPromptSpec(tipo: TipoContenido, datos: Record<string, unkno
             descripcion_fr: nullIfEmpty(fr.description),
             alergenos_fr: allergensFr.length ? allergensFr.join(", ") : null,
           };
+          if (!redactar) return columnas;
+          // La descripción redactada va con sus DOS traducciones o no va: así
+          // nunca queda un plato con descripción en inglés y no en español (o
+          // al revés). Si algo falta o no sirve, se guarda como hasta ahora:
+          // sin descripción en ningún idioma.
+          const es = limpiarDescripcionRedactada(r.descripcion_es ?? r.descripcion);
+          const descEn = limpiarDescripcionRedactada(en.description, MAX_TRADUCCION_DESCRIPCION_IA);
+          const descFr = limpiarDescripcionRedactada(fr.description, MAX_TRADUCCION_DESCRIPCION_IA);
+          if (es && descEn && descFr) {
+            return { ...columnas, descripcion_es: es, descripcion_en: descEn, descripcion_fr: descFr };
+          }
+          return { ...columnas, descripcion_en: null, descripcion_fr: null };
         },
       };
     }

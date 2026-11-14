@@ -9,6 +9,7 @@ import {
   validarDeclaracionAlergenos,
 } from "@/lib/alergenos";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
+import { MAX_DESCRIPCION_CARTA } from "@/lib/limites-carta";
 import {
   cambiosDeOrden,
   categoriasOrdenadas,
@@ -81,27 +82,58 @@ function normalizarAlergenos(alergenos_oficiales: unknown): string[] {
   return combinarAlergenos(parseAlergenos(alergenos_oficiales));
 }
 
+/** Mensaje que ve quien crea un plato sin descripción cuando la escribe la IA. */
+export const AVISO_DESCRIPCION_IA = "Descripción escrita por la IA: revísala";
+
+interface TraduccionPlato {
+  /** Columnas *_en/*_fr listas para guardar junto al plato. */
+  columnas: Record<string, unknown>;
+  /** Descripción en español escrita por la IA (solo si se pidió y sirve). */
+  descripcionGenerada: string | null;
+}
+
 /** Llama a traducir-contenido; nunca lanza. Si falla, devuelve null y el
- * caller guarda el plato igualmente sin traducción (ver informe, TAREA 2). */
-async function traducirPlato(datos: {
-  nombre: string;
-  descripcion: string;
-  ingredientes: string;
-  categoria: string;
-  alergenos: string[];
-}): Promise<Record<string, unknown> | null> {
+ * caller guarda el plato igualmente sin traducción (ver informe, TAREA 2).
+ *
+ * Con `redactarDescripcion` (solo al crear un plato sin descripción, tarea
+ * 2.2) la MISMA llamada devuelve además una descripción en español
+ * (`descripcion_es`) con sus traducciones en descripcion_en/fr. Esa clave no
+ * es una columna de Platos: se separa siempre de `columnas`. */
+async function traducirPlato(
+  datos: {
+    nombre: string;
+    descripcion: string;
+    ingredientes: string;
+    categoria: string;
+    alergenos: string[];
+  },
+  { redactarDescripcion = false }: { redactarDescripcion?: boolean } = {},
+): Promise<TraduccionPlato | null> {
   try {
     const { data, error } = await supabase.functions.invoke(
       "traducir-contenido",
       {
-        body: { tipo: "plato", datos },
+        body: {
+          tipo: "plato",
+          datos,
+          ...(redactarDescripcion ? { redactar_descripcion: true } : {}),
+        },
       },
     );
     if (error || !data?.ok) {
       console.error("Traducción de plato no disponible:", error || data?.error);
       return null;
     }
-    return data.translations as Record<string, unknown>;
+    const { descripcion_es, ...columnas } = (data.translations ?? {}) as Record<string, unknown>;
+    const texto = typeof descripcion_es === "string" ? descripcion_es.trim() : "";
+    const descripcionGenerada =
+      redactarDescripcion && texto && texto.length <= MAX_DESCRIPCION_CARTA ? texto : null;
+    if (redactarDescripcion && !descripcionGenerada) {
+      // Sin descripción en español no se guardan sus traducciones sueltas.
+      columnas.descripcion_en = null;
+      columnas.descripcion_fr = null;
+    }
+    return { columnas, descripcionGenerada };
   } catch (err) {
     console.error("Error llamando a traducir-contenido:", err);
     return null;
@@ -176,13 +208,21 @@ export function usePlatos() {
       );
 
       // 1. Traducir primero (no escribe nada; solo devuelve las columnas *_en/*_fr).
-      const traducciones = await traducirPlato({
-        nombre: nuevoPlato.nombre,
-        descripcion: nuevoPlato.descripcion || "",
-        ingredientes: nuevoPlato.ingredientes || "",
-        categoria: nuevoPlato.categoria,
-        alergenos: alergenosArray,
-      });
+      // Sin descripción, la misma llamada la redacta (tarea 2.2); una
+      // descripción escrita por el usuario nunca se toca.
+      const sinDescripcion = !nuevoPlato.descripcion?.trim();
+      const traduccion = await traducirPlato(
+        {
+          nombre: nuevoPlato.nombre,
+          descripcion: nuevoPlato.descripcion || "",
+          ingredientes: nuevoPlato.ingredientes || "",
+          categoria: nuevoPlato.categoria,
+          alergenos: alergenosArray,
+        },
+        { redactarDescripcion: sinDescripcion },
+      );
+      const traducciones = traduccion?.columnas ?? null;
+      const descripcionGenerada = sinDescripcion ? traduccion?.descripcionGenerada ?? null : null;
 
       // 2. Al final de su categoría (mayor orden + 1), salvo que se indique.
       const orden =
@@ -202,7 +242,7 @@ export function usePlatos() {
             nombre: nuevoPlato.nombre,
             categoria: nuevoPlato.categoria,
             precio_eur: nuevoPlato.precio_eur,
-            descripcion: nuevoPlato.descripcion || null,
+            descripcion: descripcionGenerada ?? (nuevoPlato.descripcion || null),
             ...(nuevoPlato.sin_gluten_disponible === true
               ? { sin_gluten_disponible: true }
               : {}),
@@ -233,6 +273,9 @@ export function usePlatos() {
         toast.warning(
           "Plato guardado sin traducción automática. Revísala más tarde en inglés/francés.",
         );
+      } else if (descripcionGenerada) {
+        // Aviso que no bloquea: el plato ya está guardado con la descripción.
+        toast.info(AVISO_DESCRIPCION_IA, { description: descripcionGenerada });
       }
 
       return data;
@@ -333,9 +376,10 @@ export function usePlatos() {
 
       // Traducir primero (no escribe nada), igual que en la creación. Si
       // falla, `traducciones` queda null y el guardado sigue igual (TAREA 2).
+      // Al editar, la IA nunca redacta la descripción (tarea 2.2: solo al crear).
       let traducciones: Record<string, unknown> | null = null;
       if (cambiaTraducible) {
-        traducciones = await traducirPlato({
+        const traduccion = await traducirPlato({
           nombre: (cambios.nombre ?? anterior?.nombre) || "",
           descripcion: (cambios.descripcion ?? anterior?.descripcion) || "",
           ingredientes: (cambios.ingredientes ?? anterior?.ingredientes) || "",
@@ -344,6 +388,7 @@ export function usePlatos() {
             cambios.alergenos_oficiales ?? anterior?.alergenos_oficiales,
           ),
         });
+        traducciones = traduccion?.columnas ?? null;
       }
 
       const { data, error } = await supabase
