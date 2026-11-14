@@ -1,18 +1,5 @@
-import {
-  LayoutDashboard,
-  UtensilsCrossed,
-  Globe,
-  Megaphone,
-  Receipt,
-  Gift,
-  LogOut,
-  Shield,
-  Settings,
-  HelpCircle,
-  MessageSquarePlus,
-  Share2,
-} from "lucide-react";
-import { useEffect, type ComponentType, type SVGProps } from "react";
+import { LogOut, Settings, UtensilsCrossed } from "lucide-react";
+import { useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { VersionPanel } from "@/components/panel/VersionPanel";
@@ -33,123 +20,23 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserRole, SectionKey } from "@/hooks/useUserRole";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
-import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
 import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
 import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
-import { Camera, ShoppingBag } from "lucide-react";
+import { MODULOS_MENU, moduloActivo, tienePermisoModulo } from "@/lib/modulosPanel";
 
-// `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
-// cualquiera de ellas (el Gestor Web agrupa carta, contenido web y bot).
-// `toggleKey` es la clave que usa el Super Admin para activar/desactivar el
-// item en el sidebar (independiente del permiso por sección): por defecto es
-// el propio sectionKey cuando es uno solo, o se declara aparte cuando el item
-// agrupa varias secciones o comparte permiso con otro item.
-// Sin `sectionKey` (Ayuda): lo ve todo el mundo, sin permisos ni interruptor.
-const menuItems: {
-  title: string;
-  url: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
-  sectionKey?: SectionKey | SectionKey[];
-  toggleKey?: string;
-  /** Solo con el permiso guardado (el super admin no lo ve por serlo). */
-  soloConPermiso?: boolean;
-  /** Pasa la página actual (`state.desde`): «Nueva petición» la guarda y propone su módulo. */
-  conOrigen?: boolean;
-}[] = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: LayoutDashboard,
-    sectionKey: "dashboard",
-  },
-  {
-    title: "Reservas",
-    url: "/reservas",
-    icon: UtensilsCrossed,
-    sectionKey: "reservas",
-    toggleKey: "reservas",
-  },
-  // Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Ver
-  // docs/funcionalidades/10-retirada-seccion-personal.md.
-  // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web y
-  // Espacios se gestionan exclusivamente desde el Super Admin y ya no forman
-  // parte del Admin Panel normal (ver /super-admin). Plantillas Email está en
-  // Reservas › Configuración desde el 04/11/2026.
-  {
-    title: "Gestor Web",
-    url: "/gestion-web",
-    icon: Globe,
-    sectionKey: SECCIONES_GESTOR_WEB,
-    toggleKey: "gestion_web",
-  },
-  {
-    title: "Newsletter",
-    url: "/marketing",
-    icon: Megaphone,
-    sectionKey: "marketing",
-    toggleKey: "marketing",
-  },
-  // RRSS (08/11/2026, antes «Instagram», sección propia desde el 05/11/2026): Instagram, Facebook y el
-  // editor IA de fotos y vídeos. Mismo permiso y mismo interruptor del Super Admin que Newsletter («marketing»).
-  {
-    title: "RRSS",
-    url: "/rrss",
-    icon: Share2,
-    // La agencia (Oficiosos) también entra, solo a «Encargos» (docs/instagram-encargos.md).
-    sectionKey: ["marketing", "instagram_agencia"],
-    toggleKey: "marketing",
-  },
-  {
-    title: "Cheques",
-    url: "/cheques",
-    icon: Gift,
-    sectionKey: "cheques",
-    toggleKey: "cheques",
-  },
-  {
-    title: "Tienda",
-    url: "/tienda",
-    icon: ShoppingBag,
-    sectionKey: "tienda",
-    toggleKey: "tienda",
-  },
-  {
-    title: "Facturas",
-    url: "/facturas",
-    icon: Receipt,
-    // Con solo «Facturas · Subida» también sale (entra a la pestaña Cargar, 06/11/2026).
-    sectionKey: ["facturas", "facturas_subida"],
-    toggleKey: "facturas",
-  },
-  // «Subir albaranes» (10/11/2026): la pantalla del tipo de usuario «Albaranes» (solo fotos). No la ve el super
-  // admin (tiene Cargar en Facturas): solo quien tiene el permiso. Interruptor del Super Admin: el de Facturas.
-  {
-    title: "Subir albaranes",
-    url: "/albaranes",
-    icon: Camera,
-    sectionKey: "facturas_albaranes",
-    toggleKey: "facturas",
-    soloConPermiso: true,
-  },
-  // «Análisis general» (07/11/2026) ya no va aquí: desde el 10/11/2026 es la pestaña «Márgenes» de Facturas
-  // (petición del dueño). /analisis lleva a ella.
-  {
-    title: "Usuarios",
-    url: "/usuarios",
-    icon: Shield,
-    sectionKey: "usuarios",
-    toggleKey: "usuarios",
-  },
-  // «Avisos» ya no va aquí (06/11/2026, petición del dueño): cada sección tiene su botón rojo (BotonAvisosSeccion)
-  // y la campana de arriba enlaza a /avisos con todos.
-  // «Nueva petición» (13/11/2026, petición del dueño): reportar errores, pedir mejoras o preguntar dudas, y
-  // ver cómo van. Para todos, sin permisos ni interruptor (como Ayuda). El super admin las ve en Super Admin › Tickets.
-  { title: "Nueva petición", url: "/peticiones", icon: MessageSquarePlus, conOrigen: true },
-  { title: "Ayuda", url: "/ayuda", icon: HelpCircle },
-];
+// Las entradas del menú salen del catálogo de módulos (`lib/modulosPanel.ts`, 14/11/2026), en su orden:
+// el mismo que manda en Control del Panel y en las rutas. Cada una se ve si el usuario tiene alguno de
+// sus permisos (`secciones`; sin secciones, todo el mundo) y su módulo está activado en Control del Panel.
+// El super admin las ve todas (salvo «Subir albaranes», solo con su permiso), también las desactivadas,
+// marcadas «Desactivado para el equipo».
+// Sección "Personal" retirada el 2026-09-23 (docs/funcionalidades/10-retirada-seccion-personal.md).
+// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web, Espacios y Bot Web son del Super
+// Admin (/super-admin). «Análisis general» es la pestaña «Márgenes» de Facturas (10/11/2026) y «Avisos»
+// va por la campana y el botón rojo de cada sección (06/11/2026).
+const AVISO_DESACTIVADO = "Desactivado para el equipo";
 
 export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
@@ -157,7 +44,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
-  const { isAdmin, role, permissions, loading } = useUserRole();
+  const { role, permissions, loading } = useUserRole();
   const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
   const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
 
@@ -172,22 +59,22 @@ export function AppSidebar() {
     setOpenMobile(false);
   }, [currentPath, setOpenMobile]);
 
-  // Filtrar items según permisos y funcionalidades activadas por el Super Admin
-  const visibleItems = menuItems.filter((item) => {
+  // Filtrar según permisos y módulos activados en Control del Panel.
+  const visibleItems = MODULOS_MENU.filter((modulo) => {
     if (loading || togglesLoading || superAdminLoading) return false;
-    if (!item.sectionKey) return true;
-    if (item.toggleKey && !isEnabled(item.toggleKey)) return false;
-    const keys = Array.isArray(item.sectionKey)
-      ? item.sectionKey
-      : [item.sectionKey];
+    // Un módulo desactivado no lo ve el equipo; el super admin sí (marcado).
+    if (!moduloActivo(modulo, isEnabled) && !isSuperAdmin) return false;
     // Usuarios se configura por permisos como las demás desde el 06/11/2026 (antes, rol admin).
     // Ser "admin" ya no da acceso a todo lo demás: solo un super admin lo ve
     // todo pase lo que pase en la tabla de permisos.
-    if (isSuperAdmin && !item.soloConPermiso) return true;
-    return keys.some(
-      (key) => permissions.find((p) => p.section_key === key)?.can_view,
-    );
-  });
+    return tienePermisoModulo(modulo, permissions, isSuperAdmin);
+  }).map((modulo) => ({
+    title: modulo.nombre,
+    url: modulo.rutas[0],
+    icon: modulo.icono,
+    conOrigen: modulo.conOrigen,
+    desactivado: !moduloActivo(modulo, isEnabled),
+  }));
 
   return (
     <Sidebar collapsible="icon">
@@ -245,24 +132,38 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={isActive(item.url)}
-                    tooltip={item.title}
+                    tooltip={item.desactivado ? `${item.title} · ${AVISO_DESACTIVADO}` : item.title}
                     className="rounded-lg"
                   >
                     <NavLink
                       to={item.url}
                       state={item.conOrigen && !isActive(item.url) ? { desde: `${currentPath}${location.search}` } : undefined}
-                      aria-label={item.title}
+                      aria-label={item.desactivado ? `${item.title} (${AVISO_DESACTIVADO.toLocaleLowerCase("es")})` : item.title}
+                      data-desactivado={item.desactivado || undefined}
                       // Al acercar el ratón o el dedo, empieza a bajar el fichero de la sección (07/11/2026).
                       onMouseEnter={() => precargarSeccion(item.url)}
                       onTouchStart={() => precargarSeccion(item.url)}
                       onFocus={() => precargarSeccion(item.url)}
-                      className="flex items-center gap-3 rounded-lg hover:bg-sidebar-accent"
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg hover:bg-sidebar-accent",
+                        // Solo lo ve el super admin: atenuado y con su marca (el equipo no lo ve).
+                        item.desactivado && "text-sidebar-foreground/60",
+                      )}
                     >
                       <item.icon
                         className="h-5 w-5 shrink-0"
                         aria-hidden="true"
                       />
                       <span className="truncate">{item.title}</span>
+                      {item.desactivado && (
+                        <span
+                          aria-hidden="true"
+                          title={AVISO_DESACTIVADO}
+                          className="ml-auto shrink-0 rounded-full border border-dashed group-data-[collapsible=icon]:hidden border-sidebar-foreground/40 px-1.5 py-px text-[10px] font-medium leading-4"
+                        >
+                          Desactivado
+                        </span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
