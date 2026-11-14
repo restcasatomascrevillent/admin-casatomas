@@ -15,6 +15,7 @@ import {
   Server,
   FileSearch,
   FileBarChart2,
+  Ticket,
 } from "lucide-react";
 import { useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -53,6 +54,8 @@ const gruposMenuSuperAdmin: { etiqueta: string; items: ItemMenu[] }[] = [
       { title: "Auditoría", url: "/super-admin/auditoria", icon: ScrollText },
       // Informes (10/11/2026): todos los informes del panel en un sitio (src/lib/informes/registro.ts).
       { title: "Informes", url: "/super-admin/informes", icon: FileBarChart2 },
+      // Tickets (13/11/2026): las peticiones de los usuarios del panel, analizadas por la IA.
+      { title: "Tickets", url: "/super-admin/tickets", icon: Ticket },
     ],
   },
   {
