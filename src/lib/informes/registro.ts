@@ -177,8 +177,10 @@ export const INFORMES: DefinicionInforme[] = [
   },
   {
     id: "servicios-mensual",
-    titulo: "Informe mensual de servicios",
-    descripcion: "Gasto de cada servicio contratado en el mes, el total, la comparación con el mes anterior y lo que falta por meter.",
+    // 13/11/2026: también la IA función por función, lo que cuesta cada cosa y los precios por confirmar.
+    titulo: "Informe mensual de costes",
+    descripcion:
+      "Gasto de cada servicio en el mes, el total y la comparación con el anterior; la IA función por función y lo que cuesta cada cosa; lo que falta por meter y los precios por confirmar.",
     seccion: "servicios",
     permiso: { tipo: "superadmin" },
     periodo: "mes",

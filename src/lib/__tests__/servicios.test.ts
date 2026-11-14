@@ -517,3 +517,57 @@ describe("alta de servicios", () => {
     expect(r.cambios).toMatchObject({ nombre: "n8n", plan: null, precio_mensual: null, precio_anual: null, activo: true, limites: {} });
   });
 });
+
+describe("Precio de todos los servicios (13/11/2026)", () => {
+  const HOY_MES = new Date("2026-11-10T12:00:00Z");
+  it("resumirCostes: lo metido a mano este mes manda sobre cuota + uso y no se proyecta", () => {
+    const servicios = [
+      servicio({ proveedor: "google", nombre: "Google Maps", precio_mensual: null, moneda: "USD", ciclo: "por_uso" }),
+      servicio({ proveedor: "openai", nombre: "OpenAI", precio_mensual: null, moneda: "USD", ciclo: "por_uso" }),
+      servicio({ proveedor: "pro", nombre: "Pro", precio_mensual: 20, moneda: "EUR", ciclo: "mensual" }),
+    ];
+    const lecturas = { openai: { coste_variable: { importe: 3, moneda: "USD" } }, pro: { coste_variable: { importe: 5, moneda: "EUR" } } };
+    const manuales = new Map([["google", { importe: 4, moneda: "USD" }], ["pro", { importe: 21, moneda: "EUR" }]]);
+    const r = resumirCostes(servicios, lecturas, 0.9, HOY_MES, manuales);
+    expect(r.filas.find((f) => f.proveedor === "google")).toMatchObject({ manualEur: 3.6, totalEur: 3.6 });
+    // Pro: la factura (21 €) en vez de cuota 20 + uso 5.
+    expect(r.filas.find((f) => f.proveedor === "pro")).toMatchObject({ manualEur: 21, totalEur: 21, fijoEur: 20 });
+    expect(r.filas.find((f) => f.proveedor === "openai")).toMatchObject({ manualEur: null, totalEur: 2.7 });
+    // Cuotas y uso solo de lo que no tiene factura metida; lo manual aparte y sin proyectar.
+    expect(r).toMatchObject({ fijoMesEur: 0, variableMesEur: 2.7, manualMesEur: 24.6, totalMesEur: 27.3 });
+    expect(r.previsionMesEur).toBe(Math.round((2.7 * 3 + 24.6) * 100) / 100);
+    // Sin manuales, como siempre.
+    expect(resumirCostes(servicios, lecturas, 0.9, HOY_MES)).toMatchObject({ manualMesEur: 0, totalMesEur: 27.7 });
+  });
+
+  it("borrador: para qué, plan siguiente, su precio y qué pasa si se pasa; al confirmar el precio, la fecha de hoy", () => {
+    const original = servicio({ proveedor: "resend", nombre: "Resend", por_confirmar: true, para_que: "Correos", plan_siguiente: "Pro", precio_siguiente: 20, si_se_pasa: "Se paran" });
+    const b = borradorDe(original);
+    expect([b.para_que, b.plan_siguiente, b.precio_siguiente, b.si_se_pasa]).toEqual(["Correos", "Pro", "20", "Se paran"]);
+    b.por_confirmar = false;
+    b.precio_siguiente = "19,99";
+    b.para_que = "  Manda los correos  ";
+    const r = cambiosDeBorrador(b, original, new Date(2026, 10, 13, 10));
+    expect(r).toMatchObject({ ok: true, cambios: { para_que: "Manda los correos", precio_siguiente: 19.99, por_confirmar: false, precio_confirmado_en: "2026-11-13" } });
+    // Volver a marcarlo «por confirmar» borra la fecha; dejarlo confirmado la conserva.
+    const confirmado = { ...original, por_confirmar: false, precio_confirmado_en: "2026-10-01" };
+    expect(cambiosDeBorrador({ ...borradorDe(confirmado), por_confirmar: true }, confirmado)).toMatchObject({ cambios: { precio_confirmado_en: null } });
+    expect(cambiosDeBorrador(borradorDe(confirmado), confirmado)).toMatchObject({ cambios: { precio_confirmado_en: "2026-10-01" } });
+    expect(cambiosDeBorrador({ ...b, precio_siguiente: "mucho" }, original)).toMatchObject({ ok: false, errores: { precio_siguiente: expect.any(String) } });
+  });
+
+  it("demo: «falta la clave» no es un aviso (las claves solo están en producción)", () => {
+    const vercel = servicio({ proveedor: "vercel", nombre: "Vercel (webs)" });
+    const lect = new Map<string, LecturaServicio>([["vercel", { proveedor: "vercel", tomado_en: "", metricas: {}, error: "falta_secreto", detalles: {} }]]);
+    const prod = estadoInstalacion({ servicios: [vercel], lecturas: lect, renovaciones: [] });
+    expect([prod.fichas[0].estado, prod.fichas[0].motivo]).toEqual(["ambar", "Falta la clave"]);
+    const demo = estadoInstalacion({ servicios: [vercel], lecturas: lect, renovaciones: [], clavesSoloEnProduccion: true });
+    expect([demo.fichas[0].estado, demo.fichas[0].motivo]).toEqual(["gris", "Clave solo en producción"]);
+    const resumen = { sinPrecio: [], porConfirmar: [] };
+    expect(pendientesServicios({ servicios: [vercel], lecturas: lect, renovaciones: [], resumen }).map((p) => [p.clave, p.gravedad])).toEqual([["error:falta_secreto", "ambar"]]);
+    const enDemo = pendientesServicios({ servicios: [vercel], lecturas: lect, renovaciones: [], resumen, clavesSoloEnProduccion: true });
+    expect(enDemo.map((p) => [p.clave, p.gravedad, p.titulo])).toEqual([
+      ["entorno:sin-claves", "info", "En la demo no se leen Vercel: sus claves solo están en producción"],
+    ]);
+  });
+});

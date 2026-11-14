@@ -1,6 +1,8 @@
 // Capturas de Super Admin › Servicios (Estado y Costes) con el Supabase falso de esta carpeta: nada sale a Supabase ni
 // a Internet. Datos sintéticos: los servicios de datos-sinteticos.mjs más Google Drive y Mapbox (con lectura
-// automática) y Google Maps (sin ella), costes de los últimos meses y un mes de pago por uso sin coste.
+// automática) y Google Maps (sin ella), costes de los últimos meses y un mes de pago por uso sin coste. Desde el
+// 13/11/2026 también «para qué», plan siguiente y límites del plan con su página (Planes gratis) y la IA por función
+// (`ia_coste_por_uso`, con cifras parecidas a las de producción de noviembre).
 //
 //   VITE_SUPABASE_URL=https://e2e-falso.supabase.co VITE_SUPABASE_ANON_KEY=anon-falsa npx vite build
 //   npx vite preview --port 4173 --strictPort --host 127.0.0.1 &
@@ -25,10 +27,39 @@ const extra = (proveedor, nombre, x) => ({
   panel_url: `https://${proveedor}.sim.test/`, limites: {}, notas: null, actualizado_en: ahora, categoria: "otros", orden: 100, activo: true,
   por_confirmar: false, fuente_precio: null, ...x,
 });
+const FUENTE_SB = "https://supabase.com/docs/guides/platform/billing-on-supabase";
+const PARA_QUE = {
+  vercel: "Publica las webs (la del restaurante y la de Touza) y este panel.",
+  supabase: "La base de datos: reservas, facturas, carta, usuarios, fotos y archivos.",
+  github: "Guarda el código de las webs y del panel y pasa las pruebas automáticas.",
+  resend: "Manda los correos: confirmaciones de reserva y la newsletter.",
+  stripe: "Cobra los cheques regalo de la web.",
+  openai: "La inteligencia artificial: leer facturas y vinos, los chats, traducir la carta…",
+  loading: "El dominio restaurantecasatomascrevillente.es, el correo y la web antigua.",
+};
+const conPlan = (s) => {
+  const x = { ...s, para_que: PARA_QUE[s.proveedor] ?? null };
+  if (s.proveedor === "supabase") {
+    Object.assign(x, { plan_siguiente: "Pro", precio_siguiente: 25, si_se_pasa: "Supabase puede limitar el proyecto hasta el mes siguiente o hasta pasar al plan Pro." });
+    x.limites = {
+      ...s.limites,
+      bd_tamano: { ...s.limites.bd_tamano, fuente: FUENTE_SB, si_se_pasa: "La base de datos pasa a solo lectura: no se podrían guardar reservas, facturas ni cambios hasta liberar espacio o pasar al plan Pro." },
+      almacenamiento: { ...s.limites.almacenamiento, fuente: FUENTE_SB },
+      egreso: { ...s.limites.egreso, fuente: FUENTE_SB },
+    };
+  }
+  if (s.proveedor === "resend") {
+    Object.assign(x, { plan_siguiente: "Pro", precio_siguiente: 20 });
+    x.limites = Object.fromEntries(Object.entries(s.limites).map(([k, l]) => [k, { ...l, fuente: "https://resend.com/docs/knowledge-base/account-quotas-and-limits" }]));
+  }
+  if (s.proveedor === "vercel") Object.assign(x, { plan_siguiente: "Pro", precio_siguiente: 20, si_se_pasa: "Vercel pausa lo que se pase (las webs o el panel) hasta que pasen 30 días." });
+  if (s.proveedor === "vapi") Object.assign(x, { precio_confirmado_en: null });
+  return x;
+};
 function datos() {
   const t = tablas();
   t.servicios_contratados = [
-    ...t.servicios_contratados,
+    ...t.servicios_contratados.map(conPlan),
     extra("google_drive", "Google Drive (copias de facturas)", { plan: "Gratis, 15 GB", moneda: "EUR", categoria: "archivos", orden: 90, limites: { almacenamiento: { orden: 1, etiqueta: "Espacio de la cuenta de Google", limite: 15, unidad: "GB", periodo: "ahora" } } }),
     extra("mapbox", "Mapbox (mapa de vinos)", { plan: "Pago por uso (gratis hasta 50.000 cargas al mes)", precio_mensual: null, ciclo: "por_uso", categoria: "mapas", orden: 85, limites: { cargas_mapa_web: { orden: 1, etiqueta: "Cargas del mapa de vinos (web)", limite: 50000, unidad: "cargas", periodo: "mes natural" } } }),
     extra("google", "Google Maps Platform (reseñas)", { plan: "Pago por uso con uso gratuito al mes", precio_mensual: null, ciclo: "por_uso", categoria: "mapas", orden: 80 }),
@@ -36,7 +67,9 @@ function datos() {
   return t;
 }
 const lecturas = () => [
-  ...funcionesSinteticas["servicios-uso"]().lecturas,
+  ...funcionesSinteticas["servicios-uso"]().lecturas.map((l) => (l.proveedor === "supabase"
+    ? { ...l, metricas: { ...l.metricas, bd_crecimiento: { etiqueta: "Crecimiento de la base de datos", valor: 6 * 1024 ** 2, unidad: "bytes", periodo: "últimos 7 días", nota: "+6 MB en 7 días." } } }
+    : l)),
   { proveedor: "google_drive", tomado_en: ahora, error: null, detalles: { plan_detectado: "15 GB de espacio" }, metricas: {
     almacenamiento: { orden: 1, etiqueta: "Espacio de la cuenta de Google", valor: 9.6 * 1024 ** 3, unidad: "bytes", limite: 15, unidad_limite: "GB", periodo: "ahora" },
     en_drive: { orden: 2, etiqueta: "De ello, en Drive", valor: 2.1 * 1024 ** 3, unidad: "bytes", periodo: "ahora" },
@@ -62,7 +95,22 @@ const resumenMes = ({ p_mes }) => {
   ];
   return [];
 };
-const rpc = { ...rpcSinteticas, servicios_resumen_mes: resumenMes };
+const filaIa = (funcion, que_hace, accion, unidad, orden, llamadas, usos, coste, mediana, extra = {}) => ({
+  funcion, que_hace, accion, unidad, orden, llamadas, usos, usos_con_coste: usos, coste_usd: coste, filas_sin_tarifa: 0, modelos_sin_tarifa: [],
+  mediana_usd: mediana, media_usd: mediana, servidor_propio: false, ...extra,
+});
+const costePorUso = ({ p_desde }) => p_desde !== mes(0) ? [] : [
+  filaIa("ocr-trabajo", "Lee las facturas y albaranes que se suben (foto o PDF) y saca sus líneas.", "Leer una factura", "documento", 25, 586, 125, 1.436, 0.0101),
+  filaIa("clasificar-productos", "Ordena en el catálogo los productos nuevos de las facturas (sola, cada pocos minutos).", "Clasificar una tanda de productos nuevos", "tanda", 80, 98, 98, 0.767, 0.0075),
+  filaIa("extraer-vino-foto", "Lee la etiqueta de la foto de un vino y busca sus datos.", "Leer la etiqueta de un vino", "foto", 60, 84, 19, 0.519, 0.026),
+  filaIa("buscar-puntuacion-parker", "Busca en internet la puntuación Parker de un vino.", "Buscar la puntuación Parker de un vino", "vino", 65, 8, 4, 0.193, 0.0484),
+  filaIa("chat-facturas", "Contesta a las preguntas del chat de Facturas.", "Contestar una pregunta en el chat de Facturas", "pregunta", 30, 157, 68, 0.104, 0.0021,
+    { usos_con_coste: 45, filas_sin_tarifa: 24, modelos_sin_tarifa: ["gpt-6.1-terra"] }),
+  filaIa("traducir-contenido", "Traduce los platos y textos de la carta a otros idiomas.", "Traducir un plato", "plato", 40, 48, 44, 0.03, 0.00066),
+  filaIa("procesar-factura", "Prepara la lectura de cada factura; aquí solo gasta al indexar productos.", "Indexar los productos de una factura", "documento", 20, 3608, 1700, 0.0078, 0.000002),
+  filaIa("recortar-foto", "Quita el fondo de las fotos de la carta, en nuestro servidor (Vercel), sin IA de pago.", "Recortar una foto", "foto", 90, 2, 2, 0, 0, { servidor_propio: true }),
+];
+const rpc = { ...rpcSinteticas, servicios_resumen_mes: resumenMes, ia_coste_por_uso: costePorUso };
 const funciones = { ...funcionesSinteticas, "servicios-uso": () => ({ lecturas: lecturas(), sin_lector: ["google", "loading"], generado_en: ahora }) };
 
 const VISTAS = [
