@@ -41,6 +41,8 @@ export interface Vino {
   featured: boolean | null;
   created_at: string | null;
   updated_at: string | null;
+  /** Carpeta del vino en Drive (marketing/Vinos/…; 20261201120000). Ausente antes de esa migración. */
+  drive_folder_id?: string | null;
   /** Se sirve por copas y su precio (20261104140000_vinos_copeo_y_parker). */
   copeo?: boolean | null;
   precio_copa_eur?: number | null;

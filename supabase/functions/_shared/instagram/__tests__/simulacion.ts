@@ -235,10 +235,13 @@ export function driveFalso(o: { alcance?: string; raizVisible?: boolean; escribi
     }
     if (u.pathname === "/drive/v3/files" && l.metodo === "GET") {
       const q = u.searchParams.get("q") ?? "";
-      const padre = /'([^']+)' in parents/.exec(q)?.[1];
+      // Uno o varios padres («'a' in parents or 'b' in parents»).
+      const padres = [...q.matchAll(/'([^']+)' in parents/g)].map((m) => m[1]);
       const nombre = /name='((?:[^'\\]|\\.)*)'/.exec(q)?.[1];
-      const lista = [...ficheros.values()].filter((f) => f.parents?.includes(padre ?? "") && !f.trashed);
-      if (q.includes(`mimeType='${CARPETA}'`)) return resp(200, { files: lista.filter((f) => f.mimeType === CARPETA && f.name === nombre) });
+      const lista = [...ficheros.values()].filter((f) => f.parents?.some((p) => padres.includes(p)) && !f.trashed);
+      // Sin `name='…'` (listarHijos) salen todas las subcarpetas; con él, solo la de ese nombre.
+      if (q.includes(`mimeType='${CARPETA}'`)) return resp(200, { files: lista.filter((f) => f.mimeType === CARPETA && (nombre === undefined || f.name === nombre)) });
+      if (q.includes("mimeType contains 'video/'")) return resp(200, { files: lista.filter((f) => f.mimeType.startsWith("video/")).map(({ bytes: _b, ...f }) => f) });
       return resp(200, { files: lista.filter((f) => f.mimeType.startsWith("image/")).map(({ bytes: _b, ...f }) => f) });
     }
     if (u.pathname === "/drive/v3/files" && l.metodo === "POST") {
@@ -249,6 +252,14 @@ export function driveFalso(o: { alcance?: string; raizVisible?: boolean; escribi
       return resp(200, { id });
     }
     const ruta = /^\/drive\/v3\/files\/([A-Za-z0-9_-]+)$/.exec(u.pathname);
+    // Mover (addParents / removeParents).
+    if (ruta && l.metodo === "PATCH" && u.searchParams.has("addParents")) {
+      const f = ficheros.get(ruta[1]);
+      if (!f) return resp(404, { error: { message: "File not found" } });
+      const quitar = (u.searchParams.get("removeParents") ?? "").split(",").filter(Boolean);
+      f.parents = [...(f.parents ?? []).filter((p) => !quitar.includes(p)), u.searchParams.get("addParents")!];
+      return resp(200, { id: f.id });
+    }
     if (ruta && l.metodo === "GET") {
       const f = ficheros.get(ruta[1]);
       if (!f) return resp(404, { error: { message: `File not found: ${ruta[1]}.` } });

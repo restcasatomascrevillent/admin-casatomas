@@ -14,6 +14,12 @@
  *     salen de instagram_fotos (por drive_id); si una foto no tiene fila,
  *     tipo = null y la aptitud se deduce de sus medidas en el panel.
  *
+ *   POST { "accion": "listar_platos", "marca": "casa-tomas" }
+ *     200 { ok, marca, alcance, avisos, truncado, categorias: [{ id, nombre, platos: [{ id, nombre, fotos: [...] }] }] }
+ *     El árbol marketing/Platos/<NN Categoría>/<plato>/ (primer nivel de cada
+ *     carpeta de plato; con tope de categorías, platos y fotos). Solo Casa
+ *     Tomás: con touza sale vacío. No crea nada si «Platos» no existe todavía.
+ *
  *   POST ?accion=subir  (multipart/form-data: archivo, marca, tipo, descripcion)
  *     200 { ok, foto, avisos }. Solo JPEG (el panel ya la convierte: ≤ 2560 px,
  *     ≤ 8 MB). Las medidas se leen del propio JPEG. Se sube a la carpeta de
@@ -75,8 +81,18 @@
  *     con subida reanudable. Uno por plato: si ya había, se REEMPLAZA (mismo
  *     id de Drive). Permiso: «Editar» en la carta. Sin filas en la BD.
  *
+ *   Árbol de la carta (Casa Tomás, desde el 15/11/2026): el original de cada
+ *   plato o vino se guarda en marketing/Platos/<NN Categoría>/<plato>/ (o
+ *   Vinos/<Tipo>/<vino>/) como «ORIGINAL - <nombre>.jpg», y su vídeo en
+ *   <plato>/Vídeos/. La carpeta se busca por el id guardado en
+ *   Platos/Vinos.drive_folder_id, si no por nombre y si no se crea; el id se
+ *   guarda siempre desde aquí. Touza sigue en marketing/carta/touza.
+ *
  *   Seguridad: solo se leen ficheros que estén DENTRO de la carpeta de la
- *   marca (por `parents`), aunque el token pueda ver más (facturas, etc.).
+ *   marca (por `parents`), o —para Casa Tomás— colgando del árbol Platos/Vinos
+ *   (estaBajo: se comprueban los ancestros, con tope), aunque el token pueda
+ *   ver más (facturas, etc.). Los originales y vídeos que aún estén en
+ *   marketing/carta/casa-tomas se siguen leyendo hasta que se muevan.
  *
  *   Errores (JSON { ok: false, error, comoArreglarlo? }): 400 · 401 · 403 ·
  *   404 · 405 · 413 · 415 · 422 · 502 (Drive) · 503 (faltan secretos de Google).
@@ -85,14 +101,19 @@ import { ErrorDrive, esIdDrive, medidasJpeg, type FicheroDrive } from "../_share
 import {
   ARREGLO_DRIVE_FILE,
   AVISO_DRIVE_FILE,
+  carpetaArbol,
   carpetaCarta,
   carpetaFotos,
   carpetaVideosCarta,
+  carpetaVideosDe,
   clasificarAlcance,
   esMarcaDrive,
   estaEn,
+  estaEnOArbol,
   leerConfigDrive,
   medidasDrive,
+  nombreOriginalArbol,
+  resolverCarpetaFicha,
   TIPOS_IMAGEN,
   type ConfigDriveInstagram,
   type MarcaDrive,
@@ -115,14 +136,17 @@ import {
   type Sesion,
 } from "../_shared/instagram/supabase.ts";
 import {
+  guardarCarpetaFicha,
   guardarOriginal,
   LADO_MAXIMO_ORIGINAL,
+  leerFichaConCarpeta,
   leerOriginal,
   marcaDeFicha,
   MAX_BYTES_ORIGINAL,
   MIGRACION_ORIGINALES,
   SECCION_CARTA,
   SIN_PERMISO_CARTA,
+  type FichaConCarpeta,
 } from "./originales.ts";
 
 const ETIQUETA = "instagram-drive";
@@ -274,9 +298,10 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
   try {
     if (request.method === "GET" && accion === "miniatura") return await miniatura(c, url.searchParams.get("marca"), url.searchParams.get("id"));
     if (request.method === "POST" && accion === "listar") return await listar(s, c, cuerpo.marca);
+    if (request.method === "POST" && accion === "listar_platos") return await listarPlatos(s, c, cuerpo.marca);
     if (request.method === "POST" && accion === "preparar") return await preparar(s, c, cuerpo.marca, cuerpo.id, deps);
     if (request.method === "POST" && accion === "subir") return await subir(s, c, request, deps);
-    return json(400, { ok: false, error: "Acción no válida (listar, subir, miniatura, preparar, subir_original, subir_original_video o descargar_original)" });
+    return json(400, { ok: false, error: "Acción no válida (listar, listar_platos, subir, miniatura, preparar, subir_original, subir_original_video o descargar_original)" });
   } catch (e) {
     if (e instanceof ErrorDrive) {
       registro("warn", ETIQUETA, "Drive", { accion, motivo: e.motivo, estado: e.estado, mensaje: e.message });
@@ -306,11 +331,73 @@ async function listar(s: Sesion, c: ConfigDriveInstagram, marca: unknown): Promi
   return json(200, { ok: true, marca, alcance, avisos, fotos: ficheros.map((f) => aRespuesta(f, porDrive.get(f.id))) });
 }
 
-/** Metadatos de un fichero comprobando que está en la carpeta de la marca. null → 404. */
+/** Topes de listar_platos (carpetas y fotos que se devuelven como mucho). */
+export const MAX_CATEGORIAS_ARBOL = 60;
+export const MAX_PLATOS_ARBOL = 600;
+export const MAX_FOTOS_ARBOL = 2000;
+
+export interface PlatoArbol {
+  id: string;
+  nombre: string;
+  fotos: FotoDriveRespuesta[];
+}
+export interface CategoriaArbol {
+  id: string;
+  nombre: string;
+  platos: PlatoArbol[];
+}
+
+const porNombre = (a: { nombre: string }, b: { nombre: string }) => a.nombre.localeCompare(b.nombre, "es", { numeric: true, sensitivity: "base" });
+
+/**
+ * Árbol marketing/Platos/<categoría>/<plato>/ → fotos del primer nivel de
+ * cada carpeta de plato (la «ORIGINAL - …» primero). Solo lectura: si
+ * «Platos» no existe, lista vacía y un aviso (nada se crea).
+ */
+async function listarPlatos(s: Sesion, c: ConfigDriveInstagram, marca: unknown): Promise<Response> {
+  if (!esMarcaDrive(marca)) return json(400, { ok: false, error: "«marca» tiene que ser casa-tomas o touza" });
+  const vacio = (avisos: string[]) => json(200, { ok: true, marca, alcance: null, avisos, truncado: false, categorias: [] });
+  if (marca !== "casa-tomas") return vacio(["El árbol «Platos» es solo de Casa Tomás."]);
+  const raiz = await carpetaArbol(c, "Platos");
+  if (!raiz) return vacio(["Todavía no existe la carpeta «Platos» dentro de «marketing» en Drive."]);
+
+  const categorias = await c.cliente.listarCarpetas(raiz, MAX_CATEGORIAS_ARBOL);
+  const platos = categorias.length ? await c.cliente.listarHijos(categorias.map((x) => x.id), "carpetas", MAX_PLATOS_ARBOL) : [];
+  const [ficheros, filas, alcance] = await Promise.all([
+    platos.length ? c.cliente.listarHijos(platos.map((x) => x.id), "imagenes", MAX_FOTOS_ARBOL) : Promise.resolve([] as FicheroDrive[]),
+    leerFotosDrive(s, marca).catch(() => ({ filas: [] as FilaFotoDrive[], sinColumna: false })),
+    c.cliente.token().then((t) => clasificarAlcance(t.alcances)),
+  ]);
+  const porDrive = new Map(filas.filas.filter((f) => f.drive_id).map((f) => [f.drive_id as string, f]));
+  const fotosDe = new Map<string, FotoDriveRespuesta[]>();
+  for (const f of ficheros) {
+    const padre = f.parents?.[0];
+    if (!padre) continue;
+    (fotosDe.get(padre) ?? fotosDe.set(padre, []).get(padre)!).push(aRespuesta(f, porDrive.get(f.id)));
+  }
+  const esOriginal = (f: FotoDriveRespuesta) => /^original\b/i.test(f.nombre);
+  const arbol: CategoriaArbol[] = categorias
+    .map((cat) => ({
+      id: cat.id,
+      nombre: cat.name,
+      platos: platos
+        .filter((p) => p.parents?.includes(cat.id))
+        .map((p) => ({ id: p.id, nombre: p.name, fotos: [...(fotosDe.get(p.id) ?? [])].sort((a, b) => Number(esOriginal(b)) - Number(esOriginal(a))) }))
+        .sort(porNombre),
+    }))
+    .sort(porNombre);
+  const avisos: string[] = [];
+  if (alcance === "drive.file") avisos.push(AVISO_DRIVE_FILE);
+  const truncado = categorias.length >= MAX_CATEGORIAS_ARBOL || platos.length >= MAX_PLATOS_ARBOL || ficheros.length >= MAX_FOTOS_ARBOL;
+  if (truncado) avisos.push("Hay más carpetas o fotos de las que se enseñan aquí: se han recortado.");
+  return json(200, { ok: true, marca, alcance, avisos, truncado, categorias: arbol });
+}
+
+/** Metadatos de un fichero comprobando que está en la carpeta de la marca (o, en Casa Tomás, en el árbol Platos/Vinos). null → 404. */
 async function ficheroDeMarca(c: ConfigDriveInstagram, marca: MarcaDrive, id: string, campos: string): Promise<FicheroDrive | null> {
   const carpeta = await carpetaFotos(c, marca);
   const f = await c.cliente.metadatos(id, campos);
-  if (!f || f.trashed || !estaEn(f, carpeta)) return null;
+  if (!f || f.trashed || !(await estaEnOArbol(c, f, carpeta, marca))) return null;
   return f;
 }
 
@@ -480,7 +567,7 @@ async function prepararOriginal(s: Sesion, o: OrigenCarta, id: string, deps: Dep
     const c = cfg.config;
     const carpeta = await carpetaCarta(c, fila.marca);
     const f = await c.cliente.metadatos(fila.drive_id, "id,mimeType,size,parents,trashed,imageMediaMetadata(width,height,rotation)");
-    if (!f || f.trashed || !estaEn(f, carpeta) || f.mimeType !== "image/jpeg" || Number(f.size ?? "0") > MAX_BYTES_FOTO) {
+    if (!f || f.trashed || !(await estaEnOArbol(c, f, carpeta, fila.marca)) || f.mimeType !== "image/jpeg" || Number(f.size ?? "0") > MAX_BYTES_FOTO) {
       registro("warn", ETIQUETA, "original no válido", { tabla: o.tabla, id, driveId: fila.drive_id });
       return { aviso };
     }
@@ -533,14 +620,8 @@ async function subirOriginal(request: Request, env: Record<string, string | unde
   const o = tabla === "Vinos" ? CARTA_VINOS : CARTA_PLATOS;
 
   try {
-    // La ficha, con el JWT del usuario (decide la RLS): nombre y marca.
-    const r = await s.fetch(`${s.sb.url}/rest/v1/${o.tabla}?id=eq.${encodeURIComponent(id)}&select=id,nombre,restaurante,touza`, {
-      headers: { apikey: s.sb.clave, Authorization: `Bearer ${s.token}`, Accept: "application/json" },
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!r.ok) throw new ErrorSupabase(`No se pudo leer el ${o.nombre} (${r.status})`, r.status);
-    const fichas = (await r.json().catch(() => [])) as Array<{ id: string; nombre: string | null; restaurante: boolean | null; touza: boolean | null }>;
-    const ficha = Array.isArray(fichas) ? fichas[0] : undefined;
+    // La ficha, con el JWT del usuario (decide la RLS): nombre, categoría, marca y carpeta de Drive.
+    const { ficha, sinColumna } = await leerFichaConCarpeta(s, o.tabla, id);
     if (!ficha) return json(404, { ok: false, error: `Ese ${o.nombre} no existe (o no tienes permiso para verlo)` });
 
     const previo = await leerOriginal(s, o.tabla, id);
@@ -548,17 +629,29 @@ async function subirOriginal(request: Request, env: Record<string, string | unde
       return json(503, { ok: false, error: `Falta aplicar la migración ${MIGRACION_ORIGINALES}`, comoArreglarlo: "Aplica la migración en Supabase (ver docs/instagram-fotos.md)." });
     }
     const marca = marcaDeFicha(ficha);
-    const carpeta = await carpetaCarta(c, marca);
+    const antigua = await carpetaCarta(c, marca);
+    // El nombre que se anota en carta_fotos_originales (su CHECK exige <nombre-seguro>-<id>.jpg).
     const nombre = `${nombreSeguro((ficha.nombre ?? "").trim() || o.nombre)}-${id}.jpg`;
     const descripcion = `Original de la foto del ${o.nombre} «${(ficha.nombre ?? "").trim() || id}» (carta)`;
+    // Casa Tomás: <Platos|Vinos>/<categoría>/<ficha>/ORIGINAL - <nombre>.jpg. Touza: como siempre.
+    let carpeta = antigua;
+    let nombreDrive = nombre;
+    if (marca === "casa-tomas") {
+      carpeta = await carpetaDeFicha(s, c, o, ficha, sinColumna);
+      nombreDrive = nombreOriginalArbol(ficha.nombre, id);
+    }
 
     let subido: FicheroDrive | null = null;
     if (previo.fila?.drive_id) {
       const f = await c.cliente.metadatos(previo.fila.drive_id, "id,parents,trashed");
-      if (f && !f.trashed && estaEn(f, carpeta)) subido = await c.cliente.reemplazar(f.id, nombre, "image/jpeg", bytes, descripcion);
+      if (f && !f.trashed && (await estaEnOArbol(c, f, antigua, marca))) {
+        // Un original que aún está en carta/casa-tomas se pasa a la carpeta de su plato (mismo id de Drive).
+        if (marca === "casa-tomas" && estaEn(f, antigua) && !estaEn(f, carpeta)) await c.cliente.mover(f.id, carpeta, f.parents ?? []);
+        subido = await c.cliente.reemplazar(f.id, nombreDrive, "image/jpeg", bytes, descripcion);
+      }
     }
     const reemplazado = !!subido;
-    if (!subido) subido = await c.cliente.subir(carpeta, nombre, "image/jpeg", bytes, descripcion);
+    if (!subido) subido = await c.cliente.subir(carpeta, nombreDrive, "image/jpeg", bytes, descripcion);
 
     try {
       await guardarOriginal(s, o.tabla, id, { drive_id: subido.id, marca, nombre, ancho: medidas.ancho, alto: medidas.alto, bytes: bytes.byteLength });
@@ -567,7 +660,7 @@ async function subirOriginal(request: Request, env: Record<string, string | unde
       return json(500, { ok: false, error: `El original está en Drive, pero no se pudo anotar en la ficha: ${sanear((e as Error).message)}`, driveId: subido.id });
     }
     registro("info", ETIQUETA, "original subido", { tabla: o.tabla, id, marca, driveId: subido.id, reemplazado, usuario: s.usuario });
-    return json(200, { ok: true, tabla: o.tabla, id, driveId: subido.id, marca, nombre, ancho: medidas.ancho, alto: medidas.alto, reemplazado });
+    return json(200, { ok: true, tabla: o.tabla, id, driveId: subido.id, marca, nombre: nombreDrive, carpetaId: carpeta, ancho: medidas.ancho, alto: medidas.alto, reemplazado });
   } catch (e) {
     if (e instanceof ErrorDrive) {
       registro("warn", ETIQUETA, "Drive (original)", { motivo: e.motivo, estado: e.estado, mensaje: e.message });
@@ -580,6 +673,24 @@ async function subirOriginal(request: Request, env: Record<string, string | unde
     registro("error", ETIQUETA, "fallo (original)", e);
     return json(500, { ok: false, error: "No se pudo guardar el original en Drive", detalle: sanear((e as Error)?.message ?? e) });
   }
+}
+
+/**
+ * Carpeta de Drive de un plato o vino de Casa Tomás (la crea si falta, salvo
+ * `crear: false`, que devuelve null) y, si el id es distinto del que tiene la
+ * ficha, lo guarda en ella desde aquí. Que no se pueda guardar (migración sin
+ * aplicar, sin permiso) no impide subir: solo se registra.
+ */
+async function carpetaDeFicha(s: Sesion, c: ConfigDriveInstagram, o: OrigenCarta, ficha: FichaConCarpeta, sinColumna: boolean): Promise<string>;
+async function carpetaDeFicha(s: Sesion, c: ConfigDriveInstagram, o: OrigenCarta, ficha: FichaConCarpeta, sinColumna: boolean, crear: boolean): Promise<string | null>;
+async function carpetaDeFicha(s: Sesion, c: ConfigDriveInstagram, o: OrigenCarta, ficha: FichaConCarpeta, sinColumna: boolean, crear = true): Promise<string | null> {
+  const r = await resolverCarpetaFicha(c, o.tabla, ficha, crear);
+  if (!r) return null;
+  if (!sinColumna && r.id !== ficha.drive_folder_id) {
+    const guardada = await guardarCarpetaFicha(s, o.tabla, ficha.id, r.id);
+    if (!guardada) registro("warn", ETIQUETA, "carpeta de Drive sin guardar en la ficha", { tabla: o.tabla, id: ficha.id, carpetaId: r.id, origen: r.origen });
+  }
+  return r.id;
 }
 
 // ---------------------------------------------------------------------------
@@ -632,27 +743,28 @@ async function autorizarCarta(request: Request, env: Record<string, string | und
   return { s: auth.sesion };
 }
 
-interface FichaCarta {
-  id: string;
-  nombre: string | null;
-  restaurante: boolean | null;
-  touza: boolean | null;
-}
-
-/** Ficha de "Platos"/"Vinos" con el JWT del usuario (decide la RLS). */
-async function leerFicha(s: Sesion, o: OrigenCarta, id: string): Promise<FichaCarta | null> {
-  const r = await s.fetch(`${s.sb.url}/rest/v1/${o.tabla}?id=eq.${encodeURIComponent(id)}&select=id,nombre,restaurante,touza`, {
-    headers: { apikey: s.sb.clave, Authorization: `Bearer ${s.token}`, Accept: "application/json" },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!r.ok) throw new ErrorSupabase(`No se pudo leer el ${o.nombre} (${r.status})`, r.status);
-  const filas = (await r.json().catch(() => [])) as FichaCarta[];
-  return Array.isArray(filas) && filas[0] ? filas[0] : null;
-}
-
-/** Vídeo original de un plato en marketing/carta/<marca>/videos (primero en la marca de la ficha). */
-async function buscarVideoOriginal(c: ConfigDriveInstagram, id: string, marcas: MarcaDrive[]): Promise<{ f: FicheroDrive; marca: MarcaDrive; carpeta: string } | null> {
+/**
+ * Vídeo original de un plato: en Casa Tomás, primero en <plato>/Vídeos del árbol
+ * Platos (el de nombre <id>.<ext>, o si no el más reciente) y luego en
+ * marketing/carta/<marca>/videos (primero en la marca de la ficha).
+ */
+async function buscarVideoOriginal(
+  s: Sesion,
+  c: ConfigDriveInstagram,
+  ficha: { ficha: FichaConCarpeta; sinColumna: boolean } | null,
+  id: string,
+  marcas: MarcaDrive[],
+): Promise<{ f: FicheroDrive; marca: MarcaDrive; carpeta: string } | null> {
   for (const marca of marcas) {
+    if (marca === "casa-tomas" && ficha && marcaDeFicha(ficha.ficha) === "casa-tomas") {
+      const carpetaFicha = await carpetaDeFicha(s, c, CARTA_PLATOS, ficha.ficha, ficha.sinColumna, false);
+      const videos = carpetaFicha ? await carpetaVideosDe(c, carpetaFicha, false) : null;
+      if (videos) {
+        const lista = (await c.cliente.listarHijos([videos], "videos", 50)).filter((x) => !x.trashed);
+        const f = lista.find((x) => esVideoDePlato(x, id)) ?? lista[0];
+        if (f) return { f, marca, carpeta: videos };
+      }
+    }
     const carpeta = await carpetaVideosCarta(c, marca);
     const f = (await c.cliente.buscarEnCarpeta(carpeta, `${id}.`)).find((x) => esVideoDePlato(x, id) && estaEn(x, carpeta));
     if (f) return { f, marca, carpeta };
@@ -702,10 +814,10 @@ async function descargarOriginal(request: Request, env: Record<string, string | 
 
   try {
     if (tipo === "video") {
-      const ficha = await leerFicha(s, o, id);
-      if (!ficha) return json(404, { ok: false, error: `Ese ${o.nombre} no existe (o no tienes permiso para verlo)` });
-      const propia = marcaDeFicha(ficha);
-      const hallado = await buscarVideoOriginal(c, id, [propia, propia === "touza" ? "casa-tomas" : "touza"]);
+      const leida = await leerFichaConCarpeta(s, o.tabla, id);
+      if (!leida.ficha) return json(404, { ok: false, error: `Ese ${o.nombre} no existe (o no tienes permiso para verlo)` });
+      const propia = marcaDeFicha(leida.ficha);
+      const hallado = await buscarVideoOriginal(s, c, { ficha: leida.ficha, sinColumna: leida.sinColumna }, id, [propia, propia === "touza" ? "casa-tomas" : "touza"]);
       if (!hallado) return json(404, { ok: false, sinOriginal: true, error: SIN_ORIGINAL });
       const { f, marca } = hallado;
       const ext = extensionVideo(f.name, f.mimeType);
@@ -726,7 +838,7 @@ async function descargarOriginal(request: Request, env: Record<string, string | 
     if (!fila) return json(404, { ok: false, sinOriginal: true, error: SIN_ORIGINAL });
     const carpeta = await carpetaCarta(c, fila.marca);
     const f = await c.cliente.metadatos(fila.drive_id, "id,name,mimeType,size,parents,trashed,imageMediaMetadata(width,height,rotation)");
-    if (!f || f.trashed || !estaEn(f, carpeta)) {
+    if (!f || f.trashed || !(await estaEnOArbol(c, f, carpeta, fila.marca))) {
       registro("warn", ETIQUETA, "original anotado fuera de su carpeta", { tabla, id, driveId: fila.drive_id });
       return json(404, { ok: false, sinOriginal: true, error: "El original anotado ya no está en la carpeta de la carta de Drive" });
     }
@@ -787,13 +899,27 @@ async function subirOriginalVideo(request: Request, env: Record<string, string |
   }
 
   try {
-    const ficha = await leerFicha(s, CARTA_PLATOS, id);
+    const { ficha, sinColumna } = await leerFichaConCarpeta(s, CARTA_PLATOS.tabla, id);
     if (!ficha) return json(404, { ok: false, error: "Ese plato no existe (o no tienes permiso para verlo)" });
     const marca = marcaDeFicha(ficha);
-    const carpeta = await carpetaVideosCarta(c, marca);
     const nombre = nombreVideoOriginal(id, ext);
     const descripcion = `Vídeo original del plato «${(ficha.nombre ?? "").trim() || id}» (carta)`;
-    const previo = (await c.cliente.buscarEnCarpeta(carpeta, `${id}.`)).find((x) => esVideoDePlato(x, id) && estaEn(x, carpeta));
+    let carpeta: string;
+    let previo: FicheroDrive | undefined;
+    if (marca === "casa-tomas") {
+      // <plato>/Vídeos. Un vídeo que aún esté en carta/casa-tomas/videos se pasa aquí (mismo id de Drive).
+      const carpetaFicha = await carpetaDeFicha(s, c, CARTA_PLATOS, ficha, sinColumna);
+      carpeta = (await carpetaVideosDe(c, carpetaFicha, true))!;
+      previo = (await c.cliente.listarHijos([carpeta], "videos", 50)).find((x) => esVideoDePlato(x, id));
+      if (!previo) {
+        const antigua = await carpetaVideosCarta(c, marca);
+        previo = (await c.cliente.buscarEnCarpeta(antigua, `${id}.`)).find((x) => esVideoDePlato(x, id) && estaEn(x, antigua));
+        if (previo) await c.cliente.mover(previo.id, carpeta, previo.parents ?? [antigua]);
+      }
+    } else {
+      carpeta = await carpetaVideosCarta(c, marca);
+      previo = (await c.cliente.buscarEnCarpeta(carpeta, `${id}.`)).find((x) => esVideoDePlato(x, id) && estaEn(x, carpeta));
+    }
     const subido = await c.cliente.subirReanudable({ ...(previo ? { reemplazarId: previo.id } : { carpeta }), nombre, tipo: TIPOS_VIDEO[ext], datos: archivo, descripcion });
     registro("info", ETIQUETA, "vídeo original subido", { id, marca, driveId: subido.id, reemplazado: !!previo, usuario: s.usuario });
     return json(200, { ok: true, tabla: "Platos", id, driveId: subido.id, marca, nombre, bytes: archivo.size, reemplazado: !!previo });

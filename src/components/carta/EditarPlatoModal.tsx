@@ -3,6 +3,7 @@ import {
   guardarUnidadPlato,
   opcionesUnidadPlato,
 } from "@/lib/unidades-platos";
+import { EnlaceAbrirEnDrive } from "./EnlaceAbrirEnDrive";
 import { AptoParaPlato } from "./AptoParaPlato";
 import {
   aptitudesManualesDisponibles,
@@ -398,6 +399,7 @@ export function EditarPlatoModal({
             Nombre, categoría, precio y declaración de alérgenos son
             obligatorios.
           </DialogDescription>
+          <EnlaceAbrirEnDrive carpetaId={plato?.drive_folder_id} />
         </DialogHeader>
 
         <Form {...form}>

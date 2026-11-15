@@ -102,6 +102,28 @@ describe("carpetas, ficheros y miniaturas", () => {
     await expect(c.buscarCarpeta("x", "abc' or '1'='1")).rejects.toBeInstanceOf(ErrorDrive);
   });
 
+  it("listarHijos: subcarpetas o imágenes de varias carpetas en una consulta (de 25 en 25) y mover cambia de padre sin cambiar el id", async () => {
+    const { d, f, llamadas } = conDrive();
+    const c = new ClienteDrive({ config: CONFIG, fetch: f });
+    const A = await c.crearCarpeta("A", RAIZ_DRIVE);
+    const B = await c.crearCarpeta("B", RAIZ_DRIVE);
+    const A1 = await c.crearCarpeta("A1", A);
+    d.ficheros.set("1FotoEnB000000000000001", { id: "1FotoEnB000000000000001", name: "b.jpg", mimeType: "image/jpeg", parents: [B] });
+    expect((await c.listarCarpetas(A)).map((x) => x.id)).toEqual([A1]);
+    expect((await c.listarHijos([A, B], "carpetas")).map((x) => x.name).sort()).toEqual(["A1"]);
+    expect((await c.listarHijos([A, B], "imagenes")).map((x) => x.id)).toEqual(["1FotoEnB000000000000001"]);
+    const q = new URL(llamadas.at(-1)!.url).searchParams.get("q")!;
+    expect(q).toContain(`'${A}' in parents or '${B}' in parents`);
+    await expect(c.listarHijos(["abc' or '1'='1"], "carpetas")).rejects.toBeInstanceOf(ErrorDrive);
+    // 30 carpetas = 2 consultas.
+    const muchas = Array.from({ length: 30 }, (_, i) => `1Carpeta${String(i).padStart(12, "0")}`);
+    llamadas.length = 0;
+    await c.listarHijos(muchas, "imagenes");
+    expect(llamadas.filter((l) => new URL(l.url).pathname === "/drive/v3/files")).toHaveLength(2);
+    await c.mover("1FotoEnB000000000000001", A, [B]);
+    expect(d.ficheros.get("1FotoEnB000000000000001")?.parents).toEqual([A]);
+  });
+
   it("sube en multipart (metadatos + bytes) y la descarga devuelve los bytes", async () => {
     const { d, f, llamadas } = conDrive();
     const c = new ClienteDrive({ config: CONFIG, fetch: f });

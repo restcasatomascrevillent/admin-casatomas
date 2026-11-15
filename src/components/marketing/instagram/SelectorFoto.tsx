@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, ImageOff, ImagePlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import {
   encajeDe,
   escalaParaCubrir,
   esAptaPara,
+  idFotoDrive,
   urlRecurso,
   type Foto,
   type FormatoId,
@@ -111,14 +112,15 @@ export function MiniaturaCarta({ platoId, url }: { platoId: string; url: string 
   );
 }
 
-type FiltroOrigen = "todas" | "drive" | "carta" | "vinos";
+type FiltroOrigen = "todas" | "drive" | "carta" | "vinos" | "platos";
 const FILTROS: ReadonlyArray<{ id: FiltroOrigen; nombre: string }> = [
   { id: "todas", nombre: "Todas" },
   { id: "drive", nombre: "Drive" },
+  { id: "platos", nombre: "Platos" },
   { id: "carta", nombre: "Carta" },
   { id: "vinos", nombre: "Vinos" },
 ];
-const origenDe = (f: Foto): Exclude<FiltroOrigen, "todas"> => (f.vinoId ? "vinos" : f.platoId ? "carta" : "drive");
+const origenDe = (f: Foto): Exclude<FiltroOrigen, "todas" | "platos"> => (f.vinoId ? "vinos" : f.platoId ? "carta" : "drive");
 
 interface Props {
   marca: MarcaId;
@@ -134,15 +136,29 @@ interface Props {
 export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseFotos, conProblema }: Props) {
   // Biblioteca de la marca en Google Drive (Edge Function instagram-drive).
   // Más los platos de la carta con foto (tipo «plato», id «carta:<id>»).
-  const { fotos: todas, avisos, cargando, error, cargandoCarta, errorCarta } = useFotosInstagram(marca);
+  const { fotos: conArbol, avisos, cargando, error, cargandoCarta, errorCarta, arbol, cargandoArbol, errorArbol } = useFotosInstagram(marca);
   const [filtro, setFiltro] = useState<FiltroOrigen>("todas");
+  const [categoriaId, setCategoriaId] = useState<string | null>(null);
+  const [platoId, setPlatoId] = useState<string | null>(null);
+  // Las fotos de Platos/<categoría>/<plato> solo se cuentan y se enseñan en su pestaña.
+  const idsArbol = useMemo(() => new Set((arbol?.fotos ?? []).map((f) => f.id)), [arbol]);
+  const todas = useMemo(() => conArbol.filter((f) => !idsArbol.has(f.id)), [conArbol, idsArbol]);
+  const hayArbol = marca === "casa-tomas";
+  const filtros = FILTROS.filter((f) => f.id !== "platos" || hayArbol);
+  const categoria = arbol?.categorias.find((c) => c.id === categoriaId) ?? null;
+  const plato = categoria?.platos.find((p) => p.id === platoId) ?? null;
+  const fotosDelPlato = useMemo(() => {
+    const porId = new Map(conArbol.map((f) => [f.id, f]));
+    return (plato?.fotos ?? []).map((f) => porId.get(idFotoDrive(f.driveId))).filter((f): f is Foto => !!f);
+  }, [plato, conArbol]);
   const cuantas: Record<FiltroOrigen, number> = {
     todas: todas.length,
     drive: todas.filter((f) => origenDe(f) === "drive").length,
     carta: todas.filter((f) => origenDe(f) === "carta").length,
     vinos: todas.filter((f) => origenDe(f) === "vinos").length,
+    platos: idsArbol.size,
   };
-  const fotos = filtro === "todas" ? todas : todas.filter((f) => origenDe(f) === filtro);
+  const fotos = filtro === "platos" ? fotosDelPlato : filtro === "todas" ? todas : todas.filter((f) => origenDe(f) === filtro);
   // En el móvil no hay «title» al pasar el ratón: al tocar una foto que no vale se explica debajo.
   const [aviso, setAviso] = useState<string | null>(null);
   const [subir, setSubir] = useState(false);
@@ -153,7 +169,7 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
       {/* Una sola fila: de dónde salen las fotos y «Subir foto». La ayuda, corta y debajo. */}
       <div className="mb-1 flex flex-wrap items-center justify-between gap-1">
       <div role="group" aria-label="Origen de las fotos" className="flex flex-wrap gap-1">
-        {FILTROS.map((f) => (
+        {filtros.map((f) => (
           <Button
             key={f.id}
             type="button"
@@ -176,6 +192,74 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
       <p id="ayuda-foto" className="mb-2 text-xs text-muted-foreground">
         Las grises no sirven para este formato: tócalas para ver por qué. Las de Drive se borran en Drive.
       </p>
+      {filtro === "platos" && (
+        <div className="mb-2 space-y-1.5" data-testid="arbol-platos">
+          {cargandoArbol && (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              Cargando las carpetas de platos…
+            </p>
+          )}
+          {errorArbol && (
+            <p role="alert" className="text-xs text-destructive" data-testid="error-arbol">
+              No se pueden cargar las carpetas de platos: {textoError(errorArbol)}
+            </p>
+          )}
+          {(arbol?.avisos ?? []).map((a) => (
+            <p key={a} className="text-xs text-amber-700" data-testid="aviso-arbol">
+              {a}
+            </p>
+          ))}
+          {arbol && arbol.categorias.length === 0 && !errorArbol && <p className="text-xs text-muted-foreground">Aún no hay carpetas en «Platos» de Drive.</p>}
+          {arbol && arbol.categorias.length > 0 && (
+            <div role="group" aria-label="Categoría" className="flex flex-wrap gap-1">
+              {arbol.categorias.map((c) => {
+                const n = c.platos.reduce((t, p) => t + p.fotos.length, 0);
+                return (
+                  <Button
+                    key={c.id}
+                    type="button"
+                    size="sm"
+                    variant={categoriaId === c.id ? "secondary" : "ghost"}
+                    aria-pressed={categoriaId === c.id}
+                    disabled={n === 0}
+                    data-testid={`categoria-${c.id}`}
+                    onClick={() => {
+                      setCategoriaId(c.id);
+                      setPlatoId(null);
+                    }}
+                    className="h-7 px-2 text-xs pointer-coarse:min-h-11"
+                  >
+                    {c.nombre} ({n})
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+          {categoria && (
+            <div role="group" aria-label="Plato" className="flex flex-wrap gap-1">
+              {categoria.platos
+                .filter((p) => p.fotos.length > 0)
+                .map((p) => (
+                  <Button
+                    key={p.id}
+                    type="button"
+                    size="sm"
+                    variant={platoId === p.id ? "secondary" : "outline"}
+                    aria-pressed={platoId === p.id}
+                    data-testid={`plato-${p.id}`}
+                    onClick={() => setPlatoId(p.id)}
+                    className="h-7 px-2 text-xs pointer-coarse:min-h-11"
+                  >
+                    {p.nombre} ({p.fotos.length})
+                  </Button>
+                ))}
+            </div>
+          )}
+          {arbol && categoria && !plato && <p className="text-xs text-muted-foreground">Elige un plato para ver sus fotos.</p>}
+          {arbol && !categoria && arbol.categorias.length > 0 && <p className="text-xs text-muted-foreground">Elige una categoría.</p>}
+        </div>
+      )}
       {avisos.map((a) => (
         <p key={a} className="mb-2 flex items-start gap-1.5 text-xs text-amber-700" data-testid="aviso-biblioteca">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -265,7 +349,7 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
         </p>
       )}
       {valor && (() => {
-        const elegida = todas.find((f) => f.id === valor);
+        const elegida = conArbol.find((f) => f.id === valor);
         const motivo = elegida ? motivoNoApta(elegida, formato, plantilla) : null;
         return motivo ? <p className="mt-1 text-xs text-destructive">La foto elegida no vale: {motivo}</p> : null;
       })()}

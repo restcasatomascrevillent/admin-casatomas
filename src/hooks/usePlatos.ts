@@ -52,6 +52,8 @@ export interface Plato {
   featured: boolean | null;
   created_at: string | null;
   updated_at: string | null;
+  /** Carpeta del plato en Drive (marketing/Platos/…; 20261201120000). Ausente antes de esa migración. */
+  drive_folder_id?: string | null;
 }
 
 export interface NuevoPlato {

@@ -77,3 +77,63 @@ export function marcaDeFicha(f: { restaurante?: boolean | null; touza?: boolean 
   if (f.touza === true) return "touza";
   return "casa-tomas";
 }
+
+// ---------------------------------------------------------------------------
+// Carpeta de Drive de cada plato o vino (columna drive_folder_id, migración
+// 20261201120000_carta_drive_folder_id). Como el usuario: decide la RLS.
+// ---------------------------------------------------------------------------
+
+export const MIGRACION_CARPETAS = "20261201120000_carta_drive_folder_id";
+
+export interface FichaConCarpeta {
+  id: string;
+  nombre: string | null;
+  categoria: string | null;
+  drive_folder_id: string | null;
+  restaurante: boolean | null;
+  touza: boolean | null;
+}
+
+/**
+ * Ficha de "Platos"/"Vinos" con su carpeta de Drive. Si la migración aún no
+ * está aplicada (la columna no existe), se lee sin ella: `sinColumna: true` y
+ * nada falla (la función se puede desplegar antes que la migración).
+ */
+export async function leerFichaConCarpeta(s: Sesion, tabla: TablaCarta, id: string): Promise<{ ficha: FichaConCarpeta | null; sinColumna: boolean }> {
+  const pedir = async (campos: string) =>
+    await s.fetch(`${s.sb.url}/rest/v1/${tabla}?id=eq.${encodeURIComponent(id)}&select=${campos}`, {
+      headers: cab(s, { Accept: "application/json" }),
+      signal: AbortSignal.timeout(MS),
+    });
+  let sinColumna = false;
+  let r = await pedir("id,nombre,categoria,drive_folder_id,restaurante,touza");
+  if (r.status === 400 && /drive_folder_id|42703/.test(await texto(r.clone()))) {
+    sinColumna = true;
+    r = await pedir("id,nombre,categoria,restaurante,touza");
+  }
+  if (!r.ok) throw new ErrorSupabase(`No se pudo leer la ficha (${r.status}): ${await texto(r)}`, r.status);
+  const filas = (await r.json().catch(() => [])) as Array<Partial<FichaConCarpeta> & { id: string }>;
+  const f = Array.isArray(filas) ? filas[0] : undefined;
+  return { ficha: f ? { id: f.id, nombre: f.nombre ?? null, categoria: f.categoria ?? null, drive_folder_id: f.drive_folder_id ?? null, restaurante: f.restaurante ?? null, touza: f.touza ?? null } : null, sinColumna };
+}
+
+/**
+ * Guarda en la ficha el id de su carpeta de Drive (desde el servidor, con el
+ * JWT del usuario). Nunca falla la subida: devuelve false si no se pudo (sin
+ * migración, sin permiso…) y lo deja en el registro.
+ */
+export async function guardarCarpetaFicha(s: Sesion, tabla: TablaCarta, id: string, carpetaId: string): Promise<boolean> {
+  try {
+    const r = await s.fetch(`${s.sb.url}/rest/v1/${tabla}?id=eq.${encodeURIComponent(id)}&select=id`, {
+      method: "PATCH",
+      headers: cab(s, { "Content-Type": "application/json", Prefer: "return=representation" }),
+      body: JSON.stringify({ drive_folder_id: carpetaId }),
+      signal: AbortSignal.timeout(MS),
+    });
+    if (!r.ok) return false;
+    const filas = (await r.json().catch(() => [])) as unknown[];
+    return Array.isArray(filas) && filas.length > 0;
+  } catch {
+    return false;
+  }
+}
