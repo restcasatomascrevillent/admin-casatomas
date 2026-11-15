@@ -41,6 +41,16 @@ import {
   limpiarObservaciones,
   numeroProvisional,
 } from "./calidad.ts";
+import {
+  aplicarReglasLectura,
+  aplicarSignoAbono,
+  avisoCajasSinUnidades,
+  avisoFechaFueraDeAnio,
+  cifConocido,
+  documentoNoCompra,
+  ivaEmbalajeNicolasValero,
+  localDestinatario,
+} from "./reglasCarga.ts";
 
 /** Peso de un conjunto de descuadres, para poder comparar dos intentos.
  *  Una alerta 'alta' (precio o total inverosímil) pesa más que diez 'media'. */
@@ -56,7 +66,9 @@ export function validarOLanzar(parsed: unknown, contexto: string): DocumentoExtr
       `La extracción no cumple el contrato (${contexto}): ${describirProblemas(v.problemas)}`,
     );
   }
-  return v.datos;
+  // Reglas de la carga histórica que no necesitan la imagen (Pluxee, líneas
+  // con IVA incluido): antes del cuadre, para no pedir relecturas inútiles.
+  return aplicarReglasLectura(v.datos);
 }
 
 /** CIF normalizado para comparar: mayúsculas, sin espacios, puntos ni guiones. */
@@ -103,9 +115,14 @@ export function fechaIso(valor: unknown): string | null {
 }
 
 // deno-lint-ignore no-explicit-any
-export function normalizarDatos(data: any) {
-  if (!data || typeof data !== "object") throw new Error("Los datos extraídos no son un objeto válido");
+export function normalizarDatos(entrada: any, hoy: Date = new Date()) {
+  if (!entrada || typeof entrada !== "object") throw new Error("Los datos extraídos no son un objeto válido");
   const avisosCalidad: AvisoCalidad[] = [];
+  // Reglas de la carga histórica (reglasCarga.ts): avisos de la lectura,
+  // signo de los abonos (Osborne los imprime en positivo) y qué no es compra.
+  if (Array.isArray(entrada.avisos_reglas)) avisosCalidad.push(...entrada.avisos_reglas);
+  const { data, esAbono } = aplicarSignoAbono(entrada);
+  const noCompra = documentoNoCompra(entrada, esCifCliente, esNombreCliente);
 
   // tipo
   let tipo = (data.tipo || "factura").toLowerCase().trim();
@@ -135,7 +152,10 @@ export function normalizarDatos(data: any) {
   // F54650895). Si no supera el dígito de control se guarda igual (es lo que
   // pone el papel) y SQL decide: lo corrige contra la ficha del proveedor si
   // está a ≤ 2 caracteres, y no crea ficha nueva con él (20261010160000).
-  const cif = data.cif && !esCifCliente(data.cif) ? (cifLimpio(data.cif) || null) : null;
+  const cifLeido = data.cif && !esCifCliente(data.cif) ? (cifLimpio(data.cif) || null) : null;
+  const conocido = cifConocido(cifLeido, data.proveedor ?? null);
+  if (conocido.aviso) avisosCalidad.push(conocido.aviso);
+  const cif = conocido.cif;
   if (cif && !cifControlValido(cif)) {
     console.warn(`[calidad] CIF leído ${cif} no supera el dígito de control.`);
   }
@@ -204,8 +224,14 @@ export function normalizarDatos(data: any) {
     : [];
   // Rótulos sin cantidad, mercancía pendiente, kg al peso y precio neto.
   const depuradas = depurarLineas(productosLeidos, cantidadLeida, data.sin_importes === true);
-  const productos: typeof productosLeidos = depuradas.lineas;
+  const productos: typeof productosLeidos = ivaEmbalajeNicolasValero(cif, depuradas.lineas);
   avisosCalidad.push(...depuradas.avisos);
+  const avisoCajas = avisoCajasSinUnidades(productos);
+  if (avisoCajas) avisosCalidad.push(avisoCajas);
+  const avisoAnio = leida ? avisoFechaFueraDeAnio(fecha, hoy) : null;
+  if (avisoAnio) avisosCalidad.push(avisoAnio);
+  const destino = localDestinatario(data.cliente, data.observaciones);
+  if (destino.aviso) avisosCalidad.push(destino.aviso);
   const cambiadasAPeso = productos.filter((p: { regla_magnitud: string }) =>
     p.regla_magnitud === "peso_cuadra" || p.regla_magnitud === "peso_con_descuento"
   ).length;
@@ -220,6 +246,19 @@ export function normalizarDatos(data: any) {
   const subtotal = toNumber(data.subtotal, true);
   const total = toNumber(data.total, true);
   const retencion = retencionNormalizada(data.retencion_irpf, data.retencion_irpf_pct, subtotal, total);
+  // Recargo de equivalencia y cargos fuera de base (tasa DGT): no tienen
+  // columna; quedan en observaciones y explican el cuadre (guardado.ts).
+  const recargo = toNumber(data.recargo_equivalencia, true);
+  const fueraBase = toNumber(data.cargos_fuera_base, true);
+  const notasPie = [
+    esAbono ? "Abono (factura rectificativa): importes guardados en negativo" : null,
+    recargo ? `Recargo de equivalencia impreso: ${Math.abs(recargo)} €` : null,
+    fueraBase ? `Cargos fuera de la base (tasas, suplidos): ${Math.abs(fueraBase)} €` : null,
+  ].filter((x): x is string => !!x);
+  const observacionesLimpias = limpiarObservaciones(data.observaciones);
+  const observaciones = notasPie.length > 0
+    ? [observacionesLimpias, ...notasPie].filter(Boolean).join(". ")
+    : observacionesLimpias;
 
   return {
     tipo,
@@ -237,8 +276,14 @@ export function normalizarDatos(data: any) {
     retencion_irpf: retencion.retencion_irpf,
     /** Porcentaje positivo (facturas.retencion_irpf_pct); null si no se sabe. */
     retencion_irpf_pct: retencion.retencion_irpf_pct,
-    observaciones: limpiarObservaciones(data.observaciones),
+    observaciones,
     resumen: data.resumen || null,
+    /** Local de destino según el destinatario impreso (facturas.local); null si no consta. */
+    local: destino.local,
+    /** Recargo + cargos fuera de base, con el signo de la base (0 si no hay). */
+    extras_total: (recargo ? Math.abs(recargo) : 0) + (fueraBase ? Math.abs(fueraBase) : 0),
+    /** No es una factura de compra (adeudo SEPA, TPV, leasing…): no se guarda (guardado.ts). */
+    no_es_compra: noCompra,
     productos,
     /** Avisos de la normalización de cantidades (no van a ninguna columna:
      *  los llamantes los añaden a alertasPrevias). */
@@ -309,7 +354,7 @@ export async function extraerConCuadre(
   let segunda: DocumentoExtraido;
   let descuadres2: Descuadre[];
   try {
-    mensajes.push({ role: "assistant", content: JSON.stringify(primera) });
+    mensajes.push({ role: "assistant", content: JSON.stringify({ ...primera, avisos_reglas: undefined }) });
     mensajes.push({ role: "user", content: mensajeCorrectivo(descuadres1) });
     segunda = validarOLanzar(await cliente.llamarVision(mensajes, undefined, undefined, "relectura"), "reintento");
     descuadres2 = comprobarCuadre(segunda);
