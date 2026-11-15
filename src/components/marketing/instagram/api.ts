@@ -427,6 +427,40 @@ export async function listarFotosDrive(marca: MarcaId, opts?: OpcionesLlamada): 
   };
 }
 
+export interface PlatoArbolDrive {
+  id: string;
+  nombre: string;
+  fotos: FotoDrive[];
+}
+export interface CategoriaArbolDrive {
+  id: string;
+  nombre: string;
+  platos: PlatoArbolDrive[];
+}
+export interface RespuestaListarPlatos {
+  categorias: CategoriaArbolDrive[];
+  alcance: string | null;
+  avisos: string[];
+  /** true si la función ha recortado carpetas o fotos (tope). */
+  truncado: boolean;
+}
+
+/** Árbol de Drive marketing/Platos/<categoría>/<plato>/ con las fotos de cada plato (solo Casa Tomás). */
+export async function listarPlatosDrive(marca: MarcaId, opts?: OpcionesLlamada): Promise<RespuestaListarPlatos> {
+  const r = await llamar<Crudo>(URL_DRIVE, { method: "POST", body: JSON.stringify({ accion: "listar_platos", marca }) }, opts, cabecerasEdge());
+  const lista = (v: unknown): Crudo[] => (Array.isArray(v) ? (v as Crudo[]) : []);
+  return {
+    categorias: lista(r.categorias).map((c) => ({
+      id: String(c.id ?? ""),
+      nombre: String(c.nombre ?? ""),
+      platos: lista(c.platos).map((p) => ({ id: String(p.id ?? ""), nombre: String(p.nombre ?? ""), fotos: lista(p.fotos) as unknown as FotoDrive[] })),
+    })),
+    alcance: typeof r.alcance === "string" ? r.alcance : null,
+    avisos: Array.isArray(r.avisos) ? r.avisos.map(String) : [],
+    truncado: r.truncado === true,
+  };
+}
+
 /** Sube un JPEG ya preparado a la carpeta de Drive de la marca y guarda su tipo y descripción. */
 export async function subirFotoDrive(
   n: { blob: Blob; marca: MarcaId; tipo: string; descripcion: string },

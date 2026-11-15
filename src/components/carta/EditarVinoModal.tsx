@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { EnlaceAbrirEnDrive } from "./EnlaceAbrirEnDrive";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -301,6 +302,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
           <DialogDescription>
             Modifica los datos del vino seleccionado
           </DialogDescription>
+          <EnlaceAbrirEnDrive carpetaId={vino?.drive_folder_id} />
         </DialogHeader>
 
         <Form {...form}>
