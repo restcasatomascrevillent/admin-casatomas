@@ -27,6 +27,7 @@ import {
 } from "@/lib/facturas/decision";
 import { resumenCortoAlerta, tituloCortoAlerta } from "@/lib/facturas/alertas";
 import type { DocumentoCifra } from "@/lib/facturas/documentosCifra";
+import { productoDeAlerta, type ProductoBuscado } from "@/lib/facturas/comprasProducto";
 import type { Tamano } from "@/lib/facturas/widgetsTablero";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
 import { nombreMes as nombreMesLargo } from "@/lib/facturas/vistasAnalisis";
@@ -71,13 +72,30 @@ export function useVisor(onIrA?: (enlace: string) => void) {
   const [docs, setDocs] = useState<DocumentoCifra[]>([]);
   const [indice, setIndice] = useState<number | null>(null);
   const [notas, setNotas] = useState<({ etiqueta: string; linea: string } | null)[]>([]);
-  /** notas (opcional, en el mismo orden que d): la etiqueta y la línea resaltada de cada documento. */
-  const abrir = (d: (DocumentoCifra | null)[], n?: ({ etiqueta: string; linea: string } | null)[]) => {
+  const [producto, setProducto] = useState<ProductoBuscado | null>(null);
+  /**
+   * notas (opcional, en el mismo orden que d): la etiqueta y la línea resaltada de cada documento.
+   * producto (opcional, 15/11/2026): cada documento se abre en la hoja del producto, con sus
+   * líneas arriba y la lista de todas sus compras.
+   */
+  const abrir = (d: (DocumentoCifra | null)[], n?: ({ etiqueta: string; linea: string } | null)[], p?: ProductoBuscado | null) => {
     const pares = d.map((x, i) => [x, n?.[i] ?? null] as const).filter((p): p is readonly [DocumentoCifra, { etiqueta: string; linea: string } | null] => !!p[0]);
     if (pares.length === 0) return;
     setDocs(pares.map((p) => p[0]));
     setNotas(pares.map((p) => p[1]));
+    setProducto(p ?? null);
     setIndice(0);
+  };
+  // Desde «Todas las compras»: si ya está en la lista va a él; si no, se añade al final.
+  const abrirOtro = (doc: DocumentoCifra) => {
+    const i = docs.findIndex((x) => x.id === doc.id);
+    if (i >= 0) {
+      setIndice(i);
+      return;
+    }
+    setDocs([...docs, doc]);
+    setNotas([...notas, null]);
+    setIndice(docs.length);
   };
   const visor = (
     <VisorDocumento
@@ -88,6 +106,8 @@ export function useVisor(onIrA?: (enlace: string) => void) {
       onAbrirEnCompras={onIrA}
       total={docs.length}
       notas={notas}
+      producto={producto}
+      onAbrirDocumento={abrirOtro}
     />
   );
   return { abrir, visor };
@@ -543,7 +563,7 @@ export function DondeAhorrar({
               ? []
               : [
                   ...(m.doc || m.docOtro
-                    ? [{ etiqueta: "Comparar facturas", icono: <FileText className={ICONO} aria-hidden />, onClick: () => abrir([m.docOtro, m.doc]) }]
+                    ? [{ etiqueta: "Comparar facturas", icono: <FileText className={ICONO} aria-hidden />, onClick: () => abrir([m.docOtro, m.doc], undefined, productoDeAlerta(m.alerta)) }]
                     : []),
                   ...(puedeEditar
                     ? [
