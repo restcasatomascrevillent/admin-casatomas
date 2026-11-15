@@ -301,10 +301,10 @@ $t2$;
 -- ---------------------------------------------------------------------------
 do $t3a$
 begin
-  assert not has_function_privilege('anon', 'public.gasto_categorias_agente(text,date,date,text,text)', 'execute'), 'T3a';
+  assert not has_function_privilege('anon', 'public.gasto_categorias_agente(text,date,date,text,text,text,text,text)', 'execute'), 'T3a';
   assert not has_function_privilege('anon', 'public.variacion_precios_agente(date,date,numeric,text,text,integer,text)', 'execute'), 'T3b';
   assert not has_function_privilege('anon', 'public.categoria_agente(text)', 'execute'), 'T3c';
-  assert has_function_privilege('authenticated', 'public.gasto_categorias_agente(text,date,date,text,text)', 'execute'), 'T3d';
+  assert has_function_privilege('authenticated', 'public.gasto_categorias_agente(text,date,date,text,text,text,text,text)', 'execute'), 'T3d';
   assert has_function_privilege('service_role', 'public.variacion_precios_agente(date,date,numeric,text,text,integer,text)', 'execute'), 'T3e';
   assert not has_function_privilege('authenticated', 'public.productos_avisar_subidas(bigint[])', 'execute'), 'T3f';
   assert not has_table_privilege('anon', 'public.configuracion_facturas', 'select'), 'T3g';

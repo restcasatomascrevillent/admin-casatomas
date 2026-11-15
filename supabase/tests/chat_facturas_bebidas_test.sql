@@ -29,7 +29,7 @@ declare
   c      record;
 begin
   -- T1 ─────────────────────────────────────────────────────────────────────
-  foreach f in array array['public.volumen_comprado_agente(text,text,date,date,text,text,integer,text)',
+  foreach f in array array['public.volumen_comprado_agente(text,text,date,date,text,text,integer,text,text,text,text)',
                            'public.volumen_tipo_envase(numeric,text,text,text)'] loop
     if has_function_privilege('anon', f, 'execute') then
       raise exception 'FALLO T1: anon puede ejecutar %', f;

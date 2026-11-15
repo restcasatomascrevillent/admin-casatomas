@@ -43,7 +43,7 @@ import {
  * El prompt va en cache (≈5.600 de 8.200 tokens de entrada, 0,10 $/M en
  * gpt-4.1-mini): ~+90 tokens ≈ +0,00001 $ por ronda.
  */
-const LIMITE_PROMPT = 6_850; // + «Precio de referencia = la ULTIMA factura» (13/11/2026) + regla 19 «como_leer» (16/11/2026) + precio tal como se compra en la 14 (11/11/2026)
+const LIMITE_PROMPT = 7_100; // + regla 20 «vinos por denominacion» (15/11/2026) + «Precio de referencia = la ULTIMA factura» (13/11/2026) + regla 19 «como_leer» (16/11/2026) + precio tal como se compra en la 14 (11/11/2026)
 
 // deno-lint-ignore no-explicit-any
 type Esquema = any;
@@ -141,7 +141,7 @@ describe("TOOLS", () => {
     // +174, ~45 tokens por ronda).
     // 11.9xx con margenes_carta y alertas_precio (16/11/2026: margenes de la carta y avisos de
     // Analisis; +1.310, ~330 tokens por ronda; las pautas de lectura van en "como_leer" del resultado).
-    expect(tamano).toBeLessThan(12_050); // + IRPF (07/11/2026) + proveedor en compras_producto (23/11/2026)
+    expect(tamano).toBeLessThan(12_400); // + denominacion en gasto_por_categoria y volumen_comprado (15/11/2026) + IRPF (07/11/2026) + proveedor en compras_producto (23/11/2026)
     for (const t of TOOLS) expect(t.function.description.length, t.function.name).toBeLessThan(330);
   });
 });
@@ -733,7 +733,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
     expect(p).toMatch(/Con convertido_desde di «convertido desde caja de 10 kg»/);
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(12_050); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(12_400); // + denominacion (15/11/2026) + 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
 });
 
@@ -767,7 +767,7 @@ describe("ronda 9 (10/10/2026, migracion 20261010170000)", () => {
 
   it("tamaños: el prompt y TOOLS no crecen respecto a la ronda 8 (5.728 y 9.620 caracteres)", () => {
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(12_050); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(12_400); // + denominacion (15/11/2026) + 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
 });
 
@@ -804,7 +804,7 @@ describe("volumen_comprado (06/11/2026, migracion 20261106400000)", () => {
     expect(t.description).toMatch(/litros de cerveza/);
     expect(t.description).toMatch(/cuantos barriles/);
     expect(t.description).toMatch(/lineas_sin_convertir/);
-    expect(Object.keys((t.parameters as Esquema).properties)).toEqual(["categoria", "producto", "desde", "hasta", "unidad", "orden"]);
+    expect(Object.keys((t.parameters as Esquema).properties)).toEqual(["categoria", "producto", "desde", "hasta", "unidad", "orden", "denominacion"]);
     expect(systemPrompt("2026-11-06").length).toBeLessThanOrEqual(LIMITE_PROMPT);
   });
 });
