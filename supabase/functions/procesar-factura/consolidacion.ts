@@ -33,6 +33,7 @@ import {
   toleranciaCabecera,
 } from "./esquema.ts";
 import { esCifCliente, esNombreCliente, normalizarCif, normalizarDatos } from "./extraccion.ts";
+import { aplicarReglasLectura } from "./reglasCarga.ts";
 import {
   bloqueRepetido,
   cuadraPorPeso,
@@ -640,8 +641,11 @@ export function consolidar(piezasEntrada: PaginaCerrada[], rondaRelectura = 0): 
 
   const documento: DocumentoExtraido & { productos: LineaConsolidada[] } = {
     tipo: cab.tipo,
+    es_abono: cab.es_abono,
+    clase_documento: cab.clase_documento,
     proveedor: cab.proveedor,
     cif: cab.cif,
+    cliente: cab.cliente,
     numero_documento: cab.numero_documento ?? "",
     fecha: cab.fecha,
     sin_importes: sinImportes,
@@ -731,6 +735,10 @@ interface CabeceraElegida {
   cif: string | null;
   numero_documento: string | null;
   fecha: string | null;
+  /** Reglas de la carga histórica (15/11/2026). */
+  cliente: string | null;
+  es_abono: boolean;
+  clase_documento: string;
 }
 
 function elegirCabecera(
@@ -793,7 +801,13 @@ function elegirCabecera(
       detalle: { valores_por_pagina: contradicciones },
     });
   }
-  return { tipo, proveedor, cif, numero_documento: numero, fecha };
+  // Destinatario (para el local): el primero que se vea. Abono: si alguna
+  // pieza lo dice. Clase: la primera que NO sea «compra» manda (un adeudo SEPA
+  // de dos páginas no se carga como gasto aunque la 2 no se identifique).
+  const cliente = primero((x) => (x.c.cliente && x.c.cliente.trim() ? x.c.cliente.trim() : null), "cliente");
+  const es_abono = cabs.some((x) => x.c.es_abono === true) || /abono|rectificativa|nota de cr[eé]dito/i.test(titulos);
+  const clase_documento = cabs.map((x) => x.c.clase_documento).find((c) => c && c !== "compra") ?? "compra";
+  return { tipo, proveedor, cif, numero_documento: numero, fecha, cliente, es_abono, clase_documento };
 }
 
 // ─── Del documento consolidado al que se guarda ─────────────────────────────
@@ -811,7 +825,10 @@ export interface DocumentoConsolidadoListo {
  * aquí NO se llama a aplicarRecuentoVerificado con un recuento global.
  * Sin número en ninguna pieza: número provisional (normalizarDatos).
  */
-export function prepararDocumentoConsolidado(c: ResultadoConsolidacion): DocumentoConsolidadoListo {
+export function prepararDocumentoConsolidado(consolidado: ResultadoConsolidacion): DocumentoConsolidadoListo {
+  // Reglas de la carga histórica sobre la lectura (Pluxee, líneas con IVA
+  // incluido) ANTES del cuadre, como en el camino de una página.
+  const c = { ...consolidado, documento: aplicarReglasLectura(consolidado.documento) };
   // Sin número en ninguna pieza ya no se lanza (10/10/2026): normalizarDatos
   // le pone uno provisional «SN-<proveedor>-<AAAAMMDD>» con su aviso.
   // Descuadres del documento consolidado (mismo validador que el camino de
