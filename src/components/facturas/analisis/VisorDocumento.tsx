@@ -12,6 +12,9 @@
 //     (pestaña nueva) y «Abrir en Compras» (su ficha).
 //   · Anterior / Siguiente (y las flechas ← →) recorren la lista sin cerrar.
 //   · Radix Dialog: foco atrapado, Escape cierra, título y descripción.
+//   · Con `producto` («Comparar facturas», 15/11/2026): el PDF se abre en la
+//     HOJA del producto y al lado salen las líneas del documento con las suyas
+//     arriba y marcadas, y todas las compras del producto (PanelProducto).
 import type { KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, ExternalLink, FileSearch, FileX2, Loader2 } from "lucide-react";
@@ -28,6 +31,15 @@ import { ETIQUETA_LOCAL, ETIQUETA_TIPO, enlaceDocumentoCompras, esPdf, vistaPrev
 import { useOriginalDrive, useUrlDeBlob } from "@/lib/facturas/originalDrive";
 import { FOCO } from "./piezas";
 import { useFocoAlCerrar } from "./desplazar";
+import { PanelProducto } from "./PanelProducto";
+import { useLineasDocumento } from "@/hooks/useComprasProducto";
+import { hojaDelProducto, hojasDelProducto, type ProductoBuscado } from "@/lib/facturas/comprasProducto";
+
+/** La hoja del producto en el PDF (y las hojas donde sale), si se sabe. */
+interface Hojas {
+  hojaInicial: number | null;
+  hojasMarcadas: number[];
+}
 
 const BUCKET = "facturas-originales";
 const SEGUNDOS_FIRMA = 600;
@@ -52,7 +64,7 @@ const ACCION =
   "inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted/60 disabled:pointer-events-none disabled:opacity-40";
 
 /** El original de Drive, servido por la Edge Function (blob URL). */
-function OriginalDrive({ doc, titulo }: { doc: DocumentoCifra; titulo: string }) {
+function OriginalDrive({ doc, titulo, hojaInicial, hojasMarcadas }: { doc: DocumentoCifra; titulo: string } & Hojas) {
   const q = useOriginalDrive(doc.id);
   const url = useUrlDeBlob(q.data);
   if (q.isError && !q.isFetching)
@@ -75,17 +87,17 @@ function OriginalDrive({ doc, titulo }: { doc: DocumentoCifra; titulo: string })
       <div className="flex shrink-0 justify-end">
         <EnlaceDescargarPdf url={url} titulo={titulo} />
       </div>
-      <VisorPdf key={doc.id} fuente={q.data} titulo={`Original: ${titulo}`} className="min-h-0 flex-1" />
+      <VisorPdf key={doc.id} fuente={q.data} titulo={`Original: ${titulo}`} className="min-h-0 flex-1" hojaInicial={hojaInicial} hojasMarcadas={hojasMarcadas} />
     </div>
   ) : (
     <ImagenZoom key={doc.id} src={url} alt={`Original: ${titulo}`} className="h-full min-h-0 w-full rounded-none border-0" />
   );
 }
 
-function Original({ doc, titulo }: { doc: DocumentoCifra; titulo: string }) {
+function Original({ doc, titulo, hojaInicial, hojasMarcadas }: { doc: DocumentoCifra; titulo: string } & Hojas) {
   const previa = vistaPreviaDrive(doc.driveUrl);
   const firmada = useUrlFirmada(!previa ? doc.archivoPath : null);
-  if (previa) return <OriginalDrive key={doc.id} doc={doc} titulo={titulo} />;
+  if (previa) return <OriginalDrive key={doc.id} doc={doc} titulo={titulo} hojaInicial={hojaInicial} hojasMarcadas={hojasMarcadas} />;
   if (doc.archivoPath) {
     if (firmada.isError)
       return (
@@ -101,7 +113,7 @@ function Original({ doc, titulo }: { doc: DocumentoCifra; titulo: string }) {
       );
     return esPdf(doc.archivoPath) ? (
       <div className="flex min-h-0 flex-1 flex-col p-2">
-        <VisorPdf key={doc.id} fuente={firmada.data} titulo={`Original: ${titulo}`} className="min-h-0 flex-1" />
+        <VisorPdf key={doc.id} fuente={firmada.data} titulo={`Original: ${titulo}`} className="min-h-0 flex-1" hojaInicial={hojaInicial} hojasMarcadas={hojasMarcadas} />
       </div>
     ) : (
       <ImagenZoom key={doc.id} src={firmada.data} alt={`Original: ${titulo}`} className="h-full min-h-0 w-full rounded-none border-0" />
@@ -123,6 +135,8 @@ export function VisorDocumento({
   onAbrirEnCompras,
   total,
   notas,
+  producto = null,
+  onAbrirDocumento,
 }: {
   documentos: DocumentoCifra[];
   indice: number | null;
@@ -133,6 +147,10 @@ export function VisorDocumento({
   total: number;
   /** «Comparar» (14/11/2026): qué factura es («Factura nueva» / «Factura anterior») y la línea del producto, resaltada. */
   notas?: ({ etiqueta: string; linea: string } | null)[];
+  /** El producto comparado: abre la hoja donde está y enseña sus líneas y todas sus compras. */
+  producto?: ProductoBuscado | null;
+  /** Abrir otro documento (desde la lista de compras del producto). */
+  onAbrirDocumento?: (doc: DocumentoCifra) => void;
 }) {
   const doc = indice !== null ? documentos[indice] : undefined;
   const abierto = !!doc;
@@ -145,6 +163,10 @@ export function VisorDocumento({
   const focoAlCerrar = useFocoAlCerrar(abierto);
   const nota = indice !== null ? (notas?.[indice] ?? null) : null;
   const titulo = doc ? `${ETIQUETA_TIPO[doc.tipo]} ${doc.numero ?? "sin número"} · ${doc.proveedor}` : "";
+  const lineasQ = useLineasDocumento(doc && producto ? doc.id : null);
+  const lineas = lineasQ.data ?? [];
+  const hojaInicial = hojaDelProducto(lineas, producto);
+  const hojasMarcadas = hojasDelProducto(lineas, producto);
 
   const teclas = (e: KeyboardEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest("input, textarea, select")) return;
@@ -221,11 +243,28 @@ export function VisorDocumento({
               {nota && (
                 <p className="rounded-md border border-amber-500/50 bg-amber-200/60 px-2 py-1 text-sm font-medium text-amber-950 dark:bg-amber-500/20 dark:text-amber-100" data-testid="visor-linea">
                   Línea del producto: {nota.linea}
+                  {hojasMarcadas.length > 0 && (
+                    <span className="font-semibold" data-testid="visor-hoja-producto">
+                      {" "}· {hojasMarcadas.length === 1 ? `en la hoja ${hojasMarcadas[0]}` : `en las hojas ${hojasMarcadas.join(", ")}`}
+                    </span>
+                  )}
                 </p>
               )}
             </header>
-            <div className="flex min-h-0 flex-1 flex-col bg-muted/20">
-              <Original doc={doc} titulo={titulo} />
+            <div className={cn("flex min-h-0 flex-1 flex-col bg-muted/20", producto && "md:flex-row")}>
+              <div className="flex min-h-0 flex-1 flex-col">
+                <Original doc={doc} titulo={titulo} hojaInicial={hojaInicial} hojasMarcadas={hojasMarcadas} />
+              </div>
+              {producto && (
+                <PanelProducto
+                  doc={doc}
+                  producto={producto}
+                  lineas={lineas}
+                  cargandoLineas={lineasQ.isLoading}
+                  errorLineas={lineasQ.isError}
+                  onAbrirDocumento={onAbrirDocumento}
+                />
+              )}
             </div>
           </>
         )}

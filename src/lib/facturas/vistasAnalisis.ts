@@ -413,6 +413,25 @@ export function geometriaPrecio(serie: PuntoPrecio[], referencia: number | null,
   };
 }
 
+/**
+ * Eje Y de la gráfica de precio (15/11/2026, «no se sabe cuánto vale cada
+ * punto»): valores redondos (1, 2, 2,5 o 5 × 10ⁿ) entre `min` y `max` de la
+ * geometría, con su `y` en el mismo viewBox (alto × margen de geometriaPrecio).
+ */
+export function ticksPrecio(g: Pick<GeometriaPrecio, "min" | "max">, n = 4, alto = 180, margen = 12): { valor: number; y: number }[] {
+  const { min: lo, max: hi } = g;
+  if (!(hi > lo)) return [];
+  const bruto = (hi - lo) / n;
+  const mag = 10 ** Math.floor(Math.log10(bruto));
+  const paso = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((k) => k >= bruto) ?? 10 * mag;
+  const out: { valor: number; y: number }[] = [];
+  for (let v = Math.ceil(lo / paso - 1e-9) * paso; v <= hi + 1e-9; v += paso) {
+    const valor = Math.round(v * 1e6) / 1e6;
+    out.push({ valor, y: Math.round((alto - margen - ((valor - lo) / (hi - lo)) * (alto - 2 * margen)) * 10) / 10 });
+  }
+  return out;
+}
+
 /** Los `n` meses (AAAA-MM) que acaban en `hasta` (AAAA-MM-DD), en orden. */
 export function mesesHasta(hasta: string, n = 6): string[] {
   const a = Number(hasta.slice(0, 4));
