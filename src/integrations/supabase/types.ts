@@ -3819,6 +3819,7 @@ export type Database = {
           categoria_en: string | null
           categoria_fr: string | null
           created_at: string | null
+          drive_folder_id: string | null
           descripcion: string | null
           descripcion_en: string | null
           descripcion_fr: string | null
@@ -3852,6 +3853,7 @@ export type Database = {
           categoria_en?: string | null
           categoria_fr?: string | null
           created_at?: string | null
+          drive_folder_id?: string | null
           descripcion?: string | null
           descripcion_en?: string | null
           descripcion_fr?: string | null
@@ -3885,6 +3887,7 @@ export type Database = {
           categoria_en?: string | null
           categoria_fr?: string | null
           created_at?: string | null
+          drive_folder_id?: string | null
           descripcion?: string | null
           descripcion_en?: string | null
           descripcion_fr?: string | null
@@ -5205,6 +5208,7 @@ export type Database = {
           categoria_en: string | null
           categoria_fr: string | null
           created_at: string | null
+          drive_folder_id: string | null
           denominacion_origen: string | null
           descripcion: string | null
           expanded: boolean | null
@@ -5244,6 +5248,7 @@ export type Database = {
           categoria_en?: string | null
           categoria_fr?: string | null
           created_at?: string | null
+          drive_folder_id?: string | null
           denominacion_origen?: string | null
           descripcion?: string | null
           expanded?: boolean | null
@@ -5283,6 +5288,7 @@ export type Database = {
           categoria_en?: string | null
           categoria_fr?: string | null
           created_at?: string | null
+          drive_folder_id?: string | null
           denominacion_origen?: string | null
           descripcion?: string | null
           expanded?: boolean | null

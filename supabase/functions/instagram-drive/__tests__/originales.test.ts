@@ -36,7 +36,7 @@ function entorno(o: {
   const originales: Fila[] = o.originales === "sin_tabla" ? [] : [...(o.originales ?? [])];
   const guardados: Fila[] = [];
   const secciones: string[] = [];
-  const ficha = o.ficha === undefined ? { id: PLATO, nombre: "Chuletón de vaca gallega", restaurante: true, touza: false, activado: true, imagen_url: URL_WEB } : o.ficha;
+  const ficha = o.ficha === undefined ? { id: PLATO, nombre: "Chuletón de vaca gallega", categoria: "Carnes", restaurante: true, touza: false, activado: true, imagen_url: URL_WEB } : o.ficha;
   const anotar = (url: string, init: RequestInit) =>
     base.llamadas.push({ url, metodo: (init.method ?? "GET").toUpperCase(), cabeceras: Object.fromEntries(new Headers(init.headers as HeadersInit).entries()), cuerpo: typeof init.body === "string" ? init.body : null, bruto: init.body } as Llamada);
   const json = (estado: number, c: unknown) => new Response(JSON.stringify(c), { status: estado, headers: { "Content-Type": "application/json" } });
@@ -107,6 +107,22 @@ function carpetaDe(d: ReturnType<typeof driveFalso>, marca: string): string | un
   return carta ? hijos(carta, marca) : undefined;
 }
 
+/** Carpeta (creándola) dentro de `padre`. */
+function carpetaEn(d: ReturnType<typeof driveFalso>, nombre: string, padre: string): string {
+  const hay = [...d.ficheros.values()].find((x) => x.name === nombre && x.parents?.includes(padre));
+  if (hay) return hay.id;
+  const id = `1Carpeta${String(d.ficheros.size).padStart(20, "0")}`;
+  d.ficheros.set(id, { id, name: nombre, mimeType: "application/vnd.google-apps.folder", parents: [padre] });
+  return id;
+}
+const carpetaPorNombre = (d: ReturnType<typeof driveFalso>, nombre: string) => [...d.ficheros.values()].find((x) => x.name === nombre && x.mimeType === "application/vnd.google-apps.folder")!.id;
+/** «Platos/Carnes/Plato» de una carpeta (sin «marketing»). */
+function rutaDe(d: ReturnType<typeof driveFalso>, id: string): string {
+  const tramos: string[] = [];
+  for (let f = d.ficheros.get(id); f && f.id !== RAIZ_DRIVE; f = d.ficheros.get(f.parents?.[0] ?? "")) tramos.unshift(f.name);
+  return tramos.join("/");
+}
+
 beforeEach(() => {
   olvidarSecretos();
   olvidarTokenDrive();
@@ -119,13 +135,15 @@ describe("instagram-drive · subir_original", () => {
     const r = await manejarDrive(formulario({ tabla: "Platos", id: PLATO, archivo: jpeg(4000, 3000) }), { env: ENV, fetch: e.f, ...deps });
     expect(r.status).toBe(200);
     const j = await r.json();
-    expect(j).toMatchObject({ ok: true, tabla: "Platos", id: PLATO, marca: "casa-tomas", nombre: `chuleton-de-vaca-gallega-${PLATO}.jpg`, ancho: 4000, alto: 3000, reemplazado: false });
-    // En la carpeta de la carta de la marca (creada si faltaba), no en instagram/fotos.
-    const carpeta = carpetaDe(e.d, "casa-tomas");
-    expect(carpeta).toBeTruthy();
+    expect(j).toMatchObject({ ok: true, tabla: "Platos", id: PLATO, marca: "casa-tomas", nombre: "ORIGINAL - Chuletón de vaca gallega.jpg", ancho: 4000, alto: 3000, reemplazado: false });
+    // En Platos/<categoría>/<plato>/ (todo creado si faltaba), no en carta/ ni en instagram/fotos.
+    const carpeta = carpetaPorNombre(e.d, "Chuletón de vaca gallega");
+    expect(j.carpetaId).toBe(carpeta);
+    expect(rutaDe(e.d, carpeta)).toBe("Platos/Carnes/Chuletón de vaca gallega");
     expect(e.d.subidas).toHaveLength(1);
-    expect(e.d.subidas[0].meta).toMatchObject({ name: `chuleton-de-vaca-gallega-${PLATO}.jpg`, parents: [carpeta] });
-    expect(e.guardados).toEqual([{ plato_id: PLATO, drive_id: j.driveId, marca: "casa-tomas", nombre: j.nombre, ancho: 4000, alto: 3000, bytes: jpegDe(4000, 3000).byteLength }]);
+    expect(e.d.subidas[0].meta).toMatchObject({ name: "ORIGINAL - Chuletón de vaca gallega.jpg", parents: [carpeta] });
+    // La fila guarda el nombre «seguro» (su CHECK lo exige); el id de la carpeta se guarda en la ficha.
+    expect(e.guardados).toEqual([{ plato_id: PLATO, drive_id: j.driveId, marca: "casa-tomas", nombre: `chuleton-de-vaca-gallega-${PLATO}.jpg`, ancho: 4000, alto: 3000, bytes: jpegDe(4000, 3000).byteLength }]);
     // Upsert por plato_id, con el JWT del usuario (decide la RLS), nunca service_role.
     const post = e.llamadas.find((l) => l.metodo === "POST" && l.url.startsWith(`${SB}/rest/v1/carta_fotos_originales`))!;
     expect(post.url).toContain("on_conflict=plato_id");
@@ -133,6 +151,62 @@ describe("instagram-drive · subir_original", () => {
     expect(post.cabeceras.authorization).toBe(`Bearer ${JWT}`);
     // El permiso que se mira es «Editar» de la carta, no el de Marketing.
     expect(e.secciones).toEqual(["editar:gestor_carta"]);
+    const patch = e.llamadas.find((l) => l.metodo === "PATCH" && l.url.startsWith(`${SB}/rest/v1/Platos?`))!;
+    expect(JSON.parse(patch.cuerpo!)).toEqual({ drive_folder_id: carpeta });
+    expect(patch.cabeceras.authorization).toBe(`Bearer ${JWT}`);
+  });
+
+  it("usa el drive_folder_id de la ficha si sigue colgando de Platos; si no, busca por nombre sin tildes en cualquier categoría y reutiliza «NN Categoría»", async () => {
+    const d = driveFalso();
+    const platos = carpetaEn(d, "Platos", RAIZ_DRIVE);
+    carpetaEn(d, "09 Carnes", platos);
+    const otra = carpetaEn(d, "04 Entrantes calientes", platos);
+    const porId = carpetaEn(d, "Carpeta con otro nombre", otra);
+    // 1. id guardado: manda aunque el nombre no coincida.
+    const a = entorno({ drive: d, ficha: { id: PLATO, nombre: "Chuletón de vaca gallega", categoria: "CARNES", restaurante: true, touza: false, drive_folder_id: porId } });
+    const ra = await (await manejarDrive(formulario({ tabla: "Platos", id: PLATO, archivo: jpeg(100, 100) }), { env: ENV, fetch: a.f, ...deps })).json();
+    expect(ra.carpetaId).toBe(porId);
+    expect(a.llamadas.some((l) => l.metodo === "PATCH" && l.url.startsWith(`${SB}/rest/v1/Platos?`))).toBe(false); // mismo id: nada que guardar
+    // 2. id caducado (no cuelga de Platos) → por nombre, ignorando tildes y mayúsculas, en cualquier categoría.
+    olvidarCarpetasDrive();
+    const fuera = carpetaEn(d, "Fuera", RAIZ_DRIVE);
+    const existente = carpetaEn(d, "CHULETON DE VACA GALLEGA", otra);
+    const b = entorno({ drive: d, ficha: { id: PLATO, nombre: "Chuletón de vaca gallega", categoria: "CARNES", restaurante: true, touza: false, drive_folder_id: fuera } });
+    const rb = await (await manejarDrive(formulario({ tabla: "Platos", id: PLATO, archivo: jpeg(100, 100) }), { env: ENV, fetch: b.f, ...deps })).json();
+    expect(rb.carpetaId).toBe(existente);
+    expect(JSON.parse(b.llamadas.find((l) => l.metodo === "PATCH" && l.url.startsWith(`${SB}/rest/v1/Platos?`))!.cuerpo!)).toEqual({ drive_folder_id: existente });
+    // 3. sin carpeta → se crea en la categoría «09 Carnes» ya existente (sin repetirla).
+    olvidarCarpetasDrive();
+    const c = entorno({ drive: d, ficha: { id: "p-nuevo", nombre: "Entrecot nuevo", categoria: "Carnes", restaurante: true, touza: false } });
+    const rc = await (await manejarDrive(formulario({ tabla: "Platos", id: "p-nuevo", archivo: jpeg(100, 100) }), { env: ENV, fetch: c.f, ...deps })).json();
+    expect(rutaDe(d, rc.carpetaId)).toBe("Platos/09 Carnes/Entrecot nuevo");
+    expect([...d.ficheros.values()].filter((x) => x.name.endsWith("Carnes"))).toHaveLength(1);
+  });
+
+  it("compatibilidad: el original que aún está en carta/casa-tomas se reemplaza con el MISMO id y se pasa a la carpeta del plato", async () => {
+    const d = driveFalso();
+    const vieja = carpetaEn(d, "casa-tomas", carpetaEn(d, "carta", RAIZ_DRIVE));
+    const id = "1OriginalViejo000000000001";
+    d.ficheros.set(id, { id, name: `chuleton-${PLATO}.jpg`, mimeType: "image/jpeg", size: "10", parents: [vieja] });
+    const e = entorno({ drive: d, originales: [{ plato_id: PLATO, drive_id: id, marca: "casa-tomas", nombre: `chuleton-${PLATO}.jpg`, ancho: 1, alto: 1, bytes: 10 }] });
+    const j = await (await manejarDrive(formulario({ tabla: "Platos", id: PLATO, archivo: jpeg(3000, 2000) }), { env: ENV, fetch: e.f, ...deps })).json();
+    expect(j).toMatchObject({ ok: true, driveId: id, reemplazado: true });
+    expect(d.ficheros.get(id)?.parents).toEqual([j.carpetaId]);
+    expect(d.subidas).toHaveLength(0);
+  });
+
+  it("sin la migración (la columna no existe) sigue funcionando: lee la ficha sin ella y no intenta guardar la carpeta", async () => {
+    const e = entorno();
+    const f = vi.fn(async (entrada: string | URL | Request, init: RequestInit = {}) => {
+      const url = String(entrada);
+      if (url.startsWith(`${SB}/rest/v1/Platos?`) && url.includes("drive_folder_id")) {
+        return new Response(JSON.stringify({ code: "42703", message: "column Platos.drive_folder_id does not exist" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      return e.f(entrada, init);
+    });
+    const r = await manejarDrive(formulario({ tabla: "Platos", id: PLATO, archivo: jpeg(100, 100) }), { env: ENV, fetch: f, ...deps });
+    expect(r.status).toBe(200);
+    expect(e.llamadas.some((l) => l.metodo === "PATCH" && l.url.startsWith(`${SB}/rest/v1/Platos?`))).toBe(false);
   });
 
   it("vino de Touza: carpeta marketing/carta/touza y upsert por vino_id", async () => {
@@ -211,7 +285,7 @@ describe("instagram-drive · preparar con el original de la carta", () => {
   it("si el plato tiene original, copia ESE JPEG (tamaño completo) a tmp/ y devuelve sus medidas", async () => {
     const e = entorno();
     await manejarDrive(formulario({ tabla: "Platos", id: PLATO, archivo: jpeg(4000, 3000) }), { env: ENV, fetch: e.f, ...deps });
-    const fichero = [...e.d.ficheros.values()].find((x) => x.name?.endsWith(`-${PLATO}.jpg`))!;
+    const fichero = [...e.d.ficheros.values()].find((x) => x.name === "ORIGINAL - Chuletón de vaca gallega.jpg")!;
     fichero.bytes = jpegDe(4000, 3000);
     const r = await manejarDrive(pedirPreparar({ accion: "preparar", origen: "carta", marca: "casa-tomas", platoId: PLATO }), { env: ENV, fetch: e.f, ...deps });
     expect(r.status).toBe(200);
@@ -255,7 +329,7 @@ describe("instagram-drive · preparar con el original de la carta", () => {
   it("vino con original: también lo usa (origen «vino»)", async () => {
     const e = entorno({ ficha: { id: VINO, nombre: "Pidio", restaurante: true, touza: false, activado: true, imagen_url: `${SB}/storage/v1/object/public/vinos/${VINO}.webp` } });
     await manejarDrive(formulario({ tabla: "Vinos", id: VINO, archivo: jpeg(1800, 2400) }), { env: ENV, fetch: e.f, ...deps });
-    const fichero = [...e.d.ficheros.values()].find((x) => x.name === `pidio-${VINO}.jpg`)!;
+    const fichero = [...e.d.ficheros.values()].find((x) => x.name === "ORIGINAL - Pidio.jpg")!;
     fichero.bytes = jpegDe(1800, 2400);
     const r = await manejarDrive(pedirPreparar({ accion: "preparar", origen: "vino", marca: "casa-tomas", vinoId: VINO }), { env: ENV, fetch: e.f, ...deps });
     expect(await r.json()).toMatchObject({ ok: true, ancho: 1800, alto: 2400, original: true });

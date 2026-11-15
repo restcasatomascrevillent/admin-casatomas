@@ -95,6 +95,9 @@ function carpeta(d: ReturnType<typeof driveFalso>, nombre: string, padre: string
 const carpetaCarta = (d: ReturnType<typeof driveFalso>, marca: string) => carpeta(d, marca, carpeta(d, "carta", RAIZ_DRIVE));
 const carpetaVideos = (d: ReturnType<typeof driveFalso>, marca: string) => carpeta(d, "videos", carpetaCarta(d, marca));
 
+/** Primera carpeta con ese nombre (en cualquier sitio del Drive simulado). */
+const carpetaPorNombre = (d: ReturnType<typeof driveFalso>, nombre: string) => [...d.ficheros.values()].find((x) => x.name === nombre && x.mimeType === "application/vnd.google-apps.folder")!.id;
+
 const pedir = (cuerpo: unknown, opts: { query?: boolean; auth?: string | null } = {}) =>
   new Request(`${SB}/functions/v1/instagram-drive${opts.query === false ? "" : "?accion=descargar_original"}`, {
     method: "POST",
@@ -181,14 +184,14 @@ describe("instagram-drive · descargar_original (foto)", () => {
 });
 
 describe("instagram-drive · vídeo original", () => {
-  it("subir_original_video: subida reanudable a marketing/carta/casa-tomas/videos/<id>.mp4", async () => {
+  it("subir_original_video: subida reanudable a Platos/<categoría>/<plato>/Vídeos/<id>.mp4", async () => {
     const e = entorno();
     const r = await manejarDrive(subirVideo({ tabla: "Platos", id: PLATO, archivo: new File([MP4], "bruto.mp4", { type: "video/mp4" }) }), { env: ENV, fetch: e.f });
     expect(r.status).toBe(200);
     const j = await r.json();
     expect(j).toMatchObject({ ok: true, id: PLATO, marca: "casa-tomas", nombre: `${PLATO}.mp4`, bytes: MP4.byteLength, reemplazado: false });
     expect(e.sesiones).toHaveLength(1);
-    expect(e.sesiones[0]).toMatchObject({ metodo: "POST", tipo: "video/mp4", largo: String(MP4.byteLength), meta: { name: `${PLATO}.mp4`, parents: [carpetaVideos(e.d, "casa-tomas")] } });
+    expect(e.sesiones[0]).toMatchObject({ metodo: "POST", tipo: "video/mp4", largo: String(MP4.byteLength), meta: { name: `${PLATO}.mp4`, parents: [carpetaPorNombre(e.d, "Vídeos")] } });
     expect(e.d.ficheros.get(j.driveId)?.bytes).toEqual(MP4);
     expect(e.secciones).toEqual(["editar:gestor_carta"]);
 
@@ -205,6 +208,17 @@ describe("instagram-drive · vídeo original", () => {
     expect(b.status).toBe(200);
     expect(b.headers.get("content-type")).toBe("video/quicktime");
     expect(new Uint8Array(await b.arrayBuffer())).toEqual(MP4);
+  });
+
+  it("compatibilidad: un vídeo que aún está en carta/casa-tomas/videos se sigue leyendo, y al subir otro se pasa a <plato>/Vídeos con el mismo id", async () => {
+    const e = entorno();
+    const viejo = "1VideoViejo0000000000000001";
+    e.d.ficheros.set(viejo, { id: viejo, name: `${PLATO}.mp4`, mimeType: "video/mp4", size: String(MP4.byteLength), parents: [carpetaVideos(e.d, "casa-tomas")], bytes: MP4 });
+    const c = await manejarDrive(pedir({ tabla: "Platos", id: PLATO, tipo: "video", comprobar: true }), { env: ENV, fetch: e.f });
+    expect(await c.json()).toMatchObject({ ok: true, tipo: "video", driveId: viejo });
+    const r = await manejarDrive(subirVideo({ id: PLATO, archivo: new File([MP4], "nuevo.mp4", { type: "video/mp4" }) }), { env: ENV, fetch: e.f });
+    expect(await r.json()).toMatchObject({ ok: true, driveId: viejo, reemplazado: true });
+    expect(e.d.ficheros.get(viejo)?.parents).toEqual([carpetaPorNombre(e.d, "Vídeos")]);
   });
 
   it("vídeo de un plato de Touza: carpeta marketing/carta/touza/videos", async () => {

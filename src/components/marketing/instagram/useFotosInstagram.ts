@@ -22,6 +22,11 @@
  * tipo «bebida»; sus medidas se apuntan con la clave «vino:<id>» y se preparan
  * con origen «vino».
  *
+ * Árbol de Platos (desde el 15/11/2026): las fotos de marketing/Platos/<categoría>/<plato>
+ * (Casa Tomás) entran en el catálogo como fotos de Drive («drive:<id>»), así que se eligen
+ * y se preparan igual; la pestaña «Platos» de SelectorFoto las enseña por categoría y plato
+ * y las demás pestañas no las cuentan (ver `arbol`).
+ *
  * Originales (desde el 08/11/2026): si el plato o el vino tiene ORIGINAL en
  * Drive (carta_fotos_originales), la foto sale con las medidas del original
  * y `original: true` («Original»); si no, `original: false` («Solo web»). Al
@@ -44,7 +49,7 @@ import {
   type MarcaId,
 } from "@/lib/instagram";
 import { aplicarOriginales, indexarOriginales, type FilaOriginalCarta } from "@/lib/instagram/originalesCarta";
-import { listarFotosDrive, prepararFotoOrigen, type FotoPreparada } from "./api";
+import { listarFotosDrive, listarPlatosDrive, prepararFotoOrigen, type CategoriaArbolDrive, type FotoPreparada } from "./api";
 
 /** Prefijo de las claves de React Query de la biblioteca de Drive. */
 export const CLAVE_FOTOS = ["instagram_drive_fotos"] as const;
@@ -52,6 +57,7 @@ export const claveFotosDrive = (marca: MarcaId) => [...CLAVE_FOTOS, marca] as co
 export const CLAVE_PREPARADA = ["instagram_drive_preparada"] as const;
 /** Clave de la copia preparada: el id de la foto («drive:…» o «carta:…»). */
 export const clavePreparada = (idFoto: string) => [...CLAVE_PREPARADA, idFoto] as const;
+export const claveArbolPlatos = (marca: MarcaId) => ["instagram_drive_platos", marca] as const;
 export const claveFotosCarta = (marca: MarcaId) => ["instagram_carta_fotos", marca] as const;
 export const claveFotosVinos = (marca: MarcaId) => ["instagram_vinos_fotos", marca] as const;
 /** Medidas reales de las fotos de la carta ya vistas (por id de plato). */
@@ -165,6 +171,35 @@ export function useFotosDrive(marca: MarcaId) {
   });
 }
 
+export interface ArbolPlatos {
+  categorias: CategoriaArbolDrive[];
+  /** Las fotos del árbol con la forma del catálogo (tipo «plato» si Drive no tiene fila). */
+  fotos: Foto[];
+  avisos: string[];
+  truncado: boolean;
+}
+
+/**
+ * Árbol de Drive Platos/<categoría>/<plato>/ (solo Casa Tomás; Touza no lo
+ * tiene). Si falla, la biblioteca sigue sin él: solo la pestaña «Platos» lo cuenta.
+ */
+export function useArbolPlatos(marca: MarcaId) {
+  return useQuery({
+    queryKey: claveArbolPlatos(marca),
+    enabled: marca === "casa-tomas",
+    queryFn: async (): Promise<ArbolPlatos> => {
+      const r = await listarPlatosDrive(marca);
+      const fotos = r.categorias
+        .flatMap((c) => c.platos.flatMap((p) => p.fotos))
+        .map((f) => fotoDesdeDrive({ ...f, tipo: f.tipo ?? "plato" }, marca))
+        .filter((f): f is Foto => f !== null);
+      return { categorias: r.categorias, fotos, avisos: r.avisos, truncado: r.truncado };
+    },
+    staleTime: 60_000,
+    retry: 1,
+  });
+}
+
 /**
  * Fotos de una marca (y, si se pide, solo las aptas para un formato) y el
  * catálogo con el que se valida y se construye la pieza.
@@ -175,9 +210,10 @@ export function useFotosInstagram(marca: MarcaId, formato?: FormatoId) {
   const medidas = useMedidasCarta();
   const vinos = useVinosConFoto(marca);
   const originales = useOriginalesCarta();
+  const arbolPlatos = useArbolPlatos(marca);
   const carta = useMemo(() => aplicarOriginales(fotosDesdePlatos(platos.data ?? [], marca, medidas), originales.data), [platos.data, marca, medidas, originales.data]);
   const deVinos = useMemo(() => aplicarOriginales(fotosDesdeVinos(vinos.data ?? [], marca, medidas), originales.data), [vinos.data, marca, medidas, originales.data]);
-  const catalogo = useMemo(() => [...(consulta.data?.fotos ?? []), ...carta, ...deVinos], [consulta.data, carta, deVinos]);
+  const catalogo = useMemo(() => [...(consulta.data?.fotos ?? []), ...(arbolPlatos.data?.fotos ?? []), ...carta, ...deVinos], [consulta.data, arbolPlatos.data, carta, deVinos]);
   const fotos = useMemo(() => fotosDe(marca, formato, catalogo), [marca, formato, catalogo]);
   return {
     fotos,
@@ -187,6 +223,10 @@ export function useFotosInstagram(marca: MarcaId, formato?: FormatoId) {
     cargando: consulta.isLoading,
     /** Error de Google Drive. */
     error: consulta.error as Error | null,
+    /** Árbol Platos/<categoría>/<plato> de Drive (solo Casa Tomás). */
+    arbol: arbolPlatos.data ?? null,
+    cargandoArbol: arbolPlatos.isLoading,
+    errorArbol: arbolPlatos.error as Error | null,
     cargandoCarta: platos.isLoading || vinos.isLoading,
     errorCarta: (platos.error ?? vinos.error) as Error | null,
   };

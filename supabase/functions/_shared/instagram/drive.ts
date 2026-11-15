@@ -10,6 +10,14 @@
  *   marketing/instagram/fotos/casa-tomas     biblioteca de Casa Tomás
  *   marketing/instagram/fotos/touza          biblioteca de Touza
  *   marketing/instagram/publicadas/AAAA-MM   JPEG de cada pieza publicada
+ *   marketing/carta/<marca>(/videos)         originales de la carta (ANTIGUO, se sigue leyendo)
+ *
+ * Árbol nuevo de la carta de Casa Tomás (mudanza del 15/11/2026; la app NO
+ * crea «Platos» ni «Vinos» al leer, solo al guardar un original):
+ *
+ *   marketing/Platos/<NN Categoría>/<plato>/ORIGINAL - <plato>.jpg
+ *   marketing/Platos/<NN Categoría>/<plato>/Vídeos/<id>.<ext>
+ *   marketing/Vinos/<Tipo>/<vino>/ORIGINAL - <vino>.jpg
  *
  * Secretos (los mismos de las facturas + la carpeta): GOOGLE_CLIENT_ID,
  * GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN y GOOGLE_DRIVE_MARKETING_FOLDER_ID.
@@ -19,7 +27,7 @@
  * creado. Ni la carpeta «marketing» (creada a mano) ni las fotos arrastradas a
  * mano a Drive. Ver comprobarDrive().
  */
-import { ALCANCE_DRIVE, ALCANCE_DRIVE_FILE, ClienteDrive, ErrorDrive, esIdDrive, nombreAlcance, type FicheroDrive } from "../google-drive.ts";
+import { ALCANCE_DRIVE, ALCANCE_DRIVE_FILE, ClienteDrive, ErrorDrive, esIdDrive, nombreAlcance, TIPO_CARPETA, type FicheroDrive } from "../google-drive.ts";
 import { dondeSecreto, type Entorno } from "./entorno.ts";
 import { registrarSecreto, sanear } from "./secretos.ts";
 
@@ -74,6 +82,7 @@ const carpetas = new Map<string, string>();
 /** Solo para pruebas. */
 export function olvidarCarpetasDrive(): void {
   carpetas.clear();
+  raicesArbol.clear();
 }
 
 async function carpeta(c: ConfigDriveInstagram, tramos: readonly string[]): Promise<string> {
@@ -98,6 +107,153 @@ export function carpetaCarta(c: ConfigDriveInstagram, marca: MarcaDrive): Promis
 /** marketing/carta/<marca>/videos: vídeos ORIGINALES (en bruto) de los platos (la crea si falta). */
 export function carpetaVideosCarta(c: ConfigDriveInstagram, marca: MarcaDrive): Promise<string> {
   return carpeta(c, ["carta", marca, "videos"]);
+}
+
+// ---------------------------------------------------------------------------
+// Árbol nuevo: Platos/<NN Categoría>/<plato>/ y Vinos/<Tipo>/<vino>/
+// ---------------------------------------------------------------------------
+
+export type ArbolCarta = "Platos" | "Vinos";
+export const ARBOLES_CARTA: readonly ArbolCarta[] = ["Platos", "Vinos"];
+export const CARPETA_VIDEOS = "Vídeos";
+/** Cuántos niveles se suben, como máximo, al comprobar si un fichero cuelga de un árbol. */
+export const TOPE_ANCESTROS = 6;
+
+/** Sin tildes, en minúsculas y con los espacios colapsados: para comparar nombres. */
+export function normalizarNombre(t: string): string {
+  return t
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** «03 Entrantes fríos» → «Entrantes fríos» (quita el prefijo numérico de las categorías). */
+export function sinPrefijoNumero(t: string): string {
+  return t.replace(/^\s*\d+\s+/, "").trim();
+}
+
+/** Nombre de carpeta de un plato o vino: el de la carta, sin barras ni saltos de línea. */
+export function nombreCarpetaFicha(nombre: string | null | undefined, id: string): string {
+  const limpio = (nombre ?? "").replace(/[\\/\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 150);
+  return limpio || id;
+}
+
+/** Nombre de la foto principal: «ORIGINAL - <nombre>.jpg». */
+export function nombreOriginalArbol(nombre: string | null | undefined, id: string): string {
+  return `ORIGINAL - ${nombreCarpetaFicha(nombre, id)}.jpg`;
+}
+
+const raicesArbol = new Map<string, string>();
+
+/** Id de marketing/Platos o marketing/Vinos. Sin `crear`, null si no existe (nunca la crea al leer). */
+export async function carpetaArbol(c: ConfigDriveInstagram, arbol: ArbolCarta, crear = false): Promise<string | null> {
+  const clave = `${c.carpetaMarketing}|${arbol}`;
+  const hecha = raicesArbol.get(clave);
+  if (hecha) return hecha;
+  const id = crear ? await c.cliente.asegurarCarpeta(arbol, c.carpetaMarketing) : await c.cliente.buscarCarpeta(arbol, c.carpetaMarketing);
+  if (id) raicesArbol.set(clave, id);
+  return id;
+}
+
+/** Las raíces que existan de los dos árboles (sin crear nada). */
+export async function carpetasArboles(c: ConfigDriveInstagram): Promise<string[]> {
+  const ids = await Promise.all(ARBOLES_CARTA.map((a) => carpetaArbol(c, a)));
+  return ids.filter((x): x is string => !!x);
+}
+
+/**
+ * ¿Cuelga el fichero (o carpeta) de alguna de las raíces, a cualquier
+ * profundidad? Mira `parents` y sube de padre en padre, con tope de niveles
+ * (TOPE_ANCESTROS) y sin pasar de la carpeta «marketing». Sustituye a estaEn
+ * donde la foto puede estar en una subcarpeta (Platos/<cat>/<plato>/…).
+ */
+export async function estaBajo(c: ConfigDriveInstagram, f: Pick<FicheroDrive, "parents">, raices: readonly string[], tope = TOPE_ANCESTROS): Promise<boolean> {
+  if (!raices.length) return false;
+  const vistos = new Set<string>();
+  let actuales = Array.isArray(f.parents) ? f.parents : [];
+  for (let nivel = 0; nivel <= tope && actuales.length; nivel++) {
+    if (actuales.some((p) => raices.includes(p))) return true;
+    if (nivel === tope) break;
+    const siguientes: string[] = [];
+    for (const p of actuales) {
+      if (vistos.has(p) || p === c.carpetaMarketing) continue;
+      vistos.add(p);
+      const m = await c.cliente.metadatos(p, "id,parents,trashed");
+      if (m && !m.trashed && Array.isArray(m.parents)) siguientes.push(...m.parents);
+    }
+    actuales = siguientes;
+  }
+  return false;
+}
+
+/**
+ * ¿Es de la carpeta «antigua» (padre directo) o cuelga del árbol Platos/Vinos?
+ * El árbol solo vale para Casa Tomás (Touza se queda como está).
+ */
+export async function estaEnOArbol(c: ConfigDriveInstagram, f: Pick<FicheroDrive, "parents">, antigua: string, marca: MarcaDrive): Promise<boolean> {
+  if (estaEn(f, antigua)) return true;
+  if (marca !== "casa-tomas") return false;
+  return await estaBajo(c, f, await carpetasArboles(c));
+}
+
+export interface FichaDeCarpeta {
+  id: string;
+  nombre: string | null;
+  categoria?: string | null;
+  drive_folder_id?: string | null;
+}
+
+export interface CarpetaResuelta {
+  id: string;
+  /** De dónde sale: el id guardado en la ficha, una carpeta que ya existía con su nombre, o una nueva. */
+  origen: "bd" | "nombre" | "creada";
+}
+
+/**
+ * Carpeta de un plato o vino en Platos/ o Vinos/:
+ *  1. `drive_folder_id` de la ficha, si sigue existiendo, no está en la papelera y cuelga del árbol.
+ *  2. Si no, una carpeta con el nombre de la ficha (sin tildes ni mayúsculas) en cualquier categoría
+ *     (a igualdad, la de su categoría y las que no empiezan por «_»).
+ *  3. Si no existe, se crea en <NN Categoría>/<nombre>, reutilizando la categoría cuyo nombre sin
+ *     el «NN » coincide (o creándola si no hay).
+ * Con `crear: false` no se crea nada (devuelve null si falta el árbol o la carpeta).
+ */
+export async function resolverCarpetaFicha(c: ConfigDriveInstagram, arbol: ArbolCarta, ficha: FichaDeCarpeta, crear: true): Promise<CarpetaResuelta>;
+export async function resolverCarpetaFicha(c: ConfigDriveInstagram, arbol: ArbolCarta, ficha: FichaDeCarpeta, crear: boolean): Promise<CarpetaResuelta | null>;
+export async function resolverCarpetaFicha(c: ConfigDriveInstagram, arbol: ArbolCarta, ficha: FichaDeCarpeta, crear: boolean): Promise<CarpetaResuelta | null> {
+  const raiz = await carpetaArbol(c, arbol, crear);
+  if (!raiz) return null;
+  if (esIdDrive(ficha.drive_folder_id)) {
+    const m = await c.cliente.metadatos(ficha.drive_folder_id, "id,name,mimeType,trashed,parents");
+    if (m && !m.trashed && m.mimeType === TIPO_CARPETA && (await estaBajo(c, m, [raiz]))) return { id: m.id, origen: "bd" };
+  }
+  const objetivo = normalizarNombre(nombreCarpetaFicha(ficha.nombre, ficha.id));
+  const categorias = await c.cliente.listarCarpetas(raiz);
+  const hijas = categorias.length ? await c.cliente.listarHijos(categorias.map((x) => x.id), "carpetas", 3000) : [];
+  const categoriaNorm = normalizarNombre(sinPrefijoNumero(ficha.categoria ?? ""));
+  const nombreDeCategoria = new Map(categorias.map((x) => [x.id, x.name]));
+  const puntos = (h: FicheroDrive) => {
+    const cat = nombreDeCategoria.get(h.parents?.[0] ?? "") ?? "";
+    return (categoriaNorm && normalizarNombre(sinPrefijoNumero(cat)) === categoriaNorm ? 2 : 0) + (cat.startsWith("_") ? 0 : 1);
+  };
+  const iguales = hijas.filter((h) => normalizarNombre(h.name) === objetivo).sort((a, b) => puntos(b) - puntos(a));
+  if (iguales[0]) return { id: iguales[0].id, origen: "nombre" };
+  if (!crear) return null;
+  const nombreCategoria = (ficha.categoria ?? "").trim();
+  let categoria = categoriaNorm ? categorias.find((x) => normalizarNombre(sinPrefijoNumero(x.name)) === categoriaNorm)?.id : undefined;
+  if (!categoria) categoria = await c.cliente.asegurarCarpeta(nombreCategoria || "Sin categoría", raiz);
+  const id = await c.cliente.crearCarpeta(nombreCarpetaFicha(ficha.nombre, ficha.id), categoria);
+  return { id, origen: "creada" };
+}
+
+/** Subcarpeta «Vídeos» de la carpeta de un plato (admite «Videos» sin tilde; la crea si `crear`). */
+export async function carpetaVideosDe(c: ConfigDriveInstagram, carpetaPlato: string, crear: boolean): Promise<string | null> {
+  const subs = await c.cliente.listarCarpetas(carpetaPlato);
+  const hay = subs.find((x) => normalizarNombre(x.name) === normalizarNombre(CARPETA_VIDEOS));
+  if (hay) return hay.id;
+  return crear ? await c.cliente.crearCarpeta(CARPETA_VIDEOS, carpetaPlato) : null;
 }
 
 /** «AAAA-MM» de una fecha (UTC). */
