@@ -39,6 +39,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
+import { textoCanceladaLargo } from "@/lib/reservas/cancelacion";
 import { esEstadoVivo, infoEstadoReserva } from "@/lib/reservas/estadosReserva";
 import { textoCreada } from "@/lib/reservas/creada";
 import { Badge } from "@/components/ui/badge";
@@ -262,6 +263,8 @@ function AccionesEstado({ reserva, onHecho }: { reserva: ReservaEditable; onHech
   const vivo = esEstadoVivo(estado);
   const info = infoEstadoReserva(estado);
   const creada = textoCreada(reserva as { created_at?: string | null; canal?: string | null });
+  // 16/11/2026: en una cancelada, quién la canceló (cliente o restaurante) y cuándo.
+  const cancelada = textoCanceladaLargo({ ...(reserva as { cancelada_por?: string | null; cancelada_at?: string | null }), estado });
   const ocupado = estaEnCurso(String(reserva.id));
   const hacer = async (accion: () => Promise<{ ok: boolean }>) => {
     if ((await accion()).ok) onHecho();
@@ -284,6 +287,11 @@ function AccionesEstado({ reserva, onHecho }: { reserva: ReservaEditable; onHech
         {creada && (
           <span className="text-sm text-muted-foreground" data-testid="creada-ficha">
             {creada}
+          </span>
+        )}
+        {cancelada && (
+          <span className="text-sm font-medium text-red-700 dark:text-red-300" data-testid="cancelada-ficha">
+            {cancelada}
           </span>
         )}
       </div>

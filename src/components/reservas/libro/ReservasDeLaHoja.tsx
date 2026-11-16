@@ -5,6 +5,7 @@ import { useReservasServicioDia } from "@/hooks/useReservasServicioDia";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { ETIQUETA_TURNO } from "@/lib/reservas/ocupacionSalas";
 import { bloquesComidaMenuDelDia } from "@/lib/reservas/menuDelDia";
+import { canceladasDelDia } from "@/lib/reservas/cancelacion";
 import { RenglonReserva } from "./RenglonReserva";
 
 // ============================================================================
@@ -14,15 +15,20 @@ import { RenglonReserva } from "./RenglonReserva";
 // día» del alta (`useReservasServicioDia`): una sola caché por día.
 // Con `onAbrirReserva`, cada renglón es un botón que abre la ficha. La comida
 // de martes a jueves va en bloques «Menú del día», «Carta» y «Resto».
+// Con `conCanceladas` (la Lista, 16/11/2026: «que las canceladas aparezcan en el
+// panel»), debajo de Comida y Cena va la sección «Canceladas» del día, aparte
+// de las activas y diciendo quién canceló cada una. No cuentan en los totales.
 // ============================================================================
 
 interface Props {
   fecha: string;
   resaltada?: string | null;
   onAbrirReserva?: (id: string) => void;
+  /** Enseña también las canceladas del día, en su sección aparte (la Lista). «Escribir reserva» no las enseña. */
+  conCanceladas?: boolean;
 }
 
-export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva }: Props) {
+export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva, conCanceladas = false }: Props) {
   const { data: reservas, isLoading, isError, refetch } = useReservasServicioDia(fecha);
   const { data: espacios } = useEspaciosReserva();
   const nombreSala = useMemo(() => {
@@ -31,6 +37,7 @@ export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva }: Pr
     return m;
   }, [espacios]);
   const grupos = useMemo(() => agruparReservasDelDia(reservas), [reservas]);
+  const canceladas = useMemo(() => (conCanceladas ? canceladasDelDia(reservas) : []), [conCanceladas, reservas]);
 
   if (isLoading) return <Skeleton className="h-24 w-full" />;
   if (isError) {
@@ -43,7 +50,7 @@ export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva }: Pr
       </p>
     );
   }
-  if (!grupos.length) return <p className="py-4 text-base text-muted-foreground">Aún no hay reservas este día.</p>;
+  if (!grupos.length && !canceladas.length) return <p className="py-4 text-base text-muted-foreground">Aún no hay reservas este día.</p>;
 
   const renglon = (r: (typeof grupos)[number]["reservas"][number]) => (
     <RenglonReserva
@@ -58,6 +65,7 @@ export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva }: Pr
 
   return (
     <div className="space-y-4">
+      {!grupos.length && <p className="py-2 text-base text-muted-foreground">No hay reservas activas este día.</p>}
       {grupos.map((g) => {
         // Comida de martes a jueves: «Menú del día», «Carta» y «Resto», cada uno por hora (10/11/2026).
         const bloques = g.turno === "comida" ? bloquesComidaMenuDelDia(fecha, g.reservas) : null;
@@ -83,6 +91,14 @@ export function ReservasDeLaHoja({ fecha, resaltada = null, onAbrirReserva }: Pr
           </section>
         );
       })}
+      {canceladas.length > 0 && (
+        <section aria-label="Canceladas" data-testid="canceladas-del-dia">
+          <h3 className="mb-1 rounded-md bg-red-50 px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-red-800 dark:bg-red-950/40 dark:text-red-200">
+            Canceladas · {canceladas.length} {canceladas.length === 1 ? "reserva" : "reservas"}
+          </h3>
+          <ul>{canceladas.map(renglon)}</ul>
+        </section>
+      )}
     </div>
   );
 }
