@@ -40,6 +40,7 @@
 
 // Unica dependencia: otro modulo puro del mismo directorio (sin red ni Deno).
 import { resolverMagnitud } from "./magnitudes.ts";
+import { CLASES_DOCUMENTO } from "./reglasCarga.ts";
 
 // ─── 1. Esquema estricto para OpenAI Structured Outputs ─────────────────────
 //
@@ -81,6 +82,26 @@ export const DESCRIPCION_RETENCION_IRPF_PCT =
   "El PORCENTAJE de retencion de IRPF impreso junto a ese importe (19, 15, 7, 1), en positivo. null si " +
   "no hay retencion o si el papel no imprime el porcentaje.";
 
+/** Descripciones de los campos de las reglas de la carga historica
+ *  (15/11/2026). Las comparten el esquema de un documento y el de una pieza. */
+export const DESCRIPCION_CLASE_DOCUMENTO =
+  "'compra' para toda factura o albaran de un proveedor (genero, servicios, suministros, alquiler, " +
+  "reparaciones, asesoria, la comision de Pluxee, Rechgo). Lo que NO es compra: 'adeudo_bancario' " +
+  "(adeudo/recibo SEPA, justificante de cargo o transferencia), 'comision_tpv' (liquidacion o comision " +
+  "del datafono), 'comision_bancaria' (custodia, mantenimiento o comisiones del banco), " +
+  "'cuota_leasing_prestamo', 'dividendo', 'venta_emitida' (factura que EMITE MASIDE 2011 / Casa Tomas a un " +
+  "cliente), 'recibo_sgae', 'otro_no_compra' (extracto, nomina, presupuesto). En la duda, 'compra'.";
+export const DESCRIPCION_CLIENTE =
+  "Destinatario/cliente tal como aparece: nombre, CIF y la DIRECCION de entrega o del cliente si se ve " +
+  "('MASIDE 2011 SL B54583356 - TOUZA COCKTAIL BAR - C/ Santa Maria de la Cabeza 4'). null si no consta.";
+export const DESCRIPCION_RECARGO =
+  "Importe en euros del RECARGO DE EQUIVALENCIA impreso en el pie (suma al total, como el IVA), en " +
+  "positivo. null si no hay.";
+export const DESCRIPCION_FUERA_BASE =
+  "Suma en euros, en positivo, de lo que el pie SUMA AL TOTAL fuera de la base imponible y del IVA: tasas " +
+  "y suplidos no sujetos (la tasa de Trafico/DGT de una ITV, un suplido). NO van aqui portes, envases, " +
+  "punto verde ni descuentos: esos son lineas. null si no hay.";
+
 export const DOCUMENTO_JSON_SCHEMA = {
   name: "documento_comercial",
   strict: true,
@@ -89,9 +110,10 @@ export const DOCUMENTO_JSON_SCHEMA = {
     additionalProperties: false,
     required: [
       "total_literal", "subtotal_literal", "iva_literal",
-      "tipo", "proveedor", "cif", "cliente", "numero_documento", "pagina", "fecha", "sin_importes",
-      "continua_en_otra_pagina", "filas_tabla", "productos",
-      "subtotal", "iva", "retencion_irpf", "retencion_irpf_pct", "total", "observaciones", "resumen",
+      "tipo", "es_abono", "clase_documento", "proveedor", "cif", "cliente", "numero_documento", "pagina", "fecha",
+      "sin_importes", "continua_en_otra_pagina", "filas_tabla", "productos",
+      "subtotal", "iva", "retencion_irpf", "retencion_irpf_pct", "recargo_equivalencia", "cargos_fuera_base",
+      "total", "observaciones", "resumen",
     ],
     properties: {
       // ── LAS CITAS VAN LAS PRIMERAS, Y ESO NO ES COSMETICA ──
@@ -134,6 +156,18 @@ export const DOCUMENTO_JSON_SCHEMA = {
         description:
           "'albaran' si el documento dice Albaran, Nota de entrega o Delivery Note, AUNQUE lleve precios e IVA. 'factura' si dice Factura o Invoice.",
       },
+      es_abono: {
+        type: "boolean",
+        description:
+          "true si el documento es un ABONO, factura rectificativa, nota de credito o devolucion (aunque " +
+          "imprima los importes en positivo, como Osborne). Los importes se copian tal cual: el signo lo pone " +
+          "el programa. false en una factura o albaran normal.",
+      },
+      clase_documento: {
+        type: "string",
+        enum: [...CLASES_DOCUMENTO],
+        description: DESCRIPCION_CLASE_DOCUMENTO,
+      },
       proveedor: {
         type: ["string", "null"],
         description: "Razon social de QUIEN EMITE el documento, no del cliente. null si no se ve.",
@@ -144,7 +178,7 @@ export const DOCUMENTO_JSON_SCHEMA = {
       },
       cliente: {
         type: ["string", "null"],
-        description: "Destinatario/cliente tal como aparece (nombre y CIF). null si no consta.",
+        description: DESCRIPCION_CLIENTE,
       },
       numero_documento: {
         type: ["string", "null"],
@@ -298,6 +332,14 @@ export const DOCUMENTO_JSON_SCHEMA = {
         type: ["number", "null"],
         description: DESCRIPCION_RETENCION_IRPF_PCT,
       },
+      recargo_equivalencia: {
+        type: ["number", "null"],
+        description: DESCRIPCION_RECARGO,
+      },
+      cargos_fuera_base: {
+        type: ["number", "null"],
+        description: DESCRIPCION_FUERA_BASE,
+      },
       total: {
         type: ["number", "null"],
         description:
@@ -342,6 +384,15 @@ export interface LineaExtraida {
 
 export interface DocumentoExtraido {
   tipo: "factura" | "albaran";
+  /** Abono / rectificativa (15/11/2026): el signo negativo lo pone normalizarDatos. */
+  es_abono?: boolean;
+  /** «compra» o lo que no es compra (reglasCarga.ts). Opcional: respuestas antiguas no lo traen. */
+  clase_documento?: string;
+  /** Recargo de equivalencia y cargos fuera de base (tasa DGT), en positivo. */
+  recargo_equivalencia?: number | null;
+  cargos_fuera_base?: number | null;
+  /** Destinatario impreso; ver `cliente` abajo. Avisos de aplicarReglasLectura, hasta normalizarDatos. */
+  avisos_reglas?: { codigo: string; severidad: "alta" | "media"; mensaje: string; detalle: Record<string, unknown> }[];
   proveedor: string | null;
   cif: string | null;
   /** Destinatario impreso (nombre y CIF). Opcional: payloads antiguos no lo traen. */
@@ -684,6 +735,23 @@ export function retencionConSigno(
   return ref !== null && ref < 0 ? -abs : abs;
 }
 
+/**
+ * Lo que el pie suma al total ademas de base e IVA: recargo de equivalencia y
+ * cargos fuera de base (tasa DGT). Con el signo de la base, como la retencion.
+ * 0 si no hay. Invariante: total = subtotal + iva + extras - retencion.
+ */
+export function extrasTotalConSigno(
+  d: { subtotal?: number | null; total?: number | null; recargo_equivalencia?: number | null; cargos_fuera_base?: number | null },
+): number {
+  const suma = [d.recargo_equivalencia, d.cargos_fuera_base]
+    .filter(esNumeroFinito).reduce((a, b) => a + Math.abs(b), 0);
+  if (suma === 0) return 0;
+  const ref = esNumeroFinito(d.subtotal) && d.subtotal !== 0
+    ? d.subtotal
+    : (esNumeroFinito(d.total) && d.total !== 0 ? d.total : null);
+  return redondear2(ref !== null && ref < 0 ? -suma : suma);
+}
+
 /** Fila de `facturas.alertas_validacion`: mismo formato que devuelve
  *  `validar_cordura_factura` en SQL. */
 export interface AlertaValidacion {
@@ -857,7 +925,8 @@ export function comprobarCuadre(datos: DocumentoExtraido): Descuadre[] {
   // ── c) subtotal + iva - retencion IRPF = total ──
   if (esNumeroFinito(datos.subtotal) && esNumeroFinito(datos.iva) && esNumeroFinito(datos.total)) {
     const retencion = retencionConSigno(datos);
-    const esperado = datos.subtotal + datos.iva - (retencion ?? 0);
+    const extras = extrasTotalConSigno(datos);
+    const esperado = datos.subtotal + datos.iva + extras - (retencion ?? 0);
     const tol = Math.max(TOL_IVA_ABS, Math.max(lineas.length, 1) * TOL_IVA_POR_LINEA);
     if (Math.abs(esperado - datos.total) > tol) {
       out.push({
@@ -865,6 +934,7 @@ export function comprobarCuadre(datos: DocumentoExtraido): Descuadre[] {
         severidad: "media",
         mensaje:
           `subtotal ${eur(datos.subtotal)} + IVA ${eur(datos.iva)}` +
+          (extras !== 0 ? ` + recargo/cargos fuera de base ${eur(extras)}` : "") +
           (retencion !== null ? ` - retencion IRPF ${eur(retencion)}` : "") +
           ` = ${eur(esperado)}, pero el total leido es ${eur(datos.total)}.`,
         detalle: {
@@ -1815,7 +1885,8 @@ export function deducirImportes(datos: DocumentoExtraido): {
   // ── A) El bloque de totales esta impreso salvo su ultima linea ──
   if (esNumeroFinito(datos.subtotal) && esNumeroFinito(datos.iva)) {
     const retencion = retencionConSigno(datos);
-    const total = redondear2(datos.subtotal + datos.iva - (retencion ?? 0));
+    const extras = extrasTotalConSigno(datos);
+    const total = redondear2(datos.subtotal + datos.iva + extras - (retencion ?? 0));
     return {
       datos: { ...datos, total },
       deduccion: {
@@ -1828,6 +1899,7 @@ export function deducirImportes(datos: DocumentoExtraido): {
           mensaje:
             `El documento no declara total a pagar. Se ha CALCULADO como base ${eur(datos.subtotal)} ` +
             `+ IVA ${eur(datos.iva)}` +
+            (extras !== 0 ? ` + recargo/cargos fuera de base ${eur(extras)}` : "") +
             (retencion !== null ? ` - retencion IRPF ${eur(retencion)}` : "") +
             ` = ${eur(total)}: aritmetica exacta sobre importes que si ` +
             `estan impresos, pero el total NO se ha leido del papel.`,
