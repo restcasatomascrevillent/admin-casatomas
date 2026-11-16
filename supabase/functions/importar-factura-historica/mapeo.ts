@@ -300,7 +300,7 @@ export function mismaFacturaPorImporte<F extends { cif?: string | null; proveedo
   const cif = cifNorm(nueva.cif);
   const nombre = nombreNorm(nueva.proveedor);
   // Número sin espacios, puntos, comas ni guiones: «A26/10,685» = «A26/10685».
-  const num = (n: string | null | undefined) => (n ?? "").toUpperCase().replace(/[\s.,\-]/g, "");
+  const num = (n: string | null | undefined) => (n ?? "").toUpperCase().replace(/[\s.,-]/g, "");
   const numNueva = num(nueva.numero_documento);
   for (const f of candidatas) {
     if (f.fecha !== nueva.fecha) continue;
