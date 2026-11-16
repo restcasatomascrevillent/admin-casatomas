@@ -428,10 +428,13 @@ export function prefiltrarLineas(lineas: Array<{ producto: string }>, compras: N
     const tl = todas.join(" ");
     const comun = new Map<number, number>();
     const cuantas = new Map<number, number>();
+    // Palabra rara (marca o vino: «Valbuena», «Mauro») que comparten línea y documento.
+    const rara = new Map<number, boolean>();
     for (const w of ws) {
       for (const k of indice.get(w) ?? []) {
         comun.set(k, (comun.get(k) ?? 0) + idf(w));
         cuantas.set(k, (cuantas.get(k) ?? 0) + 1);
+        if (w.length >= 5 && (df.get(w) ?? 0) <= 8) rara.set(k, true);
       }
     }
     // Mejor documento por producto.
@@ -439,11 +442,14 @@ export function prefiltrarLineas(lineas: Array<{ producto: string }>, compras: N
     for (const [k, s] of comun) {
       if (peso[k] <= 0) continue;
       // Una sola palabra en común solo vale si el nombre de compra es de una
-      // palabra y la línea casi también («Ricard» / «L.RICARD 1L»).
-      if ((cuantas.get(k) ?? 0) < 2 && !(docs[k].w.length === 1 && ws.length <= 1)) continue;
+      // palabra y la línea casi también («Ricard» / «L.RICARD 1L») o si es una
+      // marca rara que casi nadie más lleva («V.VALBUENA 5ºA» / «Tinto Valbuena
+      // 5º», «V.MAURO CRIANZA» / «Mauro 75 cl»: falsos negativos de la auditoría).
+      if ((cuantas.get(k) ?? 0) < 2 && !(docs[k].w.length === 1 && ws.length <= 1) && !(rara.get(k) && docs[k].w.length <= 2)) continue;
       const cob = s / peso[k];
       const sim = s / Math.sqrt(peso[k] * pesoTodas);
-      if (cob < 0.7 || sim < 0.5) continue;
+      const soloRara = (cuantas.get(k) ?? 0) < 2;
+      if (cob < (soloRara ? 0.6 : 0.7) || sim < 0.5) continue;
       const tri = trigramas(tl, docs[k].t);
       const score = sim * 0.45 + cob * 0.3 + tri * 0.25;
       const prev = porProducto.get(docs[k].p);

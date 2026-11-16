@@ -18,20 +18,26 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = any;
 
+/** 1.234,56 (con punto de miles también en 4 cifras, que toLocaleString no pone). */
+const num = (x: number, d: number): string => {
+  const [ent, dec] = Math.abs(x).toFixed(d).split(".");
+  const miles = ent.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${x < 0 ? "-" : ""}${miles}${dec ? `,${dec}` : ""}`;
+};
+
 const eur = (n: unknown, dec?: number): string => {
   const x = typeof n === "number" ? n : Number(n);
   if (n === null || n === undefined || !Number.isFinite(x)) return "—";
-  const d = dec ?? (Math.abs(x) < 1 ? 3 : 2);
-  return `${x.toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d })} €`;
+  return `${num(x, dec ?? (Math.abs(x) < 1 ? 3 : 2))} €`;
 };
 
 const pct = (n: unknown): string => {
   const x = Number(n);
   if (n === null || n === undefined || !Number.isFinite(x)) return "—";
-  return `${x > 0 ? "+" : ""}${x.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
+  return `${x > 0 ? "+" : ""}${num(x, 1)} %`;
 };
 
-const entero = (n: unknown) => Number(n ?? 0).toLocaleString("es-ES");
+const entero = (n: unknown) => num(Number(n ?? 0), 0);
 
 /** Texto de una celda: sin barras ni saltos (rompen la tabla Markdown) y sin marcado. */
 const celda = (s: unknown, max = 70): string => {
@@ -39,7 +45,7 @@ const celda = (s: unknown, max = 70): string => {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 };
 
-const porUnidad = (u: unknown) => (u ? ` /${u}` : "");
+const porUnidad = (u: unknown) => (u ? `/${u}` : "");
 
 const MOTIVOS: Record<string, string> = {
   formato_distinto: "otro envase o tamaño",

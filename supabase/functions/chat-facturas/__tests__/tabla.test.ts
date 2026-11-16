@@ -14,6 +14,7 @@ import {
   depurarCandidatas,
   lineasDeHoja,
   paqueteDelNombre,
+  prefiltrarLineas,
   type Candidata,
   type Filas,
 } from "../hoja.ts";
@@ -47,6 +48,18 @@ describe("paquetes y contenido del nombre", () => {
 
   it("«2,100GR» son 2,1 kg (antes 2,1 g)", () => {
     expect(contenidoDelNombre("TOMATE FRITO ORLANDO BRIK 2,100GR C6")).toEqual({ cantidad: 2.1, unidad: "kg" });
+  });
+});
+
+describe("prefiltro: falsos negativos de la auditoría", () => {
+  it("una marca rara basta aunque solo comparta esa palabra («Valbuena», «Mauro»)", () => {
+    const compras = [
+      { n: "TINTO VALBUENA 5º 75CL", p: 1, c: "Tinto Valbuena 5º 75 cl" },
+      { n: "Mauro 75 cl", p: 2, c: "Mauro 75 cl" },
+      ...Array.from({ length: 40 }, (_, i) => ({ n: `TINTO CRIANZA RIOJA ${i}`, p: 100 + i, c: `Tinto crianza ${i}` })),
+    ];
+    const c = prefiltrarLineas([{ producto: "V.VALBUENA 5ºA 75CL C6" }, { producto: "V.MAURO CRIANZA 75CL 14,5º C6" }, { producto: "V.TINTO DE LA CASA 75CL" }], compras);
+    expect(c.map((x) => [x.i, x.producto_id])).toEqual([[0, 1], [1, 2]]);
   });
 });
 
@@ -114,6 +127,7 @@ describe("tablaPresupuesto (la tabla completa la monta el servidor)", () => {
     expect(t).toContain("5 cl frente a 70 cl");
     expect(t).toContain("se compra en otra unidad (l, ud)");
     expect(t).toContain("descuento del 15 %");
+    expect(t).toContain("2.669 artículos");
     expect(t.indexOf("C6 ROSCA")).toBeLessThan(t.indexOf("C12 N/REF"));
     // Una barra en un nombre no rompe la tabla.
     expect(t).toContain("| MINI GIN RARO 5CL |");
