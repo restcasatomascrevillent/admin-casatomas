@@ -771,9 +771,15 @@ function resumenPorZonas(numstat) {
   return [...zonas].sort((a, b) => b[1].mas + b[1].menos - (a[1].mas + a[1].menos));
 }
 
-/** URL estable que Vercel da a la última versión de una rama (`<proyecto>-git-<rama>-<equipo>`). */
+/**
+ * URL estable que Vercel da a la última versión de una rama (`<proyecto>-git-<rama>-<equipo>`).
+ * En el nombre de la rama Vercel cambia «/» por «-» y QUITA los demás signos, puntos incluidos:
+ * `release/1.32.0` → `release-1320` (no `release-1-32-0`, que no existe). Comprobado con los alias
+ * reales de `release/X.Y.Z`, `staging` y `feature/<tema-con-guiones>`. Si el nombre completo pasara
+ * de 63 caracteres Vercel lo recorta; las ramas de este proceso quedan muy por debajo.
+ */
 export function urlRamaVercel(proyecto, rama) {
-  const slug = rama.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const slug = rama.toLowerCase().replace(/\//g, "-").replace(/[^a-z0-9-]/g, "");
   return `https://${proyecto}-git-${slug}-${EQUIPO_VERCEL}.vercel.app`;
 }
 
