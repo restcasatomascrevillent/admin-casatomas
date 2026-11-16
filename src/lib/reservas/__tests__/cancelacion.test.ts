@@ -1,6 +1,6 @@
 /**
  * «Quién canceló» (16/11/2026): textos de la Lista y de la ficha, la sección de canceladas del día y la lectura
- * que aguanta un proyecto sin la migración 20261205100000.
+ * que aguanta un proyecto sin la migración 20261205100200.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
