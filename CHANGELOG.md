@@ -20,6 +20,13 @@ Objetivo: Facturas: OCR con reglas de la carga, embeddings por nombre, Drive, pr
 - Facturas: la importación no da por duplicadas dos facturas con números distintos ([#215](https://github.com/restcasatomascrevillent/admin-casatomas/pull/215))
 - Migraciones: versión repetida 20261127100000 (fallos internos Telegram) ([#220](https://github.com/restcasatomascrevillent/admin-casatomas/pull/220))
 
+## [1.33.1] - 2026-11-16
+
+Objetivo: El check «Candidata en preview» de las releases encuentra la preview de Vercel
+
+### Cambiado
+- Release: la candidata encuentra la preview aunque Vercel no cree deployments en GitHub ([#226](https://github.com/restcasatomascrevillent/admin-casatomas/pull/226))
+
 ## [1.33.0] - 2026-11-16
 
 Objetivo: Informes de Facturas: fuera tres informes y Cervezas y Vinos como subfilas de Bebidas en «Gasto por familia»
