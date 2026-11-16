@@ -89,7 +89,9 @@ Fuente única: `src/components/trafico-web/comportamiento/definiciones.ts`. El c
     | «sin datos de después» | sin `accion` ni nada después: visitante sin «Estadísticas», cuyo id cambia en cada carga, así que es lo normal | No |
     | «sin conexión del visitante» | `sin_conexion` | No |
     | «no se arregló al recargar · revisar» | `recarga_sin_efecto`, `aviso_version_nueva`; en eventos sin `accion`, volvió a fallar en la misma sesión tras recargar | **Sí** |
-    | (ninguna: error normal) | `sin_version_nueva` (red o fichero que falta de verdad) | **Sí** |
+    | (ninguna: error normal) | `sin_version_nueva`: no hay versión nueva y el fallo sigue (red que no vuelve o fichero que falta de verdad). Si lo que falla es una página, la web ya la ha reintentado sola con UNA recarga antes de mandarlo; si esa recarga lo arregla, no llega nada | **Sí** |
+
+    Desde web-casatomas#78 (CAS-5), un corte de red de un momento al abrir una página ya no deja rastro: la página se recarga sola una vez y carga. Y si el código de una página falla en la primera carga (la web no llega a arrancar), el error sí llega: la web instala el rastreador sin React y enseña «No se pudo cargar esta página · Recargar página».
 
     Los bots no se clasifican: llevan horas falsas y nunca cuentan. En la lista de errores y en cada ocurrencia se ve lo que decidió la web. La ingesta guarda `recargado`, `origen`, `despliegue_anterior` y `build_anterior` de esos errores. El patrón SQL es el mismo que `PATRON_CHUNK_CADUCADO` (`huella.ts`); las pruebas PGlite lo comprueban.
   - **Los 404 y los bots no abren tickets**: los 404 solo si lo activas, por encima de su umbral diario; los bots nunca cuentan.
