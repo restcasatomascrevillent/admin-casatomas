@@ -3,7 +3,7 @@
 // quién ha cancelado cada reserva, cliente o restaurante, y que las canceladas
 // aparezcan en el panel»).
 // ----------------------------------------------------------------------------
-// Lo guarda la BASE DE DATOS (migración 20261205100000_reservas_cancelada_por):
+// Lo guarda la BASE DE DATOS (migración 20261205100200_reservas_cancelada_por):
 // un trigger apunta `cancelada_por` ('cliente' | 'restaurante') y `cancelada_at`
 // al pasar a «cancelada», venga de donde venga (Lista, ficha, enlace de la web,
 // correo, bot). El panel solo LEE: nunca escribe estas columnas.

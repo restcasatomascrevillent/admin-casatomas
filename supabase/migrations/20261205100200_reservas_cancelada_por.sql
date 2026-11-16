@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- 20261205100000_reservas_cancelada_por — quién canceló cada reserva (16/11/2026)
+-- 20261205100200_reservas_cancelada_por — quién canceló cada reserva (16/11/2026)
 -- ===========================================================================
 -- Petición: «que se muestre quién ha cancelado cada reserva (cliente o
 -- restaurante) y que las canceladas aparezcan en el panel de Reservas».
@@ -41,7 +41,7 @@ set client_encoding = 'UTF8';
 --
 -- APLICAR (nunca `db push`): demo primero (sfonaclosuafvlhutkon), producción
 -- (haqmmdfdzzatdnrrcgez) solo con el «sí» del dueño. Idempotente.
--- Deshacer: supabase/rollbacks/20261205100000_reservas_cancelada_por_ROLLBACK.sql
+-- Deshacer: supabase/rollbacks/20261205100200_reservas_cancelada_por_ROLLBACK.sql
 -- Pruebas: npm run test:cancelada-por:db (PGlite).
 -- ===========================================================================
 begin;
