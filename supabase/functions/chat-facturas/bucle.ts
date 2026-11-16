@@ -53,6 +53,7 @@ export const TIMEOUT_OPENAI_MS = 45_000;
 export const PRESUPUESTO_MS = 110_000;        // deadline global de la peticion entera
 export const MAX_TOOL_CALLS_POR_RONDA = 4;    // corta el fan-out que el prompt fomenta
 export const MAX_TOKENS_RESPUESTA = 800;      // el prompt pide 6 lineas; 800 sobra
+export const MAX_TOKENS_PRESUPUESTO = 2_500;   // con un presupuesto adjunto la respuesta es una tabla de hasta 40 filas
 
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -120,6 +121,8 @@ export interface OpcionesBucle {
   fetchImpl?: typeof fetch;
   /** Fecha de hoy del prompt (tests). */
   hoy?: string;
+  /** Presupuesto adjunto en esta conversacion (chat_presupuestos), si lo hay. */
+  presupuesto?: { id: string; proveedor: string | null; archivo: string | null; lineas: number } | null;
   presupuestoMs?: number;
   /**
    * SOLO la evaluación: parámetros que pisan los de parametrosModelo (p. ej.
@@ -151,6 +154,8 @@ interface Ctx {
   pregunta: string;
   clave: string;
   fetchImpl: typeof fetch;
+  /** Id del presupuesto adjunto de la conversacion (comparar_presupuesto). */
+  presupuestoId?: string | null;
 }
 
 // ─── Hilo de la conversación (11/11/2026) ────────────────────────────────────
@@ -481,7 +486,7 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       const a = await supabase.rpc("asociar_termino_agente", { p_texto: txt });
       if (!a.error && a.data && typeof a.data === "object") asoc = a.data as Asociacion;
     }
-    const ll = prepararLlamada(nombre, args, ctx.pregunta, asoc);
+    const ll = prepararLlamada(nombre, args, ctx.pregunta, asoc, ctx.presupuestoId);
     let data: unknown;
 
     if (ll.tipo === "rpc") {
@@ -592,6 +597,13 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   const aviso: string[] = [`FECHA: hoy es ${o.hoy ?? hoyMadrid()}.`];
   const hilo = pistaDelHilo(historial, String(mensaje));
   if (hilo) aviso.push(hilo);
+  if (o.presupuesto) {
+    const p = o.presupuesto;
+    aviso.push(
+      `PRESUPUESTO adjunto: «${p.archivo ?? "presupuesto"}»${p.proveedor ? ` de ${p.proveedor}` : ""}, ${p.lineas} lineas. ` +
+      "Ya se pregunto por el descuento: si el mensaje del usuario lo contesta, llama a comparar_presupuesto.",
+    );
+  }
 
   // ── Pista de la pregunta (20261107100000) ──
   //  Que es cada palabra en el catalogo («vino» = familia Vinos), el tema del
@@ -630,6 +642,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
     pregunta: String(mensaje),
     clave: o.claveOpenAI,
     fetchImpl: f,
+    presupuestoId: o.presupuesto?.id ?? null,
   };
   let respuesta = "";
   let huboFalloDeHerramienta = false;
@@ -660,7 +673,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
         model: modelo,
         messages,
         prompt_cache_key: o.claveCache ?? CLAVE_CACHE_POR_DEFECTO,
-        ...parametrosModelo(modelo, MAX_TOKENS_RESPUESTA),
+        ...parametrosModelo(modelo, o.presupuesto ? MAX_TOKENS_PRESUPUESTO : MAX_TOKENS_RESPUESTA),
         ...(o.parametrosExtra ?? {}),
         ...(esUltimo ? {} : { tools: TOOLS }),
       }),
