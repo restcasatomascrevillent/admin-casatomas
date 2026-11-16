@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { claveDia } from "@/lib/reservas/libroReservas";
+import { leerConCancelacion } from "@/lib/reservas/cancelacion";
 
 // ============================================================================
 // BUSCAR EN TODO EL HISTÓRICO Y «PENDIENTES» DE LA LISTA (11/11/2026, petición
@@ -36,6 +37,9 @@ export interface ReservaEncontrada {
   /** Cuándo se hizo (12/11/2026: se enseña en la fila). */
   created_at?: string | null;
   canal?: string | null;
+  /** «Quién canceló» (16/11/2026): 'cliente' | 'restaurante' | null (no cancelada o no consta). */
+  cancelada_por?: string | null;
+  cancelada_at?: string | null;
 }
 
 /**
@@ -62,6 +66,8 @@ function aReserva(r: Record<string, unknown>): ReservaEncontrada {
     notas_cliente: (r.notas_cliente as string | null) ?? null,
     created_at: (r.created_at as string | null) ?? null,
     canal: (r.canal as string | null) ?? null,
+    cancelada_por: (r.cancelada_por as string | null) ?? null,
+    cancelada_at: (r.cancelada_at as string | null) ?? null,
   };
 }
 
@@ -83,13 +89,16 @@ export function useBuscarReservas(texto: string) {
     staleTime: 30_000,
     queryFn: async (): Promise<ReservaEncontrada[]> => {
       const patron = `%${termino}%`;
-      const { data, error } = await supabase
-        .from("reservas")
-        .select(COLUMNAS)
-        .or(`nombre.ilike.${patron},telefono.ilike.${patron},email.ilike.${patron}`)
-        .order("fecha", { ascending: false })
-        .order("hora", { ascending: false })
-        .limit(LIMITE_RESULTADOS);
+      const { data, error } = await leerConCancelacion((columnasCancelacion) =>
+        supabase
+          .from("reservas")
+          // El tipo es el de `COLUMNAS`: las de cancelación se leen aparte en `aReserva`.
+          .select(`${COLUMNAS}${columnasCancelacion}` as typeof COLUMNAS)
+          .or(`nombre.ilike.${patron},telefono.ilike.${patron},email.ilike.${patron}`)
+          .order("fecha", { ascending: false })
+          .order("hora", { ascending: false })
+          .limit(LIMITE_RESULTADOS),
+      );
       if (error) throw error;
       return ((data ?? []) as Record<string, unknown>[]).map(aReserva);
     },
@@ -103,14 +112,17 @@ export function useReservasPorEstado(estado: string | null) {
     queryKey: ["reservas-lista", "estado", estado],
     enabled: !!estado,
     queryFn: async (): Promise<ReservaEncontrada[]> => {
-      const { data, error } = await supabase
-        .from("reservas")
-        .select(COLUMNAS)
-        .eq("estado", estado as string)
-        .gte("fecha", claveDia(new Date()))
-        .order("fecha", { ascending: true })
-        .order("hora", { ascending: true })
-        .limit(200);
+      const { data, error } = await leerConCancelacion((columnasCancelacion) =>
+        supabase
+          .from("reservas")
+          // El tipo es el de `COLUMNAS`: las de cancelación se leen aparte en `aReserva`.
+          .select(`${COLUMNAS}${columnasCancelacion}` as typeof COLUMNAS)
+          .eq("estado", estado as string)
+          .gte("fecha", claveDia(new Date()))
+          .order("fecha", { ascending: true })
+          .order("hora", { ascending: true })
+          .limit(200),
+      );
       if (error) throw error;
       return ((data ?? []) as Record<string, unknown>[]).map(aReserva);
     },
