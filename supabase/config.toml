@@ -117,6 +117,14 @@ verify_jwt = true
 [functions.clasificar-productos]
 verify_jwt = false
 
+# embeddings-nombres (20261203100000): vector de los nombres de producto que aún
+# no lo tienen. La llama el cron «embeddings-nombres» por pg_net (sin JWT) con
+# x-ocr-secret == OCR_TRABAJOS_SECRET (mismo secreto y valor de Vault que
+# ocr-trabajo), o un usuario con permiso de EDICIÓN en facturas. No acepta datos
+# del cuerpo. Ver supabase/functions/embeddings-nombres/index.ts.
+[functions.embeddings-nombres]
+verify_jwt = false
+
 # Centro de modelos de IA (20261107500000): la llama pg_cron a diario (pg_net,
 # sin JWT, con x-ocr-secret) o un SUPER ADMIN con su JWT (lo comprueba ella con
 # exigirSuperAdmin). Ver supabase/functions/ia-modelos-openai/index.ts.
