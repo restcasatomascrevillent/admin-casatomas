@@ -262,6 +262,38 @@ export class ClienteDrive {
     return salida.slice(0, maximo);
   }
 
+  /**
+   * Hijos directos (no en la papelera) de VARIAS carpetas a la vez: una consulta
+   * `'a' in parents or 'b' in parents…` por cada 25 carpetas, con paginación y
+   * tope. `carpetas` = solo subcarpetas (por nombre); `imagenes` / `videos` = solo
+   * ese tipo (los más recientes primero). Cada fichero trae `parents` para repartirlos.
+   */
+  async listarHijos(padres: readonly string[], tipo: "carpetas" | "imagenes" | "videos", maximo = 2000): Promise<FicheroDrive[]> {
+    for (const p of padres) if (!esIdDrive(p)) throw new ErrorDrive("Id de carpeta no válido", "respuesta");
+    const filtro = tipo === "carpetas" ? `mimeType='${TIPO_CARPETA}'` : tipo === "videos" ? "mimeType contains 'video/'" : "mimeType contains 'image/'";
+    const campos = "nextPageToken,files(id,name,mimeType,size,createdTime,parents,thumbnailLink,imageMediaMetadata(width,height,rotation))";
+    const orden = tipo === "carpetas" ? "name" : "createdTime%20desc";
+    const salida: FicheroDrive[] = [];
+    for (let i = 0; i < padres.length && salida.length < maximo; i += 25) {
+      const q = `(${padres.slice(i, i + 25).map((p) => `'${p}' in parents`).join(" or ")}) and trashed=false and ${filtro}`;
+      let pagina: string | undefined;
+      do {
+        const url =
+          `${URL_DRIVE}/files?q=${encodeURIComponent(q)}&fields=${encodeURIComponent(campos)}&orderBy=${orden}` +
+          `&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true${pagina ? `&pageToken=${encodeURIComponent(pagina)}` : ""}`;
+        const j = await this.json<{ files?: FicheroDrive[]; nextPageToken?: string }>(url);
+        salida.push(...(j.files ?? []));
+        pagina = j.nextPageToken;
+      } while (pagina && salida.length < maximo);
+    }
+    return salida.slice(0, maximo);
+  }
+
+  /** Subcarpetas (no en la papelera) de una carpeta, por nombre. */
+  listarCarpetas(padre: string, maximo = 500): Promise<FicheroDrive[]> {
+    return this.listarHijos([padre], "carpetas", maximo);
+  }
+
   /** Sube un fichero (multipart: metadatos + contenido en una sola petición). */
   async subir(carpeta: string, nombre: string, tipo: string, bytes: Uint8Array, descripcion?: string): Promise<FicheroDrive> {
     const frontera = `frontera-${crypto.randomUUID()}`;
@@ -333,6 +365,14 @@ export class ClienteDrive {
     if (!esUrlSesionSubida(sesion)) throw new ErrorDrive("Google Drive no dio una URL de subida válida", "respuesta", r.status);
     const cuerpo = o.datos instanceof Uint8Array ? (o.datos as Uint8Array<ArrayBuffer>) : o.datos;
     return await this.json<FicheroDrive>(sesion, { method: "PUT", headers: { "Content-Type": o.tipo }, body: cuerpo, signal: AbortSignal.timeout(300_000) });
+  }
+
+  /** Mueve un fichero a otra carpeta (su id no cambia): lo quita de `desde` y lo añade a `hacia`. */
+  async mover(id: string, hacia: string, desde: readonly string[]): Promise<void> {
+    if (!esIdDrive(id) || !esIdDrive(hacia)) throw new ErrorDrive("Id de fichero o carpeta no válido", "respuesta");
+    const quitar = desde.filter((p) => p !== hacia && esIdDrive(p));
+    const url = `${URL_DRIVE}/files/${id}?addParents=${hacia}${quitar.length ? `&removeParents=${quitar.join(",")}` : ""}&supportsAllDrives=true&fields=id`;
+    await this.json<{ id: string }>(url, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{}" });
   }
 
   /** Ficheros (no en la papelera) de una carpeta cuyo nombre contiene `texto`. */

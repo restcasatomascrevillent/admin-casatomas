@@ -149,7 +149,7 @@ describe("BloqueBotonesNovedad", () => {
     render(<Harness />);
     const verPlato = anadir().getByRole("button", { name: /échale un vistazo/i });
     expect(verPlato).toBeDisabled();
-    expect(screen.getByText(/se puede añadir cuando enlaces un plato/)).toBeInTheDocument();
+    expect(screen.getByText(/se añade solo al enlazar un plato/)).toBeInTheDocument();
     expect(screen.getByText(TEXTO_AYUDA_PLATO)).toBeInTheDocument();
 
     // El buscador reutiliza SelectorPlato y solo lista platos «en la carta».
@@ -160,11 +160,24 @@ describe("BloqueBotonesNovedad", () => {
 
     expect(ultimo.platoId).toBe("p-pulpo");
     expect(within(screen.getByTestId("plato-enlazado")).getByText("Pulpo a feira")).toBeInTheDocument();
-    const habilitado = anadir().getByRole("button", { name: /échale un vistazo/i });
-    expect(habilitado).toBeEnabled();
-    fireEvent.click(habilitado);
+    // Enlazar el plato añade ya el botón: no hay que acordarse de ponerlo aparte.
     expect(ultimo.botones).toEqual(["ver_plato"]);
     expect(screen.getByText("Lleva a «Pulpo a feira» en la carta.")).toBeInTheDocument();
+
+    // Si se quita a propósito, se puede volver a poner a mano.
+    fireEvent.click(screen.getByRole("button", { name: "Quitar «Échale un vistazo»" }));
+    expect(ultimo.botones).toEqual([]);
+    expect(ultimo.platoId).toBe("p-pulpo");
+    fireEvent.click(anadir().getByRole("button", { name: /échale un vistazo/i }));
+    expect(ultimo.botones).toEqual(["ver_plato"]);
+  });
+
+  it("enlazar un plato conserva los botones que ya había", async () => {
+    render(<Harness inicial={["llamar"]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Enlazar un plato" }));
+    fireEvent.click((await screen.findAllByRole("option"))[0]);
+    expect(ultimo.platoId).toBe("p-pulpo");
+    expect(ultimo.botones).toEqual(["llamar", "ver_plato"]);
   });
 
   it("sin plato enlazado no deja guardar «Échale un vistazo» y lo explica", () => {
