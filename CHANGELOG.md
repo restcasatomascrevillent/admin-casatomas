@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.33.0] - 2026-11-16
+
+Objetivo: Informes de Facturas: fuera tres informes y Cervezas y Vinos como subfilas de Bebidas en «Gasto por familia»
+
+### Añadido
+- Informes: menos informes de Facturas y Cervezas y Vinos como subfilas de Bebidas ([#223](https://github.com/restcasatomascrevillent/admin-casatomas/pull/223))
+
 ## [1.32.1] - 2026-11-16
 
 Objetivo: Una foto nueva en un plato con vídeo quita el vídeo anterior: en la web se ve la foto
