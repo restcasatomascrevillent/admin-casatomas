@@ -487,6 +487,25 @@ describe("EditarReservaDialog · Verificar, Confirmar y Cancelar", () => {
     expect(screen.queryByRole("button", { name: /Cancelar reserva|Verificar|Confirmar/ })).toBeNull();
   });
 
+  it("en una cancelada dice quién la canceló y cuándo (16/11/2026)", async () => {
+    mocks.reserva = fila({ estado: "cancelada", cancelada_por: "cliente", cancelada_at: "2026-11-14T18:20:00" });
+    montar();
+    expect(await screen.findByTestId("cancelada-ficha")).toHaveTextContent("Cancelada por el cliente el sábado 14 nov 2026 a las 18:20");
+  });
+
+  it("una cancelada de antes de guardarse el dato: «No consta quién la canceló»", async () => {
+    mocks.reserva = fila({ estado: "cancelada" });
+    montar();
+    expect(await screen.findByTestId("cancelada-ficha")).toHaveTextContent("No consta quién la canceló");
+  });
+
+  it("una reserva viva no dice nada de cancelación", async () => {
+    mocks.reserva = fila({ estado: "confirmada", cancelada_por: "cliente" });
+    montar();
+    await screen.findByTestId("estado-ficha");
+    expect(screen.queryByTestId("cancelada-ficha")).toBeNull();
+  });
+
   it("dice cuándo y por dónde se hizo la reserva (12/11/2026)", async () => {
     mocks.reserva = fila({ created_at: "2026-11-11T12:30:00Z", canal: "web" });
     montar();

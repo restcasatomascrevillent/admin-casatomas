@@ -200,6 +200,45 @@ describe("ListaComoLibro · las reservas de la hoja", () => {
     expect(h.editada).toHaveBeenCalledWith("r1");
   });
 
+  it("las canceladas del día van aparte, al final, diciendo quién canceló cada una (16/11/2026)", () => {
+    h.porDia[hoy] = [
+      { id: "r1", nombre: "Esther", hora: "14:15:00", numero_comensales: 2, estado: "confirmada", espacio_id: "s1" },
+      { id: "c1", nombre: "Carlos", hora: "14:30:00", numero_comensales: 3, estado: "cancelada", espacio_id: "s1", cancelada_por: "cliente", cancelada_at: "2026-11-14T18:20:00" },
+      { id: "c2", nombre: "Marta", hora: "21:00:00", numero_comensales: 5, estado: "cancelada", espacio_id: null, cancelada_por: "restaurante", cancelada_at: "2026-11-15T10:05:00" },
+      { id: "c3", nombre: "Antigua", hora: "22:00:00", numero_comensales: 2, estado: "cancelada", espacio_id: null },
+    ];
+    render(<ListaComoLibro />);
+    const hoja = hojas()[0];
+    // Las activas, como siempre: la cancelada no cuenta en la Comida.
+    const comida = within(hoja).getByRole("region", { name: "Comida" });
+    expect(comida).toHaveTextContent("1 reserva · 2 pax");
+    expect(comida).not.toHaveTextContent("Carlos");
+    expect(within(hoja).queryByRole("region", { name: "Cena" })).toBeNull();
+
+    const canceladas = within(hoja).getByRole("region", { name: "Canceladas" });
+    expect(canceladas).toHaveTextContent("Canceladas · 3 reservas");
+    const quien = within(canceladas).getAllByTestId("quien-cancelo").map((e) => e.textContent);
+    expect(quien).toEqual(["Cancelada por el cliente · 14/11 18:20", "Cancelada por el restaurante · 15/11 10:05", "Cancelada"]);
+
+    fireEvent.click(within(canceladas).getByRole("button", { name: /Abrir la reserva de Marta.*Cancelada por el restaurante/ }));
+    expect(h.editada).toHaveBeenCalledWith("c2");
+  });
+
+  it("un día con solo canceladas lo dice y las enseña", () => {
+    h.porDia[hoy] = [{ id: "c1", nombre: "Carlos", hora: "14:30:00", numero_comensales: 3, estado: "cancelada", espacio_id: null, cancelada_por: "cliente" }];
+    render(<ListaComoLibro />);
+    const hoja = hojas()[0];
+    expect(within(hoja).getByText("No hay reservas activas este día.")).toBeInTheDocument();
+    expect(within(hoja).getByRole("region", { name: "Canceladas" })).toHaveTextContent("Canceladas · 1 reserva");
+  });
+
+  it("«Escribir reserva» (sin `conCanceladas`) sigue sin enseñar las canceladas", () => {
+    h.porDia[hoy] = [{ id: "c1", nombre: "Carlos", hora: "14:30:00", numero_comensales: 3, estado: "cancelada", espacio_id: null }];
+    render(<ReservasDeLaHoja fecha={hoy} />);
+    expect(screen.getByText(/Aún no hay reservas este día/)).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Canceladas" })).toBeNull();
+  });
+
   it("hoja sin reservas: «Aún no hay reservas este día»", () => {
     render(<ListaComoLibro />);
     expect(within(hojas()[0]).getByText(/Aún no hay reservas este día/)).toBeInTheDocument();
@@ -320,6 +359,35 @@ describe("ListaComoLibro · buscador y «Pendientes»", () => {
     expect(h.aceptar).toHaveBeenCalledWith(expect.objectContaining({ id: "p2", estado: "pendiente" }));
     fireEvent.click(boton);
     expect(hojas()[0]).toHaveAccessibleName(`Hoja del ${tituloHoja(hoy)}`);
+  });
+
+  it("«Canceladas» enseña las canceladas desde hoy con quién canceló, y vuelve a la hoja al quitarlo (16/11/2026)", () => {
+    h.porEstado.cancelada = [
+      { ...reserva("c1", hoy, "Carlos", "cancelada"), cancelada_por: "cliente", cancelada_at: "2026-11-14T18:20:00" },
+      { ...reserva("c2", pasarHoja(hoy, 2), "Marta", "cancelada"), cancelada_por: "restaurante", cancelada_at: "2026-11-15T10:05:00" },
+    ];
+    render(<ListaComoLibro />);
+    const boton = screen.getByRole("button", { name: /^Canceladas$/ });
+    expect(boton).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(boton);
+    expect(boton).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: /Canceladas.*desde hoy/ })).toBeInTheDocument();
+    expect(screen.getAllByTestId("quien-cancelo").map((e) => e.textContent)).toEqual([
+      "Cancelada por el cliente · 14/11 18:20",
+      "Cancelada por el restaurante · 15/11 10:05",
+    ]);
+    // «Pendientes» y «Canceladas» se excluyen entre sí.
+    fireEvent.click(screen.getByRole("button", { name: /Pendientes/ }));
+    expect(boton).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(boton);
+    fireEvent.click(boton);
+    expect(hojas()[0]).toHaveAccessibleName(`Hoja del ${tituloHoja(hoy)}`);
+  });
+
+  it("«Canceladas» sin ninguna lo dice", () => {
+    render(<ListaComoLibro />);
+    fireEvent.click(screen.getByRole("button", { name: /^Canceladas$/ }));
+    expect(screen.getByText("No hay reservas canceladas desde hoy.")).toBeInTheDocument();
   });
 
   it("con un estado de un aviso («cancelada») abre esas reservas", () => {

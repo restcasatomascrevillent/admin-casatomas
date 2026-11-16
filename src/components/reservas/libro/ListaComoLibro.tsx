@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarIcon, ChevronLeft, ChevronRight, Clock, Plus, Search, X } from "lucide-react";
+import { Ban, CalendarIcon, ChevronLeft, ChevronRight, Clock, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -78,7 +78,7 @@ function Hoja({
         className="min-h-0 flex-1 touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3 sm:px-5"
         data-testid="hoja-scroll"
       >
-        <ReservasDeLaHoja fecha={fecha} onAbrirReserva={onAbrir} resaltada={resaltada} />
+        <ReservasDeLaHoja fecha={fecha} onAbrirReserva={onAbrir} resaltada={resaltada} conCanceladas />
       </div>
     </article>
   );
@@ -174,8 +174,8 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
             <Plus className="h-5 w-5" /> Añadir reserva a este día
           </Button>
         )}
-        <div className="order-3 flex w-full items-center gap-2 xl:order-2 xl:w-auto xl:flex-1">
-          <div className="relative min-w-0 flex-1">
+        <div className="order-3 flex w-full flex-wrap items-center gap-2 xl:order-2 xl:w-auto xl:flex-1 xl:flex-nowrap">
+          <div className="relative min-w-[14rem] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input
               type="search"
@@ -210,6 +210,23 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
             <span className={clasesNumeroPendientes(numPendientes, estado === "pendiente")}>
               {numPendientes}
             </span>
+          </Button>
+          {/* 16/11/2026 («filtrar o distinguir activas y canceladas»): las canceladas de hoy en adelante, con quién
+              canceló cada una. Las de un día concreto están al final de su hoja. */}
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(
+              "h-11 gap-2 text-base",
+              estado === "cancelada" && "border-red-300 bg-red-50 text-red-800 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/50 dark:text-red-100",
+            )}
+            aria-pressed={estado === "cancelada"}
+            onClick={() => {
+              setTexto("");
+              setEstado((e) => (e === "cancelada" ? null : "cancelada"));
+            }}
+          >
+            <Ban className="h-4 w-4" /> Canceladas
           </Button>
         </div>
       </div>
@@ -261,7 +278,13 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
               cargando={porEstado.isLoading}
               error={porEstado.isError}
               onReintentar={() => void porEstado.refetch()}
-              vacio={estado === "pendiente" ? "No hay reservas pendientes de verificar." : "No hay reservas en este estado desde hoy."}
+              vacio={
+                estado === "pendiente"
+                  ? "No hay reservas pendientes de verificar."
+                  : estado === "cancelada"
+                    ? "No hay reservas canceladas desde hoy."
+                    : "No hay reservas en este estado desde hoy."
+              }
               conVerificar={estado === "pendiente"}
               conTelefono
               onAbrir={editarReserva}
