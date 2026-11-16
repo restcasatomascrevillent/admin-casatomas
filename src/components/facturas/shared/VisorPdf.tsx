@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImageOff, Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ENLACE_ORIGINAL, VisorPantallaCompleta } from "./VisorPantallaCompleta";
@@ -20,14 +20,32 @@ async function bytesPdf(fuente: Blob | string): Promise<ArrayBuffer> {
  *
  * `fuente`: el Blob (el original de Drive que baja `facturas-original`) o la
  * URL firmada de Storage. Con un blob URL NO: `connect-src` no deja leerlo.
+ *
+ * `hojaInicial` (1, 2…; 15/11/2026): al pintarse esa hoja, la lista baja hasta
+ * ella («Comparar facturas» abre la hoja donde está el producto) y `hojasMarcadas`
+ * llevan un borde y la etiqueta «Aquí está el producto».
  */
-export function VisorPdf({ fuente, titulo, className }: { fuente: Blob | string | undefined; titulo: string; className?: string }) {
+export function VisorPdf({
+  fuente,
+  titulo,
+  className,
+  hojaInicial = null,
+  hojasMarcadas = [],
+}: {
+  fuente: Blob | string | undefined;
+  titulo: string;
+  className?: string;
+  hojaInicial?: number | null;
+  hojasMarcadas?: number[];
+}) {
   const [hojas, setHojas] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
   const [listo, setListo] = useState(false);
   const [fallo, setFallo] = useState(false);
   const [intento, setIntento] = useState(0);
   const [ampliada, setAmpliada] = useState<number | null>(null);
+  const refsHojas = useRef<(HTMLButtonElement | null)[]>([]);
+  const yaBajado = useRef<string | null>(null);
 
   useEffect(() => {
     if (!fuente) return;
@@ -69,6 +87,17 @@ export function VisorPdf({ fuente, titulo, className }: { fuente: Blob | string 
     };
   }, [fuente, intento]);
 
+  // Bajar UNA vez (por documento y hoja) a la hoja del producto en cuanto está pintada.
+  useEffect(() => {
+    if (!hojaInicial || hojaInicial < 2 || hojas.length < hojaInicial) return;
+    const clave = `${hojas[0]}|${hojaInicial}`;
+    if (yaBajado.current === clave) return;
+    const el = refsHojas.current[hojaInicial - 1];
+    if (!el) return;
+    yaBajado.current = clave;
+    if (typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "start" });
+  }, [hojas, hojaInicial]);
+
   if (fallo) {
     return (
       <div role="status" className={cn("flex flex-wrap items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground", className)}>
@@ -85,17 +114,33 @@ export function VisorPdf({ fuente, titulo, className }: { fuente: Blob | string 
   return (
     <div className={cn("flex min-h-0 flex-col gap-1", className)}>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-md border bg-muted/40 p-2" data-testid="visor-pdf">
-        {hojas.map((url, i) => (
-          <button
-            key={url}
-            type="button"
-            onClick={() => setAmpliada(i)}
-            aria-label={`Ampliar la hoja ${i + 1}${total > 1 ? ` de ${total}` : ""}`}
-            className="block w-full cursor-zoom-in rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <img src={url} alt={`${titulo} · hoja ${i + 1}`} className="block h-auto w-full bg-white shadow-sm" />
-          </button>
-        ))}
+        {hojas.map((url, i) => {
+          const marcada = hojasMarcadas.includes(i + 1);
+          return (
+            <button
+              key={url}
+              ref={(el) => {
+                refsHojas.current[i] = el;
+              }}
+              type="button"
+              onClick={() => setAmpliada(i)}
+              aria-label={`Ampliar la hoja ${i + 1}${total > 1 ? ` de ${total}` : ""}${marcada ? " (aquí está el producto)" : ""}`}
+              data-hoja={i + 1}
+              data-marcada={marcada || undefined}
+              className={cn(
+                "relative block w-full cursor-zoom-in scroll-mt-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                marcada && "ring-4 ring-amber-500",
+              )}
+            >
+              {marcada && (
+                <span className="absolute left-1 top-1 rounded bg-amber-500 px-1.5 py-0.5 text-xs font-semibold text-amber-950 shadow">
+                  Hoja {i + 1} · aquí está el producto
+                </span>
+              )}
+              <img src={url} alt={`${titulo} · hoja ${i + 1}`} className="block h-auto w-full bg-white shadow-sm" />
+            </button>
+          );
+        })}
         {cargando && (
           <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground" role="status" aria-busy="true">
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
@@ -105,6 +150,7 @@ export function VisorPdf({ fuente, titulo, className }: { fuente: Blob | string 
         {listo && total > hojas.length && (
           <p className="px-1 text-xs text-muted-foreground">
             Se enseñan las {hojas.length} primeras hojas de {total}. Para ver el resto, ábrelo con el enlace de arriba.
+            {hojaInicial && hojaInicial > hojas.length ? ` El producto está en la hoja ${hojaInicial}.` : ""}
           </p>
         )}
       </div>
