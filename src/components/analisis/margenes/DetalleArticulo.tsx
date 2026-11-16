@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { VisorDocumento } from "@/components/facturas/analisis/VisorDocumento";
+import { useEnlacesDudososEscandallo } from "@/hooks/useEnlacesDudososEscandallo";
 import { useBuscarProductos, useComprasProducto, useEdicionMargenes, type IngredienteEditado } from "@/hooks/useMargenesCarta";
 import {
   AYUDA_PCT_COSTE,
@@ -210,6 +211,7 @@ export function DetalleArticulo({
   const [compras, setCompras] = useState<number | null>(null);
   const [visorFactura, setVisorFactura] = useState<FacturaUsada | null>(null);
   const navigate = useNavigate();
+  const { data: dudosos } = useEnlacesDudososEscandallo(articulo?.tipo === "plato" ? articulo.id : null);
 
   useEffect(() => {
     setBuscando(null);
@@ -416,6 +418,11 @@ export function DetalleArticulo({
                             />
                           ) : (
                             x.nota && <p className="text-xs text-muted-foreground">{x.nota}</p>
+                          )}
+                          {orig?.id != null && dudosos?.has(orig.id) && x.productoId === orig.productoId && (
+                            <p className="text-xs text-amber-700 dark:text-amber-400" data-testid="aviso-enlace-dudoso">
+                              El ingrediente enlazado no parece coincidir con la nota.
+                            </p>
                           )}
                           {orig && !puedeEditar && <p className="text-xs text-muted-foreground">{cantidadTexto(orig)}</p>}
                           {buscando === i && <BuscadorProducto etiqueta="Buscar el producto nuevo" onElegir={elegirProducto} onCancelar={() => setBuscando(null)} />}
