@@ -107,6 +107,13 @@ verify_jwt = false
 [functions.facturas-original]
 verify_jwt = true
 
+# subir-original-drive: subida masiva del histórico a Drive desde un script
+# local (facturas-conocimiento/carga2/scripts/subir_drive.mjs), sin usuario ni
+# JWT. Autenticación real: cabecera x-subida-token == SUBIDA_DRIVE_TOKEN
+# (tiempo constante, FALLA CERRADO -> 503 si falta). No escribe en la BD.
+[functions.subir-original-drive]
+verify_jwt = false
+
 # clasificar-productos: la llama el cron «clasificar-productos» por pg_net (sin
 # JWT) con la cabecera x-ocr-secret == OCR_TRABAJOS_SECRET (mismo secreto y
 # mismo valor de Vault que ocr-trabajo), y el botón de Facturas › Productos con
