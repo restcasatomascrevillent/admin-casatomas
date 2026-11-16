@@ -7,7 +7,8 @@
 // tiene que poder hacerse con el teclado). Las etiquetas las pone la web en
 // cada idioma; aquí solo se elige el tipo.
 //
-// «Échale un vistazo» solo se ofrece con un plato de la carta enlazado, y
+// «Échale un vistazo» solo se ofrece con un plato de la carta enlazado (al
+// enlazarlo se añade solo, si cabe), y
 // «Ver menú» abre el editor del menú de la novedad. Las reglas y el payload
 // están en src/lib/menu-novedad.ts.
 // ---------------------------------------------------------------------------
@@ -113,6 +114,13 @@ export function BloqueBotonesNovedad({
     if (lleno || botones.includes(tipo)) return;
     onBotonesChange([...botones, tipo]);
     setEnfocar([`fila-${tipo}`]);
+  };
+
+  // Enlazar un plato pone ya «Échale un vistazo» (si cabe): antes había que
+  // añadirlo aparte y, si se olvidaba, se guardaba sin botón ni enlace.
+  const enlazarPlato = (id: string) => {
+    onPlatoChange(id);
+    if (!tieneVerPlato && !lleno) onBotonesChange([...botones, "ver_plato"]);
   };
 
   const quitar = (tipo: TipoBoton) => {
@@ -265,7 +273,7 @@ export function BloqueBotonesNovedad({
           </div>
           {disponibles.includes("ver_plato") && !platoId && (
             <p id="nov-botones-ayuda-plato" className="text-xs text-muted-foreground">
-              «Échale un vistazo» se puede añadir cuando enlaces un plato de la carta aquí debajo.
+              «Échale un vistazo» se añade solo al enlazar un plato de la carta aquí debajo.
             </p>
           )}
         </div>
@@ -319,7 +327,7 @@ export function BloqueBotonesNovedad({
                 <SelectorPlato
                   platos={platosEnCarta}
                   cargando={cargandoPlatos}
-                  onElegir={(elegido) => onPlatoChange(elegido.id)}
+                  onElegir={(elegido) => enlazarPlato(elegido.id)}
                   etiqueta="Cambiar plato"
                   textoSinResultados="Ningún plato de la carta coincide."
                 />
@@ -340,7 +348,7 @@ export function BloqueBotonesNovedad({
             <SelectorPlato
               platos={platosEnCarta}
               cargando={cargandoPlatos}
-              onElegir={(elegido) => onPlatoChange(elegido.id)}
+              onElegir={(elegido) => enlazarPlato(elegido.id)}
               etiqueta="Enlazar un plato"
               textoSinResultados="Ningún plato de la carta coincide."
               disabled={!!errorPlatos}
