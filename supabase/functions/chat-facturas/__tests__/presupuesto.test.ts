@@ -146,15 +146,33 @@ describe("procesarPresupuesto (turno de adjuntar)", () => {
     expect(llamadas.filter((c) => String(c[0]).endsWith("/embeddings"))).toHaveLength(1);
   });
 
-  it("CSV: se lee como texto; Excel sin lector: se rechaza con un mensaje", async () => {
-    const f = openaiFalso(LECTURA);
-    const sb = supabaseFalso();
-    const csv = btoa("producto;precio\nGamba;42");
-    const ok = await procesarPresupuesto({ ...base, supabase: sb.cliente, fetchImpl: f, adjunto: { nombre: "t.csv", mime: "text/csv", base64: csv } });
+  it("CSV: lectura determinista; la IA solo confirma las candidatas; Excel sin lector: se rechaza", async () => {
+    const f = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({ parejas: [{ id: 0, opcion: 1, decision: "mismo_formato", motivo: "" }] }) } }],
+      usage: { prompt_tokens: 50, completion_tokens: 10 },
+    }), { status: 200 })) as unknown as typeof fetch;
+    const insertado: Array<Record<string, unknown>> = [];
+    const cliente = {
+      rpc: vi.fn(async () => ({ data: [{ n: "GAMBA ROJA HUELVA", p: 5, c: "Gamba roja" }], error: null })),
+      from: vi.fn(() => ({
+        delete: () => ({ lt: async () => ({}) }),
+        insert: (fila: Record<string, unknown>) => { insertado.push(fila); return { select: () => ({ single: async () => ({ data: { id: ID }, error: null }) }) }; },
+      })),
+    };
+    const csv = btoa("producto;precio\nGamba roja Huelva;42,5\nTornillos;0,10");
+    const ok = await procesarPresupuesto({ ...base, supabase: cliente, fetchImpl: f, adjunto: { nombre: "t.csv", mime: "text/csv", base64: csv } });
     expect(ok.success).toBe(true);
-    const cuerpo = (f as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][1] as { body: string };
-    expect(cuerpo.body).toMatch(/Gamba;42/);
-    const sinLector = await procesarPresupuesto({ ...base, supabase: sb.cliente, fetchImpl: f, adjunto: { nombre: "t.xlsx", mime: "", base64: csv } });
+    // UNA llamada (un lote) y solo con la candidata, no con toda la hoja.
+    expect(f).toHaveBeenCalledTimes(1);
+    const cuerpo = String(((f as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][1] as { body: string }).body);
+    expect(cuerpo).toMatch(/Gamba roja Huelva/);
+    expect(cuerpo).not.toMatch(/Tornillos/);
+    expect(cliente.rpc).toHaveBeenCalledWith("nombres_compras_agente");
+    expect(insertado[0]).toMatchObject({ lineas_sin_compra: 1, proveedor: null });
+    expect(insertado[0].lineas).toMatchObject([{ producto_id: 5, confianza: "alta" }]);
+    expect(ok.respuesta).toMatch(/¿De qué proveedor es y te aplica algún descuento\?/);
+    expect(ok.respuesta).toMatch(/1 son artículos que no compras|otros 1 son/);
+    const sinLector = await procesarPresupuesto({ ...base, supabase: cliente, fetchImpl: f, adjunto: { nombre: "t.xlsx", mime: "", base64: csv } });
     expect(sinLector.success).toBe(false);
   });
 
@@ -188,12 +206,13 @@ describe("comparar_presupuesto (herramienta)", () => {
   it("esta en TOOLS con descuento explicito y sin id (lo pone el servidor)", () => {
     const t = TOOLS.find((x) => x.function.name === "comparar_presupuesto")!.function;
     const props = (t.parameters as { properties: Record<string, unknown> }).properties;
-    expect(Object.keys(props)).toEqual(["descuento_tipo", "descuento_valor"]);
+    expect(Object.keys(props)).toEqual(["descuento_tipo", "descuento_valor", "proveedor"]);
   });
 
   it("porcentaje, importe y ninguno van a la RPC con el id del servidor", () => {
     const pct = llamadaPresupuesto({ descuento_tipo: "porcentaje", descuento_valor: 5 }, ID);
-    expect(pct).toMatchObject({ tipo: "rpc", rpc: "comparar_presupuesto_agente", params: { p_presupuesto_id: ID, p_descuento_pct: 5, p_descuento_importe: null } });
+    expect(pct).toMatchObject({ tipo: "rpc", rpc: "comparar_presupuesto_agente", params: { p_presupuesto_id: ID, p_descuento_pct: 5, p_descuento_importe: null, p_proveedor: null } });
+    expect(llamadaPresupuesto({ descuento_tipo: "porcentaje", descuento_valor: 5, proveedor: " Disbeya " }, ID).params).toMatchObject({ p_proveedor: "Disbeya" });
     const imp = llamadaPresupuesto({ descuento_tipo: "importe", descuento_valor: 120 }, ID);
     expect(imp).toMatchObject({ params: { p_descuento_pct: null, p_descuento_importe: 120 } });
     const nin = llamadaPresupuesto({ descuento_tipo: "ninguno", descuento_valor: null }, ID);
