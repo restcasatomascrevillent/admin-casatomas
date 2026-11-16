@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.35.0] - 2026-11-16
+
+Objetivo: Quién canceló cada reserva y canceladas a la vista en la Lista
+
+### Añadido
+- Reservas: quién canceló cada reserva y canceladas a la vista en la Lista ([#228](https://github.com/restcasatomascrevillent/admin-casatomas/pull/228))
+
 ## [1.33.1] - 2026-11-16
 
 Objetivo: El check «Candidata en preview» de las releases encuentra la preview de Vercel
