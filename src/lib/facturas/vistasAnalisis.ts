@@ -13,7 +13,7 @@
 import type { CambioPrecio, DecisionFacturas } from "./decision";
 import type { IdModulo } from "./widgetsTablero";
 
-export type IdVista = "decidir" | "precios" | "ahorro" | "gasto" | "proveedores" | "revisar";
+export type IdVista = "decidir" | "precios" | "ahorro" | "gasto" | "proveedores" | "revisar" | "informe";
 
 export const VISTAS: { id: IdVista; etiqueta: string }[] = [
   { id: "decidir", etiqueta: "Qué decidir hoy" },
@@ -22,6 +22,8 @@ export const VISTAS: { id: IdVista; etiqueta: string }[] = [
   { id: "gasto", etiqueta: "Gasto" },
   { id: "proveedores", etiqueta: "Proveedores" },
   { id: "revisar", etiqueta: "Por revisar" },
+  // Informe fijo (16/11/2026): subidas frente a hace 3, 6 y 12 meses y proveedor más barato, con confianza.
+  { id: "informe", etiqueta: "Subidas y proveedor" },
 ];
 
 export const VISTA_POR_DEFECTO: IdVista = "decidir";
