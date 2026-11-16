@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- ROLLBACK de 20261127100000_fallos_internos_telegram: quita triggers, funciones, cron y la
+-- ROLLBACK de 20261127100100_fallos_internos_telegram: quita triggers, funciones, cron y la
 -- tabla de fallos, y deja la tabla de envíos como en 20261126001000.
 -- avisos_telegram_disparar sigue aceptando 'fallos' pero lo haría fallar (falta la tabla): para volver a la
 -- versión anterior reaplica su definición de supabase/migrations/20261126001000_avisos_telegram.sql (sección 3).
