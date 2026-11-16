@@ -9,6 +9,7 @@ import type { VideoPlato } from "./useVideoPlato";
 import { ACEPTA_VIDEO } from "./lecturaVideo";
 import { accionCambioFondo, MENSAJE_SIN_ORIGINAL, temaDeVideoUrl, temaMarcado, type EstadoOriginal } from "./originalVideo";
 import { buscarOriginalVideo } from "./subirVideoPlato";
+import { AVISO_FOTO_NUEVA_QUITA_VIDEO } from "./fotoNuevaQuitaVideo";
 
 interface Props {
   video: VideoPlato;
@@ -20,6 +21,8 @@ interface Props {
   temaFoto: NombreTema;
   /** true si en este formulario se está cambiando la foto/fondo. */
   fondoCambiado?: boolean;
+  /** true si al guardar se quitará el vídeo porque se ha puesto una foto nueva. */
+  seQuitaPorFoto?: boolean;
   /** Avisa del fondo marcado para el vídeo. */
   onTemaChange?: (tema: NombreTema) => void;
 }
@@ -29,7 +32,7 @@ interface Props {
  * primeros 4 s, se quita el fondo en el navegador y se compone sobre el fondo
  * elegido. Se sube al pulsar «Guardar» del formulario.
  */
-export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaFoto, fondoCambiado, onTemaChange }: Props) {
+export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaFoto, fondoCambiado, seQuitaPorFoto, onTemaChange }: Props) {
   const grabarRef = useRef<HTMLInputElement>(null);
   const elegirRef = useRef<HTMLInputElement>(null);
   // Fondo que ha tocado el usuario (null = no ha tocado: se marca el fondo real del vídeo).
@@ -161,7 +164,11 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
                 muted
                 playsInline
               />
-              {fondoCambiado && (
+              {seQuitaPorFoto ? (
+                <p role="status" className="rounded-md bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                  {AVISO_FOTO_NUEVA_QUITA_VIDEO}
+                </p>
+              ) : fondoCambiado && (
                 <p className="text-xs text-amber-700 dark:text-amber-400">
                   El vídeo mantiene su fondo; para cambiarlo, toca abajo el fondo que quieras y pulsa «Cambiar fondo del vídeo».
                 </p>

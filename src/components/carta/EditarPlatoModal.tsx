@@ -60,6 +60,7 @@ import { useVideoPlato } from "./video/useVideoPlato";
 import { SeccionVideoPlato } from "./video/SeccionVideoPlato";
 import { ErrorMigracionVideo } from "./video/subirVideoPlato";
 import { columnaVideoDisponible } from "./video/videoPlato";
+import { fotoNuevaQuitaVideo, MENSAJE_VIDEO_QUITADO_POR_FOTO } from "./video/fotoNuevaQuitaVideo";
 import {
   ALERGENOS_OFICIALES,
   SIN_ALERGENOS_DECLARADOS,
@@ -143,6 +144,8 @@ export function EditarPlatoModal({
   const imageFile = fotoCarta.original;
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
+  // Se ha elegido un fichero de foto NUEVO (no solo otro fondo para la misma).
+  const [fotoNueva, setFotoNueva] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -215,6 +218,7 @@ export function EditarPlatoModal({
 
     limpiarFoto();
     limpiarVideo();
+    setFotoNueva(false);
     setImagePreview(plato.imagen_url ?? null);
     setRemoveImage(false);
     if (fileInputRef.current) {
@@ -260,6 +264,15 @@ export function EditarPlatoModal({
     );
   };
 
+  // Foto nueva sobre un plato con vídeo antiguo: al guardar, el vídeo se quita.
+  const seQuitaVideoPorFoto =
+    !videoPlato.quitar &&
+    fotoNuevaQuitaVideo({
+      fotoNueva: !!imageFile && fotoNueva,
+      urlVideo: plato?.video_url,
+      videoEnCamino: videoPlato.videoEnCamino,
+    });
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
 
   /** Foto elegida o pegada («Pegar foto recortada»): si ya viene sin fondo, no se pasa el modelo. */
@@ -268,12 +281,14 @@ export function EditarPlatoModal({
     if (!file) return;
 
     fotoCarta.iniciar(file);
+    setFotoNueva(true);
     setRemoveImage(false);
     setImagePreview(null);
   };
 
   const clearImage = () => {
     limpiarFoto();
+    setFotoNueva(false);
     setImagePreview(null);
     setRemoveImage(true);
     if (fileInputRef.current) {
@@ -352,7 +367,11 @@ export function EditarPlatoModal({
       // Vídeo: aparte, para que un fallo (p. ej. migración sin aplicar) no
       // impida guardar el plato.
       try {
-        if (await videoPlato.guardar(plato.id, plato.video_url)) refrescarPlatos?.();
+        const quitadoPorFoto = seQuitaVideoPorFoto;
+        if (await videoPlato.guardar(plato.id, plato.video_url, plato.nombre, { fotoNueva: !!imageFile && fotoNueva })) {
+          refrescarPlatos?.();
+          if (quitadoPorFoto) toast.info(MENSAJE_VIDEO_QUITADO_POR_FOTO);
+        }
       } catch (errorVideo) {
         console.error("Error guardando el vídeo del plato:", errorVideo);
         toast.error(
@@ -698,6 +717,7 @@ export function EditarPlatoModal({
                         id={plato?.id}
                         url={removeImage ? null : plato?.imagen_url}
                         onIniciado={() => {
+                          setFotoNueva(false);
                           setRemoveImage(false);
                           setImagePreview(null);
                         }}
@@ -730,6 +750,7 @@ export function EditarPlatoModal({
                   columnaDisponible={columnaVideoDisponible(plato ? [plato] : null)}
                   temaFoto={fotoCarta.tema}
                   fondoCambiado={!!fotoCarta.original}
+                  seQuitaPorFoto={seQuitaVideoPorFoto}
                 />
               </div>
             </details>
