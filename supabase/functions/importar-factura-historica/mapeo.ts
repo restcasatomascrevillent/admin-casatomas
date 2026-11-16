@@ -292,16 +292,23 @@ const nombreNorm = (n: unknown) =>
  * Duplicado por importe: misma fecha, mismo proveedor (CIF; si no hay, nombre)
  * y mismo total (±1 céntimo). Devuelve la candidata que coincide o null.
  */
-export function mismaFacturaPorImporte<F extends { cif?: string | null; proveedor?: string | null; total?: number | string | null; fecha?: string | null }>(
-  nueva: { cif: string | null; proveedor: string | null; total: number | null; fecha: string },
+export function mismaFacturaPorImporte<F extends { cif?: string | null; proveedor?: string | null; total?: number | string | null; fecha?: string | null; numero_documento?: string | null }>(
+  nueva: { cif: string | null; proveedor: string | null; total: number | null; fecha: string; numero_documento?: string | null },
   candidatas: F[],
 ): F | null {
   if (nueva.total === null) return null;
   const cif = cifNorm(nueva.cif);
   const nombre = nombreNorm(nueva.proveedor);
+  // Número sin espacios, puntos, comas ni guiones: «A26/10,685» = «A26/10685».
+  const num = (n: string | null | undefined) => (n ?? "").toUpperCase().replace(/[\s.,-]/g, "");
+  const numNueva = num(nueva.numero_documento);
   for (const f of candidatas) {
     if (f.fecha !== nueva.fecha) continue;
     if (f.total === null || f.total === undefined || Math.abs(Number(f.total) - nueva.total) > 0.01) continue;
+    // Dos facturas con NÚMEROS distintos no son la misma aunque coincidan fecha y total
+    // (alquiler 10-26 y 11-26 del mismo día y el mismo importe, 15/11/2026).
+    const numOtra = num(f.numero_documento);
+    if (numNueva && numOtra && numNueva !== numOtra) continue;
     const mismoProveedor = cif ? cifNorm(f.cif) === cif : !!nombre && nombreNorm(f.proveedor) === nombre;
     if (mismoProveedor) return f;
   }
