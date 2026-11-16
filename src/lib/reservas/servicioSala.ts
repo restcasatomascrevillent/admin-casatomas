@@ -272,7 +272,7 @@ export interface ReservaServicio {
   llegada_at?: string | null;
   /** Lo que escribió el cliente (alergias, trona, celebración…): Hoy lo enseña en la tarjeta y en la mesa. */
   notas_cliente?: string | null;
-  /** «Quién canceló» (20261205100000): 'cliente' | 'restaurante' | null. Solo lo lee la Lista. */
+  /** «Quién canceló» (20261205100200): 'cliente' | 'restaurante' | null. Solo lo lee la Lista. */
   cancelada_por?: string | null;
   cancelada_at?: string | null;
   /** «Fijar mesa» (20261107120000): los recálculos no la mueven ni se le quita al sentar a otro. */

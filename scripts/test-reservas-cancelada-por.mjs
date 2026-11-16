@@ -3,7 +3,7 @@
 //
 //   npm run test:cancelada-por:db
 //
-// Aplica la migración REAL 20261205100000 dos veces (idempotente) y demuestra:
+// Aplica la migración REAL 20261205100200 dos veces (idempotente) y demuestra:
 //   · lo que ya estaba cancelado queda sin autor ni hora («no consta»);
 //   · un usuario del panel que cancela → 'restaurante', aunque intente decir 'cliente';
 //   · la clave de servicio (web, correo, bot) → 'cliente', lo diga o no;
@@ -18,8 +18,8 @@ import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 
 const AVISOS = await readFile("supabase/migrations/20261122160000_avisos_reservas_nuevas_canceladas.sql", "utf8");
-const MIGRACION = await readFile("supabase/migrations/20261205100000_reservas_cancelada_por.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261205100000_reservas_cancelada_por_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261205100200_reservas_cancelada_por.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261205100200_reservas_cancelada_por_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
