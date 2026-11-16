@@ -52,6 +52,7 @@ import { useDecisionFacturas } from "@/hooks/useDecisionFacturas";
 import { detalleAhorro, resumenDecision } from "@/lib/facturas/decision";
 import { resumenCortoAlerta, tituloCortoAlerta } from "@/lib/facturas/alertas";
 import { VISTAS, type IdVista } from "@/lib/facturas/vistasAnalisis";
+import { InformeSubidasProveedor } from "./InformeSubidasProveedor";
 import { FamiliasFrenteMedia } from "./Decision";
 import { ProveedoresTop } from "./GraficasPrincipales";
 import { AbonosPorProveedor, CasaTomasYTouza, GastoPorFamilia, GastosFijos, LoQueMasHaSubido } from "./TarjetasDetalle";
@@ -751,6 +752,9 @@ export function TableroCompras({
           {dec && <AvisosPorRevisar decision={dec} pendiente={pendiente} />}
         </div>
       );
+      break;
+    case "informe":
+      contenido = <InformeSubidasProveedor local={local} onIrA={onIrA} />;
       break;
   }
 

@@ -66,7 +66,14 @@ export const LIMITES: Record<string, number> = {
   /** Avisos por tipo de alertas_precio: pocos si van todos los tipos, mas si se pide uno. */
   alertas_precio: 4,
   alertas_precio_tipo: 12,
+  /** Filas del informe «Subidas y proveedor» (la RPC da el total y marca `truncado`). */
+  informe_precios: 8,
 };
+
+/** Tipos de alertas_precio que salen de los avisos de Analisis (alertas_precio_agente). */
+const TIPOS_ALERTA = ["sube", "baja", "mejor", "proveedor", "pactado", "familia", "otros"];
+/** Tipos de alertas_precio que salen del informe fijo (informe_subidas_precio / informe_proveedor_mas_barato). */
+const TIPOS_INFORME_PRECIOS = ["subidas_anuales", "proveedor_barato"];
 
 /** Fecha de hoy en Europe/Madrid. El modelo la necesita para resolver "este mes". */
 export function hoyMadrid(): string {
@@ -297,10 +304,11 @@ export const TOOLS = [
       solo_problemas: { type: ["boolean", "null"] },
     }),
   fn("alertas_precio",
-    "Avisos de Analisis: sube (por €/mes), baja, mejor (mas barato en otro proveedor), proveedor, pactado, " +
-    "familia (gasto sobre su media), otros. 'que tengo que mirar', 'donde ahorro'.",
+    "Avisos de Analisis: sube (€/mes), baja, mejor (otro proveedor mas barato), proveedor, pactado, " +
+    "familia (gasto sobre su media), otros. 'que mirar', 'donde ahorro'. " +
+    "Al año: subidas_anuales, proveedor_barato.",
     {
-      tipo: { type: ["string", "null"], enum: ["sube", "baja", "mejor", "proveedor", "pactado", "familia", "otros", null] },
+      tipo: { type: ["string", "null"], enum: [...TIPOS_ALERTA, ...TIPOS_INFORME_PRECIOS, null] },
       producto: { type: ["string", "null"] },
       local: { type: ["string", "null"], enum: ["casa_tomas", "touza", null] },
       desde: FECHA_HIST,
@@ -1025,10 +1033,29 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
     case "alertas_precio": {
       const { desde, hasta } = rangoOpcional(args);
       const tipo = texto(args.tipo);
-      if (tipo && !["sube", "baja", "mejor", "proveedor", "pactado", "familia", "otros"].includes(tipo)) {
-        throw new Error('El parametro "tipo" debe ser sube, baja, mejor, proveedor, pactado, familia, otros o null.');
+      if (tipo && !TIPOS_ALERTA.includes(tipo) && !TIPOS_INFORME_PRECIOS.includes(tipo)) {
+        throw new Error('El parametro "tipo" debe ser sube, baja, mejor, proveedor, pactado, familia, otros, subidas_anuales, proveedor_barato o null.');
       }
       const local = texto(args.local);
+      // Informe fijo «Subidas y proveedor» (20261207110000): las MISMAS RPC que la pantalla de
+      // Analisis, en su version corta. Totales solo con confianza alta y media.
+      if (tipo === "subidas_anuales" || tipo === "proveedor_barato") {
+        const comunes = {
+          p_proveedor_id: null,
+          p_familia_id: null,
+          p_local: local === "casa_tomas" || local === "touza" ? local : null,
+          p_limite: LIMITES.informe_precios,
+          p_desde: 0,
+          p_compacto: true,
+        };
+        return {
+          tipo: "rpc",
+          rpc: tipo === "subidas_anuales" ? "informe_subidas_precio" : "informe_proveedor_mas_barato",
+          params: tipo === "subidas_anuales" ? { p_meses: 12, ...comunes } : comunes,
+          limite: null,
+          maxChars: 9_000,
+        };
+      }
       return {
         tipo: "rpc",
         rpc: "alertas_precio_agente",
