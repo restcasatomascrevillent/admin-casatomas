@@ -321,6 +321,15 @@ describe("mismaFacturaPorImporte", () => {
     expect(mismaFacturaPorImporte(n, [{ cif: null, proveedor: "MARISCOS EJEMPLO", total: "370.83", fecha: "2026-03-14" }])).not.toBeNull();
     expect(mismaFacturaPorImporte(n, [{ cif: null, proveedor: "OTRO", total: 370.83, fecha: "2026-03-14" }])).toBeNull();
   });
+  it("números distintos con misma fecha y total → no es la misma (alquiler 10-26 y 11-26)", () => {
+    const alquiler = { cif: "21411858P", proveedor: "SALVADOR MAS MAS", total: 1122, fecha: "2026-11-01", numero_documento: "11-26" };
+    expect(mismaFacturaPorImporte(alquiler, [{ cif: "21411858P", total: 1122, fecha: "2026-11-01", numero_documento: "10-26" }])).toBeNull();
+  });
+  it("el mismo número escrito distinto, o sin número, sigue siendo duplicada", () => {
+    const n = { ...nueva, numero_documento: "A26/10,685" };
+    expect(mismaFacturaPorImporte(n, [{ cif: "B06805246", total: 370.83, fecha: "2026-03-14", numero_documento: "A26/10685" }])).not.toBeNull();
+    expect(mismaFacturaPorImporte(n, [{ cif: "B06805246", total: 370.83, fecha: "2026-03-14", numero_documento: null }])).not.toBeNull();
+  });
   it("sin total no se decide nada", () => {
     expect(mismaFacturaPorImporte({ ...nueva, total: null }, [{ cif: "B06805246", total: null, fecha: "2026-03-14" }])).toBeNull();
   });
