@@ -333,12 +333,29 @@ export function avisoFechaFueraDeAnio(fecha: string | null, hoy: Date = new Date
 }
 
 const ES_CAJA = /^(caja|cajas|cj|cja|pack|fardo|estuche|bandeja)$/i;
+// Unidades por caja escritas en el nombre: «C6», «C/12», «C.x06», «CAJA 04 BT», «24x33cl», «* 24»,
+// «24 uds», «P6», «contiene 24», «(total 800 g)», «2500 neto». Un volumen o un peso solo («33cl»,
+// «500 g») NO dice cuántas trae la caja; a partir de 1 kg o 1 l se da por contenido de la caja
+// («CAJA 10 KG», «TOMATE 5 KG»). Misma frontera que contenido_linea (20261207300000).
 const UNIDADES_EN_NOMBRE =
-  /(\b(c|cj|caja)\s*[/.]?\s*\d+\b)|(\b\d+\s*[x*]\s*\d)|([x*]\s*\d+\b)|(\b\d+\s*(u|ud|uds|unid|unidades|botellas?|latas?|bot|bt)\b)|(\b\d+([.,]\d+)?\s*(kg|kgs|g|gr|grs|l|lt|lts|cl|ml)\b)/i;
+  /(\b(c|cj|caja|bandeja|pack)\s*[/.]?\s*x?\s*\d+(bs?|bt|u)?\b)|(\b\d+\s*[x*]\s*\d)|([x*]\s*\d+\b)|(\b\d+\s*(u|ud|uds|unid|unidades|botellas?|latas?|bot|bt)\b)|(\bp\d{1,2}\b)|(\bcontiene\s+\d+)|(\btotal\s+\d)|(\d\s*netos?\b)/i;
+const MEDIDA_EN_NOMBRE = /\b(\d+(?:[.,]\d+)?)\s*(kgs?|k|kilos?|grs?|g|litros?|lts?|lt|l|cl|ml)\b/gi;
+
+/** El nombre trae el contenido de la caja entera: 1 kg o 1 l como mínimo (200 «cl» o más son mililitros). */
+function contenidoDeCajaEnNombre(nombre: string): boolean {
+  for (const m of nombre.matchAll(MEDIDA_EN_NOMBRE)) {
+    const n = Number(m[1].replace(",", "."));
+    const u = m[2].toLowerCase();
+    const base = /^(kgs?|k|kilos?|litros?|lts?|lt|l)$/.test(u) ? n : u === "cl" ? (n >= 200 ? n / 1000 : n / 100) : n / 1000;
+    if (base >= 1) return true;
+  }
+  return false;
+}
 
 /** Líneas facturadas por caja sin decir cuántas unidades trae la caja. */
 export function avisoCajasSinUnidades(productos: { nombre: string; unidad: string | null; bultos?: number | null }[]): AvisoRegla | null {
-  const sin = productos.filter((p) => ES_CAJA.test(String(p.unidad ?? "").trim()) && !UNIDADES_EN_NOMBRE.test(p.nombre));
+  const sin = productos.filter((p) =>
+    ES_CAJA.test(String(p.unidad ?? "").trim()) && !UNIDADES_EN_NOMBRE.test(p.nombre) && !contenidoDeCajaEnNombre(p.nombre));
   if (sin.length === 0) return null;
   return {
     codigo: "caja_sin_unidades",
