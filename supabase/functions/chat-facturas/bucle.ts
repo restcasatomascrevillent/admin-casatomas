@@ -601,7 +601,10 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
     const p = o.presupuesto;
     aviso.push(
       `PRESUPUESTO adjunto: «${p.archivo ?? "presupuesto"}»${p.proveedor ? ` de ${p.proveedor}` : ""}, ${p.lineas} lineas. ` +
-      "Ya se pregunto por el descuento: si el mensaje del usuario lo contesta, llama a comparar_presupuesto.",
+      (p.proveedor
+        ? "Ya se pregunto por el descuento: si el mensaje del usuario lo contesta, llama a comparar_presupuesto."
+        : "El fichero no dice el proveedor: ya se pregunto por el proveedor y el descuento; si el mensaje lo contesta, " +
+          "llama a comparar_presupuesto con el proveedor que diga (null si no lo dice)."),
     );
   }
 

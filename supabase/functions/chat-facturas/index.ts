@@ -5,7 +5,8 @@ import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { configModeloFuncion } from "../_shared/modelo-funcion.ts";
 import { modeloChat, parametrosModelo, sinDuplicar } from "./herramientas.ts";
 import { procesarPresupuesto } from "./adjuntar.ts";
-import { textoDeExcel } from "./excel.ts";
+import { filasDeExcel } from "./excel.ts";
+import { MODELO_CONFIRMAR } from "./hoja.ts";
 import { ejecutarConversacion, MAX_MENSAJES_HISTORIAL, type Traza, type TurnoHistorial } from "./bucle.ts";
 import { contextoDeAdjuntos, trazaParaPanel } from "./hilo.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion, registrarHerramientaChat } from "../_shared/audit-client.ts";
@@ -122,6 +123,8 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
     // reintenta UNA vez con el de respaldo; su gasto va en otro acumulador.
     const usosChat: AcumuladorUso[] = [usoChat];
     const usoEmbed = new AcumuladorUso("chat-facturas", "text-embedding-3-small", "embedding");
+    // Confirmación de parejas de una tarifa (hoja.ts, modelo fijo y rápido).
+    const usoConfirmar = new AcumuladorUso("chat-facturas", MODELO_CONFIRMAR, "chat");
     const inicioMs = Date.now();
 
     try {
@@ -147,9 +150,10 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
           clave: OPENAI_KEY,
           modelo,
           parametros: parametrosModelo(modelo, 6_000),
-          textoDeExcel,
+          filasDeExcel,
           alUsarChat: (u) => usoChat.sumar(u as never),
           alUsarEmbed: (u) => usoEmbed.sumar(u as never),
+          alUsarConfirmar: (u) => usoConfirmar.sumar(u as never),
         });
         return json({ ...r, modelo, traza: { herramientas: [] } }, 200);
       }
@@ -159,7 +163,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       if (typeof session_id === "string" && session_id) {
         const { data: pres } = await supabase
           .from("chat_presupuestos")
-          .select("id, proveedor, nombre_archivo, lineas")
+          .select("id, proveedor, nombre_archivo, lineas, lineas_sin_compra")
           .eq("session_id", session_id)
           .order("creado_en", { ascending: false })
           .limit(1)
@@ -169,7 +173,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
             id: pres.id,
             proveedor: pres.proveedor ?? null,
             archivo: pres.nombre_archivo ?? null,
-            lineas: Array.isArray(pres.lineas) ? pres.lineas.length : 0,
+            lineas: (Array.isArray(pres.lineas) ? pres.lineas.length : 0) + (Number(pres.lineas_sin_compra) || 0),
           };
         }
       }
@@ -264,7 +268,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       // lanza (ver _shared/registrar-uso-ia.ts), asi que no puede convertir una
       // respuesta buena en un 500. Se reutiliza el cliente de service role que
       // ya existe en lugar de crear otro.
-      await registrarUso([...usosChat, usoEmbed], {
+      await registrarUso([...usosChat, usoEmbed, usoConfirmar], {
         disparador: `usuario:${user.id}`,
         duracionMs: Date.now() - inicioMs,
         cliente: supabase,
