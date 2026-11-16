@@ -10,6 +10,7 @@ import {
   type ConfigMargenes,
   type UnidadEscandallo,
 } from "@/lib/analisis/margenesCarta";
+import { normalizarCandidatos, normalizarCosteVinos } from "@/lib/analisis/costeVinos";
 
 async function rpc(funcion: string, args?: Record<string, unknown>) {
   const llamar = supabase.rpc as unknown as (
@@ -102,4 +103,37 @@ export function useEdicionMargenes() {
     onSuccess: refrescar,
   });
   return { escandallo, vino, revisado, config };
+}
+
+// ─── «Coste vinos» (migración 20261207150000_coste_carta_vinos) ─────────────
+// La clave cuelga de CLAVE_MARGENES: guardar un enlace (useEdicionMargenes) la refresca sola.
+export function useCosteCartaVinos(meses: number | null, activo = true) {
+  return useQuery({
+    queryKey: [...CLAVE_MARGENES, "coste-vinos", meses],
+    enabled: activo,
+    staleTime: 5 * 60_000,
+    retry: 1,
+    queryFn: async () => normalizarCosteVinos(await rpcVinos("vinos_coste_carta", { p_hoy: null, p_meses: meses })),
+  });
+}
+
+/** Productos del catálogo que se parecen al vino (con su última compra), para enlazarlo. */
+export function useCandidatosVino(vinoId: string | null) {
+  return useQuery({
+    queryKey: [...CLAVE_MARGENES, "coste-vinos-candidatos", vinoId],
+    enabled: vinoId !== null,
+    staleTime: 60_000,
+    queryFn: async () => normalizarCandidatos(await rpcVinos("vinos_coste_candidatos", { p_vino_id: vinoId, p_limite: 6 })),
+  });
+}
+
+async function rpcVinos(funcion: string, args: Record<string, unknown>) {
+  try {
+    return await rpc(funcion, args);
+  } catch (e) {
+    if (e instanceof Error && /vinos_coste_/.test(e.message) && /could not find|does not exist|schema cache/i.test(e.message)) {
+      throw new Error("Falta aplicar en Supabase la migración 20261207150000_coste_carta_vinos.");
+    }
+    throw e;
+  }
 }
