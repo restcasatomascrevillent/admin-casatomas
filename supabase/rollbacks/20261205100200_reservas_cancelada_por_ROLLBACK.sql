@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- ROLLBACK de 20261205100000_reservas_cancelada_por.sql. Aplicar a mano SOLO si
+-- ROLLBACK de 20261205100200_reservas_cancelada_por.sql. Aplicar a mano SOLO si
 -- hay que deshacerlo.
 --
 -- BORRA DATOS: se pierde quién y cuándo canceló cada reserva (el estado
