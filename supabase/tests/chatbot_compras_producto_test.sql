@@ -135,7 +135,8 @@ begin
     format('R10: %s', j);
   -- Con embedding (el de la línea del buey de mar, como si el usuario dijera
   -- «bogavante»): solo sugerencias semánticas, nunca sumas.
-  select pf.embedding into v_emb from productos_factura pf where pf.nombre ilike 'Buey de mar%' and pf.embedding is not null limit 1;
+  -- (20261203100000: el vector va por nombre en productos_nombre_embedding)
+  select e.embedding::vector into v_emb from productos_nombre_embedding e where e.nombre ilike 'Buey de mar%' and e.embedding is not null limit 1;
   if v_emb is not null then
     j := compras_producto_agente('bogavante', null, null, null, 10, null, null, v_emb)::jsonb;
     assert j ->> 'coincidencia' = 'semantica' and not j ? 'total'
