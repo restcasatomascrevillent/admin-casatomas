@@ -13,7 +13,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 // GFM: la IA contesta con TABLAS markdown (`| a | b |`) y sin esto salían en crudo (QA 05/11/2026).
 import remarkGfm from "remark-gfm";
-import { ArrowUp, Check, Copy, Crosshair, FileText, LineChart, Pin, PinOff, RefreshCw, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ArrowUp, Check, Paperclip, Copy, Crosshair, FileText, LineChart, Pin, PinOff, RefreshCw, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { COMPONENTES_MARKDOWN_SEGUROS, urlMarkdownSegura } from "@/lib/markdown-seguro";
@@ -22,6 +22,7 @@ import { asuntoDeContexto, graficasDeMensaje, separarContexto, type GraficaIa } 
 import type { DocumentoCitado } from "@/lib/facturas/seriePrecio";
 import { formatFechaEs } from "@/lib/facturas/preguntasRapidas";
 import { enlazarDocumentos } from "@/lib/facturas/enlacesDocumentos";
+import { ACEPTA_PRESUPUESTO } from "@/lib/facturas/presupuestoAdjunto";
 import { BotonOriginal } from "../shared/BotonOriginal";
 import { GraficoSeriePrecio } from "../GraficoSeriePrecio";
 import { desplazarA } from "../analisis/desplazar";
@@ -47,6 +48,8 @@ interface Props {
   /** Preguntas para empezar (sacadas del tablero). */
   sugerencias: string[];
   onEnviar: (texto: string) => void;
+  /** Adjuntar un presupuesto de proveedor: la IA pregunta el descuento y dice qué productos interesan. */
+  onAdjuntar?: (archivo: File) => void;
   onRegenerar?: () => void;
   /** 👍/👎 de una respuesta (chat_feedback). true si quedó guardado. */
   onValorar?: (mensajeId: string, valoracion: 1 | -1, comentario?: string) => Promise<boolean>;
@@ -218,6 +221,7 @@ export function PanelCopiloto({
   isSending,
   sugerencias,
   onEnviar,
+  onAdjuntar,
   onRegenerar,
   onValorar,
   fijadas,
@@ -235,6 +239,7 @@ export function PanelCopiloto({
   const columna = completa ? "mx-auto w-full max-w-[900px] px-4 sm:px-6" : "";
   const hiloRef = useRef<HTMLDivElement>(null);
   const cajaRef = useRef<HTMLTextAreaElement>(null);
+  const archivoRef = useRef<HTMLInputElement>(null);
   const lista: Sugerencia[] = [...sugerencias.map((texto) => ({ texto })), SUGERENCIA_GRAFICA];
   const ultimoAsistente = mensajes.reduce((u, m, i) => (m.rol === "assistant" ? i : u), -1);
 
@@ -352,8 +357,34 @@ export function PanelCopiloto({
             aria-label="Pregunta para el asistente"
             disabled={isSending}
             rows={1}
-            className="max-h-32 min-h-[52px] resize-none rounded-2xl border-0 bg-transparent py-3.5 pl-4 pr-14 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-base"
+            className={cn("max-h-32 min-h-[52px] resize-none rounded-2xl border-0 bg-transparent py-3.5 pr-14 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-base", onAdjuntar ? "pl-12" : "pl-4")}
           />
+          {onAdjuntar && (
+            <>
+              <input
+                ref={archivoRef}
+                type="file"
+                accept={ACEPTA_PRESUPUESTO}
+                className="hidden"
+                data-testid="presupuesto-archivo"
+                onChange={(e) => {
+                  const archivo = e.target.files?.[0];
+                  e.target.value = "";
+                  if (archivo) onAdjuntar(archivo);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => archivoRef.current?.click()}
+                disabled={isSending}
+                aria-label="Adjuntar presupuesto de un proveedor"
+                title="Adjuntar presupuesto (PDF, Excel o foto)"
+                className={cn("absolute bottom-1 left-1 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50", FOCO)}
+              >
+                <Paperclip className="h-4 w-4" aria-hidden />
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={enviar}
