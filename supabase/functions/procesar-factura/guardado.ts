@@ -11,6 +11,7 @@
 import type { OrigenImporte } from "./esquema.ts";
 import type { DatosNormalizados } from "./extraccion.ts";
 import { type ClienteOpenAI, vec } from "./openai.ts";
+import { asegurarVectoresNombres } from "./embeddingsNombres.ts";
 import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes } from "./costeLectura.ts";
 import {
   archivarDesdeStorage,
@@ -220,12 +221,11 @@ function textoEmbedding(d: DatosNormalizados): string {
 
 function filasProductos(
   d: DatosNormalizados,
-  embeddings: number[][],
   conColumnas04b: boolean,
   conBultos = true,
   conIvaPct = true,
 ) {
-  return igualarColumnasValor(filasProductosSinIgualar(d, embeddings, conColumnas04b, conBultos, conIvaPct));
+  return igualarColumnasValor(filasProductosSinIgualar(d, conColumnas04b, conBultos, conIvaPct));
 }
 
 /**
@@ -247,7 +247,6 @@ export function igualarColumnasValor<T extends Record<string, unknown>>(filas: T
 
 function filasProductosSinIgualar(
   d: DatosNormalizados,
-  embeddings: number[][],
   conColumnas04b: boolean,
   conBultos = true,
   conIvaPct = true,
@@ -258,7 +257,8 @@ function filasProductosSinIgualar(
     unidad: p.unidad,
     precio_unitario: p.precio_unitario,
     total: p.total,
-    embedding: embeddings[i] ? vec(embeddings[i]) : null,
+    // Sin `embedding`: desde 20261203100000 el vector va por NOMBRE en
+    // productos_nombre_embedding (asegurarVectoresNombres, tras guardar).
     ...(conColumnas04b ? { pagina: p.pagina ?? 1, orden: p.orden ?? i, albaran_ref: p.albaran_ref ?? null } : {}),
     // Unidades/bultos de una línea guardada por peso (migración
     // 20261005150000). Solo se manda si hay valor: un documento sin líneas al
@@ -506,7 +506,7 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   const facturaId: number = ins.data.id;
 
   try {
-    // 7) Líneas (embeddings en lotes de 100)
+    // 7) Líneas (y el vector de sus nombres nuevos, aparte)
     await insertarLineas(ctx, facturaId, d, conColumnas04b);
 
     // 8) Validación de cordura
@@ -527,15 +527,18 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   }
 }
 
-/** Paso 7: líneas con sus embeddings. Un solo INSERT (todas o ninguna). */
+/**
+ * Paso 7: líneas. Un solo INSERT (todas o ninguna). Después, el vector de los
+ * nombres que aún no lo tienen (uno por nombre, 20261203100000); si falla, no
+ * rompe el guardado: lo completa el cron embeddings-nombres.
+ */
 async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: DatosNormalizados, conColumnas04b: boolean): Promise<void> {
   if (d.productos.length === 0) return;
-  const { supabase, openai } = ctx;
-  const embs = await openai.embed(d.productos.map((p) => p.nombre));
+  const { supabase } = ctx;
   const insertar = (conBultos: boolean, conIvaPct: boolean) =>
     supabase.from("productos_factura")
       .insert(
-        filasProductos(d, embs, conColumnas04b, conBultos, conIvaPct).map((f) => ({ factura_id: facturaId, ...f })),
+        filasProductos(d, conColumnas04b, conBultos, conIvaPct).map((f) => ({ factura_id: facturaId, ...f })),
       );
   // Columnas opcionales que puede faltar por migrar: se quita la que falte
   // y se reintenta (a lo sumo una vez por columna).
@@ -553,6 +556,7 @@ async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: Datos
     ({ error } = await insertar(conBultos, conIvaPct));
   }
   if (error) throw new Error(`insert productos: ${error.message}`);
+  await asegurarVectoresNombres(ctx, d.productos.map((p) => p.nombre));
 }
 
 /** Paso 9: el original a Drive (o copia temporal) y la referencia en la factura. */
@@ -711,7 +715,6 @@ export async function sustituirFactura(
   const d = p.datos;
 
   const [embFactura] = await openai.embed(textoEmbedding(d));
-  const embs = d.productos.length > 0 ? await openai.embed(d.productos.map((x) => x.nombre)) : [];
 
   // El original nuevo se mueve a su carpeta definitiva SOLO si la RPC sale
   // bien: la RPC ya apunta a la ruta definitiva y, si luego no se puede
@@ -749,11 +752,13 @@ export async function sustituirFactura(
       embedding: vec(embFactura),
       paginas: Math.min(20, Math.max(1, p.paginas ?? 1)),
     },
-    p_lineas: filasProductos(d, embs, true),
+    p_lineas: filasProductos(d, true),
     p_esperado: a.esperado,
     p_archivo_path: destino,
   });
   if (error) throw new Error(error.message.replace(/^.*SUSTITUCIÓN ABORTADA: /, "No se ha sustituido nada: "));
+  // Vector de los nombres nuevos (uno por nombre, 20261203100000). No rompe nada si falla.
+  await asegurarVectoresNombres({ supabase, openai }, d.productos.map((x) => x.nombre));
 
   // El original nuevo, a Drive; la RPC ya dejó la factura apuntando a la ruta
   // temporal (y sin drive_url) por si Drive falla.
@@ -825,8 +830,7 @@ export async function anadirPagina(
   const pag = p.pagina;
   const d = p.datos;
 
-  const embs = d.productos.length > 0 ? await openai.embed(d.productos.map((x) => x.nombre)) : [];
-  const lineas = filasProductos({ ...d, productos: d.productos.map((x) => ({ ...x, pagina: pag.actual })) }, embs, true);
+  const lineas = filasProductos({ ...d, productos: d.productos.map((x) => ({ ...x, pagina: pag.actual })) }, true);
   // Igual que al sustituir: si el original de la página ya no está, no se
   // apunta la factura a una ruta vacía.
   const destino = t.original_path && await existeEnStorage(supabase, t.original_path)
@@ -855,6 +859,8 @@ export async function anadirPagina(
     p_archivo_path: destino,
   });
   if (error) throw new Error(error.message.replace(/^.*AÑADIDO ABORTADO: /, "No se ha añadido nada: "));
+  // Vector de los nombres nuevos (uno por nombre, 20261203100000). No rompe nada si falla.
+  await asegurarVectoresNombres({ supabase, openai }, d.productos.map((x) => x.nombre));
 
   // El original de la página, a Drive (misma carpeta proveedor → mes, como
   // «pagN-…»). La RPC solo apunta la factura a la ruta temporal si no tenía
