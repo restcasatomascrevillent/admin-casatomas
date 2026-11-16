@@ -2,6 +2,17 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.36.0] - 2026-11-16
+
+Objetivo: Buscador de platos y botón de las novedades, informe de auditoría sin cortes y fotos de la carta en Drive
+
+### Añadido
+- Carta: fotos de la carta en el árbol de Drive Platos/Vinos ([e9c3240](https://github.com/restcasatomascrevillent/admin-casatomas/commit/e9c3240b346a39d8f7fe2fe697a241d984339b9d))
+
+### Cambiado
+- Novedades: el buscador de platos encuentra lo que se busca y enlazar un plato pone el botón ([#229](https://github.com/restcasatomascrevillent/admin-casatomas/pull/229))
+- Informes: el informe mensual de auditoría ya no se corta por tiempo ([#230](https://github.com/restcasatomascrevillent/admin-casatomas/pull/230))
+
 ## [1.33.1] - 2026-11-16
 
 Objetivo: El check «Candidata en preview» de las releases encuentra la preview de Vercel
