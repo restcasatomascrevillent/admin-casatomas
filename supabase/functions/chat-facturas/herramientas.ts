@@ -130,6 +130,7 @@ REGLAS
 18. «Ultimo mes» = mes natural anterior: di el periodo («octubre de 2026») y si esta incompleto.
 19. Si un resultado trae "como_leer", siguelo.
 20. Vinos por D.O., region o pais («de Rioja», «Ribera», «champan frances», «gallegos»): gasto_por_categoria (botellas/litros: volumen_comprado) con denominacion; nunca la busques en el nombre. Di vino_sin_denominacion.
+21. Presupuesto adjunto (aviso PRESUPUESTO): llama a comparar_presupuesto con lo que el usuario conteste sobre el descuento («ninguno» incluido); si no lo aclara, preguntaselo.
 Formato: español, 1.234,56 €, fechas 15/01/2026. Viñetas o tabla, sin saludos ni relleno. Maximo 6 lineas salvo listados.`;
 }
 
@@ -342,6 +343,13 @@ export const TOOLS = [
       orden_por: { type: ["string", "null"], description: "Una metrica o agrupacion pedida" },
       orden_dir: { type: ["string", "null"], enum: ["desc", "asc", null] },
       limite: { type: ["integer", "null"], description: "Maximo 50" },
+    }),
+  fn("comparar_presupuesto",
+    "Compara el presupuesto adjunto con lo que se compra. Solo con presupuesto adjunto y DESPUES de que el " +
+    "usuario conteste lo del descuento. ninguno = sin descuento; valor = el numero dicho (% o EUR).",
+    {
+      descuento_tipo: { type: "string", enum: ["ninguno", "porcentaje", "importe"] },
+      descuento_valor: { type: ["number", "null"] },
     }),
 ];
 
@@ -826,7 +834,7 @@ function opcionales(p: Record<string, string | null>): Record<string, string> {
  * asociacion de la BD del texto de la herramienta (textoAsociable).
  */
 // deno-lint-ignore no-explicit-any
-export function prepararLlamada(nombre: string, args: any, pregunta?: string, asoc?: Asociacion | null): Llamada {
+export function prepararLlamada(nombre: string, args: any, pregunta?: string, asoc?: Asociacion | null, presupuestoId?: string | null): Llamada {
   args = args ?? {};
   const porVolumen = pidePrecioPorVolumen(pregunta);
   switch (nombre) {
@@ -1127,9 +1135,47 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
     case "consulta_flexible":
       return { tipo: "rpc", rpc: "consulta_flexible_agente", params: { p: construirConsultaFlexible(args) }, limite: null };
 
+    case "comparar_presupuesto":
+      return llamadaPresupuesto(args, presupuestoId);
+
     default:
       throw new Error(`Herramienta desconocida: ${nombre}`);
   }
+}
+
+/** Tope de caracteres del resultado de comparar_presupuesto (una tabla de hasta 40 productos). */
+export const MAX_CHARS_PRESUPUESTO = 14_000;
+
+/**
+ * comparar_presupuesto: el id del presupuesto NO lo manda el modelo (lo pone el
+ * servidor: el de esta conversacion). El descuento tiene que venir EXPLICITO
+ * (ninguno / porcentaje / importe): sin el no se calcula.
+ */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function llamadaPresupuesto(args: any, presupuestoId?: string | null): Llamada {
+  if (!presupuestoId) {
+    throw new Error("Falta el parametro presupuesto: no hay ningun presupuesto adjunto en esta conversacion. Pide al usuario que lo adjunte.");
+  }
+  const tipo = texto(args?.descuento_tipo);
+  const valor = decimal(args?.descuento_valor);
+  if (tipo !== "ninguno" && tipo !== "porcentaje" && tipo !== "importe") {
+    throw new Error('Falta el parametro "descuento_tipo": ninguno, porcentaje o importe. Pregunta al usuario si el proveedor le aplica algun descuento.');
+  }
+  if (tipo !== "ninguno" && (valor === null || valor < 0)) {
+    throw new Error(`Falta el parametro "descuento_valor" (numero positivo) para un descuento de tipo ${tipo}.`);
+  }
+  return {
+    tipo: "rpc",
+    rpc: "comparar_presupuesto_agente",
+    params: {
+      p_presupuesto_id: presupuestoId,
+      p_descuento_pct: tipo === "porcentaje" ? valor : null,
+      p_descuento_importe: tipo === "importe" ? valor : null,
+    },
+    limite: null,
+    maxChars: MAX_CHARS_PRESUPUESTO,
+  };
 }
 
 /**

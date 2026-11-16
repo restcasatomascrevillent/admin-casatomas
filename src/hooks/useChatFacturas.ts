@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { normalizarAdjuntos, type AdjuntoChat } from "@/lib/facturas/seriePrecio";
 import { componerMensaje } from "@/lib/facturas/graficasCopiloto";
+import { archivoABase64, problemaConPresupuesto } from "@/lib/facturas/presupuestoAdjunto";
 
 // ─── Tipos alineados con las tablas reales de Supabase ───────────────────────
 // Tablas: chat_facturas_conversaciones, chat_facturas_mensajes
@@ -360,6 +361,76 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
     }
   }, [conversacionActiva, isSending, mensajes.length, nuevaConversacion, guardarMensaje, actualizarTitulo]);
 
+  // ─── Adjuntar un presupuesto de proveedor (16/11/2026) ───────────────────────
+  // El archivo va en base64 a chat-facturas, que lo lee y SIEMPRE pregunta por
+  // el descuento antes de comparar. No se guarda como factura: solo queda el
+  // mensaje «Presupuesto adjunto» y la respuesta en la conversación.
+  const adjuntarPresupuesto = useCallback(async (archivo: File) => {
+    if (isSending) return;
+    const problema = problemaConPresupuesto(archivo);
+    if (problema) {
+      toast.error("No se puede adjuntar", { description: problema });
+      return;
+    }
+    let conv = conversacionActiva;
+    if (!conv) {
+      conv = await nuevaConversacion();
+      if (!conv) return;
+    }
+    setIsSending(true);
+    const texto = `📎 Presupuesto adjunto: ${archivo.name}`;
+    const savedUserMsg = await guardarMensaje(conv, texto, "user");
+    setMensajes((prev) => [...prev, {
+      id: savedUserMsg?.id ?? crypto.randomUUID(),
+      contenido: texto,
+      rol: "user",
+      conversacion_id: conv.id,
+      created_at: savedUserMsg?.created_at ?? new Date().toISOString(),
+      persistido: !!savedUserMsg,
+    }]);
+    if (mensajes.length === 0) await actualizarTitulo(conv.id, `Presupuesto ${archivo.name}`);
+
+    try {
+      const base64 = await archivoABase64(archivo);
+      const { data, error } = await supabase.functions.invoke("chat-facturas", {
+        body: {
+          mensaje: texto,
+          session_id: conv.session_id,
+          presupuesto: { nombre: archivo.name, mime: archivo.type, base64 },
+        },
+      });
+      if (error) throw new Error(error.message);
+      const respuesta = data?.respuesta || "No he podido leer el presupuesto.";
+      const traza = trazaDeRespuesta(data);
+      const saved = await guardarMensaje(conv, respuesta, "assistant", [], traza);
+      await supabase
+        .from("chat_facturas_conversaciones")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", conv.id);
+      setMensajes((prev) => [...prev, {
+        id: saved?.id ?? crypto.randomUUID(),
+        contenido: respuesta,
+        rol: "assistant",
+        conversacion_id: conv.id,
+        created_at: saved?.created_at ?? new Date().toISOString(),
+        persistido: !!saved,
+        traza,
+      }]);
+    } catch (error) {
+      console.error("Error adjuntando el presupuesto:", error);
+      toast.error("No se pudo leer el presupuesto");
+      setMensajes((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        contenido: "⚠️ No he podido leer el presupuesto. Inténtalo de nuevo o prueba con otro formato.",
+        rol: "assistant",
+        conversacion_id: conv.id,
+        created_at: new Date().toISOString(),
+      }]);
+    } finally {
+      setIsSending(false);
+    }
+  }, [conversacionActiva, isSending, mensajes.length, nuevaConversacion, guardarMensaje, actualizarTitulo]);
+
   // ─── Eliminar conversación ────────────────────────────────────────────────────
   const eliminarConversacion = useCallback(async (convId: string) => {
     // Borrar mensajes de la conversación primero (FK)
@@ -495,6 +566,7 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
     abrirConversacionPorId,
     nuevaConversacion,
     enviarMensaje,
+    adjuntarPresupuesto,
     regenerarRespuesta,
     valorarRespuesta,
     eliminarConversacion,
