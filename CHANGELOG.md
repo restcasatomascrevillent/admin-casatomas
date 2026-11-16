@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.32.1] - 2026-11-16
+
+Objetivo: Una foto nueva en un plato con vídeo quita el vídeo anterior: en la web se ve la foto
+
+### Cambiado
+- Carta: una foto nueva quita el vídeo anterior del plato ([#221](https://github.com/restcasatomascrevillent/admin-casatomas/pull/221))
+
 ## [1.32.0] - 2026-11-14
 
 Objetivo: Fases 1-6 y cierre del 14/11: fotos y recorte en el móvil, PDF de facturas, Qué decidir y márgenes con la última factura, informes, peticiones, Linear, logs, costes, Control del Panel e Instagram

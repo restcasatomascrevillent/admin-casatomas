@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { NombreTema } from "../composicionCarta";
 import type { ProgresoVideo } from "./videoPlato";
 import type { DisponibilidadVideo } from "./procesarVideoPlato";
-import { quitarVideoPlato } from "./subirVideoPlato";
+import { quitarVideoPlato, quitarVideoPorFotoNueva } from "./subirVideoPlato";
 import { estaActivo, trabajoCambioFondo, trabajoDePlato, type TrabajoVideo } from "./colaVideos";
 import { useColaVideos } from "./useColaVideos";
+import { fotoNuevaQuitaVideo } from "./fotoNuevaQuitaVideo";
 
 export type EstadoVideo =
   | { fase: "nada" }
@@ -37,6 +38,8 @@ export function useVideoPlato(plato?: PlatoDelVideo | null) {
   const cola = useColaVideos();
   const [pendiente, setPendiente] = useState<{ archivo: File; tema: NombreTema } | null>(null);
   const [quitar, setQuitar] = useState(false);
+  // En esta ficha se ha elegido un vídeo o se le ha cambiado el fondo.
+  const [tocado, setTocado] = useState(false);
   const [disponible, setDisponible] = useState<DisponibilidadVideo | null>(null);
 
   useEffect(() => {
@@ -68,6 +71,7 @@ export function useVideoPlato(plato?: PlatoDelVideo | null) {
   const generar = useCallback(
     (archivo: File, tema: NombreTema) => {
       setQuitar(false);
+      setTocado(true);
       if (platoId) {
         setPendiente(null);
         encolar({ platoId, nombre: nombrePlato || "plato", archivo, tema, urlActual, guardarOriginal: true });
@@ -88,6 +92,7 @@ export function useVideoPlato(plato?: PlatoDelVideo | null) {
       const n = trabajoCambioFondo({ platoId, nombre: nombrePlato || "plato", tema, urlActual, previo: trabajoListo, original });
       if (!n) return false;
       setQuitar(false);
+      setTocado(true);
       encolar(n);
       return true;
     },
@@ -109,14 +114,28 @@ export function useVideoPlato(plato?: PlatoDelVideo | null) {
   const limpiar = useCallback(() => {
     setPendiente(null);
     setQuitar(false);
+    setTocado(false);
   }, []);
 
   /**
+   * Hay un vídeo posterior a lo guardado: elegido en esta ficha o todavía en
+   * la cola. Con él, una foto nueva NO quita el vídeo (ver fotoNuevaQuitaVideo).
+   */
+  const videoEnCamino = !!pendiente || tocado || (!!trabajo && estaActivo(trabajo));
+
+  /**
    * Al guardar el plato: plato nuevo con vídeo elegido → a la cola (devuelve
-   * false: aún no ha cambiado nada); «Quitar vídeo» → lo borra (true).
+   * false: aún no ha cambiado nada); «Quitar vídeo» → lo borra (true). Con
+   * `fotoNueva` (se acaba de guardar otra foto) y sin vídeo en camino, el
+   * vídeo anterior también se quita: manda lo último que se sube.
    */
   const guardar = useCallback(
-    async (id: string, urlGuardada: string | null | undefined, nombre?: string | null): Promise<boolean> => {
+    async (
+      id: string,
+      urlGuardada: string | null | undefined,
+      nombre?: string | null,
+      opciones?: { fotoNueva?: boolean },
+    ): Promise<boolean> => {
       if (pendiente) {
         encolar({ platoId: id, nombre: nombre || nombrePlato || "plato", archivo: pendiente.archivo, tema: pendiente.tema, urlActual: urlGuardada ?? null, guardarOriginal: true });
         setPendiente(null);
@@ -126,9 +145,12 @@ export function useVideoPlato(plato?: PlatoDelVideo | null) {
         await quitarVideoPlato(id, urlGuardada);
         return true;
       }
+      if (fotoNuevaQuitaVideo({ fotoNueva: !!opciones?.fotoNueva, urlVideo: urlGuardada, videoEnCamino })) {
+        return quitarVideoPorFotoNueva(id, urlGuardada);
+      }
       return false;
     },
-    [pendiente, quitar, encolar, nombrePlato],
+    [pendiente, quitar, encolar, nombrePlato, videoEnCamino],
   );
 
   return useMemo(
@@ -138,6 +160,7 @@ export function useVideoPlato(plato?: PlatoDelVideo | null) {
       disponible,
       quitar,
       setQuitar,
+      videoEnCamino,
       generar,
       cambiarFondo,
       reintentar,
@@ -150,7 +173,7 @@ export function useVideoPlato(plato?: PlatoDelVideo | null) {
       /** Hay algo que hacer al guardar (vídeo pendiente de un plato nuevo o quitar el guardado). */
       pendiente: !!pendiente || quitar,
     }),
-    [platoId, estado, disponible, quitar, generar, cambiarFondo, reintentar, cancelar, limpiar, guardar, pendiente],
+    [platoId, estado, disponible, quitar, videoEnCamino, generar, cambiarFondo, reintentar, cancelar, limpiar, guardar, pendiente],
   );
 }
 

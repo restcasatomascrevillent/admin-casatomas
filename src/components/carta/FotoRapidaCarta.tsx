@@ -43,6 +43,13 @@ interface FotoRapidaCartaProps {
    * desactivada: sin foto no hay nada que expandir). Con la mutación del hook.
    */
   quitarFoto: (id: string) => Promise<unknown>;
+  /**
+   * Solo platos: aviso que se enseña con la foto nueva elegida si al guardarla
+   * se va a quitar el vídeo anterior del plato (null = no se quita nada).
+   */
+  avisoFotoNueva?: (elemento: ElementoConFoto) => string | null;
+  /** Solo platos: tras guardar una foto nueva (quita el vídeo anterior si lo había). */
+  trasFotoNueva?: (id: string) => Promise<unknown>;
   /** Se llama con el id cuando la foto ya está guardada (la lista la enseña en la tarjeta). */
   onGuardada?: (id: string) => void;
 }
@@ -66,7 +73,7 @@ interface FotoRapidaCartaProps {
  * aviso de versión nueva no recarga la página.
  */
 export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps>(function FotoRapidaCarta(
-  { tipo, bucket, tabla, guardarUrl, quitarFoto, onGuardada },
+  { tipo, bucket, tabla, guardarUrl, quitarFoto, avisoFotoNueva, trasFotoNueva, onGuardada },
   ref,
 ) {
   const fotoCarta = useFotoCarta(tipo);
@@ -134,6 +141,8 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
       if (anterior && !subida.rutas.includes(anterior)) {
         await borrarFotoSiNoSeUsa({ tabla, bucket, ruta: anterior, excluirId: elemento.id });
       }
+      // El vídeo anterior, aparte: si falla, la foto ya está guardada.
+      await trasFotoNueva?.(elemento.id).catch((e) => console.error("Error quitando el vídeo anterior:", e));
       onGuardada?.(elemento.id);
       trasGuardarFotoCarta(fotoCarta, { tabla: tabla, id: elemento.id, nombre: elemento.nombre });
       cerrar();
@@ -164,6 +173,7 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
 
   const nombre = elemento?.nombre?.trim() || "este elemento";
   const fotoActual = elemento?.imagen_url || null;
+  const aviso = elemento && fotoCarta.original ? (avisoFotoNueva?.(elemento) ?? null) : null;
 
   return (
     <>
@@ -210,6 +220,12 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
               <ImageOff className="h-10 w-10 opacity-60" aria-hidden="true" />
               Sin foto
             </div>
+          )}
+
+          {aviso && (
+            <p role="status" className="rounded-md bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              {aviso}
+            </p>
           )}
 
           <div className="grid grid-cols-2 gap-2">

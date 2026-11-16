@@ -29,6 +29,10 @@ import { lineaActivado, lineaFotoExpandida } from "./estadoLectura";
 import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
 import { useInRouterContext } from "react-router-dom";
 import { AbrirPlatoDesdeUrl } from "./video/AbrirPlatoDesdeUrl";
+import { useColaVideos } from "./video/useColaVideos";
+import { estaActivo, trabajoDePlato } from "./video/colaVideos";
+import { quitarVideoPorFotoNueva } from "./video/subirVideoPlato";
+import { AVISO_FOTO_NUEVA_QUITA_VIDEO, fotoNuevaQuitaVideo, MENSAJE_VIDEO_QUITADO_POR_FOTO } from "./video/fotoNuevaQuitaVideo";
 import { useVideosPendientesCarta } from "./potente/useVideosPendientesCarta";
 
 // Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
@@ -50,7 +54,9 @@ export function ListaPlatos({ platos, soloLectura = false }: ListaPlatosProps) {
     toggleActivado,
     eliminarPlato,
     actualizarPlato,
+    refrescarPlatos,
   } = usePlatos();
+  const { trabajos: trabajosVideo } = useColaVideos();
   const [platoAEliminar, setPlatoAEliminar] = useState<Plato | null>(null);
   const [platoAEditar, setPlatoAEditar] = useState<Plato | null>(null);
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
@@ -59,6 +65,14 @@ export function ListaPlatos({ platos, soloLectura = false }: ListaPlatosProps) {
   const fotoRapida = useRef<FotoRapidaHandle>(null);
   const enRouter = useInRouterContext();
   const videosPendientes = useVideosPendientesCarta();
+
+  /** Vídeo que se quitará si se guarda una foto nueva en ese plato (null = ninguno). */
+  const videoQueQuitaLaFoto = (id: string): string | null => {
+    const plato = platos.find((p) => p.id === id);
+    const enCola = trabajoDePlato(trabajosVideo, id);
+    const videoEnCamino = videosPendientes.has(id) || (!!enCola && estaActivo(enCola));
+    return fotoNuevaQuitaVideo({ fotoNueva: true, urlVideo: plato?.video_url, videoEnCamino }) ? (plato?.video_url ?? null) : null;
+  };
 
   // Las fotos empiezan ocultas en el panel; solo se ocultan las tarjetas que
   // aparecen por primera vez (antes, cualquier refresco volvía a ocultarlas
@@ -356,6 +370,13 @@ export function ListaPlatos({ platos, soloLectura = false }: ListaPlatosProps) {
             onGuardada={mostrarFoto}
             guardarUrl={(id, url) => actualizarPlato.mutateAsync({ id, imagen_url: url })}
             quitarFoto={(id) => actualizarPlato.mutateAsync({ id, imagen_url: null, expanded: false })}
+            avisoFotoNueva={(elemento) => (videoQueQuitaLaFoto(elemento.id) ? AVISO_FOTO_NUEVA_QUITA_VIDEO : null)}
+            trasFotoNueva={async (id) => {
+              const url = videoQueQuitaLaFoto(id);
+              if (!url || !(await quitarVideoPorFotoNueva(id, url))) return;
+              refrescarPlatos?.();
+              toast.info(MENSAJE_VIDEO_QUITADO_POR_FOTO);
+            }}
           />
 
           {enRouter && <AbrirPlatoDesdeUrl<Plato> platos={platos} onAbrir={setPlatoAEditar} />}
