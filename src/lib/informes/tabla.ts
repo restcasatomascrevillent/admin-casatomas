@@ -21,6 +21,16 @@ export interface ColumnaInforme {
 export type ValorCelda = string | number | null;
 export type FilaInforme = Record<string, ValorCelda>;
 
+/**
+ * Clave reservada de una fila (no es una columna): con valor 1 es una SUBFILA, el detalle de la fila
+ * de encima («Cervezas» y «Vinos» dentro de «Bebidas»). Su cifra ya está sumada en la de encima: se
+ * pinta sangrada y más tenue, y en el CSV lleva «↳» delante. 16/11/2026.
+ */
+export const CLAVE_SUBFILA = "_subfila";
+export const esSubfila = (f: FilaInforme): boolean => f[CLAVE_SUBFILA] === 1;
+/** Lo que se antepone al nombre de una subfila en el CSV. */
+export const MARCA_SUBFILA = "↳ ";
+
 export interface TablaInforme {
   titulo: string;
   columnas: ColumnaInforme[];
@@ -100,7 +110,16 @@ function valorCsv(valor: ValorCelda, tipo: TipoCelda): string {
 export function csvInformeTabla(inf: InformeTabla): string {
   const bloques = inf.tablas.map((t) => {
     const lineas = [`# ${celdaCsv(t.titulo)} · ${celdaCsv(inf.textoPeriodo)}`, t.columnas.map((c) => celdaCsv(c.etiqueta)).join(";")];
-    for (const f of [...t.filas, ...(t.total ? [t.total] : [])]) lineas.push(t.columnas.map((c) => valorCsv(f[c.id] ?? null, c.tipo)).join(";"));
+    for (const f of [...t.filas, ...(t.total ? [t.total] : [])]) {
+      lineas.push(
+        t.columnas
+          .map((c, i) => {
+            const v = f[c.id] ?? null;
+            return valorCsv(i === 0 && esSubfila(f) && typeof v === "string" ? `${MARCA_SUBFILA}${v}` : v, c.tipo);
+          })
+          .join(";"),
+      );
+    }
     if (t.nota) lineas.push(`# ${celdaCsv(t.nota)}`);
     return lineas.join("\r\n");
   });
