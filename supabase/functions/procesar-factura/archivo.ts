@@ -281,6 +281,43 @@ export async function buscarEnDrive(
   }
 }
 
+/**
+ * Como subirADrive, pero antes mira si en la carpeta de destino (proveedor →
+ * mes) ya hay un fichero con ese nombre: si lo hay, devuelve su enlace sin
+ * subir nada. Así una subida masiva se puede reanudar sin duplicados
+ * (subir-original-drive, 16/11/2026). LANZA si Drive falla.
+ */
+export async function subirADriveSiNoEsta(
+  cfg: ConfigDrive,
+  bytes: Uint8Array,
+  fileName: string,
+  mimeType: string,
+  fecha: string | null,
+  proveedor: string | null,
+): Promise<{ url: string; yaEstaba: boolean }> {
+  if (!driveActivo(cfg)) throw new Error(DRIVE_NO_CONFIGURADO);
+  try {
+    const token = await driveToken(cfg);
+    const provFolder = await ensureFolder(carpetaProveedor(proveedor), cfg.parentFolder.trim(), token);
+    const monthFolder = await ensureFolder(carpetaMes(fecha), provFolder, token);
+    const q = encodeURIComponent(
+      `name='${fileName.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}' and '${monthFolder}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false`,
+    );
+    const r = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,webViewLink,createdTime)&orderBy=createdTime&spaces=drive&pageSize=5`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!r.ok) throw new ErrorDrive(`Drive buscar fichero ${r.status}: ${await r.text()}`, r.status);
+    const f = (((await r.json()).files ?? []) as { id: string; webViewLink?: string }[]).find((x) => !!x?.id);
+    if (f) return { url: f.webViewLink ?? `https://drive.google.com/file/d/${f.id}/view`, yaEstaba: true };
+  } catch (e) {
+    olvidarSiCaduca(e);
+    throw e;
+  }
+  // Las carpetas ya están en la caché: subirADrive no las vuelve a buscar.
+  return { url: await subirADrive(cfg, bytes, fileName, mimeType, fecha, proveedor), yaEstaba: false };
+}
+
 // ─── Supabase Storage: solo almacén temporal ─────────────────────────────────
 
 // Marcas diacriticas (U+0300–U+036F) que deja sueltas `normalize("NFD")`.
