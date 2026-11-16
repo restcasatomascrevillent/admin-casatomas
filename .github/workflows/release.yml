@@ -19,6 +19,7 @@ permissions:
   contents: write
   pull-requests: write
   deployments: read
+  statuses: read # el estado «Vercel» del commit (scripts/esperar-despliegue.mjs)
 
 concurrency:
   group: release-publicar
@@ -124,7 +125,7 @@ jobs:
           REPO: ${{ github.event.repository.name }}
         run: |
           set +e
-          node scripts/esperar-despliegue.mjs --sha "$GITHUB_SHA" --entorno Production --minutos 20
+          node scripts/esperar-despliegue.mjs --sha "$GITHUB_SHA" --entorno Production --url "https://$REPO.vercel.app" --minutos 20
           node scripts/comprobar-despliegue.mjs "https://$REPO.vercel.app" --version "$VERSION" --commit "$GITHUB_SHA" --json produccion.json
           ESTADO=$?
           set -e
