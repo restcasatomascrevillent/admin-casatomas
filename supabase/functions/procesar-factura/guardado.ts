@@ -212,7 +212,7 @@ export async function numeroProvisionalLibre(supabase: Supa, d: DatosNormalizado
   return null;
 }
 
-function textoEmbedding(d: DatosNormalizados): string {
+export function textoEmbedding(d: DatosNormalizados): string {
   return d.resumen
     ? d.resumen
     : `${d.tipo} de ${d.proveedor || "proveedor desconocido"}, ${d.fecha}, total ${d.total}€. Productos: ${
