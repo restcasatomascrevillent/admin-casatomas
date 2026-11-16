@@ -140,7 +140,7 @@ describe("Super Admin › Informes", () => {
   });
 
   it("toma el periodo de la URL y lo vuelve a pedir al cambiarlo", async () => {
-    pintar("/super-admin/informes?informe=facturas-gasto-mes&desde=2026-01-01&hasta=2026-03-31");
+    pintar("/super-admin/informes?informe=facturas-gasto-familia&desde=2026-01-01&hasta=2026-03-31");
     await screen.findByTestId("vista-informe");
     await waitFor(() => expect(estado.facturas).toHaveBeenCalled());
     expect(estado.facturas.mock.calls[0][1]).toEqual({ tipo: "rango", desde: "2026-01-01", hasta: "2026-03-31" });
@@ -160,7 +160,7 @@ describe("Super Admin › Informes", () => {
     estado.facturas = vi.fn(async () => {
       throw new Error("sin conexión");
     });
-    pintar("/super-admin/informes?informe=facturas-productos");
+    pintar("/super-admin/informes?informe=facturas-gasto-familia");
     expect(await screen.findByText(/No se han podido cargar los datos del informe/)).toBeInTheDocument();
     estado.facturas = vi.fn(async () => informeProveedores);
     fireEvent.click(screen.getByRole("button", { name: /Reintentar/ }));
