@@ -7,7 +7,8 @@ import {
   LOTE_ESCRITURA,
   nombresUnicos,
 } from "../procesar-factura/embeddingsNombres.ts";
-import { embedOpenAI, rellenarPendientes, textoParaEmbedding } from "./relleno.ts";
+import { embedOpenAI, rellenarFacturas, rellenarPendientes, textoParaEmbedding } from "./relleno.ts";
+import { textoEmbedding } from "../procesar-factura/guardado.ts";
 
 /** Supabase simulado: la tabla productos_nombre_embedding en memoria. */
 function supaFalso(inicial: Record<string, string | null>) {
@@ -111,5 +112,75 @@ describe("embeddings por nombre", () => {
   it("un nombre en blanco se manda como «(sin nombre)»", () => {
     expect(textoParaEmbedding("  ")).toBe("(sin nombre)");
     expect(textoParaEmbedding("Pulpo")).toBe("Pulpo");
+  });
+});
+
+describe("rellenarFacturas (facturas.embedding)", () => {
+  type Fila = { id: number; tipo: string; proveedor: string | null; fecha: string; total: number; resumen: string | null; embedding: string | null };
+  function supaFacturas(facturas: Fila[], lineas: { factura_id: number; nombre: string }[], fallaId?: number) {
+    return {
+      from(t: string) {
+        const f: { limite?: number } = {};
+        const q = {
+          select: () => q,
+          is: () => q,
+          in: () => q,
+          order: () => q,
+          limit: (n: number) => ((f.limite = n), q),
+          update: (v: { embedding: string }) => ({
+            eq: async (_c: string, id: number) => {
+              if (id === fallaId) return { error: { message: "boom" } };
+              facturas.find((x) => x.id === id)!.embedding = v.embedding;
+              return { error: null };
+            },
+          }),
+          then(res: (r: unknown) => void) {
+            res({ data: t === "facturas" ? facturas.filter((x) => x.embedding === null).slice(0, f.limite) : lineas, error: null });
+          },
+        };
+        return q;
+      },
+    };
+  }
+  const base = { tipo: "factura", proveedor: "Makro", fecha: "2026-10-01", total: 12.5, embedding: null };
+
+  it("usa el MISMO texto que textoEmbedding (con y sin resumen) y guarda con update", async () => {
+    const fs: Fila[] = [{ id: 1, ...base, resumen: null }, { id: 2, ...base, proveedor: null, resumen: "Resumen X" }];
+    const lineas = [{ factura_id: 1, nombre: "Pulpo" }, { factura_id: 1, nombre: "Tomate" }];
+    const embed = vi.fn(async (t: string[]) => t.map(() => [0.5]));
+    const r = await rellenarFacturas({ supabase: supaFacturas(fs, lineas), embed });
+    expect(embed).toHaveBeenCalledTimes(1);
+    const esperado = textoEmbedding({
+      tipo: "factura", proveedor: "Makro", fecha: "2026-10-01", total: 12.5, resumen: null,
+      productos: [{ nombre: "Pulpo" }, { nombre: "Tomate" }],
+    } as never);
+    expect(embed.mock.calls[0][0]).toEqual([esperado, "Resumen X"]);
+    expect(esperado).toBe("factura de Makro, 2026-10-01, total 12.5€. Productos: Pulpo, Tomate");
+    expect(r).toEqual({ facturasPendientes: 2, facturasGuardadas: 2, facturasFallidas: 0 });
+    expect(fs[0].embedding).toBe("[0.5]");
+  });
+
+  it("sin pendientes no llama a OpenAI", async () => {
+    const embed = vi.fn();
+    const r = await rellenarFacturas({ supabase: supaFacturas([{ id: 1, ...base, resumen: null, embedding: "[1]" }], []), embed });
+    expect(r.facturasPendientes).toBe(0);
+    expect(embed).not.toHaveBeenCalled();
+  });
+
+  it("si un update falla, el resto se guarda", async () => {
+    const fs: Fila[] = [{ id: 1, ...base, resumen: "a" }, { id: 2, ...base, resumen: "b" }];
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await rellenarFacturas({ supabase: supaFacturas(fs, [], 1), embed: async (t) => t.map(() => [1]) });
+    expect(r).toEqual({ facturasPendientes: 2, facturasGuardadas: 1, facturasFallidas: 1 });
+    expect(fs[1].embedding).toBe("[1]");
+    err.mockRestore();
+  });
+
+  it("limita a 200 por pasada", async () => {
+    const fs: Fila[] = Array.from({ length: 250 }, (_, i) => ({ id: i + 1, ...base, resumen: "r" }));
+    const embed = vi.fn(async (t: string[]) => t.map(() => [1]));
+    const r = await rellenarFacturas({ supabase: supaFacturas(fs, []), embed });
+    expect(r.facturasPendientes).toBe(200);
+    expect(embed).toHaveBeenCalledTimes(1);
   });
 });

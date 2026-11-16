@@ -4,7 +4,7 @@ import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { autenticar, corsHeaders, jsonResponse, verificarSecreto } from "../procesar-factura/auth.ts";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
-import { embedOpenAI, FUNCION, MODELO, rellenarPendientes } from "./relleno.ts";
+import { embedOpenAI, FUNCION, MODELO, rellenarFacturas, rellenarPendientes } from "./relleno.ts";
 const createClient = clienteConAuditoria(createClientBase, FUNCION);
 
 // ============================================================================
@@ -22,7 +22,8 @@ const createClient = clienteConAuditoria(createClientBase, FUNCION);
 //      secreto y valor de Vault que ocr-trabajo). Tiempo constante, FALLA CERRADO.
 //    · A mano, con el JWT de un usuario con permiso de EDICIÓN en facturas.
 //  No acepta datos del cuerpo. Secretos: OPENAI_API_KEY (claveOpenAI("ocr")).
-//  Respuesta: { ok, pendientes, guardados }
+//  Tras los nombres rellena facturas.embedding (hasta 200 por pasada, una llamada).
+//  Respuesta: { ok, pendientes, guardados, facturasPendientes, facturasGuardadas, facturasFallidas }
 // ============================================================================
 
 const URL_SB = Deno.env.get("SUPABASE_URL")!;
@@ -53,10 +54,21 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   const uso = new AcumuladorUso(FUNCION, MODELO, "embedding");
   const t0 = Date.now();
   try {
-    const r = await rellenarPendientes({
+    const deps = {
       supabase,
-      embed: (textos) => embedOpenAI(textos, { apiKey: claveOpenAI("ocr"), alUsar: (u) => uso.sumar(u as never) }),
-    });
+      embed: (textos: string[]) => embedOpenAI(textos, { apiKey: claveOpenAI("ocr"), alUsar: (u) => uso.sumar(u as never) }),
+    };
+    const nombres = await rellenarPendientes(deps);
+    // Después de los nombres: cabeceras de factura sin vector. Si falla, los
+    // nombres ya guardados cuentan y el cron reintenta en 10 min.
+    let facturas: Awaited<ReturnType<typeof rellenarFacturas>> | { facturasError: string };
+    try {
+      facturas = await rellenarFacturas(deps);
+    } catch (e) {
+      uso.marcarError();
+      facturas = { facturasError: (e as Error)?.message ?? String(e) };
+    }
+    const r = { ...nombres, ...facturas };
     console.log(`[${FUNCION}] ${disparador} · ${JSON.stringify(r)}`);
     return jsonResponse({ ok: true, ...r });
   } catch (e) {
