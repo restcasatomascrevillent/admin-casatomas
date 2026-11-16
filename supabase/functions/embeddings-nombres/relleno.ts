@@ -7,6 +7,9 @@
 // ============================================================================
 
 import { guardarVectoresNombres, TABLA_NOMBRES } from "../procesar-factura/embeddingsNombres.ts";
+import { textoEmbedding } from "../procesar-factura/guardado.ts";
+import type { DatosNormalizados } from "../procesar-factura/extraccion.ts";
+import { vec } from "../procesar-factura/openai.ts";
 
 export const FUNCION = "embeddings-nombres";
 export const MODELO = "text-embedding-3-small";
@@ -62,4 +65,77 @@ export async function embedOpenAI(
     throw new Error(`OpenAI devolvió ${vectores.length} vectores para ${textos.length} nombres`);
   }
   return vectores;
+}
+
+// ----------------------------------------------------------------------------
+//  Vector de la CABECERA de factura (facturas.embedding), tras los nombres.
+//  Mismo texto que al guardar (textoEmbedding de procesar-factura/guardado.ts),
+//  reconstruido desde facturas + productos_factura. Una sola llamada a OpenAI.
+// ----------------------------------------------------------------------------
+
+/** Facturas por pasada. */
+export const LIMITE_FACTURAS = 200;
+
+interface FilaFactura {
+  id: number;
+  tipo: string | null;
+  proveedor: string | null;
+  fecha: string | null;
+  total: number | null;
+  resumen: string | null;
+}
+
+/** Objeto mínimo que espera textoEmbedding (solo lee estos campos). */
+export function datosParaTexto(f: FilaFactura, nombres: string[]): DatosNormalizados {
+  return {
+    tipo: f.tipo,
+    proveedor: f.proveedor ?? "",
+    fecha: f.fecha,
+    total: f.total,
+    resumen: f.resumen,
+    productos: nombres.map((nombre) => ({ nombre })),
+  } as unknown as DatosNormalizados;
+}
+
+export async function rellenarFacturas(
+  deps: DepsRelleno,
+): Promise<{ facturasPendientes: number; facturasGuardadas: number; facturasFallidas: number }> {
+  const limite = Math.max(1, Math.min(LIMITE_FACTURAS, deps.limite ?? LIMITE_FACTURAS));
+  const { data, error } = await deps.supabase.from("facturas")
+    .select("id,tipo,proveedor,fecha,total,resumen").is("embedding", null).order("id", { ascending: true }).limit(limite);
+  if (error) throw new Error(`leer facturas pendientes: ${error.message}`);
+  const filas: FilaFactura[] = data ?? [];
+  if (filas.length === 0) return { facturasPendientes: 0, facturasGuardadas: 0, facturasFallidas: 0 };
+
+  // Líneas solo de las que no traen resumen (con resumen el texto es el resumen).
+  const sinResumen = filas.filter((f) => !f.resumen).map((f) => f.id);
+  const nombresPor = new Map<number, string[]>();
+  if (sinResumen.length > 0) {
+    const l = await deps.supabase.from("productos_factura")
+      .select("factura_id,nombre").in("factura_id", sinResumen)
+      .order("orden", { ascending: true }).order("id", { ascending: true });
+    if (l.error) throw new Error(`leer líneas: ${l.error.message}`);
+    for (const r of (l.data ?? []) as { factura_id: number; nombre: string }[]) {
+      const a = nombresPor.get(r.factura_id) ?? [];
+      a.push(r.nombre);
+      nombresPor.set(r.factura_id, a);
+    }
+  }
+  const textos = filas.map((f) => textoParaEmbedding(textoEmbedding(datosParaTexto(f, nombresPor.get(f.id) ?? []))));
+  const vectores = await deps.embed(textos);
+  if (vectores.length !== filas.length) throw new Error(`OpenAI devolvió ${vectores.length} vectores para ${filas.length} facturas`);
+
+  let guardadas = 0;
+  let fallidas = 0;
+  for (let i = 0; i < filas.length; i++) {
+    try {
+      const { error: e } = await deps.supabase.from("facturas").update({ embedding: vec(vectores[i]) }).eq("id", filas[i].id);
+      if (e) throw new Error(e.message);
+      guardadas++;
+    } catch (e) {
+      fallidas++;
+      console.error(`[${FUNCION}] factura ${filas[i].id}: no se guardó el vector:`, (e as Error)?.message ?? e);
+    }
+  }
+  return { facturasPendientes: filas.length, facturasGuardadas: guardadas, facturasFallidas: fallidas };
 }
