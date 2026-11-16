@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.38.0] - 2026-11-16
+
+Objetivo: Presupuestos en el chat: tarifas de cualquier tamaño, columnas automáticas y emparejado por texto + IA que mira formato y tamaño
+
+### Añadido
+- Chat-facturas: tarifas Excel/CSV de cualquier tamaño en el presupuesto ([#239](https://github.com/restcasatomascrevillent/admin-casatomas/pull/239))
+
 ## [1.37.0] - 2026-11-16
 
 Objetivo: Unifica 1.35 y 1.36: quién canceló cada reserva, buscador de platos y botón de novedades, informe de auditoría sin cortes y fotos de la carta en Drive
