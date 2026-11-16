@@ -10,7 +10,7 @@
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { Etiqueta, Explicacion, Filete, Lienzo, Titular } from "@/components/trafico-web/informe/piezas";
 import { COLOR, PILA_TITULOS } from "@/components/trafico-web/informe/tema";
-import { alineadaDerecha, paginarTablas, textoCelda, type FilaInforme, type InformeTabla, type PaginaTabla } from "@/lib/informes/tabla";
+import { alineadaDerecha, esSubfila, paginarTablas, textoCelda, type FilaInforme, type InformeTabla, type PaginaTabla } from "@/lib/informes/tabla";
 
 const ALTO_FILA = 38;
 
@@ -57,10 +57,20 @@ const celda = (derecha: boolean, extra?: CSSProperties): CSSProperties => ({
 });
 
 function Fila({ pagina, fila, total = false }: { pagina: PaginaTabla; fila: FilaInforme; total?: boolean }) {
+  // Subfila (16/11/2026): el detalle de la fila de encima, sangrado y más tenue («Cervezas» dentro de «Bebidas»).
+  const sub = !total && esSubfila(fila);
   return (
-    <tr style={total ? { borderTop: `2px solid ${COLOR.pizarra}` } : { borderBottom: `1px solid ${COLOR.rejilla}` }}>
-      {pagina.tabla.columnas.map((c) => (
-        <td key={c.id} style={celda(alineadaDerecha(c.tipo), { fontSize: 16, fontWeight: total ? 700 : 400, color: COLOR.pizarra })}>
+    <tr data-subfila={sub ? "" : undefined} style={total ? { borderTop: `2px solid ${COLOR.pizarra}` } : { borderBottom: `1px solid ${COLOR.rejilla}` }}>
+      {pagina.tabla.columnas.map((c, i) => (
+        <td
+          key={c.id}
+          style={celda(alineadaDerecha(c.tipo), {
+            fontSize: sub ? 15 : 16,
+            fontWeight: total ? 700 : 400,
+            color: sub ? COLOR.tenue : COLOR.pizarra,
+            ...(sub && i === 0 ? { paddingLeft: 40 } : null),
+          })}
+        >
           {textoCelda(fila[c.id] ?? null, c.tipo)}
         </td>
       ))}

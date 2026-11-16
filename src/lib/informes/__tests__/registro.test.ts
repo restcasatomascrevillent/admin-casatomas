@@ -3,7 +3,8 @@ import { SECTIONS } from "@/hooks/useUserRole";
 import type { Exploracion, ParametrosExplorar } from "@/lib/facturas/explorador";
 
 const estado = vi.hoisted(() => ({ llamadas: [] as unknown[], respuesta: null as unknown }));
-vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
+// «Gasto por familia» pide también las subfamilias (productos_gasto_por_categoria): aquí, ninguna.
+vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: async () => ({ data: [], error: null }) } }));
 vi.mock("@/hooks/useExplorarCompras", () => ({
   consultarExplorarCompras: vi.fn(async (p: unknown) => {
     estado.llamadas.push(p);
@@ -33,8 +34,13 @@ describe("registro de informes", () => {
 
   it("están los informes que había repartidos por el panel", () => {
     expect(INFORMES.map((i) => i.id)).toEqual(
-      expect.arrayContaining(["trafico-web-mensual", "rrss-mensual", "facturas-gasto-proveedor", "facturas-gasto-familia", "facturas-gasto-mes", "facturas-productos", "carta-vino-favorito"]),
+      expect.arrayContaining(["trafico-web-mensual", "rrss-mensual", "facturas-gasto-proveedor", "facturas-gasto-familia", "facturas-carta-vinos", "carta-vino-favorito"]),
     );
+  });
+
+  it("16/11/2026: ya no están «Gasto por mes», «Productos más comprados» ni «Platos: facturas y carta»", () => {
+    const ids = INFORMES.map((i) => i.id);
+    for (const id of ["facturas-gasto-mes", "facturas-productos", "facturas-carta-platos"]) expect(ids).not.toContain(id);
   });
 
   it("un super admin los ve todos, agrupados en el orden de las secciones", () => {
