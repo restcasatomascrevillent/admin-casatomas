@@ -91,7 +91,7 @@ En el PR de la release corren solos:
 | **Validar release a producción** | La rama es `release/X.Y.Z`, `versionado.json` y el CHANGELOG dicen esa versión, parte del último `main` y la etiqueta no existe |
 | **Release · candidata** | Vercel despliega la rama; su `/version.json` lleva la versión y el commit exactos; en la web, la prueba rápida (humo) contra esa preview; capturas antes/después si hay cambios visuales. Actualiza el informe del PR con los resultados |
 
-La preview de la candidata está en el PR (check de Vercel y apartado *Validación*). Pruébala ahí: es exactamente lo que se publicará.
+La preview de la candidata está en el PR (check de Vercel y apartado *Validación*). Pruébala ahí: es exactamente lo que se publicará. Su URL es la de la rama, sin los puntos de la versión: `release/1.4.0` → `https://web-casatomas-git-release-140-casa-tomas.vercel.app` (en el panel, `admin-casatomas-git-release-140-…`).
 
 - **Si hay que corregir algo:** mejor arreglarlo en staging (PR a staging) y volver a preparar la release (`git push origin --delete release/1.4.0`, cerrar el PR y repetir el paso 3). Un commit directo en la rama de la release también vale; el informe lo marca como «hecho en la release» y al publicar vuelve a staging solo.
 - **Si `main` cambia** mientras la release está abierta, «Validar release a producción» falla: hay que prepararla otra vez.
