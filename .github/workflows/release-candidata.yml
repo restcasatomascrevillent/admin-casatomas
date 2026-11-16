@@ -1,7 +1,9 @@
 # Release · candidata (docs/PROCESO-DE-CAMBIOS.md).
 #
 # En cada PR release/X.Y.Z → main valida la COMBINACIÓN EXACTA que se va a publicar, no staging:
-#   1. Espera a que Vercel despliegue la rama (preview con el Supabase de la demo).
+#   1. Espera a que Vercel despliegue la rama (preview con el Supabase de la demo). La encuentra por
+#      la URL de la rama, que tiene que servir ese commit, y por el estado «Vercel» del commit: no
+#      necesita que Vercel cree «deployments» en GitHub (scripts/esperar-despliegue.mjs).
 #   2. Comprueba que esa preview lleva la versión X.Y.Z y el commit de la rama.
 #   3. Si hay cambios visuales, saca capturas antes (main) / después (release) con el Supabase falso
 #      y los datos sintéticos de tests/e2e-movil (sin datos reales) y las sube a la rama
@@ -21,6 +23,7 @@ permissions:
   contents: write # solo para subir las capturas a la rama capturas-release
   pull-requests: write
   deployments: read
+  statuses: read # el estado «Vercel» del commit (scripts/esperar-despliegue.mjs)
 
 concurrency:
   group: candidata-${{ github.head_ref || github.ref_name }}
@@ -60,7 +63,9 @@ jobs:
       - name: Esperar la preview de Vercel
         id: preview
         continue-on-error: true
-        run: node scripts/esperar-despliegue.mjs --sha "$SHA" --entorno Preview --minutos 20
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node scripts/esperar-despliegue.mjs --sha "$SHA" --entorno Preview --rama "$RAMA" --minutos 20 --json preview.json
 
       - name: Versión y commit de la preview
         id: comprobar
@@ -69,7 +74,8 @@ jobs:
           URL: ${{ steps.preview.outputs.url }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
-          if [ -z "$URL" ]; then echo '{"ok":false,"detalle":"Vercel no publicó la preview de esta rama"}' > preview.json; exit 1; fi
+          # Sin URL, preview.json ya lleva el motivo que dio la espera (build fallido, plazo agotado…).
+          if [ -z "$URL" ]; then [ -s preview.json ] || echo '{"ok":false,"detalle":"Vercel no publicó la preview de esta rama"}' > preview.json; exit 1; fi
           node scripts/comprobar-despliegue.mjs "$URL" --version "$VERSION" --commit "$SHA" --json preview.json
 
       - run: npm ci
@@ -123,6 +129,7 @@ jobs:
         shell: bash
         env:
           RESULTADO_CAPTURAS: ${{ steps.capturas.outcome }}
+          NUMERO_PR: ${{ github.event.pull_request.number }}
           URL_EJECUCION: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           node --input-type=module - <<'JS'
@@ -137,8 +144,11 @@ jobs:
           } else if (cap && cap !== "skipped") res.capturas = { ok: false, motivo: capturas?.motivo ?? `el paso terminó en «${cap}» ([ejecución](${run}))` };
           writeFileSync("resultados.json", JSON.stringify(res, null, 2));
           JS
-          NUM=$(gh pr list --base main --head "$RAMA" --state open --json number --jq '.[0].number // empty')
-          if [ -z "$NUM" ]; then echo "No hay PR abierto de $RAMA a main."; exit 0; fi
+          # El PR es el del evento. Lanzado a mano se busca por la rama, y también si ya está aceptado o
+          # cerrado: buscando solo los abiertos, un PR aceptado mientras corría esto se quedaba sin resultados.
+          NUM="$NUMERO_PR"
+          if [ -z "$NUM" ]; then NUM=$(gh pr list --base main --head "$RAMA" --state all --json number --jq '.[0].number // empty'); fi
+          if [ -z "$NUM" ]; then echo "No hay ningún PR de $RAMA a main."; exit 0; fi
           gh pr view "$NUM" --json body --jq .body > actual.md
           node scripts/release.mjs informe --base origin/main --head HEAD --rama "$RAMA" --resultados resultados.json --cuerpo-actual actual.md --salida cuerpo.md
           gh pr edit "$NUM" --body-file cuerpo.md

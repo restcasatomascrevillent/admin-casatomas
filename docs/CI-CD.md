@@ -30,7 +30,7 @@
 | `version.mjs` | Versión del build (`/version.json` y etiqueta del panel) a partir de `versionado.json` y la rama |
 | `vercel-produccion.mjs` | *Ignored Build Step* de Vercel: qué commits de `main` se publican |
 | `comprobar-despliegue.mjs` | Que una URL sirve la versión y el commit esperados |
-| `esperar-despliegue.mjs` | Espera el despliegue de Vercel de un commit (deployments de GitHub) y da su URL |
+| `esperar-despliegue.mjs` | Espera el despliegue de Vercel de un commit y da su URL. Lo da por hecho cuando la URL (la de la rama en las previews, la de producción) sirve ese commit en `/version.json`; el estado «Vercel» del commit avisa si el build falla. No necesita que Vercel cree «deployments» en GitHub (en estos proyectos ese ajuste está apagado) |
 | `capturas-release.mjs` | Capturas antes/después en móvil y escritorio con datos de prueba |
 
 ## Ficheros de versión
