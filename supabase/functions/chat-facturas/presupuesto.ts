@@ -35,6 +35,8 @@ export interface LineaPresupuesto {
   cantidad: number | null;
   /** Precio por `unidad`, SIN IVA, antes de descuentos. */
   precio: number;
+  /** Envases que trae ese precio (P6, 24U…): el historial por unidades se compara con precio / envases. */
+  envases?: number;
 }
 
 export interface PresupuestoLeido {

@@ -28,7 +28,9 @@ import {
 } from "./presupuesto.ts";
 import {
   columnasConIA,
+  comprasPorProducto,
   confirmarParejas,
+  depurarCandidatas,
   detectarColumnas,
   filasDeCsv,
   lineasDeHoja,
@@ -166,8 +168,14 @@ async function procesarHoja(e: EntradaAdjuntar, nombre: string, tipo: "excel" | 
   const { data: compras, error: errNom } = await e.supabase.rpc("nombres_compras_agente");
   if (errNom) throw new Error(`nombres_compras_agente: ${errNom.message}`);
   // Paso 1: candidatas por texto (en memoria). Paso 2: la IA confirma producto y formato.
-  const previas = prefiltrarLineas(leidas, (Array.isArray(compras) ? compras : []) as NombreCompra[]);
-  const conf = await confirmarParejas(leidas, previas, { clave: e.clave, fetchImpl: e.fetchImpl, alUsar: e.alUsarConfirmar });
+  const nombresCompra = (Array.isArray(compras) ? compras : []) as NombreCompra[];
+  const previas = prefiltrarLineas(leidas, nombresCompra);
+  // Paso 1b: reglas fijas (sin alcohol, otra edad, otro sabor, envases…) antes de gastar IA.
+  const porProducto = comprasPorProducto(nombresCompra);
+  const depuradas = depurarCandidatas(leidas, previas, porProducto);
+  const conf = await confirmarParejas(leidas, depuradas.candidatas, {
+    clave: e.clave, fetchImpl: e.fetchImpl, alUsar: e.alUsarConfirmar, compras: porProducto,
+  });
   const lineas = conf.candidatas.map((c) => ({
     ...leidas[c.i],
     producto_id: c.producto_id,

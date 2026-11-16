@@ -14,6 +14,7 @@
 // ============================================================================
 import type { AcumuladorUso, UsageBruto } from "../_shared/registrar-uso-ia.ts";
 import { esErrorDeModelo } from "../_shared/modelo-funcion.ts";
+import { resumenParaModelo, tablaPresupuesto } from "./tabla.ts";
 import {
   type Adjunto,
   type DocRef,
@@ -363,7 +364,27 @@ async function embedConsulta(consulta: string, ctx: Ctx): Promise<string> {
   return vector;
 }
 
-interface ResultadoTool { contenido: string; fallo: boolean; adjunto?: Adjunto | null; referencias?: DocRef[]; nombrados?: DocNombrado[] }
+interface ResultadoTool {
+  contenido: string;
+  fallo: boolean;
+  adjunto?: Adjunto | null;
+  referencias?: DocRef[];
+  nombrados?: DocNombrado[];
+  /** comparar_presupuesto: la tabla completa (Markdown) que se añade a la respuesta tal cual. */
+  tabla?: string;
+}
+
+/**
+ * comparar_presupuesto (auditoría 16/11/2026): la tabla la monta el servidor
+ * con TODAS las líneas y el modelo solo ve el resumen. Antes el resultado se
+ * recortaba y el modelo enseñaba 4 ofertas de 143.
+ */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function prepararPresupuesto(data: any): { tabla: string; paraModelo: unknown } | null {
+  if (!data || typeof data !== "object" || Array.isArray(data) || data.error) return null;
+  return { tabla: tablaPresupuesto(data), paraModelo: resumenParaModelo(data) };
+}
 
 /** Documentos (con enlace al original) para los ids dados. Best-effort: si falla, sin referencias. */
 async function cargarReferencias(ids: number[], supabase: Cliente): Promise<DocRef[]> {
@@ -521,6 +542,11 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       }
     }
 
+    if (nombre === "comparar_presupuesto") {
+      const p = prepararPresupuesto(data);
+      if (p) return { fallo: false, tabla: p.tabla, contenido: JSON.stringify(p.paraModelo) };
+    }
+
     let referencias: DocRef[] = [];
     if (nombre === "variacion_precios") referencias = await referenciasVariacion(data, supabase);
     else if (nombre === "filtrar_documentos") referencias = await cargarReferencias(idsDeFilas(data), supabase);
@@ -651,6 +677,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   let huboFalloDeHerramienta = false;
   const adjuntos: Adjunto[] = [];
   const referenciasAcum: DocRef[][] = [];
+  let tablaPresupuestoFinal: string | null = null;
   const nombradosAcum: DocNombrado[] = [];
   const apuntar = (h: HerramientaEjecutada, error?: string, resumen?: ResumenResultado) => {
     o.alEjecutarHerramienta?.(h);
@@ -717,6 +744,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
         );
         if (r.fallo) huboFalloDeHerramienta = true;
         if (r.adjunto) adjuntos.push(r.adjunto);
+        if (r.tabla) tablaPresupuestoFinal = r.tabla;
         if (r.referencias?.length) referenciasAcum.push(r.referencias);
         if (r.nombrados?.length) nombradosAcum.push(...r.nombrados);
         messages.push({ role: "tool", tool_call_id: tc.id, content: r.contenido });
@@ -741,6 +769,11 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
 
     respuesta = msg.content || "";
     break;
+  }
+
+  if (tablaPresupuestoFinal) {
+    // La tabla del presupuesto va siempre completa debajo del comentario del modelo.
+    respuesta = `${respuesta.trim() || "Esta es la comparación de la tarifa con lo que compras:"}\n\n${tablaPresupuestoFinal}`;
   }
 
   if (!respuesta.trim()) {
