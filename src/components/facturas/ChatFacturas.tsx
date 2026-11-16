@@ -225,6 +225,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     abrirConversacionPorId,
     nuevaConversacion,
     enviarMensaje,
+    adjuntarPresupuesto,
     regenerarRespuesta,
     valorarRespuesta,
     eliminarConversacion,
@@ -406,6 +407,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
           isSending={isSending}
           sugerencias={sugerencias}
           onEnviar={(texto) => void enviarMensaje(texto)}
+          onAdjuntar={(archivo) => void adjuntarPresupuesto(archivo)}
           onRegenerar={regenerarRespuesta}
           onValorar={valorarRespuesta}
           fijadas={idsFijadas}
@@ -434,6 +436,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         isSending={isSending}
         sugerencias={sugerencias}
         onEnviar={(texto) => void enviarMensaje(texto)}
+          onAdjuntar={(archivo) => void adjuntarPresupuesto(archivo)}
         onRegenerar={regenerarRespuesta}
         onValorar={valorarRespuesta}
         fijadas={idsFijadas}

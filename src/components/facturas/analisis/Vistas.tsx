@@ -16,12 +16,15 @@ import { decisionesDeHoy, explicarAhorro, geometriaPrecio, nombreMes, notasCompa
 import { FILTROS_VACIOS, parametrosExplorar, type LocalRpc } from "@/lib/facturas/explorador";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
 import { useExplorarCompras } from "@/hooks/useExplorarCompras";
+import { useComprasProducto } from "@/hooks/useComprasProducto";
+import { comprasDelMes, comprasQueCuentan, productoDeAlerta, type ProductoBuscado } from "@/lib/facturas/comprasProducto";
 import { useAccionDecision } from "@/hooks/useDecisionFacturas";
 import { useCambiarPrecioCarta, useMargenesDecidir } from "@/hooks/useMargenesDecidir";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { usePuedeEditarFacturas } from "./edicionFacturas";
 import { BOTON, Chip, useVisor } from "./Decision";
 import { FOCO, SinDatos } from "./piezas";
+import { GraficaPrecioMeses } from "./GraficaPrecioMeses";
 
 const precio2 = (n: number | null) => (n === null ? "—" : n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
@@ -139,7 +142,7 @@ export function QueDecidirHoy({
               return (
                 <Fila key={x.id} tipo="mejor" texto={t}>
                   {!pendiente && (c.doc || c.docOtro) && (
-                    <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc, c.docOtro], notas ?? undefined)}>
+                    <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc, c.docOtro], notas ?? undefined, productoDeAlerta(c.alerta))}>
                       <FileText className="h-3.5 w-3.5" aria-hidden /> Ver las dos facturas
                     </button>
                   )}
@@ -155,13 +158,13 @@ export function QueDecidirHoy({
             return (
               <Fila key={x.id} tipo="sube" texto={t}>
                 {!pendiente && c.doc && c.docOtro ? (
-                  <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.docOtro, c.doc], notas ? [notas[1], notas[0]] : undefined)}>
+                  <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.docOtro, c.doc], notas ? [notas[1], notas[0]] : undefined, productoDeAlerta(c.alerta))}>
                     <FileText className="h-3.5 w-3.5" aria-hidden /> Ver las dos facturas
                   </button>
                 ) : (
                   !pendiente &&
                   c.doc && (
-                    <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc], notas ? [notas[0]] : undefined)}>
+                    <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc], notas ? [notas[0]] : undefined, productoDeAlerta(c.alerta))}>
                       <FileText className="h-3.5 w-3.5" aria-hidden /> Ver factura
                     </button>
                   )
@@ -446,6 +449,15 @@ function DetallePrecio({
     [producto, d?.unidad, d?.proveedorId, d?.proveedor, meses, fin, local],
   );
   const q = useExplorarCompras(params, { retraso: 0, activo: !!producto && !!e?.cambio && e.cambio.alerta.tipo !== "facturas_precio_proveedor" });
+  // Compras del producto para el cuadro de cada punto (precio, fecha, cantidad y documento).
+  const buscado: ProductoBuscado | null = e?.top
+    ? e.top.productoId !== null || e.top.nombreNormalizado
+      ? { productoId: e.top.productoId, nombreNormalizado: e.top.nombreNormalizado, nombre: e.top.producto }
+      : null
+    : e?.cambio && e.cambio.alerta.tipo !== "facturas_precio_proveedor"
+      ? productoDeAlerta(e.cambio.alerta)
+      : null;
+  const comprasQ = useComprasProducto(buscado);
   if (!e) {
     return (
       <Caja titulo="Precio" testId="caja-precio-detalle">
@@ -481,6 +493,7 @@ function DetallePrecio({
   // Un solo mes con precio: una frase en vez de un punto suelto sobre unos ejes vacíos.
   const solo = g && g.puntos.length === 1 ? g.puntos[0] : null;
   const proveedorSolo = e.top ? e.top.proveedor : e.cambio.alerta.datos.proveedor;
+  const proveedorGrafica = e.top ? e.top.proveedorId : e.cambio.alerta.datos.proveedorId;
   const cargando = !!e.cambio && q.isLoading;
   // Marcar precio pactado: hace falta saber proveedor, línea y precio.
   const pacto = e.top
@@ -508,25 +521,19 @@ function DetallePrecio({
             </span>
           </SinDatos>
         ) : (
-          <svg viewBox="0 0 400 180" preserveAspectRatio="none" className="block h-full w-full" role="img" aria-label={`Precio de ${titulo} por mes: ${g.puntos.map((p) => `${mesCorto(p.mes)} ${precio2(p.precio)} €`).join(", ")}${g.referencia !== null ? `. Raya: ${textoRef}, ${precio2(g.referencia)} €` : ""}`}>
-            <line x1="12" x2="388" y1="168" y2="168" className="stroke-border" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-            {g.yReferencia !== null && (
-              <line x1="12" x2="388" y1={g.yReferencia} y2={g.yReferencia} className="stroke-foreground/50" strokeWidth="1.2" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" data-testid="raya-referencia" />
-            )}
-            <path d={g.linea} fill="none" className="stroke-primary" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-            {g.puntos.map((p) => (
-              <circle key={p.mes} cx={p.x} cy={p.y} r="3" className="fill-primary" vectorEffect="non-scaling-stroke" />
-            ))}
-          </svg>
+          <GraficaPrecioMeses
+            g={g}
+            unidad={unidad}
+            etiquetaRef={textoRef === "precio pactado" ? "pactado" : "antes"}
+            ariaLabel={`Precio de ${titulo} por mes: ${g.puntos.map((p) => `${mesCorto(p.mes)} ${precio2(p.precio)} €`).join(", ")}${g.referencia !== null ? `. Raya: ${textoRef}, ${precio2(g.referencia)} €` : ""}`}
+            comprasDe={
+              comprasQ.data
+                ? (mes) => comprasDelMes(comprasQueCuentan(comprasQ.data, local), mes, unidad, proveedorGrafica)
+                : undefined
+            }
+          />
         )}
       </div>
-      {g && !solo && (
-        <div className="mt-1 flex shrink-0 justify-between text-[0.6875rem] tabular-nums text-muted-foreground" aria-hidden>
-          {g.meses.map((m) => (
-            <span key={m.mes}>{mesCorto(m.mes)}</span>
-          ))}
-        </div>
-      )}
       {g && !solo && (
         <p className="mt-1 shrink-0 text-xs text-muted-foreground">
           € por {unidad}, sin IVA
@@ -541,12 +548,12 @@ function DetallePrecio({
         <div className="mt-2 flex shrink-0 flex-wrap gap-1.5">
           {e.cambio?.doc && e.cambio.docOtro && (e.cambio.alerta.tipo === "facturas_precio_sube" || e.cambio.alerta.tipo === "facturas_precio_baja") ? (
             // La compra anterior (más barata si sube, más cara si baja) al lado de la de ahora.
-            <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([e.cambio!.docOtro, e.cambio!.doc])}>
+            <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([e.cambio!.docOtro, e.cambio!.doc], undefined, productoDeAlerta(e.cambio!.alerta))}>
               <FileText className="h-3.5 w-3.5" aria-hidden /> Comparar facturas
             </button>
           ) : (
             e.cambio?.doc && (
-              <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([e.cambio!.doc])}>
+              <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([e.cambio!.doc], undefined, productoDeAlerta(e.cambio!.alerta))}>
                 <FileText className="h-3.5 w-3.5" aria-hidden /> Ver factura
               </button>
             )
@@ -632,7 +639,7 @@ export function AhorroExplicado({ decision, pendiente, onIrA }: { decision: Deci
                 {!pendiente && (
                   <div className="flex flex-wrap gap-1.5">
                     {(c.doc || c.docOtro) && (
-                      <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc, c.docOtro])}>
+                      <button type="button" className={cn(BOTON, FOCO)} onClick={() => abrir([c.doc, c.docOtro], undefined, productoDeAlerta(c.alerta))}>
                         <FileText className="h-3.5 w-3.5" aria-hidden /> Comparar las dos facturas
                       </button>
                     )}

@@ -38,7 +38,7 @@ begin
                            'public.consulta_flexible_agente(jsonb)',
                            'public.ficha_proveedor_agente(text)',
                            'public.compras_producto_agente(text,date,date,text,integer,text,text,vector,text)',
-                           'public.gasto_categorias_agente(text,date,date,text,text)',
+                           'public.gasto_categorias_agente(text,date,date,text,text,text,text,text)',
                            'public.variacion_precios_agente(date,date,numeric,text,text,integer,text)'] loop
     if has_function_privilege('anon', f, 'execute')
        or not has_function_privilege('authenticated', f, 'execute') or not has_function_privilege('service_role', f, 'execute') then

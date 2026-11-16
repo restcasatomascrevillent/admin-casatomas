@@ -15,6 +15,8 @@
 
 import {
   comprobarCuadre,
+  DESCRIPCION_CLASE_DOCUMENTO,
+  DESCRIPCION_CLIENTE,
   DESCRIPCION_IVA_PCT,
   DESCRIPCION_RETENCION_IRPF,
   DESCRIPCION_RETENCION_IRPF_PCT,
@@ -25,6 +27,7 @@ import {
   tipoIvaLinea,
   type VerificacionPie,
 } from "./esquema.ts";
+import { CLASES_DOCUMENTO } from "./reglasCarga.ts";
 
 // ─── 1. Esquema estricto ─────────────────────────────────────────────────────
 //  Mismas reglas que DOCUMENTO_JSON_SCHEMA: todo en `required`, opcionales como
@@ -101,7 +104,7 @@ export const PAGINA_JSON_SCHEMA = {
         description: "SOLO lo que se ve en ESTA imagen. null en lo que no esté.",
         required: [
           "titulo_literal", "tipo", "proveedor", "cif", "numero_documento", "numero_etiqueta_literal", "fecha",
-          "fecha_literal",
+          "fecha_literal", "cliente", "es_abono", "clase_documento",
         ],
         properties: {
           titulo_literal: { ...strNull, description: "La palabra grande del título: 'FACTURA', 'ALBARÁN'." },
@@ -115,6 +118,16 @@ export const PAGINA_JSON_SCHEMA = {
           },
           fecha: { ...strNull, description: "YYYY-MM-DD. En España DD/MM/AAAA." },
           fecha_literal: strNull,
+          cliente: { ...strNull, description: DESCRIPCION_CLIENTE },
+          es_abono: {
+            type: ["boolean", "null"],
+            description: "true si el título dice abono, rectificativa, nota de crédito o devolución; null si no se ve el título.",
+          },
+          clase_documento: {
+            type: ["string", "null"],
+            enum: [...CLASES_DOCUMENTO, null],
+            description: DESCRIPCION_CLASE_DOCUMENTO + " null si en esta imagen no se ve qué documento es.",
+          },
         },
       },
       sin_importes: {
@@ -275,6 +288,10 @@ export interface CabeceraVisible {
   numero_etiqueta_literal: string | null;
   fecha: string | null;
   fecha_literal: string | null;
+  /** 15/11/2026 (reglas de la carga histórica). Opcionales: piezas guardadas antes no los traen. */
+  cliente?: string | null;
+  es_abono?: boolean | null;
+  clase_documento?: string | null;
 }
 
 export interface Arrastre {

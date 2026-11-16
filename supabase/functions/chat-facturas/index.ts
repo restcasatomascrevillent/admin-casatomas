@@ -3,7 +3,9 @@ import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { configModeloFuncion } from "../_shared/modelo-funcion.ts";
-import { modeloChat, sinDuplicar } from "./herramientas.ts";
+import { modeloChat, parametrosModelo, sinDuplicar } from "./herramientas.ts";
+import { procesarPresupuesto } from "./adjuntar.ts";
+import { textoDeExcel } from "./excel.ts";
 import { ejecutarConversacion, MAX_MENSAJES_HISTORIAL, type Traza, type TurnoHistorial } from "./bucle.ts";
 import { contextoDeAdjuntos, trazaParaPanel } from "./hilo.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion, registrarHerramientaChat } from "../_shared/audit-client.ts";
@@ -123,12 +125,54 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
     const inicioMs = Date.now();
 
     try {
-      const { mensaje, session_id } = await req.json();
+      const { mensaje, session_id, presupuesto: adjuntoPresupuesto } = await req.json();
       if (!mensaje || !String(mensaje).trim()) {
         return json({ success: false, respuesta: "No he recibido ninguna pregunta." }, 200);
       }
       if (typeof mensaje !== "string" || mensaje.length > 16000) return json({ success: false, respuesta: "La pregunta debe tener como máximo 16000 caracteres." }, 400);
       // El contenido de la consulta queda en auditoría, no en logs técnicos.
+
+      // ── Presupuesto de proveedor adjunto (16/11/2026) ──
+      // Turno aparte, sin modelo de chat: lee el documento, lo casa con el
+      // catalogo, lo guarda en chat_presupuestos (NO es una factura) y contesta
+      // SIEMPRE con la pregunta del descuento. La comparacion llega en el
+      // siguiente mensaje, con la herramienta comparar_presupuesto.
+      if (adjuntoPresupuesto && typeof adjuntoPresupuesto === "object") {
+        if (typeof session_id !== "string" || !session_id) return json({ success: false, respuesta: "Falta la conversación." }, 400);
+        const r = await procesarPresupuesto({
+          supabase,
+          adjunto: adjuntoPresupuesto,
+          sessionId: session_id,
+          usuarioId: user.id,
+          clave: OPENAI_KEY,
+          modelo,
+          parametros: parametrosModelo(modelo, 6_000),
+          textoDeExcel,
+          alUsarChat: (u) => usoChat.sumar(u as never),
+          alUsarEmbed: (u) => usoEmbed.sumar(u as never),
+        });
+        return json({ ...r, modelo, traza: { herramientas: [] } }, 200);
+      }
+
+      // Presupuesto adjunto mas reciente de esta conversacion (si lo hay).
+      let presupuestoAdjunto: { id: string; proveedor: string | null; archivo: string | null; lineas: number } | null = null;
+      if (typeof session_id === "string" && session_id) {
+        const { data: pres } = await supabase
+          .from("chat_presupuestos")
+          .select("id, proveedor, nombre_archivo, lineas")
+          .eq("session_id", session_id)
+          .order("creado_en", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (pres?.id) {
+          presupuestoAdjunto = {
+            id: pres.id,
+            proveedor: pres.proveedor ?? null,
+            archivo: pres.nombre_archivo ?? null,
+            lineas: Array.isArray(pres.lineas) ? pres.lineas.length : 0,
+          };
+        }
+      }
 
       // ── Historial de la conversacion ──
       // Las respuestas traen en `adjuntos` el contexto de herramientas que
@@ -183,6 +227,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
         },
         alEjecutarHerramienta: registrarHerramientaChat,
         traza,
+        presupuesto: presupuestoAdjunto,
         // Una clave por conversacion: sus rondas y preguntas comparten prefijo.
         claveCache: typeof session_id === "string" && session_id ? `chat-facturas:${session_id}`.slice(0, 64) : undefined,
       });

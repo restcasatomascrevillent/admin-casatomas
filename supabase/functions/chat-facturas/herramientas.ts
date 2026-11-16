@@ -129,6 +129,8 @@ REGLAS
 17. Seguimiento («hazme la comparativa», «y en cerveza?»): mismo tema, unidad y periodo que el turno anterior.
 18. «Ultimo mes» = mes natural anterior: di el periodo («octubre de 2026») y si esta incompleto.
 19. Si un resultado trae "como_leer", siguelo.
+20. Vinos por D.O., region o pais («de Rioja», «Ribera», «champan frances», «gallegos»): gasto_por_categoria (botellas/litros: volumen_comprado) con denominacion; nunca la busques en el nombre. Di vino_sin_denominacion.
+21. Presupuesto adjunto (aviso PRESUPUESTO): llama a comparar_presupuesto con lo que el usuario conteste sobre el descuento («ninguno» incluido); si no lo aclara, preguntaselo.
 Formato: español, 1.234,56 €, fechas 15/01/2026. Viñetas o tabla, sin saludos ni relleno. Maximo 6 lineas salvo listados.`;
 }
 
@@ -143,6 +145,8 @@ const TIPO_NULL = { type: ["string", "null"], enum: ["factura", "albaran", null]
 const FECHA_HIST = { type: ["string", "null"], description: "null salvo periodo dicho por el usuario" } as const;
 const TIPO_AMBOS = { ...TIPO_NULL, description: "null (ambos) salvo que diga facturas o albaranes; 'cajas' no es tipo" };
 const UNIDAD = { type: ["string", "null"] } as const;
+/** Filtro de vino por D.O., region o pais (20261202100000): nunca va en producto. */
+const DENOMINACION = { type: ["string", "null"], description: "D.O., region o pais del vino: 'Rioja', 'Ribera', 'gallegos', 'champan frances'" } as const;
 
 export const METRICAS_FLEX = [
   "count_documentos", "count_con_total", "count_lineas",
@@ -245,6 +249,7 @@ export const TOOLS = [
       hasta: FECHA_HIST,
       tipo: TIPO_AMBOS,
       agrupar: { type: ["string", "null"], enum: ["mes", "proveedor", null] },
+      denominacion: DENOMINACION,
     }),
   fn("variacion_precios",
     "Que ha subido o bajado de precio: ultima compra frente a su precio anterior, por producto.",
@@ -275,6 +280,7 @@ export const TOOLS = [
       hasta: FECHA_HIST,
       unidad: { type: ["string", "null"], enum: ["l", "kg", null] },
       orden: { type: ["string", "null"], enum: ["envases", null], description: "envases: mas botellas primero" },
+      denominacion: DENOMINACION,
     }),
   fn("buscar_productos",
     "Lineas de producto por nombre o descripcion ('compramos gambas?', 'que aceite').",
@@ -337,6 +343,13 @@ export const TOOLS = [
       orden_por: { type: ["string", "null"], description: "Una metrica o agrupacion pedida" },
       orden_dir: { type: ["string", "null"], enum: ["desc", "asc", null] },
       limite: { type: ["integer", "null"], description: "Maximo 50" },
+    }),
+  fn("comparar_presupuesto",
+    "Compara el presupuesto adjunto con lo que se compra. Solo con presupuesto adjunto y DESPUES de que el " +
+    "usuario conteste lo del descuento. ninguno = sin descuento; valor = el numero dicho (% o EUR).",
+    {
+      descuento_tipo: { type: "string", enum: ["ninguno", "porcentaje", "importe"] },
+      descuento_valor: { type: ["number", "null"] },
     }),
 ];
 
@@ -568,6 +581,82 @@ export function familiaDeBebida(v: unknown): string | null {
   return concretas[0] ?? "bebida";
 }
 
+// ─── Vinos por denominacion (migracion 20261202100000) ──────────────────────
+//  «¿Cuanto me he gastado en vinos de Rioja en septiembre?» (dueño, 15/11/2026):
+//  el bot buscaba «Rioja» en el NOMBRE de la linea y contesto «no hay compras»;
+//  las lineas casi nunca dicen la D.O. Ahora la D.O., region y pais estan en
+//  productos_catalogo (de la carta o deducidas) y gasto_categorias_agente /
+//  volumen_comprado_agente filtran con p_denominacion (la BD casa el texto con
+//  D.O. + region + pais, sin tildes y con alias: Ribera = Ribera del Duero).
+
+/** Palabras de D.O. (una o varias seguidas), regiones y paises que reconoce el filtro. */
+const DENOMINACION_FRASES = [
+  "rioja", "ribera del duero", "ribera duero", "ribera", "rueda", "toro", "bierzo", "cigales", "priorat", "priorato",
+  "montsant", "penedes", "cava", "cavas", "rias baixas", "rias bajas", "ribeiro", "ribeira sacra", "valdeorras",
+  "monterrei", "jumilla", "yecla", "alicante", "utiel requena", "almansa", "la mancha", "valdepenas", "navarra",
+  "somontano", "campo de borja", "calatayud", "carinena", "jerez", "sherry", "montilla", "champagne", "champan",
+  "champanes", "burdeos", "bordeaux", "borgona", "chablis", "alsacia", "loira", "rodano", "provenza",
+  "saint emilion", "margaux", "pauillac", "sauternes", "prosecco", "lanzarote", "txakoli",
+  // regiones y adjetivos
+  "galicia", "gallego", "gallegos", "gallega", "gallegas", "castilla y leon", "castilla", "castellano", "castellanos",
+  "cataluna", "catalan", "catalanes", "pais vasco", "vasco", "vascos", "riojano", "riojanos", "andalucia",
+  "andaluces", "canarias", "canarios", "valencianos", "alicantinos", "madrilenos", "murcianos", "aragoneses",
+  "manchegos",
+  // paises
+  "francia", "frances", "franceses", "francesa", "francesas", "espana", "espanol", "espanoles", "nacionales",
+  "italia", "italiano", "italianos", "alemania", "aleman", "alemanes", "portugal", "portugues", "portugueses",
+  "australia", "australianos", "sudafrica", "hungria",
+].sort((a, b) => b.split(" ").length - a.split(" ").length);
+const VACIAS_VINO = new Set([
+  "vino", "vinos", "de", "del", "la", "las", "los", "el", "y", "d", "o", "ca", "do", "doca", "dop", "aoc", "igp",
+  "denominacion", "origen", "region", "zona", "tinto", "tintos", "blanco", "blancos", "rosado", "rosados",
+  "espumoso", "espumosos", "botella", "botellas", "compra", "compras", "gasto",
+]);
+
+/**
+ * Texto que es SOLO una denominacion, region o pais de vino («vinos de Rioja»,
+ * «Ribera», «champán francés», «vinos gallegos», «D.O.Ca. Rioja») → el texto
+ * limpio para p_denominacion. Un producto concreto («Martelo Rioja», «vino
+ * blanco Lanzar») o una familia sola («vino») → null.
+ */
+export function denominacionDeTexto(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const palabras = v.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
+  const encontradas: string[] = [];
+  let i = 0;
+  while (i < palabras.length) {
+    const frase = DENOMINACION_FRASES.find((f) => {
+      const ps = f.split(" ");
+      return ps.every((p, k) => palabras[i + k] === p);
+    });
+    if (frase) { encontradas.push(frase); i += frase.split(" ").length; continue; }
+    if (!VACIAS_VINO.has(palabras[i])) return null;
+    i++;
+  }
+  return encontradas.length > 0 ? encontradas.join(" ") : null;
+}
+
+/** El filtro de vino: el parametro del modelo o, si no, el que va escrito en la categoria/producto. */
+function filtroVino(arg: unknown, ...textos: unknown[]): string | null {
+  const directo = texto(arg);
+  if (directo) return directo;
+  for (const t of textos) { const d = denominacionDeTexto(t); if (d) return d; }
+  return null;
+}
+
+/** Como contestar cuando se filtra por denominacion. */
+export const NOTA_RESPUESTA_DENOMINACION =
+  "Filtrado por D.O./region/pais del catalogo (filtro_vino), no por el nombre de la linea: da la cifra y los " +
+  "productos (top_productos o por_producto). Si viene vino_sin_denominacion, dilo: «N lineas de vino (X €) sin " +
+  "denominacion conocida» con sus ejemplos; no entran en la cifra. Lista vacia: «no hay compras de vino con esa " +
+  "denominacion registrada», nunca «no hay compras con ese nombre».";
+
+/** ¿La pregunta va de botellas, litros o cajas (volumen) y no de gasto? */
+function pideVolumen(pregunta?: string): boolean {
+  return /botell|litro|envase|caja|barril|magnum/i.test(pregunta ?? "");
+}
+
 // ─── Asociacion de terminos (migracion 20261107100000) ──────────────────────
 //  «Tiene que asociar las cosas» (dueño, 06/11/2026). La BD decide si un texto
 //  es una FAMILIA del catalogo (cerveza, birra, vino, marisco…), un producto de
@@ -631,9 +720,11 @@ export function pidePrecioPorVolumen(pregunta?: string): boolean {
 function llamadaVolumen(p: {
   categoria: string | null; producto: string | null; desde: string | null; hasta: string | null;
   unidad?: string | null; orden?: string | null; limite?: number | null; nota?: string; porLitro?: boolean;
+  denominacion?: string | null;
 }): Llamada {
   const orden = p.orden === "envases" || p.orden === "botellas" ? "envases" : null;
   const limite = p.limite ?? (orden ? LIMITE_VOLUMEN_ENVASES : null);
+  const notaVolumen = p.porLitro ? NOTA_RESPUESTA_VOLUMEN_LITRO : NOTA_RESPUESTA_VOLUMEN;
   return {
     tipo: "rpc",
     rpc: "volumen_comprado_agente",
@@ -645,10 +736,11 @@ function llamadaVolumen(p: {
       p_medida: p.unidad === "l" || p.unidad === "kg" ? p.unidad : null,
       p_limite: limite,
       p_orden: orden,
+      ...(p.denominacion ? { p_denominacion: p.denominacion } : {}),
     },
     limite: null,
     maxChars: MAX_CHARS_VOLUMEN,
-    notaRespuesta: p.porLitro ? NOTA_RESPUESTA_VOLUMEN_LITRO : NOTA_RESPUESTA_VOLUMEN,
+    notaRespuesta: p.denominacion ? `${NOTA_RESPUESTA_DENOMINACION} ${notaVolumen}` : notaVolumen,
     ...(p.nota ? { nota: p.nota } : {}),
   };
 }
@@ -688,6 +780,45 @@ function desvioVolumen(
   });
 }
 
+/** gasto_categorias_agente; p_denominacion solo se manda si hay filtro de vino (20261202100000). */
+function llamadaGasto(p: {
+  categoria: string | null; desde: string | null; hasta: string | null; tipo: string | null; agrupar: string | null;
+  denominacion?: string | null; nota?: string;
+}): Llamada {
+  return {
+    tipo: "rpc",
+    rpc: "gasto_categorias_agente",
+    params: {
+      p_categoria: p.categoria,
+      p_desde: p.desde,
+      p_hasta: p.hasta,
+      p_tipo: p.tipo,
+      p_agrupar: p.agrupar,
+      ...(p.denominacion ? { p_denominacion: p.denominacion } : {}),
+    },
+    limite: null,
+    ...(p.denominacion ? { notaRespuesta: NOTA_RESPUESTA_DENOMINACION } : {}),
+    ...(p.nota ? { nota: p.nota } : {}),
+  };
+}
+
+/**
+ * Herramienta por producto o busqueda con el texto de una D.O. («rioja», «vinos de
+ * Ribera»): se contesta por denominacion del catalogo, nunca buscando el texto en
+ * el nombre. Gasto salvo que se pregunte por botellas/litros (volumen_comprado).
+ */
+function desvioDenominacion(
+  herramienta: string, denominacion: string, desde: string | null, hasta: string | null,
+  pregunta: string | undefined, porVolumen: boolean,
+): Llamada {
+  const nota = `${herramienta}('${denominacion}') se ha contestado por la denominacion de origen del catalogo ` +
+    "(las lineas de factura casi nunca dicen la D.O.; buscarla en el nombre da «no hay compras»).";
+  if (porVolumen || pideVolumen(pregunta)) {
+    return llamadaVolumen({ categoria: "vino", producto: null, desde, hasta, porLitro: porVolumen, denominacion, nota });
+  }
+  return llamadaGasto({ categoria: "vino", desde, hasta, tipo: null, agrupar: null, denominacion, nota });
+}
+
 /** Parametros opcionales que solo existen desde 20261008120000: solo se mandan si vienen. */
 function opcionales(p: Record<string, string | null>): Record<string, string> {
   const r: Record<string, string> = {};
@@ -703,7 +834,7 @@ function opcionales(p: Record<string, string | null>): Record<string, string> {
  * asociacion de la BD del texto de la herramienta (textoAsociable).
  */
 // deno-lint-ignore no-explicit-any
-export function prepararLlamada(nombre: string, args: any, pregunta?: string, asoc?: Asociacion | null): Llamada {
+export function prepararLlamada(nombre: string, args: any, pregunta?: string, asoc?: Asociacion | null, presupuestoId?: string | null): Llamada {
   args = args ?? {};
   const porVolumen = pidePrecioPorVolumen(pregunta);
   switch (nombre) {
@@ -782,6 +913,8 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
     case "historial_precios": {
       const producto = texto(args.producto);
       if (!producto) throw new Error("Falta el nombre del producto");
+      const den = denominacionDeTexto(producto);
+      if (den) return desvioDenominacion("historial_precios", den, null, null, pregunta, porVolumen);
       const desvio = desvioVolumen("historial_precios", producto, asoc, porVolumen, null, null);
       if (desvio) return desvio;
       // La RPC marca su propio truncado sobre el total real de filas. p_base false:
@@ -799,6 +932,8 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
       const producto = texto(args.producto);
       if (!producto) throw new Error("Falta el nombre del producto");
       const { desde, hasta } = rangoOpcional(args);
+      const den = denominacionDeTexto(producto);
+      if (den) return desvioDenominacion("compras_producto", den, desde, hasta, pregunta, porVolumen);
       const desvio = desvioVolumen("compras_producto", producto, asoc, porVolumen, desde, hasta);
       if (desvio) return desvio;
       return {
@@ -824,18 +959,16 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
 
     case "gasto_por_categoria": {
       const { desde, hasta } = rangoOpcional(args);
-      return {
-        tipo: "rpc",
-        rpc: "gasto_categorias_agente",
-        params: {
-          p_categoria: texto(args.categoria),
-          p_desde: desde,
-          p_hasta: hasta,
-          p_tipo: tipoDeProducto(args.tipo, pregunta),
-          p_agrupar: texto(args.agrupar),
-        },
-        limite: null,
-      };
+      // «vinos de rioja» puesto como categoria: categoria vino + filtro de denominacion.
+      const denCat = denominacionDeTexto(args.categoria);
+      const denominacion = filtroVino(args.denominacion) ?? denCat;
+      return llamadaGasto({
+        categoria: denCat ? "vino" : texto(args.categoria),
+        desde, hasta,
+        tipo: tipoDeProducto(args.tipo, pregunta),
+        agrupar: texto(args.agrupar),
+        denominacion,
+      });
     }
 
     case "variacion_precios": {
@@ -945,6 +1078,11 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
     case "volumen_comprado": {
       let categoria = texto(args.categoria);
       let producto = texto(args.producto);
+      // «rioja» o «vinos de ribera» en categoria/producto: es la denominacion, no un nombre.
+      const denominacion = filtroVino(args.denominacion, categoria, producto);
+      if (denominacion && denominacionDeTexto(categoria)) categoria = "vino";
+      if (denominacion && denominacionDeTexto(producto)) producto = null;
+      if (denominacion && !categoria && !producto) categoria = "vino";
       if (!categoria && !producto) throw new Error('Falta el parametro "categoria" o "producto".');
       // «cerveza» puesta como producto es la familia (la RPC tambien lo hace,
       // pero «la bebida cerveza» no lo reconoceria).
@@ -953,13 +1091,15 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
       const { desde, hasta } = rangoOpcional(args);
       return llamadaVolumen({
         categoria, producto, desde, hasta,
-        unidad: texto(args.unidad), orden: texto(args.orden), porLitro: porVolumen,
+        unidad: texto(args.unidad), orden: texto(args.orden), porLitro: porVolumen, denominacion,
       });
     }
 
     case "buscar_productos": {
       const consulta = texto(args.consulta);
       if (!consulta) throw new Error("Falta la consulta");
+      const den = denominacionDeTexto(consulta);
+      if (den) return desvioDenominacion("buscar_productos", den, null, null, pregunta, porVolumen);
       const familia = familiaVolumen(consulta, asoc);
       if (familia) {
         return llamadaVolumen({
@@ -995,9 +1135,47 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
     case "consulta_flexible":
       return { tipo: "rpc", rpc: "consulta_flexible_agente", params: { p: construirConsultaFlexible(args) }, limite: null };
 
+    case "comparar_presupuesto":
+      return llamadaPresupuesto(args, presupuestoId);
+
     default:
       throw new Error(`Herramienta desconocida: ${nombre}`);
   }
+}
+
+/** Tope de caracteres del resultado de comparar_presupuesto (una tabla de hasta 40 productos). */
+export const MAX_CHARS_PRESUPUESTO = 14_000;
+
+/**
+ * comparar_presupuesto: el id del presupuesto NO lo manda el modelo (lo pone el
+ * servidor: el de esta conversacion). El descuento tiene que venir EXPLICITO
+ * (ninguno / porcentaje / importe): sin el no se calcula.
+ */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function llamadaPresupuesto(args: any, presupuestoId?: string | null): Llamada {
+  if (!presupuestoId) {
+    throw new Error("Falta el parametro presupuesto: no hay ningun presupuesto adjunto en esta conversacion. Pide al usuario que lo adjunte.");
+  }
+  const tipo = texto(args?.descuento_tipo);
+  const valor = decimal(args?.descuento_valor);
+  if (tipo !== "ninguno" && tipo !== "porcentaje" && tipo !== "importe") {
+    throw new Error('Falta el parametro "descuento_tipo": ninguno, porcentaje o importe. Pregunta al usuario si el proveedor le aplica algun descuento.');
+  }
+  if (tipo !== "ninguno" && (valor === null || valor < 0)) {
+    throw new Error(`Falta el parametro "descuento_valor" (numero positivo) para un descuento de tipo ${tipo}.`);
+  }
+  return {
+    tipo: "rpc",
+    rpc: "comparar_presupuesto_agente",
+    params: {
+      p_presupuesto_id: presupuestoId,
+      p_descuento_pct: tipo === "porcentaje" ? valor : null,
+      p_descuento_importe: tipo === "importe" ? valor : null,
+    },
+    limite: null,
+    maxChars: MAX_CHARS_PRESUPUESTO,
+  };
 }
 
 /**

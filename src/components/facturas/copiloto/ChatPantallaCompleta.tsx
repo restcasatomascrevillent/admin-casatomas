@@ -44,6 +44,8 @@ interface Props {
   isSending: boolean;
   sugerencias: string[];
   onEnviar: (texto: string) => void;
+  /** Presupuesto de proveedor adjunto (PDF, Excel o foto). */
+  onAdjuntar?: (archivo: File) => void;
   onRegenerar?: () => void;
   /** 👍/👎 de una respuesta (chat_feedback). true si quedó guardado. */
   onValorar?: (mensajeId: string, valoracion: 1 | -1, comentario?: string) => Promise<boolean>;

@@ -40,7 +40,7 @@ begin
   foreach f in array array['public.asociar_termino_agente(text)', 'public.asociar_pregunta_agente(text)',
                            'public.lineas_producto_agente(text,text)', 'public.lineas_producto_base_agente(text,text)',
                            'public.categoria_agente(text)',
-                           'public.volumen_comprado_agente(text,text,date,date,text,text,integer,text)'] loop
+                           'public.volumen_comprado_agente(text,text,date,date,text,text,integer,text,text,text,text)'] loop
     if has_function_privilege('anon', f, 'execute') then
       raise exception 'FALLO T1: anon puede ejecutar %', f;
     end if;
