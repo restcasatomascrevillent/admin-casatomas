@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.38.1] - 2026-11-16
+
+Objetivo: Presupuestos auditados: tabla completa desde el servidor, reglas de formato y tamaño, referencias y ahorro corregidos
+
+### Cambiado
+- Chat-facturas: presupuestos auditados — tabla completa desde el servidor, reglas de formato y referencias corregidas ([#241](https://github.com/restcasatomascrevillent/admin-casatomas/pull/241))
+
 ## [1.38.0] - 2026-11-16
 
 Objetivo: Presupuestos en el chat: tarifas de cualquier tamaño, columnas automáticas y emparejado por texto + IA que mira formato y tamaño
