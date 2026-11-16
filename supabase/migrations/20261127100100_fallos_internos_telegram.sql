@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ============================================================================
--- 20261127100000_fallos_internos_telegram — Fallos internos al Telegram de los
+-- 20261127100100_fallos_internos_telegram — Fallos internos al Telegram de los
 -- desarrolladores (12/11/2026)
 -- ----------------------------------------------------------------------------
 -- Un ÚNICO punto de envío con «tipo de aviso» para los fallos que sirven a quien
@@ -24,7 +24,7 @@ set client_encoding = 'UTF8';
 -- fallo; cada envío queda en avisos_telegram_envios (tipo 'fallo', fallo_id).
 -- Respeta avisos_telegram_config (activo y chat_id).
 --
--- Rollback: supabase/rollbacks/20261127100000_fallos_internos_telegram_ROLLBACK.sql
+-- Rollback: supabase/rollbacks/20261127100100_fallos_internos_telegram_ROLLBACK.sql
 -- Test:     supabase/tests/fallos_internos_telegram_test.sql
 -- ============================================================================
 set lock_timeout = '5s';
@@ -56,7 +56,7 @@ create table if not exists public.fallos_internos (
   ultimo_error  text
 );
 comment on table public.fallos_internos is
-  'Fallos internos para desarrolladores (20261127100000). Se envían al Telegram de avisos con la Edge Function avisos-telegram (acción fallos).';
+  'Fallos internos para desarrolladores (20261127100100). Se envían al Telegram de avisos con la Edge Function avisos-telegram (acción fallos).';
 
 create unique index if not exists fallos_internos_clave_uq on public.fallos_internos (tipo, clave) where clave is not null;
 create index if not exists fallos_internos_pendientes_idx on public.fallos_internos (created_at) where enviado_en is null;

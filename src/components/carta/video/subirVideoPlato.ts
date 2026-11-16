@@ -12,6 +12,7 @@ import { rutaEnBucket } from "../subirFotoCarta";
 import type { NombreTema } from "../composicionCarta";
 import { esErrorColumnaVideo, extensionVideo, rutaVideoPlato } from "./videoPlato";
 import { tipoMimeBruto } from "../potente/colaPendientes";
+import { trabajosVivos } from "../potente/trabajosVideo";
 import { toast } from "sonner";
 import {
   archivoDesdeOriginal,
@@ -84,6 +85,19 @@ export async function quitarVideoPlato(id: string, urlActual: string | null | un
   const originales = await listarOriginales(id).catch(() => [] as string[]);
   const borrar = [...(ruta ? [ruta] : []), ...originales];
   if (borrar.length) await supabase.storage.from(BUCKET_VIDEO).remove(borrar).catch(() => undefined);
+}
+
+/**
+ * Foto nueva en un plato con vídeo (ver fotoNuevaQuitaVideo.ts): quita el
+ * vídeo anterior, salvo que haya uno mandado a un dispositivo potente y aún
+ * sin terminar (ese llegará después y se queda). Devuelve true si lo quitó.
+ */
+export async function quitarVideoPorFotoNueva(id: string, urlActual: string | null | undefined): Promise<boolean> {
+  if (!urlActual) return false;
+  const vivos = await trabajosVivos(id).catch(() => null);
+  if (vivos?.disponible && vivos.trabajos.length > 0) return false;
+  await quitarVideoPlato(id, urlActual);
+  return true;
 }
 
 // ---------------------------------------------------------------------------

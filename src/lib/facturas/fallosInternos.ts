@@ -5,7 +5,7 @@ import { alertasRelevantes, type ResultadoProcesamiento } from "./colaSubida";
 /**
  * Fallos internos para desarrolladores (Telegram, 12/11/2026). PUNTO ÚNICO de envío desde el
  * panel: el RPC `registrar_fallo_interno(tipo, datos, clave)` (migración
- * 20261127100000_fallos_internos_telegram). Otros tipos se añaden a la lista blanca del RPC.
+ * 20261127100100_fallos_internos_telegram). Otros tipos se añaden a la lista blanca del RPC.
  * Nunca lanza: un fallo al avisar no puede romper lo que el usuario está haciendo.
  */
 export type TipoFalloInterno = "albaran_aviso";
