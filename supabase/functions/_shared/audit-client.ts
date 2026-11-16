@@ -87,6 +87,8 @@ export const ADMITE_INTEGRACION: ReadonlySet<string> = new Set([
   // permitido + tope de tamaño + límite por IP con HMAC + cupo diario en la RPC);
   // el proceso, pg_cron con su secreto o un super admin.
   "registrar-actividad-web", "procesar-logs-web",
+  // Embeddings por nombre (20261203100000): pg_cron con x-ocr-secret o un usuario de facturas.
+  "embeddings-nombres",
 ]);
 
 /** La autenticación y autorización de negocio siguen en cada handler. */

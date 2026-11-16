@@ -183,6 +183,12 @@ export function depurarLineas<T extends LineaCalidad>(
       quitadas.push({ nombre: l.nombre, motivo: "sin cantidad (rótulo impreso)" });
       return;
     }
+    // Fila de tarifa / listado de precios (precio sin cantidad ni importe): no
+    // es compra ni entra en la base (reglas de la carga histórica, 15/11/2026).
+    if (esNum(l.precio_unitario) && !esNum(l.total) && !l.bonificada && (cant === null || cant === 0)) {
+      quitadas.push({ nombre: l.nombre, motivo: "precio de tarifa sin cantidad" });
+      return;
+    }
     if (PENDIENTE.test(l.nombre) && (!esNum(l.total) || l.total === 0)) {
       quitadas.push({ nombre: l.nombre, motivo: "mercancía pendiente de servir" });
       return;

@@ -354,7 +354,42 @@ rellenes un hueco con el resultado de una operación.
 ════════════════════════════════════════════
 6. RESUMEN
 ════════════════════════════════════════════
-El campo "resumen" son 1-2 frases que se usan para búsqueda semántica: qué tipo de género o servicio es, qué proveedor, importe total y para qué sirve en el restaurante.`;
+El campo "resumen" son 1-2 frases que se usan para búsqueda semántica: qué tipo de género o servicio es, qué proveedor, importe total y para qué sirve en el restaurante.
+
+════════════════════════════════════════════
+7. LO APRENDIDO CON 2.400 FACTURAS DEL RESTAURANTE
+════════════════════════════════════════════
+· ABONOS: si el título dice abono, rectificativa, nota de crédito o
+  devolución, es_abono = true y copia los importes TAL CUAL (Osborne los
+  imprime en positivo: el signo lo pone el programa). Una devolución de
+  envases dentro de una factura normal es una línea con su importe negativo.
+· REGALOS: una línea "sin cargo" o a 0 € con precio de tarifa impreso lleva
+  bonificada = true, ese precio en precio_unitario y total = 0.
+· LÍNEAS SIN IVA: cada línea es la BASE. Si el proveedor imprime las líneas
+  con el IVA incluido, cópialas igual (el programa las pasa a base y avisa).
+· FUERA DE LA BASE: el recargo de equivalencia va en recargo_equivalencia; una
+  tasa o suplido no sujeto que suma al total (la tasa de Tráfico/DGT de una
+  ITV) va en cargos_fuera_base. Portes, embalajes, envases, punto verde y
+  descuentos del pie son LÍNEAS (sección D1).
+· QUÉ NO ES COMPRA (clase_documento): adeudos o recibos SEPA y justificantes
+  del banco, liquidaciones o comisiones del TPV, custodias y comisiones
+  bancarias, cuotas de leasing o préstamo, avisos de dividendos, recibos de
+  la SGAE y las facturas que EMITE MASIDE 2011 / Casa Tomás a otro cliente
+  (ventas). Todo lo demás es 'compra', también los servicios (Rechgo, por
+  ejemplo, es una compra de 690 € + IVA).
+· PLUXEE (A78604113): copia todas las líneas; el programa deja como gasto solo
+  la comisión.
+· DESTINATARIO: copia en "cliente" el nombre Y la dirección del destinatario:
+  "Touza Cocktail Bar" o la calle Santa María de la Cabeza nº 4 es el bar
+  Touza; Casa Tomás es el restaurante.
+· CIF QUE A VECES NO SE VE: Transgourmet es A17371758 (reconócelo por el
+  logo o el nombre aunque el escaneo no muestre el CIF).
+· NICOLÁS Y VALERO: el cargo de embalajes (1,82 € por entrega) es una línea
+  más, con IVA del 10 %.
+· LONJA DE SANTA POLA (B54490115): cada página es una factura de UN armador;
+  pon el nombre del armador en observaciones.
+· VARIAS HOJAS: los escaneos pueden venir en orden inverso; guíate por
+  «Hoja n/N» o «Suma anterior», no por el orden de las imágenes.`;
 
 /** Instrucción de usuario del camino de una página (texto idéntico al de v101). */
 export const TEXTO_EXTRACCION =

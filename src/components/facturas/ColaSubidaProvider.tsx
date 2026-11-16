@@ -31,6 +31,7 @@ import {
   type Sustituible,
 } from "@/lib/facturas/documentoLargo";
 import { ETIQUETA_TIPO, tipoDocumento } from "@/lib/facturas/resultadosCarga";
+import { avisarFalloAlbaran } from "@/lib/facturas/fallosInternos";
 import {
   descartarPendienteServidor,
   fusionarPendientes,
@@ -113,6 +114,8 @@ export function ColaSubidaProvider({ children, deps }: Props) {
       // «Ver» lleva al documento guardado (Compras › Documentos), no a la lista de la subida.
       const ver = { label: "Ver", onClick: () => navegarRef.current(rutaVerDocumento(r?.facturaId)) };
       const pos = { position: POSICION_AVISOS };
+      // Avisos de un albarán (también dentro de una tanda): al Telegram de desarrolladores.
+      if (clase === "avisos") avisarFalloAlbaran(r);
       if (r?.success && !r.duplicado) {
         // Documento nuevo: lista, productos, compras y proveedores (QA C-11).
         invalidarTrasDocumento(queryClient);

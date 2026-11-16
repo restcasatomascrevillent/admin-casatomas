@@ -264,3 +264,16 @@ aparece guardada. En `ocr_trabajos` queda una fila con `num_paginas = 1` y `orig
    cliente (B54583356, MASIDE) ya no puede quedar como CIF del proveedor.
 5. Ver la copia de una sustitución:
    `select id, factura_id, sustituida_at, resumen_antes, resumen_despues from facturas_sustituciones order by id desc;`
+
+## 8. Reglas de la carga histórica en el OCR diario (15-nov-2026)
+
+Lo aprendido extrayendo a mano ~2.400 facturas (`facturas-conocimiento/carga2/PROMPT-AGENTE.md`) ya lo aplica también `procesar-factura` / `ocr-trabajo`: prompt (sección 7), esquema (`es_abono`, `clase_documento`, `recargo_equivalencia`, `cargos_fuera_base`, dirección en `cliente`) y código puro en `procesar-factura/reglasCarga.ts` (abonos en negativo, local touza/casa_tomas, documentos que no son compra, Pluxee, líneas con IVA incluido, CIF de Nicolás y Valero 2025 y Transgourmet, fecha fuera de año, cajas sin unidades, filas de tarifa, duplicados con números distintos).
+
+Sin migración: solo desplegar las dos funciones (demo primero):
+
+```bash
+npx supabase functions deploy procesar-factura --project-ref sfonaclosuafvlhutkon
+npx supabase functions deploy ocr-trabajo      --project-ref sfonaclosuafvlhutkon
+```
+
+Un documento que no es compra (adeudo SEPA, comisión de TPV, leasing, venta emitida por MASIDE…) ya no se guarda: «Cargar» muestra «No es una factura de compra: …».

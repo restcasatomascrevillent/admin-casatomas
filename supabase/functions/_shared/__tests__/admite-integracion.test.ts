@@ -24,6 +24,7 @@ const AUTENTICACION_PROPIA: Record<string, { mecanismo: string; patrones: RegExp
   "sync-trafico-web": { mecanismo: "x-webhook-secret en tiempo constante", patrones: [/x-webhook-secret/, /compararTiempoConstante/] },
   "ocr-trabajo": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed", patrones: [/verificarSecreto/] },
   "clasificar-productos": { mecanismo: "x-ocr-secret o usuario con facturas:edit", patrones: [/verificarSecreto/, /autenticar\(req, cfgAuth, "edit"\)/] },
+  "embeddings-nombres": { mecanismo: "x-ocr-secret o usuario con facturas:edit", patrones: [/verificarSecreto/, /autenticar\(req, cfgAuth, "edit"\)/] },
   "sincronizar-costes-openai": { mecanismo: "x-ocr-secret en tiempo constante", patrones: [/verificarSecreto/] },
   "instagram-programador": { mecanismo: "x-webhook-secret en tiempo constante, fail-closed (solo pg_cron)", patrones: [/x-webhook-secret/, /compararTiempoConstante/] },
   "facturas-originales-drive": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (pg_cron) o JWT de admin", patrones: [/verificarSecreto/, /exigirAdmin/] },

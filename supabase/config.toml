@@ -107,6 +107,13 @@ verify_jwt = false
 [functions.facturas-original]
 verify_jwt = true
 
+# subir-original-drive: subida masiva del histórico a Drive desde un script
+# local (facturas-conocimiento/carga2/scripts/subir_drive.mjs), sin usuario ni
+# JWT. Autenticación real: cabecera x-subida-token == SUBIDA_DRIVE_TOKEN
+# (tiempo constante, FALLA CERRADO -> 503 si falta). No escribe en la BD.
+[functions.subir-original-drive]
+verify_jwt = false
+
 # clasificar-productos: la llama el cron «clasificar-productos» por pg_net (sin
 # JWT) con la cabecera x-ocr-secret == OCR_TRABAJOS_SECRET (mismo secreto y
 # mismo valor de Vault que ocr-trabajo), y el botón de Facturas › Productos con
@@ -115,6 +122,14 @@ verify_jwt = true
 # supabase/functions/clasificar-productos/index.ts y la migración
 # 20261007160000_productos_catalogo_categorias.sql.
 [functions.clasificar-productos]
+verify_jwt = false
+
+# embeddings-nombres (20261203100000): vector de los nombres de producto que aún
+# no lo tienen. La llama el cron «embeddings-nombres» por pg_net (sin JWT) con
+# x-ocr-secret == OCR_TRABAJOS_SECRET (mismo secreto y valor de Vault que
+# ocr-trabajo), o un usuario con permiso de EDICIÓN en facturas. No acepta datos
+# del cuerpo. Ver supabase/functions/embeddings-nombres/index.ts.
+[functions.embeddings-nombres]
 verify_jwt = false
 
 # Centro de modelos de IA (20261107500000): la llama pg_cron a diario (pg_net,

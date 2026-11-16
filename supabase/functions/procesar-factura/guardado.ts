@@ -11,6 +11,7 @@
 import type { OrigenImporte } from "./esquema.ts";
 import type { DatosNormalizados } from "./extraccion.ts";
 import { type ClienteOpenAI, vec } from "./openai.ts";
+import { asegurarVectoresNombres } from "./embeddingsNombres.ts";
 import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes } from "./costeLectura.ts";
 import {
   archivarDesdeStorage,
@@ -24,6 +25,7 @@ import {
   STORAGE_BUCKET,
 } from "./archivo.ts";
 import { decidirCoincidencia, leerPagina, type PaginaDocumento } from "./paginasDocumento.ts";
+import { esOtraFacturaConNumeroDistinto } from "./reglasCarga.ts";
 
 // deno-lint-ignore no-explicit-any
 type Supa = any;
@@ -220,12 +222,11 @@ function textoEmbedding(d: DatosNormalizados): string {
 
 function filasProductos(
   d: DatosNormalizados,
-  embeddings: number[][],
   conColumnas04b: boolean,
   conBultos = true,
   conIvaPct = true,
 ) {
-  return igualarColumnasValor(filasProductosSinIgualar(d, embeddings, conColumnas04b, conBultos, conIvaPct));
+  return igualarColumnasValor(filasProductosSinIgualar(d, conColumnas04b, conBultos, conIvaPct));
 }
 
 /**
@@ -247,7 +248,6 @@ export function igualarColumnasValor<T extends Record<string, unknown>>(filas: T
 
 function filasProductosSinIgualar(
   d: DatosNormalizados,
-  embeddings: number[][],
   conColumnas04b: boolean,
   conBultos = true,
   conIvaPct = true,
@@ -258,7 +258,8 @@ function filasProductosSinIgualar(
     unidad: p.unidad,
     precio_unitario: p.precio_unitario,
     total: p.total,
-    embedding: embeddings[i] ? vec(embeddings[i]) : null,
+    // Sin `embedding`: desde 20261203100000 el vector va por NOMBRE en
+    // productos_nombre_embedding (asegurarVectoresNombres, tras guardar).
     ...(conColumnas04b ? { pagina: p.pagina ?? 1, orden: p.orden ?? i, albaran_ref: p.albaran_ref ?? null } : {}),
     // Unidades/bultos de una línea guardada por peso (migración
     // 20261005150000). Solo se manda si hay valor: un documento sin líneas al
@@ -296,12 +297,17 @@ export function faltaColumnaIvaPct(msg: string | undefined | null): boolean {
 }
 
 /** Mezcla alertas pre-guardado con las de validar_cordura_factura (manda SQL por código). */
-export async function validarYGuardarAlertas(supabase: Supa, facturaId: number, previas: Alerta[]): Promise<Alerta[]> {
+export async function validarYGuardarAlertas(
+  supabase: Supa,
+  facturaId: number,
+  previas: Alerta[],
+  extrasTotal = 0,
+): Promise<Alerta[]> {
   let alertas: Alerta[] = [];
   try {
     const { data, error } = await supabase.rpc("validar_cordura_factura", { p_factura_id: facturaId });
     if (error) throw new Error(error.message);
-    const sql = Array.isArray(data) ? data : [];
+    const sql = quitarIvaExplicadoPorExtras(Array.isArray(data) ? data : [], extrasTotal);
     const codigosSql = new Set(sql.map((a: Alerta) => a?.codigo));
     alertas = [...sql, ...previas.filter((a) => !codigosSql.has(a?.codigo))];
   } catch (e) {
@@ -312,6 +318,20 @@ export async function validarYGuardarAlertas(supabase: Supa, facturaId: number, 
     .update({ alertas_validacion: alertas.length > 0 ? alertas : null }).eq("id", facturaId);
   if (updErr) console.error("[validacion] No se pudieron guardar las alertas:", updErr.message);
   return alertas;
+}
+
+/**
+ * El SQL cuadra base + IVA − IRPF = total y no conoce el recargo de
+ * equivalencia ni los cargos fuera de base (tasa DGT de una ITV): si la
+ * diferencia que marca es exactamente esa, no es un descuadre.
+ */
+export function quitarIvaExplicadoPorExtras(alertas: Alerta[], extrasTotal: number): Alerta[] {
+  if (!extrasTotal) return alertas;
+  return alertas.filter((a) => {
+    if (a?.codigo !== "iva_incoherente") return true;
+    const dif = Number((a.detalle as Record<string, unknown> | undefined)?.diferencia);
+    return !(Number.isFinite(dif) && Math.abs(Math.abs(dif) - Math.abs(extrasTotal)) <= 0.05);
+  });
 }
 
 /**
@@ -437,10 +457,22 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     if (ya?.id) return await completarGuardada(ctx, e, ya);
   }
 
+  // 3b) No es una factura de compra (adeudo SEPA, comisión de TPV, leasing,
+  //     venta emitida por MASIDE…): no se carga como gasto (reglas de la carga
+  //     histórica, 15/11/2026). Se corta antes de escribir nada.
+  if (d.no_es_compra) throw new Error(d.no_es_compra.mensaje);
+
   // 4) Duplicado (las notas sin número llevan uno provisional, ver abajo)
-  const existente = esNumeroProvisional(d.numero_documento)
+  let existente = esNumeroProvisional(d.numero_documento)
     ? await numeroProvisionalLibre(supabase, d)
     : await buscarExistente(supabase, d);
+  // Mismo proveedor + fecha + total con NÚMEROS distintos: son dos facturas
+  // (alquiler 10-26 y 11-26), no un duplicado. Igual que la importación (#215).
+  if (existente && esOtraFacturaConNumeroDistinto(d.numero_documento, existente)) {
+    console.log(`[procesar-factura] ${d.numero_documento} coincide en datos con la factura ${existente.id} (` +
+      `${existente.numero_documento}) pero el número es otro: no es duplicado.`);
+    existente = null;
+  }
   if (existente) {
     console.log(`[procesar-factura] DUPLICADO: ${d.numero_documento} (ya existe la factura ${existente.id})`);
     return {
@@ -487,6 +519,9 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     total_origen: e.totalOrigen,
     observaciones: d.observaciones,
     resumen: d.resumen,
+    // Local según el destinatario impreso (facturas.local, 20261104170000).
+    // La importación lo manda en cabeceraExtra, que va después y manda.
+    ...(d.local ? { local: d.local } : {}),
     embedding: vec(embFactura),
     verificada: false,
     procesado_en: new Date().toISOString(),
@@ -506,11 +541,11 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   const facturaId: number = ins.data.id;
 
   try {
-    // 7) Líneas (embeddings en lotes de 100)
+    // 7) Líneas (y el vector de sus nombres nuevos, aparte)
     await insertarLineas(ctx, facturaId, d, conColumnas04b);
 
     // 8) Validación de cordura
-    const alertas = await validarYGuardarAlertas(supabase, facturaId, alertasPrevias);
+    const alertas = await validarYGuardarAlertas(supabase, facturaId, alertasPrevias, d.extras_total ?? 0);
 
     // 9) Original: a Drive (carpeta del proveedor → mes). Storage solo como
     //    copia TEMPORAL si Drive falla (el cron facturas-originales-drive la
@@ -527,15 +562,18 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   }
 }
 
-/** Paso 7: líneas con sus embeddings. Un solo INSERT (todas o ninguna). */
+/**
+ * Paso 7: líneas. Un solo INSERT (todas o ninguna). Después, el vector de los
+ * nombres que aún no lo tienen (uno por nombre, 20261203100000); si falla, no
+ * rompe el guardado: lo completa el cron embeddings-nombres.
+ */
 async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: DatosNormalizados, conColumnas04b: boolean): Promise<void> {
   if (d.productos.length === 0) return;
-  const { supabase, openai } = ctx;
-  const embs = await openai.embed(d.productos.map((p) => p.nombre));
+  const { supabase } = ctx;
   const insertar = (conBultos: boolean, conIvaPct: boolean) =>
     supabase.from("productos_factura")
       .insert(
-        filasProductos(d, embs, conColumnas04b, conBultos, conIvaPct).map((f) => ({ factura_id: facturaId, ...f })),
+        filasProductos(d, conColumnas04b, conBultos, conIvaPct).map((f) => ({ factura_id: facturaId, ...f })),
       );
   // Columnas opcionales que puede faltar por migrar: se quita la que falte
   // y se reintenta (a lo sumo una vez por columna).
@@ -553,6 +591,7 @@ async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: Datos
     ({ error } = await insertar(conBultos, conIvaPct));
   }
   if (error) throw new Error(`insert productos: ${error.message}`);
+  await asegurarVectoresNombres(ctx, d.productos.map((p) => p.nombre));
 }
 
 /** Paso 9: el original a Drive (o copia temporal) y la referencia en la factura. */
@@ -711,7 +750,6 @@ export async function sustituirFactura(
   const d = p.datos;
 
   const [embFactura] = await openai.embed(textoEmbedding(d));
-  const embs = d.productos.length > 0 ? await openai.embed(d.productos.map((x) => x.nombre)) : [];
 
   // El original nuevo se mueve a su carpeta definitiva SOLO si la RPC sale
   // bien: la RPC ya apunta a la ruta definitiva y, si luego no se puede
@@ -749,11 +787,13 @@ export async function sustituirFactura(
       embedding: vec(embFactura),
       paginas: Math.min(20, Math.max(1, p.paginas ?? 1)),
     },
-    p_lineas: filasProductos(d, embs, true),
+    p_lineas: filasProductos(d, true),
     p_esperado: a.esperado,
     p_archivo_path: destino,
   });
   if (error) throw new Error(error.message.replace(/^.*SUSTITUCIÓN ABORTADA: /, "No se ha sustituido nada: "));
+  // Vector de los nombres nuevos (uno por nombre, 20261203100000). No rompe nada si falla.
+  await asegurarVectoresNombres({ supabase, openai }, d.productos.map((x) => x.nombre));
 
   // El original nuevo, a Drive; la RPC ya dejó la factura apuntando a la ruta
   // temporal (y sin drive_url) por si Drive falla.
@@ -825,8 +865,7 @@ export async function anadirPagina(
   const pag = p.pagina;
   const d = p.datos;
 
-  const embs = d.productos.length > 0 ? await openai.embed(d.productos.map((x) => x.nombre)) : [];
-  const lineas = filasProductos({ ...d, productos: d.productos.map((x) => ({ ...x, pagina: pag.actual })) }, embs, true);
+  const lineas = filasProductos({ ...d, productos: d.productos.map((x) => ({ ...x, pagina: pag.actual })) }, true);
   // Igual que al sustituir: si el original de la página ya no está, no se
   // apunta la factura a una ruta vacía.
   const destino = t.original_path && await existeEnStorage(supabase, t.original_path)
@@ -855,6 +894,8 @@ export async function anadirPagina(
     p_archivo_path: destino,
   });
   if (error) throw new Error(error.message.replace(/^.*AÑADIDO ABORTADO: /, "No se ha añadido nada: "));
+  // Vector de los nombres nuevos (uno por nombre, 20261203100000). No rompe nada si falla.
+  await asegurarVectoresNombres({ supabase, openai }, d.productos.map((x) => x.nombre));
 
   // El original de la página, a Drive (misma carpeta proveedor → mes, como
   // «pagN-…»). La RPC solo apunta la factura a la ruta temporal si no tenía

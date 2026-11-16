@@ -152,8 +152,8 @@ begin
          observaciones, resumen, embedding, verificada, archivo_path, alertas_validacion
     from public.facturas where id = 54
   returning id into v_copia;
-  insert into public.productos_factura (factura_id, nombre, cantidad, unidad, precio_unitario, total, embedding, pagina, orden)
-  select v_copia, nombre, cantidad, unidad, precio_unitario, total, embedding, pagina, orden
+  insert into public.productos_factura (factura_id, nombre, cantidad, unidad, precio_unitario, total, pagina, orden)
+  select v_copia, nombre, cantidad, unidad, precio_unitario, total, pagina, orden
     from public.productos_factura where factura_id = 54 order by orden;
   select count(*) into v_lin_antes from public.productos_factura where factura_id = v_copia;
   select count(*) into v_hist_antes from public.historial_precios where factura_id = v_copia;
