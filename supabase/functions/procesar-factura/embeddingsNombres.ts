@@ -21,6 +21,7 @@ export const LOTE_ESCRITURA = 50;
 const LOTE_LECTURA = 100;
 
 // deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Supa = any;
 
 /** Nombres distintos (tal cual, sin normalizar) y no vacíos. */

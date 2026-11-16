@@ -14,6 +14,7 @@ export const MODELO = "text-embedding-3-small";
 export const LIMITE = 500;
 
 // deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Supa = any;
 
 export interface DepsRelleno {
@@ -54,10 +55,9 @@ export async function embedOpenAI(
   if (!res.ok) throw new Error(`OpenAI embeddings ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const json = await res.json();
   opts.alUsar?.(json?.usage);
-  // deno-lint-ignore no-explicit-any
-  const datos = [...(json?.data ?? [])].sort((a: any, b: any) => (a.index ?? 0) - (b.index ?? 0));
-  // deno-lint-ignore no-explicit-any
-  const vectores = datos.map((d: any) => d.embedding as number[]);
+  type FilaEmbedding = { index?: number; embedding: number[] };
+  const datos = [...((json?.data ?? []) as FilaEmbedding[])].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  const vectores = datos.map((d) => d.embedding);
   if (vectores.length !== textos.length) {
     throw new Error(`OpenAI devolvió ${vectores.length} vectores para ${textos.length} nombres`);
   }
