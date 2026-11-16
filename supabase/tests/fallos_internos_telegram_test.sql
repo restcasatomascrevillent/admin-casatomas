@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- Test de 20261127100000_fallos_internos_telegram. BEGIN … ROLLBACK: no deja nada escrito
+-- Test de 20261127100100_fallos_internos_telegram. BEGIN … ROLLBACK: no deja nada escrito
 -- (el aviso a Telegram es pg_net y no sale si se deshace la transacción).
 -- Acaba en «fallos_internos_telegram_test: OK».
 --   npx supabase db query --linked -f supabase/tests/fallos_internos_telegram_test.sql
