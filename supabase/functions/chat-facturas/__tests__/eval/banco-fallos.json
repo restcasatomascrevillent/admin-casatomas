@@ -177,6 +177,105 @@
       "rpc": { "debe": ["gamba roja"], "prod": { "debe": ["\"hasta\" ?: ?\"2026-1[12]-"] }, "max_ms": 3000 },
       "ia": { "prod": { "no_debe": ["07/09/2026"] } },
       "sql": "select pf.nombre, pf.cantidad, pf.unidad, pf.precio_unitario, f.fecha from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ilike '%gamba roja%' and pf.total > 0 order by f.fecha desc limit 5"
+    },
+    {
+      "id": "p01",
+      "origen": "revisión del #255 (17/11/2026): abreviaturas",
+      "mensaje": "Cuánto he gastado en aceite de oliva",
+      "fallo_original": "Sumaba 3.768 € de anchoas y ventrescas «A/OLIVA» y conservas «AO» (recorte «a» = aceite y sigla «ao»).",
+      "correcto": "Solo las líneas que dicen aceite de oliva; las conservas «A/OLIVA» no entran (ni sumadas ni como posibles).",
+      "herramienta": {"nombre": "compras_producto", "argumentos": {"producto": "aceite de oliva"}},
+      "rpc": {"debe": ["aceite"], "no_debe": ["A/OLIVA", "A\\.OLIVA", "ANCHOA CANTAB"], "max_ms": 3000},
+      "ia": {"no_debe": ["anchoa", "ventresca"]},
+      "sql": "select pf.nombre, pf.total from productos_factura pf where pf.nombre ~* 'a/oliva|\\mAO\\M'"
+    },
+    {
+      "id": "p02",
+      "origen": "revisión del #255 (17/11/2026): abreviaturas",
+      "mensaje": "A cuánto compro la pera conferencia",
+      "fallo_original": "Traía «TOMATE PERA C-M/MM MC 6KG» («c» de «C-M» = conferencia): el último precio podía ser el del tomate.",
+      "correcto": "Solo la pera conferencia; el tomate pera no aparece.",
+      "herramienta": {"nombre": "compras_producto", "argumentos": {"producto": "pera conferencia"}},
+      "rpc": {"no_debe": ["TOMATE"], "prod": {"debe": ["CONFERENCIA"]}, "max_ms": 3000},
+      "ia": {"no_debe": ["tomate"]},
+      "sql": "select pf.nombre, pf.total from productos_factura pf where pf.nombre ~* 'pera'"
+    },
+    {
+      "id": "p03",
+      "origen": "revisión del #255 (17/11/2026): siglas",
+      "mensaje": "Cuánto gasto en frutos rojos",
+      "fallo_original": "Sumaba manzana Pink Lady, kiwi Zespri y «PIMIENTO PEQ FR DUL» (sigla «FR» de la misma categoría y proveedor).",
+      "correcto": "Solo frutos rojos: una sigla que no encabeza la línea no cuenta.",
+      "herramienta": {"nombre": "compras_producto", "argumentos": {"producto": "frutos rojos"}},
+      "rpc": {"no_debe": ["PINK LADY", "KIWI", "PEQ FR"], "prod": {"debe": ["ROJO"]}, "max_ms": 3000},
+      "ia": {"no_debe": ["kiwi", "manzana", "pimiento"]},
+      "sql": "select pf.nombre, pf.total from productos_factura pf where pf.nombre ~* 'frutos? rojos?|\\mFR\\M'"
+    },
+    {
+      "id": "p04",
+      "origen": "revisión del #255 (17/11/2026): abreviaturas",
+      "mensaje": "Precio del solomillo de vaca",
+      "fallo_original": "Sumaba «GAL-SEL.CHULETERO C/S VACA RUBIA GALLEGA» («s» de «C/S» = solomillo): +656 €.",
+      "correcto": "Los solomillos de vaca (y el «Chuletero de vaca con hueso y solomillo» del catálogo, que sí lo lleva); el chuletero «C/S VACA» no aparece.",
+      "herramienta": {"nombre": "compras_producto", "argumentos": {"producto": "solomillo de vaca"}},
+      "rpc": {"no_debe": ["GAL-SEL\\.CHULETERO"], "prod": {"debe": ["SOLOMILLO"]}, "max_ms": 3000},
+      "ia": {"no_debe": ["chuletero"]},
+      "sql": "select pf.nombre, pf.total from productos_factura pf where pf.nombre ~* 'solomillo.*vaca|c/s vaca'"
+    },
+    {
+      "id": "p05",
+      "origen": "revisión del #255 (17/11/2026): abreviaturas",
+      "mensaje": "Cuánto he gastado en vieira congelada",
+      "fallo_original": "Pasaba de 69 € a 10.100 €: «Vieira CON concha» («con» = congelada recortada).",
+      "correcto": "Producción: la vieira congelada (unos 69 €); las vieiras con concha no se suman.",
+      "herramienta": {"nombre": "compras_producto", "argumentos": {"producto": "vieira congelada"}},
+      "rpc": {"no_debe": ["CON CONCHA"], "prod": {"debe": ["\"total\": ?\\{[^}]*\"importe\": ?[0-9]{1,3}(\\.[0-9]+)?[,}]"]}, "max_ms": 3000},
+      "ia": {"no_debe": ["10\\.[01][0-9]{2}"]},
+      "sql": "select pf.nombre, pf.total from productos_factura pf where pf.nombre ~* 'vieira'"
+    },
+    {
+      "id": "p06",
+      "origen": "revisión del #255 (17/11/2026): proveedor por parecido",
+      "mensaje": "Qué le compramos a Mercadona",
+      "fallo_original": "Daba por seguro «REGISTRO MERCANTIL DE ALICANTE» (parecido 0,50) y contestaba con sus cifras.",
+      "correcto": "No hay ningún proveedor Mercadona: lo dice y, si acaso, pregunta por los parecidos, sin cifras.",
+      "herramienta": {"nombre": "ficha_proveedor", "argumentos": {"proveedor": "mercadona"}},
+      "rpc": {"debe": ["sin_datos"], "no_debe": ["top_productos", "proveedor_corregido"], "max_ms": 3000},
+      "ia": {"debe": ["no hay|no consta|no aparece|no tengo|no se (le )?compra|ning[uú]n"], "no_debe": ["mercantil[^\n]*€"]},
+      "sql": "select * from proveedor_buscar_agente('mercadona')"
+    },
+    {
+      "id": "p07",
+      "origen": "revisión del #255 (17/11/2026): proveedor por parecido",
+      "mensaje": "Facturas de Naturgy",
+      "fallo_original": "Usaba «NATURCID, S.L.» (parecido 0,63) como si fuera Naturgy.",
+      "correcto": "Ninguna factura de Naturgy; Naturcid, como mucho, como parecido para preguntar.",
+      "herramienta": {"nombre": "filtrar_documentos", "argumentos": {"filtro": "todos", "texto": "naturgy", "tipo": null, "desde": null, "hasta": null, "orden": null, "limite": null}},
+      "rpc": {"debe": ["\"total_filas\": ?0"], "no_debe": ["proveedor_corregido"], "max_ms": 3000},
+      "ia": {"no_debe": ["naturcid[^\n]*€"]},
+      "sql": "select * from proveedor_buscar_agente('naturgy')"
+    },
+    {
+      "id": "p08",
+      "origen": "revisión del #255 (17/11/2026): proveedor por parecido",
+      "mensaje": "A cuánto compro la cerveza a Mahou",
+      "fallo_original": "Usaba «MAMADOU MACOUMB NDOUR» (una persona física, parecido 0,50) como proveedor.",
+      "correcto": "No se compra a Mahou: lo dice, sin cifras de otro proveedor.",
+      "herramienta": {"nombre": "compras_producto", "argumentos": {"producto": "cerveza", "proveedor": "mahou"}},
+      "rpc": {"debe": ["proveedor_no_encontrado", "sin_datos"], "no_debe": ["ultima_factura", "proveedor_corregido", "\"importe\""], "max_ms": 3000},
+      "ia": {"no_debe": ["mamadou[^\n]*€"]},
+      "sql": "select * from proveedor_buscar_agente('mahou')"
+    },
+    {
+      "id": "p09",
+      "origen": "revisión del #255 (17/11/2026): proveedor por parecido",
+      "mensaje": "Albaranes de Damm sin facturar",
+      "fallo_original": "Usaba «VIVEROS LA DAMA, S.L.» (parecido 0,60) como si fuera Damm.",
+      "correcto": "Ningún proveedor Damm: lo dice o pregunta, sin dar albaranes de Viveros La Dama.",
+      "herramienta": {"nombre": "albaranes_sin_factura", "argumentos": {"proveedor": "damm", "desde": null, "hasta": null}},
+      "rpc": {"debe": ["sin_datos"], "no_debe": ["dias_sin_facturar", "\"albaranes\""], "max_ms": 3000},
+      "ia": {"no_debe": ["viveros[^\n]*€"]},
+      "sql": "select * from proveedor_buscar_agente('damm')"
     }
   ]
 }
