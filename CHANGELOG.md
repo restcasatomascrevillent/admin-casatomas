@@ -2,6 +2,14 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.40.1] - 2026-11-17
+
+Objetivo: Chat de facturas fiable: búsqueda con abreviaturas sin mezclar productos, proveedor parecido preguntando, totales completos, vinos por botella y fallos registrados
+
+### Cambiado
+- Chat-facturas: fallos de la evaluación de 123 preguntas reales ([#255](https://github.com/restcasatomascrevillent/admin-casatomas/pull/255))
+- Chat-facturas: abreviaturas aparte, proveedor solo por errata real y chat_error agrupado ([#258](https://github.com/restcasatomascrevillent/admin-casatomas/pull/258))
+
 ## [1.40.0] - 2026-11-17
 
 Objetivo: Márgenes: coste efectivo de los vinos (vista nueva y pestaña Vinos), control de ingredientes de escandallo y lectura de packs y cajas en las líneas de factura
