@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 
-import { informeCartaFacturas, ultimasCompras, type ArticuloCarta, type LineaCompra } from "../fuentes/cartaFacturas";
-import type { InformeTabla } from "../tabla";
+import { comprasPorAnada, informeCartaFacturas, ultimasCompras, type ArticuloCarta, type LineaCompra, type VinculoCompra } from "../fuentes/cartaFacturas";
+import { esSubfila, type InformeTabla } from "../tabla";
 
 const articulo = (id: string, nombre: string, categoria: string | null, extra: Partial<ArticuloCarta> = {}): ArticuloCarta => ({
   id,
@@ -98,5 +98,104 @@ describe("informes «Vinos/Platos: facturas y carta»", () => {
     expect(r.tablas[0].filas.find((f) => f.nombre === "Croquetas")).toMatchObject({ producto: "Falta el escandallo", compra: null });
     expect(r.tablas[0].columnas.map((c) => c.id)).not.toContain("margen");
     expect(r.descripcion).toContain("a 1 le falta el escandallo");
+  });
+
+  // 17/11/2026 (dueño: «hay información mal, por ejemplo Fefiñanes; si hay compra de varias añadas aunque no
+  // esté en carta, añádelo»). Los datos reales: la carta dice 2024, enlazado al producto «Fefiñanes 2025»;
+  // el 2023 es otro producto del catálogo, sin enlazar.
+  describe("vinos con compras de varias añadas (Fefiñanes)", () => {
+    const PRIMERAS = "D. PRIMERAS MARCAS, S.A.U.";
+    const compra = (id: number, producto: number, nombre: string, fecha: string, total: number, cantidad: number): LineaCompra => ({
+      ...linea(id, producto, fecha, total, cantidad, { proveedor: PRIMERAS }),
+      nombre,
+      iva_pct: 21,
+    });
+    const lineas = [
+      compra(21499, 11130, "Fefiñanes 2023", "2025-04-30", 825, 60),
+      compra(21500, 11130, "Fefiñanes 2023", "2025-04-30", 0, 12), // sin cargo: no cuenta
+      compra(8921, 2332, "Fefiñanes 2025 (cód. 198068)", "2026-05-31", 837, 60),
+      compra(8922, 2332, "Fefiñanes 2025 (cód. 198068), segunda línea", "2026-05-31", 0, 6),
+      compra(9939, 2332, "Fefiñanes 2025 (cód. 198068)", "2026-06-30", 460.35, 33),
+      compra(9940, 2332, "Fefiñanes 2025 (cód. 198068), segunda línea", "2026-06-30", 0, 3),
+      compra(1, 50, "MUGA RESERVA 2021", "2026-09-01", 90, 6),
+      compra(2, 60, "MACAN 2020 (ref. 145275)", "2026-03-01", 300, 6),
+      compra(3, 60, "MACAN 2021 (ref. 150076)", "2026-08-01", 330, 6),
+    ];
+    const catalogo = [
+      { id: 2332, nombre: "Fefiñanes 2025" },
+      { id: 11130, nombre: "Fefiñanes 2023" },
+      { id: 50, nombre: "Muga Reserva 2021" },
+      { id: 60, nombre: "Macán" },
+      { id: 70, nombre: "Fefiñanes III Año 2021" }, // otro vino: no se junta
+    ];
+    const vinculos: VinculoCompra[] = [
+      { articuloId: "f", productoId: 2332, producto: "Fefiñanes 2025", orden: 0 },
+      { articuloId: "fm", productoId: 2332, producto: "Fefiñanes 2025", orden: 0 },
+      { articuloId: "m", productoId: 50, producto: "Muga Reserva 2021", orden: 0 },
+      { articuloId: "mc", productoId: 60, producto: "Macán", orden: 0 },
+    ];
+    const informe = () =>
+      informeCartaFacturas(
+        "vinos",
+        {
+          articulos: [
+            articulo("f", "Fefiñanes 2024", "VINOS BLANCOS — RÍAS BAIXAS", { precio_eur: 26.5, anada: 2024 }),
+            articulo("fm", "Fefiñanes 2024 (Magnum)", "VINOS BLANCOS — RÍAS BAIXAS", { precio_eur: 52.2, anada: 2024 }),
+            articulo("m", "Muga Reserva 2021", "VINOS TINTOS — RIOJA", { anada: 2021 }),
+            articulo("mc", "Macán 2020", "VINOS TINTOS — RIOJA"),
+          ],
+          vinculos,
+          compras: ultimasCompras(lineas),
+          anadas: comprasPorAnada(vinculos, catalogo, lineas),
+        },
+        { hoy: "2026-11-17" },
+      ) as InformeTabla;
+
+    it("la última compra de cada añada, con su proveedor, aunque el producto no esté enlazado", () => {
+      expect(comprasPorAnada(vinculos, catalogo, lineas).get("f")).toEqual([
+        { anada: 2025, eurUd: 13.95, unidad: "botella", ivaPct: 21, fecha: "2026-06-30", proveedor: PRIMERAS },
+        { anada: 2023, eurUd: 13.75, unidad: "botella", ivaPct: 21, fecha: "2025-04-30", proveedor: PRIMERAS },
+      ]);
+    });
+
+    it("una subfila por añada comprada, diciendo si es la de la carta; la fila del vino no cambia", () => {
+      const filas = informe().tablas[0].filas;
+      const i = filas.findIndex((f) => f.nombre === "Fefiñanes 2024");
+      expect(filas[i]).toMatchObject({ precio: 26.5, compra: 13.95, compra_iva: 16.88, fecha: "30/06/2026" });
+      expect(filas.slice(i + 1, i + 3).map((f) => [esSubfila(f), f.nombre, f.compra, f.compra_iva, f.unidad, f.fecha, f.proveedor])).toEqual([
+        [true, "Añada 2025 · no está en carta", 13.95, 16.88, "botella", "30/06/2026", PRIMERAS],
+        [true, "Añada 2023 · no está en carta", 13.75, 16.64, "botella", "30/04/2025", PRIMERAS],
+      ]);
+      // Las añadas salen del nombre de la factura aunque sea un solo producto («Macán»); la de la carta se señala.
+      const j = filas.findIndex((f) => f.nombre === "Macán 2020");
+      expect(filas.slice(j + 1, j + 3).map((f) => f.nombre)).toEqual(["Añada 2021 · no está en carta", "Añada 2020 · la de la carta"]);
+      // Una sola añada y es la de la carta: sin subfilas.
+      expect(filas.filter((f) => f.vino === "Muga Reserva 2021")).toEqual([]);
+    });
+
+    it("las subfilas no cuentan como vinos y salen con el proveedor en «Compras por añada»", () => {
+      const r = informe();
+      expect(r.descripcion).toContain("4 vinos: 4 activos, 0 con foto y 4 con compra");
+      expect(r.descripcion).toContain("De 3 vinos se enseña la compra de cada añada.");
+      const t = r.tablas[1];
+      expect(t.titulo).toBe("Compras por añada");
+      expect(t.columnas.map((c) => c.id)).toEqual(["vino", "anada", "en_carta", "compra", "compra_iva", "unidad", "fecha", "proveedor"]);
+      expect(t.filas.some(esSubfila)).toBe(false);
+      expect(t.filas.filter((f) => f.vino === "Fefiñanes 2024")).toMatchObject([
+        { anada: "2025", en_carta: "No", compra: 13.95, fecha: "30/06/2026", proveedor: PRIMERAS },
+        { anada: "2023", en_carta: "No", compra: 13.75, fecha: "30/04/2025", proveedor: PRIMERAS },
+      ]);
+      expect(t.filas.filter((f) => f.vino === "Macán 2020").map((f) => [f.anada, f.en_carta])).toEqual([["2021", "No"], ["2020", "Sí"]]);
+    });
+
+    it("sin compras de otras añadas no hay segunda tabla", () => {
+      const r = informeCartaFacturas(
+        "vinos",
+        { articulos: [articulo("m", "Muga Reserva 2021", "RIOJA")], vinculos: [vinculos[2]], compras: ultimasCompras(lineas), anadas: comprasPorAnada([vinculos[2]], catalogo, lineas) },
+        { hoy: "2026-11-17" },
+      ) as InformeTabla;
+      expect(r.tablas).toHaveLength(1);
+      expect(r.tablas[0].filas).toHaveLength(1);
+    });
   });
 });

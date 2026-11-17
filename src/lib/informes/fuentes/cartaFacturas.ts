@@ -27,11 +27,20 @@
 //  y la compra «sin IVA (base)» y «con IVA» (IVA de la línea; si no lo trae, 21 %
 //  en vinos y 10 % en platos). Fuera la columna «Categoría» (el rótulo largo tipo
 //  «VINOS TINTOS — RIBERA DEL DUERO»): las filas siguen ordenadas por categoría.
+//  17/11/2026 (dueño: «hay información mal, por ejemplo Fefiñanes; si hay compra de
+//  varias añadas aunque no esté en carta, añádelo»). El catálogo de compras tiene un
+//  producto por añada («Fefiñanes 2023», «Fefiñanes 2025») y el vino solo se enlaza a
+//  uno (`vino_producto`): el «Fefiñanes 2024» de la carta salía con el precio del 2025
+//  sin decirlo y la compra del 2023 no salía. Ahora, en vinos, se juntan los productos
+//  del catálogo con el mismo nombre sin la añada y, si hay compras de varias añadas (o
+//  de una que no es la de la carta), sale una subfila por añada con su última compra,
+//  diciendo cuál es la de la carta; debajo, la tabla «Compras por añada» con el
+//  proveedor. La fila del vino no cambia (la compra del producto enlazado, la del margen).
 // ============================================================================
 import { supabase } from "@/integrations/supabase/client";
 import { fmt, normalizarMargenes } from "@/lib/analisis/margenesCarta";
 import type { ContextoInforme } from "../registro";
-import { nombreArchivoInforme, type ColumnaInforme, type FilaInforme, type ResultadoInformeTabla } from "../tabla";
+import { CLAVE_SUBFILA, esSubfila, nombreArchivoInforme, type ColumnaInforme, type FilaInforme, type ResultadoInformeTabla } from "../tabla";
 
 export type TipoCartaFacturas = "vinos" | "platos";
 
@@ -43,6 +52,9 @@ export interface ArticuloCarta {
   precio_eur: number | null;
   activado: boolean | null;
   imagen_url: string | null;
+  /** Solo vinos: la añada de la carta (no vale si `sin_anada`). */
+  anada?: number | string | null;
+  sin_anada?: boolean | null;
 }
 
 /** Producto de compra vinculado a un vino (la botella) o a un plato (un ingrediente del escandallo). */
@@ -53,18 +65,28 @@ export interface VinculoCompra {
   producto: string | null;
   /** Orden en el escandallo (el primero es el principal); 0 en vinos. */
   orden: number;
+  /** Categoría del producto en el catálogo (para buscar sus otras añadas). */
+  categoriaId?: number | null;
+}
+
+/** Producto del catálogo de compras (para juntar las añadas de un mismo vino). */
+export interface ProductoCatalogo {
+  id: number;
+  nombre: string | null;
 }
 
 /** Línea de compra con su documento (productos_factura + facturas). */
 export interface LineaCompra {
   id: number;
   producto_id: number | null;
+  /** Nombre en la factura (de ahí sale la añada comprada). */
+  nombre?: string | null;
   cantidad: number | string | null;
   unidad: string | null;
   total: number | string | null;
   /** IVA de la línea (%). */
   iva_pct?: number | string | null;
-  facturas: { fecha: string | null; tipo: string | null; local: string | null; total: number | string | null; facturado_en_id: number | null } | null;
+  facturas: { fecha: string | null; tipo: string | null; local: string | null; total: number | string | null; facturado_en_id: number | null; proveedor?: string | null } | null;
 }
 
 export interface UltimaCompra {
@@ -76,6 +98,12 @@ export interface UltimaCompra {
   ivaPct: number | null;
   /** `YYYY-MM-DD`. */
   fecha: string;
+  proveedor?: string | null;
+}
+
+/** La última compra de una añada de un vino (`anada` null: la factura no dice la añada). */
+export interface CompraAnada extends UltimaCompra {
+  anada: number | null;
 }
 
 const num = (v: unknown): number | null => {
@@ -94,26 +122,117 @@ function lineaValida(l: LineaCompra): boolean {
   return (num(f.total) ?? 0) >= 0;
 }
 
-/** La última compra de cada producto (fecha más reciente; a igualdad, la última línea). */
-export function ultimasCompras(lineas: readonly LineaCompra[]): Map<number, UltimaCompra> {
-  const mejor = new Map<number, LineaCompra>();
+/** La última compra válida de cada grupo de líneas (fecha más reciente; a igualdad, la última línea). */
+function ultimasPor<K>(lineas: readonly LineaCompra[], clave: (l: LineaCompra) => K): Map<K, UltimaCompra> {
+  const mejor = new Map<K, LineaCompra>();
   for (const l of lineas) {
     if (!lineaValida(l)) continue;
-    const actual = mejor.get(l.producto_id as number);
+    const k = clave(l);
+    const actual = mejor.get(k);
     const fecha = l.facturas!.fecha as string;
     const fechaActual = actual?.facturas?.fecha ?? "";
-    if (!actual || fecha > fechaActual || (fecha === fechaActual && l.id > actual.id)) mejor.set(l.producto_id as number, l);
+    if (!actual || fecha > fechaActual || (fecha === fechaActual && l.id > actual.id)) mejor.set(k, l);
   }
-  const res = new Map<number, UltimaCompra>();
-  for (const [producto, l] of mejor) {
-    res.set(producto, {
+  const res = new Map<K, UltimaCompra>();
+  for (const [k, l] of mejor) {
+    res.set(k, {
       eurUd: Math.round(((num(l.total) as number) / (num(l.cantidad) as number)) * 10000) / 10000,
       unidad: l.unidad?.trim().toLowerCase() || "ud",
       ivaPct: num(l.iva_pct),
       fecha: (l.facturas!.fecha as string).slice(0, 10),
+      proveedor: l.facturas!.proveedor?.trim() || null,
     });
   }
   return res;
+}
+
+/** La última compra de cada producto (fecha más reciente; a igualdad, la última línea). */
+export function ultimasCompras(lineas: readonly LineaCompra[]): Map<number, UltimaCompra> {
+  return ultimasPor(lineas, (l) => l.producto_id as number);
+}
+
+// ─── Añadas (17/11/2026) ────────────────────────────────────────────────────
+
+/** Añada en un nombre («Fefiñanes 2025 (cód. 198068)» → 2025). Los mismos años que `vinos_coste_carta_datos`. */
+export function anadaDe(texto: string | null | undefined): number | null {
+  const m = /\b(19[5-9]\d|20[0-4]\d)\b/.exec(texto ?? "");
+  return m ? Number(m[1]) : null;
+}
+
+/** Nombre sin tildes, añadas ni signos («Fefiñanes 2025» → «fefinanes»), como `vinos_coste_nombre_base`. */
+export function nombreSinAnada(nombre: string | null | undefined): string {
+  return (nombre ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\b(19[5-9]\d|20[0-4]\d)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** Añada de la carta: la del vino o, si no la tiene, la de su nombre. */
+export function anadaCarta(a: Pick<ArticuloCarta, "nombre" | "anada" | "sin_anada">): number | null {
+  const n = a.sin_anada ? null : num(a.anada);
+  return n !== null && n > 0 ? n : anadaDe(a.nombre);
+}
+
+/**
+ * De cada producto enlazado a un vino, los productos del catálogo que son el mismo vino en otra
+ * añada (mismo nombre sin la añada), él incluido.
+ */
+export function productosMismoVino(vinculos: readonly VinculoCompra[], catalogo: readonly ProductoCatalogo[]): Map<number, number[]> {
+  const porNombre = new Map<string, number[]>();
+  for (const p of catalogo) {
+    const base = nombreSinAnada(p.nombre);
+    if (base) porNombre.set(base, [...(porNombre.get(base) ?? []), p.id]);
+  }
+  const res = new Map<number, number[]>();
+  for (const v of vinculos) {
+    const iguales = porNombre.get(nombreSinAnada(v.producto)) ?? [];
+    res.set(v.productoId, [...new Set([v.productoId, ...iguales])]);
+  }
+  return res;
+}
+
+/**
+ * Por vino, la última compra de CADA añada (la más reciente primero; sin añada, al final), mirando su
+ * producto enlazado y los del mismo vino en otra añada. La añada es la del nombre en la factura y, si
+ * no la dice, la del producto del catálogo.
+ */
+export function comprasPorAnada(
+  vinculos: readonly VinculoCompra[],
+  catalogo: readonly ProductoCatalogo[],
+  lineas: readonly LineaCompra[],
+): Map<string, CompraAnada[]> {
+  const nombres = new Map<number, string | null>(catalogo.map((p) => [p.id, p.nombre]));
+  for (const v of vinculos) if (!nombres.has(v.productoId)) nombres.set(v.productoId, v.producto);
+  const porProducto = new Map<number, LineaCompra[]>();
+  for (const l of lineas) {
+    if (l.producto_id === null) continue;
+    porProducto.set(l.producto_id, [...(porProducto.get(l.producto_id) ?? []), l]);
+  }
+  const familias = productosMismoVino(vinculos, catalogo);
+  const res = new Map<string, CompraAnada[]>();
+  for (const v of vinculos) {
+    const suyas = (familias.get(v.productoId) ?? []).flatMap((id) => porProducto.get(id) ?? []);
+    const ultimas = ultimasPor(suyas, (l) => anadaDe(l.nombre) ?? anadaDe(nombres.get(l.producto_id as number)));
+    res.set(
+      v.articuloId,
+      [...ultimas].map(([anada, c]) => ({ ...c, anada })).sort((a, b) => (b.anada ?? 0) - (a.anada ?? 0)),
+    );
+  }
+  return res;
+}
+
+/**
+ * ¿Hay que enseñar las añadas? Sí con compras de varias, o de una sola que no es la de la carta
+ * (la fila del vino llevaría el precio de otra añada sin decirlo).
+ */
+function anadasQueSeEnsenan(a: ArticuloCarta, anadas: readonly CompraAnada[] | undefined): readonly CompraAnada[] {
+  if (!anadas?.length) return [];
+  if (anadas.length > 1) return anadas;
+  const carta = anadaCarta(a);
+  return carta !== null && anadas[0].anada !== null && anadas[0].anada !== carta ? anadas : [];
 }
 
 /** «2026-10-12» → «12/10/2026». */
@@ -190,6 +309,7 @@ export function filasCartaFacturas(
   compras: ReadonlyMap<number, UltimaCompra>,
   margenes: MargenesVinos = new Map(),
   ivaCartaPct: number = IVA_CARTA_POR_DEFECTO,
+  anadas: ReadonlyMap<string, readonly CompraAnada[]> = new Map(),
 ): FilaInforme[] {
   const principal = vinculosPrincipales(vinculos);
   const porNombre = (x: string, y: string) => x.localeCompare(y, "es", { sensitivity: "base" });
@@ -200,27 +320,59 @@ export function filasCartaFacturas(
       if (!ca !== !cb) return ca ? -1 : 1;
       return porNombre(ca, cb) || porNombre(a.nombre ?? "", b.nombre ?? "");
     })
-    .map((a) => {
+    .flatMap((a) => {
       const v = principal.get(a.id);
       const c = v ? compras.get(v.productoId) : undefined;
       const precio = num(a.precio_eur);
       const ivaCompra = c ? (c.ivaPct ?? IVA_COMPRA_SUPUESTO[tipo]) : null;
-      return {
-        nombre: a.nombre?.trim() || "(sin nombre)",
+      const conIva = (x: UltimaCompra) => redondear2(x.eurUd * (1 + (x.ivaPct ?? IVA_COMPRA_SUPUESTO[tipo]) / 100));
+      const nombre = a.nombre?.trim() || "(sin nombre)";
+      const carta = anadaCarta(a);
+      // Una subfila por añada comprada (17/11/2026): `vino`, `anada`, `en_carta` y `proveedor` son para «Compras por añada».
+      const subfilas: FilaInforme[] = anadasQueSeEnsenan(a, anadas.get(a.id)).map((x) => {
+        const enCarta = x.anada === null || carta === null ? null : x.anada === carta;
+        return {
+          nombre: x.anada === null ? "Sin añada en la factura" : `Añada ${x.anada}${enCarta === null ? "" : enCarta ? " · la de la carta" : " · no está en carta"}`,
+          vino: nombre,
+          anada: x.anada === null ? "Sin añada" : String(x.anada),
+          en_carta: enCarta === null ? null : siNo(enCarta),
+          compra: x.eurUd,
+          compra_iva: conIva(x),
+          unidad: x.unidad,
+          fecha: fechaCorta(x.fecha),
+          proveedor: x.proveedor ?? null,
+          [CLAVE_SUBFILA]: 1,
+        };
+      });
+      const fila: FilaInforme = {
+        nombre,
         // Sin ningún producto en su escandallo, se dice (antes, «—» sin explicar por qué).
         ...(tipo === "platos" ? { producto: v ? v.producto : FALTA_ESCANDALLO } : {}),
         precio,
         venta: precio !== null && precio > 0 ? redondear2(precio / (1 + ivaCartaPct / 100)) : null,
         compra: c ? c.eurUd : null,
-        compra_iva: c && ivaCompra !== null ? redondear2(c.eurUd * (1 + ivaCompra / 100)) : null,
+        compra_iva: c && ivaCompra !== null ? conIva(c) : null,
         ...(tipo === "vinos" ? { margen: textoMargen(margenes.get(a.id)) } : {}),
         unidad: c ? c.unidad : null,
         fecha: c ? fechaCorta(c.fecha) : null,
         activo: siNo(a.activado === true),
         foto: siNo(tieneFoto(a)),
       };
+      return [fila, ...subfilas];
     });
 }
+
+/** Columnas de «Compras por añada»: lo de las subfilas y el proveedor (no cabe en la tabla principal). */
+const COLUMNAS_ANADAS: ColumnaInforme[] = [
+  { id: "vino", etiqueta: "Vino de la carta", tipo: "texto" },
+  { id: "anada", etiqueta: "Añada comprada", tipo: "texto", ancho: 110 },
+  { id: "en_carta", etiqueta: "En carta", tipo: "texto", ancho: 80 },
+  { id: "compra", etiqueta: "Compra sin IVA (base)", tipo: "precio", ancho: 105 },
+  { id: "compra_iva", etiqueta: "Compra con IVA", tipo: "precio", ancho: 100 },
+  { id: "unidad", etiqueta: "Unidad", tipo: "texto", ancho: 85 },
+  { id: "fecha", etiqueta: "Fecha", tipo: "fecha", ancho: 110 },
+  { id: "proveedor", etiqueta: "Proveedor", tipo: "texto", ancho: 260 },
+];
 
 export interface DatosCartaFacturas {
   articulos: readonly ArticuloCarta[];
@@ -230,13 +382,19 @@ export interface DatosCartaFacturas {
   margenes?: MargenesVinos;
   /** IVA de la carta (%), el de Facturas › Márgenes. */
   ivaCartaPct?: number;
+  /** Solo vinos: la última compra de cada añada por id de vino (`comprasPorAnada`). */
+  anadas?: ReadonlyMap<string, readonly CompraAnada[]>;
 }
 
 /** El informe como tabla. Función pura (se prueba sin Supabase). */
 export function informeCartaFacturas(tipo: TipoCartaFacturas, datos: DatosCartaFacturas, ctx: ContextoInforme): ResultadoInformeTabla {
   const t = TEXTOS[tipo];
   if (datos.articulos.length === 0) return { vacio: true, motivo: `No hay ${t.plural} en la carta.` };
-  const filas = filasCartaFacturas(tipo, datos.articulos, datos.vinculos, datos.compras, datos.margenes, datos.ivaCartaPct);
+  const todas = filasCartaFacturas(tipo, datos.articulos, datos.vinculos, datos.compras, datos.margenes, datos.ivaCartaPct, datos.anadas);
+  // Las subfilas (añadas compradas) no son vinos: no cuentan en los totales.
+  const filas = todas.filter((f) => !esSubfila(f));
+  const porAnada = todas.filter(esSubfila).map(({ [CLAVE_SUBFILA]: _sub, ...f }) => f);
+  const vinosConAnadas = new Set(porAnada.map((f) => f.vino)).size;
   const conCompra = filas.filter((f) => f.compra !== null).length;
   const sinEscandallo = tipo === "platos" ? filas.filter((f) => f.producto === FALTA_ESCANDALLO).length : 0;
   const activos = filas.filter((f) => f.activo === "Sí").length;
@@ -249,21 +407,37 @@ export function informeCartaFacturas(tipo: TipoCartaFacturas, datos: DatosCartaF
       `${filas.length} ${filas.length === 1 ? t.singular : t.plural}: ${activos} activos, ${conFoto} con foto ` +
       `y ${conCompra} con compra en las facturas` +
       (tipo === "platos" ? `; a ${sinEscandallo} ${sinEscandallo === 1 ? "le falta" : "les falta"} el escandallo` : "") +
-      `. Precio de carta frente a la última compra ${deQue}.`,
+      `. Precio de carta frente a la última compra ${deQue}.` +
+      (vinosConAnadas > 0 ? ` De ${vinosConAnadas} ${vinosConAnadas === 1 ? "vino" : "vinos"} se enseña la compra de cada añada.` : ""),
     textoPeriodo: `Carta a ${fechaCorta(ctx.hoy)}`,
     tablas: [
       {
         titulo: t.titulo,
         columnas: columnasCartaFacturas(tipo),
-        filas,
+        filas: todas,
         nota:
           `Carta con IVA: lo que paga el cliente. Venta sin IVA: lo que te queda al quitar el IVA (${fmt(datos.ivaCartaPct ?? IVA_CARTA_POR_DEFECTO, 0)} %). ` +
           `Compra: última factura o albarán de Casa Tomás, por la unidad en que se compra, sin IVA (base) y con IVA (el de la factura; si no lo dice, ${IVA_COMPRA_SUPUESTO[tipo]} %). ` +
           "«—»: sin compra vinculada (se vincula en Facturas › Márgenes)." +
           (tipo === "vinos"
             ? " Margen: el de Facturas › Márgenes con la última factura: cuántas veces cobras lo que pagas (venta sin IVA ÷ coste sin IVA, en el formato de la carta) y el beneficio, en % del precio de venta sin IVA."
-            : " «Falta el escandallo»: el plato no tiene ingredientes; se añaden en Facturas › Márgenes."),
+            : " «Falta el escandallo»: el plato no tiene ingredientes; se añaden en Facturas › Márgenes.") +
+          (porAnada.length > 0
+            ? " Filas sangradas: si del vino se han comprado varias añadas (o una que no es la de la carta), la última compra de cada una; la fila del vino lleva la del producto enlazado."
+            : ""),
       },
+      ...(porAnada.length > 0
+        ? [
+            {
+              titulo: "Compras por añada",
+              columnas: COLUMNAS_ANADAS,
+              filas: porAnada,
+              nota:
+                "Vinos con compras de varias añadas, o de una que no es la de la carta: la última compra de cada añada, esté o no en la carta. " +
+                "Se juntan los productos de las facturas con el mismo nombre sin la añada. «Sin añada»: la factura no la dice.",
+            },
+          ]
+        : []),
     ],
     nombreArchivo: nombreArchivoInforme(t.titulo, ctx.hoy),
   };
@@ -279,7 +453,9 @@ const fallo = (error: { message?: string }, que: string) => new Error(error.mess
 
 async function leerArticulos(tipo: TipoCartaFacturas): Promise<ArticuloCarta[]> {
   // «Platos» tiene las mismas columnas que «Vinos».
-  const { data, error } = await supabase.from((tipo === "vinos" ? "Vinos" : "Platos") as "Vinos").select("id, nombre, categoria, precio_eur, activado, imagen_url");
+  // `anada` y `sin_anada` (solo vinos) no están en types.ts.
+  const columnas = "id, nombre, categoria, precio_eur, activado, imagen_url" + (tipo === "vinos" ? ", anada, sin_anada" : "");
+  const { data, error } = (await supabase.from((tipo === "vinos" ? "Vinos" : "Platos") as "Vinos").select(columnas)) as unknown as Respuesta;
   if (error) throw fallo(error, `los ${tipo}`);
   return (data ?? []) as ArticuloCarta[];
 }
@@ -287,7 +463,7 @@ async function leerArticulos(tipo: TipoCartaFacturas): Promise<ArticuloCarta[]> 
 /** vino_producto y escandallo_platos no están en types.ts (migración 20261115200000). */
 async function leerVinculos(tipo: TipoCartaFacturas): Promise<VinculoCompra[]> {
   const tabla = tipo === "vinos" ? "vino_producto" : "escandallo_platos";
-  const columnas = tipo === "vinos" ? "vino_id, producto_id, productos_catalogo(nombre)" : "plato_id, producto_id, orden, productos_catalogo(nombre)";
+  const columnas = tipo === "vinos" ? "vino_id, producto_id, productos_catalogo(nombre, categoria_id)" : "plato_id, producto_id, orden, productos_catalogo(nombre)";
   // Orden del escandallo de Márgenes (orden, id): el primero es el ingrediente principal.
   const { data, error } = (await supabase
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- tabla fuera de los tipos generados
@@ -296,15 +472,36 @@ async function leerVinculos(tipo: TipoCartaFacturas): Promise<VinculoCompra[]> {
     .order(tipo === "vinos" ? "vino_id" : "orden", { ascending: true })
     .order(tipo === "vinos" ? "producto_id" : "id", { ascending: true })) as unknown as Respuesta;
   if (error) throw fallo(error, "los productos vinculados");
-  type Fila = { vino_id?: string; plato_id?: string; producto_id: number; orden?: number | null; productos_catalogo?: { nombre: string | null } | null };
+  type Fila = { vino_id?: string; plato_id?: string; producto_id: number; orden?: number | null; productos_catalogo?: { nombre: string | null; categoria_id?: number | null } | null };
   return ((data ?? []) as Fila[])
     .map((f) => ({
       articuloId: String(tipo === "vinos" ? f.vino_id : f.plato_id),
       productoId: Number(f.producto_id),
       producto: f.productos_catalogo?.nombre ?? null,
       orden: f.orden ?? 0,
+      categoriaId: f.productos_catalogo?.categoria_id ?? null,
     }))
     .filter((v) => v.articuloId && Number.isFinite(v.productoId));
+}
+
+/** Los productos del catálogo de esas categorías (las de los vinos enlazados), para juntar sus añadas. */
+async function leerCatalogo(categorias: number[]): Promise<ProductoCatalogo[]> {
+  if (categorias.length === 0) return [];
+  const productos: ProductoCatalogo[] = [];
+  for (let pagina = 0; pagina < PAGINAS_MAXIMAS; pagina++) {
+    const desde = pagina * POR_PAGINA;
+    const { data, error } = await supabase
+      .from("productos_catalogo")
+      .select("id, nombre")
+      .in("categoria_id", categorias)
+      .order("id", { ascending: true })
+      .range(desde, desde + POR_PAGINA - 1);
+    if (error) throw fallo(error, "los productos del catálogo");
+    const lote = (data ?? []) as ProductoCatalogo[];
+    productos.push(...lote);
+    if (lote.length < POR_PAGINA) break;
+  }
+  return productos;
 }
 
 /** Las líneas de compra de esos productos, por tandas (PostgREST corta cada petición a 1.000 filas). */
@@ -315,7 +512,7 @@ async function leerLineasCompra(productos: number[]): Promise<LineaCompra[]> {
     const desde = pagina * POR_PAGINA;
     const { data, error } = await supabase
       .from("productos_factura")
-      .select("id, producto_id, cantidad, unidad, total, iva_pct, facturas!inner(fecha, tipo, local, total, facturado_en_id)")
+      .select("id, producto_id, nombre, cantidad, unidad, total, iva_pct, facturas!inner(fecha, tipo, local, total, facturado_en_id, proveedor)")
       .in("producto_id", productos)
       .gt("total", 0)
       .gt("cantidad", 0)
@@ -352,6 +549,11 @@ export async function obtenerInformeCartaFacturas(tipo: TipoCartaFacturas, ctx: 
   const [articulos, vinculos, m] = await Promise.all([leerArticulos(tipo), leerVinculos(tipo), leerMargenes()]);
   const margenes = tipo === "vinos" ? m.vinos : (new Map() as MargenesVinos);
   // Solo las compras de los productos que cuentan (en platos, el ingrediente principal).
-  const lineas = await leerLineasCompra([...new Set([...vinculosPrincipales(vinculos).values()].map((v) => v.productoId))]);
-  return informeCartaFacturas(tipo, { articulos, vinculos, compras: ultimasCompras(lineas), margenes, ivaCartaPct: m.ivaCartaPct }, ctx);
+  const principales = [...vinculosPrincipales(vinculos).values()];
+  // Vinos: también las de los productos del mismo vino en otra añada (17/11/2026).
+  const catalogo = tipo === "vinos" ? await leerCatalogo([...new Set(principales.map((v) => v.categoriaId).filter((c): c is number => typeof c === "number"))]) : [];
+  const productos = tipo === "vinos" ? [...productosMismoVino(principales, catalogo).values()].flat() : principales.map((v) => v.productoId);
+  const lineas = await leerLineasCompra([...new Set(productos)]);
+  const anadas = tipo === "vinos" ? comprasPorAnada(principales, catalogo, lineas) : undefined;
+  return informeCartaFacturas(tipo, { articulos, vinculos, compras: ultimasCompras(lineas), margenes, ivaCartaPct: m.ivaCartaPct, anadas }, ctx);
 }
