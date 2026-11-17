@@ -129,6 +129,9 @@ jobs:
       - name: clasificar-productos por tandas, sin cortes por tiempo (PGlite)
         if: env.COMPLETA == 'true'
         run: npm run test:clasificar-productos:db
+      - name: Reparación de producto_id que era una categoría (PGlite)
+        if: env.COMPLETA == 'true'
+        run: npm run test:reparar-producto-categoria:db
       - name: Indicaciones para la IA por proveedor (PGlite)
         if: env.COMPLETA == 'true'
         run: npm run test:proveedores-notas-ia:db
