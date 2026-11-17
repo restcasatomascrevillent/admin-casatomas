@@ -2,6 +2,18 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.40.0] - 2026-11-17
+
+Objetivo: Márgenes: coste efectivo de los vinos (vista nueva y pestaña Vinos), control de ingredientes de escandallo y lectura de packs y cajas en las líneas de factura
+
+### Añadido
+- Facturas: coste de la carta de vinos con botellas sin cargo ([#245](https://github.com/restcasatomascrevillent/admin-casatomas/pull/245))
+
+### Cambiado
+- Escandallos: control del enlace ingrediente-producto ([#243](https://github.com/restcasatomascrevillent/admin-casatomas/pull/243))
+- Facturas: el contenido de las líneas entiende packs y cajas ([#246](https://github.com/restcasatomascrevillent/admin-casatomas/pull/246))
+- Margenes: un solo coste por vino (efectivo) en la pestaña Vinos y en los avisos ([#247](https://github.com/restcasatomascrevillent/admin-casatomas/pull/247))
+
 ## [1.39.0] - 2026-11-17
 
 Objetivo: Cerrar el control de gastos de los servicios (Vercel Pro, Hostinger, Loading, Mapbox) y ver el gasto de IA por acción
