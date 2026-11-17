@@ -1,7 +1,7 @@
 // Prueba la migración 20261211100000_reparar_producto_id_de_categoria y su rollback contra un
 // Postgres en memoria (PGlite). Nunca toca Supabase.
 //
-//   npm run test:reparar-producto-categoria:db
+//   node scripts/test-reparar-producto-categoria.mjs
 //
 // Caso real (17/11/2026): la categoría Servicios es la 11 y el producto 11 es la mostaza; la IA
 // metía en la mostaza alquileres y descuentos. Se comprueba que:
