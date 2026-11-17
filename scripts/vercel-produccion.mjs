@@ -6,12 +6,13 @@
 // "Merge pull request #N from <org>/release/X.Y.Z") y versionado.json dice esa misma versión.
 // Un push directo a main, un squash, un rebase o un PR desde staging no llegan a producción.
 // Las previews (release/*) se construyen siempre. La demo (staging) también, SALVO si todo lo que
-// cambia desde el último despliegue de staging (VERCEL_GIT_PREVIOUS_SHA) son docs, Markdown o tests:
-// así no gastamos despliegues de Vercel en commits que no cambian la web. Ante cualquier duda
+// cambia desde el último despliegue de staging (VERCEL_GIT_PREVIOUS_SHA) son docs, Markdown, tests o
+// cosas de Supabase que el panel no lleva dentro (migraciones, rollbacks, Edge Functions que la app
+// no importa): así no gastamos compilaciones de Vercel en commits que no cambian el panel. Ante cualquier duda
 // (sin SHA anterior, git sin historia suficiente, lista vacía) se construye.
 // Ver docs/PROCESO-DE-CAMBIOS.md.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -29,7 +30,10 @@ export function debeConstruir(env, mensaje, versionFichero) {
   return version !== null && version === versionFichero;
 }
 
-// Rutas que no cambian lo que se despliega. Ojo: nada de vercel.json, public/, api/ ni scripts/.
+// Rutas que no cambian lo que se despliega. Ojo: nada de vercel.json, public/, api/ ni scripts/
+// (salvo las pruebas PGlite, scripts/test-*.mjs, que no entran en el build). Lo de Supabase lo
+// despliega Supabase, no Vercel: migraciones, rollbacks, pruebas SQL y config.toml nunca cambian
+// el panel (17/11/2026: cada compilación del panel cuesta ~5 céntimos de dólar en el plan Pro).
 const SIN_DESPLIEGUE = [
   /^docs\//,
   /\.md$/i,
@@ -37,17 +41,79 @@ const SIN_DESPLIEGUE = [
   /\.(test|spec)\.[mc]?[jt]sx?$/,
   /^e2e\//,
   /^\.github\//,
+  /^supabase\/(migrations|rollbacks|tests)\//,
+  /^supabase\/config\.toml$/,
+  /^scripts\/test-[^/]+\.mjs$/,
 ];
 
-/** true si TODOS los ficheros son docs/Markdown/tests (y hay al menos uno). */
-export function soloDocsOTests(ficheros) {
+const FUNCION = /^supabase\/functions\/([^/]+)\//;
+
+/**
+ * true si TODOS los ficheros son docs/Markdown/tests o cosas de Supabase que el panel no lleva
+ * dentro (y hay al menos uno). `carpetasApp`: carpetas de supabase/functions que la app importa
+ * (ver carpetasFuncionesDeLaApp); un cambio en una Edge Function que la app NO importa tampoco
+ * cambia el panel. Sin esa lista (null), cualquier cambio en supabase/functions construye.
+ */
+export function soloDocsOTests(ficheros, carpetasApp = null) {
   const lista = (ficheros ?? []).map((f) => f.trim()).filter(Boolean);
-  return lista.length > 0 && lista.every((f) => SIN_DESPLIEGUE.some((re) => re.test(f)));
+  return lista.length > 0 && lista.every((f) => {
+    if (SIN_DESPLIEGUE.some((re) => re.test(f))) return true;
+    const carpeta = FUNCION.exec(f)?.[1];
+    return !!carpeta && carpetasApp instanceof Set && !carpetasApp.has(carpeta);
+  });
 }
 
 /** true si es la demo (staging) y lo cambiado desde su último despliegue no afecta a la web. */
-export function saltarDemo(env, ficheros) {
-  return env.VERCEL_ENV !== "production" && env.VERCEL_GIT_COMMIT_REF === "staging" && soloDocsOTests(ficheros);
+export function saltarDemo(env, ficheros, carpetasApp = null) {
+  return env.VERCEL_ENV !== "production" && env.VERCEL_GIT_COMMIT_REF === "staging" && soloDocsOTests(ficheros, carpetasApp);
+}
+
+const CODIGO = /\.(m|c)?[jt]sx?$/;
+
+/** Ficheros de código bajo `dir` (recursivo, sin node_modules). */
+function codigoDe(dir) {
+  const salida = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+    const ruta = path.join(dir, e.name);
+    if (e.isDirectory()) salida.push(...codigoDe(ruta));
+    else if (CODIGO.test(e.name)) salida.push(ruta);
+  }
+  return salida;
+}
+
+/**
+ * Carpetas de supabase/functions que acaban dentro del panel: las que importa src/ o api/
+ * (p. ej. `_shared`, `emails-reserva`) y las que importan esas a su vez. Se calcula leyendo
+ * el código, sin lista a mano. null si no se puede leer algo: entonces se construye siempre.
+ */
+export function carpetasFuncionesDeLaApp(raiz = process.cwd()) {
+  try {
+    const funciones = path.join(raiz, "supabase", "functions");
+    const existentes = new Set(readdirSync(funciones, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name));
+    const usadas = new Set();
+    for (const dir of ["src", "api"]) {
+      for (const f of codigoDe(path.join(raiz, dir))) {
+        for (const m of readFileSync(f, "utf8").matchAll(/supabase\/functions\/([A-Za-z0-9_.-]+)\//g)) usadas.add(m[1]);
+      }
+    }
+    const pendientes = [...usadas];
+    while (pendientes.length) {
+      const carpeta = pendientes.pop();
+      if (!existentes.has(carpeta)) continue;
+      for (const f of codigoDe(path.join(funciones, carpeta))) {
+        for (const m of readFileSync(f, "utf8").matchAll(/["'`](?:\.\.\/)+([A-Za-z0-9_.-]+)\//g)) {
+          if (existentes.has(m[1]) && !usadas.has(m[1])) {
+            usadas.add(m[1]);
+            pendientes.push(m[1]);
+          }
+        }
+      }
+    }
+    return usadas;
+  } catch {
+    return null;
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -61,8 +127,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (process.env.VERCEL_ENV !== "production" && process.env.VERCEL_GIT_COMMIT_REF === "staging" && anterior) {
     let ficheros = null;
     try { ficheros = execFileSync("git", ["diff", "--name-only", anterior, "HEAD"], { encoding: "utf8" }).split(/\r?\n/); } catch { /* sin historia: se construye */ }
-    if (ficheros && saltarDemo(process.env, ficheros)) {
-      console.log("Demo NO se construye: desde el último despliegue de staging solo cambian docs, Markdown o tests.");
+    if (ficheros && saltarDemo(process.env, ficheros, carpetasFuncionesDeLaApp())) {
+      console.log("Demo NO se construye: desde el último despliegue de staging solo cambian docs, tests o cosas de Supabase que el panel no lleva dentro.");
       process.exit(0);
     }
   }
