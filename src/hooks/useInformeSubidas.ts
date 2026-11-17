@@ -16,6 +16,11 @@ async function rpc(funcion: string, args: Record<string, unknown>) {
   return llamar.call(supabase, funcion, args);
 }
 
+/** El error con su código de Postgres/PostgREST, para que la pantalla lo explique en castellano. */
+function errorInforme(error: { message?: string; code?: string }, porDefecto: string): Error & { code?: string } {
+  return Object.assign(new Error(error.message || porDefecto), { code: error.code });
+}
+
 export interface FiltrosInforme {
   proveedorId: number | null;
   familiaId: number | null;
@@ -40,7 +45,7 @@ export function useInformeSubidas(meses: MesesInforme, f: FiltrosInforme, limite
         p_desde: 0,
       });
       if (esErrorRpcInexistente(error)) return null;
-      if (error) throw new Error(error.message || "No se han podido calcular las subidas de precio");
+      if (error) throw errorInforme(error, "No se han podido calcular las subidas de precio");
       return normalizarSubidas(data);
     },
   });
@@ -61,7 +66,7 @@ export function useInformeBarato(f: FiltrosInforme, limite: number) {
         p_desde: 0,
       });
       if (esErrorRpcInexistente(error)) return null;
-      if (error) throw new Error(error.message || "No se ha podido calcular el proveedor más barato");
+      if (error) throw errorInforme(error, "No se ha podido calcular el proveedor más barato");
       return normalizarBarato(data);
     },
   });

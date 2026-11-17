@@ -6,13 +6,15 @@
 //     al final de cada lista y con su motivo, pero no suman.
 //   · Filtros: proveedor y categoría (los dos bloques) y con qué se compara
 //     la última compra (hace 3, 6 o 12 meses; solo el bloque de subidas).
-//   · Dos listas con scroll propio (la página no desplaza); en estrecho, una
-//     debajo de otra dentro de la vista.
+//   · Los dos totales eligen qué lista se ve (una a la vez, 17/11/2026: las dos
+//     juntas no cabían en la tablet); la lista ocupa el alto que queda y hace
+//     scroll por dentro (la página no desplaza).
+//   · Con error, los totales y la lista lo dicen en castellano y dejan reintentar.
 //   · «Comparar facturas» abre el visor de Análisis con las dos facturas y la
 //     línea del producto marcada (el mismo de «Qué decidir hoy»).
 // Las cuentas están en SQL (20261207110000_informe_subidas_proveedor).
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { FileText } from "lucide-react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { FileText, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useInformeBarato, useInformeSubidas, type FiltrosInforme } from "@/hooks/useInformeSubidas";
 import {
@@ -25,6 +27,7 @@ import {
   euros0,
   euros2,
   fechaEs,
+  mensajeErrorInforme,
   notasBarato,
   notasSubida,
   pct,
@@ -53,7 +56,7 @@ interface Props {
 
 const TONO_CONFIANZA = { alta: "baja", media: "plano", baja: "aviso" } as const;
 const SELECT =
-  "h-9 min-w-0 max-w-full rounded-md border border-border/70 bg-background px-2 text-[0.8125rem] text-foreground pointer-coarse:h-11 max-sm:w-full";
+  "h-9 min-w-0 max-w-full rounded-md border border-border/70 bg-background px-2 text-[0.8125rem] text-foreground pointer-coarse:h-11 max-sm:w-full sm:max-w-[15rem]";
 
 function ChipConfianza({ nivel }: { nivel: Confianza }) {
   return (
@@ -79,13 +82,70 @@ function Selector({ etiqueta, todos, opciones, valor, onCambio }: { etiqueta: st
   );
 }
 
-function Total({ etiqueta, valor, detalle, testId }: { etiqueta: string; valor: string; detalle: string; testId: string }) {
+type Bloque = "subidas" | "barato";
+
+/**
+ * Un total arriba que también elige qué lista se ve debajo (como las cifras del
+ * tablero): las dos listas una encima de otra no cabían en la tablet (cada una
+ * medía 36 px a 768×1024; revisión del 17/11/2026). Con error, lo dice y deja
+ * reintentar; nunca se queda en «Calculando…».
+ */
+function Total({
+  etiqueta,
+  valor,
+  detalle,
+  testId,
+  activo,
+  onElegir,
+  controla,
+  error,
+  onReintentar,
+  reintentando,
+}: {
+  etiqueta: string;
+  valor: string;
+  detalle: string;
+  testId: string;
+  activo: boolean;
+  onElegir: () => void;
+  controla: string;
+  error: string | null;
+  onReintentar: () => void;
+  reintentando: boolean;
+}) {
   return (
-    <div className="min-w-0 rounded-xl border border-border/70 bg-card px-3 py-2" data-testid={testId}>
-      <p className="text-xs font-medium text-muted-foreground">{etiqueta}</p>
-      <p className="text-lg font-semibold leading-tight tabular-nums tracking-tight text-foreground">{valor}</p>
-      <p className="text-xs leading-snug text-muted-foreground">{detalle}</p>
+    <div
+      className={cn(
+        "relative min-w-0 rounded-xl border px-3 py-2 transition-colors",
+        activo ? "border-foreground/70 bg-card" : "border-transparent bg-muted/50 hover:border-border/70 hover:bg-muted",
+      )}
+      data-testid={testId}
+    >
+      <button
+        type="button"
+        aria-pressed={activo}
+        aria-controls={controla}
+        onClick={onElegir}
+        className={cn("block w-full min-w-0 text-left after:absolute after:inset-0 after:rounded-xl", FOCO)}
+      >
+        <span className="block text-xs font-medium leading-snug text-muted-foreground">{etiqueta}</span>
+        <span className={cn("block font-semibold leading-tight tabular-nums tracking-tight", error ? "text-sm text-destructive" : "text-lg text-foreground")}>
+          {error ? "No se ha podido calcular" : valor}
+        </span>
+        <span className="line-clamp-2 block text-xs leading-snug text-muted-foreground @[64rem]/tablero:line-clamp-1" title={error ?? detalle}>
+          {error ?? detalle}
+        </span>
+      </button>
+      {error && <Reintentar onClick={onReintentar} cargando={reintentando} className="relative z-10 mt-1.5" />}
     </div>
+  );
+}
+
+function Reintentar({ onClick, cargando, className }: { onClick: () => void; cargando: boolean; className?: string }) {
+  return (
+    <button type="button" className={cn(BOTON, FOCO, className)} onClick={onClick} disabled={cargando}>
+      <RotateCw className={cn("h-3.5 w-3.5", cargando && "animate-spin")} aria-hidden /> {cargando ? "Reintentando…" : "Reintentar"}
+    </button>
   );
 }
 
@@ -99,18 +159,20 @@ function Fila({ titulo, nivel, linea, cifra, pieCifra, detalle, motivo, children
             <ChipConfianza nivel={nivel} />
           </p>
           <p className="mt-0.5 break-words text-xs leading-snug text-muted-foreground">{linea}</p>
+          <p className="mt-1 break-words text-xs leading-snug text-muted-foreground">{detalle}</p>
+          <p className="mt-0.5 break-words text-xs leading-snug text-muted-foreground">
+            <span className="font-medium text-foreground/80">{nivel === "baja" ? "Por qué hay que revisarlo: " : "Confianza: "}</span>
+            {motivo}
+          </p>
         </div>
         <div className="shrink-0 text-right">
           <p className={cn("text-sm font-semibold tabular-nums", nivel === "baja" ? "text-muted-foreground line-through decoration-1" : "text-foreground")}>{cifra}</p>
           <p className="text-xs text-muted-foreground">{pieCifra}</p>
+          {/* Desde 640 px el botón va bajo la cifra: cada fila gana una línea de alto (17/11/2026). */}
+          {children && <div className="mt-1 flex flex-col items-end gap-1 max-sm:hidden">{children}</div>}
         </div>
       </div>
-      <p className="mt-1 break-words text-xs leading-snug text-muted-foreground">{detalle}</p>
-      <p className="mt-0.5 break-words text-xs leading-snug text-muted-foreground">
-        <span className="font-medium text-foreground/80">{nivel === "baja" ? "Por qué hay que revisarlo: " : "Confianza: "}</span>
-        {motivo}
-      </p>
-      {children && <div className="mt-1.5 flex flex-wrap gap-1.5">{children}</div>}
+      {children && <div className="mt-1.5 flex flex-wrap gap-1.5 sm:hidden">{children}</div>}
     </li>
   );
 }
@@ -194,7 +256,11 @@ function VerMas({ visibles, total, limite, onMas, cargando }: { visibles: number
   );
 }
 
+const CALCULANDO = "Calculando… Tarda unos segundos: repasa las compras de dos años.";
+const SIN_MIGRACION = "Este informe necesita la migración «informe_subidas_proveedor».";
+
 export function InformeSubidasProveedor({ local, onIrA }: Props) {
+  const [bloque, setBloque] = useState<Bloque>("subidas");
   const [meses, setMeses] = useState<MesesInforme>(MESES_POR_DEFECTO);
   const [proveedorId, setProveedorId] = useState<number | null>(null);
   const [familiaId, setFamiliaId] = useState<number | null>(null);
@@ -203,9 +269,14 @@ export function InformeSubidasProveedor({ local, onIrA }: Props) {
   const filtros: FiltrosInforme = useMemo(() => ({ proveedorId, familiaId, local }), [proveedorId, familiaId, local]);
   const subQ = useInformeSubidas(meses, filtros, limiteSub);
   const barQ = useInformeBarato(filtros, limiteBar);
-  const sub = subQ.data ?? null;
-  const bar = barQ.data ?? null;
+  // Con error no se enseña lo de antes (placeholderData) como si fuera de estos filtros.
+  const sub = subQ.isError ? null : (subQ.data ?? null);
+  const bar = barQ.isError ? null : (barQ.data ?? null);
+  const errSub = subQ.isError ? mensajeErrorInforme(subQ.error) : null;
+  const errBar = barQ.isError ? mensajeErrorInforme(barQ.error) : null;
   const { abrir, visor } = useVisor(onIrA);
+  const idLista = useId();
+  const filtrado = proveedorId !== null || familiaId !== null;
 
   // Las opciones de los filtros son las del informe SIN filtrar (con un filtro puesto, la RPC solo devuelve las suyas).
   const [opciones, setOpciones] = useState<{ proveedores: OpcionFiltro[]; familias: OpcionFiltro[] }>({ proveedores: [], familias: [] });
@@ -224,79 +295,129 @@ export function InformeSubidasProveedor({ local, onIrA }: Props) {
     setLimiteBar(PAGINA_INFORME);
   };
 
-  const vacio = (q: { isPending: boolean; isError: boolean; error: unknown }, dato: unknown, nada: string) =>
-    q.isPending ? "Calculando… Tarda unos segundos: repasa las compras de dos años." : q.isError ? (q.error instanceof Error ? q.error.message : "No se ha podido calcular.") : dato === null ? "Este informe necesita la migración «informe_subidas_proveedor»." : nada;
+  const valorTotal = (pendiente: boolean, texto: string | null) => (pendiente ? "—" : (texto ?? "—"));
+  const detalleTotal = (pendiente: boolean, texto: string | null) => (pendiente ? "Calculando…" : (texto ?? "Falta la migración del informe"));
+
+  // Vacío: distingue «no hay con qué comparar» de «nada ha subido / nada sale más barato».
+  const conFiltros = filtrado ? " con estos filtros" : "";
+  const vacioSub = !sub
+    ? SIN_MIGRACION
+    : sub.comparados === 0
+      ? `No hay compras de hace ${meses} meses al mismo proveedor con las que comparar${conFiltros}. Prueba con otro periodo.`
+      : `De ${sub.comparados} productos comparados, ninguno ha subido frente a hace ${meses} meses${conFiltros}.`;
+  const vacioBar = !bar
+    ? SIN_MIGRACION
+    : bar.productosVariosProveedores === 0
+      ? `Ningún producto se ha comprado a dos o más proveedores en 12 meses${conFiltros}: no hay con qué comparar.`
+      : `De ${bar.productosVariosProveedores} productos comprados a varios proveedores, ninguno sale más barato en otro${conFiltros}.`;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2.5 max-sm:h-auto" data-testid="informe-subidas-proveedor">
-      <div className="grid shrink-0 grid-cols-1 gap-2 @[48rem]/tablero:grid-cols-2">
+    <div className="flex h-full min-h-0 flex-col gap-2 max-sm:h-auto" data-testid="informe-subidas-proveedor">
+      <div className="grid shrink-0 grid-cols-2 gap-2" role="group" aria-label="Qué lista ver">
         <Total
           testId="total-subidas"
           etiqueta={`Lo que te cuestan las subidas (frente a hace ${meses} meses)`}
-          valor={sub ? `+${euros0(sub.fiable.importe)} € al año` : "—"}
-          detalle={sub ? resumenSubidas(sub) : "Calculando…"}
+          valor={valorTotal(subQ.isPending, sub ? `+${euros0(sub.fiable.importe)} € al año` : null)}
+          detalle={detalleTotal(subQ.isPending, sub ? resumenSubidas(sub) : null)}
+          activo={bloque === "subidas"}
+          onElegir={() => setBloque("subidas")}
+          controla={idLista}
+          error={errSub}
+          onReintentar={() => void subQ.refetch()}
+          reintentando={subQ.isFetching}
         />
-        <Total testId="total-ahorro" etiqueta="Ahorro posible cambiando de proveedor" valor={bar ? `${euros0(bar.fiable.importe)} € al año` : "—"} detalle={bar ? resumenBarato(bar) : "Calculando…"} />
+        <Total
+          testId="total-ahorro"
+          etiqueta="Ahorro posible cambiando de proveedor"
+          valor={valorTotal(barQ.isPending, bar ? `${euros0(bar.fiable.importe)} € al año` : null)}
+          detalle={detalleTotal(barQ.isPending, bar ? resumenBarato(bar) : null)}
+          activo={bloque === "barato"}
+          onElegir={() => setBloque("barato")}
+          controla={idLista}
+          error={errBar}
+          onReintentar={() => void barQ.refetch()}
+          reintentando={barQ.isFetching}
+        />
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5">
         <Selector etiqueta="Proveedor" todos="Todos" opciones={opciones.proveedores} valor={proveedorId} onCambio={(v) => cambiarFiltro(() => setProveedorId(v))} />
         <Selector etiqueta="Categoría" todos="Todas" opciones={opciones.familias} valor={familiaId} onCambio={(v) => cambiarFiltro(() => setFamiliaId(v))} />
-        <Segmentado
-          compacto
-          etiqueta="Comparar la última compra con la de hace"
-          opciones={MESES_INFORME.map((m) => ({ valor: String(m), etiqueta: `Hace ${m} meses` }))}
-          valor={String(meses)}
-          onCambio={(v) => cambiarFiltro(() => setMeses(Number(v) as MesesInforme))}
-        />
-        <p className="text-xs text-muted-foreground">Precios sin IVA. Sin abonos ni líneas regaladas.</p>
+        {bloque === "subidas" && (
+          <Segmentado
+            compacto
+            etiqueta="Comparar la última compra con la de hace"
+            opciones={MESES_INFORME.map((m) => ({ valor: String(m), etiqueta: `Hace ${m} meses` }))}
+            valor={String(meses)}
+            onCambio={(v) => cambiarFiltro(() => setMeses(Number(v) as MesesInforme))}
+          />
+        )}
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 @[48rem]/tablero:grid-cols-2 @[48rem]/tablero:[grid-template-rows:minmax(0,1fr)]">
-        <Caja
-          titulo="Subidas de precio"
-          subtitulo={`La última compra frente a la de hace ${meses} meses, al mismo proveedor y en la misma unidad. El impacto es la diferencia por lo comprado en 12 meses.`}
-          testId="caja-informe-subidas"
-        >
-          {!sub || sub.filas.length === 0 ? (
-            <SinDatos>{vacio(subQ, subQ.data, `Ningún producto ha subido frente a hace ${meses} meses con estos filtros.`)}</SinDatos>
-          ) : (
-            <>
-              <ol aria-label="Subidas de precio, de más a menos impacto" className={cn(subQ.isPlaceholderData && "opacity-60")}>
-                {sub.filas.map((f) => (
-                  <FilaDeSubida key={f.id} f={f} onComparar={() => abrir([f.docRef, f.doc], notasSubida(f), productoDeFila(f))} />
-                ))}
-              </ol>
-              <VerMas visibles={sub.filas.length} total={sub.totalFilas} limite={limiteSub} cargando={subQ.isFetching} onMas={() => setLimiteSub(siguienteLimite(limiteSub))} />
-              {sub.sinReferencia > 0 && (
-                <p className="mt-2 text-xs leading-snug text-muted-foreground">
-                  {sub.sinReferencia} productos no se pueden comparar: no hay compra al mismo proveedor de hace {meses} meses.
-                </p>
-              )}
-              <NoEntran e={sub.excluidos} />
-            </>
-          )}
-        </Caja>
-
-        <Caja
-          titulo="Proveedor más barato"
-          subtitulo="Productos comprados a dos o más proveedores en 12 meses: la última factura de cada uno, en la misma unidad. El ahorro es la diferencia por lo comprado al más caro."
-          testId="caja-informe-barato"
-        >
-          {!bar || bar.filas.length === 0 ? (
-            <SinDatos>{vacio(barQ, barQ.data, "Con estos filtros, nada sale más barato en otro proveedor al que ya compras.")}</SinDatos>
-          ) : (
-            <>
-              <ol aria-label="Productos más baratos en otro proveedor, de más a menos ahorro" className={cn(barQ.isPlaceholderData && "opacity-60")}>
-                {bar.filas.map((f) => (
-                  <FilaDeBarato key={f.id} f={f} onComparar={() => abrir([f.doc, f.docBarato], notasBarato(f), productoDeFila(f))} />
-                ))}
-              </ol>
-              <VerMas visibles={bar.filas.length} total={bar.totalFilas} limite={limiteBar} cargando={barQ.isFetching} onMas={() => setLimiteBar(siguienteLimite(limiteBar))} />
-              <NoEntran e={bar.excluidos} />
-            </>
-          )}
-        </Caja>
+      {/* Una lista a la vez, con todo el alto que queda y scroll dentro (la página no desplaza). En pantallas muy
+          bajas no encoge de 16rem: entonces desplaza la vista de Análisis, no la página. En el móvil, el tablero
+          entero desplaza como una página (igual que las demás vistas). */}
+      <div id={idLista} className="flex min-h-[16rem] flex-1 flex-col max-sm:min-h-0">
+        {bloque === "subidas" ? (
+          <Caja
+            titulo="Subidas de precio"
+            subtitulo={`Última compra frente a la de hace ${meses} meses (mismo proveedor, unidad y envase; sin IVA). Impacto: la diferencia por lo comprado en 12 meses.`}
+            testId="caja-informe-subidas"
+          >
+            {errSub ? (
+              <SinDatos>
+                <span className="block">{errSub}</span>
+                <Reintentar onClick={() => void subQ.refetch()} cargando={subQ.isFetching} className="mt-2" />
+              </SinDatos>
+            ) : subQ.isPending ? (
+              <SinDatos>{CALCULANDO}</SinDatos>
+            ) : !sub || sub.filas.length === 0 ? (
+              <SinDatos>{vacioSub}</SinDatos>
+            ) : (
+              <>
+                <ol aria-label="Subidas de precio, de más a menos impacto" className={cn(subQ.isPlaceholderData && "opacity-60")}>
+                  {sub.filas.map((f) => (
+                    <FilaDeSubida key={f.id} f={f} onComparar={() => abrir([f.docRef, f.doc], notasSubida(f), productoDeFila(f))} />
+                  ))}
+                </ol>
+                <VerMas visibles={sub.filas.length} total={sub.totalFilas} limite={limiteSub} cargando={subQ.isFetching} onMas={() => setLimiteSub(siguienteLimite(limiteSub))} />
+                {sub.sinReferencia > 0 && (
+                  <p className="mt-2 text-xs leading-snug text-muted-foreground">
+                    {sub.sinReferencia} productos no se pueden comparar: no hay compra al mismo proveedor de hace {meses} meses.
+                  </p>
+                )}
+                <NoEntran e={sub.excluidos} />
+              </>
+            )}
+          </Caja>
+        ) : (
+          <Caja
+            titulo="Proveedor más barato"
+            subtitulo="Última factura de cada proveedor en 12 meses (misma unidad y envase; sin IVA). Ahorro: la diferencia por lo comprado al más caro."
+            testId="caja-informe-barato"
+          >
+            {errBar ? (
+              <SinDatos>
+                <span className="block">{errBar}</span>
+                <Reintentar onClick={() => void barQ.refetch()} cargando={barQ.isFetching} className="mt-2" />
+              </SinDatos>
+            ) : barQ.isPending ? (
+              <SinDatos>{CALCULANDO}</SinDatos>
+            ) : !bar || bar.filas.length === 0 ? (
+              <SinDatos>{vacioBar}</SinDatos>
+            ) : (
+              <>
+                <ol aria-label="Productos más baratos en otro proveedor, de más a menos ahorro" className={cn(barQ.isPlaceholderData && "opacity-60")}>
+                  {bar.filas.map((f) => (
+                    <FilaDeBarato key={f.id} f={f} onComparar={() => abrir([f.doc, f.docBarato], notasBarato(f), productoDeFila(f))} />
+                  ))}
+                </ol>
+                <VerMas visibles={bar.filas.length} total={bar.totalFilas} limite={limiteBar} cargando={barQ.isFetching} onMas={() => setLimiteBar(siguienteLimite(limiteBar))} />
+                <NoEntran e={bar.excluidos} />
+              </>
+            )}
+          </Caja>
+        )}
       </div>
       {visor}
     </div>

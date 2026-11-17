@@ -396,3 +396,16 @@ export function unirOpciones(a: OpcionFiltro[], b: OpcionFiltro[]): OpcionFiltro
 
 /** Cuántas filas pedir al pulsar «Ver más» (tope de la RPC: 1000). */
 export const siguienteLimite = (actual: number): number => Math.min(actual + PAGINA_INFORME, LIMITE_MAXIMO_INFORME);
+
+/**
+ * El error de una de las dos RPC, en castellano y sin el texto crudo del servidor
+ * («internal error», «permission denied for function…»): revisión del 17/11/2026.
+ */
+export function mensajeErrorInforme(e: unknown): string {
+  const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code?: unknown }).code ?? "") : "";
+  const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+  if (code === "42501" || /permiso|permission denied/i.test(msg)) return "No tienes permiso para ver los informes de Facturas.";
+  if (code === "57014" || /timeout|canceling statement|tiempo/i.test(msg)) return "El cálculo ha tardado demasiado. Vuelve a intentarlo o filtra por proveedor o categoría.";
+  if (/failed to fetch|network|conexi/i.test(msg)) return "No hay conexión con el servidor. Comprueba la red y vuelve a intentarlo.";
+  return "No se ha podido calcular el informe: el servidor ha dado un error.";
+}
