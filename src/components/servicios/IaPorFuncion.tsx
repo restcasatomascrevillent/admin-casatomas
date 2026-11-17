@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, Bot, Coins, Loader2 } from "lucide-react";
-import { useCostePorUso } from "@/hooks/useCostePorUso";
-import { type FilaCostePorUso, costesPorAccion, plural, textoCosteUso, totalesIa, ventanasIa } from "@/lib/costesServicios";
+import { useCostePorUso, useCuadreOpenai } from "@/hooks/useCostePorUso";
+import { type FilaCostePorUso, costesPorAccion, plural, resumirCuadreOpenai, textoCosteUso, totalesIa, ventanasIa } from "@/lib/costesServicios";
 import { textoMes, textoMesCorto } from "@/lib/informeServicios";
-import { formatearEur } from "@/lib/servicios";
+import { fechaCorta, formatearEur } from "@/lib/servicios";
 import { cn } from "@/lib/utils";
 import { Bloque } from "./Bloque";
 import { formatearCambio } from "./TipoCambio";
@@ -48,6 +48,9 @@ export function IaPorFuncion({ eurPorUsd, hoy: hoyProp }: Props) {
   const v = useMemo(() => ventanasIa(hoy), [hoy]);
   const actualQ = useCostePorUso(v.actual.desde, v.actual.hasta);
   const anteriorQ = useCostePorUso(v.anterior.desde, v.anterior.hasta);
+  const cuadreQ = useCuadreOpenai(v.actual.desde, v.actual.hasta);
+  const cuadre = useMemo(() => resumirCuadreOpenai(cuadreQ.data ?? null, eurPorUsd), [cuadreQ.data, eurPorUsd]);
+  const ultimoDiaReal = fechaCorta(cuadreQ.data?.ultimoDia ?? null);
   const actual = actualQ.data?.disponible ? actualQ.data.filas : null;
   const anterior = anteriorQ.data?.disponible ? anteriorQ.data.filas : null;
   const sinMigracion = actualQ.data?.disponible === false;
@@ -176,6 +179,37 @@ export function IaPorFuncion({ eurPorUsd, hoy: hoyProp }: Props) {
                   </table>
                 </div>
               </>
+            )}
+            {cuadre.estado !== "sin_datos" && (
+              <div
+                className={cn(
+                  "min-w-0 rounded-md border p-3 text-sm",
+                  cuadre.estado === "cuadra" ? "border-border bg-muted/30" : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100",
+                )}
+                data-testid="ia-cuadre"
+                data-estado={cuadre.estado}
+              >
+                <p className="font-medium">Cuadre con la factura de OpenAI{ultimoDiaReal ? ` (días cerrados hasta el ${ultimoDiaReal})` : ""}</p>
+                <dl className="mt-2 grid min-w-0 grid-cols-[1fr_auto] gap-x-4 gap-y-1 tabular-nums">
+                  <dt>Facturado por OpenAI</dt>
+                  <dd className="text-right font-semibold">{formatearEur(cuadre.realEur)}</dd>
+                  <dt>Registrado por las funciones del panel y de la web</dt>
+                  <dd className="text-right">{formatearEur(cuadre.registradoEur)}</dd>
+                  {cuadre.estado === "fuera" && (
+                    <>
+                      <dt>Fuera de producción (demo y pruebas)</dt>
+                      <dd className="text-right font-semibold" data-testid="ia-cuadre-fuera">{formatearEur(cuadre.fueraEur)}{cuadre.fueraPct != null ? ` · ${cuadre.fueraPct} %` : ""}</dd>
+                    </>
+                  )}
+                </dl>
+                <p className="mt-2 text-xs">
+                  {cuadre.estado === "cuadra"
+                    ? "Cuadra: todo lo que cobra OpenAI sale de las funciones de arriba."
+                    : cuadre.estado === "fuera"
+                      ? "La demo y las pruebas de modelos usan la misma clave de OpenAI que producción: su gasto entra en la factura (y en el total del mes) pero no en la tabla de arriba, que solo cuenta producción."
+                      : "Aquí hay registrado más de lo que OpenAI ha facturado: alguna tarifa de modelo está por encima de la real. Revísalas en Modelos."}
+                </p>
+              </div>
             )}
             <p className="text-xs text-muted-foreground">
               Sale de lo que registra cada función (tokens × tarifa de su modelo), sin IVA. Lo que factura OpenAI de verdad, por proceso, está en el bloque de OpenAI; y en el total del mes la IA ya va dentro de OpenAI: no se cuenta dos veces.

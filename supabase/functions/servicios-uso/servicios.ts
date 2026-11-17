@@ -10,7 +10,7 @@
 //  datos), le pone el límite del plan (de `servicios_contratados.limites`),
 //  calcula lo gastado por uso este mes (`coste_variable`) cuando se puede,
 //  guarda una fila en `servicios_uso` y devuelve la última lectura de cada uno.
-//  Los proveedores sin API razonable (Google Maps, Loading…) salen en
+//  Los proveedores sin API razonable (Google Maps…) salen en
 //  `sin_lector`: la pantalla dice que se miren en su panel.
 //    · Caché: si la última lectura tiene < 15 min, no llama a la API salvo
 //      `?forzar=1` (o cuerpo { "forzar": true }); aun forzando, nunca más de
@@ -39,7 +39,9 @@
 //    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN (ya existen si
 //                            se guardan copias de facturas en Drive: espacio de la cuenta)
 //  Mapbox no tiene API de consumo: cuenta las cargas del mapa de vinos con la
-//  RPC servicios_cargas_mapa_vinos (logs de la web; un mínimo), sin secreto.
+//  RPC servicios_cargas_mapa_vinos (contador que suma la web), sin secreto.
+//  Vercel (plan Pro): además del uso, lee la facturación del periodo
+//  (/v1/billing/charges) y lo compara con los 20 US$ de uso incluidos.
 // ============================================================================
 import { exigirSuperAdmin, respuestaJson, type FabricaCliente } from "../_shared/autorizacion.ts";
 import { ClienteDrive, ErrorDrive, URL_DRIVE } from "../_shared/google-drive.ts";
@@ -372,7 +374,7 @@ export function resumirUsoVercel(json: unknown): UsoVercel {
       const fallos = sumaDe(s, /^request_miss_count$/i);
       return aciertos != null && fallos != null && aciertos + fallos > 0 ? (aciertos / (aciertos + fallos)) * 100 : undefined;
     })(),
-    // Hobby no los da por API (comprobado el 10/11/2026); si un día salen, se leen.
+    // /v2/usage no los da (comprobado el 10/11/2026); en Pro salen en la facturación.
     bytesDespliegues: ultimoDe(json, /deployment.*(storage|size).*bytes?$|^deployments?_storage(_bytes)?$/i),
     bytesFunciones: ultimoDe(json, /(function|lambda).*(storage|size).*bytes?$|^functions?_storage(_bytes)?$/i),
     porProyecto: peticionesPorProyecto(json),
@@ -414,6 +416,149 @@ export async function metricasRecorteServidor(ctx: ContextoLector): Promise<Reco
     recortes_servidor_dia: { orden: 9, etiqueta: "Recortes de fotos en el servidor hoy (tope del panel)", valor: n("recortes_dia"), unidad: "fotos", periodo: "hoy" },
     cpu_recortes_mes: { orden: 10, etiqueta: "CPU de los recortes en el servidor (tope del panel)", valor: minutos, unidad: "minutos", periodo: "mes en curso" },
   };
+}
+
+/** Uso incluido en el plan Pro de Vercel (US$ por periodo) si `servicios_contratados.limites.uso_periodo` no dice otra cosa. */
+export const VERCEL_USO_INCLUIDO_USD = 20;
+
+export interface FacturacionVercel {
+  /** Uso del periodo a precio de tarifa (sin la cuota del plan). */
+  usoUsd: number;
+  /** Lo que Vercel ya da por facturado (0 mientras lo cubre lo incluido). */
+  facturadoUsd: number;
+  porServicio: Array<{ servicio: string; usd: number }>;
+  porProyecto: Array<{ proyecto: string; usd: number }>;
+  filas: number;
+}
+
+/**
+ * Va sumando los cargos de /v1/billing/charges (formato FOCUS, una línea JSON
+ * por cargo). Solo el USO (`ChargeCategory: "Usage"`): la cuota del plan
+ * («Purchase») ya está en el precio fijo del servicio. Un mes son decenas de
+ * miles de líneas (~20 MB): se suman al vuelo, sin guardarlas.
+ */
+export function sumadorFacturacionVercel() {
+  const servicios = new Map<string, number>();
+  const proyectos = new Map<string, number>();
+  let usoUsd = 0;
+  let facturadoUsd = 0;
+  let filas = 0;
+  const fila = (f: unknown) => {
+    if (!esObjeto(f) || typeof f.ChargeCategory !== "string") return;
+    const usd = numero(f.EffectiveCost);
+    if (usd == null) return;
+    filas++;
+    facturadoUsd += numero(f.BilledCost) ?? 0;
+    if (f.ChargeCategory !== "Usage" || usd <= 0) return;
+    usoUsd += usd;
+    const servicio = String(f.ServiceName ?? "Otros").slice(0, 80);
+    servicios.set(servicio, (servicios.get(servicio) ?? 0) + usd);
+    const proyecto = esObjeto(f.Tags) && typeof f.Tags.ProjectName === "string" ? f.Tags.ProjectName.slice(0, 80) : null;
+    if (proyecto) proyectos.set(proyecto, (proyectos.get(proyecto) ?? 0) + usd);
+  };
+  const linea = (texto: string) => {
+    const t = texto.trim();
+    if (!t.startsWith("{") && !t.startsWith("[")) return;
+    try {
+      const o = JSON.parse(t);
+      // Por si un día responde con una lista o con { data: [...] } en vez de líneas.
+      if (Array.isArray(o)) o.forEach(fila);
+      else if (esObjeto(o) && Array.isArray(o.data)) o.data.forEach(fila);
+      else fila(o);
+    } catch { /* línea a medias: se ignora */ }
+  };
+  const orden = <T extends { usd: number }>(l: T[]) => l.sort((a, b) => b.usd - a.usd).map((x) => ({ ...x, usd: redondear(x.usd, 4) }));
+  const resultado = (): FacturacionVercel | null => filas === 0 ? null : {
+    usoUsd,
+    facturadoUsd,
+    porServicio: orden([...servicios].map(([servicio, usd]) => ({ servicio, usd }))),
+    porProyecto: orden([...proyectos].map(([proyecto, usd]) => ({ proyecto, usd }))),
+    filas,
+  };
+  return { linea, resultado };
+}
+
+/** Lo mismo, de un texto entero (pruebas y respuestas pequeñas). */
+export function resumirFacturacionVercel(texto: string): FacturacionVercel | null {
+  const s = sumadorFacturacionVercel();
+  for (const l of texto.split("\n")) s.linea(l);
+  return s.resultado();
+}
+
+/** Lee la respuesta línea a línea (sin cargar los ~20 MB de un mes en memoria). */
+async function sumarFacturacion(res: Response): Promise<FacturacionVercel | null> {
+  const s = sumadorFacturacionVercel();
+  if (!res.body) {
+    for (const l of (await res.text().catch(() => "")).split("\n")) s.linea(l);
+    return s.resultado();
+  }
+  const lector = res.body.getReader();
+  const deco = new TextDecoder();
+  let resto = "";
+  for (;;) {
+    const { done, value } = await lector.read();
+    if (value) resto += deco.decode(value, { stream: true });
+    const corte = resto.lastIndexOf("\n");
+    if (corte >= 0) {
+      for (const l of resto.slice(0, corte).split("\n")) s.linea(l);
+      resto = resto.slice(corte + 1);
+    }
+    if (done) break;
+  }
+  s.linea(resto + deco.decode());
+  return s.resultado();
+}
+
+/** Nombres de los conceptos de la factura de Vercel, en palabras del panel. */
+const CONCEPTO_VERCEL: Record<string, string> = {
+  "Build CPU Minutes": "compilaciones",
+  "Build Minutes": "compilaciones",
+  "Function Storage": "almacenamiento de funciones",
+  "Deployment Storage": "almacenamiento de despliegues",
+  "Web Analytics Events": "estadísticas de visitas",
+  "Image Optimization Transformation": "imágenes optimizadas",
+  "Fast Data Transfer": "datos servidos",
+  "CDN Requests": "visitas",
+  "Fluid Active CPU": "CPU de las funciones",
+};
+
+/**
+ * Lo gastado por uso en el periodo de facturación en curso (plan Pro): el
+ * periodo sale del equipo (/v2/teams) y los cargos, de /v1/billing/charges.
+ * null si el plan no factura por uso (Hobby), el token no tiene permiso de
+ * facturación o Vercel no responde: el resto de la tarjeta sigue igual.
+ */
+async function facturacionVercel(
+  ctx: ContextoLector, equipo: string, cab: Record<string, string>,
+): Promise<{ plan: string | null; inicio: Date; fin: Date; f: FacturacionVercel } | { plan: string | null; aviso: string } | null> {
+  const t = await pedir(ctx, `https://api.vercel.com/v2/teams/${encodeURIComponent(equipo)}?teamId=${encodeURIComponent(equipo)}`, cab).catch(() => null);
+  const billing = t?.ok && esObjeto(t.json) && esObjeto(t.json.billing) ? t.json.billing : null;
+  if (!billing) return null;
+  const plan = typeof billing.plan === "string" ? billing.plan : null;
+  if (plan === "hobby") return null;
+  const periodo = esObjeto(billing.period) ? billing.period : null;
+  const ini = periodo ? numero(periodo.start) : null;
+  const fin = periodo ? numero(periodo.end) : null;
+  if (ini == null || fin == null || fin <= ini) return { plan, aviso: "Vercel no ha dado el periodo de facturación: el uso del periodo se mira en su panel (Usage)." };
+  const inicio = new Date(ini);
+  const url = `https://api.vercel.com/v1/billing/charges?teamId=${encodeURIComponent(equipo)}&from=${encodeURIComponent(inicio.toISOString())}&to=${encodeURIComponent(ctx.ahora.toISOString())}`;
+  let res: Response;
+  try {
+    res = await ctx.fetch(url, { headers: { ...cab, Accept: "application/jsonl, application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS * 2) });
+  } catch {
+    return { plan, aviso: "Vercel no ha respondido al pedir la facturación del periodo." };
+  }
+  if (!res.ok) {
+    return {
+      plan,
+      aviso: res.status === 401 || res.status === 403
+        ? "El token de Vercel no tiene permiso para leer la facturación: el uso del periodo se mira en su panel (Usage)."
+        : `No se pudo leer la facturación de Vercel (respuesta ${res.status}).`,
+    };
+  }
+  const f = await sumarFacturacion(res).catch(() => null);
+  if (!f) return { plan, aviso: "Vercel ha cambiado el formato de su facturación: no se reconocen los cargos." };
+  return { plan, inicio, fin: new Date(fin), f };
 }
 
 export const leerVercel: Lector = async (ctx) => {
@@ -473,8 +618,6 @@ export const leerVercel: Lector = async (ctx) => {
     if (r.gbHoras != null) {
       metricas.memoria_funciones = {
         orden: 5.5, etiqueta: "Memoria de las funciones", valor: redondear(r.gbHoras, 3), unidad: "GB-hora", periodo,
-        // Límite del plan Hobby si servicios_contratados no tiene uno (20261120100000 lo añade, editable).
-        limite: 360, unidad_limite: "GB-hora",
       };
     }
     // Almacenamiento (petición del dueño, 10/11/2026). Es «ahora», no del periodo: el último valor del día.
@@ -505,9 +648,48 @@ export const leerVercel: Lector = async (ctx) => {
     }
   }
 
+  // 4. Plan Pro: lo gastado por uso en el periodo de facturación frente a lo que incluye el plan.
+  let costeVariable: CosteVariable | null = null;
+  const fact = await facturacionVercel(ctx, equipo, cab).catch(() => null);
+  if (fact?.plan) detalles.plan_detectado = fact.plan === "pro" ? "Pro" : fact.plan;
+  if (fact && "aviso" in fact) avisos.push(fact.aviso);
+  else if (fact) {
+    const { f, inicio, fin } = fact;
+    const dia = (d: Date) => fechaEs(d.toISOString()) ?? "";
+    const periodo = `periodo de facturación (del ${dia(inicio)} al ${dia(fin)})`;
+    const transcurrido = Math.max(3_600_000, ctx.ahora.getTime() - inicio.getTime());
+    const previsto = f.usoUsd * Math.max(1, (fin.getTime() - inicio.getTime()) / transcurrido);
+    const exceso = Math.max(0, f.usoUsd - VERCEL_USO_INCLUIDO_USD);
+    const reparto = f.porServicio.filter((x) => x.usd >= 0.01).slice(0, 4)
+      .map((x) => `${CONCEPTO_VERCEL[x.servicio] ?? x.servicio} ${fmtNum(x.usd)} US$`).join(" · ");
+    const proyectos = f.porProyecto.filter((x) => x.usd >= 0.01).slice(0, 4)
+      .map((x) => `${x.proyecto.replace(/-casatomas$/, "")} ${fmtNum(x.usd)} US$`).join(" · ");
+    metricas.uso_periodo = {
+      orden: 0, etiqueta: "Uso del periodo de facturación", valor: redondear(f.usoUsd), unidad: "USD", periodo,
+      limite: VERCEL_USO_INCLUIDO_USD, unidad_limite: "USD",
+      nota: [
+        reparto ? `En qué se va: ${reparto}.` : "",
+        proyectos ? `Por proyecto: ${proyectos}.` : "",
+        `A este ritmo, ${fmtNum(previsto)} US$ al acabar el periodo.`,
+        "El plan Pro incluye 20 US$ de uso; lo que pase se cobra aparte de la cuota.",
+      ].filter(Boolean).join(" "),
+    };
+    detalles.facturacion = {
+      desde: inicio.toISOString(), hasta: fin.toISOString(), uso_usd: redondear(f.usoUsd, 4), previsto_usd: redondear(previsto),
+      facturado_usd: redondear(f.facturadoUsd, 4), por_servicio: f.porServicio.slice(0, 10), por_proyecto: f.porProyecto.slice(0, 10),
+    };
+    if (previsto > VERCEL_USO_INCLUIDO_USD && exceso === 0) {
+      avisos.push(`A este ritmo el uso de Vercel llegará a ${fmtNum(previsto)} US$ en el periodo: unos ${fmtNum(previsto - VERCEL_USO_INCLUIDO_USD)} US$ más que los 20 US$ incluidos, que se cobrarían aparte.`);
+    }
+    costeVariable = {
+      importe: redondear(exceso), moneda: "USD", periodo, origen: "api",
+      nota: "Uso por encima de los 20 US$ que incluye el plan Pro (la cuota de 20 US$ va aparte, como precio fijo).",
+    };
+  }
+
   if (avisos.length) detalles.avisos = avisos;
   if (Object.keys(metricas).length === Object.keys(recortes).length) return { metricas, error: "error_api", detalles };
-  return { metricas, detalles };
+  return { metricas, detalles, ...(costeVariable ? { coste_variable: costeVariable } : {}) };
 };
 
 // ─── Supabase ───────────────────────────────────────────────────────────────
@@ -1410,9 +1592,9 @@ export const leerGoogleDrive: Lector = async (ctx) => {
 };
 
 // ─── Mapbox (mapa de vinos de la web) ──────────────────────────────────────
-// Mapbox no tiene API de consumo: las cargas salen de los logs de la web
-// (sesiones que abren el mapa, solo con cookies de análisis aceptadas: es un
-// mínimo). Precio de https://www.mapbox.com/pricing (03/11/2026).
+// Mapbox no tiene API de consumo: la web suma una carga en nuestra base cada
+// vez que dibuja el mapa (mapa_vinos_contar_carga, 20261209100000; sin ningún
+// dato del visitante). Precio de https://www.mapbox.com/pricing (03/11/2026).
 export const MAPBOX_CARGAS_GRATIS = 50_000;
 export const MAPBOX_USD_POR_MIL = 5;
 
@@ -1422,16 +1604,16 @@ export const leerMapbox: Lector = async (ctx) => {
   try {
     const { data, error } = await ctx.admin.rpc("servicios_cargas_mapa_vinos", { p_desde: inicioMesUtc(ctx.ahora).toISOString() });
     if (error) {
-      return { metricas: {}, error: "error_api", detalles: { avisos: ["Falta aplicar la migración 20261122153000_servicios_costes_mes (cuenta las cargas del mapa)."] } };
+      return { metricas: {}, error: "error_api", detalles: { avisos: ["Falta aplicar la migración 20261209100000_servicios_cierre (cuenta las cargas del mapa)."] } };
     }
     n = numero(data);
   } catch {
     return { metricas: {}, error: "error_interno", detalles: {} };
   }
   if (n == null) {
-    return { metricas: {}, error: "error_api", detalles: { avisos: ["Sin los logs de la web no se pueden contar las cargas del mapa: míralas en el panel de Mapbox."] } };
+    return { metricas: {}, error: "error_api", detalles: { avisos: ["Sin el contador de cargas (migración 20261209100000_servicios_cierre) no se pueden contar: míralas en el panel de Mapbox."] } };
   }
-  const nota = "Sesiones de la web que abren el mapa (solo quien acepta las cookies de análisis: es un mínimo).";
+  const nota = "Veces que la web ha dibujado el mapa este mes (contador propio). La cifra oficial, en el panel de Mapbox (Statistics).";
   const exceso = Math.max(0, n - MAPBOX_CARGAS_GRATIS);
   return {
     metricas: { cargas_mapa_web: { orden: 1, etiqueta: "Cargas del mapa de vinos (web)", valor: n, unidad: "cargas", limite: MAPBOX_CARGAS_GRATIS, periodo, nota } },

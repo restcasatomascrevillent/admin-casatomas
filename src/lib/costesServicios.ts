@@ -427,6 +427,67 @@ export function totalesIa(filas: FilaCostePorUso[]): TotalesIa {
   };
 }
 
+// ─── 3b. Cuadre con la factura de OpenAI ────────────────────────────────────
+
+/** `ia_cuadre_openai(p_desde, p_hasta)`: los días que OpenAI ya ha publicado. */
+export interface CuadreOpenai {
+  dias: number;
+  /** «AAAA-MM-DD» del último día con coste real. */
+  ultimoDia: string | null;
+  /** Lo que OpenAI ha facturado esos días (toda la clave: producción, demo y pruebas). */
+  realUsd: number;
+  /** Lo que registraron esos mismos días las funciones de este proyecto. */
+  registradoUsd: number;
+}
+
+export function normalizarCuadreOpenai(dato: unknown): CuadreOpenai | null {
+  if (typeof dato !== "object" || dato === null) return null;
+  const d = dato as Record<string, unknown>;
+  const real = num(d.real_usd);
+  const registrado = num(d.registrado_usd);
+  if (real == null || registrado == null) return null;
+  return {
+    dias: num(d.dias) ?? 0,
+    ultimoDia: typeof d.ultimo_dia === "string" && /^\d{4}-\d{2}-\d{2}/.test(d.ultimo_dia) ? d.ultimo_dia.slice(0, 10) : null,
+    realUsd: real,
+    registradoUsd: registrado,
+  };
+}
+
+/** Por debajo de esto (céntimos de dólar o un 3 %) la diferencia es redondeo de tarifas, no gasto de fuera. */
+const MARGEN_CUADRE_USD = 0.05;
+const MARGEN_CUADRE_PCT = 0.03;
+
+export interface ResumenCuadre {
+  /** cuadra: lo registrado explica la factura · fuera: hay gasto que no es de aquí · de_mas: aquí hay más que en la factura. */
+  estado: "sin_datos" | "cuadra" | "fuera" | "de_mas";
+  realEur: number;
+  registradoEur: number;
+  /** Factura − registrado (≥ 0 con «fuera»). */
+  fueraEur: number;
+  /** % de la factura que no viene de este proyecto. */
+  fueraPct: number | null;
+}
+
+/**
+ * Lo facturado por OpenAI frente a lo registrado aquí. La clave de OpenAI es
+ * la misma en producción, en la demo y en las pruebas: lo que no está
+ * registrado en este proyecto es gasto de fuera (17/11/2026: en noviembre, la
+ * demo y las pruebas de modelos eran casi una cuarta parte de la factura).
+ */
+export function resumirCuadreOpenai(c: CuadreOpenai | null, eurPorUsd: number): ResumenCuadre {
+  if (!c || c.dias === 0) return { estado: "sin_datos", realEur: 0, registradoEur: 0, fueraEur: 0, fueraPct: null };
+  const dif = c.realUsd - c.registradoUsd;
+  const margen = Math.max(MARGEN_CUADRE_USD, c.realUsd * MARGEN_CUADRE_PCT);
+  return {
+    estado: Math.abs(dif) <= margen ? "cuadra" : dif > 0 ? "fuera" : "de_mas",
+    realEur: redondear2(c.realUsd * eurPorUsd),
+    registradoEur: redondear2(c.registradoUsd * eurPorUsd),
+    fueraEur: redondear2(dif * eurPorUsd),
+    fueraPct: c.realUsd > 0 ? Math.round((dif / c.realUsd) * 100) : null,
+  };
+}
+
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const isoLocal = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 

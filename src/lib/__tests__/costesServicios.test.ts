@@ -274,3 +274,28 @@ describe("IA función por función y lo que cuesta cada cosa (pasos 3 y 4)", () 
     expect(ventanaMes("2026-02-01")).toEqual({ desde: "2026-02-01", hasta: "2026-02-28" });
   });
 });
+
+describe("cuadre con la factura de OpenAI", () => {
+  it("normaliza lo que devuelve la RPC (numeric como texto) y descarta lo que no es un cuadre", async () => {
+    const { normalizarCuadreOpenai } = await import("@/lib/costesServicios");
+    expect(normalizarCuadreOpenai({ dias: 16, ultimo_dia: "2026-11-16", real_usd: "5.7154", registrado_usd: 4.45 }))
+      .toEqual({ dias: 16, ultimoDia: "2026-11-16", realUsd: 5.7154, registradoUsd: 4.45 });
+    expect(normalizarCuadreOpenai(null)).toBeNull();
+    expect(normalizarCuadreOpenai({ dias: 0 })).toBeNull();
+  });
+
+  it("lo que factura OpenAI y no está registrado aquí es gasto de fuera (demo y pruebas)", async () => {
+    const { resumirCuadreOpenai } = await import("@/lib/costesServicios");
+    // Noviembre de 2026: 5,72 US$ facturados, 4,45 registrados en producción.
+    expect(resumirCuadreOpenai({ dias: 16, ultimoDia: "2026-11-16", realUsd: 5.7154, registradoUsd: 4.45 }, 0.9))
+      .toEqual({ estado: "fuera", realEur: 5.14, registradoEur: 4.01, fueraEur: 1.14, fueraPct: 22 });
+    // Diferencias de redondeo de tarifas (céntimos o menos de un 3 %): cuadra.
+    expect(resumirCuadreOpenai({ dias: 3, ultimoDia: "2026-11-03", realUsd: 1, registradoUsd: 0.96 }, 1).estado).toBe("cuadra");
+    expect(resumirCuadreOpenai({ dias: 3, ultimoDia: "2026-11-03", realUsd: 10, registradoUsd: 10.2 }, 1).estado).toBe("cuadra");
+    // Más registrado que facturado: alguna tarifa está alta.
+    expect(resumirCuadreOpenai({ dias: 3, ultimoDia: "2026-11-03", realUsd: 2, registradoUsd: 3 }, 1).estado).toBe("de_mas");
+    // Sin días publicados o sin la migración: no se enseña nada.
+    expect(resumirCuadreOpenai(null, 1).estado).toBe("sin_datos");
+    expect(resumirCuadreOpenai({ dias: 0, ultimoDia: null, realUsd: 0, registradoUsd: 0 }, 1).estado).toBe("sin_datos");
+  });
+});
