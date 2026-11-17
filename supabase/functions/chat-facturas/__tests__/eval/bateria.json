@@ -617,21 +617,26 @@
      "tipo": null,
      "agrupar": null,
      "denominacion": null
+    },
+    "asociacion": {
+     "categoria": "Panadería y repostería",
+     "familia": "Panadería y repostería",
+     "tipo": "producto"
     }
    },
    "esperado": [
     {
      "ruta": "total.importe",
-     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'helado' and pf.nombre !~* 'mostaza' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
-     "tol": 150,
-     "valor": 31.26,
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id left join productos_catalogo pc on pc.id = pf.producto_id where (pc.nombre ~* '^helado' or pf.nombre ~* 'helado') and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 5799.18,
      "tipo": "num"
     }
    ],
    "rpc": {
     "max_ms": 8000
    },
-   "nota": "referencia aproximada: líneas con «helado» en el nombre; tolerancia ancha (150 €) porque el nombre no es la categoría"
+   "nota": "helado = producto (catálogo «Helado de…»), no la categoría Panadería (39.636 €): va por compras_producto"
   },
   {
    "id": "r033",
@@ -4771,20 +4776,14 @@
      "producto": "ml"
     }
    },
-   "esperado": [
-    {
-     "ruta": "total.lineas",
-     "sql": "select count(*) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '[[:<:]]ml[[:>:]]' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
-     "tol": 0,
-     "op": "<=",
-     "valor": 95,
-     "tipo": "num"
-    }
-   ],
+   "esperado": [],
    "rpc": {
+    "debe": [
+     "Falta el nombre del producto"
+    ],
     "max_ms": 8000
    },
-   "nota": "«ml» es una unidad, no un producto: no debe devolver medio catálogo"
+   "nota": "«ml» es una unidad, no un producto: la herramienta dice que falta el nombre (antes devolvía 668 líneas)"
   },
   {
    "id": "t11",
@@ -5368,7 +5367,7 @@
    },
    "esperado": [
     {
-     "ruta": "ultima_factura.precio_unitario",
+     "ruta": "ultima_factura.precio_linea",
      "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'lagar cervera.*magnum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tol": 0.01,
      "valor": 22.9,
@@ -5378,7 +5377,7 @@
    "rpc": {
     "max_ms": 8000
    },
-   "nota": "22,90 € el magnum; 11,45 € el 75 cl"
+   "nota": "22,90 € el magnum; 11,45 € el 75 cl. el precio de la línea va en precio_linea; precio_unitario es el coste real con las botellas sin cargo"
   },
   {
    "id": "t32",
@@ -5399,7 +5398,7 @@
    },
    "esperado": [
     {
-     "ruta": "ultima_factura.precio_unitario",
+     "ruta": "ultima_factura.precio_linea",
      "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'lagar cervera albari.o 75cl' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tol": 0.01,
      "valor": 11.45,
@@ -5408,7 +5407,8 @@
    ],
    "rpc": {
     "max_ms": 8000
-   }
+   },
+   "nota": "el precio de la línea va en precio_linea; precio_unitario es el coste real con las botellas sin cargo"
   },
   {
    "id": "t33",
@@ -5490,7 +5490,7 @@
    },
    "esperado": [
     {
-     "ruta": "ultima_factura.precio_unitario",
+     "ruta": "ultima_factura.precio_linea",
      "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'seque 2021' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tol": 0.01,
      "valor": 18.7,
@@ -5499,7 +5499,8 @@
    ],
    "rpc": {
     "max_ms": 8000
-   }
+   },
+   "nota": "el precio de la línea va en precio_linea; precio_unitario es el coste real con las botellas sin cargo"
   }
  ]
 }

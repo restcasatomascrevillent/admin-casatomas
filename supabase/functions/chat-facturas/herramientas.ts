@@ -147,6 +147,8 @@ Formato: español, 1.234,56 €, fechas 15/01/2026. Viñetas o tabla, sin saludo
 //  `["tipo", "null"]` y el modelo manda null. Sin `pattern` en las fechas (ver
 //  historial de index.ts): el formato se valida en `fechaOpcional`.
 const FECHA_NULL = { type: ["string", "null"] } as const;
+/** filtrar_documentos admite además «abono» (factura con total negativo). */
+const TIPO_DOC = { type: ["string", "null"], enum: ["factura", "albaran", "abono", null] } as const;
 const TIPO_NULL = { type: ["string", "null"], enum: ["factura", "albaran", null] } as const;
 /** Periodo de las herramientas por producto/categoria: el modelo ponia "este año" sin que se pidiera (prueba del 07/10). */
 const FECHA_HIST = { type: ["string", "null"], description: "null salvo periodo dicho por el usuario" } as const;
@@ -219,7 +221,7 @@ export const TOOLS = [
     {
       filtro: { type: "string", enum: ["todos", "sin_total", "sin_verificar", "con_alertas", "fecha_dudosa"] },
       texto: { type: ["string", "null"], description: "Numero de documento, proveedor o CIF" },
-      tipo: TIPO_NULL,
+      tipo: TIPO_DOC,
       desde: FECHA_NULL,
       hasta: FECHA_NULL,
       orden: { type: ["string", "null"], enum: ["fecha_desc", "fecha_asc", "total_desc", "total_asc", null] },
@@ -366,6 +368,13 @@ export const TOOLS = [
 // ─── Validacion de argumentos ────────────────────────────────────────────────
 
 /** Normaliza 'albarán'/'albaranes'/'facturas'… a los valores que aceptan las RPC. */
+/** Tipo de filtrar_documentos: como normalizarTipo, y «abono» (nota de credito, rectificativa) = total negativo. */
+export function normalizarTipoDocumento(v: unknown): string | null {
+  const t = String(v ?? "").toLowerCase().trim();
+  if (t.startsWith("abono") || t.startsWith("rectificativa")) return "abono";
+  return normalizarTipo(v);
+}
+
 export function normalizarTipo(v: unknown): string | null {
   const t = String(v ?? "").toLowerCase().trim();
   if (!t) return null;
@@ -697,6 +706,7 @@ export function textoAsociable(nombre: string, args: any): string | null {
     case "buscar_productos":
       return texto(a.consulta);
     case "ranking":
+    case "gasto_por_categoria":
       return texto(a.categoria);
     default:
       return null;
@@ -903,7 +913,7 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
         params: {
           p_filtro: texto(args.filtro) ?? "todos",
           p_texto: texto(args.texto),
-          p_tipo: normalizarTipo(args.tipo),
+          p_tipo: normalizarTipoDocumento(args.tipo),
           p_desde: desde,
           p_hasta: hasta,
           p_orden: texto(args.orden),
@@ -976,6 +986,22 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
       // «vinos de rioja» puesto como categoria: categoria vino + filtro de denominacion.
       const denCat = denominacionDeTexto(args.categoria);
       const denominacion = filtroVino(args.denominacion) ?? denCat;
+      // «gasto en helado»: un PRODUCTO (no una familia) puesto como categoria daba el gasto de toda la
+      // categoria donde esta catalogado (helado = Panaderia: 39.636 € en vez de ~1.400 €). Va por producto.
+      const catTxt = texto(args.categoria);
+      if (asoc?.tipo === "producto" && catTxt && !denominacion && !texto(args.agrupar)) {
+        return {
+          tipo: "rpc",
+          rpc: "compras_producto_agente",
+          params: {
+            p_texto: catTxt, p_desde: desde, p_hasta: hasta,
+            p_tipo: tipoDeProducto(args.tipo, pregunta),
+            p_limite: LIMITES.compras_producto, p_base: false,
+          },
+          limite: null,
+          respaldoSemantico: { consulta: catTxt, param: "p_embedding" },
+        };
+      }
       return llamadaGasto({
         categoria: denCat ? "vino" : texto(args.categoria),
         desde, hasta,
