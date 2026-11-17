@@ -40,6 +40,7 @@ import {
   porcentaje,
   precioCompra,
   textoFactura,
+  textoCosteFactura,
   textoMediana,
   textoMedianaIngrediente,
   veces,
@@ -310,7 +311,10 @@ export function DetalleArticulo({
               <dl className="grid grid-cols-3 gap-2 text-sm">
                 <Dato etiqueta="Precio de carta" valor={euros(a.precio)} />
                 <Dato etiqueta={`Sin IVA (${config.ivaPct} %)`} valor={euros(a.venta)} />
-                <Dato etiqueta="Te cuesta (última factura)" valor={euros(a.coste)} />
+                <Dato
+                  etiqueta={textoCosteFactura(a) ? "Te cuesta (con las sin cargo)" : "Te cuesta (última factura)"}
+                  valor={euros(a.coste)}
+                />
                 {a.tipo === "vino" && <Dato etiqueta="Cobras × lo que pagas" valor={veces(a.multiplicador)} rojo={rojo} />}
                 <Dato etiqueta={ETIQUETA_PCT_COSTE} valor={porcentaje(a.pct)} rojo={rojo && a.tipo === "plato"} />
                 <Dato etiqueta="Te queda (antes de sueldos y gastos)" valor={euros(a.margen)} />
@@ -321,6 +325,11 @@ export function DetalleArticulo({
                 />
                 {conIva && <Dato etiqueta="Te cuesta con IVA" valor={euros(a.costeIva)} />}
               </dl>
+              {textoCosteFactura(a) && (
+                <p className="text-xs text-muted-foreground" data-testid="coste-factura">
+                  {textoCosteFactura(a)}. El coste es el total pagado ÷ (botellas pagadas + sin cargo), el mismo de «Coste vinos».
+                </p>
+              )}
               <p className="text-xs text-muted-foreground" data-testid="ayuda-pct-coste">{AYUDA_PCT_COSTE}</p>
               {rojo && <p className="text-xs font-medium text-destructive" data-testid="que-hacer-rojo">{QUE_HACER_EN_ROJO}</p>}
               {conIva && notaIva(a) && <p className="text-xs text-muted-foreground">{notaIva(a)}.</p>}

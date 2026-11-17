@@ -132,6 +132,15 @@ describe("MargenesCarta", () => {
     expect(within(lista).getByTestId("mediana")).toHaveTextContent("Lo normal en 3 meses (mediana): 75,00 € la botella");
   });
 
+  it("Vinos con botellas sin cargo: el coste es el efectivo y la factura sale como dato secundario", () => {
+    estado = { ...estado, data: { ...DATOS, vinos: [{ ...DATOS.vinos[0], coste: 75.67, costeFactura: 80.4, botellasSinCargo: 3 }] } };
+    pintar();
+    fireEvent.click(screen.getByRole("radio", { name: /Vinos/ }));
+    const lista = screen.getByTestId("margenes-lista");
+    expect(within(lista).getByTestId("mediana")).toHaveTextContent("factura 80,40 € · con 3 sin cargo · Lo normal en 3 meses");
+    expect(within(lista).getByText(/La botella te cuesta 75,67 €/)).toBeInTheDocument();
+  });
+
   it("Vinos: margen de la tienda (desactivada) e interruptor «Con IVA»", () => {
     pintar();
     fireEvent.click(screen.getByRole("radio", { name: /Vinos/ }));

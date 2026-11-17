@@ -59,6 +59,7 @@ import {
   puntosDispersion,
   resumenFiable,
   textoFactura,
+  textoCosteFactura,
   textoMediana,
   textoPctCoste,
   veces,
@@ -239,6 +240,7 @@ function FilaArticulo({
   const rojo = a.banderas.includes("coste_alto") || a.banderas.includes("multiplicador_bajo");
   const f = facturaDeArticulo(a);
   const mediana = textoMediana(a, d.config);
+  const sinCargo = textoCosteFactura(a);
   const masNueva = a.tipo !== "plato" ? avisoCompraMasNueva(f, a.ultima, d.hoy) : null;
   return (
     <li className="flex items-start gap-1">
@@ -264,9 +266,9 @@ function FilaArticulo({
             </span>
           )}
           <span className="block break-words text-sm leading-snug text-muted-foreground">{explicacion(a, d.config)}</span>
-          {(mediana || masNueva) && (
+          {(sinCargo || mediana || masNueva) && (
             <span className="block break-words text-xs text-muted-foreground" data-testid="mediana">
-              {[mediana, masNueva].filter(Boolean).join(" · ")}
+              {[sinCargo, mediana, masNueva].filter(Boolean).join(" · ")}
             </span>
           )}
           {a.tipo === "vino" && a.multiplicadorTienda !== null && (
