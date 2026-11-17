@@ -728,7 +728,7 @@ describe("Super Admin › Servicios › Costes · precio de todo (13/11/2026)", 
     expect(sinDato).toHaveTextContent(/Supabase · Datos servidos \(límite 5 GB\).*Supabase no da este dato por API/);
   });
 
-  it("cuánto cuesta cada cosa e IA función por función (con el aviso de las llamadas sin tarifa)", async () => {
+  it("cuánto cuesta cada cosa y gasto de IA por acción (con el aviso de las llamadas sin tarifa)", async () => {
     h.rpc.mockImplementation(async (fn: string, args?: { p_desde?: string }) => {
       if (fn !== "ia_coste_por_uso") return { data: [], error: null };
       if (args?.p_desde !== `${mesDe(new Date()).slice(0, 7)}-01`) return { data: [], error: null };
@@ -749,10 +749,10 @@ describe("Super Admin › Servicios › Costes · precio de todo (13/11/2026)", 
     expect(t(linea("traducir-contenido").textContent)).toContain("Traducir un platosin usos todavía");
     expect(t(linea("recortar-foto").textContent)).toContain("Recortar una fotogratis (en nuestro servidor)");
     expect(t(linea("chat-facturas").textContent)).toContain("≈ 0,2 céntimos");
-    const ia = screen.getByRole("region", { name: "IA, función por función" });
+    const ia = screen.getByRole("region", { name: "Gasto de IA por acción" });
     expect(within(ia).getByRole("alert")).toHaveTextContent("24 llamadas de gpt-6.1-terra sin tarifa: su coste no está sumado.");
     const filaIa = (f: string) => within(ia).getByRole("table").querySelector(`[data-ia-funcion='${f}']`) as HTMLElement;
-    expect(t(filaIa("ocr-trabajo").textContent)).toMatch(/Lee las facturas.*586.*316 documentos.*1,29 €.*0,6 céntimos por documento/);
+    expect(t(filaIa("ocr-trabajo").textContent)).toMatch(/Leer una factura.*Lee las facturas.*316 documentos.*586 llamadas.*1,29 €.*93 %.*0,6 céntimos por documento/);
     expect(t(within(ia).getByTestId("ia-total").textContent)).toBe("1,39 €");
   });
 
@@ -761,7 +761,7 @@ describe("Super Admin › Servicios › Costes · precio de todo (13/11/2026)", 
       ? { data: null, error: { code: "PGRST202", message: "Could not find the function public.ia_coste_por_uso" } }
       : { data: [], error: null });
     pintar("/super-admin/servicios?tab=costes");
-    const ia = await screen.findByRole("region", { name: "IA, función por función" });
+    const ia = await screen.findByRole("region", { name: "Gasto de IA por acción" });
     expect(await within(ia).findByRole("alert")).toHaveTextContent("20261129153000_costes_servicios_ia");
     expect(screen.getByRole("region", { name: "Coste de este mes por proveedor" })).toBeInTheDocument();
   });
