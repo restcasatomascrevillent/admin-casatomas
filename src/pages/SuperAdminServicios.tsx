@@ -65,7 +65,12 @@ const ALTURA_MINIMA_SERVICIOS = 360;
  * `data-[state=inactive]:hidden` imprescindible (como en Tienda/Cheques): una clase `flex` le gana al
  * atributo `hidden` con el que Radix deja las pestañas inactivas.
  */
-const CONTENIDO_PESTANA = "mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
+// `relative`: los textos `sr-only` de dentro son `position: absolute`; sin un antepasado posicionado
+// se colocaban respecto a la página, el scroll de la pestaña no los recortaba y alargaban el
+// documento entero. Al ir de Estado a la tarjeta de un servicio (`scrollIntoView`) el navegador
+// desplazaba también la página: cabecera y pestañas fuera de la vista y media pantalla en blanco
+// (17/11/2026, el dueño: «cuando clicas un servicio en Estado y redirige se ve mal, peta»).
+const CONTENIDO_PESTANA = "relative mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
 
 /**
  * Super Admin › Servicios: el sitio único de lo contratado y de lo que cuesta
