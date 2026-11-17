@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mensajeFallo } from "../fallos";
 import {
-  aplicarTopes, type Aviso, construirResumen, construirSemanal, evaluarPendientes, fraseAviso, fraseReserva, incluirRevision, mensajeAviso,
+  aplicarTopes, aplicarTopesPorGrupo, type Aviso, construirResumen, construirSemanal, evaluarPendientes, fraseAviso, fraseReserva, incluirRevision, mensajeAviso,
   motivoSospechoso, notaTope, pendientesDeEnvio, type ReservaInfo, visibilidadReserva,
 } from "../logica";
 
@@ -145,6 +145,35 @@ describe("avisos-telegram · topes y resumen semanal", () => {
     expect(notaTope(1)).toContain("1 aviso más");
   });
 
+  it("topes aparte: las reservas no se quedan sin avisar por los avisos de precio (y al revés)", () => {
+    const l = [
+      ...Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, reserva: false })),
+      ...Array.from({ length: 3 }, (_, i) => ({ id: `r${i}`, reserva: true })),
+    ];
+    const topes = { hora: 10, dia: 30, reservasHora: 20, reservasDia: 60 };
+    const esR = (x: { reserva: boolean }) => x.reserva;
+    // Los 10 de la hora ya gastados en precios: las 3 reservas salen igual; los 12 de precio van a la nota.
+    const a = aplicarTopesPorGrupo(l, esR, { hora: 10, dia: 10, reservasHora: 0, reservasDia: 0 }, topes);
+    expect(a.enviar.map((x) => x.id)).toEqual(["r0", "r1", "r2"]);
+    expect(a.resto).toHaveLength(12);
+    // Precios al tope libre (10): salen 10 de 12 + las 3 reservas, en el orden original.
+    const b = aplicarTopesPorGrupo(l, esR, { hora: 0, dia: 0, reservasHora: 0, reservasDia: 0 }, topes);
+    expect(b.enviar.map((x) => x.id)).toEqual([...Array.from({ length: 10 }, (_, i) => `p${i}`), "r0", "r1", "r2"]);
+    expect(b.resto.map((x) => x.id)).toEqual(["p10", "p11"]);
+    // Las reservas tienen tope propio: con 19 ya mandadas esa hora, solo cabe 1.
+    const c = aplicarTopesPorGrupo(l, esR, { hora: 0, dia: 0, reservasHora: 19, reservasDia: 19 }, topes);
+    expect(c.enviar.filter(esR).map((x) => x.id)).toEqual(["r0"]);
+  });
+
+  it("semanal: dice «más de 35 días» y, si hay más albaranes, el total de todos", () => {
+    const lunes = new Date("2026-11-16T08:00:00Z");
+    const { texto } = construirSemanal({
+      albaranes: { n: 22, proveedores: 14, importe: 9304.88, total_n: 113, total_proveedores: 42, total_importe: 46734.15, mayores: [{ proveedor: "Proveedor Y", importe: 2100, n: 3 }] },
+    }, lunes, null);
+    expect(texto).toContain("Albaranes sin factura desde hace más de 35 días: 9.304,88 € en 14 proveedores");
+    expect(texto).toContain("En total, con los más recientes: 113 albaranes de 42 proveedores (46.734,15 €)");
+  });
+
   it("semanal: vinos, tienda, facturas y albaranes con cifras y enlace; vacío si no hay nada", () => {
     const lunes = new Date("2026-11-16T08:00:00Z");
     const { texto, secciones } = construirSemanal({
@@ -157,7 +186,8 @@ describe("avisos-telegram · topes y resumen semanal", () => {
     expect(texto).toContain("Vinos de la carta por debajo de ×2,3: 69 de 85");
     expect(texto).toContain("Tienda por debajo de ×1,5: 72 de 90 (10 se venden por debajo del coste)");
     expect(texto).toContain("Facturas por verificar: 1.276 documentos (1.440.000,00 €)");
-    expect(texto).toContain("Albaranes sin factura: 9.305,00 € en 14 proveedores");
+    expect(texto).toContain("Albaranes sin factura desde hace más de 35 días: 9.305,00 € en 14 proveedores");
+    expect(texto).not.toContain("En total, con los más recientes"); // sin totales: no se inventa la línea
     expect(texto).toContain("https://panel.example/facturas?tab=margenes");
     expect(texto.length).toBeLessThan(1500);
     expect(construirSemanal({ vinos: { bajo: 0 }, albaranes: { n: 0 } }, lunes, null)).toEqual({ texto: "", secciones: 0 });
@@ -180,6 +210,11 @@ describe("avisos-telegram · fallos graves (fallos.ts)", () => {
   it("cron caído: una línea por tarea", () => {
     const t = mensajeFallo({ ...base, tipo: "cron_caido", datos: { crons: [{ job: "reanudar-trabajos-ocr", minutos: 49, maximo: 30, error: "job startup timeout" }] } });
     expect(t).toContain("- reanudar-trabajos-ocr: 49 min sin éxito (máx. 30) · job startup timeout");
+  });
+  it("el agrupado trae los ids de los descartados", () => {
+    const t = mensajeFallo({ ...base, tipo: "albaran_aviso", datos: { factura_id: 3, avisos: [], acumulados_antes: 2, acumulados_desde: "2026-11-13T09:00:00Z", acumulados_ids: [41, 42] } });
+    expect(t).toContain("Ids: 41, 42");
+    expect(mensajeFallo({ ...base, tipo: "chat_pulgar_abajo", datos: { pregunta: "p", acumulados_antes: 1, acumulados_desde: "2026-11-13T09:00:00Z" } })).not.toContain("Ids:");
   });
   it("pulgar abajo y albarán dicen cuántos más se agruparon", () => {
     const d = { acumulados_antes: 4, acumulados_desde: "2026-11-13T09:00:00Z" };
