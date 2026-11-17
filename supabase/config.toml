@@ -391,3 +391,11 @@ verify_jwt = false
 # petición es suya o es super admin; forzar solo super admin).
 [functions.analizar-peticion]
 verify_jwt = true
+
+# Super Admin › Gestor Gasto › «Control (Excel)»: JWT de usuario + is_super_admin
+# (exigirSuperAdmin). Lee y edita en el Excel de control de OficiosOsIA (Google
+# Drive, secretos GOOGLE_* de las facturas) SOLO las filas del cliente de este
+# panel (CONTROL_EXCEL_CLIENTE, por defecto «Casa Tomás»). Nunca devuelve tokens.
+# Ver supabase/functions/control-excel/control.ts y docs/CONTROL-EXCEL.md.
+[functions.control-excel]
+verify_jwt = true
