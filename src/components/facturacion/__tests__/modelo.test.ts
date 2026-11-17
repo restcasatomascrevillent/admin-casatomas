@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { nuevaFactura, nuevaLinea, totalesFactura, mensualFactura, erroresFactura, facturaSchema } from "../modelo";
+import { nuevaFactura as nuevoRecibo, nuevaLinea, totalesFactura, totalesRecibo, sinDatosFiscales, tituloRecibo, textoMesRecibo, mensualFactura, erroresFactura, facturaSchema, type Factura } from "../modelo";
+
+/** Documento antiguo, de cuando eran facturas con IVA: el cálculo de lo ya guardado no cambia. */
+const nuevaFactura = (): Factura => ({ ...nuevoRecibo(), aplicarIva: true, ivaGlobal: 21 });
 
 describe("facturación comercial", () => {
   it("conserva el cálculo de facturas antiguas con varios tipos de IVA", () => {
@@ -33,7 +36,7 @@ describe("facturación comercial", () => {
   it("redondea importes por línea sin acumular decimales binarios", () => {
     const f = nuevaFactura();
     delete f.ivaGlobal;
-    f.lineas = [{...nuevaLinea(),cantidad:3,precio:0.1},{...nuevaLinea(),precio:1.005,iva:0}];
+    f.lineas = [{...nuevaLinea(),cantidad:3,precio:0.1,iva:21},{...nuevaLinea(),precio:1.005,iva:0}];
     expect(totalesFactura(f).base).toBe(1.31);
     expect(totalesFactura(f).total).toBe(1.37);
   });
@@ -42,11 +45,18 @@ describe("facturación comercial", () => {
     f.lineas = [{...nuevaLinea("Soporte"),precio:0},{...nuevaLinea(),precio:30,descuento:100}];
     expect(totalesFactura(f).total).toBe(0);
   });
-  it("permite guardar un borrador incompleto, pero bloquea su factura", () => {
-    const f = nuevaFactura();
+  it("permite guardar un borrador incompleto, pero no emitirlo: pide número, cliente y conceptos, nunca datos fiscales", () => {
+    const f = nuevoRecibo();
     expect(facturaSchema.safeParse(f).success).toBe(true);
-    expect(erroresFactura(f)).toContain("Indica el número de factura.");
-    expect(erroresFactura(f)).toHaveLength(4);
+    expect(erroresFactura(f)).toEqual(["Indica el número de recibo.", "Indica el nombre del cliente.", "Todos los conceptos deben tener una descripción."]);
+    f.numero = "R-2026-001"; f.cliente.nombre = "Casa Tomás"; f.lineas[0].concepto = "Instalación";
+    // Sin NIF, sin dirección y sin vencimiento posterior: un recibo no los lleva.
+    expect(f.cliente.nif).toBe(""); expect(f.emisor.direccion).toBe("");
+    expect(erroresFactura(f)).toEqual([]);
+    f.tipo = "mensual";
+    expect(erroresFactura(f)).toEqual(["Indica el mes que se paga."]);
+    f.mes = "2026-11";
+    expect(erroresFactura(f)).toEqual([]);
   });
   it("rechaza cantidades inválidas, impuestos fuera de rango y fechas imposibles", () => {
     const f = nuevaFactura();
@@ -54,9 +64,13 @@ describe("facturación comercial", () => {
     f.emisor = {nombre:"Emisor",nif:"TEST",direccion:"Dirección",email:""};
     f.cliente = {...f.emisor,nombre:"Cliente"};
     f.fecha = "2026-02-30";
-    expect(erroresFactura(f)).toContain("Indica fechas válidas.");
+    expect(erroresFactura(f)).toContain("Indica una fecha válida.");
+    // El vencimiento ya no se enseña ni se comprueba (un recibo no vence).
     f.fecha = "2026-10-03"; f.vencimiento = "2026-10-01";
-    expect(erroresFactura(f)).toContain("El vencimiento no puede ser anterior a la fecha de factura.");
+    expect(erroresFactura(f).join(" ")).not.toMatch(/vencimiento/i);
+    f.mes = "2026-13";
+    expect(facturaSchema.safeParse(f).success).toBe(false);
+    delete f.mes;
     f.lineas[0].cantidad = 0;
     expect(facturaSchema.safeParse(f).success).toBe(false);
     f.lineas[0].cantidad = 1; f.lineas[0].iva = 101;
@@ -105,4 +119,38 @@ describe("facturación comercial", () => {
     expect(totalesFactura(f).iva).toBe(0.01);
   });
 
+});
+
+describe("recibos sin datos fiscales (17/11/2026)", () => {
+  it("un recibo nuevo nace sin IVA, sin retención y sin datos fiscales de nadie", () => {
+    const f = nuevoRecibo();
+    expect(f).toMatchObject({ aplicarIva: false, retencion: 0, tipo: "licencia" });
+    expect(f.ivaGlobal).toBeUndefined();
+    expect(f.emisor).toEqual({ nombre: "OficiosOsIA", nif: "", direccion: "", email: "" });
+    expect(nuevaLinea().iva).toBe(0);
+    expect(sinDatosFiscales(f)).toBe(f); // ya está limpio: mismo objeto
+  });
+  it("una factura antigua se trata como recibo: se le quitan NIF, dirección, email, IVA y retención", () => {
+    const vieja = nuevaFactura();
+    vieja.emisor = { nombre: "OficiosOsIA", nif: "B00000000", direccion: "Calle Mayor 1", email: "a@b.test" };
+    vieja.cliente = { nombre: "Casa Tomás", nif: "B11111111", direccion: "Plaza 2", email: "c@d.test" };
+    vieja.lineas = [{ ...nuevaLinea("Licencia"), concepto: "Licencia", precio: 100, iva: 21 }];
+    vieja.retencion = 15;
+    expect(totalesFactura(vieja).total).toBe(106); // 100 + 21 − 15, como estaba guardada
+    const recibo = sinDatosFiscales(vieja);
+    expect(recibo.emisor).toEqual({ nombre: "OficiosOsIA", nif: "", direccion: "", email: "" });
+    expect(recibo.cliente).toEqual({ nombre: "Casa Tomás", nif: "", direccion: "", email: "" });
+    expect(recibo).toMatchObject({ aplicarIva: false, retencion: 0 });
+    const t = totalesRecibo(vieja);
+    expect(t.total).toBe(100); expect(t.iva).toBe(0); expect(t.retencion).toBe(0); expect(t.grupos).toEqual([]);
+    expect(vieja.cliente.nif).toBe("B11111111"); // no muta el original
+  });
+  it("da título al recibo según su tipo y su mes", () => {
+    expect(tituloRecibo({})).toBe("Licencia global");
+    expect(tituloRecibo({ tipo: "mensual", mes: "2026-11" })).toBe("Pago mensual · noviembre de 2026");
+    expect(tituloRecibo({ tipo: "mensual" })).toBe("Pago mensual");
+    expect(textoMesRecibo("2026-01")).toBe("enero de 2026");
+    expect(textoMesRecibo("2026-00")).toBe("");
+    expect(textoMesRecibo(undefined)).toBe("");
+  });
 });
