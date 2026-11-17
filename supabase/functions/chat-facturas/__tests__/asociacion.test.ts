@@ -63,7 +63,7 @@ describe("textoAsociable", () => {
     expect(textoAsociable("variacion_precios", { producto: "cerveza", categoria: null })).toBe("cerveza");
     expect(textoAsociable("buscar_productos", { consulta: "birra" })).toBe("birra");
     expect(textoAsociable("ranking", { criterio: "cantidad", categoria: "vino" })).toBe("vino");
-    expect(textoAsociable("gasto_por_categoria", { categoria: "vino" })).toBeNull(); // categoria_agente ya asocia
+    expect(textoAsociable("gasto_por_categoria", { categoria: "vino" })).toBe("vino"); // un producto como categoria va por producto
     expect(textoAsociable("estadisticas_globales", {})).toBeNull();
   });
 });

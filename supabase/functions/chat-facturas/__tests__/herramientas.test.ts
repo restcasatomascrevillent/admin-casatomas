@@ -327,6 +327,22 @@ describe("prepararLlamada", () => {
     expect(() => prepararLlamada("ranking", { criterio: "cantidad", desde: "enero" })).toThrow(/fecha/);
   });
 
+  it("filtrar_documentos: tipo abono va tal cual (total negativo en la BD); otros tipos como siempre", () => {
+    const ab = prepararLlamada("filtrar_documentos", { texto: "guillem", tipo: "abono" });
+    expect(ab.tipo === "rpc" && ab.params.p_tipo).toBe("abono");
+    const fa = prepararLlamada("filtrar_documentos", { tipo: "facturas" });
+    expect(fa.tipo === "rpc" && fa.params.p_tipo).toBe("factura");
+  });
+
+  it("gasto_por_categoria: un producto (helado) puesto como categoria va por compras_producto; una familia, no", () => {
+    const prod = prepararLlamada("gasto_por_categoria", { categoria: "helado", desde: "2026-01-01", hasta: "2026-12-31" },
+      "cuanto he gastado en helado", { tipo: "producto", categoria: "Panadería y repostería" });
+    expect(prod.tipo === "rpc" && prod.rpc).toBe("compras_producto_agente");
+    const fam = prepararLlamada("gasto_por_categoria", { categoria: "marisco" }, "gasto en marisco",
+      { tipo: "familia", categoria: "Pescado y marisco" });
+    expect(fam.tipo === "rpc" && fam.rpc).toBe("gasto_categorias_agente");
+  });
+
   it("filtrar_documentos: por defecto 'todos'; texto, tipo y fechas", () => {
     const ll = prepararLlamada("filtrar_documentos", {
       filtro: null, texto: " Osborne ", tipo: "albaranes", desde: "2026-01-01", hasta: null, orden: null, limite: null,
