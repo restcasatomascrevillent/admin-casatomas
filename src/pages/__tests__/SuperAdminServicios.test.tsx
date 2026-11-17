@@ -99,7 +99,8 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/components/SuperAdminLayout", () => ({
   SuperAdminLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
-vi.mock("@/hooks/useAlturaDisponible", () => ({ useAlturaDisponible: () => undefined }));
+// Sin medidas (jsdom no hace layout): la pantalla cae a su disposición de siempre, sin alto fijo ni reparto de fichas.
+vi.mock("@/hooks/useAlturaDisponible", () => ({ useAlturaDisponible: () => undefined, useTamanoElemento: () => null }));
 // La tarjeta de Telegram tiene su propio test (TarjetaTelegram.test.tsx).
 vi.mock("@/components/servicios/TarjetaTelegram", () => ({ TarjetaTelegram: () => null }));
 vi.mock("sonner", () => ({ toast: h.toast }));
