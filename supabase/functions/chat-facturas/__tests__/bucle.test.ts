@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { ejecutarConversacion, MAX_TOOL_CALLS_POR_RONDA, type EstadoUso, type Traza } from "../bucle.ts";
+import { describe, expect, it, vi } from "vitest";
+import { ejecutarConversacion, MARGEN_REINTENTO_MS, MAX_TOOL_CALLS_POR_RONDA, PRESUPUESTO_MS, type EstadoUso, type Traza } from "../bucle.ts";
 
 // Acumulador mínimo con la forma de AcumuladorUso (el real importa supabase-js por URL).
 function acumulador(modelo: string) {
@@ -176,5 +176,92 @@ describe("chat-facturas · respaldo semantico de compras_producto (11/11/2026)",
     const llamada = sb.rpcs.find((x) => x.fn === "compras_producto_agente")!.args as Record<string, unknown>;
     expect(llamada.p_proveedor).toBe("Grupo Embajadores");
     expect(llamada.p_texto).toBe("chuletero ternera");
+  });
+});
+
+// 17/11/2026: «Dime precio fefiñanes y fefiñanes magnum» — la BD cortó una consulta a los 8 s
+// («no he podido consultar») y el turno siguiente abrió con «la consulta anterior agotó el tiempo…».
+describe("chat-facturas · sin sensación de fallo", () => {
+  const dosRondas = (tools: unknown[]) => openaiFalso([
+    { body: { choices: [{ message: { role: "assistant", content: null, tool_calls: tools } }], usage: usage(1000, 20) } },
+    { body: { choices: [{ message: { role: "assistant", content: "Listo." } }], usage: usage(1200, 30) } },
+  ]);
+
+  it("tiempo agotado en la BD: se reintenta una vez y el modelo ni se entera", async () => {
+    const sb = supabaseFalso();
+    let intentos = 0;
+    sb.rpc = ((fn: string) => {
+      if (fn !== "estadisticas_globales_agente") return Promise.resolve({ data: [], error: null });
+      intentos++;
+      return Promise.resolve(intentos === 1
+        ? { data: null, error: { code: "57014", message: "canceling statement due to statement timeout" } }
+        : { data: { total_documentos: 3 }, error: null });
+    }) as typeof sb.rpc;
+    const ai = dosRondas([llamadaTool("estadisticas_globales")]);
+    const traza: Traza = { llamadas: [], herramientas: [] };
+    const r = await ejecutarConversacion({ supabase: sb, claveOpenAI: "x", mensaje: "¿cuántas facturas hay?", modelo: "gpt-x", uso: estado("gpt-x"), traza, fetchImpl: ai.f });
+    expect(intentos).toBe(2);
+    expect(r.huboFalloDeHerramienta).toBe(false);
+    expect(traza.herramientas[0].resultado).toBe("completada");
+    const tool = (ai.cuerpos[1].messages as { role: string; content: string }[]).find((m) => m.role === "tool")!;
+    expect(tool.content).not.toMatch(/timeout|error/i);
+  });
+
+  it("sin margen de tiempo no se reintenta, y el aviso al modelo no pide hablar de fallos técnicos", async () => {
+    const sb = supabaseFalso();
+    let intentos = 0;
+    // El reloj salta cuando la BD corta la consulta: ya no queda margen para repetirla.
+    const real = Date.now.bind(Date);
+    let salto = 0;
+    const reloj = vi.spyOn(Date, "now").mockImplementation(() => real() + salto);
+    sb.rpc = ((fn: string) => {
+      if (fn !== "estadisticas_globales_agente") return Promise.resolve({ data: [], error: null });
+      intentos++;
+      salto += PRESUPUESTO_MS - MARGEN_REINTENTO_MS + 1_000;
+      return Promise.resolve({ data: null, error: { code: "57014", message: "canceling statement due to statement timeout" } });
+    }) as typeof sb.rpc;
+    const ai = dosRondas([llamadaTool("estadisticas_globales")]);
+    try {
+      const r = await ejecutarConversacion({ supabase: sb, claveOpenAI: "x", mensaje: "¿cuántas facturas hay?", modelo: "gpt-x", uso: estado("gpt-x"), fetchImpl: ai.f });
+      expect(intentos).toBe(1);
+      expect(r.huboFalloDeHerramienta).toBe(true);
+      const tool = (ai.cuerpos[1].messages as { role: string; content: string }[]).find((m) => m.role === "tool")!;
+      expect(tool.content).toContain("sin detalles tecnicos");
+    } finally {
+      reloj.mockRestore();
+    }
+  });
+
+  it("las herramientas de una ronda van en paralelo y sus resultados quedan en el orden pedido", async () => {
+    const sb = supabaseFalso();
+    let enCurso = 0, maximo = 0;
+    sb.rpc = ((fn: string) => {
+      if (fn === "asociar_pregunta_agente" || fn === "meses_compras_incompletos") return Promise.resolve({ data: [], error: null });
+      enCurso++; maximo = Math.max(maximo, enCurso);
+      // La primera tarda más que la segunda: aun así su resultado va primero.
+      return new Promise((ok) => setTimeout(() => { enCurso--; ok({ data: { quien: fn }, error: null }); }, fn === "estadisticas_globales_agente" ? 30 : 5));
+    }) as typeof sb.rpc;
+    const ai = dosRondas([llamadaTool("estadisticas_globales", "a"), llamadaTool("albaranes_sin_factura", "b")]);
+    const traza: Traza = { llamadas: [], herramientas: [] };
+    await ejecutarConversacion({ supabase: sb, claveOpenAI: "x", mensaje: "resumen", modelo: "gpt-x", uso: estado("gpt-x"), traza, fetchImpl: ai.f });
+    expect(maximo).toBe(2);
+    const tools = (ai.cuerpos[1].messages as { role: string; tool_call_id?: string }[]).filter((m) => m.role === "tool");
+    expect(tools.map((m) => m.tool_call_id)).toEqual(["a", "b"]);
+    expect(traza.herramientas.map((h) => h.nombre)).toEqual(["estadisticas_globales", "albaranes_sin_factura"]);
+  });
+
+  it("el fallo de un turno anterior llega al modelo sin el texto técnico", async () => {
+    const ai = openaiFalso([{ body: { choices: [{ message: { role: "assistant", content: "Listo." } }], usage: usage(1000, 20) } }]);
+    await ejecutarConversacion({
+      supabase: supabaseFalso(), claveOpenAI: "x", mensaje: "¿y el magnum?", modelo: "gpt-x", uso: estado("gpt-x"), fetchImpl: ai.f,
+      historial: [
+        { role: "user", content: "precio fefiñanes magnum" },
+        { role: "assistant", content: "No he podido consultarlo.", herramientas: [{ nombre: "compras_producto", argumentos: { producto: "fefiñanes magnum" }, error: "canceling statement due to statement timeout" }] },
+      ],
+    });
+    const enviado = JSON.stringify(ai.cuerpos[0].messages);
+    expect(enviado).not.toMatch(/statement timeout/);
+    expect(enviado).toContain("sin_resultado");
+    expect(enviado).toContain("sin mencionar fallos ni reintentos");
   });
 });
