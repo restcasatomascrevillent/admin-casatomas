@@ -24,6 +24,18 @@ describe("mensajeFallo", () => {
     expect(t).toContain("ana@casa.es");
     expect(t).toMatch(/Hora: 12\/11\/2026/);
   });
+  it("chat_error: motivo, pregunta y los fallos acumulados desde el aviso anterior", () => {
+    const t = mensajeFallo({
+      ...base, usuario: null, tipo: "chat_error",
+      datos: { origen: "panel", motivo: "tiempo_agotado", pregunta: "Precio del pulpo", duracion_ms: 20500, acumulados_antes: 7, acumulados_desde: "2026-11-12T10:00:00Z" },
+    });
+    expect(t).toContain("Fallo del copiloto de Facturas");
+    expect(t).toContain("Motivo: tiempo_agotado (panel)");
+    expect(t).toContain("Pregunta: Precio del pulpo");
+    expect(t).toContain("Duración: 20.5 s");
+    expect(t).toMatch(/Además: 7 fallos más del chat desde 12\/11\/2026/);
+    expect(mensajeFallo({ ...base, tipo: "chat_error", datos: { motivo: "error" } })).not.toContain("Además");
+  });
   it("tipo desconocido: formato genérico y nunca pasa de 4096", () => {
     const t = mensajeFallo({ ...base, tipo: "otro_fallo", datos: { x: "y".repeat(9000) } });
     expect(t).toContain("Fallo interno: otro fallo");

@@ -938,7 +938,9 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
       const { desde, hasta } = rangoOpcional(args);
       const den = denominacionDeTexto(producto);
       if (den) return desvioDenominacion("compras_producto", den, desde, hasta, pregunta, porVolumen);
-      const desvio = desvioVolumen("compras_producto", producto, asoc, porVolumen, desde, hasta);
+      // Con proveedor pedido no se desvía a volumen_comprado (no filtra por proveedor: «cerveza a
+      // Mahou» daba los litros de todos los proveedores). 18/11/2026.
+      const desvio = texto(args.proveedor) ? null : desvioVolumen("compras_producto", producto, asoc, porVolumen, desde, hasta);
       if (desvio) return desvio;
       return {
         tipo: "rpc",
