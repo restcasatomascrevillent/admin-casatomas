@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.39.0] - 2026-11-17
+
+Objetivo: Cerrar el control de gastos de los servicios (Vercel Pro, Hostinger, Loading, Mapbox) y ver el gasto de IA por acción
+
+### Añadido
+- Servicios: cierre de los gastos mensuales y gasto de IA por acción ([#253](https://github.com/restcasatomascrevillent/admin-casatomas/pull/253))
+
 ## [1.38.4] - 2026-11-17
 
 Objetivo: Chat de facturas sin sensación de fallo e informe de vinos con la compra de cada añada
