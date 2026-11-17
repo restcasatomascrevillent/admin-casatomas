@@ -13,6 +13,8 @@ vi.mock("@/hooks/useMargenesCarta", () => ({
   useEdicionMargenes: () => edicion,
   useBuscarProductos: () => ({ data: [], isFetching: false }),
   useComprasProducto: () => ({ data: [], isLoading: false, isError: false }),
+  useCosteCartaVinos: () => ({ isLoading: true, isError: false, isFetching: true, data: undefined, error: null, refetch: () => undefined }),
+  useCandidatosVino: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
 import { MargenesCarta } from "../MargenesCarta";
@@ -130,6 +132,15 @@ describe("MargenesCarta", () => {
     expect(within(lista).getByTestId("mediana")).toHaveTextContent("Lo normal en 3 meses (mediana): 75,00 € la botella");
   });
 
+  it("Vinos con botellas sin cargo: el coste es el efectivo y la factura sale como dato secundario", () => {
+    estado = { ...estado, data: { ...DATOS, vinos: [{ ...DATOS.vinos[0], coste: 75.67, costeFactura: 80.4, botellasSinCargo: 3 }] } };
+    pintar();
+    fireEvent.click(screen.getByRole("radio", { name: /Vinos/ }));
+    const lista = screen.getByTestId("margenes-lista");
+    expect(within(lista).getByTestId("mediana")).toHaveTextContent("factura 80,40 € · con 3 sin cargo · Lo normal en 3 meses");
+    expect(within(lista).getByText(/La botella te cuesta 75,67 €/)).toBeInTheDocument();
+  });
+
   it("Vinos: margen de la tienda (desactivada) e interruptor «Con IVA»", () => {
     pintar();
     fireEvent.click(screen.getByRole("radio", { name: /Vinos/ }));
@@ -200,5 +211,16 @@ describe("MargenesCarta", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Falta aplicar en Supabase la migración");
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(estado.refetch).toHaveBeenCalled();
+  });
+
+  it("la vista «Coste vinos» sustituye al resumen y a la gráfica por la tabla de costes", () => {
+    pintar();
+    fireEvent.click(screen.getByRole("radio", { name: "Coste de la carta de vinos" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Calculando el coste de cada vino…");
+    expect(screen.queryByTestId("margenes-resumen")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("margenes-lista")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Todos" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: /Vinos/ }));
+    expect(screen.getByTestId("margenes-resumen")).toBeInTheDocument();
   });
 });

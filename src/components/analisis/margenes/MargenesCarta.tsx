@@ -22,8 +22,10 @@
 //     €/kg», con botón para abrir el original) y la mediana de 3 meses debajo, en
 //     pequeño. Textos en sencillo: «cobras 2,5 veces lo que pagas», «de cada 100 €
 //     que cobras, 37 € se van en ingredientes» (el % es del precio de VENTA sin IVA).
+//   · 16/11/2026: vista «Coste vinos» (CosteCartaVinos): la carta de vinos botella a
+//     botella con el coste efectivo (botellas sin cargo), filtros y enlace al producto.
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChefHat, CircleSlash, FileText, Loader2, Scale, Settings2, Wine } from "lucide-react";
+import { AlertTriangle, ChefHat, CircleSlash, FileText, Loader2, Receipt, Scale, Settings2, Wine } from "lucide-react";
 import { CartesianGrid, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -57,6 +59,7 @@ import {
   puntosDispersion,
   resumenFiable,
   textoFactura,
+  textoCosteFactura,
   textoMediana,
   textoPctCoste,
   veces,
@@ -64,10 +67,11 @@ import {
   type FacturaUsada,
   type MargenesCarta as Datos,
 } from "@/lib/analisis/margenesCarta";
+import { CosteCartaVinos } from "./CosteCartaVinos";
 import { DetalleArticulo } from "./DetalleArticulo";
 import { DialogoUmbrales } from "./DialogoUmbrales";
 
-type Vista = "peso" | "vinos" | "borrador";
+type Vista = "peso" | "vinos" | "coste" | "borrador";
 type Filtro = "problemas" | "todos" | "sin_datos";
 
 const fechaCorta = (f: string | null) => (f ? new Date(`${f}T00:00:00`).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—");
@@ -236,6 +240,7 @@ function FilaArticulo({
   const rojo = a.banderas.includes("coste_alto") || a.banderas.includes("multiplicador_bajo");
   const f = facturaDeArticulo(a);
   const mediana = textoMediana(a, d.config);
+  const sinCargo = textoCosteFactura(a);
   const masNueva = a.tipo !== "plato" ? avisoCompraMasNueva(f, a.ultima, d.hoy) : null;
   return (
     <li className="flex items-start gap-1">
@@ -261,9 +266,9 @@ function FilaArticulo({
             </span>
           )}
           <span className="block break-words text-sm leading-snug text-muted-foreground">{explicacion(a, d.config)}</span>
-          {(mediana || masNueva) && (
+          {(sinCargo || mediana || masNueva) && (
             <span className="block break-words text-xs text-muted-foreground" data-testid="mediana">
-              {[mediana, masNueva].filter(Boolean).join(" · ")}
+              {[sinCargo, mediana, masNueva].filter(Boolean).join(" · ")}
             </span>
           )}
           {a.tipo === "vino" && a.multiplicadorTienda !== null && (
@@ -364,7 +369,7 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
 
   const d = q.data;
   const borrador = useMemo(() => (d ? platosBorrador(d) : []), [d]);
-  const lista: ArticuloMargen[] = useMemo(() => (d ? (vista === "peso" ? d.peso : vista === "vinos" ? d.vinos : borrador) : []), [d, vista, borrador]);
+  const lista: ArticuloMargen[] = useMemo(() => (d ? (vista === "peso" ? d.peso : vista === "vinos" || vista === "coste" ? d.vinos : borrador) : []), [d, vista, borrador]);
   const filas = useMemo(() => {
     if (!d) return [];
     // En el borrador, «No funciona» solo enseña lo que ya está revisado: los gramos estimados no son fiables.
@@ -413,15 +418,17 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 max-lg:overflow-y-auto max-lg:overscroll-contain sm:gap-3">
-      <Resumen d={d} />
+      {vista !== "coste" && <Resumen d={d} />}
       <div className="flex shrink-0 flex-wrap items-center gap-2">
                 {/* 11/11/2026 (dueño: móvil): controles segmentados compactos a todo el ancho (antes, botones enormes que
             se partían en varias filas); «(borrador)» solo desde tablet. */}
         <ToggleGroup type="single" value={vista} onValueChange={(v) => v && setVista(v as Vista)} variant="outline" aria-label="Qué parte de la carta" className="w-full gap-0 sm:w-auto sm:gap-1">
-          <ToggleGroupItem value="peso" className="min-h-10 flex-1 gap-1.5 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm"><Scale className="h-4 w-4" aria-hidden /> Por peso</ToggleGroupItem>
-          <ToggleGroupItem value="vinos" className="min-h-10 flex-1 gap-1.5 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm"><Wine className="h-4 w-4" aria-hidden /> Vinos</ToggleGroupItem>
-          <ToggleGroupItem value="borrador" aria-label="Platos (borrador)" className="min-h-10 flex-1 gap-1.5 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm"><ChefHat className="h-4 w-4" aria-hidden /> Platos<span className="hidden sm:inline">&nbsp;(borrador)</span></ToggleGroupItem>
+          <ToggleGroupItem value="peso" className="min-h-10 flex-1 gap-1.5 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm"><Scale className="h-4 w-4 max-sm:hidden" aria-hidden /> Por peso</ToggleGroupItem>
+          <ToggleGroupItem value="vinos" className="min-h-10 flex-1 gap-1.5 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm"><Wine className="h-4 w-4 max-sm:hidden" aria-hidden /> Vinos</ToggleGroupItem>
+          <ToggleGroupItem value="coste" aria-label="Coste de la carta de vinos" className="min-h-10 flex-1 gap-1.5 whitespace-nowrap px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm"><Receipt className="h-4 w-4 max-sm:hidden" aria-hidden /> Coste vinos</ToggleGroupItem>
+          <ToggleGroupItem value="borrador" aria-label="Platos (borrador)" className="min-h-10 flex-1 gap-1.5 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm"><ChefHat className="h-4 w-4 max-sm:hidden" aria-hidden /> Platos<span className="hidden sm:inline">&nbsp;(borrador)</span></ToggleGroupItem>
         </ToggleGroup>
+        {vista !== "coste" && (<>
         <ToggleGroup type="single" value={filtro} onValueChange={(v) => v && setFiltro(v as Filtro)} variant="outline" aria-label="Qué enseñar" className="w-full gap-0 sm:w-auto sm:gap-1">
           <ToggleGroupItem value="problemas" className="min-h-10 flex-1 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm">No funciona</ToggleGroupItem>
           <ToggleGroupItem value="todos" className="min-h-10 flex-1 px-2 text-[0.8125rem] pointer-coarse:min-h-11 sm:flex-none sm:px-3 sm:text-sm">Todos</ToggleGroupItem>
@@ -431,11 +438,13 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
           <Switch checked={conIva} onCheckedChange={setConIva} aria-label="Ver costes y precios con IVA" />
           Con IVA
         </label>
-        <Button variant="ghost" size="sm" className="min-h-10 pointer-coarse:min-h-11" onClick={() => setUmbrales(true)}>
+        </>)}
+        <Button variant="ghost" size="sm" className={cn("min-h-10 pointer-coarse:min-h-11", vista === "coste" && "ml-auto")} onClick={() => setUmbrales(true)}>
           <Settings2 className="mr-1.5 h-4 w-4" aria-hidden /> Umbrales
         </Button>
       </div>
-      <ComoSeLee d={d} />
+      {vista === "coste" && <CosteCartaVinos puedeEditar={puedeEditar} onFactura={setFactura} />}
+      {vista !== "coste" && <ComoSeLee d={d} />}
       {vista === "vinos" && !d.tienda.activa && (
         <p className="shrink-0 rounded-lg border border-border/70 bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground" role="note" data-testid="aviso-tienda">
           La tienda de vinos está desactivada. Su margen se calcula igualmente: precio de tienda = carta − {d.tienda.descuentoPct} %, sin IVA ({d.config.ivaTiendaPct} %).
@@ -455,6 +464,7 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
           </span>
         </p>
       )}
+      {vista !== "coste" && (
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(9rem,38%)_1fr] gap-2 max-lg:flex-none max-lg:grid-rows-[15rem_auto] lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-1 lg:gap-3">
         <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-border/70 bg-card p-2" aria-label="Precio de venta frente al coste (% del precio de venta)">
           {/* 11/11/2026: el título largo con `truncate` ensanchaba la columna de la rejilla y la gráfica se salía por la derecha. */}
@@ -481,6 +491,7 @@ export function MargenesCarta({ puedeEditar, articuloInicial = null }: { puedeEd
           )}
         </section>
       </div>
+      )}
       <DetalleArticulo
         articulo={articulo}
         config={d.config}
