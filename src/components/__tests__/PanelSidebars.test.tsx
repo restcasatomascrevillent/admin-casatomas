@@ -135,8 +135,8 @@ describe.each([
 
 // ───────── Super Admin: orden del menú y grupo «Más módulos» (2026-11-03) ─────────
 
-// «Gestor Gasto» bajó a «Más módulos» el 2026-11-10 (petición del dueño).
-const MAS_MODULOS = ["Gestor Gasto", "Ecommerce", "Asistente Tel.", "Espacios", "Bot Web"];
+// «Gestor Gasto» bajó a «Más módulos» el 2026-11-10 y volvió al grupo «Costes» el 2026-11-17 (petición del dueño).
+const MAS_MODULOS = ["Ecommerce", "Asistente Tel.", "Espacios", "Bot Web"];
 
 function renderSuperAdmin(ruta = "/super-admin", { defaultOpen = true } = {}) {
   return render(
@@ -159,8 +159,8 @@ describe("menú del Super Admin", () => {
       // Tickets (13/11/2026): las peticiones de los usuarios, analizadas por la IA.
       "Tickets",
       // «Costes» es una pestaña de Servicios desde el 2026-11-04: ya no tiene entrada propia.
-      // «Gestor Gasto» está en «Más módulos» desde el 2026-11-10.
-      "Servicios",
+      // «Gestor Gasto» vuelve a estar aquí, en el grupo «Costes», desde el 2026-11-17.
+      "Gestor Gasto", "Servicios",
       "Tráfico web", "Logs", "Reseñas Google",
     ]);
     // «Plantillas Email» se fue a Reservas › Configuración (04/11/2026).
@@ -220,14 +220,15 @@ describe("menú del Super Admin", () => {
     expect(screen.getByRole("link", { name: "Espacios" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("Gestor Gasto vive en «Más módulos» (2026-11-10): fuera del grupo Costes y abierto al estar en él", () => {
+  it("Gestor Gasto vuelve al grupo Costes (2026-11-17): a la vista, fuera de «Más módulos», que sigue plegado al estar en él", () => {
     localStorage.setItem("superadmin:menu:mas-modulos", "cerrado");
     renderSuperAdmin("/super-admin/gestor-gasto");
-    expect(within(screen.getByRole("list", { name: "Costes" })).queryByRole("link", { name: "Gestor Gasto" })).not.toBeInTheDocument();
-    expect(botonMasModulos()).toHaveAttribute("aria-expanded", "true");
-    const enlace = within(screen.getByRole("list", { name: "Más módulos" })).getByRole("link", { name: "Gestor Gasto" });
+    const enlace = within(screen.getByRole("list", { name: "Costes" })).getByRole("link", { name: "Gestor Gasto" });
     expect(enlace).toHaveAttribute("href", "/super-admin/gestor-gasto");
     expect(enlace).toHaveAttribute("aria-current", "page");
+    expect(botonMasModulos()).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(botonMasModulos());
+    expect(within(screen.getByRole("list", { name: "Más módulos" })).queryByRole("link", { name: "Gestor Gasto" })).not.toBeInTheDocument();
   });
 
   it("sin almacenamiento (modo privado) funciona igual, plegado", () => {
@@ -241,7 +242,7 @@ describe("menú del Super Admin", () => {
     setItem.mockRestore();
   });
 
-  it("con el menú plegado a iconos es un botón que abre un menú con los cinco (teclado incluido)", async () => {
+  it("con el menú plegado a iconos es un botón que abre un menú con los cuatro (teclado incluido)", async () => {
     renderSuperAdmin("/super-admin/bot-web", { defaultOpen: false });
     const boton = botonMasModulos();
     expect(boton).toHaveAccessibleName("Más módulos");

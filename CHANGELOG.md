@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.41.0] - 2026-11-17
+
+Objetivo: Gestor Gasto con recibos sin datos fiscales, pago mensual con gastos de Servicios y Control Excel
+
+### Añadido
+- Gestor-gasto: recibos sin datos fiscales, pago mensual con gastos de Servicios y Control Excel ([#261](https://github.com/restcasatomascrevillent/admin-casatomas/pull/261))
+
 ## [1.40.1] - 2026-11-17
 
 Objetivo: Chat de facturas fiable: búsqueda con abreviaturas sin mezclar productos, proveedor parecido preguntando, totales completos, vinos por botella y fallos registrados
