@@ -19,6 +19,15 @@
 //  clasificar» de Facturas › Productos.
 // ============================================================================
 
+import {
+  abreviaturasActivas,
+  type AbreviaturaFila,
+  type AbreviaturasPorProveedor,
+  compactarAbreviaturas,
+  expandirAbreviaturaInicial,
+  extraerAbreviaturasNuevas,
+} from "./abreviaturas.ts";
+
 export const FUNCION = "clasificar-productos";
 export const MODELO_POR_DEFECTO = "gpt-5.6-luna";
 /** Líneas pendientes que se leen por tanda y textos distintos que se mandan al modelo. */
@@ -35,15 +44,29 @@ export interface LineaPendiente {
   unidad: string | null;
   precio_unitario: number | string | null;
   proveedor: string | null;
+  proveedor_id?: number | null;
 }
 
 export interface TextoPendiente {
   texto: string;
   ejemplo: string;
   proveedor: string | null;
+  proveedor_id?: number | null;
   unidad: string | null;
   precio: number | null;
   lineas: number;
+}
+
+/** Ficha de proveedor que se le pasa a la IA (solo si tiene notas). */
+export interface FichaProveedor {
+  id: number;
+  nombre: string;
+  notas_ia: string | null;
+}
+
+export interface ExtrasPrompt {
+  abreviaturas?: AbreviaturasPorProveedor;
+  fichas?: FichaProveedor[];
 }
 
 export interface ProductoCatalogo {
@@ -62,6 +85,8 @@ export interface Categoria {
 
 export interface Asignacion {
   texto: string;
+  /** Abreviatura de marca NUEVA vista en la línea (no está en el diccionario del proveedor). */
+  abreviatura?: { token: string; expansion: string } | null;
   producto_id: number | null;
   nombre_nuevo: string | null;
   categoria_id: number | null;
@@ -89,12 +114,27 @@ export const ESQUEMA_CLASIFICACION = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["texto", "producto_id", "nombre_nuevo", "categoria_id"],
+          required: ["texto", "producto_id", "nombre_nuevo", "categoria_id", "abreviatura"],
           properties: {
             texto: { type: "string", description: "El campo t EXACTO de la línea" },
             producto_id: { type: ["integer", "null"], description: "id del catálogo si es el MISMO producto" },
             nombre_nuevo: { type: ["string", "null"], description: "Nombre canónico si no está en el catálogo" },
             categoria_id: { type: ["integer", "null"], description: "id de la categoría más concreta (para nombre_nuevo)" },
+            abreviatura: {
+              anyOf: [
+                {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["token", "expansion"],
+                  properties: {
+                    token: { type: "string", description: "La abreviatura TAL CUAL aparece en la línea, sin puntos («LP»)" },
+                    expansion: { type: "string", description: "La marca completa a la que corresponde («Laurent-Perrier»)" },
+                  },
+                },
+                { type: "null" },
+              ],
+              description: "Abreviatura de MARCA que no está en la lista del proveedor y cuya marca se deduce; si no, null",
+            },
           },
         },
       },
@@ -119,6 +159,7 @@ export function agruparPendientes(lineas: LineaPendiente[], max = MAX_TEXTOS): T
       texto: t,
       ejemplo: l.nombre,
       proveedor: l.proveedor ?? null,
+      ...(l.proveedor_id != null ? { proveedor_id: l.proveedor_id } : {}),
       unidad: l.unidad ?? null,
       precio: Number.isFinite(precio) ? precio : null,
       lineas: 1,
@@ -137,6 +178,7 @@ export function construirMensajes(
   textos: TextoPendiente[],
   catalogo: ProductoCatalogo[],
   categorias: Categoria[],
+  extras: ExtrasPrompt = {},
 ): { role: "system" | "user"; content: string }[] {
   const activas = categorias.filter((c) => c.activa);
   const porId = new Map(categorias.map((c) => [c.id, c]));
@@ -150,19 +192,43 @@ export function construirMensajes(
     "Para CADA línea pendiente (campo t) devuelve una asignación:\n" +
     "- Si es EL MISMO producto que uno del catálogo (aunque esté escrito distinto, con erratas del OCR o el " +
     "formato del envase repetido), pon su producto_id y deja nombre_nuevo y categoria_id a null.\n" +
-    "- Si no está, inventa nombre_nuevo: corto, legible, en español con mayúscula inicial, con la marca si " +
-    "aporta y el formato si distingue (70 cl, 5 L, Magnum); sin códigos internos. En vinos, cavas y champanes, " +
+    "- Si no está, inventa nombre_nuevo con SIEMPRE este patrón: MARCA + producto o variedad + formato " +
+    "(«Laurent-Perrier La Cuvée 75 cl», «Johnnie Walker Black 70 cl», «Marqués de Murrieta Reserva 2021»). " +
+    "La MARCA va completa y primero, NUNCA su abreviatura («LP» es Laurent-Perrier, «JW» es Johnnie Walker) ni su " +
+    "forma cortada. La marca se deduce, por este orden, de: la propia línea; otras líneas pendientes que sean el " +
+    "mismo producto (si una trae la marca entera, úsala en todas); el catálogo (un producto de la misma marca); " +
+    "las abreviaturas conocidas del proveedor y su ficha. Si de verdad no se puede saber, deja solo el producto: " +
+    "no inventes la marca. El producto genérico sin marca (rape, lubina) va solo con su nombre. Formato si " +
+    "distingue (70 cl, 5 L, Magnum); sin códigos internos ni palabras de envase o familia (BOT., C/6B, CAJA, CHA., " +
+    "UD). El orden de las palabras de un producto YA del catálogo no importa para reconocerlo: «Nata Natop Debic " +
+    "2 L» y «Debic Nata Natop 2 L» son el mismo. En vinos, cavas y champanes, " +
     "CON la añada si la línea la trae («Pago de Carraovejas 2019»). Varias líneas que " +
     "sean el mismo producto nuevo llevan EXACTAMENTE el mismo nombre_nuevo. Pon categoria_id con la categoría " +
     "MÁS CONCRETA de la lista (la subcategoría si la hay).\n" +
+    "- abreviatura: si la línea lleva (tras palabras de envase o familia como BOT., C/6B, CHA., W.) una abreviatura " +
+    "de MARCA que NO está en la lista de abreviaturas de su proveedor, devuélvela como {token, expansion} " +
+    "(token = «DP», expansion = «Dom Pérignon»; token = «LP», expansion = «Laurent-Perrier»), también si la línea " +
+    "se asigna a un producto del catálogo. Propón la marca más probable por la otra línea, el catálogo o lo que " +
+    "sepas del sector: una persona la confirmará o corregirá. El token tiene que estar en la línea y ser las " +
+    "iniciales o el comienzo de la marca. Nunca para BOT, CHA, C/6B, CAJA, UD, W, LC ni otras palabras de envase, " +
+    "familia o formato. Si no hay una candidata razonable, null.\n" +
     "- Otro vino, otra añada del mismo vino, otra variedad u otro tamaño (botella frente a Magnum) son productos distintos.\n" +
     "- Portes, mano de obra, reparaciones, guardias, gestión y logística o rappels van a Servicios.\n" +
     `Categorías (id: ruta — qué entra):\n${taxonomia}`;
   const lista = catalogo.length
     ? catalogo.map((p) => `${p.id}|${p.nombre}|${p.categoria_id ?? ""}`).join("\n")
     : "(vacío)";
+  const nombresProveedor = new Map<number, string>();
+  for (const t of textos) if (t.proveedor_id != null && t.proveedor) nombresProveedor.set(t.proveedor_id, t.proveedor);
+  const abrev = extras.abreviaturas ? compactarAbreviaturas(extras.abreviaturas, nombresProveedor) : "";
+  const fichas = (extras.fichas ?? [])
+    .filter((f) => f.notas_ia && f.notas_ia.trim())
+    .map((f) => `${f.nombre}: ${f.notas_ia!.replace(/\s+/g, " ").trim().slice(0, 300)}`)
+    .join("\n");
   const usuario =
     `Catálogo actual (id|nombre|categoria_id):\n${lista}\n\n` +
+    (abrev ? `Abreviaturas de cada proveedor (ABREV=Marca completa; sustitúyelas siempre en nombre_nuevo):\n${abrev}\n\n` : "") +
+    (fichas ? `Ficha de proveedores:\n${fichas}\n\n` : "") +
     "Líneas pendientes (t = texto normalizado EXACTO, ej = texto original, prov = proveedor, u = unidad, p = precio):\n" +
     textos.map((t) => JSON.stringify({ t: t.texto, ej: t.ejemplo, prov: t.proveedor, u: t.unidad, p: t.precio })).join("\n") +
     "\n\nDevuelve una asignación por cada t, con el t exacto.";
@@ -228,6 +294,7 @@ export function validarAsignaciones(
   textos: TextoPendiente[],
   catalogo: ProductoCatalogo[],
   categorias: Categoria[],
+  abreviaturas: AbreviaturasPorProveedor = new Map(),
 ): ElementoClasificacion[] {
   const pedidos = new Map(textos.map((t) => [t.texto, t]));
   const productos = new Map(catalogo.map((p) => [p.id, p]));
@@ -259,7 +326,10 @@ export function validarAsignaciones(
       elemento = { textos: [], producto_id: delCatalogo.id, nombre: null, categoria_id: null, unidad: null };
     } else {
       const categoriaPropia = otraAnada ? elegido?.categoria_id : a.categoria_id;
-      const propuesto = otraAnada ?? limpiarNombre(a.nombre_nuevo).slice(0, 200);
+      // Red de seguridad: «LP La Cuvée» → «Laurent-Perrier La Cuvée» con el diccionario del proveedor.
+      const nombreIA = expandirAbreviaturaInicial(
+        limpiarNombre(a.nombre_nuevo), pedido.proveedor_id != null ? abreviaturas.get(pedido.proveedor_id) : undefined);
+      const propuesto = otraAnada ?? nombreIA.slice(0, 200);
       const corregido = propuesto && typeof categoriaPropia === "number" && conAnada.has(categoriaPropia)
         ? nombreConOtraAnada(propuesto, pedido.texto, pedido.ejemplo) : null;
       const nombre = corregido ?? propuesto;
@@ -302,13 +372,15 @@ export interface ResultadoClasificar {
   textos: number;
   propuestas: number;
   aplicado: { productos_creados?: number; alias_creados?: number; lineas_asignadas?: number } | null;
+  /** Avisos de abreviatura nueva creados (pantalla de subida y campana). */
+  avisos_abreviaturas?: number;
 }
 
 export async function clasificarPendientes(deps: DependenciasClasificar): Promise<ResultadoClasificar> {
   const { supabase } = deps;
   const { data: filas, error: e1 } = await supabase
     .from("productos_factura")
-    .select("id, nombre, nombre_normalizado, unidad, precio_unitario, facturas(proveedor)")
+    .select("id, nombre, nombre_normalizado, unidad, precio_unitario, facturas(proveedor, proveedor_id)")
     .is("producto_id", null)
     .order("id", { ascending: true })
     .limit(MAX_LINEAS);
@@ -321,6 +393,7 @@ export async function clasificarPendientes(deps: DependenciasClasificar): Promis
     unidad: f.unidad,
     precio_unitario: f.precio_unitario,
     proveedor: f.facturas?.proveedor ?? null,
+    proveedor_id: f.facturas?.proveedor_id ?? null,
   }));
   const textos = agruparPendientes(lineas);
   if (textos.length === 0) return { pendientes: lineas.length, textos: 0, propuestas: 0, aplicado: null };
@@ -334,11 +407,57 @@ export async function clasificarPendientes(deps: DependenciasClasificar): Promis
   const catalogo = (cat ?? []) as ProductoCatalogo[];
   const categorias = (cats ?? []) as Categoria[];
 
-  const respuesta = await deps.llamarModelo(construirMensajes(textos, catalogo, categorias), ESQUEMA_CLASIFICACION);
-  const items = validarAsignaciones(respuesta, textos, catalogo, categorias);
+  const extras = await cargarExtras(supabase, textos);
+  const respuesta = await deps.llamarModelo(construirMensajes(textos, catalogo, categorias, extras), ESQUEMA_CLASIFICACION);
+  const items = validarAsignaciones(respuesta, textos, catalogo, categorias, extras.abreviaturas);
   if (items.length === 0) return { pendientes: lineas.length, textos: textos.length, propuestas: 0, aplicado: null };
 
   const { data: aplicado, error: e4 } = await supabase.rpc("productos_aplicar_clasificacion_ia", { p_items: items });
   if (e4) throw new Error(`productos_aplicar_clasificacion_ia: ${e4.message}`);
-  return { pendientes: lineas.length, textos: textos.length, propuestas: items.length, aplicado: aplicado ?? null };
+  // Abreviaturas nuevas: aviso para confirmarlas. Es una ayuda: si falla no se pierde la clasificación.
+  let avisos = 0;
+  const nuevas = extraerAbreviaturasNuevas(respuesta, textos, extras.abreviaturas);
+  if (nuevas.length > 0) {
+    try {
+      const { data, error } = await supabase.rpc("abreviaturas_proponer", { p_items: nuevas });
+      if (error) console.warn(`[${FUNCION}] abreviaturas_proponer: ${error.message}`);
+      else avisos = Number((data as { avisos_creados?: number } | null)?.avisos_creados ?? 0);
+    } catch (e) {
+      console.warn(`[${FUNCION}] abreviaturas_proponer:`, (e as Error)?.message ?? e);
+    }
+  }
+  return {
+    pendientes: lineas.length, textos: textos.length, propuestas: items.length, aplicado: aplicado ?? null,
+    ...(avisos > 0 ? { avisos_abreviaturas: avisos } : {}),
+  };
+}
+
+/**
+ * Abreviaturas y fichas de los proveedores de esta tanda. Si la tabla aún no
+ * existe (migración sin aplicar) o falla, se sigue sin ellas: son una ayuda.
+ */
+export async function cargarExtras(supabase: Supa, textos: TextoPendiente[]): Promise<ExtrasPrompt> {
+  const ids = [...new Set(textos.map((t) => t.proveedor_id).filter((x): x is number => typeof x === "number"))];
+  if (ids.length === 0) return {};
+  const extras: ExtrasPrompt = {};
+  try {
+    const { data, error } = await supabase
+      .from("abreviaturas_proveedor")
+      .select("proveedor_id, abreviatura, expansion, origen, veces, en_nombre")
+      .in("proveedor_id", ids)
+      .order("veces", { ascending: false })
+      .limit(1000);
+    if (error) console.warn(`[${FUNCION}] abreviaturas: ${error.message}`);
+    else extras.abreviaturas = abreviaturasActivas((data ?? []) as AbreviaturaFila[]);
+  } catch (e) {
+    console.warn(`[${FUNCION}] abreviaturas:`, (e as Error)?.message ?? e);
+  }
+  try {
+    const { data, error } = await supabase.from("proveedores").select("id, nombre, notas_ia").in("id", ids);
+    if (error) console.warn(`[${FUNCION}] fichas: ${error.message}`);
+    else extras.fichas = (data ?? []) as FichaProveedor[];
+  } catch (e) {
+    console.warn(`[${FUNCION}] fichas:`, (e as Error)?.message ?? e);
+  }
+  return extras;
 }

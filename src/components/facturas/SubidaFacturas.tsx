@@ -37,6 +37,7 @@ import { CorregirDocumentoDialog } from "./CorregirDocumentoDialog";
 import { useCorreccionDocumento, usePermisosFacturas } from "@/hooks/usePermisosFacturas";
 import { useDecisionDuplicado } from "./useDecisionDuplicado";
 import { CalendarioSubidas } from "./CalendarioSubidas";
+import { AvisosAbreviaturas } from "./AvisosAbreviaturas";
 
 /** Título del aviso de un fichero que no se admite. */
 const TITULO_RECHAZO: Record<CausaRechazo, string> = {
@@ -163,6 +164,8 @@ export function SubidaFacturas() {
     >
       {/* Archivos subidos en los últimos 7 días (una fila; el detalle de cada día en una ventanita). */}
       <CalendarioSubidas version={terminados.length} conEnlace={permisos.consultar} />
+      {/* «LP parece Laurent-Perrier. ¿Confirmar?»: abreviaturas nuevas propuestas por la IA (20261209310000). */}
+      <AvisosAbreviaturas puedeEditar={permisos.editar} />
       {compacta ? (
         // Con algo en la cola: una fila ligera para añadir más.
         <div
