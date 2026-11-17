@@ -1,6 +1,6 @@
 import { describe,it,expect } from "vitest";
 import { nuevaFactura,nuevaLinea } from "../modelo";
-import { catalogoInicial,agregarProductos,recuperarServicios,ultimaFacturaCliente,prepararNuevaFactura,aplicarGastosServicios,cambiarMes,cambiarTipo,lineaCuota,siguienteNumero,ID_CUOTA_MENSUAL,type GastoServicio } from "../catalogo";
+import { catalogoInicial,agregarProductos,recuperarServicios,ultimaFacturaCliente,prepararNuevaFactura,aplicarGastosServicios,anadirConcepto,anadirGastoServicio,cambiarMes,cambiarTipo,descuentoAServicios,lineaCuota,quitarConcepto,siguienteNumero,ID_CUOTA_MENSUAL,type GastoServicio } from "../catalogo";
 import { totalesRecibo } from "../modelo";
 import type { FacturaGuardada } from "@/hooks/useFacturacionOficiososia";
 
@@ -111,5 +111,32 @@ describe("pago mensual: cuota fija + gastos de Servicios",()=>{
     expect(otraVez.mes).toBe("2027-01");
     expect(otraVez.lineas.map(l=>l.concepto)).toEqual(["Cuota mensual · enero de 2027","Módulo extra"]);
     expect(cambiarTipo(otraVez,"mensual")).toBe(otraVez);
+  });
+  it("pone el mismo descuento a todos los servicios sin tocar la cuota ni lo añadido a mano",()=>{
+    const f=anadirConcepto(aplicarGastosServicios(mensual(),gastos));
+    const d=descuentoAServicios(f,25);
+    expect(d.lineas.map(l=>[l.proveedor,l.descuento])).toEqual([[undefined,0],[undefined,0],["openai",25],["vercel",25]]);
+    expect(totalesRecibo(d).total).toBe(847.87); // 800 + 31,77 + 16,10
+    expect(descuentoAServicios(d,25)).toBe(d);
+    expect(descuentoAServicios(d,250).lineas[2].descuento).toBe(100);
+    expect(descuentoAServicios(d,-5).lineas[2].descuento).toBe(0);
+    expect(descuentoAServicios(mensual(),10).lineas[0].descuento).toBe(0); // sin servicios no hace nada
+  });
+  it("quita un gasto y lo vuelve a añadir con su importe de Servicios; no lo duplica ni añade lo que cuesta 0 €",()=>{
+    const f=aplicarGastosServicios(mensual(),gastos);
+    const sinVercel=quitarConcepto(f,f.lineas[2].id);
+    expect(sinVercel.lineas.map(l=>l.proveedor)).toEqual([undefined,"openai"]);
+    const otraVez=anadirGastoServicio(sinVercel,gastos[1]);
+    expect(otraVez.lineas[2]).toMatchObject({concepto:"Vercel · Hosting",precio:21.47,descuento:0,proveedor:"vercel"});
+    expect(anadirGastoServicio(otraVez,gastos[1])).toBe(otraVez);
+    expect(anadirGastoServicio(otraVez,gastos[2])).toBe(otraVez);
+    // Quitar el último concepto deja una línea vacía para empezar.
+    const solo=quitarConcepto({...f,lineas:[f.lineas[0]]},f.lineas[0].id);
+    expect(solo.lineas).toHaveLength(1);expect(solo.lineas[0]).toMatchObject({concepto:"",precio:0});
+  });
+  it("un concepto a mano se añade antes de los servicios (y al final si no hay servicios)",()=>{
+    const f=anadirConcepto(aplicarGastosServicios(mensual(),gastos));
+    expect(f.lineas.map(l=>l.proveedor)).toEqual([undefined,undefined,"openai","vercel"]);
+    expect(anadirConcepto(mensual()).lineas).toHaveLength(2);
   });
 });

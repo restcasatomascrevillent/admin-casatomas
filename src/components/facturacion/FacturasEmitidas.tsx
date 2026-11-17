@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, Pencil, Copy, FilePlus2, Trash2 } from "lucide-react";
+import { Download, Eye, Pencil, Copy, FilePlus2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { euros, tipoDeRecibo, tituloRecibo, totalesRecibo } from "./modelo";
@@ -9,11 +9,13 @@ import type { BorradorGuardado, FacturaGuardada } from "@/hooks/useFacturacionOf
 const selectClass = "mt-1 h-10 w-full rounded-md border bg-background px-3 text-base md:text-sm";
 
 /** Lista de recibos emitidos y borradores (17/11/2026: recibos, sin NIF ni impuestos). */
-export function FacturasEmitidas({facturas,borradores=[],editarBorrador,busy,editar,duplicar,descargar,nueva,eliminar}: {
+export function FacturasEmitidas({facturas,borradores=[],editarBorrador,busy,editar,duplicar,descargar,nueva,eliminar,previsualizar}: {
   borradores?:BorradorGuardado[];editarBorrador:(b:BorradorGuardado)=>void;
   facturas:FacturaGuardada[];busy:boolean;editar:(f:FacturaGuardada)=>void;duplicar:(f:FacturaGuardada)=>void;
   eliminar:(f:FacturaGuardada,estado:"emitida"|"borrador")=>void;
   descargar:(f:FacturaGuardada)=>void;nueva:()=>void;
+  /** Abre la vista previa del PDF (también de un borrador). Sin ella no sale el botón. */
+  previsualizar?:(f:FacturaGuardada,estado:"emitida"|"borrador")=>void;
 }) {
   const [busqueda,setBusqueda] = useState("");
   const [desde,setDesde] = useState("");
@@ -47,6 +49,7 @@ export function FacturasEmitidas({facturas,borradores=[],editarBorrador,busy,edi
         <p className="mt-1 break-words text-xs text-muted-foreground">{g.documento.fecha.split("-").reverse().join("/")} · {tituloRecibo(g.documento)}</p></div>
       <p className="text-lg font-semibold">{euros(totalesRecibo(g.documento).total)}</p>
       <div className="flex flex-wrap gap-2">
+        {previsualizar && <Button size="sm" variant="outline" disabled={busy} onClick={()=>previsualizar(g,g.estado)} aria-label={"Vista previa del PDF de "+(g.numero || "el borrador sin número")}><Eye className="mr-2 h-4 w-4" />Vista previa</Button>}
         <Button size="sm" variant="outline" disabled={busy} onClick={()=>g.estado==="borrador"?editarBorrador(g):editar(g)}><Pencil className="mr-2 h-4 w-4" />{g.estado==="borrador"?"Continuar":"Editar"}</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={()=>duplicar(g)}><Copy className="mr-2 h-4 w-4" />Duplicar</Button>
         <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={busy} onClick={()=>eliminar(g,g.estado)} aria-label={"Eliminar "+(g.estado==="emitida"?"recibo ":"borrador ")+(g.numero || "sin número")}><Trash2 className="mr-2 h-4 w-4" />Eliminar</Button>

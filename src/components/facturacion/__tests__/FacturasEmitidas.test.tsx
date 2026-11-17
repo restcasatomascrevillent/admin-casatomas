@@ -47,4 +47,15 @@ describe('listado de recibos y borradores',()=>{
   expect(screen.getByRole('button',{name:'Eliminar recibo R-2026-001'})).toBeDisabled();
  });
 
+ it('ofrece la vista previa del PDF en emitidos y borradores (solo si se le pasa)',()=>{
+  const previsualizar=vi.fn();
+  const props={facturas:[emitida],borradores:[borrador],busy:false,editar:vi.fn(),editarBorrador:vi.fn(),duplicar:vi.fn(),descargar:vi.fn(),nueva:vi.fn(),eliminar:vi.fn()};
+  const {rerender}=render(<FacturasEmitidas {...props}/>);
+  expect(screen.queryByRole('button',{name:/Vista previa/})).not.toBeInTheDocument();
+  rerender(<FacturasEmitidas {...props} previsualizar={previsualizar}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Vista previa del PDF de R-2026-001'}));
+  expect(previsualizar).toHaveBeenLastCalledWith(expect.objectContaining({id:'e'}),'emitida');
+  fireEvent.click(screen.getByRole('button',{name:'Vista previa del PDF de R-2026-002'}));
+  expect(previsualizar).toHaveBeenLastCalledWith(expect.objectContaining({id:'b'}),'borrador');
+ });
 });
