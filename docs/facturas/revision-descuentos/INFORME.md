@@ -236,6 +236,30 @@ datos van como migraciones, con su vuelta atrás.
 
 ---
 
+### 5.1 Hecho el 17/11/2026 (en la demo; en producción, con la release)
+
+| PR | Qué | En la demo |
+|---|---|---|
+| [#287](https://github.com/restcasatomascrevillent/admin-casatomas/pull/287) | Punto 1: la clasificación con IA ya no acepta un id de categoría como producto; la migración `20261211100000` limpia la mostaza y deja esas líneas para que el cron las reclasifique | Función desplegada y migración aplicada (en la demo no había nada que limpiar). **En producción, primero la función y después la migración** |
+| [#288](https://github.com/restcasatomascrevillent/admin-casatomas/pull/288) | Punto 2: `importe_neto`, tabla de repartos, reglas, triggers y relleno (`20261211200000`) | 496 de 658 descuentos asociados (98,9 % del importe); ningún documento cambia su suma |
+| [#289](https://github.com/restcasatomascrevillent/admin-casatomas/pull/289) | Punto 3: las 13 funciones de precios, costes, márgenes, Análisis, alertas y copiloto usan el neto (`20261211300000`) | Heineken 33 cl 41,80 → 25,52 €; barril Cruzcampo 50 l 203,98 → 105,15 €; Laurent-Perrier La Cuvée 239,24 → 191,40 € |
+
+**Pendiente:**
+
+- **Punto 4, regalos.** Que la lectura guarde la marca de regalo exige tocar `procesar-factura`
+  (`guardado.ts`) y las dos funciones de OCR por páginas (`ocr_anadir_pagina` y
+  `ocr_sustituir_factura`), que hoy no guardan `descuento_pct` ni `importe_bruto`. No conviene
+  marcar a ciegas el histórico: de las 607 líneas a 0 €, solo 61 tienen precio impreso sin marcar, y
+  muchas no son regalos (pan sin valorar, envases, remesas de Pluxee).
+- **Punto 5, lectura de documentos nuevos** (a qué línea va cada descuento; código de promoción de
+  Makro). Conviene hacerlo después del cotejo con originales.
+- **Punto 6**, unir los 3 albaranes a su factura: es un arreglo de datos de producción (en la demo no
+  están). Se hace con `vincular_albaran_factura` cuando se publique.
+- **Apartado 7**, cotejo con los originales: bloqueado hasta que la carpeta del panel en Drive se
+  comparta con la cuenta conectada a Claude.
+
+---
+
 ## 6. Qué no cambia
 
 - El **gasto** (suma de documentos con IVA) no cambia: los descuentos ya están restados en el total de
