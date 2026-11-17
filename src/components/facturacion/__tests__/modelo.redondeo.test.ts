@@ -16,7 +16,9 @@ const ivaExacto = (centimos: number, porcentaje: number) => {
 };
 
 const facturaConBase = (precio: number, iva = 21): Factura => {
+  // Documento antiguo, de cuando eran facturas con IVA (los recibos nuevos van sin impuestos).
   const f = nuevaFactura();
+  f.aplicarIva = true;
   f.ivaGlobal = iva;
   f.lineas = [{ ...f.lineas[0], concepto: "Servicio", cantidad: 1, precio, descuento: 0, iva }];
   return f;

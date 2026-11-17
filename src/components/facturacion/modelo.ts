@@ -1,6 +1,21 @@
 import { z } from "zod";
 
-export const categorias = ["Instalación", "Licencia", "Módulo", "Soporte", "Otros"] as const;
+/**
+ * Recibos de OficiosOsIA (17/11/2026, petición del dueño: «quítale el membrete y todos los datos
+ * fiscales, solo que funcionen tipo recibos sin ninguna información fiscal»). El documento guardado
+ * sigue teniendo la forma de la antigua factura (emisor, cliente, IVA, retención…) para que lo ya
+ * guardado se siga leyendo, pero la pantalla y el PDF trabajan siempre con `sinDatosFiscales`: sin
+ * NIF, sin dirección fiscal, sin IVA y sin retención.
+ *
+ * Dos tipos de recibo:
+ *   · «licencia»: licencia global (instalación, licencias, módulos…), pago puntual.
+ *   · «mensual»:  pago de un mes: la cuota fija + los gastos de ese mes que se ven en
+ *                 Servicios (IA, hosting…), cada uno editable por si se aplica un descuento.
+ */
+export const categorias = ["Instalación", "Licencia", "Módulo", "Soporte", "Servicio", "Otros"] as const;
+export const tiposRecibo = ["licencia", "mensual"] as const;
+export type TipoRecibo = (typeof tiposRecibo)[number];
+export const TEXTO_TIPO_RECIBO: Record<TipoRecibo, string> = { licencia: "Licencia global", mensual: "Pago mensual" };
 export const periodicidades = ["Puntual", "Mensual", "Anual"] as const;
 const precioSchema = z.number().finite().min(0).max(1000000);
 const porcentajeSchema = z.number().finite().min(0).max(100);
@@ -10,6 +25,8 @@ export const catalogoSchema = z.object({
     precio: precioSchema, periodicidad: z.enum(periodicidades), iva: porcentajeSchema.optional(),
   })).max(100),
   paquetes: z.array(z.object({id:z.string(), nombre:z.string().min(1).max(120), productoIds:z.array(z.string()).max(100)})).max(30),
+  /** Precio fijo del pago mensual (sin los gastos de Servicios). */
+  cuotaMensual: precioSchema.optional(),
 });
 export type CatalogoFacturacion = z.infer<typeof catalogoSchema>;
 const texto = z.string().max(500);
@@ -24,6 +41,8 @@ export const facturaSchema = z.object({
   lineas: z.array(z.object({
     id: z.string(), categoria: z.enum(categorias), concepto: z.string().max(300),
     productoId: z.string().optional(), paqueteId: z.string().optional(),
+    /** Gasto traído de Servicios (proveedor de `servicios_contratados`): se refresca al cambiar de mes. */
+    proveedor: z.string().max(80).optional(),
     periodicidad: z.enum(periodicidades),
     cantidad: z.number().finite().positive().max(100000),
     precio: z.number().finite().min(0).max(1000000),
@@ -36,6 +55,10 @@ export const facturaSchema = z.object({
   ivaGlobal: porcentajeSchema.optional(),
   catalogo: catalogoSchema.optional(),
   pago: texto, notas: z.string().max(2000),
+  /** Sin tipo (documentos anteriores al 17/11/2026) se trata como «licencia». */
+  tipo: z.enum(tiposRecibo).optional(),
+  /** Mes que se paga («AAAA-MM»), solo en «mensual». */
+  mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
 });
 export type Factura = z.infer<typeof facturaSchema>;
 export type LineaFactura = Factura["lineas"][number];
@@ -55,7 +78,7 @@ export const redondear = (n: number) => {
 export function nuevaLinea(categoria: LineaFactura["categoria"] = "Módulo"): LineaFactura {
   return { id: crypto.randomUUID(), categoria, concepto: categoria === "Instalación" ? "Instalación y puesta en marcha" : categoria,
     periodicidad: categoria === "Instalación" ? "Puntual" : "Mensual",
-    cantidad: 1, precio: 0, descuento: 0, iva: 21 };
+    cantidad: 1, precio: 0, descuento: 0, iva: 0 };
 }
 export function nuevaFactura(emisor?: ParteFactura): Factura {
   const hoy = new Date();
@@ -64,8 +87,36 @@ export function nuevaFactura(emisor?: ParteFactura): Factura {
   const vacio = { nombre: "", nif: "", direccion: "", email: "" };
   return { numero: "", fecha: localDate(hoy), vencimiento: localDate(vence),
     emisor: emisor ?? { ...vacio, nombre: "OficiosOsIA" }, cliente: { ...vacio },
-    lineas: [{...nuevaLinea("Otros"),concepto:""}], retencion: 0, descuentoGlobal: 0, aplicarIva: true, ivaGlobal: 21, pago: "", notas: "" };
+    lineas: [{...nuevaLinea("Otros"),concepto:""}], retencion: 0, descuentoGlobal: 0, aplicarIva: false, pago: "", notas: "", tipo: "licencia" };
 }
+const MESES_RECIBO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+/** «2026-11» → «noviembre de 2026» («» si no es un mes válido). */
+export function textoMesRecibo(mes: string | undefined): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(mes ?? "");
+  const nombre = m ? MESES_RECIBO[Number(m[2]) - 1] : undefined;
+  return m && nombre ? `${nombre} de ${m[1]}` : "";
+}
+/** «2026-11»: el mes (hora local) de una fecha. */
+export const mesDeFecha = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+export const tipoDeRecibo = (f: Pick<Factura, "tipo">): TipoRecibo => f.tipo ?? "licencia";
+/** «Licencia global» o «Pago mensual · noviembre de 2026». */
+export function tituloRecibo(f: Pick<Factura, "tipo" | "mes">): string {
+  const tipo = tipoDeRecibo(f);
+  const mes = tipo === "mensual" ? textoMesRecibo(f.mes) : "";
+  return mes ? `${TEXTO_TIPO_RECIBO[tipo]} · ${mes}` : TEXTO_TIPO_RECIBO[tipo];
+}
+/**
+ * El documento como recibo: sin NIF, dirección ni email de nadie, sin IVA y sin retención.
+ * Devuelve el mismo objeto si ya estaba limpio (no fuerza renders ni marca cambios).
+ */
+export function sinDatosFiscales(f: Factura): Factura {
+  const limpia = (p: ParteFactura) => (p.nif || p.direccion || p.email ? { nombre: p.nombre, nif: "", direccion: "", email: "" } : p);
+  const emisor = limpia(f.emisor), cliente = limpia(f.cliente);
+  if (emisor === f.emisor && cliente === f.cliente && f.aplicarIva === false && f.retencion === 0) return f;
+  return { ...f, emisor, cliente, aplicarIva: false, retencion: 0 };
+}
+/** Totales de un recibo: los de siempre, sin impuestos ni retención pase lo que pase. */
+export const totalesRecibo = (f: Factura) => totalesFactura(sinDatosFiscales(f));
 export function totalesFactura(f: Factura) {
   const lineas = f.lineas.map(l => {
     const bruto = redondear(l.cantidad * l.precio);
@@ -95,18 +146,17 @@ export function mensualFactura(f: Factura) {
 }
 export function erroresFactura(f: Factura): string[] {
   const parse = facturaSchema.safeParse(f);
-  if (!parse.success) return ["Revisa cantidades, precios, descuentos, impuestos y longitud de los textos."];
+  if (!parse.success) return ["Revisa cantidades, precios, descuentos y longitud de los textos."];
   const errores: string[] = [];
-  if (!f.numero.trim()) errores.push("Indica el número de factura.");
-  for (const [rol, parte] of [["emisor", f.emisor], ["cliente", f.cliente]] as const) {
-    if (!parte.nombre.trim() || !parte.nif.trim() || !parte.direccion.trim()) errores.push(`Completa nombre o razón social, NIF y dirección del ${rol}.`);
-  }
+  if (!f.numero.trim()) errores.push("Indica el número de recibo.");
+  if (!f.cliente.nombre.trim()) errores.push("Indica el nombre del cliente.");
+  if (tipoDeRecibo(f) === "mensual" && !textoMesRecibo(f.mes)) errores.push("Indica el mes que se paga.");
   if (f.lineas.some(l => !l.concepto.trim())) errores.push("Todos los conceptos deben tener una descripción.");
   const fechaValida = (v: string) => {
     const d = new Date(v + "T12:00:00Z");
     return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10) === v;
   };
-  if (!fechaValida(f.fecha) || !fechaValida(f.vencimiento)) errores.push("Indica fechas válidas.");
-  else if (f.vencimiento < f.fecha) errores.push("El vencimiento no puede ser anterior a la fecha de factura.");
+  // El vencimiento ya no se enseña (un recibo no vence): solo se exige la fecha del recibo.
+  if (!fechaValida(f.fecha)) errores.push("Indica una fecha válida.");
   return errores;
 }
