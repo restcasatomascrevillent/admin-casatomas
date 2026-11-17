@@ -284,6 +284,47 @@ const limpiarNombre = (s: unknown): string =>
   typeof s === "string" ? s.replace(/\s+/g, " ").trim() : "";
 const claveNombre = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+/** Familia ra\u00edz de una categor\u00eda (sube por padre_id). null si no se conoce. */
+function familiaRaiz(id: number | null | undefined, porId: Map<number, Categoria>): number | null {
+  if (typeof id !== "number") return null;
+  let c = porId.get(id);
+  if (!c) return null;
+  const vistos = new Set<number>();
+  while (c.padre_id != null && porId.has(c.padre_id) && !vistos.has(c.id)) {
+    vistos.add(c.id);
+    c = porId.get(c.padre_id)!;
+  }
+  return c.id;
+}
+
+/** Palabras de 3 o m\u00e1s letras, sin tildes. */
+const palabras = (s: string | null | undefined): string[] =>
+  claveNombre(s ?? "").split(/[^a-z0-9\u00f1]+/).filter((p) => p.length >= 3 && !/^\d+$/.test(p));
+
+/** \u00bfComparten alguna palabra (o el comienzo de una, para las abreviaturas: \u00abcerv\u00bb y \u00abcerveza\u00bb)? */
+function compartenPalabra(nombreProducto: string, ...textos: (string | null | undefined)[]): boolean {
+  const delProducto = palabras(nombreProducto);
+  return textos.flatMap(palabras).some((t) => delProducto.some((p) => p.startsWith(t) || t.startsWith(p)));
+}
+
+/**
+ * El modelo a veces pone en producto_id el id de la CATEGOR\u00cdA (17/11/2026: \u00ab11\u00bb = Servicios ca\u00eda en
+ * el producto 11, \u00abMostaza de cerveza Rooftop 150 g\u00bb, con alquileres, luz y descuentos). Un producto
+ * del cat\u00e1logo no se acepta si es de otra familia que la categor\u00eda que propone el propio modelo, ni si
+ * su id coincide con el de una categor\u00eda y no comparte ninguna palabra con la l\u00ednea.
+ */
+function productoSospechoso(
+  a: Partial<Asignacion>,
+  elegido: ProductoCatalogo,
+  pedido: TextoPendiente,
+  categoriasPorId: Map<number, Categoria>,
+): boolean {
+  const propuesta = familiaRaiz(a.categoria_id, categoriasPorId);
+  const delProducto = familiaRaiz(elegido.categoria_id, categoriasPorId);
+  if (propuesta !== null && delProducto !== null && propuesta !== delProducto) return true;
+  return categoriasPorId.has(elegido.id) && !compartenPalabra(elegido.nombre, pedido.texto, pedido.ejemplo);
+}
+
 /**
  * Convierte la respuesta del modelo en elementos para la RPC: descarta textos
  * que no se pidieron, ids que no existen y nombres vacíos; junta los textos que
@@ -298,6 +339,7 @@ export function validarAsignaciones(
 ): ElementoClasificacion[] {
   const pedidos = new Map(textos.map((t) => [t.texto, t]));
   const productos = new Map(catalogo.map((p) => [p.id, p]));
+  const categoriasPorId = new Map(categorias.map((c) => [c.id, c]));
   const categoriasActivas = new Set(categorias.filter((c) => c.activa).map((c) => c.id));
   const porNombre = new Map(catalogo.map((p) => [claveNombre(limpiarNombre(p.nombre)), p]));
   const conAnada = categoriasConAnada(categorias);
@@ -313,7 +355,8 @@ export function validarAsignaciones(
     if (!pedido || vistos.has(texto)) continue;
     let clave: string;
     let elemento: ElementoClasificacion;
-    const elegido = typeof a.producto_id === "number" ? productos.get(a.producto_id) : undefined;
+    const candidato = typeof a.producto_id === "number" ? productos.get(a.producto_id) : undefined;
+    const elegido = candidato && !productoSospechoso(a, candidato, pedido, categoriasPorId) ? candidato : undefined;
     // Solo vinos, cavas y champanes: el mismo vino de OTRA añada que la del catálogo es
     // otro producto, con la añada de la línea. En el resto un año en el nombre no cuenta.
     const otraAnada = elegido && conAnada.has(elegido.categoria_id ?? -1)
