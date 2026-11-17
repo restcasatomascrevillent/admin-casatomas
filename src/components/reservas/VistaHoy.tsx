@@ -29,7 +29,6 @@ import { useCanAccessSection } from "@/hooks/useUserRole";
 import { VistaHoyMovil } from "./movil/VistaHoyMovil";
 import { BotonSentarSinReserva } from "./SentarSinReserva";
 import { InterruptoresServiciosOnline } from "./InterruptoresServiciosOnline";
-import { BotonPendientes } from "./libro/BotonPendientes";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -267,7 +266,6 @@ export function VistaHoy({
           // Bloqueo de comida / cena online del día elegido (10/11/2026), en la misma barra (11/11/2026).
           servicios={<InterruptoresServiciosOnline fecha={hoy} />}
           // «Pendientes» como en la Lista (12/11/2026): el número y, al tocarlo, la lista; «Ver el día» va a ese día.
-          pendientes={<BotonPendientes onVerDia={irADia} />}
           busqueda={busqueda}
           onBusqueda={setBusqueda}
           filtroTurno={filtroTurno}
@@ -355,7 +353,6 @@ function turnoSiguiente(): "comida" | "cena" {
 function BarraFiltrosHoy({
   dia,
   servicios,
-  pendientes,
   busqueda,
   onBusqueda,
   filtroTurno,
@@ -366,8 +363,6 @@ function BarraFiltrosHoy({
   dia?: { fecha: string; hoy: string; onCambiar: (fecha: string) => void };
   /** «Cerrar comida / Cerrar cena» del día elegido: a la derecha de las acciones. */
   servicios?: ReactNode;
-  /** «Pendientes» (12/11/2026): junto a las acciones, también para quien solo ve. */
-  pendientes?: ReactNode;
   /** Botones de acción junto al turno («Organizar», «Sin reserva»). */
   accion?: ReactNode;
   busqueda: string;
@@ -422,10 +417,9 @@ function BarraFiltrosHoy({
           />
         </div>
       </div>
-      {(accion || servicios || pendientes) && (
+      {(accion || servicios) && (
         <div className="flex flex-wrap items-center gap-2">
           {accion}
-          {pendientes}
           {servicios && <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">{servicios}</div>}
         </div>
       )}
