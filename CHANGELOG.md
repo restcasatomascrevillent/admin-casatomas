@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.43.2] - 2026-11-17
+
+Objetivo: Estado de Servicios cabe en una pantalla sin scroll y abrir un servicio ya no descoloca la página
+
+### Cambiado
+- Servicios: Estado cabe en una pantalla sin scroll y abrir un servicio ya no descoloca la página ([#280](https://github.com/restcasatomascrevillent/admin-casatomas/pull/280))
+
 ## [1.43.0] - 2026-11-17
 
 Objetivo: Informe de subidas y proveedor más barato, diccionario de abreviaturas por proveedor y avisos de Telegram útiles
