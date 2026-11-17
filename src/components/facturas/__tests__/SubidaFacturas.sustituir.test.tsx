@@ -265,7 +265,7 @@ describe("SubidaFacturas · páginas sueltas, relectura de la existente y unir f
       modo: "anadir_pagina", factura_id: 352, trabajo_id: anadible.trabajo_id,
       esperado: { lineas: 3, updated_at: "2026-10-10T11:00:00" },
     });
-    expect(doble.rpcs[0]).toEqual({ nombre: "ocr_resumen_factura", args: { p_factura_id: 352 } });
+    expect(doble.rpcs.filter((r) => r.nombre !== "abreviaturas_avisos_pendientes")[0]).toEqual({ nombre: "ocr_resumen_factura", args: { p_factura_id: 352 } });
     await waitFor(() => expect(screen.queryByRole("region", { name: "Pendientes de decidir" })).toBeNull());
   });
 
