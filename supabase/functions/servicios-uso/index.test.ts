@@ -544,7 +544,8 @@ describe("lectores", () => {
       [ruta]: equipo(plan),
       "api.vercel.com/v1/billing/charges": (url) => {
         expect(url.searchParams.get("from")).toBe("2026-10-27T12:00:00.000Z");
-        expect(url.searchParams.get("to")).toBe(AHORA.toISOString());
+        // Un día más que «ahora»: Vercel solo da los días (08:00–08:00 UTC) que acaban antes de `to`.
+        expect(url.searchParams.get("to")).toBe(new Date(AHORA.getTime() + 86_400_000).toISOString());
         return jsonl(lineas);
       },
     });
@@ -568,6 +569,15 @@ describe("lectores", () => {
     const pasado = await LECTORES.vercel(ctx(SECRETOS, rutas([cargo("Build CPU Minutes", 27.5)])));
     expect(pasado.coste_variable?.importe).toBe(7.5);
     expect(pasado.detalles?.avisos).toBeUndefined();
+
+    // A menos de un día del final del periodo, `to` no pasa del final.
+    const finCerca = AHORA.getTime() + 3_600_000;
+    let pedidoHasta = "";
+    await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({
+      [ruta]: () => resp({ billing: { plan: "pro", period: { start: inicio, end: finCerca } } }),
+      "api.vercel.com/v1/billing/charges": (url) => { pedidoHasta = url.searchParams.get("to") ?? ""; return jsonl([cargo("Build CPU Minutes", 1)]); },
+    })));
+    expect(pedidoHasta).toBe(new Date(finCerca).toISOString());
 
     // Hobby: no se pide la facturación. Token sin permiso o formato nuevo: aviso, y el resto sigue.
     const hobby = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ [ruta]: equipo("hobby") })));

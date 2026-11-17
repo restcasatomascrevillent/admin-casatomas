@@ -25,7 +25,10 @@ export const NOMBRE_PROYECTO: Record<ProyectoTrafico, string> = {
   "touza-restaurant-website": "Touza",
 };
 
-/** Límite de Fast Data Transfer del plan Hobby: 100 GB decimales (así factura Vercel). */
+/**
+ * Cupo de Fast Data Transfer del antiguo plan Hobby (100 GB decimales). Desde el plan Pro (10/11/2026) no hay
+ * cupo: se paga por uso. Solo queda como valor por defecto de `limite_bytes`, que la pantalla ya no enseña.
+ */
 export const LIMITE_FDT_BYTES = 100e9;
 
 type Fns = Database["public"]["Functions"];
