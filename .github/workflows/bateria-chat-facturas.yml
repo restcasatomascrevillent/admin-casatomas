@@ -1,0 +1,101 @@
+# Batería de pruebas del copiloto de Facturas contra PRODUCCIÓN (nivel rpc: solo SELECT, sin OpenAI).
+#
+# ESTADO: PREPARADO Y DESACTIVADO. Solo se lanza a mano (Actions → «Batería del copiloto de Facturas» →
+# Run workflow, escribiendo «si» en la casilla). El disparador semanal está comentado más abajo: se activa
+# quitando el «#» de las dos líneas de `schedule` SOLO cuando el dueño dé el «sí» (gasta minutos de CI:
+# unos 6 por pasada, 4 pasadas al mes ≈ 25 minutos).
+#
+# Qué hace: ejecuta scripts/eval-chat-fallos.mjs --bateria --en-vivo (212 casos; 172 con valor esperado
+# calculado por SQL propio) y compara con la pasada anterior (cache). Falla (rojo) solo si algo que antes
+# iba bien ahora falla (--solo-regresiones). El informe completo queda como artefacto (90 días).
+# Es de solo lectura: cada consulta es un select de una función *_agente o del SQL de verificación.
+#
+# Secret necesario: SUPABASE_ACCESS_TOKEN (el mismo de copia-seguridad-bd.yml).
+name: Batería del copiloto de Facturas
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: "Escribe «si» para lanzarla (lee producción, no escribe nada)"
+        required: true
+        default: "no"
+      categorias:
+        description: "Solo estas categorías (separadas por comas; vacío = todas)"
+        required: false
+        default: ""
+  # schedule:
+  #   - cron: "17 5 * * 1" # los lunes, 05:17 UTC (06:17 / 07:17 en Madrid)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bateria-chat-facturas
+  cancel-in-progress: false
+
+jobs:
+  bateria:
+    if: ${{ github.event_name == 'schedule' || inputs.confirmar == 'si' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PROYECTO_REF: haqmmdfdzzatdnrrcgez # casatomas-prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Histórico de la pasada anterior
+        uses: actions/cache/restore@v4
+        with:
+          path: evals
+          key: bateria-chat-facturas-nunca-coincide
+          restore-keys: bateria-chat-facturas-
+
+      - name: Enlazar con producción (solo lectura)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || { echo "::error::Falta el secret SUPABASE_ACCESS_TOKEN"; exit 1; }
+          enlace="$RUNNER_TEMP/enlace"
+          mkdir -p "$enlace/supabase"
+          printf 'project_id = "%s"\n' "$PROYECTO_REF" > "$enlace/supabase/config.toml"
+          supabase link --project-ref "$PROYECTO_REF" --workdir "$enlace" < /dev/null
+
+      - name: Lanzar la batería
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          CATEGORIAS: ${{ inputs.categorias }}
+        run: |
+          set -uo pipefail
+          extra=()
+          [ -z "${CATEGORIAS:-}" ] || extra+=(--categoria "$CATEGORIAS")
+          # --solo-regresiones: rojo solo si algo que iba bien ahora falla
+          node scripts/eval-chat-fallos.mjs --bateria --en-vivo --solo-regresiones \
+            --dir "$RUNNER_TEMP/enlace" --historico evals "${extra[@]}" | tee informe.txt
+          exit "${PIPESTATUS[0]}"
+
+      - name: Guardar el histórico para la próxima pasada
+        if: ${{ always() }}
+        uses: actions/cache/save@v4
+        with:
+          path: evals
+          key: bateria-chat-facturas-${{ github.run_id }}
+
+      - name: Subir el informe
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bateria-chat-facturas
+          path: |
+            informe.txt
+            evals/
+          retention-days: 90
