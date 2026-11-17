@@ -244,3 +244,22 @@ fallos de herramientas del 07/11 (gamba roja e IRPF) ya están resueltos.
 - No se ha cambiado `ia_modelo_funcion`: queda en `gpt-6.1-terra` con respaldo `gpt-4.1-mini`.
 
 **Decisión (11/11/2026):** en producción `chat-facturas` pasa de gpt-4.1-mini a **gpt-6.1-terra** (respaldo gpt-4.1-mini). El dueño prefirió terra a luna para asegurar el hilo de conversación.
+
+## Banco de fallos reales (17/11/2026)
+
+Además de la batería de modelos, hay un banco con las preguntas de producción que el copiloto contestó
+mal en la evaluación del 16/11/2026 (Laurent Perrier, Sierra Cantabria, base de Acciona, litros de
+cerveza, carabinero, pan de cristal, precios de botella…), con la respuesta correcta calculada por SQL:
+`supabase/functions/chat-facturas/__tests__/eval/banco-fallos.json`. Se lanza con
+`scripts/eval-chat-fallos.mjs` desde una carpeta enlazada al proyecto (`supabase/.temp/project-ref`):
+
+| Orden | Qué hace | Coste |
+|---|---|---|
+| `node scripts/eval-chat-fallos.mjs` | Nivel **rpc**: llama a la herramienta de cada pregunta (solo `SELECT`) y comprueba el resultado y lo que tarda. Vale para la demo y para producción (`--dir <carpeta enlazada a prod> --npx-prefix <repo con node_modules>`). | Gratis |
+| `node scripts/eval-chat-fallos.mjs --ia --solo f01,f03` | Nivel **ia**: la pregunta entera por la acción «evaluar» (el bucle real) y comprueba la respuesta redactada. Solo demo. | ≈ 0,01 $ por pregunta |
+
+`--ver` enseña el resultado de cada consulta y `--salida f.json` guarda el informe. Resultados del
+17/11/2026: producción con el código anterior, **7 de 16 (44 %)**, con dos consultas de 6 s; demo con
+este cambio, **16 de 16**, mediana 0,2 s. Nivel ia en la demo (5 preguntas): 5 de 5, entre 6 y 13 s.
+Las cifras de `prod` y `demo` son de ese día: si los datos crecen, se recalculan con la consulta `sql`
+de cada caso.

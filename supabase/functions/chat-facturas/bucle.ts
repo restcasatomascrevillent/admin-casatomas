@@ -36,6 +36,11 @@ import {
   type Asociacion,
   type PalabraAsociada,
   necesitaRespaldoSemantico,
+  esConsultaDeVino,
+  MAX_VINOS_CARTA,
+  resumenVinoCarta,
+  resultadoVacio,
+  sinCompras,
   prepararLlamada,
   recortar,
   separarAdjunto,
@@ -55,6 +60,7 @@ export const TIMEOUT_OPENAI_MS = 45_000;
 export const PRESUPUESTO_MS = 110_000;        // deadline global de la peticion entera
 export const MAX_TOOL_CALLS_POR_RONDA = 4;    // corta el fan-out que el prompt fomenta
 export const MAX_TOKENS_RESPUESTA = 800;      // el prompt pide 6 lineas; 800 sobra
+export const TIMEOUT_RESPALDO_SEMANTICO_MS = 6_000;  // tope del embedding de sugerencias de un «no hay»
 export const MARGEN_REINTENTO_MS = 30_000;     // tiempo minimo que debe quedar para reintentar una consulta cortada
 export const MAX_TOKENS_PRESUPUESTO = 2_500;   // con un presupuesto adjunto la respuesta es una tabla de hasta 40 filas
 
@@ -140,6 +146,10 @@ export interface ResultadoBucle {
   adjuntos: Adjunto[];
   modelo: string;
   huboFalloDeHerramienta: boolean;
+  /** El modelo no llegó a redactar: la respuesta es el texto de reserva. */
+  sinRespuesta: boolean;
+  /** Todas las consultas volvieron sin datos (un «no hay»): el panel anima a decir si debería haberlos. */
+  sinDatos: boolean;
 }
 
 /** Estado por peticion: deadline compartido y memo de embeddings. */
@@ -351,7 +361,7 @@ function msRestantes(ctx: Ctx): number {
  * Embedding de la consulta, memoizado por peticion: el prompt fomenta el
  * fan-out y era facil acabar pagando dos veces el mismo `embed("tomate")`.
  */
-async function embedConsulta(consulta: string, ctx: Ctx): Promise<string> {
+async function embedConsulta(consulta: string, ctx: Ctx, maxMs?: number): Promise<string> {
   const clave = consulta.toLowerCase().trim();
   const memo = ctx.embeddings.get(clave);
   if (memo) return memo;
@@ -360,7 +370,7 @@ async function embedConsulta(consulta: string, ctx: Ctx): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${ctx.clave}` },
     body: JSON.stringify({ model: "text-embedding-3-small", input: consulta }),
-  }, msRestantes(ctx));
+  }, maxMs ? Math.min(maxMs, msRestantes(ctx)) : msRestantes(ctx));
   if (!res.ok) throw new Error(`OpenAI embeddings ${res.status}`);
   const json = await res.json();
   // Se contabiliza AQUI y no en el memo: una consulta repetida no vuelve a pagar.
@@ -513,8 +523,15 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       const a = await supabase.rpc("asociar_termino_agente", { p_texto: txt });
       if (!a.error && a.data && typeof a.data === "object") asoc = a.data as Asociacion;
     }
-    const ll = prepararLlamada(nombre, args, ctx.pregunta, asoc, ctx.presupuestoId);
+    let ll = prepararLlamada(nombre, args, ctx.pregunta, asoc, ctx.presupuestoId);
     let data: unknown;
+    // Vino: el coste efectivo por botella de la carta, en paralelo a la consulta (si falla, sin él).
+    const vinoCarta: Promise<ReturnType<typeof resumenVinoCarta>> | null = esConsultaDeVino(ll, asoc)
+      ? Promise.resolve(supabase.rpc("margenes_carta_agente", { p_texto: txt, p_vista: "vinos", p_solo_problemas: false, p_limite: MAX_VINOS_CARTA }))
+          // deno-lint-ignore no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .then((r: any) => (r?.error ? null : resumenVinoCarta(r?.data)), () => null)
+      : null;
 
     if (ll.tipo === "rpc") {
       let r = await supabase.rpc(ll.rpc, ll.params);
@@ -527,13 +544,24 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       }
       if (r.error) throw r.error;
       data = r.data;
+      // historial_precios / grafico_precio sin ninguna compra: antes de decir «no hay» se busca
+      // como compras_producto (abreviaturas, erratas, sugerencias por texto y por significado).
+      if (sinCompras(nombre, data)) {
+        const alt = prepararLlamada("compras_producto", { producto: args?.producto }, ctx.pregunta, asoc, ctx.presupuestoId);
+        if (alt.tipo === "rpc" && alt.rpc === "compras_producto_agente") {
+          const ra = await supabase.rpc(alt.rpc, alt.params);
+          if (!ra.error && ra.data) { data = ra.data; ll = alt; }
+        }
+      }
       // compras_producto: si el texto no casa con nada, UNA segunda llamada
       // con el embedding (solo sugerencias). Se paga solo en ese caso.
       // Es SOLO un extra de sugerencias: si falla (OpenAI, red, RPC) se queda el resultado
       // textual (sin datos) en vez de tumbar la respuesta con «problema tecnico».
       if (ll.respaldoSemantico && necesitaRespaldoSemantico(data)) {
         try {
-          const embedding = await embedConsulta(ll.respaldoSemantico.consulta, ctx);
+          // Con tope propio: solo aporta sugerencias y la llamada de embeddings ha llegado a tardar
+          // 10-25 s (evaluación del 16/11/2026); pasado el tope se contesta con lo que dio el texto.
+          const embedding = await embedConsulta(ll.respaldoSemantico.consulta, ctx, TIMEOUT_RESPALDO_SEMANTICO_MS);
           const r2 = await supabase.rpc(ll.rpc, { ...ll.params, [ll.respaldoSemantico.param]: embedding });
           if (r2.error) throw r2.error;
           data = r2.data;
@@ -555,6 +583,9 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       }
     }
 
+    const vino = vinoCarta ? await vinoCarta : null;
+    if (vino && data && typeof data === "object" && !Array.isArray(data)) data = { vino_carta: vino, ...(data as Record<string, unknown>) };
+
     if (nombre === "comparar_presupuesto") {
       const p = prepararPresupuesto(data);
       if (p) return { fallo: false, tabla: p.tabla, contenido: JSON.stringify(p.paraModelo) };
@@ -572,7 +603,10 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
         "Cita cada documento por su proveedor, su numero TAL CUAL viene aqui y su fecha: la app convierte el numero en enlace al original en Drive y lo lista debajo. No escribas URLs ni digas que no puedes enseñarlo.";
     }
 
-    const { data: paraModelo, adjunto } = separarAdjunto(nombre, anotarRuta(ll, data));
+    // El vino de la carta, lo primero que lee el modelo (antes que las notas de la consulta).
+    let anotado = anotarRuta(ll, data);
+    if (vino && anotado && typeof anotado === "object" && !Array.isArray(anotado)) anotado = { vino_carta: vino, ...anotado };
+    const { data: paraModelo, adjunto } = separarAdjunto(nombre, anotado);
     return {
       fallo: false,
       adjunto,
@@ -688,6 +722,9 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   };
   let respuesta = "";
   let huboFalloDeHerramienta = false;
+  let sinRespuesta = false;
+  let consultasVacias = 0;
+  let consultasConDatos = 0;
   const adjuntos: Adjunto[] = [];
   const referenciasAcum: DocRef[][] = [];
   let tablaPresupuestoFinal: string | null = null;
@@ -762,6 +799,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
           textoError ? undefined : resumenDeResultado(r.contenido),
         );
         if (r.fallo) huboFalloDeHerramienta = true;
+        else if (!textoError) { if (resultadoVacio(r.contenido)) consultasVacias++; else consultasConDatos++; }
         if (r.adjunto) adjuntos.push(r.adjunto);
         if (r.tabla) tablaPresupuestoFinal = r.tabla;
         if (r.referencias?.length) referenciasAcum.push(r.referencias);
@@ -797,6 +835,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
 
   if (!respuesta.trim()) {
     // El modelo agoto los pasos sin redactar. Mejor decirlo que devolver vacio.
+    sinRespuesta = true;
     respuesta = huboFalloDeHerramienta
       ? "No he podido consultar los datos de facturas en este momento. Vuelve a intentarlo en unos segundos."
       : "No he conseguido resolver la consulta. Prueba a preguntarlo de forma mas concreta, por ejemplo indicando un proveedor, un numero de documento o un mes.";
@@ -808,5 +847,5 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   const refs = unirReferencias([citados, ...referenciasAcum]);
   if (refs.length > 0 && respuesta.trim()) adjuntos.push({ tipo: "documentos", datos: refs });
 
-  return { respuesta, adjuntos, modelo, huboFalloDeHerramienta };
+  return { respuesta, adjuntos, modelo, huboFalloDeHerramienta, sinRespuesta, sinDatos: consultasVacias > 0 && consultasConDatos === 0 };
 }
