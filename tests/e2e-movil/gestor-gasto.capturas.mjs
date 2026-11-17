@@ -6,8 +6,9 @@
 //   npx vite preview --port 4173 --strictPort --host 127.0.0.1 &
 //   node tests/e2e-movil/gestor-gasto.capturas.mjs [carpeta-de-capturas]
 //
-// Saca móvil (375×812) y escritorio (1280×800) de cada pantalla, avisa si algo se desborda en horizontal y comprueba
-// que en el recibo no aparece ningún dato fiscal. No entra en `npm test`.
+// Saca móvil (375×812) y escritorio (1280×800) de cada pantalla (recibos, pago mensual con los gastos de Servicios y
+// sus descuentos, vista previa del PDF y Control Excel), avisa si algo se desborda en horizontal y comprueba que en el
+// recibo no aparece ningún dato fiscal. No entra en `npm test`.
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -93,8 +94,13 @@ const PANTALLAS = [
   { id: "recibos", ir: (page) => pestana(page, "Recibos") },
   { id: "licencia-datos", ir: async () => {} },
   { id: "licencia-revisar", recibo: true, ir: (page) => paso(page, "3. Revisar") },
-  { id: "mensual-conceptos", ir: async (page) => { await page.getByRole("button", { name: "Nuevo pago mensual" }).click(); await paso(page, "2. Conceptos"); await page.getByText("Total de Servicios").waitFor({ timeout: 15_000 }); } },
-  { id: "mensual-revisar", recibo: true, ir: async (page) => { await page.getByRole("button", { name: "Nuevo pago mensual" }).click(); await paso(page, "2. Conceptos"); await page.getByText("Total de Servicios").waitFor({ timeout: 15_000 }); await paso(page, "3. Revisar"); } },
+  { id: "mensual-conceptos", ir: async (page) => { await page.getByRole("button", { name: "Nuevo pago mensual" }).click(); await paso(page, "2. Conceptos"); await page.getByText("Servicios en el recibo").waitFor({ timeout: 15_000 }); } },
+  { id: "mensual-revisar", recibo: true, ir: async (page) => { await page.getByRole("button", { name: "Nuevo pago mensual" }).click(); await paso(page, "2. Conceptos"); await page.getByText("Servicios en el recibo").waitFor({ timeout: 15_000 }); await paso(page, "3. Revisar"); } },
+  // Los gastos de Servicios se editan en su bloque: un descuento a uno y otro a todos.
+  { id: "mensual-descuentos", ir: async (page) => { await page.getByRole("button", { name: "Nuevo pago mensual" }).click(); await paso(page, "2. Conceptos"); await page.getByText("Servicios en el recibo").waitFor({ timeout: 15_000 }); await page.getByLabel("Descuento a todos los servicios (%)").fill("20"); await page.getByRole("button", { name: "Aplicar a todos" }).click(); await page.getByLabel("Descuento de OpenAI (%)").fill("50"); } },
+  // Vista previa del PDF: de un borrador (desde la lista) y de un recibo emitido.
+  { id: "previa-pdf-borrador", ir: async (page) => { await pestana(page, "Recibos"); await page.getByRole("button", { name: "Vista previa del PDF de R-2026-002" }).click(); await page.getByRole("dialog").locator("img").first().waitFor({ timeout: 30_000 }); } },
+  { id: "previa-pdf-emitido", ir: async (page) => { await pestana(page, "Recibos"); await page.getByRole("button", { name: "Vista previa del PDF de R-2026-001" }).click(); await page.getByRole("dialog").locator("img").first().waitFor({ timeout: 30_000 }); } },
   { id: "tarifas", ir: (page) => pestana(page, "Tarifas") },
   { id: "control-excel", ir: async (page) => { await pestana(page, "Control Excel"); await page.getByText(CLIENTE).first().waitFor({ timeout: 15_000 }); } },
 ];
