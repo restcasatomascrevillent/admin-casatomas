@@ -4356,6 +4356,9 @@ export type Database = {
       reservas: {
         Row: {
           canal: string | null
+          /** «Quién canceló» (20261205100200_reservas_cancelada_por): los escribe el trigger de la BD, el panel solo los lee. Ver src/lib/reservas/cancelacion.ts. */
+          cancelada_at: string | null
+          cancelada_por: string | null
           /** Solo existe si 20261003143000_reserva_web_prueba_consentimiento.sql está aplicada. */
           condiciones_aceptadas_at: string | null
           consentimiento_newsletter: boolean
@@ -4394,6 +4397,8 @@ export type Database = {
         }
         Insert: {
           canal?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           condiciones_aceptadas_at?: string | null
           consentimiento_newsletter?: boolean
           created_at?: string | null
@@ -4423,6 +4428,8 @@ export type Database = {
         }
         Update: {
           canal?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
           condiciones_aceptadas_at?: string | null
           consentimiento_newsletter?: boolean
           created_at?: string | null

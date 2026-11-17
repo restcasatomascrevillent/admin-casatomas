@@ -97,6 +97,7 @@ vi.mock("../_shared/registrar-uso-ia.ts", () => ({
 }));
 vi.mock("https://esm.sh/@supabase/supabase-js@2", () => ({ createClient: h.cliente }));
 vi.mock("https://esm.sh/@supabase/supabase-js@2.57.4", () => ({ createClient: h.cliente }));
+vi.mock("https://esm.sh/xlsx@0.18.5", () => ({ read: () => ({ SheetNames: [], Sheets: {} }), utils: { sheet_to_csv: () => "", sheet_to_json: () => [] } }));
 vi.mock("https://deno.land/std@0.168.0/http/server.ts", () => ({ serve: (fn: (r: Request) => Promise<Response>) => { h.estado.ultimo = fn; } }));
 
 const ENV: Record<string, string> = {

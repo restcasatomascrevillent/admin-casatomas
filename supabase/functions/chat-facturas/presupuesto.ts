@@ -21,7 +21,7 @@ const OPENAI = "https://api.openai.com/v1";
 
 /** Tope del fichero que se acepta (bytes, ya decodificado). */
 export const MAX_BYTES_PRESUPUESTO = 8 * 1024 * 1024;
-/** Líneas que se guardan como máximo (el resto se descarta con aviso). */
+/** Líneas que se guardan como máximo de un PDF o una foto (las hojas de cálculo no tienen tope: hoja.ts). */
 export const MAX_LINEAS_PRESUPUESTO = 150;
 
 export type TipoPresupuesto = "pdf" | "imagen" | "excel" | "csv";
@@ -35,6 +35,8 @@ export interface LineaPresupuesto {
   cantidad: number | null;
   /** Precio por `unidad`, SIN IVA, antes de descuentos. */
   precio: number;
+  /** Envases que trae ese precio (P6, 24U…): el historial por unidades se compara con precio / envases. */
+  envases?: number;
 }
 
 export interface PresupuestoLeido {
@@ -277,20 +279,29 @@ export function unirEmparejadas(
   });
 }
 
-/** La respuesta fija al adjuntar: SIEMPRE pregunta por el descuento antes de calcular nada. */
+/**
+ * La respuesta fija al adjuntar: SIEMPRE pregunta por el descuento antes de
+ * calcular nada y, si el fichero no dice de qué proveedor es, pregunta las dos
+ * cosas en una sola pregunta.
+ */
 export function mensajeTrasAdjuntar(p: {
   archivo: string;
   proveedor: string | null;
   lineas: number;
   queCompras: number;
   avisos: string[];
+  /** Hojas grandes: artículos que no se parecen a nada que se compre (solo se cuentan). */
+  noCompras?: number;
 }): string {
   const quien = p.proveedor ? ` de **${p.proveedor}**` : "";
-  const partes = [
-    `He leído el presupuesto «${p.archivo}»${quien}: ${p.lineas} producto${p.lineas === 1 ? "" : "s"}, ` +
-      `${p.queCompras} de ellos ya los compras.`,
-    ...p.avisos.map((a) => `Aviso: ${a}`),
-    "**¿Este proveedor te aplica algún descuento?** Dime un porcentaje (por ejemplo, 5 %), un importe sobre el total (por ejemplo, 120 €) o «ninguno», y te digo qué productos te interesan.",
-  ];
-  return partes.join("\n\n");
+  const fmt = (n: number) => n.toLocaleString("es-ES");
+  const resumen = p.noCompras != null
+    ? `He leído la tarifa «${p.archivo}»${quien}: ${fmt(p.lineas)} artículo${p.lineas === 1 ? "" : "s"}. ` +
+      `${fmt(p.queCompras)} se parecen a lo que compras; los otros ${fmt(p.noCompras)} son artículos que no compras.`
+    : `He leído el presupuesto «${p.archivo}»${quien}: ${p.lineas} producto${p.lineas === 1 ? "" : "s"}, ` +
+      `${p.queCompras} de ellos ya los compras.`;
+  const pregunta = p.proveedor
+    ? "**¿Este proveedor te aplica algún descuento?** Dime un porcentaje (por ejemplo, 5 %), un importe sobre el total (por ejemplo, 120 €) o «ninguno», y te digo qué productos te interesan."
+    : "**¿De qué proveedor es y te aplica algún descuento?** Dime el nombre y un porcentaje (por ejemplo, «Disbeya, 5 %»), un importe sobre el total o «ninguno», y te digo qué productos te interesan.";
+  return [resumen, ...p.avisos.map((a) => `Aviso: ${a}`), pregunta].join("\n\n");
 }

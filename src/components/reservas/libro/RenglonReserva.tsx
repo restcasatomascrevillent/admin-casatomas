@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { horaCorta } from "@/lib/reservas/ocupacionSalas";
-import { ESTADO_NO_SHOW, infoEstadoReserva } from "@/lib/reservas/estadosReserva";
+import { ESTADO_CANCELADA, ESTADO_NO_SHOW, infoEstadoReserva } from "@/lib/reservas/estadosReserva";
+import { textoCanceladaCorto } from "@/lib/reservas/cancelacion";
 import { textoCreadaCorta } from "@/lib/reservas/creada";
 
 // ============================================================================
@@ -22,6 +23,9 @@ export interface DatosRenglon {
   notas_cliente?: string | null;
   telefono?: string | null;
   created_at?: string | null;
+  /** «Quién canceló» (16/11/2026): se enseña bajo el nombre de las canceladas. */
+  cancelada_por?: string | null;
+  cancelada_at?: string | null;
 }
 
 interface Props {
@@ -42,11 +46,13 @@ export function RenglonReserva({ reserva: r, sala, resaltada = false, conTelefon
   const hora = horaCorta(r.hora) ?? r.hora;
   // Con teléfono (resultados y «Pendientes»), también cuándo se hizo (12/11/2026, petición del dueño).
   const debajo = [conTelefono ? r.telefono : null, conTelefono ? textoCreadaCorta(r) : null].filter(Boolean).join(" · ");
+  // 16/11/2026: en una cancelada, quién la canceló y cuándo («Cancelada por el cliente · 14/11 18:20»).
+  const cancelada = textoCanceladaCorto(r);
   const contenido = (
     <>
       <span className="font-semibold tabular-nums">{hora}</span>
       <span className="min-w-0">
-        <span className="block break-words font-medium leading-snug">{r.nombre || "Sin nombre"}</span>
+        <span className={cn("block break-words font-medium leading-snug", r.estado === ESTADO_CANCELADA && "text-muted-foreground line-through")}>{r.nombre || "Sin nombre"}</span>
         {/* Sin estado (lista de «Pendientes» con «Verificar»), en el móvil las personas van aquí debajo: así el nombre tiene
             sitio y no se parte letra a letra (12/11/2026, revisión móvil). */}
         {sinEstado ? (
@@ -55,6 +61,11 @@ export function RenglonReserva({ reserva: r, sala, resaltada = false, conTelefon
           </span>
         ) : null}
         {debajo ? <span className={cn("block truncate text-sm text-muted-foreground tabular-nums", sinEstado && "max-sm:hidden")}>{debajo}</span> : null}
+        {cancelada ? (
+          <span className="block text-sm font-medium text-red-700 dark:text-red-300" data-testid="quien-cancelo">
+            {cancelada}
+          </span>
+        ) : null}
         {r.notas_cliente ? <span className="block truncate text-sm text-amber-800 dark:text-amber-300">{r.notas_cliente}</span> : null}
       </span>
       <span className={cn("justify-self-end rounded-md border px-2 py-0.5 text-sm font-semibold tabular-nums", sinEstado && "max-sm:hidden")}>{r.numero_comensales} px</span>
@@ -82,6 +93,7 @@ export function RenglonReserva({ reserva: r, sala, resaltada = false, conTelefon
         "border-b border-border/60 last:border-b-0",
         accion && "flex items-center gap-2 pr-2",
         r.estado === ESTADO_NO_SHOW && "opacity-60",
+        r.estado === ESTADO_CANCELADA && "bg-muted/40",
         resaltada && "bg-amber-100 dark:bg-amber-900/30",
       )}
     >
@@ -90,7 +102,7 @@ export function RenglonReserva({ reserva: r, sala, resaltada = false, conTelefon
           type="button"
           className={cn(clases, "rounded-md hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}
           onClick={() => onAbrir(r.id)}
-          aria-label={`Abrir la reserva de ${r.nombre || "Sin nombre"}, ${hora}, ${r.numero_comensales} personas`}
+          aria-label={`Abrir la reserva de ${r.nombre || "Sin nombre"}, ${hora}, ${r.numero_comensales} personas${cancelada ? `, ${cancelada}` : ""}`}
         >
           {contenido}
         </button>

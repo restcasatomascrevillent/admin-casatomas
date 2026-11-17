@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
 import type { ReservaMesaServicio } from "@/lib/reservas/servicioSala";
+import { leerConCancelacion } from "@/lib/reservas/cancelacion";
 import { crearInvalidacionDiferida, REFRESCO_PERIODICO, vigilarCanal } from "@/lib/realtimeCanal";
 
 // ============================================================================
@@ -51,14 +52,16 @@ export function useReservasServicioDia(fecha: string | null | undefined, espacio
     queryKey: [CLAVE_RESERVAS_SERVICIO_DIA, fecha, espacioId ?? null],
     enabled: !!fecha,
     queryFn: async (): Promise<ReservaMesaServicio[]> => {
-      let q = (supabase.from("reservas" as any) as any)
-        .select(
-          "id, nombre, hora, numero_comensales, estado, espacio_id, telefono, email, importante, llegada_at, salida_at, notas_cliente, menu_del_dia",
-        )
-        .eq("fecha", fecha);
-      if (espacioId) q = q.eq("espacio_id", espacioId);
-
-      const { data, error } = await q;
+      // «Quién canceló» (16/11/2026): si el proyecto aún no tiene esas columnas, se lee sin ellas.
+      const { data, error } = await leerConCancelacion<unknown[]>((columnasCancelacion) => {
+        let q = (supabase.from("reservas" as any) as any)
+          .select(
+            `id, nombre, hora, numero_comensales, estado, espacio_id, telefono, email, importante, llegada_at, salida_at, notas_cliente, menu_del_dia${columnasCancelacion}`,
+          )
+          .eq("fecha", fecha);
+        if (espacioId) q = q.eq("espacio_id", espacioId);
+        return q;
+      });
       if (error) throw error;
       return ((data ?? []) as any[]).map((r) => ({
         id: r.id as string,
@@ -74,6 +77,8 @@ export function useReservasServicioDia(fecha: string | null | undefined, espacio
         salida_at: (r.salida_at as string | null) ?? null,
         notas_cliente: (r.notas_cliente as string | null) ?? null,
         menu_del_dia: (r.menu_del_dia as boolean | null) ?? null,
+        cancelada_por: (r.cancelada_por as string | null) ?? null,
+        cancelada_at: (r.cancelada_at as string | null) ?? null,
       }));
     },
   });

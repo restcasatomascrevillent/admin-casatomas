@@ -13,6 +13,8 @@ vi.mock("@/hooks/useMargenesCarta", () => ({
   useEdicionMargenes: () => edicion,
   useBuscarProductos: () => ({ data: [], isFetching: false }),
   useComprasProducto: () => ({ data: [], isLoading: false, isError: false }),
+  useCosteCartaVinos: () => ({ isLoading: true, isError: false, isFetching: true, data: undefined, error: null, refetch: () => undefined }),
+  useCandidatosVino: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
 import { MargenesCarta } from "../MargenesCarta";
@@ -200,5 +202,16 @@ describe("MargenesCarta", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Falta aplicar en Supabase la migración");
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(estado.refetch).toHaveBeenCalled();
+  });
+
+  it("la vista «Coste vinos» sustituye al resumen y a la gráfica por la tabla de costes", () => {
+    pintar();
+    fireEvent.click(screen.getByRole("radio", { name: "Coste de la carta de vinos" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Calculando el coste de cada vino…");
+    expect(screen.queryByTestId("margenes-resumen")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("margenes-lista")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Todos" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: /Vinos/ }));
+    expect(screen.getByTestId("margenes-resumen")).toBeInTheDocument();
   });
 });

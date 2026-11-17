@@ -2,6 +2,50 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.38.1] - 2026-11-16
+
+Objetivo: Presupuestos auditados: tabla completa desde el servidor, reglas de formato y tamaño, referencias y ahorro corregidos
+
+### Cambiado
+- Chat-facturas: presupuestos auditados — tabla completa desde el servidor, reglas de formato y referencias corregidas ([#241](https://github.com/restcasatomascrevillent/admin-casatomas/pull/241))
+
+## [1.38.0] - 2026-11-16
+
+Objetivo: Presupuestos en el chat: tarifas de cualquier tamaño, columnas automáticas y emparejado por texto + IA que mira formato y tamaño
+
+### Añadido
+- Chat-facturas: tarifas Excel/CSV de cualquier tamaño en el presupuesto ([#239](https://github.com/restcasatomascrevillent/admin-casatomas/pull/239))
+
+## [1.37.0] - 2026-11-16
+
+Objetivo: Unifica 1.35 y 1.36: quién canceló cada reserva, buscador de platos y botón de novedades, informe de auditoría sin cortes y fotos de la carta en Drive
+
+### Añadido
+- Carta: fotos de la carta en el árbol de Drive Platos/Vinos ([e9c3240](https://github.com/restcasatomascrevillent/admin-casatomas/commit/e9c3240b346a39d8f7fe2fe697a241d984339b9d))
+- Reservas: quién canceló cada reserva y canceladas a la vista en la Lista ([#228](https://github.com/restcasatomascrevillent/admin-casatomas/pull/228))
+
+### Cambiado
+- Novedades: el buscador de platos encuentra lo que se busca y enlazar un plato pone el botón ([#229](https://github.com/restcasatomascrevillent/admin-casatomas/pull/229))
+- Informes: el informe mensual de auditoría ya no se corta por tiempo ([#230](https://github.com/restcasatomascrevillent/admin-casatomas/pull/230))
+
+## [1.34.0] - 2026-11-16
+
+Objetivo: Facturas: OCR con reglas de la carga, embeddings por nombre, Drive, presupuestos y vinos por D.O. en el chat, gráfica de precios; fallos internos al Telegram
+
+### Añadido
+- Facturas: gráfica de precio con eje y detalle; «Comparar facturas» abre en la hoja del producto ([#213](https://github.com/restcasatomascrevillent/admin-casatomas/pull/213))
+- Chat-facturas: vinos por denominación de origen (Rioja, Ribera, gallegos…) ([#214](https://github.com/restcasatomascrevillent/admin-casatomas/pull/214))
+- Facturas: el OCR diario aplica las reglas de la carga histórica ([#216](https://github.com/restcasatomascrevillent/admin-casatomas/pull/216))
+- Facturas: un embedding por nombre de producto en halfvec (BD -40 % en demo) ([#217](https://github.com/restcasatomascrevillent/admin-casatomas/pull/217))
+- Facturas: subir-original-drive, subida del histórico 2025 a Drive sin tocar la BD ([#218](https://github.com/restcasatomascrevillent/admin-casatomas/pull/218))
+- Avisos: fallos internos al Telegram de desarrolladores ([#177](https://github.com/restcasatomascrevillent/admin-casatomas/pull/177))
+- Facturas: el chat compara un presupuesto de proveedor ([#219](https://github.com/restcasatomascrevillent/admin-casatomas/pull/219))
+- Facturas: el cron de embeddings rellena también facturas.embedding ([#224](https://github.com/restcasatomascrevillent/admin-casatomas/pull/224))
+
+### Cambiado
+- Facturas: la importación no da por duplicadas dos facturas con números distintos ([#215](https://github.com/restcasatomascrevillent/admin-casatomas/pull/215))
+- Migraciones: versión repetida 20261127100000 (fallos internos Telegram) ([#220](https://github.com/restcasatomascrevillent/admin-casatomas/pull/220))
+
 ## [1.33.1] - 2026-11-16
 
 Objetivo: El check «Candidata en preview» de las releases encuentra la preview de Vercel

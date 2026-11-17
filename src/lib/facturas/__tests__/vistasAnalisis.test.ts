@@ -25,7 +25,7 @@ const dec = () => normalizarDecision(RESPUESTA);
 
 describe("vistas", () => {
   it("seis vistas, «Qué decidir hoy» por defecto; la de la URL manda sobre la recordada", () => {
-    expect(VISTAS.map((v) => v.etiqueta)).toEqual(["Qué decidir hoy", "Precios", "Ahorro", "Gasto", "Proveedores", "Por revisar"]);
+    expect(VISTAS.map((v) => v.etiqueta)).toEqual(["Qué decidir hoy", "Precios", "Ahorro", "Gasto", "Proveedores", "Por revisar", "Subidas y proveedor"]);
     expect(vistaInicial(new URLSearchParams(), null)).toBe("decidir");
     expect(vistaInicial(new URLSearchParams(), "gasto")).toBe("gasto");
     expect(vistaInicial(new URLSearchParams("vista=precios"), "gasto")).toBe("precios");

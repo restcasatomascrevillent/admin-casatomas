@@ -143,7 +143,7 @@ describe("TOOLS", () => {
     // +174, ~45 tokens por ronda).
     // 11.9xx con margenes_carta y alertas_precio (16/11/2026: margenes de la carta y avisos de
     // Analisis; +1.310, ~330 tokens por ronda; las pautas de lectura van en "como_leer" del resultado).
-    expect(tamano).toBeLessThan(13_000); // + denominacion (15/11/2026) + comparar_presupuesto (16/11/2026); + IRPF (07/11/2026) + proveedor en compras_producto (23/11/2026)
+    expect(tamano).toBeLessThan(13_100); // + subidas_anuales y proveedor_barato en alertas_precio (16/11/2026, +93, ~25 tokens por ronda); + denominacion (15/11/2026) + comparar_presupuesto (16/11/2026); + IRPF (07/11/2026) + proveedor en compras_producto (23/11/2026)
     for (const t of TOOLS) expect(t.function.description.length, t.function.name).toBeLessThan(330);
   });
 });
@@ -736,7 +736,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
     expect(p).toMatch(/Con convertido_desde di «convertido desde caja de 10 kg»/);
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(13_000); // + denominacion (15/11/2026) 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(13_100); // + informe de subidas y proveedor en alertas_precio (16/11/2026, +93) + + denominacion (15/11/2026) 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
 });
 
@@ -770,7 +770,7 @@ describe("ronda 9 (10/10/2026, migracion 20261010170000)", () => {
 
   it("tamaños: el prompt y TOOLS no crecen respecto a la ronda 8 (5.728 y 9.620 caracteres)", () => {
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(13_000); // + denominacion (15/11/2026) 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(13_100); // + informe de subidas y proveedor en alertas_precio (16/11/2026, +93) + + denominacion (15/11/2026) 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
   });
 });
 
@@ -936,6 +936,23 @@ describe("margenes_carta y alertas_precio (16/11/2026, migracion 20261116100000)
     expect(sube).toMatchObject({
       params: { p_tipo: "sube", p_producto: "percebe", p_local: "touza", p_desde: "2026-10-01", p_hasta: "2026-10-31", p_limite: 12 },
     });
+  });
+
+  it("alertas_precio: subidas_anuales y proveedor_barato usan las RPC del informe fijo (20261207110000)", () => {
+    const sub = prepararLlamada("alertas_precio", { tipo: "subidas_anuales", producto: null, local: "touza", desde: null, hasta: null });
+    expect(sub).toMatchObject({
+      tipo: "rpc",
+      rpc: "informe_subidas_precio",
+      params: { p_meses: 12, p_proveedor_id: null, p_familia_id: null, p_local: "touza", p_limite: 8, p_desde: 0, p_compacto: true },
+      limite: null,
+      maxChars: 9000,
+    });
+    const bar = prepararLlamada("alertas_precio", { tipo: "proveedor_barato", producto: null, local: null, desde: null, hasta: null });
+    expect(bar).toMatchObject({ rpc: "informe_proveedor_mas_barato", params: { p_local: null, p_limite: 8, p_compacto: true } });
+    expect(bar.params).not.toHaveProperty("p_meses");
+    const def = TOOLS.find((t) => t.function.name === "alertas_precio");
+    expect(JSON.stringify(def)).toContain("subidas_anuales");
+    expect(JSON.stringify(def)).toContain("proveedor_barato");
   });
 
   it("alertas_precio valida tipo y fechas", () => {
