@@ -310,7 +310,7 @@ const reserva = (id: string, fecha: string, nombre: string, estado = "pendiente"
   notas_cliente: null,
 });
 
-describe("ListaComoLibro · buscador y «Pendientes»", () => {
+describe("ListaComoLibro · buscador, «Canceladas» y sin «Pendientes»", () => {
   it("al escribir 2 letras busca en todo el histórico, agrupa por día y abre la reserva al tocarla", () => {
     h.encontradas = [reserva("r1", "2026-12-01", "Lucía Pérez", "confirmada"), reserva("r2", "2025-03-14", "Lucía Gómez", "completada")];
     render(<ListaComoLibro />);
@@ -344,21 +344,18 @@ describe("ListaComoLibro · buscador y «Pendientes»", () => {
     expect(screen.getByText("No hay ninguna reserva con ese nombre, teléfono o email.")).toBeInTheDocument();
   });
 
-  it("«Pendientes» cuenta las pendientes, las enseña al pulsarlo y vuelve a la hoja al quitarlo", () => {
-    h.porEstado.pendiente = [reserva("p1", hoy, "Ana"), reserva("p2", pasarHoja(hoy, 2), "Berta")];
+  it("ya no hay botón «Pendientes» (CAS-9, 17/11/2026: lo pendiente se verifica desde Reservas › Avisos)", () => {
+    h.porEstado.pendiente = [reserva("p1", hoy, "Ana")];
     render(<ListaComoLibro />);
-    const boton = screen.getByRole("button", { name: /Pendientes/ });
-    expect(boton).toHaveTextContent("2");
-    expect(boton).toHaveAttribute("aria-pressed", "false");
-    fireEvent.click(boton);
-    expect(boton).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: /Pendientes/ })).toBeNull();
+  });
+
+  it("un enlace antiguo con `?status=pendiente` sigue abriendo las pendientes, con «Verificar» en cada fila", () => {
+    h.porEstado.pendiente = [reserva("p1", hoy, "Ana"), reserva("p2", pasarHoja(hoy, 2), "Berta")];
+    render(<ListaComoLibro estadoInicial="pendiente" />);
     expect(screen.getByRole("heading", { name: /Pendientes de verificar/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Abrir la reserva de Berta/ })).toBeInTheDocument();
-    // «Verificar» en cada fila (12/11/2026): verifica sin abrir la ficha.
     fireEvent.click(screen.getByRole("button", { name: "Verificar la reserva de Berta" }));
     expect(h.aceptar).toHaveBeenCalledWith(expect.objectContaining({ id: "p2", estado: "pendiente" }));
-    fireEvent.click(boton);
-    expect(hojas()[0]).toHaveAccessibleName(`Hoja del ${tituloHoja(hoy)}`);
   });
 
   it("«Canceladas» enseña las canceladas desde hoy con quién canceló, y vuelve a la hoja al quitarlo (16/11/2026)", () => {
@@ -376,10 +373,6 @@ describe("ListaComoLibro · buscador y «Pendientes»", () => {
       "Cancelada por el cliente · 14/11 18:20",
       "Cancelada por el restaurante · 15/11 10:05",
     ]);
-    // «Pendientes» y «Canceladas» se excluyen entre sí.
-    fireEvent.click(screen.getByRole("button", { name: /Pendientes/ }));
-    expect(boton).toHaveAttribute("aria-pressed", "false");
-    fireEvent.click(boton);
     fireEvent.click(boton);
     expect(hojas()[0]).toHaveAccessibleName(`Hoja del ${tituloHoja(hoy)}`);
   });

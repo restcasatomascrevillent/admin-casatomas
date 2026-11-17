@@ -1,12 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Bell, CheckCheck, ChevronDown, ExternalLink, Info, Volume2 } from "lucide-react";
+import { Bell, CheckCheck, CheckCircle2, ChevronDown, ExternalLink, Info, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAvisosSeccion, useContadorAvisosSeccion, type FiltrosAvisosSeccion } from "@/hooks/useAvisosSeccion";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
-import { agruparPorDia, EVENTO_ABRIR_AVISOS, horaAviso, rutaDeAviso, SECCIONES_AVISOS, TIPO_ICON, type SeccionAvisos } from "@/lib/avisos";
+import { agruparPorDia, EVENTO_ABRIR_AVISOS, horaAviso, PARAM_ABRIR_AVISOS, reservaDeAviso, rutaDeAviso, SECCIONES_AVISOS, TIPO_ICON, type SeccionAvisos } from "@/lib/avisos";
 import { cn } from "@/lib/utils";
-import { EstadoReservaAviso, useEstadosReservasAvisos } from "@/hooks/useEstadosReservasAvisos";
+import { EstadoReservaAviso, useReservasAvisos } from "@/hooks/useEstadosReservasAvisos";
+import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import { useSearchParams } from "react-router-dom";
 import { useAbrirAviso } from "@/hooks/useAbrirAviso";
 import { AjustesAvisosEnVivo } from "@/components/notificaciones/AvisosEnVivo";
 import { useEstadoAvisosEnVivo } from "@/hooks/useAvisosEnVivo";
@@ -32,6 +35,20 @@ export function BotonAvisosSeccion({ seccion, className, compacto = false }: { s
     window.addEventListener(EVENTO_ABRIR_AVISOS, alAbrir);
     return () => window.removeEventListener(EVENTO_ABRIR_AVISOS, alAbrir);
   }, [seccion]);
+  // `?avisos=reservas` en la URL (CAS-9, 17/11/2026): los avisos de reservas del Dashboard traen aquí, con el
+  // modal ya abierto. Se abre una vez y se quita de la URL (atrás no lo vuelve a abrir).
+  const [params, setParams] = useSearchParams();
+  const pedido = params.get(PARAM_ABRIR_AVISOS) === seccion;
+  useEffect(() => {
+    if (!pedido) return;
+    setAbierto(true);
+    if (seccion === "reservas") avisosEnVivo.marcarVistos();
+    setParams((p) => {
+      const n = new URLSearchParams(p);
+      n.delete(PARAM_ABRIR_AVISOS);
+      return n;
+    }, { replace: true });
+  }, [pedido, seccion, setParams]);
   const pendientes = useContadorAvisosSeccion(seccion);
   const conPendientes = pendientes > 0;
   // En Reservas, late mientras haya algo nuevo sin mirar (AvisosEnVivo); abrirlo lo da por visto.
@@ -85,6 +102,25 @@ export function BotonAvisosSeccion({ seccion, className, compacto = false }: { s
   );
 }
 
+/**
+ * Color de cada fila en los avisos de Reservas (CAS-9, 17/11/2026, petición del dueño: «diferentes tipos de colores
+ * de filas»): azul la reserva nueva (hay que verificarla), rojo la cancelada (solo revisar). Revisada, más clara.
+ */
+const TONO_AVISO_RESERVA: Record<string, { borde: string; fondo: string; fondoRevisado: string; icono: string }> = {
+  reserva_nueva: {
+    borde: "border-l-sky-500",
+    fondo: "bg-sky-50 dark:bg-sky-950/40",
+    fondoRevisado: "bg-sky-50/40 dark:bg-sky-950/15",
+    icono: "text-sky-700 dark:text-sky-300",
+  },
+  reserva_cancelada: {
+    borde: "border-l-red-500",
+    fondo: "bg-red-50 dark:bg-red-950/40",
+    fondoRevisado: "bg-red-50/40 dark:bg-red-950/15",
+    icono: "text-red-700 dark:text-red-300",
+  },
+};
+
 function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
@@ -126,16 +162,31 @@ function ModalAvisos({
   const { avisos, loading, cargandoMas, hayMas, error, cargarMas, marcarRevisado, marcarTodosRevisados } =
     useAvisosSeccion(seccion, filtros, abierto);
   const grupos = agruparPorDia(avisos);
-  // Estado actual de cada reserva avisada (12/11/2026, petición del dueño).
-  const estados = useEstadosReservasAvisos(avisos);
+  // Cada reserva avisada (12/11/2026: su estado; 17/11/2026, CAS-9: también lo que necesita «Verificar»).
+  const reservas = useReservasAvisos(avisos);
+  const estados = new Map([...reservas].map(([id, r]) => [id, r.estado]));
+  const { canAccess: puedeEditarReservas } = useCanAccessSection("reservas", "edit");
+  const { aceptar, estaEnCurso } = useAccionesServicioReserva();
+  const esReservas = seccion === "reservas";
   const haySinRevisar = avisos.some((n) => !n.leida) || pendientes > 0;
   const etiquetaTipo = (tipo: string) => config.tipos.find((t) => t.tipo === tipo)?.etiqueta ?? tipo;
 
   const irAlOrigen = (n: NotificacionDashboard) => {
-    void marcarRevisado(n.id);
+    // En Reservas «Ver» solo enseña la reserva: el aviso se cierra con «Verificar» o «Revisado» (CAS-9). En el
+    // resto de secciones, ir al origen lo da por revisado, como siempre.
+    if (!esReservas) void marcarRevisado(n.id);
     // La ficha de una reserva se abre encima y el modal sigue debajo; ir a otra pantalla lo cierra.
     if (!abreFicha(n)) onAbiertoChange(false);
     abrirAviso(n);
+  };
+
+  /** «Verificar» desde el aviso (CAS-9): la misma acción que en la ficha (correo al cliente) y el aviso queda revisado. */
+  const verificarDesdeAviso = async (n: NotificacionDashboard) => {
+    const id = reservaDeAviso(n);
+    const reserva = id ? reservas.get(id) : undefined;
+    if (!reserva) return;
+    const r = await aceptar(reserva);
+    if (r.ok) void marcarRevisado(n.id);
   };
 
   return (
@@ -147,9 +198,17 @@ function ModalAvisos({
             {config.titulo}
           </DialogTitle>
           <DialogDescription>
-            {pendientes > 0 ? `${pendientes} sin revisar.` : "Ninguno sin revisar."} Pulsa un aviso para ir a lo que lo
-            ha generado.
+            {pendientes > 0 ? `${pendientes} sin revisar.` : "Ninguno sin revisar."}{" "}
+            {esReservas
+              ? "«Verificar» confirma la reserva al cliente y quita el aviso; «Ver» abre la reserva."
+              : "Pulsa un aviso para ir a lo que lo ha generado."}
           </DialogDescription>
+          {esReservas && (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" data-testid="leyenda-avisos-reservas">
+              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border-l-4 border-l-sky-500 bg-sky-100 dark:bg-sky-900/60" aria-hidden="true" />Reserva nueva: verificar</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border-l-4 border-l-red-500 bg-red-100 dark:bg-red-900/60" aria-hidden="true" />Cancelada: revisar</span>
+            </p>
+          )}
         </DialogHeader>
 
         {/* Sonido y avisos del ordenador, plegados (12/11/2026, captura del dueño en el móvil: ocupaban media pantalla). */}
@@ -235,10 +294,23 @@ function ModalAvisos({
                     {g.items.map((n) => {
                       const Icono = TIPO_ICON[n.tipo] || Info;
                       const ruta = rutaDeAviso(n);
+                      const tono = esReservas ? TONO_AVISO_RESERVA[n.tipo] : undefined;
+                      const idReserva = reservaDeAviso(n);
+                      const reserva = idReserva ? reservas.get(idReserva) : undefined;
+                      // «Verificar» solo en una reserva nueva que sigue pendiente (y con permiso de editar). Ya verificada,
+                      // confirmada o cancelada no hay nada que verificar: queda «Revisado».
+                      const conVerificar = esReservas && n.tipo === "reserva_nueva" && puedeEditarReservas && reserva?.estado === "pendiente";
                       return (
-                        <li key={n.id} className={cn("flex flex-wrap items-start gap-x-3 gap-y-2 p-3", !n.leida && "bg-destructive/5")}>
+                        <li
+                          key={n.id}
+                          data-tipo-aviso={n.tipo}
+                          className={cn(
+                            "flex flex-wrap items-start gap-x-3 gap-y-2 p-3",
+                            tono ? cn("border-l-4", tono.borde, !n.leida ? tono.fondo : tono.fondoRevisado) : !n.leida && "bg-destructive/5",
+                          )}
+                        >
                           <Icono
-                            className={cn("mt-0.5 h-4 w-4 shrink-0", !n.leida ? "text-destructive" : "text-muted-foreground")}
+                            className={cn("mt-0.5 h-4 w-4 shrink-0", tono ? tono.icono : !n.leida ? "text-destructive" : "text-muted-foreground")}
                             aria-hidden="true"
                           />
                           {/* En el móvil el texto ocupa toda la fila y los botones bajan debajo (antes se estrujaba en una columna). */}
@@ -260,16 +332,29 @@ function ModalAvisos({
                                 Ver
                               </Button>
                             )}
-                            {!n.leida && (
+                            {conVerificar ? (
                               <Button
-                                variant="ghost"
                                 size="sm"
-                                className="h-9 gap-1"
-                                onClick={() => void marcarRevisado(n.id)}
-                                aria-label={`Marcar como revisado: ${n.titulo}`}
+                                className="h-9 gap-1 bg-emerald-600 font-semibold text-white hover:bg-emerald-700"
+                                disabled={!reserva || estaEnCurso(reserva.id)}
+                                onClick={() => void verificarDesdeAviso(n)}
+                                aria-label={`Verificar la reserva: ${n.titulo}${n.mensaje ? `, ${n.mensaje}` : ""}`}
                               >
-                                Revisado
+                                <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                Verificar
                               </Button>
+                            ) : (
+                              !n.leida && (
+                                <Button
+                                  variant={tono ? "outline" : "ghost"}
+                                  size="sm"
+                                  className="h-9 gap-1"
+                                  onClick={() => void marcarRevisado(n.id)}
+                                  aria-label={`Marcar como revisado: ${n.titulo}`}
+                                >
+                                  Revisado
+                                </Button>
+                              )
                             )}
                           </div>
                         </li>

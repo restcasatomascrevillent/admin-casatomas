@@ -144,6 +144,19 @@ describe("Avisos", () => {
     expect(ubicacion.actual).toBe("/facturas?tab=compras&modo=documentos&doc=383");
   });
 
+  it("CAS-9: una reserva nueva o cancelada lleva a Reservas › Avisos (sin darla por revisada ni «✓»)", () => {
+    h.permisos = { reservas: true };
+    h.notificaciones = [
+      aviso("n1", "reserva_nueva", { referencia_tipo: "reserva", referencia_id: "res-r1" }),
+      aviso("c1", "reserva_cancelada", { referencia_tipo: "reserva", referencia_id: "res-r2" }),
+    ];
+    pintar(<AvisosDashboard />);
+    expect(screen.queryByRole("button", { name: /Marcar como revisado/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Ir a los avisos de reservas: Aviso n1" }));
+    expect(ubicacion.actual).toBe("/reservas?avisos=reservas");
+    expect(h.marcarLeida).not.toHaveBeenCalled();
+  });
+
   it("sin nada que pueda ver: «No hay avisos», y siempre el enlace a la página Avisos", () => {
     h.facturas = false;
     pintar(<AvisosDashboard />);

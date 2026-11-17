@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Ban, CalendarIcon, ChevronLeft, ChevronRight, Clock, Plus, Search, X } from "lucide-react";
+import { Ban, CalendarIcon, ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,6 @@ import { etiquetaEstadoReserva } from "@/lib/reservas/estadosReserva";
 import { MIN_LETRAS_BUSQUEDA, useBuscarReservas, useReservasPorEstado } from "@/hooks/useBusquedaReservas";
 import { ReservasDeLaHoja } from "./ReservasDeLaHoja";
 import { ResultadosLista } from "./ResultadosLista";
-import { clasesBotonPendientes, clasesNumeroPendientes } from "./BotonPendientes";
 
 // ============================================================================
 // LA LISTA COMO EL LIBRO (10/11/2026, petición del dueño: «hacer o simular como
@@ -35,7 +34,8 @@ const ALTURA_MINIMA_LIBRO = 360;
 interface Props {
   /**
    * Un estado que llega de un aviso o de un enlace (`?status=`): la Lista abre esas reservas de hoy en
-   * adelante en vez de la hoja del día. «pendiente» es el botón «Pendientes».
+   * adelante en vez de la hoja del día (p. ej. `?status=pendiente` de un enlace antiguo). El botón «Pendientes»
+   * se quitó el 17/11/2026 (CAS-9, petición del dueño): lo pendiente se verifica desde Reservas › Avisos.
    */
   estadoInicial?: string | null;
   /**
@@ -95,16 +95,13 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
   const [bloque, setBloque] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(bloque, ALTURA_MINIMA_LIBRO);
   const [resaltada, setResaltada] = useState<string | null>(null);
-  // Buscador (todo el histórico) y «Pendientes» / estado del aviso. Con cualquiera de los dos se ven
+  // Buscador (todo el histórico) y «Canceladas» / estado del enlace. Con cualquiera de los dos se ven
   // los resultados en lugar de la hoja; «Ver el día» o quitarlos vuelve a la hoja.
   const [texto, setTexto] = useState("");
   const [estado, setEstado] = useState<string | null>(estadoInicial);
   const busqueda = useBuscarReservas(texto);
-  const pendientes = useReservasPorEstado("pendiente");
-  const otroEstado = useReservasPorEstado(estado && estado !== "pendiente" ? estado : null);
-  const porEstado = estado === "pendiente" ? pendientes : otroEstado;
+  const porEstado = useReservasPorEstado(estado);
   const buscando = texto.trim().length >= MIN_LETRAS_BUSQUEDA;
-  const numPendientes = pendientes.data?.length ?? 0;
 
   const irA = (clave: string) => {
     setTexto("");
@@ -196,21 +193,6 @@ export function ListaComoLibro({ estadoInicial = null, onAnadirReserva, resaltar
               </button>
             )}
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className={cn("h-11 gap-2 text-base", clasesBotonPendientes(estado === "pendiente"))}
-            aria-pressed={estado === "pendiente"}
-            onClick={() => {
-              setTexto("");
-              setEstado((e) => (e === "pendiente" ? null : "pendiente"));
-            }}
-          >
-            <Clock className="h-4 w-4" /> Pendientes
-            <span className={clasesNumeroPendientes(numPendientes, estado === "pendiente")}>
-              {numPendientes}
-            </span>
-          </Button>
           {/* 16/11/2026 («filtrar o distinguir activas y canceladas»): las canceladas de hoy en adelante, con quién
               canceló cada una. Las de un día concreto están al final de su hoja. */}
           <Button

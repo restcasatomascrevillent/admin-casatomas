@@ -168,6 +168,16 @@ export function avisoCaducado(n: Pick<NotificacionDashboard, "caduca_en">, ahora
   return Number.isFinite(t) && t <= ahora;
 }
 
+/**
+ * Parámetro de la URL que abre el modal «Avisos» de una sección al llegar (`?avisos=reservas`). Lo usan los
+ * avisos de reservas del Dashboard (CAS-9, 17/11/2026): llevan a Reservas › Avisos, donde se verifican.
+ */
+export const PARAM_ABRIR_AVISOS = "avisos";
+export const rutaAvisosReservas = () => `/reservas?${PARAM_ABRIR_AVISOS}=reservas`;
+/** Avisos que se atienden en Reservas › Avisos (reservas nuevas y canceladas). */
+export const esAvisoDeReservas = (n: { tipo: string; referencia_tipo?: string | null }) =>
+  n.referencia_tipo === "reserva" && tiposDeSeccion("reservas").includes(n.tipo);
+
 /** Evento para abrir el modal «Avisos» de una sección desde otro sitio («Ver todas» de Análisis). */
 export const EVENTO_ABRIR_AVISOS = "abrir-avisos-seccion";
 export function abrirAvisosSeccion(seccion: SeccionAvisos) {

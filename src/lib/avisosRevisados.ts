@@ -31,3 +31,30 @@ export async function marcarAvisosRevisados(filtro: { ids?: string[]; tipos?: re
   });
   return { marcados: typeof data === "number" ? data : 0, error };
 }
+
+/** Tipos de aviso que se dan por revisados al responder a la reserva (verificarla o rechazarla). */
+export const TIPOS_AVISO_AL_RESPONDER_RESERVA: readonly string[] = ["reserva_nueva"];
+
+/**
+ * Da por revisados los avisos sin revisar de UNA reserva (CAS-9, 17/11/2026, petición del dueño: «tenemos
+ * que darle a los dos botones para que se quite»). Al verificar o rechazar una reserva desde cualquier sitio
+ * (ficha, Lista, avisos), su aviso «Reserva nueva» deja de contar: ya está atendida. Nunca falla: es un
+ * extra de la acción, no debe estropearla. Devuelve cuántos ha marcado.
+ */
+export async function marcarAvisosDeReserva(reservaId: string, tipos: readonly string[] = TIPOS_AVISO_AL_RESPONDER_RESERVA): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .from("notificaciones_dashboard")
+      .select("id")
+      .eq("referencia_tipo", "reserva")
+      .eq("referencia_id", reservaId)
+      .eq("leida", false)
+      .in("tipo", [...tipos]);
+    const ids = ((data ?? []) as Array<{ id: string }>).map((n) => n.id);
+    if (error || !ids.length) return 0;
+    const r = await marcarAvisosRevisados({ ids });
+    return r.error ? 0 : r.marcados;
+  } catch {
+    return 0;
+  }
+}

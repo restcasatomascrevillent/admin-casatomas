@@ -11,14 +11,22 @@ const bd = vi.hoisted(() => ({
 }));
 // «Ver» en una reserva abre su ficha en un modal si se pueden editar reservas (11/11/2026, `useAbrirAviso`).
 const permiso = vi.hoisted(() => ({ editaReservas: false }));
-// Estado de las reservas avisadas (12/11/2026): se prueba aparte; aquí sin consulta.
+// Las reservas avisadas (12/11/2026: su estado; 17/11/2026, CAS-9: los datos para «Verificar»): sin consulta.
+const reservasAvisadas = vi.hoisted(() => ({ estado: "pendiente" }));
 vi.mock("@/hooks/useEstadosReservasAvisos", () => ({
-  useEstadosReservasAvisos: () => new Map([["res-r1", "pendiente"]]),
+  useEstadosReservasAvisos: () => new Map([["res-r1", reservasAvisadas.estado]]),
+  useReservasAvisos: () =>
+    new Map([["res-r1", { id: "res-r1", nombre: "Lucía", telefono: null, email: "lucia@x.test", fecha: "2026-12-01", hora: "21:00:00", numero_comensales: 2, estado: reservasAvisadas.estado, notas_cliente: null, espacio_id: null, canal: "web" }]]),
   EstadoReservaAviso: ({ aviso, estados }: { aviso: { referencia_id?: string | null }; estados: Map<string, string> }) =>
     aviso.referencia_id && estados.get(aviso.referencia_id) ? <span data-testid="estado-reserva-aviso">{estados.get(aviso.referencia_id)}</span> : null,
 }));
 vi.mock("@/hooks/useUserRole", () => ({
   useCanAccessSection: () => ({ canAccess: permiso.editaReservas, loading: false }),
+}));
+// «Verificar» desde el aviso usa la acción de siempre (correo al cliente): aquí se simula.
+const acciones = vi.hoisted(() => ({ aceptar: vi.fn(async (_r: { id: string }) => ({ ok: true })) }));
+vi.mock("@/hooks/useAccionesServicioReserva", () => ({
+  useAccionesServicioReserva: () => ({ aceptar: acciones.aceptar, estaEnCurso: () => false }),
 }));
 vi.mock("@/components/reservas/EditarReservaDialog", () => ({
   EditarReservaDialog: ({ reservaId }: { reservaId: string }) => <div data-testid="ficha-reserva">{reservaId}</div>,
@@ -64,9 +72,9 @@ const aviso = (id: string, tipo: string, leida = false, extra: Record<string, un
   ({ id, tipo, titulo: `Aviso ${id}`, mensaje: null, leida, created_at: hoy, referencia_tipo: null, referencia_id: null, ...extra });
 
 const Ruta = () => <p data-testid="ruta">{useLocation().pathname + useLocation().search}</p>;
-const pintar = (seccion: "reservas" | "facturas") =>
+const pintar = (seccion: "reservas" | "facturas", inicio = "/inicio") =>
   render(
-    <MemoryRouter initialEntries={["/inicio"]}>
+    <MemoryRouter initialEntries={[inicio]}>
       <BotonAvisosSeccion seccion={seccion} />
       <Routes><Route path="*" element={<Ruta />} /></Routes>
     </MemoryRouter>,
@@ -74,6 +82,8 @@ const pintar = (seccion: "reservas" | "facturas") =>
 
 beforeEach(() => {
   bd.revisados = [];
+  reservasAvisadas.estado = "pendiente";
+  acciones.aceptar.mockClear();
   bd.filas = [
     aviso("r1", "reserva_nueva", false, { referencia_tipo: "reserva", referencia_id: "res-r1" }),
     aviso("r2", "reserva_cancelada", false, { referencia_tipo: "reserva" }),
@@ -152,14 +162,28 @@ describe("Botón «Avisos» de cada sección", () => {
     }
   });
 
-  it("«Ver» lleva al origen del aviso, lo marca revisado y cierra el modal", async () => {
+  it("Reservas sin permiso de editar: «Ver» lleva al origen y cierra el modal, pero NO da el aviso por revisado (CAS-9)", async () => {
     pintar("reservas");
     fireEvent.click(await screen.findByRole("button", { name: "Avisos: 2 sin revisar" }));
     const modal = await screen.findByRole("dialog");
     fireEvent.click(await within(modal).findByRole("button", { name: "Ver: Aviso r1" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByTestId("ruta")).toHaveTextContent("/reservas?tab=reservas");
-    expect(bd.revisados[0]).toEqual({ p_ids: ["r1"], p_tipos: null });
+    expect(bd.revisados).toEqual([]);
+  });
+
+  it("Facturas: «Ver» sigue dando el aviso por revisado al ir a su origen", async () => {
+    pintar("facturas");
+    fireEvent.click(await screen.findByRole("button", { name: "Avisos: 1 sin revisar" }));
+    const modal = await screen.findByRole("dialog");
+    const ver = within(modal).queryByRole("button", { name: "Ver: Aviso f1" });
+    if (ver) {
+      fireEvent.click(ver);
+      await waitFor(() => expect(bd.revisados[0]).toEqual({ p_ids: ["f1"], p_tipos: null }));
+    } else {
+      // Sin ruta de origen no hay «Ver»: queda «Revisado».
+      expect(within(modal).getByRole("button", { name: "Marcar como revisado: Aviso f1" })).toBeInTheDocument();
+    }
   });
 
   it("con permiso de editar reservas, «Ver» en una reserva abre su ficha encima y el modal sigue abierto", async () => {
@@ -173,9 +197,107 @@ describe("Botón «Avisos» de cada sección", () => {
       fireEvent.click(await within(modal).findByRole("button", { name: "Ver: Aviso r1" }));
       expect(await screen.findByTestId("ficha-reserva")).toHaveTextContent("res-r1");
       expect(screen.getByRole("dialog")).toBeInTheDocument();
-      expect(bd.revisados[0]).toEqual({ p_ids: ["r1"], p_tipos: null });
+      // «Ver» solo enseña la reserva: el aviso se cierra con «Verificar» o «Revisado» (CAS-9).
+      expect(bd.revisados).toEqual([]);
     } finally {
       permiso.editaReservas = false;
     }
+  });
+});
+
+describe("Reservas › Avisos: colores, «Verificar» y «Revisado» (CAS-9, 17/11/2026)", () => {
+  const abrir = async () => {
+    pintar("reservas");
+    fireEvent.click(await screen.findByRole("button", { name: "Avisos: 2 sin revisar" }));
+    const modal = await screen.findByRole("dialog", { name: /Avisos de reservas/ });
+    await waitFor(() => expect(within(modal).getAllByRole("listitem")).toHaveLength(2));
+    return modal;
+  };
+  const fila = (modal: HTMLElement, texto: string) => within(modal).getByText(texto).closest("li") as HTMLElement;
+
+  it("cada tipo tiene su color de fila y su leyenda: azul la reserva nueva, rojo la cancelada", async () => {
+    const modal = await abrir();
+    expect(within(modal).getByTestId("leyenda-avisos-reservas")).toHaveTextContent(/Reserva nueva: verificar.*Cancelada: revisar/);
+    expect(fila(modal, "Aviso r1")).toHaveAttribute("data-tipo-aviso", "reserva_nueva");
+    expect(fila(modal, "Aviso r1").className).toMatch(/border-l-sky-500/);
+    expect(fila(modal, "Aviso r2")).toHaveAttribute("data-tipo-aviso", "reserva_cancelada");
+    expect(fila(modal, "Aviso r2").className).toMatch(/border-l-red-500/);
+  });
+
+  it("reserva nueva pendiente: «Ver» y «Verificar» (sin «Revisado»); cancelada: «Ver» y «Revisado»", async () => {
+    permiso.editaReservas = true;
+    try {
+      const modal = await abrir();
+      const nueva = within(fila(modal, "Aviso r1"));
+      expect(nueva.getByRole("button", { name: "Ver: Aviso r1" })).toBeInTheDocument();
+      expect(nueva.getByRole("button", { name: /^Verificar la reserva: Aviso r1/ })).toBeInTheDocument();
+      expect(nueva.queryByRole("button", { name: /Marcar como revisado/ })).toBeNull();
+      const cancelada = within(fila(modal, "Aviso r2"));
+      expect(cancelada.getByRole("button", { name: "Marcar como revisado: Aviso r2" })).toBeInTheDocument();
+      expect(cancelada.queryByRole("button", { name: /^Verificar/ })).toBeNull();
+    } finally {
+      permiso.editaReservas = false;
+    }
+  });
+
+  it("«Verificar» verifica la reserva (correo al cliente) y deja el aviso revisado: un solo botón", async () => {
+    permiso.editaReservas = true;
+    try {
+      const modal = await abrir();
+      fireEvent.click(within(modal).getByRole("button", { name: /^Verificar la reserva: Aviso r1/ }));
+      await waitFor(() => expect(acciones.aceptar).toHaveBeenCalledWith(expect.objectContaining({ id: "res-r1", estado: "pendiente", email: "lucia@x.test" })));
+      await waitFor(() => expect(bd.revisados).toEqual([{ p_ids: ["r1"], p_tipos: null }]));
+      await waitFor(() => expect(within(modal).queryByText("Aviso r1")).not.toBeInTheDocument());
+      expect(await screen.findByRole("button", { name: "Avisos: 1 sin revisar", hidden: true })).toBeInTheDocument();
+    } finally {
+      permiso.editaReservas = false;
+    }
+  });
+
+  it("si la verificación falla, el aviso sigue sin revisar", async () => {
+    permiso.editaReservas = true;
+    acciones.aceptar.mockResolvedValueOnce({ ok: false });
+    try {
+      const modal = await abrir();
+      fireEvent.click(within(modal).getByRole("button", { name: /^Verificar la reserva: Aviso r1/ }));
+      await waitFor(() => expect(acciones.aceptar).toHaveBeenCalled());
+      expect(bd.revisados).toEqual([]);
+      expect(within(modal).getByText("Aviso r1")).toBeInTheDocument();
+    } finally {
+      permiso.editaReservas = false;
+    }
+  });
+
+  it("si la reserva ya no está pendiente (verificada en la ficha), en vez de «Verificar» sale «Revisado»", async () => {
+    permiso.editaReservas = true;
+    reservasAvisadas.estado = "verificada";
+    try {
+      const modal = await abrir();
+      const nueva = within(fila(modal, "Aviso r1"));
+      expect(nueva.queryByRole("button", { name: /^Verificar/ })).toBeNull();
+      expect(nueva.getByRole("button", { name: "Marcar como revisado: Aviso r1" })).toBeInTheDocument();
+    } finally {
+      permiso.editaReservas = false;
+    }
+  });
+
+  it("sin permiso de editar reservas no sale «Verificar»: solo «Revisado»", async () => {
+    const modal = await abrir();
+    expect(within(modal).queryByRole("button", { name: /^Verificar/ })).toBeNull();
+    expect(within(fila(modal, "Aviso r1")).getByRole("button", { name: "Marcar como revisado: Aviso r1" })).toBeInTheDocument();
+  });
+
+  it("verificada desde otro sitio (la ficha, la Lista…), su aviso «Reserva nueva» sale solo de «Sin revisar»", async () => {
+    const modal = await abrir();
+    const { avisarReservaAtendida } = await import("@/hooks/useAvisosSeccion");
+    avisarReservaAtendida("res-r1");
+    await waitFor(() => expect(within(modal).queryByText("Aviso r1")).not.toBeInTheDocument());
+    expect(within(modal).getByText("Aviso r2")).toBeInTheDocument();
+  });
+
+  it("`?avisos=reservas` en la URL (desde el Dashboard) abre el modal al llegar y se quita de la URL", async () => {
+    pintar("reservas", "/reservas?avisos=reservas");
+    expect(await screen.findByRole("dialog", { name: /Avisos de reservas/ })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("ruta").textContent).toBe("/reservas"));
   });
 });
