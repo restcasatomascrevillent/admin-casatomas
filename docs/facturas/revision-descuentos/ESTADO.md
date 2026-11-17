@@ -32,3 +32,14 @@ Reglas del encargo:
 ## Notas para retomar
 
 (se van añadiendo)
+
+### Hallazgos provisionales (17/11, fase 1.B en curso)
+
+- Prod: 4.556 documentos, 30.478 líneas. 1.958 con `descuento_pct` (101 al 100 %, 1.318 parciales),
+  607 líneas a 0 € con cantidad (509 sin marcar como regalo), 2.434 líneas negativas en documentos
+  positivos.
+- **Líneas de descuento aparte (1.191, −62.261 €)** catalogadas como productos sueltos de Servicios
+  («Descuento Heineken» −17.289 €, «Descuento comercial», «Compra más paga menos» ×5 variantes…): el
+  descuento NO llega al producto que descuenta → coste de producto inflado.
+- Asignaciones erróneas: «Mostaza de cerveza Rooftop 150 g» recibe 26 líneas de descuento (−3.054 €,
+  «- 20 % BONIFICAC S/ …», «COMPRA MAS PAGA MENOS»).
