@@ -145,8 +145,8 @@ describe("avisos-telegram · mensajes", () => {
 describe("avisos-telegram · resumen diario", () => {
   it("agrupa por tipo con número y frases, el más numeroso primero", () => {
     const avisos = [
-      aviso({ tipo: "reserva_nueva", titulo: "Reserva de Ana", mensaje: "4 personas", created_at: "2026-11-11T08:00:00Z" }),
-      aviso({ tipo: "reserva_nueva", titulo: "Reserva de Luis", mensaje: null, created_at: "2026-11-11T09:00:00Z" }),
+      aviso({ tipo: "reserva_nueva", titulo: "Reserva nueva", mensaje: "Ana Pérez · 12/11 21:00 · 4 pers. · web", created_at: "2026-11-11T08:00:00Z" }),
+      aviso({ tipo: "reserva_nueva", titulo: "Reserva nueva", mensaje: null, created_at: "2026-11-11T09:00:00Z" }),
       aviso({ datos: { texto_telegram: "El vino X ha bajado a 2,1×." } }),
       aviso({ tipo: "reserva_sin_asignar", titulo: "No sale" }),
       aviso({ tipo: "ia_modelo_nuevo", titulo: "Tampoco" }),
@@ -156,8 +156,9 @@ describe("avisos-telegram · resumen diario", () => {
     expect(total).toBe(3);
     expect(texto).toContain("Últimas 24 h: 3 avisos.");
     expect(texto.indexOf("Reservas nuevas (2)")).toBeLessThan(texto.indexOf("Margen bajo (1)"));
-    expect(texto).toContain("• Reserva de Luis");
-    expect(texto).toContain("• 4 personas");
+    expect(texto).toContain("• Reserva nueva\n");
+    expect(texto).toContain("• Reserva nueva: 12/11 21:00 · 4 pers. · web");
+    expect(texto).not.toContain("Ana");
     expect(texto).toContain("• El vino X ha bajado a 2,1×.");
     expect(texto).not.toContain("No sale");
     expect(texto).not.toContain("Tampoco");
@@ -170,8 +171,8 @@ describe("avisos-telegram · resumen diario", () => {
     expect(texto.match(/^• /gm)?.length).toBe(4);
     expect(texto).toContain("…y 3 más.");
   });
-  it("sin avisos lo dice", () => {
-    expect(construirResumen([], AHORA).texto).toContain("Sin avisos en las últimas 24 h.");
+  it("sin avisos no manda nada (texto vacío)", () => {
+    expect(construirResumen([], AHORA)).toMatchObject({ texto: "", total: 0 });
   });
   it("nunca pasa de 4.096 aunque haya muchos tipos y textos largos", () => {
     const tipos = ["facturas_precio_sube", "facturas_margen_bajo", "reserva_nueva", "facturas_revision", "facturas_proveedor_nuevo", "facturas_importe_inusual", "facturas_precio_baja", "facturas_precio_mejor", "reserva_cancelada", "subida_precio", "facturas_familia_gasto", "facturas_precio_pactado"];
