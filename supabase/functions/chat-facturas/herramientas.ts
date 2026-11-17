@@ -367,6 +367,23 @@ export const TOOLS = [
 
 // ─── Validacion de argumentos ────────────────────────────────────────────────
 
+/**
+ * «agua», «pan», «queso»: aunque se asocien como producto, si la categoría asociada lleva ese nombre
+ * («Refrescos y aguas», «Panadería y repostería», «Lácteos y quesos») el texto SIGUE siendo una categoría.
+ * Una sola palabra, que sea (o empiece como) una palabra del nombre de la categoría o al revés (≥ 3 letras);
+ * «helado» (categoría Panadería) no lo es, así que va por producto.
+ */
+export function esNombreDeCategoria(txt: string, asoc?: Asociacion | null): boolean {
+  const norm = (v: string) => v.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  const t = norm(txt);
+  if (!asoc?.categoria || !/^[a-z]{3,}$/.test(t)) return false;
+  const stem = t.replace(/(es|s)$/, "");
+  return norm(asoc.categoria).split(/[^a-z]+/).some((w) => {
+    const w0 = w.replace(/(es|s)$/, "");
+    return w0.length >= 3 && (w0.startsWith(stem) || stem.startsWith(w0));
+  });
+}
+
 /** Normaliza 'albarán'/'albaranes'/'facturas'… a los valores que aceptan las RPC. */
 /** Tipo de filtrar_documentos: como normalizarTipo, y «abono» (nota de credito, rectificativa) = total negativo. */
 export function normalizarTipoDocumento(v: unknown): string | null {
@@ -989,7 +1006,7 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
       // «gasto en helado»: un PRODUCTO (no una familia) puesto como categoria daba el gasto de toda la
       // categoria donde esta catalogado (helado = Panaderia: 39.636 € en vez de ~1.400 €). Va por producto.
       const catTxt = texto(args.categoria);
-      if (asoc?.tipo === "producto" && catTxt && !denominacion && !texto(args.agrupar)) {
+      if (asoc?.tipo === "producto" && catTxt && !denominacion && !texto(args.agrupar) && !esNombreDeCategoria(catTxt, asoc)) {
         return {
           tipo: "rpc",
           rpc: "compras_producto_agente",
