@@ -27,7 +27,8 @@ Reglas del encargo:
 - [ ] Fase 1.C: búsqueda en el texto de los originales de Drive. **Bloqueado**: falta acceso a la carpeta del panel (pedido al dueño). `read_file_content` de Drive devuelve el texto OCR del PDF: barato.
 - [ ] Fase 1.D: verificación visual de los originales marcados.
 - [x] Fase 1.E: informe (`INFORME.md`), versión 1 sin el cotejo con originales (apartado 7 del informe).
-- [ ] Fase 2: correcciones, PR a staging, demo.
+- [x] Fase 2 (parte posible sin originales): #287 clasificación IA, #288 descuentos asociados, #289 precios netos; todo en la demo (funciones y migraciones aplicadas, panel READY).
+- [ ] Pendiente: regalos en la lectura (procesar-factura + ocr_anadir_pagina/ocr_sustituir_factura), lectura de nuevos descuentos y Makro, 3 albaranes de producción, cotejo con originales (bloqueado por acceso a Drive). Ver INFORME.md § 5.1.
 
 ## Notas para retomar
 
