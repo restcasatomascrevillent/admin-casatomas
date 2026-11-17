@@ -69,6 +69,16 @@ export function etiquetaDiaReservas(clave: string, hoy: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
+/** La misma, corta, para la fila del día en el móvil: «Hoy · mar 17 nov», «Mañana · mié 18 nov» o «Vie 20 nov». */
+export function etiquetaDiaReservasCorta(clave: string, hoy: string): string {
+  const [a, m, d] = clave.split("-").map(Number);
+  const texto = new Date(a, m - 1, d).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" }).replace(/[,.]/g, "");
+  if (clave === hoy) return `Hoy · ${texto}`;
+  if (clave === sumarDias(hoy, 1)) return `Mañana · ${texto}`;
+  if (clave === sumarDias(hoy, -1)) return `Ayer · ${texto}`;
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 /** Claves de este navegador (mismo estilo que `reservas:timeline-estados:abierto`). */
 export const CLAVE_VISTA_HOY = "reservas:hoy:vista";
 export const CLAVE_SALA_PLANO_HOY = "reservas:hoy:sala-plano";

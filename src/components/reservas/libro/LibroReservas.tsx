@@ -86,16 +86,17 @@ export function LibroReservas({ soloCrear = false, fechaInicial = null, onReserv
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-dialogo-nueva-reserva="">
-      {/* Cabecera: pasar hojas */}
-      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2 pr-12">
-        <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label="Día anterior" onClick={() => irA(pasarHoja(fecha, -1))}>
+      {/* Cabecera: pasar hojas. En el móvil (17/11/2026, «Nueva» desde Reservas) cabe en UNA fila: el día encoge y
+          «Hoy» no sale (antes ocupaba tres líneas a 375 px). */}
+      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2 pr-12 max-sm:flex-nowrap max-sm:px-2">
+        <Button type="button" variant="outline" size="icon" className="h-11 w-11 shrink-0" aria-label="Día anterior" onClick={() => irA(pasarHoja(fecha, -1))}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <Popover open={calendarioAbierto} onOpenChange={setCalendarioAbierto}>
           <PopoverTrigger asChild>
-            <Button type="button" variant="outline" className="h-11 min-w-[16rem] justify-start text-base font-semibold">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {tituloHoja(fecha)}
+            <Button type="button" variant="outline" className="h-11 min-w-[16rem] justify-start text-base font-semibold max-sm:min-w-0 max-sm:flex-1 max-sm:justify-center max-sm:px-2 max-sm:text-sm">
+              <CalendarIcon className="mr-2 h-4 w-4 max-sm:hidden" />
+              <span className="truncate">{tituloHoja(fecha)}</span>
             </Button>
           </PopoverTrigger>
           {/* Sin Portal (10/11/2026): portado fuera del diálogo, el foco atrapado del libro cerraba el
@@ -116,10 +117,10 @@ export function LibroReservas({ soloCrear = false, fechaInicial = null, onReserv
             />
           </PopoverPrimitive.Content>
         </Popover>
-        <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label="Día siguiente" onClick={() => irA(pasarHoja(fecha, 1))}>
+        <Button type="button" variant="outline" size="icon" className="h-11 w-11 shrink-0" aria-label="Día siguiente" onClick={() => irA(pasarHoja(fecha, 1))}>
           <ChevronRight className="h-5 w-5" />
         </Button>
-        <Button type="button" variant="ghost" className="h-11" onClick={() => irA(claveDia(new Date()))}>
+        <Button type="button" variant="ghost" className="h-11 max-sm:hidden" onClick={() => irA(claveDia(new Date()))}>
           Hoy
         </Button>
       </div>

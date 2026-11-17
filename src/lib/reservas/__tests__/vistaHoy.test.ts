@@ -7,6 +7,7 @@ import {
   CLAVE_SALA_PLANO_HOY,
   CLAVE_VISTA_HOY,
   coincideFiltroHoy,
+  etiquetaDiaReservasCorta,
   guardarSalaPlanoHoy,
   guardarVistaHoy,
   leerSalaPlanoHoy,
@@ -111,5 +112,12 @@ describe("lo que cabe dentro de una mesa del plano", () => {
     expect(nombreCartelMesa("Lucía Ortega Marín")).toBe("Lucía O.");
     expect(nombreCartelMesa("  Oscar  ")).toBe("Oscar");
     expect(nombreCartelMesa(null)).toBe("Sin nombre");
+  });
+
+  it("la etiqueta corta del día (móvil): hoy, mañana, ayer y otro día", () => {
+    expect(etiquetaDiaReservasCorta("2026-11-17", "2026-11-17")).toBe("Hoy · mar 17 nov");
+    expect(etiquetaDiaReservasCorta("2026-11-18", "2026-11-17")).toBe("Mañana · mié 18 nov");
+    expect(etiquetaDiaReservasCorta("2026-11-16", "2026-11-17")).toBe("Ayer · lun 16 nov");
+    expect(etiquetaDiaReservasCorta("2026-11-20", "2026-11-17")).toBe("Vie 20 nov");
   });
 });
