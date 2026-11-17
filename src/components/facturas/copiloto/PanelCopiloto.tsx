@@ -26,6 +26,7 @@ import { ACEPTA_PRESUPUESTO } from "@/lib/facturas/presupuestoAdjunto";
 import { BotonOriginal } from "../shared/BotonOriginal";
 import { GraficoSeriePrecio } from "../GraficoSeriePrecio";
 import { desplazarA } from "../analisis/desplazar";
+import { BotonDictado } from "./BotonDictado";
 
 const PLUGINS_MARKDOWN = [remarkGfm];
 
@@ -357,7 +358,7 @@ export function PanelCopiloto({
             aria-label="Pregunta para el asistente"
             disabled={isSending}
             rows={1}
-            className={cn("max-h-32 min-h-[52px] resize-none rounded-2xl border-0 bg-transparent py-3.5 pr-14 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-base", onAdjuntar ? "pl-12" : "pl-4")}
+            className={cn("max-h-32 min-h-[52px] resize-none rounded-2xl border-0 bg-transparent py-3.5 pr-24 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-base", onAdjuntar ? "pl-12" : "pl-4")}
           />
           {onAdjuntar && (
             <>
@@ -385,6 +386,7 @@ export function PanelCopiloto({
               </button>
             </>
           )}
+          <BotonDictado valor={input} onCambio={setInput} disabled={isSending} className="absolute bottom-1 right-12" />
           <button
             type="button"
             onClick={enviar}
