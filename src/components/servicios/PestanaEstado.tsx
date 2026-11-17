@@ -163,7 +163,9 @@ function Ficha({ ficha, onAbrir }: { ficha: FichaEstado; onAbrir: (proveedor: st
   const resumenAnillos = ficha.anillos.map(detalleAnillo).join(". ");
   const resumenDatos = ficha.datos.map((d) => d.completo).join(". ");
   return (
-    <li className="min-w-0" data-ficha={ficha.proveedor} data-estado={ficha.estado}>
+    // Las fichas se reparten el ancho de su fila (crecen): la última fila también la llena, sin
+    // huecos, sea cual sea el número de servicios y el ancho de la pantalla (17/11/2026).
+    <li className="min-w-0 flex-1 basis-[8.5rem] sm:basis-[12rem] lg:basis-[14.5rem]" data-ficha={ficha.proveedor} data-estado={ficha.estado}>
       {/* Un solo control por ficha: el nombre accesible lo dice todo (estado, anillos y datos). */}
       <button
         type="button"
@@ -180,13 +182,17 @@ function Ficha({ ficha, onAbrir }: { ficha: FichaEstado; onAbrir: (proveedor: st
           <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-foreground">{ficha.nombre}</span>
           <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", tono.punto)} aria-hidden="true" />
         </span>
-        <Anillos ficha={ficha} />
-        <span className={cn("text-sm font-semibold leading-tight", tono.texto)}>{ficha.motivo}</span>
-        {ficha.anillos.length === 1 && (
-          <span className="line-clamp-1 w-full text-xs text-muted-foreground">{ficha.anillos[0].etiqueta}</span>
-        )}
+        {/* Anillos y estado, centrados en el alto que sobre: una ficha con menos datos que sus
+            vecinas de fila no deja un hueco en blanco debajo. */}
+        <span className="flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-2">
+          <Anillos ficha={ficha} />
+          <span className={cn("text-sm font-semibold leading-tight", tono.texto)}>{ficha.motivo}</span>
+          {ficha.anillos.length === 1 && (
+            <span className="line-clamp-1 w-full text-xs text-muted-foreground">{ficha.anillos[0].etiqueta}</span>
+          )}
+        </span>
         {ficha.datos.length > 0 && (
-          <span className="mt-auto flex w-full min-w-0 flex-col gap-1 border-t border-border/60 pt-2 text-[11px] sm:gap-0.5 sm:text-xs" aria-hidden="true" data-datos={ficha.datos.length}>
+          <span className="flex w-full min-w-0 flex-col gap-1 border-t border-border/60 pt-2 text-[11px] sm:gap-0.5 sm:text-xs" aria-hidden="true" data-datos={ficha.datos.length}>
             {ficha.datos.map((d) => (
               <span key={d.clave} className="flex min-w-0 items-baseline justify-between gap-2" data-dato={d.clave} title={d.completo}>
                 <span className="min-w-0 break-words text-left leading-tight text-muted-foreground">{d.corta}</span>
@@ -275,7 +281,7 @@ export function PestanaEstado({ estado, resumen, pendientes, ultima, cargandoLec
       ) : (
         <>
           {conDatos.length > 0 && (
-            <ul className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6" aria-label="Estado de cada servicio">
+            <ul className="flex min-w-0 flex-wrap gap-3" aria-label="Estado de cada servicio">
               {conDatos.map((f) => <Ficha key={f.proveedor} ficha={f} onAbrir={onAbrir} />)}
             </ul>
           )}
