@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { facturaSchema, mensualFactura, type Factura } from "@/components/facturacion/modelo";
+import { facturaSchema, mensualFactura, sinDatosFiscales, type Factura } from "@/components/facturacion/modelo";
 
 export interface FacturaGuardada {
   id: string; numero: string; documento: Factura; creado_en: string; actualizado_en: string;
@@ -15,13 +15,16 @@ interface RpcFacturacion {
 }
 const db = supabase as unknown as RpcFacturacion;
 export const FACTURACION_KEY = ["oficiososia-facturacion"] as const;
+/**
+ * Valida lo guardado y lo entrega ya como recibo (17/11/2026): sin NIF, dirección, IVA ni
+ * retención, aunque el documento guardado los tuviera de cuando eran facturas. Lo guardado no
+ * se toca hasta que se vuelve a guardar.
+ */
 function validarDatos(data: unknown): DatosFacturacion {
   const d = data as DatosFacturacion;
-  if (!d || !Array.isArray(d.facturas)) throw new Error("Respuesta de facturación inválida.");
-  if (d.config) facturaSchema.parse(d.config.documento);
-  d.facturas.forEach(f => facturaSchema.parse(f.documento));
-  (d.borradores ?? []).forEach(b => facturaSchema.parse(b.documento));
-  return d;
+  if (!d || !Array.isArray(d.facturas)) throw new Error("Respuesta de recibos inválida.");
+  const limpio = <T extends { documento: Factura }>(g: T): T => ({ ...g, documento: sinDatosFiscales(facturaSchema.parse(g.documento) as Factura) });
+  return { config: d.config ? limpio(d.config) : null, facturas: d.facturas.map(limpio), ...(d.borradores ? { borradores: d.borradores.map(limpio) } : {}) };
 }
 export function useFacturacionOficiososia() {
   const cache = useQueryClient();
@@ -40,9 +43,11 @@ export function useFacturacionOficiososia() {
       p_id: factura?.id ?? null, p_version_factura: factura?.version ?? null,
       p_emitir: !!factura, p_borrador_id:borrador?.id ?? null, p_version_borrador:borrador?.version ?? null, p_factura_origen:borrador?.facturaId ?? null,
     });
-    if (error) throw new Error(error.code === "23505" ? "Ya existe una factura con ese número." : error.message);
-    const result = data as RespuestaGuardado;
-    facturaSchema.parse(result.config.documento);
+    if (error) throw new Error(error.code === "23505" ? "Ya existe un recibo con ese número." : error.message);
+    const bruto = data as RespuestaGuardado;
+    facturaSchema.parse(bruto.config.documento);
+    const limpio = <T extends { documento: Factura }>(g: T): T => ({ ...g, documento: sinDatosFiscales(g.documento) });
+    const result: RespuestaGuardado = { ...bruto, config: limpio(bruto.config), factura: bruto.factura ? limpio(bruto.factura) : bruto.factura, borrador: bruto.borrador ? limpio(bruto.borrador) : bruto.borrador };
     cache.setQueryData<DatosFacturacion>(FACTURACION_KEY, previo => ({
       config: result.config,
       borradores: result.borrador ? [result.borrador,...(previo?.borradores ?? []).filter(b=>b.id!==result.borrador?.id)] : (previo?.borradores ?? []).filter(b=>b.id!==result.borrador_eliminado),

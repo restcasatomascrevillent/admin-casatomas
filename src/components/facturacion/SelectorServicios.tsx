@@ -20,7 +20,7 @@ interface Props {
 export function SelectorServicios({catalogo,lineas,agregar}: Props) {
   const elegidos = productosSeleccionados(lineas,catalogo);
   return <Card><CardHeader className="pb-3"><CardTitle className="text-base">Añadir servicios en un clic</CardTitle>
-    <p className="text-xs text-muted-foreground">Las tarifas se editan en «Módulos y paquetes». Después puedes ajustar cada importe en la factura.</p>
+    <p className="text-xs text-muted-foreground">Las tarifas se editan en «Tarifas». Después puedes ajustar cada importe en el recibo.</p>
   </CardHeader><CardContent>
     <Tabs defaultValue="paquetes">
       <ChipsSubnivel aria-label="Qué añadir" chips={[{ valor: "paquetes", etiqueta: "Paquetes" }, { valor: "modulos", etiqueta: "Módulos y servicios" }]} />
@@ -30,10 +30,10 @@ export function SelectorServicios({catalogo,lineas,agregar}: Props) {
         return <Button key={p.id} type="button" variant="outline" disabled={!productos.length || incluidos === productos.length} onClick={()=>agregar(p.productoIds,p.id)} className="h-auto w-full justify-start gap-3 whitespace-normal py-3 text-left">
           <Package className="h-5 w-5 shrink-0" /><span className="min-w-0"><strong className="block">{p.nombre}</strong>
             <span className="mt-1 block text-xs font-normal text-muted-foreground">{productos.map(v=>v.nombre).join(" · ")}</span>
-            <span className="mt-1 block text-xs">{incluidos}/{productos.length} incluidos en esta factura</span>
+            <span className="mt-1 block text-xs">{incluidos}/{productos.length} incluidos en este recibo</span>
           </span><Plus className="ml-auto h-4 w-4 shrink-0" />
         </Button>;
-      }) : <p className="text-sm text-muted-foreground">Crea un paquete en la pestaña de catálogo.</p>}</TabsContent>
+      }) : <p className="text-sm text-muted-foreground">Crea un paquete en la pestaña «Tarifas».</p>}</TabsContent>
       <TabsContent value="modulos" className="grid grid-cols-1 gap-2 pt-2 sm:grid-cols-2">{catalogo.productos.map(p =>
         <Button key={p.id} type="button" variant="outline" disabled={elegidos.has(p.id)} onClick={()=>agregar([p.id])} className="h-auto justify-start gap-2 whitespace-normal py-3 text-left">
           {elegidos.has(p.id) ? <Check className="h-4 w-4 shrink-0" /> : <Plus className="h-4 w-4 shrink-0" />}
@@ -72,11 +72,16 @@ export function EditarCatalogo({catalogo,cambiar,busy}: {catalogo:CatalogoFactur
   };
   const producto = (id:string, v:Partial<CatalogoFacturacion["productos"][number]>) => cambiar({...catalogo,productos:catalogo.productos.map(p=>p.id===id?{...p,...v}:p)});
   const selectClass = "h-10 w-full rounded-md border border-input bg-background px-2 text-base md:text-sm";
-  return <><AlertDialog open={!!pendiente} onOpenChange={open=>{if(!open)setEliminarId(null);}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar módulo del catálogo</AlertDialogTitle><AlertDialogDescription>Vas a eliminar «{pendiente?.nombre}» del catálogo y de los paquetes que lo incluyan. Las facturas ya creadas conservan sus conceptos. Pulsa «Guardar catálogo y tarifas» después para guardar el cambio.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={busy} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={eliminar}>Eliminar módulo</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+  return <><AlertDialog open={!!pendiente} onOpenChange={open=>{if(!open)setEliminarId(null);}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar módulo del catálogo</AlertDialogTitle><AlertDialogDescription>Vas a eliminar «{pendiente?.nombre}» del catálogo y de los paquetes que lo incluyan. Los recibos ya creados conservan sus conceptos. Pulsa «Guardar tarifas» después para guardar el cambio.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={busy} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={eliminar}>Eliminar módulo</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   <fieldset disabled={busy} className="min-w-0 space-y-5">
+    <Card><CardHeader><CardTitle className="text-base">Pago mensual</CardTitle>
+      <p className="text-sm text-muted-foreground">El precio fijo de cada mes. Al crear un pago mensual se pone solo y, debajo, los gastos de ese mes que se ven en Servicios (IA, hosting…). En cada recibo se puede cambiar.</p>
+    </CardHeader><CardContent>
+      <label className="block max-w-xs text-xs">Cuota mensual fija (€)<Input aria-label="Cuota mensual fija (€)" type="number" min={0} max={1000000} step="0.01" value={catalogo.cuotaMensual ?? 0} onChange={e=>cambiar({...catalogo,cuotaMensual:Number(e.target.value)})} className="mt-1" /></label>
+    </CardContent></Card>
     <Card><CardHeader><CardTitle className="text-base">Tarifas de módulos y servicios</CardTitle>
-      <p className="text-sm text-muted-foreground">Define tus precios una vez. Se copiarán al seleccionar un módulo o paquete en una nueva factura.</p>
-      <p className="text-xs text-muted-foreground">Arrastra desde el asa o usa las flechas para mover los módulos arriba y abajo. Pulsa «Guardar catálogo y tarifas» para conservar el orden.</p>
+      <p className="text-sm text-muted-foreground">Para las licencias globales: define tus precios una vez. Se copiarán al seleccionar un módulo o paquete en un recibo nuevo.</p>
+      <p className="text-xs text-muted-foreground">Arrastra desde el asa o usa las flechas para mover los módulos arriba y abajo. Pulsa «Guardar tarifas» para conservar el orden.</p>
     </CardHeader><CardContent className="space-y-3">
       <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={({active,over})=>{
         if(over)mover(catalogo.productos.findIndex(p=>p.id===active.id),catalogo.productos.findIndex(p=>p.id===over.id));
