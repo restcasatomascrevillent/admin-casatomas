@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.41.3] - 2026-11-17
+
+Objetivo: Estado de Servicios sin avisos falsos ni repetidos y con las fichas llenando cada fila
+
+### Cambiado
+- Servicios: Estado sin avisos repetidos ni falsos y fichas que llenan cada fila ([#272](https://github.com/restcasatomascrevillent/admin-casatomas/pull/272))
+
 ## [1.41.2] - 2026-11-17
 
 Objetivo: Test de Instagram (SelectorPlatos) estable: deja de tumbar a ratos el check de las releases
