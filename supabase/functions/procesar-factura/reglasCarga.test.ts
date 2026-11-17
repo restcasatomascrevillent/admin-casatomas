@@ -148,6 +148,23 @@ describe("3/10. cajas y filas de tarifa", () => {
     expect(avisoCajasSinUnidades([{ nombre: "VINO TINTO CRIANZA C6", unidad: "caja" }])).toBeNull();
     expect(avisoCajasSinUnidades([{ nombre: "AGUA 12x75cl", unidad: "caja" }])).toBeNull();
   });
+  it("un volumen solo («33cl», «500ml») no dice cuántas trae la caja → aviso; «* 24», «C.x06», «contiene 6» o 10 kg, no", () => {
+    const aviso = (nombre: string, unidad = "caja") => avisoCajasSinUnidades([{ nombre, unidad }])?.codigo ?? null;
+    expect(aviso("COCACOLA LT 33CL REGULAR", "pack")).toBe("caja_sin_unidades");
+    expect(aviso("CASERA GASEOSA PERSONAL.RET 500ml")).toBe("caja_sin_unidades");
+    expect(aviso("REFRESCO KAS LIMON RET 350ml")).toBe("caja_sin_unidades");
+    expect(aviso("Juan Gil Etiqueta Plata 12 meses 75 cl")).toBe("caja_sin_unidades");
+    expect(aviso("Vino Reserva 2016")).toBe("caja_sin_unidades");
+    expect(aviso("COCA COLA 237 CL. * 24")).toBeNull();
+    expect(aviso("HEINEKEN 1/3 LONG NET * 24")).toBeNull();
+    expect(aviso("JUAN GIL NACAR C.x06 BOT.0,75 L ES-ECO-024-MU")).toBeNull();
+    expect(aviso("C/6B LP LA CUVEE 0,75L")).toBeNull();
+    expect(aviso("aro leche entera 1 L contiene 6 unidades")).toBeNull();
+    expect(aviso("ESTRELLA GALICIA 33CL P6 C4")).toBeNull();
+    expect(aviso("ZZ ACEITE (CAJA 10 KG)")).toBeNull();
+    expect(aviso("TOMATE PERA 5 KG")).toBeNull();
+    expect(aviso("COCACOLA LT 33CL REGULAR", "lata")).toBeNull();
+  });
   it("una fila de tarifa (precio sin cantidad ni importe) no es producto", () => {
     const d = normalizarDatos(doc({
       productos: [linea(), linea({ nombre: "Tarifa: jamón ibérico", cantidad: 0, precio_unitario: 45, total: null })],
