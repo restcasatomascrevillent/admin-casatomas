@@ -36,9 +36,21 @@
 //  de una que no es la de la carta), sale una subfila por añada con su última compra,
 //  diciendo cuál es la de la carta; debajo, la tabla «Compras por añada» con el
 //  proveedor. La fila del vino no cambia (la compra del producto enlazado, la del margen).
+//  17/11/2026 (dueño: «Fefiñanes 2024 (Magnum) aparece y no hay ninguna factura que
+//  mencione Fefiñanes magnum; revisa ese artículo y los demás; lo de "Añada 202X…" se
+//  corta»). En producción el magnum está enlazado al producto de 75 cl (como Godeval y La
+//  Hormiga) y once vinos comprados por caja enseñaban el precio de la caja entera
+//  (Laurent-Perrier Alexandra Rosé: 1.014 € en vez de 338 € la botella). Ahora:
+//    · Precio por BOTELLA: los envases de cada línea salen de la vista `volumen_lineas`
+//      (la misma conversión que usa Facturas › Márgenes: «C/6B» = 6 botellas). La columna
+//      «Unidad» de vinos pasa a «Botella» («75 cl», «1,5 l»).
+//    · Solo cuentan las compras del FORMATO de la carta (el del nombre: «Magnum» = 1,5 l;
+//      sin formato en el nombre, hasta 75 cl), en la fila y en las añadas. Si del vino solo
+//      se compra otro formato, la fila queda sin compra ni margen y una subfila lo dice
+//      («Sin compras en magnum (1,5 l): solo de 75 cl»). El margen solo sale con compra.
 // ============================================================================
 import { supabase } from "@/integrations/supabase/client";
-import { fmt, normalizarMargenes } from "@/lib/analisis/margenesCarta";
+import { fmt, litrosTexto, normalizarMargenes } from "@/lib/analisis/margenesCarta";
 import type { ContextoInforme } from "../registro";
 import { CLAVE_SUBFILA, esSubfila, nombreArchivoInforme, type ColumnaInforme, type FilaInforme, type ResultadoInformeTabla } from "../tabla";
 
@@ -86,14 +98,20 @@ export interface LineaCompra {
   total: number | string | null;
   /** IVA de la línea (%). */
   iva_pct?: number | string | null;
+  /** Solo vinos (de `volumen_lineas`): botellas de la línea («C/6B» × 20 = 120); null si no se sabe. */
+  envases?: number | string | null;
+  /** Solo vinos: litros de UNA botella de la línea (0,75; 1,5…); null si no se sabe. */
+  litros?: number | string | null;
   facturas: { fecha: string | null; tipo: string | null; local: string | null; total: number | string | null; facturado_en_id: number | null; proveedor?: string | null } | null;
 }
 
 export interface UltimaCompra {
-  /** Base sin IVA de la línea / cantidad. */
+  /** Base sin IVA de la línea / cantidad (en vinos, / botellas si se saben). */
   eurUd: number;
   /** Unidad en que se compra («botella», «caja», «kg»…). */
   unidad: string;
+  /** Solo vinos: litros de la botella comprada (null si no se sabe). */
+  litros?: number | null;
   /** IVA de la línea (%), si la factura lo trae. */
   ivaPct: number | null;
   /** `YYYY-MM-DD`. */
@@ -135,9 +153,13 @@ function ultimasPor<K>(lineas: readonly LineaCompra[], clave: (l: LineaCompra) =
   }
   const res = new Map<K, UltimaCompra>();
   for (const [k, l] of mejor) {
+    // Por botella si se sabe cuántas trae la línea (una caja «C/6B» son 6): antes salía el precio de la caja.
+    const envases = num(l.envases);
+    const porBotella = envases !== null && envases > 0;
     res.set(k, {
-      eurUd: Math.round(((num(l.total) as number) / (num(l.cantidad) as number)) * 10000) / 10000,
-      unidad: l.unidad?.trim().toLowerCase() || "ud",
+      eurUd: Math.round(((num(l.total) as number) / (porBotella ? envases : (num(l.cantidad) as number))) * 10000) / 10000,
+      unidad: porBotella ? "botella" : l.unidad?.trim().toLowerCase() || "ud",
+      litros: num(l.litros),
       ivaPct: num(l.iva_pct),
       fecha: (l.facturas!.fecha as string).slice(0, 10),
       proveedor: l.facturas!.proveedor?.trim() || null,
@@ -176,6 +198,81 @@ export function anadaCarta(a: Pick<ArticuloCarta, "nombre" | "anada" | "sin_anad
   return n !== null && n > 0 ? n : anadaDe(a.nombre);
 }
 
+// ─── Formato de la botella (17/11/2026) ─────────────────────────────────────
+
+/**
+ * Litros de la botella que dice un nombre de la carta: una sola medida («37,5 cl», «1,5 l») o, si no,
+ * «doble magnum»/«jeroboam» (3 l), «magnum» (1,5 l) o «litro» (1 l). Lo mismo que `envase_texto`, con
+ * la que Facturas › Márgenes saca el formato de la carta. null: el nombre no lo dice.
+ */
+export function litrosFormato(nombre: string | null | undefined): number | null {
+  const t = (nombre ?? "").toLowerCase().replace(/\s+/g, " ");
+  const medidas = new Set(
+    [...t.matchAll(/(?<![\p{L}\d])(\d{1,4}(?:[.,]\d{1,3})?)\s*(cl|ml|ltrs?|lts?|lt|litros?|l)(?![\p{L}\d])/gu)].map((m) => {
+      const n = Number(m[1].replace(",", "."));
+      return Math.round(n * (m[2] === "cl" ? 0.01 : m[2] === "ml" ? 0.001 : 1) * 10000) / 10000;
+    }),
+  );
+  if (medidas.size === 1) {
+    const l = [...medidas][0];
+    return l > 0 && l <= 30 ? l : null;
+  }
+  if (medidas.size > 1) return null;
+  if (/(?<![\p{L}])(doble magnum|jeroboam)(?![\p{L}])/u.test(t)) return 3;
+  if (/(?<![\p{L}])magnum(?![\p{L}])/u.test(t)) return 1.5;
+  if (/(?<![\p{L}])litro(?![\p{L}])/u.test(t)) return 1;
+  return null;
+}
+
+/** Botella normal: la de un vino cuyo nombre no dice formato (como en Márgenes, hasta 75 cl). */
+const LITROS_BOTELLA = 0.75;
+
+/**
+ * ¿Es la compra del formato de la carta? Sin formato en el nombre, vale cualquier botella de hasta 75 cl
+ * (Márgenes hace lo mismo); un magnum no. Si no se sabe qué botella es la de la línea, cuenta.
+ */
+export function mismoFormato(litrosCarta: number | null, litrosCompra: number | null | undefined): boolean {
+  if (litrosCompra === null || litrosCompra === undefined) return true;
+  return litrosCarta === null ? litrosCompra <= LITROS_BOTELLA + 0.01 : Math.abs(litrosCompra - litrosCarta) <= 0.01;
+}
+
+/** «magnum (1,5 l)», «75 cl», «37,5 cl». */
+export function textoFormato(litros: number): string {
+  const nombre = Math.abs(litros - 1.5) <= 0.01 ? "magnum" : Math.abs(litros - 3) <= 0.01 ? "doble magnum" : null;
+  return nombre ? `${nombre} (${litrosTexto(litros)})` : litrosTexto(litros);
+}
+
+/** La compra que cuenta para un vino: la última de su formato, y los otros formatos que se compran del mismo producto. */
+export interface CompraVino {
+  ultima: UltimaCompra | null;
+  /** Litros de las botellas de otro formato compradas (por si no hay ninguna del suyo). */
+  otrosFormatos: number[];
+}
+
+/**
+ * Por vino, la última compra de su producto enlazado EN EL FORMATO DE LA CARTA. El magnum enlazado al
+ * producto de 75 cl (Fefiñanes, Godeval, La Hormiga) se queda sin compra: no hay facturas de magnum.
+ */
+export function comprasDelFormato(
+  vinculos: readonly VinculoCompra[],
+  articulos: readonly Pick<ArticuloCarta, "id" | "nombre">[],
+  lineas: readonly LineaCompra[],
+): Map<string, CompraVino> {
+  const formato = new Map(articulos.map((a) => [a.id, litrosFormato(a.nombre)]));
+  const res = new Map<string, CompraVino>();
+  for (const v of vinculos) {
+    const carta = formato.get(v.articuloId) ?? null;
+    const suyas = lineas.filter((l) => l.producto_id === v.productoId && lineaValida(l));
+    const delFormato = suyas.filter((l) => mismoFormato(carta, num(l.litros)));
+    const otros = suyas.map((l) => num(l.litros)).filter((x): x is number => x !== null && !mismoFormato(carta, x));
+    res.set(v.articuloId, {
+      ultima: ultimasPor(delFormato, () => 0).get(0) ?? null,
+      otrosFormatos: [...new Set(otros)].sort((a, b) => a - b),
+    });
+  }
+  return res;
+}
+
 /**
  * De cada producto enlazado a un vino, los productos del catálogo que son el mismo vino en otra
  * añada (mismo nombre sin la añada), él incluido.
@@ -197,13 +294,16 @@ export function productosMismoVino(vinculos: readonly VinculoCompra[], catalogo:
 /**
  * Por vino, la última compra de CADA añada (la más reciente primero; sin añada, al final), mirando su
  * producto enlazado y los del mismo vino en otra añada. La añada es la del nombre en la factura y, si
- * no la dice, la del producto del catálogo.
+ * no la dice, la del producto del catálogo. Con `articulos`, solo las compras del formato de la carta
+ * (17/11/2026: el magnum no hereda las añadas de la botella de 75 cl).
  */
 export function comprasPorAnada(
   vinculos: readonly VinculoCompra[],
   catalogo: readonly ProductoCatalogo[],
   lineas: readonly LineaCompra[],
+  articulos?: readonly Pick<ArticuloCarta, "id" | "nombre">[],
 ): Map<string, CompraAnada[]> {
+  const formato = new Map((articulos ?? []).map((a) => [a.id, litrosFormato(a.nombre)]));
   const nombres = new Map<number, string | null>(catalogo.map((p) => [p.id, p.nombre]));
   for (const v of vinculos) if (!nombres.has(v.productoId)) nombres.set(v.productoId, v.producto);
   const porProducto = new Map<number, LineaCompra[]>();
@@ -214,7 +314,10 @@ export function comprasPorAnada(
   const familias = productosMismoVino(vinculos, catalogo);
   const res = new Map<string, CompraAnada[]>();
   for (const v of vinculos) {
-    const suyas = (familias.get(v.productoId) ?? []).flatMap((id) => porProducto.get(id) ?? []);
+    const carta = formato.get(v.articuloId) ?? null;
+    const suyas = (familias.get(v.productoId) ?? [])
+      .flatMap((id) => porProducto.get(id) ?? [])
+      .filter((l) => !articulos || mismoFormato(carta, num(l.litros)));
     const ultimas = ultimasPor(suyas, (l) => anadaDe(l.nombre) ?? anadaDe(nombres.get(l.producto_id as number)));
     res.set(
       v.articuloId,
@@ -251,8 +354,10 @@ export const IVA_COMPRA_SUPUESTO: Record<TipoCartaFacturas, number> = { vinos: 2
 export const IVA_CARTA_POR_DEFECTO = 10;
 
 /**
- * Columnas: nombre, (ingrediente), carta con y sin IVA, compra sin y con IVA, (margen), unidad, fecha,
- * activo y foto. Sin «Categoría» (14/11/2026). Anchos para que quepan en la diapositiva.
+ * Columnas: nombre, (ingrediente), carta con y sin IVA, compra sin y con IVA, (margen), unidad (en vinos,
+ * «Botella»: 75 cl, 1,5 l), fecha, activo y foto. Sin «Categoría» (14/11/2026). 17/11/2026: anchos medidos
+ * en la diapositiva para que nada se corte («3500,00 €», «30/06/2026», «ACTIVO»), con el relleno de 9 px de
+ * las tablas de 9 columnas o más; el margen y los nombres largos van en dos líneas.
  */
 export function columnasCartaFacturas(tipo: TipoCartaFacturas): ColumnaInforme[] {
   return [
@@ -260,13 +365,13 @@ export function columnasCartaFacturas(tipo: TipoCartaFacturas): ColumnaInforme[]
     ...(tipo === "platos" ? [{ id: "producto", etiqueta: "Ingrediente", tipo: "texto" as const, ancho: 170 }] : []),
     { id: "precio", etiqueta: "Carta con IVA", tipo: "precio", ancho: 100 },
     { id: "venta", etiqueta: "Venta sin IVA", tipo: "precio", ancho: 100 },
-    { id: "compra", etiqueta: "Compra sin IVA (base)", tipo: "precio", ancho: 105 },
+    { id: "compra", etiqueta: "Compra sin IVA (base)", tipo: "precio", ancho: 100 },
     { id: "compra_iva", etiqueta: "Compra con IVA", tipo: "precio", ancho: 100 },
-    ...(tipo === "vinos" ? [{ id: "margen", etiqueta: "Margen (lo que ganas)", tipo: "texto" as const, ancho: 150 }] : []),
-    { id: "unidad", etiqueta: "Unidad", tipo: "texto", ancho: 85 },
-    { id: "fecha", etiqueta: "Fecha", tipo: "fecha", ancho: 110 },
-    { id: "activo", etiqueta: "Activo", tipo: "texto", ancho: 75 },
-    { id: "foto", etiqueta: "Foto", tipo: "texto", ancho: 65 },
+    ...(tipo === "vinos" ? [{ id: "margen", etiqueta: "Margen (lo que ganas)", tipo: "texto" as const, ancho: 134 }] : []),
+    { id: "unidad", etiqueta: tipo === "vinos" ? "Botella" : "Unidad", tipo: "texto", ancho: 84 },
+    { id: "fecha", etiqueta: "Fecha", tipo: "fecha", ancho: 116 },
+    { id: "activo", etiqueta: "Activo", tipo: "texto", ancho: 80 },
+    { id: "foto", etiqueta: "Foto", tipo: "texto", ancho: 62 },
   ];
 }
 
@@ -297,21 +402,21 @@ export type MargenesVinos = ReadonlyMap<string, number | null>;
 export function textoMargen(multiplicador: number | null | undefined): string | null {
   if (multiplicador === null || multiplicador === undefined || !(multiplicador > 0)) return null;
   const beneficio = Math.round((1 - 1 / multiplicador) * 100);
-  return `×${fmt(multiplicador, 2)} · beneficio ${beneficio} %`;
+  // Espacios duros: en la diapositiva va en dos líneas, «×2,30 ·» y «beneficio 57 %», nunca partiendo la cifra.
+  return `×${fmt(multiplicador, 2)}\u00a0· beneficio\u00a0${beneficio}\u00a0%`;
 }
+
+/** Lo que sale en «Botella»: la botella si se sabe («75 cl», «1,5 l»); si no, la unidad de la factura. */
+const formatoCompra = (c: UltimaCompra) => (c.litros ? litrosTexto(c.litros) : c.unidad);
 
 export const FALTA_ESCANDALLO = "Falta el escandallo";
 
-export function filasCartaFacturas(
-  tipo: TipoCartaFacturas,
-  articulos: readonly ArticuloCarta[],
-  vinculos: readonly VinculoCompra[],
-  compras: ReadonlyMap<number, UltimaCompra>,
-  margenes: MargenesVinos = new Map(),
-  ivaCartaPct: number = IVA_CARTA_POR_DEFECTO,
-  anadas: ReadonlyMap<string, readonly CompraAnada[]> = new Map(),
-): FilaInforme[] {
-  const principal = vinculosPrincipales(vinculos);
+export function filasCartaFacturas(tipo: TipoCartaFacturas, datos: DatosCartaFacturas): FilaInforme[] {
+  const { articulos, compras, comprasVino } = datos;
+  const margenes: MargenesVinos = datos.margenes ?? new Map();
+  const ivaCartaPct = datos.ivaCartaPct ?? IVA_CARTA_POR_DEFECTO;
+  const anadas: ReadonlyMap<string, readonly CompraAnada[]> = datos.anadas ?? new Map();
+  const principal = vinculosPrincipales(datos.vinculos);
   const porNombre = (x: string, y: string) => x.localeCompare(y, "es", { sensitivity: "base" });
   return [...articulos]
     .sort((a, b) => {
@@ -322,7 +427,9 @@ export function filasCartaFacturas(
     })
     .flatMap((a) => {
       const v = principal.get(a.id);
-      const c = v ? compras.get(v.productoId) : undefined;
+      // Vinos: la compra de su formato (17/11/2026); si no se ha calculado, la última del producto, como antes.
+      const cv = tipo === "vinos" ? comprasVino?.get(a.id) : undefined;
+      const c = cv ? (cv.ultima ?? undefined) : v ? compras.get(v.productoId) : undefined;
       const precio = num(a.precio_eur);
       const ivaCompra = c ? (c.ivaPct ?? IVA_COMPRA_SUPUESTO[tipo]) : null;
       const conIva = (x: UltimaCompra) => redondear2(x.eurUd * (1 + (x.ivaPct ?? IVA_COMPRA_SUPUESTO[tipo]) / 100));
@@ -338,12 +445,21 @@ export function filasCartaFacturas(
           en_carta: enCarta === null ? null : siNo(enCarta),
           compra: x.eurUd,
           compra_iva: conIva(x),
-          unidad: x.unidad,
+          unidad: formatoCompra(x),
           fecha: fechaCorta(x.fecha),
           proveedor: x.proveedor ?? null,
           [CLAVE_SUBFILA]: 1,
         };
       });
+      // Solo se compra en otro formato (el magnum enlazado a la botella de 75 cl): se dice en vez de poner su precio.
+      if (cv && !cv.ultima && cv.otrosFormatos.length > 0) {
+        const suyo = litrosFormato(a.nombre);
+        subfilas.unshift({
+          nombre: `Sin compras ${suyo === null ? "de botella de 75 cl" : `en ${textoFormato(suyo)}`}: solo de ${cv.otrosFormatos.map(textoFormato).join(" y ")}`,
+          [CLAVE_AVISO]: 1,
+          [CLAVE_SUBFILA]: 1,
+        });
+      }
       const fila: FilaInforme = {
         nombre,
         // Sin ningún producto en su escandallo, se dice (antes, «—» sin explicar por qué).
@@ -352,8 +468,9 @@ export function filasCartaFacturas(
         venta: precio !== null && precio > 0 ? redondear2(precio / (1 + ivaCartaPct / 100)) : null,
         compra: c ? c.eurUd : null,
         compra_iva: c && ivaCompra !== null ? conIva(c) : null,
-        ...(tipo === "vinos" ? { margen: textoMargen(margenes.get(a.id)) } : {}),
-        unidad: c ? c.unidad : null,
+        // Sin compra en su formato no hay margen (el de Márgenes sería el estimado desde otra botella).
+        ...(tipo === "vinos" ? { margen: c ? textoMargen(margenes.get(a.id)) : null } : {}),
+        unidad: c ? formatoCompra(c) : null,
         fecha: c ? fechaCorta(c.fecha) : null,
         activo: siNo(a.activado === true),
         foto: siNo(tieneFoto(a)),
@@ -367,17 +484,22 @@ const COLUMNAS_ANADAS: ColumnaInforme[] = [
   { id: "vino", etiqueta: "Vino de la carta", tipo: "texto" },
   { id: "anada", etiqueta: "Añada comprada", tipo: "texto", ancho: 110 },
   { id: "en_carta", etiqueta: "En carta", tipo: "texto", ancho: 80 },
-  { id: "compra", etiqueta: "Compra sin IVA (base)", tipo: "precio", ancho: 105 },
-  { id: "compra_iva", etiqueta: "Compra con IVA", tipo: "precio", ancho: 100 },
-  { id: "unidad", etiqueta: "Unidad", tipo: "texto", ancho: 85 },
-  { id: "fecha", etiqueta: "Fecha", tipo: "fecha", ancho: 110 },
+  { id: "compra", etiqueta: "Compra sin IVA (base)", tipo: "precio", ancho: 106 },
+  { id: "compra_iva", etiqueta: "Compra con IVA", tipo: "precio", ancho: 106 },
+  { id: "unidad", etiqueta: "Botella", tipo: "texto", ancho: 90 },
+  { id: "fecha", etiqueta: "Fecha", tipo: "fecha", ancho: 120 },
   { id: "proveedor", etiqueta: "Proveedor", tipo: "texto", ancho: 260 },
 ];
+
+/** Clave de la subfila que avisa de que solo se compra otro formato (no es una añada: no va a «Compras por añada»). */
+const CLAVE_AVISO = "_aviso";
 
 export interface DatosCartaFacturas {
   articulos: readonly ArticuloCarta[];
   vinculos: readonly VinculoCompra[];
   compras: ReadonlyMap<number, UltimaCompra>;
+  /** Solo vinos: la compra de cada vino en el formato de su carta (`comprasDelFormato`); manda sobre `compras`. */
+  comprasVino?: ReadonlyMap<string, CompraVino>;
   /** Solo vinos: multiplicador de Facturas › Márgenes por id de vino. */
   margenes?: MargenesVinos;
   /** IVA de la carta (%), el de Facturas › Márgenes. */
@@ -390,10 +512,13 @@ export interface DatosCartaFacturas {
 export function informeCartaFacturas(tipo: TipoCartaFacturas, datos: DatosCartaFacturas, ctx: ContextoInforme): ResultadoInformeTabla {
   const t = TEXTOS[tipo];
   if (datos.articulos.length === 0) return { vacio: true, motivo: `No hay ${t.plural} en la carta.` };
-  const todas = filasCartaFacturas(tipo, datos.articulos, datos.vinculos, datos.compras, datos.margenes, datos.ivaCartaPct, datos.anadas);
-  // Las subfilas (añadas compradas) no son vinos: no cuentan en los totales.
+  const todas = filasCartaFacturas(tipo, datos);
+  // Las subfilas (añadas compradas y avisos de formato) no son vinos: no cuentan en los totales.
   const filas = todas.filter((f) => !esSubfila(f));
-  const porAnada = todas.filter(esSubfila).map(({ [CLAVE_SUBFILA]: _sub, ...f }) => f);
+  const avisos = todas.filter((f) => f[CLAVE_AVISO] === 1).length;
+  const porAnada = todas.filter((f) => esSubfila(f) && f[CLAVE_AVISO] !== 1).map(({ [CLAVE_SUBFILA]: _sub, ...f }) => f);
+  // La marca del aviso no es una columna: fuera de la tabla.
+  const visibles = todas.map(({ [CLAVE_AVISO]: _aviso, ...f }) => f);
   const vinosConAnadas = new Set(porAnada.map((f) => f.vino)).size;
   const conCompra = filas.filter((f) => f.compra !== null).length;
   const sinEscandallo = tipo === "platos" ? filas.filter((f) => f.producto === FALTA_ESCANDALLO).length : 0;
@@ -414,13 +539,18 @@ export function informeCartaFacturas(tipo: TipoCartaFacturas, datos: DatosCartaF
       {
         titulo: t.titulo,
         columnas: columnasCartaFacturas(tipo),
-        filas: todas,
+        filas: visibles,
         nota:
           `Carta con IVA: lo que paga el cliente. Venta sin IVA: lo que te queda al quitar el IVA (${fmt(datos.ivaCartaPct ?? IVA_CARTA_POR_DEFECTO, 0)} %). ` +
-          `Compra: última factura o albarán de Casa Tomás, por la unidad en que se compra, sin IVA (base) y con IVA (el de la factura; si no lo dice, ${IVA_COMPRA_SUPUESTO[tipo]} %). ` +
+          (tipo === "vinos"
+            ? `Compra: última factura o albarán de Casa Tomás de una botella del formato de la carta (las cajas, por botella), sin IVA (base) y con IVA (el de la factura; si no lo dice, ${IVA_COMPRA_SUPUESTO[tipo]} %). `
+            : `Compra: última factura o albarán de Casa Tomás, por la unidad en que se compra, sin IVA (base) y con IVA (el de la factura; si no lo dice, ${IVA_COMPRA_SUPUESTO[tipo]} %). `) +
           "«—»: sin compra vinculada (se vincula en Facturas › Márgenes)." +
           (tipo === "vinos"
-            ? " Margen: el de Facturas › Márgenes con la última factura: cuántas veces cobras lo que pagas (venta sin IVA ÷ coste sin IVA, en el formato de la carta) y el beneficio, en % del precio de venta sin IVA."
+            ? " Margen: el de Facturas › Márgenes con la última factura: cuántas veces cobras lo que pagas (venta sin IVA ÷ coste sin IVA) y el beneficio, en % del precio de venta sin IVA." +
+              (avisos > 0
+                ? " «Sin compras en magnum…»: en las facturas solo hay botellas de otro formato; no se pone su precio ni el margen estimado."
+                : "")
             : " «Falta el escandallo»: el plato no tiene ingredientes; se añaden en Facturas › Márgenes.") +
           (porAnada.length > 0
             ? " Filas sangradas: si del vino se han comprado varias añadas (o una que no es la de la carta), la última compra de cada una; la fila del vino lleva la del producto enlazado."
@@ -528,6 +658,42 @@ async function leerLineasCompra(productos: number[]): Promise<LineaCompra[]> {
 }
 
 /**
+ * Botellas y litros por botella de cada línea (vista `volumen_lineas`, la conversión de Facturas › Márgenes:
+ * envase del catálogo o del texto de la línea, «C/6B» = 6 botellas). Si no se puede leer, el informe sale
+ * igual, por la unidad de la factura y sin mirar el formato.
+ */
+async function leerVolumenes(productos: number[]): Promise<Map<number, { envases: number | null; litros: number | null }>> {
+  const res = new Map<number, { envases: number | null; litros: number | null }>();
+  if (productos.length === 0) return res;
+  try {
+    for (let pagina = 0; pagina < PAGINAS_MAXIMAS; pagina++) {
+      const desde = pagina * POR_PAGINA;
+      const { data, error } = (await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vista fuera de los tipos generados
+        .from("volumen_lineas" as any)
+        .select("linea_id, medida, cantidad_base, envases")
+        .in("producto_id", productos)
+        .gt("importe", 0)
+        .gt("cantidad", 0)
+        .order("linea_id", { ascending: true })
+        .range(desde, desde + POR_PAGINA - 1)) as unknown as Respuesta;
+      if (error) return new Map();
+      const lote = (data ?? []) as { linea_id: number; medida: string | null; cantidad_base: number | string | null; envases: number | string | null }[];
+      for (const f of lote) {
+        const envases = num(f.envases);
+        const base = num(f.cantidad_base);
+        const litros = f.medida === "l" && envases !== null && envases > 0 && base !== null ? Math.round((base / envases) * 10000) / 10000 : null;
+        res.set(Number(f.linea_id), { envases: envases !== null && envases > 0 ? envases : null, litros });
+      }
+      if (lote.length < POR_PAGINA) break;
+    }
+  } catch {
+    return new Map();
+  }
+  return res;
+}
+
+/**
  * Multiplicador de cada vino según Facturas › Márgenes (RPC `margenes_carta`, la misma cuenta). Si falla, el informe
  * sale igual con «—» en «Margen»: no se pierde el resto por esto.
  */
@@ -553,7 +719,11 @@ export async function obtenerInformeCartaFacturas(tipo: TipoCartaFacturas, ctx: 
   // Vinos: también las de los productos del mismo vino en otra añada (17/11/2026).
   const catalogo = tipo === "vinos" ? await leerCatalogo([...new Set(principales.map((v) => v.categoriaId).filter((c): c is number => typeof c === "number"))]) : [];
   const productos = tipo === "vinos" ? [...productosMismoVino(principales, catalogo).values()].flat() : principales.map((v) => v.productoId);
-  const lineas = await leerLineasCompra([...new Set(productos)]);
-  const anadas = tipo === "vinos" ? comprasPorAnada(principales, catalogo, lineas) : undefined;
-  return informeCartaFacturas(tipo, { articulos, vinculos, compras: ultimasCompras(lineas), margenes, ivaCartaPct: m.ivaCartaPct, anadas }, ctx);
+  const ids = [...new Set(productos)];
+  // Vinos: botellas y formato de cada línea (17/11/2026), para el precio por botella y no mezclar magnum con 75 cl.
+  const [leidas, volumenes] = await Promise.all([leerLineasCompra(ids), tipo === "vinos" ? leerVolumenes(ids) : Promise.resolve(new Map())]);
+  const lineas = leidas.map((l) => ({ ...l, ...(volumenes.get(l.id) ?? {}) }));
+  const anadas = tipo === "vinos" ? comprasPorAnada(principales, catalogo, lineas, articulos) : undefined;
+  const comprasVino = tipo === "vinos" ? comprasDelFormato(principales, articulos, lineas) : undefined;
+  return informeCartaFacturas(tipo, { articulos, vinculos, compras: ultimasCompras(lineas), comprasVino, margenes, ivaCartaPct: m.ivaCartaPct, anadas }, ctx);
 }
