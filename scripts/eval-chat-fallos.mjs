@@ -18,6 +18,8 @@
 //   node scripts/eval-chat-fallos.mjs --ia --solo f01,f02 --modelo gpt-6.1-terra
 //   node scripts/eval-chat-fallos.mjs --dir ../carpeta-enlazada-a-prod --npx-prefix ../repo-con-node_modules
 //   node scripts/eval-chat-fallos.mjs --salida informe.json
+//   node scripts/eval-chat-fallos.mjs --simular a.sql,b.sql   # crea antes esas migraciones en una transacción
+//        (begin; a.sql; b.sql; banco; rollback): probar en producción funciones que aún no tiene, sin cambiar nada.
 //
 // Código de salida: 0 todo bien · 1 algún caso falla · 2 no se pudo ejecutar.
 import { execFileSync } from "node:child_process";
@@ -98,7 +100,7 @@ export function problemasDelBanco(banco, nombresHerramientas) {
 // ─── Ejecución ──────────────────────────────────────────────────────────────
 
 function args(argv) {
-  const o = { ia: false, ver: false, solo: null, dir: RAIZ, npxPrefix: null, modelo: "gpt-6.1-terra", salida: null, entorno: null };
+  const o = { ia: false, ver: false, solo: null, dir: RAIZ, npxPrefix: null, modelo: "gpt-6.1-terra", salida: null, entorno: null, simular: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--ia") o.ia = true;
@@ -109,6 +111,7 @@ function args(argv) {
     else if (a === "--modelo") o.modelo = argv[++i];
     else if (a === "--salida") o.salida = argv[++i];
     else if (a === "--entorno") o.entorno = argv[++i];
+    else if (a === "--simular") o.simular = argv[++i].split(",").map((f) => path.resolve(f));
     else throw new Error(`Opción desconocida: ${a}`);
   }
   return o;
@@ -128,6 +131,12 @@ function consultar(sql, o) {
   return json.rows;
 }
 
+/** El banco dentro de una transacción que crea antes las migraciones dadas y se deshace al final. */
+export function sqlSimulado(banco, migraciones) {
+  if (!migraciones.length) return banco;
+  return ["begin;", ...migraciones, banco, "rollback;"].join(String.fromCharCode(10));
+}
+
 const SERVICIO = "(select set_config('request.jwt.claims', '{\"role\":\"service_role\"}', true))";
 
 async function main() {
@@ -135,6 +144,7 @@ async function main() {
   const ref = readFileSync(path.join(o.dir, "supabase/.temp/project-ref"), "utf8").trim();
   const entorno = o.entorno ?? PROYECTOS[ref];
   if (!entorno) throw new Error(`Proyecto enlazado desconocido (${ref}): indica --entorno demo|prod.`);
+  if (o.ia && o.simular.length) throw new Error("--simular solo vale para el nivel rpc.");
   if (o.ia && entorno === "prod") throw new Error("El nivel --ia no se lanza contra producción (escribe en la cola de pg_net y gasta OpenAI).");
 
   const h = await import(pathToFileURL(path.join(RAIZ, "supabase/functions/chat-facturas/herramientas.ts")).href);
@@ -151,7 +161,8 @@ async function main() {
       const ll = h.prepararLlamada(c.herramienta.nombre, c.herramienta.argumentos, c.mensaje, c.herramienta.asociacion ?? null);
       return `select ${literalSql(c.id)} as id, clock_timestamp() as a, ${sqlDeLlamada(ll)}::text as r, clock_timestamp() as b`;
     });
-    const sql = `with cfg as materialized (select ${SERVICIO} as x), t as (\n${filas.map((f) => `select * from (${f} from cfg) q`).join("\nunion all\n")}\n)\nselect id, round(extract(epoch from (b - a)) * 1000) as ms, r from t;`;
+    const consulta = `with cfg as materialized (select ${SERVICIO} as x), t as (\n${filas.map((f) => `select * from (${f} from cfg) q`).join("\nunion all\n")}\n)\nselect id, round(extract(epoch from (b - a)) * 1000) as ms, r from t;`;
+    const sql = sqlSimulado(consulta, o.simular.map((f) => readFileSync(f, "utf8")));
     const porId = new Map(consultar(sql, o).map((f) => [f.id, f]));
     for (const c of casos) {
       const f = porId.get(c.id);
