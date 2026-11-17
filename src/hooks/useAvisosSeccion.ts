@@ -10,6 +10,15 @@ export const TAMANO_PAGINA_AVISOS_SECCION = 30;
 /** Evento para que los contadores se relean al marcar avisos (en el modal o donde sea). */
 const EVENTO_AVISOS_CAMBIADOS = "avisos-seccion-cambiados";
 export const avisarAvisosCambiados = () => window.dispatchEvent(new Event(EVENTO_AVISOS_CAMBIADOS));
+/**
+ * Una reserva se ha verificado o rechazado (CAS-9): sus avisos «Reserva nueva» ya están revisados en la base de
+ * datos. La lista de avisos abierta los da por revisados sin volver a pedirlos.
+ */
+const EVENTO_RESERVA_ATENDIDA = "aviso-reserva-atendida";
+export function avisarReservaAtendida(reservaId: string) {
+  window.dispatchEvent(new CustomEvent(EVENTO_RESERVA_ATENDIDA, { detail: { reservaId } }));
+  avisarAvisosCambiados();
+}
 
 /**
  * Avisos sin revisar (leida = false) de una sección: el número del botón rojo. Se relee cada
@@ -98,6 +107,27 @@ export function useAvisosSeccion(seccion: SeccionAvisos, filtros: FiltrosAvisosS
       setLoading(false);
     });
   }, [leer, activo]);
+
+  // Verificada o rechazada desde otro sitio (la ficha abierta con «Ver», la Lista…): su «Reserva nueva» se da por
+  // revisada aquí también (en la base de datos ya lo está).
+  useEffect(() => {
+    if (!activo) return;
+    const alAtender = (e: Event) => {
+      const reservaId = (e as CustomEvent<{ reservaId?: string }>).detail?.reservaId;
+      if (!reservaId) return;
+      setAvisos((prev) => {
+        const ids = new Set(prev.filter((n) => !n.leida && n.tipo === "reserva_nueva" && n.referencia_tipo === "reserva" && n.referencia_id === reservaId).map((n) => n.id));
+        if (!ids.size) return prev;
+        if (estado === "sin_revisar") {
+          crudas.current = Math.max(0, crudas.current - ids.size);
+          return prev.filter((n) => !ids.has(n.id));
+        }
+        return prev.map((n) => (ids.has(n.id) ? { ...n, leida: true } : n));
+      });
+    };
+    window.addEventListener(EVENTO_RESERVA_ATENDIDA, alAtender);
+    return () => window.removeEventListener(EVENTO_RESERVA_ATENDIDA, alAtender);
+  }, [activo, estado]);
 
   const cargarMas = async () => {
     if (cargandoMas || !hayMas) return;
