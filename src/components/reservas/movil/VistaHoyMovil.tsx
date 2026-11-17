@@ -41,6 +41,8 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   Armchair,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   CheckCircle2,
   CircleSlash,
@@ -50,6 +52,7 @@ import {
   Lock,
   MapPin,
   Phone,
+  Plus,
   RefreshCw,
   Search,
   StickyNote,
@@ -96,7 +99,7 @@ import { COLORES_MESA, estadoColorMovil } from "@/lib/reservas/coloresMesa";
 import { configServicioSalaDesde, type ReservaMesaServicio } from "@/lib/reservas/servicioSala";
 import { turnoDeHora } from "@/lib/reservas/asignacionMesas";
 import { ESTADOS_RESERVA, type EstadoReserva } from "@/lib/reservas/estadosReserva";
-import { turnoPorDefecto, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
+import { etiquetaDiaReservasCorta, sumarDias, turnoPorDefecto, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
 import {
   estadoMesasHoy,
   candidatasParaMesa,
@@ -204,10 +207,16 @@ export function VistaHoyMovil({
   fecha,
   columna,
   canceladas: canceladasMovil,
+  dia,
+  onNuevaReserva,
 }: {
   reservas: ReservaMovil[] | undefined;
   fecha: string;
   columna?: ColumnaHoy;
+  /** Móvil (17/11/2026, petición del dueño): flechas para pasar de día. `hoy` es el día de verdad. */
+  dia?: { hoy: string; onCambiar: (fecha: string) => void };
+  /** Móvil (17/11/2026): «Nueva reserva» en el día que se ve. Sin permiso de crear, no se pasa y no sale. */
+  onNuevaReserva?: () => void;
   /** Las anuladas del día en el móvil (13/11/2026): salen en «Por llegar» con la etiqueta «Anulada». */
   canceladas?: ReservaMovil[];
 }) {
@@ -445,11 +454,58 @@ export function VistaHoyMovil({
         {hayMenu && <BotonAvisosSeccion seccion="reservas" className="h-11 gap-1 px-2" />}
       </div>
       )}
+      {/* El día y «Nueva reserva» (17/11/2026, petición del dueño: «no deja pasar de día ni generar una nueva reserva
+          manualmente»). Una sola fila: flechas, el día en corto y, a la derecha, el alta. Fuera de hoy el día va en
+          ámbar y tocarlo vuelve a hoy, para que nadie siente por error en otro día. */}
+      {!columna && (dia || onNuevaReserva) && (
+        <div className="flex shrink-0 items-center gap-1.5" data-testid="hoy-movil-dia">
+          {dia && (
+            <div className="flex min-w-0 flex-1 items-center gap-1" role="group" aria-label="Día">
+              <Button type="button" variant="outline" size="icon" className="h-11 w-11 shrink-0" aria-label="Día anterior" onClick={() => dia.onCambiar(sumarDias(fecha, -1))}>
+                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+              </Button>
+              {fecha === dia.hoy ? (
+                <span className="min-w-0 flex-1 truncate text-center text-base font-semibold" aria-live="polite" data-testid="dia-reservas-movil">
+                  {etiquetaDiaReservasCorta(fecha, dia.hoy)}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => dia.onCambiar(dia.hoy)}
+                  className="flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md bg-amber-100 px-2 text-base font-semibold text-amber-950 active:bg-amber-200 dark:bg-amber-950/60 dark:text-amber-100"
+                  aria-label={`${etiquetaDiaReservasCorta(fecha, dia.hoy)}. Volver a hoy`}
+                  aria-live="polite"
+                  data-testid="dia-reservas-movil"
+                >
+                  <span className="truncate">{etiquetaDiaReservasCorta(fecha, dia.hoy)}</span>
+                  <Undo2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                </button>
+              )}
+              <Button type="button" variant="outline" size="icon" className="h-11 w-11 shrink-0" aria-label="Día siguiente" onClick={() => dia.onCambiar(sumarDias(fecha, 1))}>
+                <ChevronRight className="h-5 w-5" aria-hidden="true" />
+              </Button>
+            </div>
+          )}
+          {onNuevaReserva && (
+            // El mismo azul clarito que «Nueva Reserva» en tablet y escritorio. A menos de 390 px, solo el «+».
+            <Button
+              type="button"
+              className="ml-auto h-11 shrink-0 gap-1 border border-sky-300 bg-sky-100 px-3 font-semibold text-sky-900 shadow-sm hover:bg-sky-200 dark:border-sky-700 dark:bg-sky-900/60 dark:text-sky-50 dark:hover:bg-sky-900 max-[389px]:w-11 max-[389px]:px-0 pointer-coarse:h-11"
+              onClick={onNuevaReserva}
+              aria-label="Nueva reserva"
+              data-testid="nueva-reserva-movil"
+            >
+              <Plus className="h-5 w-5" aria-hidden="true" />
+              <span className="max-[389px]:hidden">Nueva</span>
+            </Button>
+          )}
+        </div>
+      )}
       {/* «Pendientes» también en el móvil (12/11/2026, petición del dueño): reloj y número junto a «Cerrar comida / Cerrar
-          cena»; abre la misma lista que en la Lista y en Reservas (aquí sin «Ver el día»: el móvil no cambia de día). */}
+          cena»; abre la misma lista que en la Lista y en Reservas. Con las flechas de día (17/11/2026), «Ver el día» va a ese día. */}
       {!columna && (
         <div className="flex shrink-0 items-center gap-1.5" data-testid="hoy-movil-servicios">
-          <BotonPendientes compacto className="shrink-0" />
+          <BotonPendientes compacto className="shrink-0" onVerDia={dia?.onCambiar} />
           {/* «Sin reserva» baja aquí (12/11/2026): arriba no cabía junto a «Lista | Mesas». */}
           <BotonSentarSinReserva soloIcono className="shrink-0" />
           <InterruptoresServiciosOnline fecha={fecha} compacta className="min-w-0 flex-1" />
@@ -665,7 +721,9 @@ export function FilaReservaMovil({
           <span className="w-14 shrink-0 text-lg font-semibold leading-tight tabular-nums">{horaCorta(reserva.hora)}</span>
           <span className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight">{reserva.nombre || "Sin nombre"}</span>
           {/* Tocar el número cambia las personas (10/11/2026). */}
-          <BotonPersonas reserva={reserva} className="text-xl font-bold leading-none" />
+          {/* 17/11/2026 (captura del dueño: «se ve un poco apretado»): sin el margen negativo, que lo pegaba a «Sentar» y
+              «Fuera», y con más aire entre el icono, el número y el borde. */}
+          <BotonPersonas reserva={reserva} className="my-0 gap-1.5 px-2.5 text-xl font-bold leading-none" />
           {/* Teléfono (15/10/2026, petición del dueño): icono de 44 px con márgenes negativos para no
               hacer la fila más alta. Desde 375 px: a 320 px dejaba el nombre en ~100 px. */}
           {tel && (

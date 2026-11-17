@@ -18,7 +18,8 @@ const aFecha = (iso: string) => new Date(Number(iso.slice(0, 4)), Number(iso.sli
 
 const BOTON =
   "whitespace-nowrap rounded-md font-medium text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm";
-const TAMANO = { normal: "min-h-11 px-3 text-sm", compacto: "min-h-8 px-2 text-[0.8125rem] pointer-coarse:min-h-11 2xl:px-2.5" } as const;
+// Compacto en el móvil (17/11/2026): menos relleno lateral para que Avisos y Ayuda quepan a su derecha, en la misma fila.
+const TAMANO = { normal: "min-h-11 px-3 text-sm", compacto: "min-h-8 px-2 text-[0.8125rem] pointer-coarse:min-h-11 max-sm:px-1.5 max-[389px]:px-1 2xl:px-2.5" } as const;
 
 export function SelectorPeriodo({
   valor,

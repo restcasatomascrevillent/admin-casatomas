@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.38.3] - 2026-11-17
+
+Objetivo: Reservas en el móvil con flechas de día y «Nueva reserva», y la fila de avisos de Facturas más compacta
+
+### Cambiado
+- Movil: día y «Nueva» en Reservas, pax con aire y avisos de Facturas en una fila ([#249](https://github.com/restcasatomascrevillent/admin-casatomas/pull/249))
+
 ## [1.38.2] - 2026-11-17
 
 Objetivo: clasificar-productos ya no se corta por tiempo ni pierde lo que hizo la IA (CAS-7)
