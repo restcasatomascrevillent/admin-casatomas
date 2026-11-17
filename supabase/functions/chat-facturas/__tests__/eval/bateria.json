@@ -5367,17 +5367,17 @@
    },
    "esperado": [
     {
-     "ruta": "ultima_factura.precio_linea",
-     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'lagar cervera.*magnum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select sum(pf.total) / sum(pf.cantidad) from productos_factura pf where pf.factura_id = (select f.id from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'lagar cervera.*magnum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1) and pf.nombre ~* 'lagar cervera.*magnum' and pf.total >= 0",
      "tol": 0.01,
-     "valor": 22.9,
+     "valor": 19.08,
      "tipo": "num"
     }
    ],
    "rpc": {
     "max_ms": 8000
    },
-   "nota": "22,90 € el magnum; 11,45 € el 75 cl. el precio de la línea va en precio_linea; precio_unitario es el coste real con las botellas sin cargo"
+   "nota": "coste real del magnum: 343,50 € / (15 pagadas + 3 sin cargo) = 19,08 €; la línea dice 22,90 €. La misma factura trae el 75 cl: no se mezclan los formatos (antes 14,31 €)"
   },
   {
    "id": "t32",
@@ -5398,17 +5398,17 @@
    },
    "esperado": [
     {
-     "ruta": "ultima_factura.precio_linea",
-     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'lagar cervera albari.o 75cl' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select sum(pf.total) / sum(pf.cantidad) from productos_factura pf where pf.factura_id = (select f.id from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'lagar cervera albari.o 75cl' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1) and pf.nombre ~* 'lagar cervera albari.o 75cl' and pf.total >= 0",
      "tol": 0.01,
-     "valor": 11.45,
+     "valor": 9.54,
      "tipo": "num"
     }
    ],
    "rpc": {
     "max_ms": 8000
    },
-   "nota": "el precio de la línea va en precio_linea; precio_unitario es el coste real con las botellas sin cargo"
+   "nota": "coste real del 75 cl: 171,75 € / (15 + 3 sin cargo) = 9,54 €, igual que t26; la línea dice 11,45 €"
   },
   {
    "id": "t33",
@@ -5490,17 +5490,17 @@
    },
    "esperado": [
     {
-     "ruta": "ultima_factura.precio_linea",
-     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'seque 2021' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select sum(pf.total) / sum(pf.cantidad) from productos_factura pf where pf.factura_id = (select f.id from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'seque 2021' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1) and pf.nombre ~* 'seque 2021' and pf.total >= 0",
      "tol": 0.01,
-     "valor": 18.7,
+     "valor": 15.58,
      "tipo": "num"
     }
    ],
    "rpc": {
     "max_ms": 8000
    },
-   "nota": "el precio de la línea va en precio_linea; precio_unitario es el coste real con las botellas sin cargo"
+   "nota": "coste real: 561 € / 36 botellas (pagadas + sin cargo) = 15,58 €; la línea dice 18,70 €"
   }
  ]
 }
