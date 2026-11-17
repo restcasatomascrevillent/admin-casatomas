@@ -21,6 +21,7 @@ import {
   type DocNombrado,
   anotarRuta,
   documentosNombrados,
+  esTiempoAgotado,
   elegirDocumento,
   idsDeFilas,
   nombradosEnRespuesta,
@@ -54,6 +55,7 @@ export const TIMEOUT_OPENAI_MS = 45_000;
 export const PRESUPUESTO_MS = 110_000;        // deadline global de la peticion entera
 export const MAX_TOOL_CALLS_POR_RONDA = 4;    // corta el fan-out que el prompt fomenta
 export const MAX_TOKENS_RESPUESTA = 800;      // el prompt pide 6 lineas; 800 sobra
+export const MARGEN_REINTENTO_MS = 30_000;     // tiempo minimo que debe quedar para reintentar una consulta cortada
 export const MAX_TOKENS_PRESUPUESTO = 2_500;   // con un presupuesto adjunto la respuesta es una tabla de hasta 40 filas
 
 // deno-lint-ignore no-explicit-any
@@ -275,10 +277,14 @@ export function mensajesDeHistorial(historial: TurnoHistorial[]): Mensaje[] {
           tool_call_id: ids[j],
           content: JSON.stringify({
             turno_anterior: true,
-            ...(h.error ? { error: String(h.error).slice(0, 200) } : {}),
+            // Sin el texto del error (17/11/2026): con «statement timeout» a la vista el
+            // modelo abría la respuesta siguiente con «la consulta anterior agotó el tiempo…».
+            ...(h.error ? { sin_resultado: true } : {}),
             ...(h.resumen?.proveedores?.length ? { proveedores: h.resumen.proveedores } : {}),
             ...(h.resumen?.productos?.length ? { productos: h.resumen.productos } : {}),
-            nota: "Resumen de un turno anterior (sin cifras). Para dar cifras, vuelve a consultar.",
+            nota: h.error
+              ? "Esta consulta no dio resultado en un turno anterior. Si hace falta, vuelve a consultarla y da el dato sin mencionar fallos ni reintentos."
+              : "Resumen de un turno anterior (sin cifras). Para dar cifras, vuelve a consultar.",
           }),
         });
       });
@@ -511,7 +517,14 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
     let data: unknown;
 
     if (ll.tipo === "rpc") {
-      const r = await supabase.rpc(ll.rpc, ll.params);
+      let r = await supabase.rpc(ll.rpc, ll.params);
+      // Tiempo agotado en la BD (corta a los 8 s): UN reintento si queda margen. El
+      // segundo intento encuentra los datos ya en memoria y suele entrar en plazo;
+      // así el usuario espera unos segundos más en vez de leer «no he podido consultar».
+      if (r.error && esTiempoAgotado(r.error) && ctx.deadline - Date.now() > MARGEN_REINTENTO_MS) {
+        console.warn(`[chat-facturas] ${ll.rpc}: tiempo agotado, se reintenta una vez`);
+        r = await supabase.rpc(ll.rpc, ll.params);
+      }
       if (r.error) throw r.error;
       data = r.data;
       // compras_producto: si el texto no casa con nada, UNA segunda llamada
@@ -586,8 +599,8 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
         aviso: corregible
           ? "LLAMADA INVALIDA: no se ha consultado nada. Corrige los argumentos y vuelve a llamar " +
             "a la herramienta. NO respondas con cifras de otro periodo ni con el historico completo."
-          : "La consulta a la base de datos ha fallado. Dile al usuario que no has podido " +
-            "consultar los datos; NO respondas con cifras.",
+          : "Este dato no se ha podido consultar ahora. Contesta lo demas con normalidad y di solo, " +
+            "sin detalles tecnicos, que este dato no lo puedes consultar en este momento; NO des cifras de el.",
       }),
     };
   }
@@ -731,14 +744,20 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
 
     if (!esUltimo && msg.tool_calls?.length > 0) {
       const atendidas = msg.tool_calls.slice(0, MAX_TOOL_CALLS_POR_RONDA);
-      for (const tc of atendidas) {
+      // En paralelo (17/11/2026): «precio de X y de Y» son dos o tres consultas
+      // independientes y en serie se sumaban sus tiempos. Los resultados se
+      // apuntan después, en el orden en que el modelo las pidió.
+      const ejecutadas = await Promise.all(atendidas.map(async (tc: Mensaje) => {
         let args = {};
         try { args = JSON.parse(tc.function.arguments || "{}"); } catch { /* el modelo mando JSON invalido */ }
         const inicioTool = Date.now();
         const r = await ejecutarTool(tc.function.name, args, supabase, ctx);
+        return { tc, args, r, duracion_ms: Date.now() - inicioTool };
+      }));
+      for (const { tc, args, r, duracion_ms } of ejecutadas) {
         const textoError = (() => { try { const e = JSON.parse(r.contenido).error; return e ? String(e) : ""; } catch { return ""; } })();
         apuntar(
-          { nombre: tc.function.name, argumentos: args, resultado: r.fallo || textoError ? "fallida" : "completada", duracion_ms: Date.now() - inicioTool },
+          { nombre: tc.function.name, argumentos: args, resultado: r.fallo || textoError ? "fallida" : "completada", duracion_ms },
           textoError || undefined,
           textoError ? undefined : resumenDeResultado(r.contenido),
         );
