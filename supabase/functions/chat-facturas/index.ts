@@ -3,7 +3,7 @@ import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { configModeloFuncion } from "../_shared/modelo-funcion.ts";
-import { modeloChat, parametrosModelo, sinDuplicar } from "./herramientas.ts";
+import { datosIncidencia, modeloChat, motivoDeError, parametrosModelo, sinDuplicar, type MotivoIncidencia } from "./herramientas.ts";
 import { procesarPresupuesto } from "./adjuntar.ts";
 import { filasDeExcel } from "./excel.ts";
 import { MODELO_CONFIRMAR } from "./hoja.ts";
@@ -22,6 +22,12 @@ const createClient = clienteConAuditoria(createClientBase, "chat-facturas");
 //  traza (11/11/2026): { herramientas: [{ nombre, argumentos, resultado,
 //  error?, resumen? }] }. El panel la guarda con la respuesta (adjunto
 //  "contexto", para el hilo) y con el 👍/👎 (tabla chat_feedback).
+//  incidencia (17/11/2026): si la peticion acaba en error, tiempo agotado,
+//  herramienta caida o sin respuesta, OUT lleva { incidencia: <motivo> } (el
+//  panel enseña «Reintentar») y queda una fila en fallos_internos (tipo
+//  chat_error: pregunta recortada, duracion, motivo y herramientas; SIN usuario).
+//  sin_datos: true cuando todas las consultas volvieron vacias (un «no hay»):
+//  el panel pregunta de un toque si deberia haber datos (👎 con motivo).
 //  adjuntos (20261008120000, contrato con la UI): [{ tipo: 'serie_precio',
 //  datos: <serie_precios_agente> }] cuando el modelo llama a grafico_precio;
 //  se omite si no hay. El modelo solo ve el resumen (separarAdjunto).
@@ -126,6 +132,25 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
     // Confirmación de parejas de una tarifa (hoja.ts, modelo fijo y rápido).
     const usoConfirmar = new AcumuladorUso("chat-facturas", MODELO_CONFIRMAR, "chat");
     const inicioMs = Date.now();
+    let preguntaActual = "";
+    const trazaActual: Traza = { llamadas: [], herramientas: [] };
+    // Deja rastro de la peticion fallida (nunca lanza: registrar no puede romper la respuesta).
+    const registrarIncidencia = async (motivo: MotivoIncidencia, detalle?: string | null, modeloUsado?: string | null) => {
+      try {
+        const { error } = await supabase.rpc("fallo_interno_registrar", {
+          p_tipo: "chat_error",
+          p_datos: datosIncidencia({
+            motivo, pregunta: preguntaActual, duracionMs: Date.now() - inicioMs, modelo: modeloUsado ?? modelo, detalle,
+            herramientas: trazaActual.herramientas,
+          }),
+          p_usuario_id: null,
+          p_clave: null,
+        });
+        if (error) console.warn("[chat-facturas] incidencia sin registrar:", error.message);
+      } catch (e) {
+        console.warn("[chat-facturas] incidencia sin registrar:", e instanceof Error ? e.message : e);
+      }
+    };
 
     try {
       const { mensaje, session_id, presupuesto: adjuntoPresupuesto } = await req.json();
@@ -133,6 +158,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
         return json({ success: false, respuesta: "No he recibido ninguna pregunta." }, 200);
       }
       if (typeof mensaje !== "string" || mensaje.length > 16000) return json({ success: false, respuesta: "La pregunta debe tener como máximo 16000 caracteres." }, 400);
+      preguntaActual = mensaje;
       // El contenido de la consulta queda en auditoría, no en logs técnicos.
 
       // ── Presupuesto de proveedor adjunto (16/11/2026) ──
@@ -216,8 +242,8 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       // Pista de la pregunta + bucle de function-calling (bucle.ts).
       // Traza de las herramientas: vuelve al panel para guardarla con la
       // respuesta (hilo) y con el 👍/👎 (chat_feedback).
-      const traza: Traza = { llamadas: [], herramientas: [] };
-      const { respuesta, adjuntos, modelo: modeloUsado } = await ejecutarConversacion({
+      const traza = trazaActual;
+      const { respuesta, adjuntos, modelo: modeloUsado, huboFalloDeHerramienta, sinRespuesta, sinDatos } = await ejecutarConversacion({
         supabase,
         claveOpenAI: OPENAI_KEY,
         mensaje,
@@ -236,9 +262,15 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
         claveCache: typeof session_id === "string" && session_id ? `chat-facturas:${session_id}`.slice(0, 64) : undefined,
       });
 
+      // Peticion que «funciono» pero no sirvio: sin respuesta redactada o con una consulta caida.
+      const incidencia: MotivoIncidencia | null = sinRespuesta ? "sin_respuesta" : huboFalloDeHerramienta ? "herramienta_fallida" : null;
+      if (incidencia) await registrarIncidencia(incidencia, null, modeloUsado);
+
       return json({
         success: true,
         respuesta,
+        ...(incidencia ? { incidencia } : {}),
+        ...(sinDatos && !incidencia ? { sin_datos: true } : {}),
         ...(adjuntos.length > 0 ? { adjuntos } : {}),
         modelo: modeloUsado,
         traza: trazaParaPanel(traza),
@@ -251,9 +283,11 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
 
       // Mensaje util para el usuario segun el tipo de fallo, en vez de un
       // "hubo un error" generico que no dice si reintentar o avisar a alguien.
-      let visible = "Ha habido un problema al procesar tu consulta. Intentalo de nuevo.";
+      const motivo = motivoDeError(msg);
+      await registrarIncidencia(motivo, msg);
+      let visible = "Ha habido un problema al procesar tu consulta. Pulsa «Reintentar».";
       if (msg.includes("aborted") || msg.toLowerCase().includes("timeout")) {
-        visible = "La consulta ha tardado demasiado y se ha cancelado. Prueba con una pregunta mas concreta.";
+        visible = "La consulta ha tardado demasiado y se ha cancelado. Pulsa «Reintentar» o prueba con una pregunta mas concreta.";
       } else if (msg.includes("OpenAI chat 429") || msg.includes("OpenAI embeddings 429")) {
         visible = "El servicio de IA esta saturado ahora mismo. Espera unos segundos y vuelve a intentarlo.";
       } else if (msg.includes("OpenAI chat 401") || msg.includes("OpenAI embeddings 401")) {
@@ -262,7 +296,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
         visible = "El servicio de IA no ha respondido. Intentalo de nuevo en un momento.";
       }
 
-      return json({ success: false, respuesta: visible, error: msg }, 200);
+      return json({ success: false, respuesta: visible, error: msg, incidencia: motivo }, 200);
     } finally {
       // Pasa por aqui TODO: exito, error y las salidas tempranas del try. Nunca
       // lanza (ver _shared/registrar-uso-ia.ts), asi que no puede convertir una

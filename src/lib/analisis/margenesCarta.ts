@@ -159,6 +159,13 @@ export interface VinoMargen {
   formatoDistinto: boolean;
   /** Lo que cuesta la botella (formato de la carta) según la ÚLTIMA factura, sin IVA. */
   coste: number | null;
+  /**
+   * Precio de la botella en la última factura, SIN descontar las botellas sin cargo (dato secundario).
+   * `coste` ya es el efectivo (total pagado ÷ botellas pagadas + sin cargo) desde 20261208213000.
+   */
+  costeFactura: number | null;
+  /** Botellas sin cargo de la última factura (0 si no hay): explican por qué `coste` < `costeFactura`. */
+  botellasSinCargo: number;
   /** Lo mismo con la última factura que había hace 6 meses. */
   coste6m: number | null;
   costeIva: number | null;
@@ -399,6 +406,8 @@ export function normalizarMargenes(entrada: unknown): MargenesCarta {
     litrosProducto: num(v.litros_producto),
     formatoDistinto: v.formato_distinto === true,
     coste: num(v.coste),
+    costeFactura: num(v.coste_factura) ?? num(v.coste),
+    botellasSinCargo: num(v.botellas_sin_cargo) ?? 0,
     coste6m: num(v.coste_6m),
     costeIva: num(v.coste_iva),
     costeMediana: num(v.coste_mediana),
@@ -567,6 +576,16 @@ export function textoMediana(a: ArticuloMargen, config: ConfigMargenes = CONFIG_
   if (a.tipo === "vino") return a.costeMediana === null ? null : `${cab}: ${euros(a.costeMediana)} la botella`;
   if (a.costeMediana === null) return null;
   return `${cab}: hacerlo costaría ${euros(a.costeMediana)}` + (a.pctMediana !== null ? ` (${textoPctCoste(a.pctMediana)})` : "");
+}
+
+/**
+ * Vino con botellas sin cargo: el precio de la factura como dato secundario del coste efectivo
+ * («factura 16,85 € · con 2 sin cargo»). null si no hay botellas sin cargo.
+ */
+export function textoCosteFactura(a: ArticuloMargen): string | null {
+  if (a.tipo !== "vino" || !(a.botellasSinCargo > 0) || a.costeFactura === null) return null;
+  const n = a.botellasSinCargo;
+  return `factura ${euros(a.costeFactura)} · con ${fmt(n, Number.isInteger(n) ? 0 : 1)} sin cargo`;
 }
 
 /** Ingrediente: «Mediana de 3 meses: 20,10 €/kg». */

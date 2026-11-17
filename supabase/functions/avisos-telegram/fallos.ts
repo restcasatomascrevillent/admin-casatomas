@@ -64,6 +64,28 @@ const FORMATOS: Record<string, Formato> = {
       ...(limpio(d.comentario) ? [`Comentario: ${recortar(limpio(d.comentario), 400)}`] : []),
     ].join("\n");
   },
+  // 18/11/2026: agrupados en SQL (fallo_interno_registrar): como mucho uno cada 15 min; los
+  // que llegaron mientras tanto vienen contados en acumulados_antes.
+  chat_error: (f) => {
+    const d = f.datos;
+    const acumulados = Number(d.acumulados_antes);
+    const herramientas = Array.isArray(d.herramientas)
+      ? (d.herramientas as Record<string, unknown>[]).slice(0, 8).map((h) => `${limpio(h.nombre)}:${limpio(h.resultado)}`).join(", ")
+      : "";
+    return [
+      "Fallo del copiloto de Facturas",
+      `Motivo: ${limpio(d.motivo) || "(desconocido)"}${limpio(d.origen) ? ` (${limpio(d.origen)})` : ""}`,
+      `Hora: ${horaLegible(f.created_at)}`,
+      ...(Number.isFinite(Number(d.duracion_ms)) ? [`Duración: ${Math.round(Number(d.duracion_ms) / 100) / 10} s`] : []),
+      ...(limpio(d.modelo) ? [`Modelo: ${recortar(limpio(d.modelo), 60)}`] : []),
+      `Pregunta: ${recortar(limpio(d.pregunta), 300) || "(sin pregunta)"}`,
+      ...(limpio(d.detalle) ? [`Detalle: ${recortar(limpio(d.detalle), 300)}`] : []),
+      ...(herramientas ? [`Herramientas: ${recortar(herramientas, 400)}`] : []),
+      ...(Number.isInteger(acumulados) && acumulados > 0
+        ? [`Además: ${acumulados} fallo${acumulados === 1 ? "" : "s"} más del chat desde ${horaLegible(limpio(d.acumulados_desde))} (se agrupan: un aviso cada 15 min como mucho).`]
+        : []),
+    ].join("\n");
+  },
 };
 
 /** Texto de un fallo (tipo conocido o genérico), siempre ≤ LIMITE_TELEGRAM. */

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { normalizarAdjuntos, type AdjuntoChat } from "@/lib/facturas/seriePrecio";
 import { componerMensaje } from "@/lib/facturas/graficasCopiloto";
 import { archivoABase64, problemaConPresupuesto } from "@/lib/facturas/presupuestoAdjunto";
+import { registrarFalloInterno } from "@/lib/facturas/fallosInternos";
 
 // ─── Tipos alineados con las tablas reales de Supabase ───────────────────────
 // Tablas: chat_facturas_conversaciones, chat_facturas_mensajes
@@ -38,13 +39,27 @@ export interface MensajeChat {
   traza?: TrazaChat;
   /** 👍 (1) / 👎 (-1) ya dado por este usuario: no se vota dos veces. */
   valoracion?: 1 | -1;
+  /**
+   * `error`: la petición falló (tiempo agotado, IA caída, sin respuesta): se
+   * enseña «Reintentar». `sin_datos`: la respuesta es un «no hay»: se pregunta
+   * de un toque si debería haber datos (👎 con motivo). 17/11/2026.
+   */
+  aviso?: AvisoChat;
 }
+
+export type AvisoChat = "error" | "sin_datos";
+
+/** Texto del mensaje cuando la función no devuelve nada (red, tiempo agotado del navegador…). */
+export const TEXTO_SIN_RESPUESTA = "⚠️ No he podido responder: la consulta no ha llegado o ha tardado demasiado. Pulsa «Reintentar».";
 
 /** Traza de herramientas de una respuesta (chat-facturas/hilo.ts, trazaParaPanel). */
 export interface TrazaChat {
   modelo: string | null;
   herramientas: unknown[];
+  aviso?: AvisoChat;
 }
+
+const avisoValido = (v: unknown): AvisoChat | undefined => (v === "error" || v === "sin_datos" ? v : undefined);
 
 /** Tabla sin tipos generados (migración 20261123200000_chat_feedback). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,20 +72,41 @@ export const MAX_HISTORIAL_FEEDBACK = 10;
 export function trazaDeAdjuntos(adjuntos: unknown): TrazaChat | undefined {
   if (!Array.isArray(adjuntos)) return undefined;
   const a = adjuntos.find((x) => x && typeof x === "object" && (x as { tipo?: unknown }).tipo === "contexto") as
-    { datos?: { modelo?: unknown; herramientas?: unknown } } | undefined;
+    { datos?: { modelo?: unknown; herramientas?: unknown; aviso?: unknown } } | undefined;
   if (!a?.datos || !Array.isArray(a.datos.herramientas)) return undefined;
-  return { modelo: typeof a.datos.modelo === "string" ? a.datos.modelo : null, herramientas: a.datos.herramientas };
+  const aviso = avisoValido(a.datos.aviso);
+  return { modelo: typeof a.datos.modelo === "string" ? a.datos.modelo : null, herramientas: a.datos.herramientas, ...(aviso ? { aviso } : {}) };
 }
 
 /** La traza que devuelve chat-facturas (`traza` + `modelo`), o undefined si no viene (función sin desplegar). */
 export function trazaDeRespuesta(data: unknown): TrazaChat | undefined {
-  const d = data as { traza?: { herramientas?: unknown }; modelo?: unknown } | null;
-  if (!d || !d.traza || !Array.isArray(d.traza.herramientas)) return undefined;
-  return { modelo: typeof d.modelo === "string" ? d.modelo : null, herramientas: d.traza.herramientas };
+  const d = data as { traza?: { herramientas?: unknown }; modelo?: unknown; success?: unknown; incidencia?: unknown; sin_datos?: unknown } | null;
+  if (!d) return undefined;
+  // `incidencia` (o success = false) = la petición falló; `sin_datos` = la respuesta es un «no hay».
+  const aviso: AvisoChat | undefined = d.incidencia || d.success === false ? "error" : d.sin_datos === true ? "sin_datos" : undefined;
+  const herramientas = d.traza && Array.isArray(d.traza.herramientas) ? d.traza.herramientas : null;
+  if (!herramientas && !aviso) return undefined;
+  return { modelo: typeof d.modelo === "string" ? d.modelo : null, herramientas: herramientas ?? [], ...(aviso ? { aviso } : {}) };
 }
 
 const adjuntoContexto = (t: TrazaChat | undefined) =>
-  t ? [{ tipo: "contexto", datos: { modelo: t.modelo, herramientas: t.herramientas } }] : [];
+  t ? [{ tipo: "contexto", datos: { modelo: t.modelo, herramientas: t.herramientas, ...(t.aviso ? { aviso: t.aviso } : {}) } }] : [];
+
+/**
+ * La función no ha devuelto nada (red caída, tiempo agotado en el navegador): se avisa a
+ * desarrollo con la pregunta recortada, la duración y el motivo (fallos_internos, tipo
+ * chat_error, sin usuario). Los fallos que ve la propia función los registra ella.
+ */
+export function avisarChatSinRespuesta(pregunta: string, duracionMs: number, detalle: string): void {
+  const texto = pregunta.replace(/\s+/g, " ").trim();
+  void registrarFalloInterno("chat_error", {
+    origen: "panel",
+    motivo: "sin_respuesta_del_servidor",
+    pregunta: texto.length > 300 ? texto.slice(0, 300) + "…" : texto,
+    duracion_ms: Math.round(duracionMs),
+    detalle: detalle.slice(0, 300),
+  });
+}
 
 /**
  * `activo` = false (quien no tiene «Editar» en Facturas: sin IA, 06/11/2026):
@@ -123,6 +159,7 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
       persistido: true,
       adjuntos: normalizarAdjuntos(m.adjuntos),
       traza: m.rol === "assistant" ? trazaDeAdjuntos(m.adjuntos) : undefined,
+      aviso: m.rol === "assistant" ? trazaDeAdjuntos(m.adjuntos)?.aviso : undefined,
     }));
 
     setMensajes(mapped);
@@ -309,6 +346,7 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
       await actualizarTitulo(conv.id, pregunta.trim());
     }
 
+    const inicio = Date.now();
     try {
       // Llamar a la edge function con session_id = conv.session_id
       const { data, error } = await supabase.functions.invoke("chat-facturas", {
@@ -342,18 +380,21 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
         persistido: !!savedAssistantMsg,
         adjuntos,
         traza,
+        aviso: traza?.aviso,
       };
       setMensajes((prev) => [...prev, msgAsistente]);
     } catch (error) {
       console.error("Error en chat:", error);
       toast.error("No se pudo enviar el mensaje");
+      avisarChatSinRespuesta(texto, Date.now() - inicio, error instanceof Error ? error.message : String(error));
 
       const msgError: MensajeChat = {
         id: crypto.randomUUID(),
-        contenido: "⚠️ Hubo un problema al procesar tu consulta.",
+        contenido: TEXTO_SIN_RESPUESTA,
         rol: "assistant",
         conversacion_id: conv.id,
         created_at: new Date().toISOString(),
+        aviso: "error",
       };
       setMensajes((prev) => [...prev, msgError]);
     } finally {
@@ -480,6 +521,7 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
     // Reenviar el mensaje del usuario (sin guardarlo de nuevo en DB ni en el estado)
     if (!conversacionActiva) return;
     setIsSending(true);
+    const inicio = Date.now();
     try {
       const { data, error } = await supabase.functions.invoke("chat-facturas", {
         body: { mensaje: lastUserMsg.contenido, session_id: conversacionActiva.session_id, tipo_interaccion: "regeneracion" },
@@ -505,10 +547,21 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
           persistido: !!savedMsg,
           adjuntos,
           traza,
+          aviso: traza?.aviso,
         },
       ]);
-    } catch {
+    } catch (error) {
       toast.error("No se pudo regenerar la respuesta");
+      avisarChatSinRespuesta(lastUserMsg.contenido, Date.now() - inicio, error instanceof Error ? error.message : String(error));
+      // El aviso se queda en el hilo para poder volver a reintentar.
+      setMensajes((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        contenido: TEXTO_SIN_RESPUESTA,
+        rol: "assistant",
+        conversacion_id: conversacionActiva.id,
+        created_at: new Date().toISOString(),
+        aviso: "error",
+      }]);
     } finally {
       setIsSending(false);
     }
