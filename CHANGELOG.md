@@ -2,6 +2,17 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.43.1] - 2026-11-17
+
+Objetivo: Chat de facturas más preciso: vinos con botellas sin cargo, sin variaciones absurdas, búsqueda exacta y erratas, y batería de 212 preguntas
+
+### Cambiado
+- Chat-facturas: arregla fallos de la batería (94 % de aciertos) ([#277](https://github.com/restcasatomascrevillent/admin-casatomas/pull/277))
+- Chat-facturas: reservas de la revisión del #277 ([#278](https://github.com/restcasatomascrevillent/admin-casatomas/pull/278))
+
+### Otros
+- Chat-facturas: batería de 212 casos con valores verificados, histórico y workflow manual ([#269](https://github.com/restcasatomascrevillent/admin-casatomas/pull/269))
+
 ## [1.43.0] - 2026-11-17
 
 Objetivo: Informe de subidas y proveedor más barato, diccionario de abreviaturas por proveedor y avisos de Telegram útiles
