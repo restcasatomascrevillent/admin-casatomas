@@ -48,7 +48,7 @@ export type FiltroAvisos = "todos" | "sin_leer" | "reservas" | "facturas" | "otr
 
 export const TIPOS_POR_FILTRO: Record<"reservas" | "facturas", string[]> = {
   reservas: ["solicitud_pendiente", "reserva_nueva", "reserva_cancelada", "reserva_sin_asignar"],
-  facturas: ["facturas_subida", "subida_precio", "original_sin_drive", ...TIPOS_ALERTA_FACTURAS.map((t) => t.tipo), TIPO_MARGEN_BAJO],
+  facturas: ["facturas_subida", "facturas_abreviatura", "subida_precio", "original_sin_drive", ...TIPOS_ALERTA_FACTURAS.map((t) => t.tipo), TIPO_MARGEN_BAJO],
 };
 
 export const FILTROS_AVISOS: { valor: FiltroAvisos; etiqueta: string }[] = [
