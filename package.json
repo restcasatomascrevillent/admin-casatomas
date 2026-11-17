@@ -30,6 +30,7 @@
     "test:platos-aptitudes:db": "node scripts/test-platos-aptitudes.mjs",
     "test:alertas-lineas:db": "node scripts/test-alertas-lineas-factura.mjs",
     "test:clasificar-productos:db": "node scripts/test-clasificar-productos.mjs",
+    "test:reparar-producto-categoria:db": "node scripts/test-reparar-producto-categoria.mjs",
     "test:abreviaturas:db": "node scripts/test-abreviaturas.mjs",
     "test:abreviaturas-avisos:db": "node scripts/test-abreviaturas-avisos.mjs",
     "test:abreviaturas-endurecer:db": "node scripts/test-abreviaturas-endurecer.mjs",

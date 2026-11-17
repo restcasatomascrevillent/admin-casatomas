@@ -92,6 +92,62 @@ describe("validarAsignaciones", () => {
     expect(items).toEqual([{ textos: ["raro"], producto_id: null, nombre: "Cosa rara", categoria_id: null, unidad: "ud" }]);
   });
 
+  describe("id de categoría en producto_id (el «11» de Servicios caía en la mostaza)", () => {
+    const cats: Categoria[] = [
+      { id: 6, nombre: "Despensa", padre_id: null, descripcion: null, activa: true },
+      { id: 11, nombre: "Servicios", padre_id: null, descripcion: null, activa: true },
+      { id: 1, nombre: "Bebidas", padre_id: null, descripcion: null, activa: true },
+      { id: 12, nombre: "Vinos", padre_id: 1, descripcion: null, activa: true },
+    ];
+    const cat: ProductoCatalogo[] = [
+      { id: 11, nombre: "Mostaza de cerveza Rooftop 150 g", categoria_id: 6 },
+      { id: 40, nombre: "Marqués de Riscal Reserva 75 cl", categoria_id: 12 },
+    ];
+    const pend = agruparPendientes([
+      linea(1, "ALQUILER LOCAL FEBRERO", "alquiler local febrero"),
+      linea(2, "- 20 % BONIFICAC S/ 12.975,5", "- 20 % bonificac s/ 12.975,5"),
+      linea(3, "MOSTAZA DE CERVEZA 150G -ROOFTOP-", "mostaza de cerveza 150g -rooftop-"),
+      linea(4, "RISCAL RVA 75", "riscal rva 75"),
+    ]);
+
+    it("con nombre y categoría propios, el 11 se descarta y se crea el producto de Servicios", () => {
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "alquiler local febrero", producto_id: 11, nombre_nuevo: "Alquiler del local", categoria_id: 11 }] },
+        pend, cat, cats,
+      );
+      expect(items).toEqual([{ textos: ["alquiler local febrero"], producto_id: null, nombre: "Alquiler del local", categoria_id: 11, unidad: "ud" }]);
+    });
+
+    it("sin nombre propio y sin nada en común con la mostaza, la línea se queda sin clasificar", () => {
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "- 20 % bonificac s/ 12.975,5", producto_id: 11, nombre_nuevo: null, categoria_id: null }] },
+        pend, cat, cats,
+      );
+      expect(items).toEqual([]);
+    });
+
+    it("la mostaza de verdad sigue entrando en el producto 11", () => {
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "mostaza de cerveza 150g -rooftop-", producto_id: 11, nombre_nuevo: null, categoria_id: null }] },
+        pend, cat, cats,
+      );
+      expect(items).toEqual([{ textos: ["mostaza de cerveza 150g -rooftop-"], producto_id: 11, nombre: null, categoria_id: null, unidad: null }]);
+    });
+
+    it("un producto de otra familia que la categoría propuesta no se acepta; la misma familia sí", () => {
+      const otra = validarAsignaciones(
+        { asignaciones: [{ texto: "riscal rva 75", producto_id: 40, nombre_nuevo: "Riscal Reserva 75 cl", categoria_id: 11 }] },
+        pend, cat, cats,
+      );
+      expect(otra).toEqual([{ textos: ["riscal rva 75"], producto_id: null, nombre: "Riscal Reserva 75 cl", categoria_id: 11, unidad: "ud" }]);
+      const misma = validarAsignaciones(
+        { asignaciones: [{ texto: "riscal rva 75", producto_id: 40, nombre_nuevo: null, categoria_id: 1 }] },
+        pend, cat, cats,
+      );
+      expect(misma).toEqual([{ textos: ["riscal rva 75"], producto_id: 40, nombre: null, categoria_id: null, unidad: null }]);
+    });
+  });
+
   describe("añadas: otra añada es otro producto; la misma añada sigue siendo el mismo", () => {
     const cat: ProductoCatalogo[] = [
       { id: 20, nombre: "Pago de Carraovejas 2019", categoria_id: 2 },
