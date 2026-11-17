@@ -47,13 +47,30 @@ El pago de un mes concreto («Mes que se paga»). Lleva:
    metido a mano para ese mes manda; si no, la cuota del plan más el uso leído. Lo que cuesta 0 € no
    se añade, y lo que en Servicios «falta meter» se avisa y no entra hasta que se meta.
 
-Los gastos se ponen solos al crear el pago mensual y al cambiar de mes. Después son conceptos
-normales: **el precio y el descuento de cada uno se editan** (por si se aplica un descuento), se
-pueden quitar o reordenar, y el botón «Volver a traer los importes» los repone desde Servicios
-conservando los descuentos. Hay además un descuento global para todo el recibo.
+Los gastos se ponen solos al crear el pago mensual y al cambiar de mes, y **se modifican en su
+propio bloque**, «Gastos de Servicios» (paso «Conceptos»):
+
+- cada gasto tiene su **precio** y su **descuento (%)**, y al lado «En el recibo»: lo que de verdad
+  se cobra por él;
+- «**Descuento a todos (%)**» pone el mismo descuento a todos los servicios de una vez (la cuota y
+  los conceptos a mano no se tocan);
+- la papelera quita un gasto del recibo y «Añadir» lo vuelve a poner con su importe de Servicios;
+- «Volver a traer los importes» repone los precios de Servicios conservando los descuentos.
+
+El bloque dice cuánto suman los servicios en el recibo frente a lo que marcan en Servicios y cuánto
+se descuenta. La lista «Conceptos del recibo» de debajo lleva solo la cuota y lo que se añada a
+mano (que se coloca antes de los servicios). Hay además un descuento global para todo el recibo.
 
 Para el mes en curso los importes estimados aún pueden crecer: el recibo guarda lo que había al
 hacerlo (o lo que se haya editado).
+
+## Vista previa del PDF
+
+«Vista previa» (en cada recibo de la lista, emitido o borrador) y «Vista previa del PDF» (paso
+«Revisar») enseñan el PDF tal cual, hoja a hoja, **sin guardar ni emitir nada**. De un recibo
+emitido es el mismo PDF que se descarga, y se puede descargar desde ahí. De un borrador sale marcado
+«BORRADOR · SIN EMITIR», aunque le falten datos (pone «pendiente»), y no se descarga: para eso hay
+que emitirlo.
 
 ## Guardado
 

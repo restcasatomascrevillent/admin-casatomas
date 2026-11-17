@@ -40,9 +40,12 @@ type Formato = (f: Fallo, ctx: Contexto) => string;
 /** «Además: N más desde …»: los que llegaron agrupados (fallos_internos_agrupar, 15 min) desde el aviso anterior. */
 function ademas(d: Record<string, unknown>, uno: string, varios: string): string[] {
   const n = Number(d.acumulados_antes);
-  return Number.isInteger(n) && n > 0
-    ? [`Además: ${n} ${n === 1 ? uno : varios} más desde ${horaLegible(limpio(d.acumulados_desde))} (se agrupan: un aviso cada 15 min como mucho).`]
-    : [];
+  if (!(Number.isInteger(n) && n > 0)) return [];
+  const ids = Array.isArray(d.acumulados_ids) ? d.acumulados_ids.map((x) => limpio(String(x))).filter(Boolean) : [];
+  return [
+    `Además: ${n} ${n === 1 ? uno : varios} más desde ${horaLegible(limpio(d.acumulados_desde))} (se agrupan: un aviso cada 15 min como mucho).`,
+    ...(ids.length ? [`Ids: ${ids.slice(0, 10).join(", ")}${ids.length > 10 ? "…" : ""}`] : []),
+  ];
 }
 
 const diaHora = (v: unknown): string => horaLegible(limpio(v) || null);

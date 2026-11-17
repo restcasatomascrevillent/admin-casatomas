@@ -2,6 +2,34 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.42.0] - 2026-11-17
+
+Objetivo: Gestor Gasto: descuentos en los gastos de Servicios y vista previa del PDF
+
+### Añadido
+- Gestor-gasto: gastos de Servicios editables con descuentos y vista previa del PDF ([#273](https://github.com/restcasatomascrevillent/admin-casatomas/pull/273))
+
+## [1.41.3] - 2026-11-17
+
+Objetivo: Estado de Servicios sin avisos falsos ni repetidos y con las fichas llenando cada fila
+
+### Cambiado
+- Servicios: Estado sin avisos repetidos ni falsos y fichas que llenan cada fila ([#272](https://github.com/restcasatomascrevillent/admin-casatomas/pull/272))
+
+## [1.41.2] - 2026-11-17
+
+Objetivo: Test de Instagram (SelectorPlatos) estable: deja de tumbar a ratos el check de las releases
+
+### Otros
+- Instagram: SelectorPlatos espera lo suficiente al error del árbol de platos ([#270](https://github.com/restcasatomascrevillent/admin-casatomas/pull/270))
+
+## [1.41.1] - 2026-11-17
+
+Objetivo: El uso de Vercel coincide con su factura, Tráfico web sin el cupo de Hobby y menos compilaciones de la demo
+
+### Cambiado
+- Servicios: el uso de Vercel cuenta el día en curso, tráfico web sin el cupo de Hobby y menos compilaciones de la demo ([#264](https://github.com/restcasatomascrevillent/admin-casatomas/pull/264))
+
 ## [1.41.0] - 2026-11-17
 
 Objetivo: Gestor Gasto con recibos sin datos fiscales, pago mensual con gastos de Servicios y Control Excel

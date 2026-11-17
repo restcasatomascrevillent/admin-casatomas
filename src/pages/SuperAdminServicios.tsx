@@ -31,7 +31,7 @@ import {
   useResumenesMes,
   useServiciosContratados,
 } from "@/hooks/useServicios";
-import { avisosPlan as calcularAvisosPlan, inventarioServicios, pendientesDePlan } from "@/lib/costesServicios";
+import { avisosPlan as calcularAvisosPlan, inventarioServicios } from "@/lib/costesServicios";
 import { type FilaResumenMes, MESES_REVISADOS, costesFaltantes, cuentaFaltantes, informeMes, textoMes, textoMesCorto, ultimosMeses } from "@/lib/informeServicios";
 import {
   CAMBIO_POR_DEFECTO,
@@ -189,14 +189,19 @@ export default function SuperAdminServicios() {
   const porMeter = cargandoFaltantes ? 0 : cuentaFaltantes(faltantes);
   const avisosIa = useMemo(() => {
     const a = calcularAvisosCostes({ sinRegistro: sinRegistroQ.data, modelos: porModeloQ.data, fijos: [], fijosSinVerificarRpc: null });
-    return { sinRegistro: a.sinInstrumentar.length + a.instrumentadasMudas.length, modelosSinTarifa: a.modelosSinTarifa.length };
+    // Solo las que de verdad NO apuntan su gasto. Las que lo apuntan pero llevan días sin usarse
+    // («mudas») no son un fallo: salían como «7 funciones de IA no registran su gasto» (17/11/2026)
+    // cuando solo estaban sin usar; en Costes ya salen como «Sin usar este mes».
+    return { sinRegistro: a.sinInstrumentar.length, modelosSinTarifa: a.modelosSinTarifa.length };
   }, [sinRegistroQ.data, porModeloQ.data]);
   const pendientes = useMemo(
     () => pendientesServicios({
       servicios: enUso, lecturas: porProveedor, renovaciones, resumen, sinLector, ia: avisosIa, costesPorMeter: porMeter, clavesSoloEnProduccion: CLAVES_SOLO_EN_PRODUCCION,
-      planes: pendientesDePlan(avisosDelPlan),
+      // Los límites que se pasarían pronto (pendientesDePlan) ya no se repiten aquí (17/11/2026, el
+      // dueño: «quita esos avisos, ya se ve claro»): la ficha del servicio va en ámbar con su % y el
+      // detalle (cuándo llegaría, qué pasaría) está en Costes › «Planes gratis».
     }),
-    [enUso, porProveedor, renovaciones, resumen, sinLector, avisosIa, porMeter, avisosDelPlan],
+    [enUso, porProveedor, renovaciones, resumen, sinLector, avisosIa, porMeter],
   );
   // Servicios en rojo, como el titular de Estado («1 servicio necesita atención»): antes contaba
   // líneas de «Qué mirar» y un servicio con dos métricas al límite sumaba 2 (09/11/2026).

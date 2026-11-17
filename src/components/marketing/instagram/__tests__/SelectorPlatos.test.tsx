@@ -104,7 +104,10 @@ describe("SelectorFoto · pestaña Platos", () => {
     await waitFor(() => expect(screen.getByTestId("filtro-origen-drive").textContent).toBe("Drive (1)"));
     expect(screen.queryByTestId("error-arbol")).toBeNull();
     fireEvent.click(screen.getByTestId("filtro-origen-platos"));
-    expect((await screen.findByTestId("error-arbol")).textContent).toMatch(/Drive no responde/);
+    // `useArbolPlatos` reintenta una vez (retry: 1, que manda sobre el `retry: false` del cliente de la prueba) y
+    // react-query espera 1 s antes de reintentar: el error llega pasado ese segundo. Con la espera por defecto
+    // (1 s) era una carrera que fallaba a ratos en CI (17/11/2026, release v1.41.0). Como en SubirFoto.test.tsx.
+    expect((await screen.findByTestId("error-arbol", undefined, { timeout: 4000 })).textContent).toMatch(/Drive no responde/);
     a.unmount();
     pintar(<Selector marca="touza" />);
     await waitFor(() => expect(screen.getByTestId("filtro-origen-drive")).toBeTruthy());
