@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.41.2] - 2026-11-17
+
+Objetivo: Test de Instagram (SelectorPlatos) estable: deja de tumbar a ratos el check de las releases
+
+### Otros
+- Instagram: SelectorPlatos espera lo suficiente al error del árbol de platos ([#270](https://github.com/restcasatomascrevillent/admin-casatomas/pull/270))
+
 ## [1.41.1] - 2026-11-17
 
 Objetivo: El uso de Vercel coincide con su factura, Tráfico web sin el cupo de Hobby y menos compilaciones de la demo
