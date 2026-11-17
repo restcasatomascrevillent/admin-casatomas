@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { reservaDeAviso } from "@/lib/avisos";
 import { infoEstadoReserva } from "@/lib/reservas/estadosReserva";
+import type { ReservaParaVerificar } from "@/lib/reservas/verificacion";
 
 // ============================================================================
 // El estado ACTUAL de las reservas de una lista de avisos (12/11/2026, petición
@@ -16,19 +17,35 @@ import { infoEstadoReserva } from "@/lib/reservas/estadosReserva";
 
 type AvisoConReserva = { referencia_tipo?: string | null; referencia_id?: string | null };
 
-export function useEstadosReservasAvisos(avisos: readonly AvisoConReserva[]): ReadonlyMap<string, string> {
+/**
+ * Los datos de la reserva de un aviso, los que necesita «Verificar» desde el modal de avisos (CAS-9,
+ * 17/11/2026): la misma acción que en la ficha (correo al cliente) sin abrirla.
+ */
+export type ReservaDeAviso = ReservaParaVerificar;
+
+const COLUMNAS_RESERVA_AVISO = "id, fecha, hora, nombre, telefono, email, numero_comensales, estado, espacio_id, notas_cliente, canal";
+const SIN_RESERVAS: ReadonlyMap<string, ReservaDeAviso> = new Map();
+
+/** Las reservas de una lista de avisos (una consulta), por id. */
+export function useReservasAvisos(avisos: readonly AvisoConReserva[]): ReadonlyMap<string, ReservaDeAviso> {
   const ids = useMemo(() => [...new Set(avisos.map(reservaDeAviso).filter((x): x is string => !!x))].sort(), [avisos]);
   const { data } = useQuery({
-    queryKey: ["reservas-lista", "estados-avisos", ids],
+    queryKey: ["reservas-lista", "reservas-avisos", ids],
     enabled: ids.length > 0,
     staleTime: 30_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from("reservas").select("id, estado").in("id", ids);
+      const { data, error } = await supabase.from("reservas").select(COLUMNAS_RESERVA_AVISO).in("id", ids);
       if (error) throw error;
-      return new Map(((data ?? []) as Array<{ id: string; estado: string }>).map((r) => [r.id, r.estado]));
+      return new Map(((data ?? []) as unknown as ReservaDeAviso[]).map((r) => [r.id, r]));
     },
   });
-  return data ?? new Map();
+  return data ?? SIN_RESERVAS;
+}
+
+/** Solo el estado de cada reserva avisada (la insignia «Pendiente», «Verificada»…). */
+export function useEstadosReservasAvisos(avisos: readonly AvisoConReserva[]): ReadonlyMap<string, string> {
+  const reservas = useReservasAvisos(avisos);
+  return useMemo(() => new Map([...reservas].map(([id, r]) => [id, r.estado])), [reservas]);
 }
 
 /** Insignia del estado de la reserva de un aviso («Pendiente», «Verificada», «Confirmada»…). Nada si no es de reserva. */

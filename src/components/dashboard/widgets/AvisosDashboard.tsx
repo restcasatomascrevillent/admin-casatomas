@@ -9,6 +9,10 @@
 // enseña su detalle (`mensaje`: «Jorge Santos · 12/11 15:00 · 8 pers. · web»); el de una reserva abre su
 // ficha aquí mismo (Verificar, Confirmar, Cancelar, editar); «✓» lo da por revisado sin salir; las
 // etiquetas de sección filtran la lista y «Revisar todos» marca todos los que se ven.
+//
+// 17/11/2026 (CAS-9, dueño: «que sigan habiendo avisos en el dashboard pero que te redirijan al apartado avisos de
+// reservas»): los avisos de reservas (nuevas y canceladas) llevan a Reservas › Avisos con el modal abierto, donde se
+// verifican o se revisan. Tocarlos aquí ya no los da por revisados (ni hay «✓»): eso se hace allí, con un botón.
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Bell, Check, CheckCheck, Info } from "lucide-react";
@@ -18,7 +22,7 @@ import { useCanAccessSection } from "@/hooks/useUserRole";
 import { usePermisosFacturas } from "@/hooks/usePermisosFacturas";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
-import { etiquetaDia, horaAviso, rutaDeAviso, TIPO_ICON } from "@/lib/avisos";
+import { esAvisoDeReservas, etiquetaDia, horaAviso, rutaAvisosReservas, rutaDeAviso, TIPO_ICON } from "@/lib/avisos";
 import {
   avisosParaDashboard,
   ETIQUETA_SECCION_AVISO,
@@ -70,8 +74,13 @@ export function AvisosDashboard() {
   const estados = useEstadosReservasAvisos(visibles.slice(0, MAX_FILAS));
   const haySinLeer = porSeccion.length > 0;
 
-  // El aviso de una reserva abre su ficha aquí (se verifica o confirma sin cambiar de pantalla); el resto, su origen.
+  // Reserva nueva o cancelada: a Reservas › Avisos (allí se verifica o se revisa). Otro aviso de una reserva abre su
+  // ficha aquí; el resto, su origen (y lo da por revisado, como siempre).
   const abrir = (n: NotificacionDashboard, ruta: string | null) => {
+    if (reservas && esAvisoDeReservas(n)) {
+      navigate(rutaAvisosReservas());
+      return;
+    }
     void marcarLeida(n.id);
     if (reservas && n.referencia_tipo === "reserva" && n.referencia_id) editarReserva(n.referencia_id);
     else if (ruta) navigate(ruta);
@@ -131,6 +140,7 @@ export function AvisosDashboard() {
                 const Icono = TIPO_ICON[n.tipo] || Info;
                 const ruta = rutaDeAviso(n);
                 const seAbre = !!ruta || (reservas && n.referencia_tipo === "reserva" && !!n.referencia_id);
+                const deReservas = reservas && esAvisoDeReservas(n);
                 const contenido = (
                   <>
                     <Icono className={cn("mt-0.5 h-4 w-4 shrink-0", n.leida ? "text-muted-foreground" : "text-destructive")} aria-hidden="true" />
@@ -154,14 +164,14 @@ export function AvisosDashboard() {
                         type="button"
                         onClick={() => abrir(n, ruta)}
                         className={cn("flex min-w-0 flex-1 items-start gap-2 py-1.5 text-left hover:bg-muted/50", FOCO)}
-                        aria-label={`Abrir: ${n.titulo}${n.mensaje ? `, ${n.mensaje}` : ""}`}
+                        aria-label={deReservas ? `Ir a los avisos de reservas: ${n.titulo}${n.mensaje ? `, ${n.mensaje}` : ""}` : `Abrir: ${n.titulo}${n.mensaje ? `, ${n.mensaje}` : ""}`}
                       >
                         {contenido}
                       </button>
                     ) : (
                       <div className="flex min-w-0 flex-1 items-start gap-2 py-1.5">{contenido}</div>
                     )}
-                    {!n.leida && (
+                    {!n.leida && !deReservas && (
                       <button
                         type="button"
                         onClick={() => void marcarLeida(n.id)}

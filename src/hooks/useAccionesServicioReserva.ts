@@ -93,12 +93,17 @@ import {
 } from "@/lib/reservas/notificarCliente";
 import { aplicarCambioReserva, mensajeErrorServicio, type ReservaServicio } from "@/lib/reservas/servicioSala";
 import type { CambiosVerificacion, ReservaParaVerificar } from "@/lib/reservas/verificacion";
+import { marcarAvisosDeReserva } from "@/lib/avisosRevisados";
+import { avisarReservaAtendida } from "@/hooks/useAvisosSeccion";
 
 // Antes se declaraban aquí; siguen saliendo de este módulo para quien ya las importaba.
 export { CLAVES_LISTAS_RESERVAS, ErrorSinFilasReserva, __resetColumnaLlegadaParaTests };
 
 /** El texto en singular si `n` es 1 y en plural si no (para los avisos de las acciones en bloque). */
 const uno = (n: number, singular: string, plural: string) => (n === 1 ? singular : plural);
+
+/** Acciones que responden a una reserva nueva: con ellas su aviso queda atendido (CAS-9). */
+const ACCIONES_QUE_ATIENDEN_EL_AVISO: ReadonlySet<IdAccionEjecutable> = new Set<IdAccionEjecutable>(["aceptar", "verificar", "rechazar"]);
 
 /** Refresca lo cacheado que depende de una reserva cuando se escribe `cambios`. */
 function refrescar(queryClient: QueryClient, cambios: object) {
@@ -340,6 +345,12 @@ export function useAccionesServicioReserva() {
       if (def.recuerdaEstadoPrevio) recordarEstadoPrevio(reserva.id, vista.estado);
       if (def.olvidaEstadoPrevio) olvidarEstadoPrevio(reserva.id);
       if (!enBloque) mostrarAviso(def.aviso(vista, entrada as EntradasAccion[K], cambios), reserva.id, accionAviso);
+
+      // Responder a la reserva (verificarla o rechazarla) atiende su aviso «Reserva nueva»: deja de contar como
+      // sin revisar sin tener que pulsar también «Revisado» en Avisos (CAS-9, 17/11/2026). En segundo plano.
+      if (ACCIONES_QUE_ATIENDEN_EL_AVISO.has(id)) {
+        void marcarAvisosDeReserva(reserva.id).then((n) => { if (n > 0) avisarReservaAtendida(reserva.id); });
+      }
 
       const correo = def.avisaCliente
         ? enBloque

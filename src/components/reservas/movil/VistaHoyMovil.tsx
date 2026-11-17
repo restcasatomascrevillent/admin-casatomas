@@ -64,7 +64,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
-import { BotonPendientes } from "@/components/reservas/libro/BotonPendientes";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -501,11 +500,9 @@ export function VistaHoyMovil({
           )}
         </div>
       )}
-      {/* «Pendientes» también en el móvil (12/11/2026, petición del dueño): reloj y número junto a «Cerrar comida / Cerrar
-          cena»; abre la misma lista que en la Lista y en Reservas. Con las flechas de día (17/11/2026), «Ver el día» va a ese día. */}
+      {/* «Pendientes» se quitó el 17/11/2026 (CAS-9, petición del dueño): lo pendiente se verifica desde Avisos. */}
       {!columna && (
         <div className="flex shrink-0 items-center gap-1.5" data-testid="hoy-movil-servicios">
-          <BotonPendientes compacto className="shrink-0" onVerDia={dia?.onCambiar} />
           {/* «Sin reserva» baja aquí (12/11/2026): arriba no cabía junto a «Lista | Mesas». */}
           <BotonSentarSinReserva soloIcono className="shrink-0" />
           <InterruptoresServiciosOnline fecha={fecha} compacta className="min-w-0 flex-1" />
