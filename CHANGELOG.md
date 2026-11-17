@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.38.4] - 2026-11-17
+
+Objetivo: Chat de facturas sin sensación de fallo e informe de vinos con la compra de cada añada
+
+### Cambiado
+- Chat de facturas sin sensación de fallo e informe de vinos con la compra de cada añada ([#251](https://github.com/restcasatomascrevillent/admin-casatomas/pull/251))
+
 ## [1.38.3] - 2026-11-17
 
 Objetivo: Reservas en el móvil con flechas de día y «Nueva reserva», y la fila de avisos de Facturas más compacta
