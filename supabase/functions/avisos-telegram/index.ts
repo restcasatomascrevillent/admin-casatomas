@@ -4,9 +4,9 @@ import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-cl
 import { exigirSuperAdmin } from "../_shared/autorizacion.ts";
 import { compararTiempoConstante } from "../_shared/tiempo-constante.ts";
 import {
-  type Accion, agruparEnMensajes, aplicarTopes, type Aviso, type ConfigTelegram, construirResumen, construirSemanal, cuerpoSendMessage, type DatosSemanales,
+  type Accion, agruparEnMensajes, aplicarTopesPorGrupo, type Aviso, type ConfigTelegram, construirResumen, construirSemanal, cuerpoSendMessage, type DatosSemanales,
   diaMadrid, type Envio, errorSaneado, esAccion, evaluarPendientes, mensajeAviso, notaTope, type ReservaInfo, SIN_CONFIGURAR, silencioAhora,
-  type Sugerencia, TEXTO_PRUEBA, TIPOS_RESERVA, TOPE_DIA, TOPE_HORA,
+  type Sugerencia, TEXTO_PRUEBA, TIPOS_RESERVA, TOPE_DIA, TOPE_HORA, TOPE_RESERVAS_DIA, TOPE_RESERVAS_HORA,
 } from "./logica.ts";
 import { type Contexto, type Fallo, idAlbaran, mensajeFallo } from "./fallos.ts";
 const createClient = clienteConAuditoria(createClientBase, "avisos-telegram");
@@ -197,7 +197,12 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
     if (cfg.semanal_activo === false) return json({ ok: true, enviados: 0, motivo: "semanal apagada" });
     const { data, error: eSem } = await sb.rpc("avisos_telegram_datos_semanal");
     if (eSem) return json({ ok: false, error: eSem.message }, 500);
-    const semanal = construirSemanal((data ?? {}) as DatosSemanales, ahora, PANEL_URL);
+    const datosSem = (data ?? {}) as DatosSemanales;
+    // Total de albaranes sin factura (el aviso solo cuenta los de más de 35 días); si falla, se omite esa línea.
+    const { data: tot, error: eTot } = await sb.rpc("avisos_telegram_albaranes_total");
+    if (eTot) console.warn("[avisos-telegram] albaranes total:", eTot.message);
+    else if (datosSem.albaranes) datosSem.albaranes = { ...datosSem.albaranes, ...(tot as object) };
+    const semanal = construirSemanal(datosSem, ahora, PANEL_URL);
     const marcar = async () => {
       const { error } = await sb.from("avisos_telegram_config").update({ semanal_ultimo_dia: diaMadrid(ahora) }).eq("id", true);
       if (error) console.error("[avisos-telegram] semanal_ultimo_dia:", error.message);
@@ -236,15 +241,25 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
     // Lo que no se va a mandar nunca (unidades dudosas, reserva cancelada desde el panel…) se da por consumido.
     await registrar(ev.descartar.map((d) => ({ tipo: "aviso", aviso_id: d.aviso.id, ok: true, error: d.motivo })));
 
-    // Topes contra la inundación: por hora y por día (solo cuentan los envíos correctos de avisos).
-    const contar = async (desdeIso: string): Promise<number> => {
-      const { count } = await sb.from("avisos_telegram_envios").select("id", { count: "exact", head: true })
-        .eq("tipo", "aviso").eq("ok", true).is("error", null).gte("enviado_en", desdeIso);
-      return count ?? 0;
-    };
-    const [usadosHora, usadosDia] = await Promise.all([contar(new Date(ahora.getTime() - 3600_000).toISOString()), contar(desde)]);
-    const topes = { hora: cfg.tope_hora ?? TOPE_HORA, dia: cfg.tope_dia ?? TOPE_DIA };
-    const { enviar, resto } = aplicarTopes(ev.enviar, { hora: usadosHora, dia: usadosDia }, topes);
+    // Topes contra la inundación: por hora y por día (solo cuentan los envíos correctos de avisos). Las reservas
+    // tienen el suyo y se cuentan aparte, para que los avisos de precio no las dejen sin avisar.
+    const desdeHora = new Date(ahora.getTime() - 3600_000).toISOString();
+    const { data: envsOk } = await sb.from("avisos_telegram_envios").select("aviso_id, enviado_en")
+      .eq("tipo", "aviso").eq("ok", true).is("error", null).gte("enviado_en", desde).limit(2000);
+    const idsEnv = [...new Set((envsOk ?? []).map((e: { aviso_id: string | null }) => e.aviso_id).filter(Boolean))] as string[];
+    const idsReserva = new Set<string>();
+    if (idsEnv.length) {
+      const { data: tr } = await sb.from("notificaciones_dashboard").select("id").in("id", idsEnv).in("tipo", TIPOS_RESERVA);
+      for (const x of tr ?? []) idsReserva.add((x as { id: string }).id);
+    }
+    const usados = { hora: 0, dia: 0, reservasHora: 0, reservasDia: 0 };
+    for (const e of (envsOk ?? []) as { aviso_id: string | null; enviado_en: string }[]) {
+      const res = !!e.aviso_id && idsReserva.has(e.aviso_id);
+      const reciente = e.enviado_en >= desdeHora;
+      if (res) { usados.reservasDia++; if (reciente) usados.reservasHora++; } else { usados.dia++; if (reciente) usados.hora++; }
+    }
+    const topes = { hora: cfg.tope_hora ?? TOPE_HORA, dia: cfg.tope_dia ?? TOPE_DIA, reservasHora: TOPE_RESERVAS_HORA, reservasDia: TOPE_RESERVAS_DIA };
+    const { enviar, resto } = aplicarTopesPorGrupo(ev.enviar, (a) => TIPOS_RESERVA.includes(a.tipo), usados, topes);
     const pendientes = enviar.slice(0, 50);
     // El resto va en una nota («…y N más»); si no hay nada que mandar, la nota sale como mucho una vez por hora.
     let nota: string | null = null;

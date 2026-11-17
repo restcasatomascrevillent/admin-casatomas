@@ -12,6 +12,9 @@ export const FRASES_POR_TIPO = 4;
 /** Tope de avisos «al momento» por hora y por día (configurable: tope_hora y tope_dia). El resto, en el panel. */
 export const TOPE_HORA = 10;
 export const TOPE_DIA = 30;
+/** Tope propio de las reservas (nuevas/canceladas de hoy y mañana): no compiten con los avisos de precio o margen. */
+export const TOPE_RESERVAS_HORA = 20;
+export const TOPE_RESERVAS_DIA = 60;
 /** «Por revisar»: solo entra en el resumen si cambia en CAMBIO_REVISION documentos o han pasado DIAS_REVISION días. */
 export const CAMBIO_REVISION = 5;
 export const DIAS_REVISION = 7;
@@ -259,6 +262,21 @@ export function pendientesDeEnvio(
 export function aplicarTopes<T>(lista: T[], usados: { hora: number; dia: number }, topes: { hora: number; dia: number }): { enviar: T[]; resto: T[] } {
   const libres = Math.max(0, Math.min(topes.hora - usados.hora, topes.dia - usados.dia));
   return { enviar: lista.slice(0, libres), resto: lista.slice(libres) };
+}
+
+/**
+ * Topes separados: las reservas tienen el suyo (y se cuentan aparte), el resto de avisos comparten hora y día.
+ * Así un día con muchos avisos de precio no deja sin avisar de una reserva, ni al revés. Conserva el orden.
+ */
+export function aplicarTopesPorGrupo<T>(
+  lista: T[], esReserva: (x: T) => boolean,
+  usados: { hora: number; dia: number; reservasHora: number; reservasDia: number },
+  topes: { hora: number; dia: number; reservasHora: number; reservasDia: number },
+): { enviar: T[]; resto: T[] } {
+  const res = aplicarTopes(lista.filter(esReserva), { hora: usados.reservasHora, dia: usados.reservasDia }, { hora: topes.reservasHora, dia: topes.reservasDia });
+  const otros = aplicarTopes(lista.filter((x) => !esReserva(x)), { hora: usados.hora, dia: usados.dia }, topes);
+  const ok = new Set<T>([...res.enviar, ...otros.enviar]);
+  return { enviar: lista.filter((x) => ok.has(x)), resto: lista.filter((x) => !ok.has(x)) };
 }
 
 /** Línea para los avisos que no caben por el tope. */
@@ -606,7 +624,7 @@ export interface DatosSemanales {
   vinos?: { limite?: number; bajo?: number; total?: number; peor?: { nombre: string; multiplicador: number }[] };
   tienda?: { activa?: boolean; limite?: number; bajo?: number; total?: number; bajo_coste?: number; peor?: { nombre: string; multiplicador: number }[] };
   facturas?: { documentos?: number; importe?: number; mayores?: { proveedor: string | null; total: number; fecha: string | null }[] };
-  albaranes?: { n?: number; proveedores?: number; importe?: number; mayores?: { proveedor: string | null; importe: number; n: number }[] };
+  albaranes?: { total_n?: number; total_proveedores?: number; total_importe?: number; n?: number; proveedores?: number; importe?: number; mayores?: { proveedor: string | null; importe: number; n: number }[] };
 }
 
 const miles = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" as unknown as boolean });
@@ -645,8 +663,11 @@ export function construirSemanal(d: DatosSemanales, ahora: Date, panelUrl?: stri
   const al = d.albaranes;
   if (al && (al.n ?? 0) > 0) {
     bloques.push([
-      `Albaranes sin factura: ${eurM(al.importe ?? 0)} en ${al.proveedores ?? "?"} ${al.proveedores === 1 ? "proveedor" : "proveedores"}`,
+      `Albaranes sin factura desde hace más de 35 días: ${eurM(al.importe ?? 0)} en ${al.proveedores ?? "?"} ${al.proveedores === 1 ? "proveedor" : "proveedores"}`,
       ...(al.mayores ?? []).slice(0, 3).map((x) => `• ${recortar(limpio(x.proveedor) || "Sin proveedor", 40)} · ${eurM(x.importe)} (${x.n} ${x.n === 1 ? "albarán" : "albaranes"})`),
+      ...((al.total_n ?? 0) > (al.n ?? 0)
+        ? [`En total, con los más recientes: ${al.total_n} albaranes de ${al.total_proveedores ?? "?"} proveedores (${eurM(al.total_importe ?? 0)})`]
+        : []),
     ].join("\n"));
   }
   if (bloques.length === 0) return { texto: "", secciones: 0 };
