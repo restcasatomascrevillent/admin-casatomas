@@ -274,3 +274,89 @@ describe("IA función por función y lo que cuesta cada cosa (pasos 3 y 4)", () 
     expect(ventanaMes("2026-02-01")).toEqual({ desde: "2026-02-01", hasta: "2026-02-28" });
   });
 });
+
+describe("cuadre con la factura de OpenAI", () => {
+  it("normaliza lo que devuelve la RPC (numeric como texto) y descarta lo que no es un cuadre", async () => {
+    const { normalizarCuadreOpenai } = await import("@/lib/costesServicios");
+    expect(normalizarCuadreOpenai({ dias: 16, ultimo_dia: "2026-11-16", real_usd: "5.7154", registrado_usd: 4.45 }))
+      .toEqual({ dias: 16, ultimoDia: "2026-11-16", realUsd: 5.7154, registradoUsd: 4.45 });
+    expect(normalizarCuadreOpenai(null)).toBeNull();
+    expect(normalizarCuadreOpenai({ dias: 0 })).toBeNull();
+  });
+
+  it("lo que factura OpenAI y no está registrado aquí es gasto de fuera (demo y pruebas)", async () => {
+    const { resumirCuadreOpenai } = await import("@/lib/costesServicios");
+    // Noviembre de 2026: 5,72 US$ facturados, 4,45 registrados en producción.
+    expect(resumirCuadreOpenai({ dias: 16, ultimoDia: "2026-11-16", realUsd: 5.7154, registradoUsd: 4.45 }, 0.9))
+      .toEqual({ estado: "fuera", realEur: 5.14, registradoEur: 4.01, fueraEur: 1.14, fueraPct: 22 });
+    // Diferencias de redondeo de tarifas (céntimos o menos de un 3 %): cuadra.
+    expect(resumirCuadreOpenai({ dias: 3, ultimoDia: "2026-11-03", realUsd: 1, registradoUsd: 0.96 }, 1).estado).toBe("cuadra");
+    expect(resumirCuadreOpenai({ dias: 3, ultimoDia: "2026-11-03", realUsd: 10, registradoUsd: 10.2 }, 1).estado).toBe("cuadra");
+    // Más registrado que facturado: alguna tarifa está alta.
+    expect(resumirCuadreOpenai({ dias: 3, ultimoDia: "2026-11-03", realUsd: 2, registradoUsd: 3 }, 1).estado).toBe("de_mas");
+    // Sin días publicados o sin la migración: no se enseña nada.
+    expect(resumirCuadreOpenai(null, 1).estado).toBe("sin_datos");
+    expect(resumirCuadreOpenai({ dias: 0, ultimoDia: null, realUsd: 0, registradoUsd: 0 }, 1).estado).toBe("sin_datos");
+  });
+});
+
+describe("gasto de IA por acción", () => {
+  const fila = (p: Partial<FilaCostePorUso> & Pick<FilaCostePorUso, "funcion">): FilaCostePorUso => ({
+    queHace: null, accion: null, unidad: "llamada", orden: 100, llamadas: 1, usos: 1, usosConCoste: 1, costeUsd: 0, filasSinTarifa: 0,
+    modelosSinTarifa: [], medianaUsd: 0, mediaUsd: 0, servidorPropio: false, ...p,
+  });
+  const CATALOGO = [
+    { funcion: "ocr-trabajo", accion: "Leer una factura", que_hace: "Lee las facturas", activo: true, instrumentada: true },
+    { funcion: "chat-facturas", accion: "Contestar una pregunta en el chat de Facturas", activo: true, instrumentada: true },
+    { funcion: "traducir-contenido", accion: "Traducir un plato", activo: true, instrumentada: true },
+    { funcion: "format-novedad", accion: "Dar formato a una novedad", activo: true, instrumentada: true },
+    { funcion: "recortar-foto", accion: "Recortar una foto", activo: true, instrumentada: true },
+    { funcion: "embeddings-nombres", accion: null, que_hace: "Prepara el buscador", activo: true, instrumentada: true },
+    { funcion: "dibujo", accion: "Pasar a limpio un dibujo", activo: true, instrumentada: false },
+    { funcion: "ia-modelos-openai", accion: "Probar un modelo", activo: false, instrumentada: true },
+  ];
+
+  it("cada acción con su gasto, su parte del total y el mes anterior, de más a menos", async () => {
+    const { gastoPorAccion } = await import("@/lib/costesServicios");
+    const g = gastoPorAccion({
+      actual: [
+        fila({ funcion: "chat-facturas", accion: "Contestar una pregunta en el chat de Facturas", costeUsd: 1, usos: 40, llamadas: 90 }),
+        fila({ funcion: "ocr-trabajo", accion: "Leer una factura", costeUsd: 3, usos: 130, llamadas: 600 }),
+        fila({ funcion: "recortar-foto", accion: "Recortar una foto", costeUsd: 0, servidorPropio: true }),
+        fila({ funcion: "embeddings-nombres", costeUsd: null, filasSinTarifa: 2, modelosSinTarifa: ["modelo-nuevo"] }),
+      ],
+      anterior: [fila({ funcion: "ocr-trabajo", costeUsd: 2 })],
+      catalogo: CATALOGO,
+    });
+    expect(g.filas.map((f) => [f.funcion, f.nombre, f.pct, f.anteriorUsd])).toEqual([
+      ["ocr-trabajo", "Leer una factura", 75, 2],
+      ["chat-facturas", "Contestar una pregunta en el chat de Facturas", 25, null],
+      ["recortar-foto", "Recortar una foto", 0, null],
+      ["embeddings-nombres", "Prepara el buscador", null, null], // sin acción: lo que hace; sin tarifa: sin %
+    ]);
+    expect(g.totales).toMatchObject({ costeUsd: 4, llamadas: 692, filasSinTarifa: 2 });
+  });
+
+  it("no se escapa nada: lo que no se ha usado, lo que gasta sin catálogo y lo que no apunta su gasto", async () => {
+    const { gastoPorAccion } = await import("@/lib/costesServicios");
+    const g = gastoPorAccion({
+      actual: [fila({ funcion: "ocr-trabajo", costeUsd: 1 }), fila({ funcion: "funcion-nueva", costeUsd: 0.5 }), fila({ funcion: "ia-modelos-openai", costeUsd: 0.1 })],
+      catalogo: CATALOGO,
+    });
+    // Las activas sin uso este mes (la de pruebas de modelos, desactivada, no se lista).
+    expect(g.sinUso.map((f) => f.nombre)).toEqual([
+      "Contestar una pregunta en el chat de Facturas", "Traducir un plato", "Dar formato a una novedad", "Recortar una foto", "Prepara el buscador", "Pasar a limpio un dibujo",
+    ]);
+    expect(g.sinCatalogar).toEqual(["funcion-nueva"]);
+    expect(g.sinRegistro).toEqual([{ funcion: "dibujo", nombre: "Pasar a limpio un dibujo" }]);
+    expect(g.filas.find((f) => f.funcion === "funcion-nueva")?.nombre).toBe("funcion-nueva");
+    expect(g.filas.find((f) => f.funcion === "ocr-trabajo")?.nombre).toBe("Leer una factura"); // la RPC no la traía: sale del catálogo
+  });
+
+  it("sin catálogo (cargando o sin permiso) salen las filas con gasto y ningún aviso", async () => {
+    const { gastoPorAccion } = await import("@/lib/costesServicios");
+    const g = gastoPorAccion({ actual: [fila({ funcion: "x", queHace: "Hace X", costeUsd: 0 })] });
+    expect(g).toMatchObject({ sinUso: [], sinCatalogar: [], sinRegistro: [] });
+    expect(g.filas[0]).toMatchObject({ nombre: "Hace X", pct: null });
+  });
+});

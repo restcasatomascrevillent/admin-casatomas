@@ -49,6 +49,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
@@ -169,6 +170,9 @@ serve(conAuditoriaDePeticion("procesar-dibujo-perimetro", createClientBase, asyn
   const auth = await autenticar(req);
   if (!auth.ok) return auth.response;
 
+  // Gasto de IA (Super Admin › Servicios › Costes): se anota en el finally, también si la llamada falla.
+  const uso = new AcumuladorUso("procesar-dibujo-perimetro", MODEL, "chat");
+  const t0 = Date.now();
   try {
     if (!OPENAI_KEY) {
       throw new Error("OPENAI_API_KEY no configurada en los secrets de la función");
@@ -252,6 +256,7 @@ Las coordenadas deben estar en metros. Intenta crear un perímetro cerrado y coh
     }
 
     const data = await response.json();
+    uso.sumar(data.usage);
     const choice = data.choices?.[0];
     const content = choice?.message?.content || "";
 
@@ -343,9 +348,12 @@ Las coordenadas deben estar en metros. Intenta crear un perímetro cerrado y coh
       area: areaCalculada !== null ? redondear(areaCalculada) : result.area,
     });
   } catch (error) {
+    uso.marcarError();
     console.error("[procesar-dibujo-perimetro] Error:", error);
     return json({
       error: error instanceof Error ? error.message : "Error processing drawing",
     });
+  } finally {
+    await registrarUso(uso, { disparador: `usuario:${auth.userId}`, duracionMs: Date.now() - t0 });
   }
 }));
