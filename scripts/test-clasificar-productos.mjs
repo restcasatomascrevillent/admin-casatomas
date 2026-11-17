@@ -3,7 +3,7 @@
 //
 //   npm run test:clasificar-productos:db
 //
-// Cubre la migración REAL 20261205100000 (aplicada dos veces) y su rollback:
+// Cubre la migración REAL 20261208100000 (aplicada dos veces) y su rollback:
 //   - productos_asignar_por_alias: tandas, tope de tiempo, «quedan», no pisa
 //     líneas con producto, solo service_role.
 //   - productos_aplicar_clasificacion_ia: crea productos y alias, asigna SOLO
@@ -15,8 +15,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 
-const MIGRACION = await readFile("supabase/migrations/20261205100000_clasificar_productos_por_tandas.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261205100000_clasificar_productos_por_tandas_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261208100000_clasificar_productos_por_tandas.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261208100000_clasificar_productos_por_tandas_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };

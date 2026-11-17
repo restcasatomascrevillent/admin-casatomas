@@ -1,4 +1,4 @@
--- Vuelta atrás de 20261205100000_clasificar_productos_por_tandas (solo funciones: no hay datos que deshacer).
+-- Vuelta atrás de 20261208100000_clasificar_productos_por_tandas (solo funciones: no hay datos que deshacer).
 -- Devuelve productos_aplicar_clasificacion_ia a la versión de 20261007160000 (UPDATE sin límite al final)
 -- y productos_despachar_clasificacion a la de 20261106200000, y quita productos_asignar_por_alias.
 set lock_timeout = '5s';

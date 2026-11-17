@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ============================================================================
--- 20261205100000_clasificar_productos_por_tandas — «clasificar-productos» ya
+-- 20261208100000_clasificar_productos_por_tandas — «clasificar-productos» ya
 -- no se corta por tiempo (CAS-7, 16/11/2026)
 -- ----------------------------------------------------------------------------
 -- QUÉ PASABA
@@ -34,10 +34,10 @@ set client_encoding = 'UTF8';
 -- APLICAR (una a una, nunca `db push`): demo primero (sfonaclosuafvlhutkon);
 -- producción (haqmmdfdzzatdnrrcgez) solo tras aceptar el PR de la release y
 -- con el «sí» del dueño:
---   supabase db query --linked -f supabase/migrations/20261205100000_clasificar_productos_por_tandas.sql
+--   supabase db query --linked -f supabase/migrations/20261208100000_clasificar_productos_por_tandas.sql
 -- Tiene que terminar en «clasificar_productos_por_tandas: aplicada».
 -- No hay que desplegar ninguna función (clasificar-productos no cambia).
--- Deshacer: supabase/rollbacks/20261205100000_clasificar_productos_por_tandas_ROLLBACK.sql
+-- Deshacer: supabase/rollbacks/20261208100000_clasificar_productos_por_tandas_ROLLBACK.sql
 -- Pruebas: npm run test:clasificar-productos:db (PGlite, sin tocar Supabase).
 -- ============================================================================
 
@@ -191,7 +191,7 @@ security definer
 set search_path = public, extensions
 as $function$
 -- 20261106200000: la URL sale de Vault («project_url»).
--- 20261205100000: antes de llamar a la función, lo que ya tiene alias se asigna aquí (sin IA).
+-- 20261208100000: antes de llamar a la función, lo que ya tiene alias se asigna aquí (sin IA).
 declare
   v_url     text;
   v_secreto text;
