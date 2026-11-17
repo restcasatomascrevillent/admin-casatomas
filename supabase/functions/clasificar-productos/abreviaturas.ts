@@ -71,7 +71,9 @@ export function compactarAbreviaturas(
 /**
  * Red de seguridad: «LP La Cuvée 75 cl» → «Laurent-Perrier La Cuvée 75 cl» si LP
  * es una abreviatura conocida de ese proveedor. Solo la primera palabra (con o
- * sin punto) y solo si el nombre no empieza ya por la expansión.
+ * sin punto) y solo si el nombre no empieza ya por la expansión. Las palabras
+ * que la expansión ya contiene no se repiten: «Coca Cola Zero» → «Coca-Cola Zero»
+ * (no «Coca-Cola Cola Zero»), «Juve & Camps Reserva» → «Juve&Camps Reserva».
  */
 export function expandirAbreviaturaInicial(
   nombre: string,
@@ -84,7 +86,16 @@ export function expandirAbreviaturaInicial(
   if (!hallada) return nombre;
   const resto = m[2].trim();
   if (sinTildes(resto).startsWith(sinTildes(hallada.expansion))) return resto ? resto : nombre;
-  return resto ? `${hallada.expansion} ${resto}` : hallada.expansion;
+  // Palabras de la expansión (Coca-Cola → coca, cola) frente a las del nombre tras la abreviatura.
+  const palabras = (t: string) => [...t.matchAll(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]+/g)]
+    .map((x) => ({ n: sinTildes(x[0]), fin: (x.index ?? 0) + x[0].length }));
+  const exp = palabras(hallada.expansion).map((p) => p.n);
+  const nom = palabras(nombre);
+  let usadas = 1;                                  // la propia abreviatura
+  let j = nom[0].n.length >= 3 && exp[0]?.startsWith(nom[0].n) ? 1 : 0;   // «coca» ya es el comienzo de «coca»
+  while (j < exp.length && usadas < nom.length && nom[usadas].n === exp[j]) { usadas++; j++; }
+  const sobra = nombre.slice(nom[usadas - 1].fin).replace(/^[\s.&,-]+/, "").trim();
+  return sobra ? `${hallada.expansion} ${sobra}` : hallada.expansion;
 }
 
 /** Espejo de abreviaturas_token_generico (SQL): lo que NO es una marca (envase, familia, calidad, partículas). */

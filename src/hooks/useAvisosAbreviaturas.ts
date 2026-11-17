@@ -38,10 +38,10 @@ export function useAvisosAbreviaturas(activo: boolean) {
     staleTime: 30_000,
     refetchInterval: 60_000,
     retry: false,
-    queryFn: async (): Promise<AvisoAbreviatura[]> => {
+    // null = la RPC no existe todavía (sin migración) o no hay permiso: la pantalla no pinta nada.
+    queryFn: async (): Promise<AvisoAbreviatura[] | null> => {
       const { data, error } = await rpc("abreviaturas_avisos_pendientes");
-      // Sin la migración (o sin permiso) no hay avisos: no es un fallo de la pantalla.
-      if (error) return [];
+      if (error) return null;
       return Array.isArray(data) ? (data as AvisoAbreviatura[]) : [];
     },
   });
@@ -64,5 +64,49 @@ export function useResolverAbreviatura() {
       void qc.invalidateQueries({ queryKey: ["notificaciones"] });
     },
     onError: (e: Error) => toast.error("No se ha podido guardar", { description: e.message }),
+  });
+}
+
+// ── Abreviaturas aprendidas (20261209500000): lista con «No es» para quitar las falsas ──
+export interface AbreviaturaAprendida {
+  id: number;
+  proveedor_id: number;
+  proveedor: string;
+  abreviatura: string;
+  expansion: string;
+  origen: "aprendida" | "manual" | string;
+  veces: number;
+  usable: boolean;
+}
+
+export const CLAVE_ABREVIATURAS_APRENDIDAS = ["facturas", "abreviaturas_aprendidas"] as const;
+
+export function useAbreviaturasAprendidas(activo: boolean) {
+  return useQuery({
+    queryKey: CLAVE_ABREVIATURAS_APRENDIDAS,
+    enabled: activo,
+    staleTime: 30_000,
+    retry: false,
+    queryFn: async (): Promise<AbreviaturaAprendida[]> => {
+      const { data, error } = await rpc("abreviaturas_listar");
+      if (error) throw new Error(error.message);
+      return Array.isArray(data) ? (data as AbreviaturaAprendida[]) : [];
+    },
+  });
+}
+
+export function useQuitarAbreviatura() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const { data, error } = await rpc("abreviaturas_quitar", { p_id: id });
+      if (error) throw new Error(error.message);
+      return data as { quitada?: boolean };
+    },
+    onSuccess: () => {
+      toast.success("Quitada: no se volverá a aprender");
+      void qc.invalidateQueries({ queryKey: CLAVE_ABREVIATURAS_APRENDIDAS });
+    },
+    onError: (e: Error) => toast.error("No se ha podido quitar", { description: e.message }),
   });
 }

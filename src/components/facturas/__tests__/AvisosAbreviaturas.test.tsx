@@ -66,4 +66,34 @@ describe("AvisosAbreviaturas (pantalla de subida)", () => {
     await waitFor(() => expect(h.rpc).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("con 10 avisos la caja tiene alto máximo y scroll interior (la pantalla no hace scroll de página)", async () => {
+    const diez = Array.from({ length: 10 }, (_, n) => ({ ...aviso, id: `a${n}`, abreviatura: `ab${String.fromCharCode(97 + n)}`, propuesta: `Marca ${n}` }));
+    h.rpc.mockImplementation(async (nombre: string) => (nombre === "abreviaturas_avisos_pendientes" ? { data: diez, error: null } : { data: {}, error: null }));
+    montar();
+    const caja = await screen.findByTestId("avisos-abreviaturas");
+    expect(caja.className).toContain("max-h-[30vh]");
+    expect(caja.className).toContain("flex-col");
+    const lista = screen.getByTestId("avisos-abreviaturas-lista");
+    expect(lista.className).toContain("overflow-y-auto");
+    expect(lista.className).toContain("min-h-0");
+    expect(lista.querySelectorAll("li")).toHaveLength(10);
+    // El título (y su contador) no se esconde dentro del scroll.
+    expect(screen.getByText("Abreviaturas por confirmar (10)")).toBeInTheDocument();
+  });
+
+  it("«Abreviaturas aprendidas» lista lo aprendido y «No es» lo quita", async () => {
+    h.rpc.mockImplementation(async (nombre: string) => {
+      if (nombre === "abreviaturas_avisos_pendientes") return { data: [], error: null };
+      if (nombre === "abreviaturas_listar") {
+        return { data: [{ id: 5, proveedor_id: 3, proveedor: "Nicolás y Valero", abreviatura: "cs", expansion: "Cs-Salchichon", origen: "aprendida", veces: 7, usable: true }], error: null };
+      }
+      return { data: { quitada: true }, error: null };
+    });
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: /Abreviaturas aprendidas/ }));
+    expect(await screen.findByText("«CS» = Cs-Salchichon")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "CS de Nicolás y Valero no es Cs-Salchichon" }));
+    await waitFor(() => expect(h.rpc).toHaveBeenCalledWith("abreviaturas_quitar", { p_id: 5 }));
+  });
 });

@@ -2,7 +2,14 @@ import { useState } from "react";
 import { Check, Pencil, Tags, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { type AvisoAbreviatura, useAvisosAbreviaturas, useResolverAbreviatura } from "@/hooks/useAvisosAbreviaturas";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  type AvisoAbreviatura,
+  useAbreviaturasAprendidas,
+  useAvisosAbreviaturas,
+  useQuitarAbreviatura,
+  useResolverAbreviatura,
+} from "@/hooks/useAvisosAbreviaturas";
 
 /**
  * «LP parece Laurent-Perrier. ¿Confirmar?» en la pantalla de subida de Facturas.
@@ -10,20 +17,84 @@ import { type AvisoAbreviatura, useAvisosAbreviaturas, useResolverAbreviatura } 
  * Confirmar o corregir guarda la abreviatura del proveedor y pone al producto su marca completa.
  */
 export function AvisosAbreviaturas({ puedeEditar }: { puedeEditar: boolean }) {
-  const { data: avisos = [] } = useAvisosAbreviaturas(puedeEditar);
-  if (!puedeEditar || avisos.length === 0) return null;
+  const { data: avisos } = useAvisosAbreviaturas(puedeEditar);
+  if (!puedeEditar || !avisos) return null;
   return (
-    <section aria-label="Abreviaturas por confirmar" data-testid="avisos-abreviaturas" className="shrink-0 rounded-lg border border-gold/40 bg-muted/30 px-3 py-2">
-      <h3 className="mb-1 flex items-center gap-1.5 text-sm font-semibold">
-        <Tags className="h-4 w-4" aria-hidden="true" />
-        Abreviaturas por confirmar ({avisos.length})
-      </h3>
-      <ul className="divide-y">
-        {avisos.map((a) => (
-          <FilaAviso key={a.id} aviso={a} />
-        ))}
-      </ul>
-    </section>
+    <div className="shrink-0 space-y-1">
+      {avisos.length > 0 && (
+        // Alto máximo con scroll interior: una carga masiva puede traer 50 avisos y la pantalla no hace scroll de página.
+        <section
+          aria-label="Abreviaturas por confirmar"
+          data-testid="avisos-abreviaturas"
+          className="flex max-h-[30vh] flex-col rounded-lg border border-gold/40 bg-muted/30 px-3 py-2"
+        >
+          <h3 className="mb-1 flex shrink-0 items-center gap-1.5 text-sm font-semibold">
+            <Tags className="h-4 w-4" aria-hidden="true" />
+            Abreviaturas por confirmar ({avisos.length})
+          </h3>
+          <ul className="min-h-0 flex-1 divide-y overflow-y-auto overscroll-contain" data-testid="avisos-abreviaturas-lista">
+            {avisos.map((a) => (
+              <FilaAviso key={a.id} aviso={a} />
+            ))}
+          </ul>
+        </section>
+      )}
+      <AbreviaturasAprendidas />
+    </div>
+  );
+}
+
+/** «Abreviaturas aprendidas»: ventana con la lista y un «No es» para quitar una falsa (y que no se vuelva a aprender). */
+function AbreviaturasAprendidas() {
+  const [abierta, setAbierta] = useState(false);
+  const { data = [], isLoading, isError } = useAbreviaturasAprendidas(abierta);
+  const quitar = useQuitarAbreviatura();
+  return (
+    <Dialog open={abierta} onOpenChange={setAbierta}>
+      <DialogTrigger asChild>
+        <Button type="button" variant="ghost" className="h-8 gap-1.5 px-2 text-xs text-muted-foreground">
+          <Tags className="h-3.5 w-3.5" aria-hidden="true" />
+          Abreviaturas aprendidas
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] max-w-xl overflow-hidden">
+        <DialogHeader>
+          <DialogTitle>Abreviaturas aprendidas</DialogTitle>
+          <DialogDescription>Si alguna no es una abreviatura, pulsa «No es»: se quita y no se vuelve a aprender.</DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[60vh] overflow-y-auto">
+          {isLoading && <p className="py-4 text-sm text-muted-foreground">Cargando…</p>}
+          {isError && <p className="py-4 text-sm text-destructive">No se ha podido cargar la lista.</p>}
+          {!isLoading && !isError && data.length === 0 && <p className="py-4 text-sm text-muted-foreground">Todavía no hay ninguna.</p>}
+          <ul className="divide-y">
+            {data.map((a) => (
+              <li key={a.id} className="flex items-center gap-2 py-2" data-abreviatura-aprendida={a.abreviatura}>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">
+                    «{a.abreviatura.toUpperCase()}» = {a.expansion}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {a.proveedor} · {a.origen === "manual" ? "confirmada" : `vista ${a.veces} ${a.veces === 1 ? "vez" : "veces"}`}
+                    {a.usable ? "" : " · aún no se usa"}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 gap-1.5 px-3"
+                  disabled={quitar.isPending}
+                  onClick={() => quitar.mutate(a.id)}
+                  aria-label={`${a.abreviatura.toUpperCase()} de ${a.proveedor} no es ${a.expansion}`}
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                  No es
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

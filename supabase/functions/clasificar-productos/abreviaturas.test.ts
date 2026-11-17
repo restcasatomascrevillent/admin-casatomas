@@ -83,6 +83,31 @@ describe("expandirAbreviaturaInicial (red de seguridad)", () => {
   });
 });
 
+describe("expandirAbreviaturaInicial no repite lo que la expansión ya contiene", () => {
+  const lista = [
+    { abreviatura: "coca", expansion: "Coca-Cola" },
+    { abreviatura: "juve", expansion: "Juve&Camps" },
+    { abreviatura: "fever", expansion: "Fever-Tree" },
+    { abreviatura: "lp", expansion: "Laurent-Perrier" },
+    { abreviatura: "dp", expansion: "Dom Pérignon" },
+  ];
+  it("Coca Cola Zero, Juve & Camps y Fever Tree Tonic salen con la marca una sola vez", () => {
+    expect(expandirAbreviaturaInicial("Coca Cola Zero 33 cl", lista)).toBe("Coca-Cola Zero 33 cl");
+    expect(expandirAbreviaturaInicial("Juve & Camps Reserva de la Familia 75 cl", lista)).toBe("Juve&Camps Reserva de la Familia 75 cl");
+    expect(expandirAbreviaturaInicial("Fever Tree Tonic 20 cl", lista)).toBe("Fever-Tree Tonic 20 cl");
+  });
+  it("la abreviatura sola o con la marca escrita detrás tampoco duplica", () => {
+    expect(expandirAbreviaturaInicial("Coca Zero 33 cl", lista)).toBe("Coca-Cola Zero 33 cl");
+    expect(expandirAbreviaturaInicial("Coca", lista)).toBe("Coca-Cola");
+    expect(expandirAbreviaturaInicial("LP Laurent Perrier Brut 75 cl", lista)).toBe("Laurent-Perrier Brut 75 cl");
+  });
+  it("LP y DP siguen expandiéndose", () => {
+    expect(expandirAbreviaturaInicial("LP La Cuvée 75 cl", lista)).toBe("Laurent-Perrier La Cuvée 75 cl");
+    expect(expandirAbreviaturaInicial("DP Vintage 2012 75 cl", lista)).toBe("Dom Pérignon Vintage 2012 75 cl");
+    expect(expandirAbreviaturaInicial("DP. Rosé 75 cl", lista)).toBe("Dom Pérignon Rosé 75 cl");
+  });
+});
+
 describe("el nombre sigue Marca + producto + formato", () => {
   const abreviaturas = abreviaturasActivas([fila("lp", "Laurent-Perrier")]);
   const catalogo: ProductoCatalogo[] = [{ id: 1, nombre: "Laurent-Perrier Brut 75 cl", categoria_id: 2 }];
