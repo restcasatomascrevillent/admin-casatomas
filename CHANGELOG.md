@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.44.0] - 2026-11-17
+
+Objetivo: Avisos de reservas: Verificar y Revisado en un solo botón, filas por tipo y sin «Pendientes» (CAS-9)
+
+### Añadido
+- Reservas: avisos con Verificar y Revisado en un solo botón, sin «Pendientes» (CAS-9) ([#283](https://github.com/restcasatomascrevillent/admin-casatomas/pull/283))
+
 ## [1.43.2] - 2026-11-17
 
 Objetivo: Estado de Servicios cabe en una pantalla sin scroll y abrir un servicio ya no descoloca la página
