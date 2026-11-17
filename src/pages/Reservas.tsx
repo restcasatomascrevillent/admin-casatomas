@@ -365,15 +365,46 @@ export default function Reservas() {
     );
   }
 
-  // Móvil (< 768 px, 07/11/2026, petición del dueño): el teléfono del camarero es SOLO para sentar. Solo
-  // «Hoy», sin pestañas, sin «Nueva reserva» ni avisos, y sin la barra superior del panel (el botón de menú
-  // va en la fila de controles de `VistaHoyMovil`). Un `?tab=otra` también cae aquí. Tablet y escritorio, igual.
+  // «Nueva reserva»: la hoja del día y el formulario (LibroReservas). El mismo contenido para el botón de tablet y
+  // escritorio y para el «+ Nueva» del móvil.
+  const contenidoNuevaReserva = (
+    <DialogContent className="reservas-contraste flex h-[94dvh] max-h-[94dvh] w-[98vw] max-w-[98vw] flex-col gap-0 overflow-hidden p-0">
+      <DialogHeader className="flex-row flex-wrap items-center gap-3 space-y-0 border-b px-4 py-2 pr-12">
+        <DialogTitle className="text-lg">
+          Nueva reserva
+          {fechaNuevaReserva && fechaHojaNueva ? ` · ${diaLargo(fechaHojaNueva)}` : ""}
+        </DialogTitle>
+        <DialogDescription className="sr-only">Las reservas del día y, al lado, el formulario para apuntar una nueva.</DialogDescription>
+      </DialogHeader>
+      {bajoDemanda(
+        <LibroReservas
+          soloCrear={soloCrear}
+          fechaInicial={fechaNuevaReserva}
+          onReservaCreada={setUltimaCreada}
+          // Desde «+ Añadir reserva a este día»: sin la hoja (ya se ve detrás), solo apuntar.
+          soloApuntar={!!fechaNuevaReserva}
+          onCambioFecha={setFechaHojaNueva}
+        />,
+      )}
+    </DialogContent>
+  );
+
+  // Móvil (< 768 px, 07/11/2026, petición del dueño): el teléfono del camarero es para sentar. Solo «Hoy», sin
+  // pestañas y sin la barra superior del panel (el botón de menú va en la fila de controles de `VistaHoyMovil`).
+  // Un `?tab=otra` también cae aquí. Tablet y escritorio, igual.
+  // 17/11/2026 (petición del dueño): desde el móvil también se pasa de día y se apunta una reserva a mano («+ Nueva»,
+  // con permiso de crear): abre el formulario en el día que se está viendo (sin la hoja, que ya se ve detrás).
   if (esMovil) {
     return (
       <DashboardLayout sinCabeceraMovil>
         <div className="reservas-contraste contents">
-          <VistaHoy onAbrirSala={handleEspacioClick} />
+          <VistaHoy onAbrirSala={handleEspacioClick} onNuevaReserva={puedeCrearReservas ? abrirNuevaReserva : undefined} />
         </div>
+        {puedeCrearReservas && (
+          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+            {contenidoNuevaReserva}
+          </Dialog>
+        )}
       </DashboardLayout>
     );
   }
@@ -427,25 +458,7 @@ export default function Reservas() {
                     Nueva Reserva
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="reservas-contraste flex h-[94dvh] max-h-[94dvh] w-[98vw] max-w-[98vw] flex-col gap-0 overflow-hidden p-0">
-                  <DialogHeader className="flex-row flex-wrap items-center gap-3 space-y-0 border-b px-4 py-2 pr-12">
-                    <DialogTitle className="text-lg">
-                      Nueva reserva
-                      {fechaNuevaReserva && fechaHojaNueva ? ` · ${diaLargo(fechaHojaNueva)}` : ""}
-                    </DialogTitle>
-                    <DialogDescription className="sr-only">Las reservas del día y, al lado, el formulario para apuntar una nueva.</DialogDescription>
-                  </DialogHeader>
-                  {bajoDemanda(
-                    <LibroReservas
-                      soloCrear={soloCrear}
-                      fechaInicial={fechaNuevaReserva}
-                      onReservaCreada={setUltimaCreada}
-                      // Desde «+ Añadir reserva a este día»: sin la hoja (ya se ve detrás), solo apuntar.
-                      soloApuntar={!!fechaNuevaReserva}
-                      onCambioFecha={setFechaHojaNueva}
-                    />,
-                  )}
-                </DialogContent>
+                {contenidoNuevaReserva}
               </Dialog>
             )}
             </div>

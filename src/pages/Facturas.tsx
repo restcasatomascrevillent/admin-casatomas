@@ -232,9 +232,12 @@ const Facturas = () => {
                     Son de lo comprado (precios, documentos): solo para quien consulta Facturas. */}
                 {/* 12/11/2026 (móvil): el gasto de IA, Avisos y Ayuda juntos a la derecha. Antes había dos `ml-auto` y el
                     importe quedaba suelto en medio de la fila. */}
-                <div className={cn("flex items-center gap-2 sm:order-none sm:ml-0", barraUnica ? "order-4 ml-auto" : "order-2")}>
-                  {permisos.consultar && <BotonAvisosSeccion seccion="facturas" compacto={barraUnica} />}
-                  <BotonAyuda seccion="facturas" />
+                {/* 17/11/2026 (captura del dueño a 412 px: con avisos sin revisar, el botón rojo y la ayuda no cabían junto al
+                    periodo y caían solos a otra fila): en el móvil van más estrechos y pegados, y el periodo también
+                    encoge (`SelectorPeriodo`), así que comparten fila desde 360 px. */}
+                <div className={cn("flex shrink-0 items-center gap-2 max-sm:gap-0.5 sm:order-none sm:ml-0", barraUnica ? "order-4 ml-auto" : "order-2")}>
+                  {permisos.consultar && <BotonAvisosSeccion seccion="facturas" compacto={barraUnica} className="max-sm:gap-1 max-sm:px-2" />}
+                  <BotonAyuda seccion="facturas" className="max-sm:w-9" />
                 </div>
               </>
             }
