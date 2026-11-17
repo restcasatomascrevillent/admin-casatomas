@@ -8,7 +8,7 @@ import { alertasRelevantes, type ResultadoProcesamiento } from "./colaSubida";
  * 20261127100100_fallos_internos_telegram). Otros tipos se añaden a la lista blanca del RPC.
  * Nunca lanza: un fallo al avisar no puede romper lo que el usuario está haciendo.
  */
-export type TipoFalloInterno = "albaran_aviso";
+export type TipoFalloInterno = "albaran_aviso" | "chat_error";
 
 // Tabla/RPC sin tipos generados todavía.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

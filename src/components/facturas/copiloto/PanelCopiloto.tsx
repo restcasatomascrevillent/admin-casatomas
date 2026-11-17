@@ -437,6 +437,41 @@ function MensajeUsuario({ mensaje, completa }: { mensaje: MensajeChat; completa?
   );
 }
 
+/** Motivos de un toque para el 👎 de una respuesta «no hay datos» (van como comentario). */
+export const MOTIVOS_SIN_DATOS = ["Sí que hay compras", "No me ha entendido"] as const;
+
+/**
+ * Bajo una respuesta «no hay datos»: «¿Debería haber datos?» con dos motivos de un
+ * toque, que guardan un 👎 con ese motivo (17/11/2026: en mes y medio solo hubo un
+ * 👍 y los falsos «no hay» no dejaban rastro). No aparece si ya se ha valorado.
+ */
+export function PreguntaSinDatos({ onValorar }: { onValorar: (valoracion: 1 | -1, comentario?: string) => Promise<boolean> }) {
+  const [enviando, setEnviando] = useState(false);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" role="group" aria-label="¿Debería haber datos?">
+      <span>¿Debería haber datos?</span>
+      {MOTIVOS_SIN_DATOS.map((motivo) => (
+        <button
+          key={motivo}
+          type="button"
+          disabled={enviando}
+          onClick={async () => {
+            setEnviando(true);
+            try {
+              await onValorar(-1, `Sin datos: ${motivo}`);
+            } finally {
+              setEnviando(false);
+            }
+          }}
+          className={cn("min-h-9 rounded-full border border-border/70 px-3 text-foreground hover:bg-muted disabled:opacity-50", FOCO)}
+        >
+          {motivo}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MensajeAsistente({
   mensaje,
   completa,
@@ -484,6 +519,21 @@ function MensajeAsistente({
         );
       })}
       {documentos.length > 0 && <DocumentosCitados documentos={documentos} />}
+      {mensaje.aviso === "error" && onRegenerar && (
+        <div>
+          <button
+            type="button"
+            onClick={onRegenerar}
+            className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border/70 px-3 text-sm font-medium text-foreground hover:bg-muted", FOCO)}
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden />
+            Reintentar
+          </button>
+        </div>
+      )}
+      {mensaje.aviso === "sin_datos" && onValorar && !mensaje.valoracion && (
+        <PreguntaSinDatos onValorar={(v, c) => onValorar(mensaje.id, v, c)} />
+      )}
       <div className="-ml-2 flex flex-wrap items-center gap-x-0.5 text-xs text-muted-foreground/80">
         <BotonCopiar texto={mensaje.contenido} />
         {onValorar && (

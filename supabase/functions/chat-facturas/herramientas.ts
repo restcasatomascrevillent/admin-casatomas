@@ -902,6 +902,8 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
           p_limite: entero(args.limite),
         },
         limite: null,
+        // sumas (base, IVA, total de TODO lo filtrado), como_leer y por_mes van detrás de las filas.
+        maxChars: MAX_CHARS_FILTRAR,
       };
     }
 
@@ -936,7 +938,9 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
       const { desde, hasta } = rangoOpcional(args);
       const den = denominacionDeTexto(producto);
       if (den) return desvioDenominacion("compras_producto", den, desde, hasta, pregunta, porVolumen);
-      const desvio = desvioVolumen("compras_producto", producto, asoc, porVolumen, desde, hasta);
+      // Con proveedor pedido no se desvía a volumen_comprado (no filtra por proveedor: «cerveza a
+      // Mahou» daba los litros de todos los proveedores). 18/11/2026.
+      const desvio = texto(args.proveedor) ? null : desvioVolumen("compras_producto", producto, asoc, porVolumen, desde, hasta);
       if (desvio) return desvio;
       return {
         tipo: "rpc",
@@ -1179,6 +1183,122 @@ export function llamadaPresupuesto(args: any, presupuestoId?: string | null): Ll
     limite: null,
     maxChars: MAX_CHARS_PRESUPUESTO,
   };
+}
+
+/** filtrar_documentos: 10 filas + sumas + reparto por mes (hasta 24 meses). */
+export const MAX_CHARS_FILTRAR = 9_000;
+
+// ─── Sin compras: probar las alternativas antes de decir «no hay» (17/11/2026) ─
+//  Evaluación de 123 preguntas reales: los falsos «no hay compras» (Laurent
+//  Perrier, Sierra Cantabria) son los fallos que más desconfianza crean. La
+//  búsqueda con abreviaturas, siglas, erratas y sugerencias está en
+//  compras_producto_agente; historial_precios y grafico_precio no la tenían.
+
+/** historial_precios o grafico_precio sin ninguna compra: se repite por compras_producto (sugerencias). */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function sinCompras(nombre: string, data: any): boolean {
+  if (!data || typeof data !== "object" || Array.isArray(data) || data.error !== undefined) return false;
+  if (nombre === "historial_precios") return data.compras_encontradas === 0 && !data.subproductos;
+  if (nombre === "grafico_precio") return data.sin_datos === true;
+  return false;
+}
+
+// ─── Vinos de la carta: coste efectivo por botella (17/11/2026) ─────────────
+//  27 de las últimas 39 preguntas eran «precio de la botella de X». La respuesta
+//  buena no es la línea de la factura (por caja, o sin contar las botellas sin
+//  cargo) sino el coste EFECTIVO por botella de la pantalla «Coste vinos»
+//  (vinos_coste_carta_datos, vía margenes_carta_agente), con el precio de carta
+//  y el multiplicador. Se pide en paralelo a la consulta del producto.
+
+/** ¿La consulta de producto es de un vino? (asociación del catálogo: categoría de vinos o espumosos). */
+export function esConsultaDeVino(ll: Llamada, asoc?: Asociacion | null): boolean {
+  if (ll.tipo !== "rpc" || (ll.rpc !== "compras_producto_agente" && ll.rpc !== "historial_precios_agente")) return false;
+  return asoc?.tipo === "producto" && /vino|espumos|champ|cava/i.test(asoc.categoria ?? "");
+}
+
+/** «Laurent Perrier» son 7 vinos de la carta: con 4 se quedaba fuera La Cuvée (prueba del 17/11/2026). */
+export const MAX_VINOS_CARTA = 8;
+export const NOTA_VINO_CARTA =
+  "Es un vino de la carta: contesta PRIMERO con coste_botella (coste EFECTIVO por botella, SIN IVA, ya contando " +
+  "botellas_sin_cargo; si difiere de coste_factura, da los dos), el proveedor, la fecha y el numero de ultima_factura, " +
+  "precio_carta y multiplicador. Siempre por botella: nunca en €/litro ni por caja. estado dudoso o revisar, o avisos: " +
+  "dilo. sin_datos: no hay coste para ese vino (di el motivo). Esto va antes que nota_respuesta; lo demas, como contexto.";
+
+/** Lo que el modelo necesita de margenes_carta_agente (vista vinos) para un vino; null si no hay ninguno. */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function resumenVinoCarta(data: any): { como_leer: string; vinos: unknown[] } | null {
+  if (!data || typeof data !== "object" || !Array.isArray(data.vinos) || data.vinos.length === 0) return null;
+  // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vinos = data.vinos.slice(0, MAX_VINOS_CARTA).map((v: any) => {
+    const f = v?.ultima_factura && typeof v.ultima_factura === "object" ? v.ultima_factura : null;
+    const salida: Record<string, unknown> = {
+      nombre: v?.nombre, precio_carta: v?.precio_carta, coste_botella: v?.coste_botella, coste_factura: v?.coste_factura,
+      botellas_sin_cargo: v?.botellas_sin_cargo, multiplicador: v?.multiplicador, estado: v?.estado, avisos: v?.avisos,
+      sin_datos: v?.sin_datos, producto_comprado: v?.producto_comprado,
+      ultima_factura: f ? { fecha: f.fecha, proveedor: f.proveedor, numero: f.numero } : undefined,
+    };
+    for (const k of Object.keys(salida)) if (salida[k] === undefined || salida[k] === null) delete salida[k];
+    return salida;
+  });
+  return { como_leer: NOTA_VINO_CARTA, vinos };
+}
+
+// ─── Incidencias: lo que se registra y lo que ve el panel (17/11/2026) ──────
+//  La evaluación encontró 3 fallos técnicos que no dejaron rastro. Cada
+//  petición que acaba en error, tiempo agotado, herramienta caída o sin
+//  respuesta se apunta en fallos_internos (tipo chat_error) con la pregunta,
+//  la duración y el motivo, sin usuario; el panel recibe `incidencia` y
+//  enseña «Reintentar».
+
+export type MotivoIncidencia = "tiempo_agotado" | "ia_saturada" | "ia_configuracion" | "ia_no_responde" | "error" | "herramienta_fallida" | "sin_respuesta";
+
+/** Motivo de una excepción del handler (el mismo criterio que su mensaje visible). */
+export function motivoDeError(msg: string): MotivoIncidencia {
+  if (msg.includes("aborted") || /timeout/i.test(msg)) return "tiempo_agotado";
+  if (msg.includes("OpenAI chat 429") || msg.includes("OpenAI embeddings 429")) return "ia_saturada";
+  if (msg.includes("OpenAI chat 401") || msg.includes("OpenAI embeddings 401")) return "ia_configuracion";
+  if (msg.startsWith("OpenAI")) return "ia_no_responde";
+  return "error";
+}
+
+export const MAX_PREGUNTA_INCIDENCIA = 300;
+
+/** Datos del fallo interno `chat_error`: pregunta recortada, duración, motivo y herramientas (sin usuario). */
+export function datosIncidencia(p: {
+  motivo: MotivoIncidencia; pregunta: string; duracionMs: number; modelo?: string | null; detalle?: string | null;
+  herramientas?: { nombre: string; resultado: string; duracion_ms?: number; error?: string }[];
+}): Record<string, unknown> {
+  const pregunta = p.pregunta.replace(/\s+/g, " ").trim();
+  return {
+    origen: "chat-facturas",
+    motivo: p.motivo,
+    pregunta: pregunta.length > MAX_PREGUNTA_INCIDENCIA ? pregunta.slice(0, MAX_PREGUNTA_INCIDENCIA) + "…" : pregunta,
+    duracion_ms: Math.round(p.duracionMs),
+    ...(p.modelo ? { modelo: p.modelo } : {}),
+    ...(p.detalle ? { detalle: p.detalle.slice(0, 300) } : {}),
+    ...(p.herramientas?.length
+      ? { herramientas: p.herramientas.slice(0, 8).map((h) => ({
+          nombre: h.nombre, resultado: h.resultado,
+          ...(h.duracion_ms !== undefined ? { ms: h.duracion_ms } : {}),
+          ...(h.error ? { error: h.error.slice(0, 200) } : {}),
+        })) }
+      : {}),
+  };
+}
+
+/** ¿El resultado (JSON) de una herramienta dice que no hay datos? Uno cortado o ilegible cuenta como «con datos». */
+export function resultadoVacio(contenido: string): boolean {
+  try {
+    const d = JSON.parse(contenido);
+    if (!d || typeof d !== "object") return false;
+    if (d.vino_carta) return false;
+    return d.sin_datos === true || (Array.isArray(d.resultados) && d.resultados.length === 0);
+  } catch {
+    return false;
+  }
 }
 
 /**
