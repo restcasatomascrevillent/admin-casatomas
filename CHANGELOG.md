@@ -16,6 +16,13 @@ Objetivo: Informe de subidas y proveedor más barato, diccionario de abreviatura
 - Abreviaturas (B1-B3) y informe Subidas (A1-A2) ([#263](https://github.com/restcasatomascrevillent/admin-casatomas/pull/263))
 - Telegram: reservas de la revisión del #262 ([#267](https://github.com/restcasatomascrevillent/admin-casatomas/pull/267))
 
+## [1.42.0] - 2026-11-17
+
+Objetivo: Gestor Gasto: descuentos en los gastos de Servicios y vista previa del PDF
+
+### Añadido
+- Gestor-gasto: gastos de Servicios editables con descuentos y vista previa del PDF ([#273](https://github.com/restcasatomascrevillent/admin-casatomas/pull/273))
+
 ## [1.41.3] - 2026-11-17
 
 Objetivo: Estado de Servicios sin avisos falsos ni repetidos y con las fichas llenando cada fila

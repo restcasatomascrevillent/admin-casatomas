@@ -14,6 +14,10 @@ vi.mock("@/hooks/useGastosServiciosMes",()=>({
   useGastosServiciosMes:(mes:string|undefined)=>{mock.mesPedido.push(mes);return mes && mock.gastos ? mock.gastos : {gastos:null,cargando:false,error:false,disponible:true};},
 }));
 vi.mock("@/components/control-excel/ControlExcel",()=>({ControlExcel:()=><p>Control del Excel de prueba</p>}));
+// La vista previa del PDF se simula: jsPDF y pdf.js no corren en jsdom. Se anota qué recibo se pide.
+const previa=vi.hoisted(()=>({blob:vi.fn(async()=>new Blob(["pdf"]))}));
+vi.mock("../pdf",()=>({blobPdfFactura:previa.blob,descargarBlobPdf:vi.fn(),descargarFactura:vi.fn()}));
+vi.mock("@/components/facturas/shared/VisorPdf",()=>({VisorPdf:({titulo}:{titulo:string})=><p data-testid="visor-pdf">{titulo}</p>}));
 import { EditorFacturacion } from "../EditorFacturacion";
 
 const GASTOS:GastoServicio[]=[
@@ -154,6 +158,27 @@ describe("editor de recibos",()=>{
     expect(guardado.vencimiento).toBe(guardado.fecha);
   });
 
+  it("«Vista previa del PDF» enseña el PDF sin guardar ni emitir: del borrador en edición y de los de la lista",async()=>{
+    const documento=mock.data!.config!.documento;
+    documento.cliente.nombre="Casa Tomás";
+    mock.data!.facturas=[{id:"emitida",numero:"R-2026-001",documento:{...documento,numero:"R-2026-001"},creado_en:"2026-10-03",actualizado_en:"2026-10-03"}];
+    mock.data!.borradores=[{id:"b1",numero:"R-2026-010",documento,factura_id:null,creado_en:"2026-10-04",actualizado_en:"2026-10-04"}];
+    render(<EditorFacturacion/>);
+    fireEvent.click(screen.getByRole("button",{name:"3. Revisar"}));
+    fireEvent.click(screen.getByRole("button",{name:"Vista previa del PDF"}));
+    expect(await screen.findByTestId("visor-pdf")).toHaveTextContent("Recibo R-2026-010");
+    expect(previa.blob).toHaveBeenLastCalledWith(expect.objectContaining({numero:"R-2026-010"}),{borrador:true});
+    expect(mock.guardar).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button",{name:"Cerrar"}));
+    await waitFor(()=>expect(screen.queryByTestId("visor-pdf")).not.toBeInTheDocument());
+    fireEvent.mouseDown(screen.getByRole("tab",{name:"Recibos"}),{button:0,ctrlKey:false});
+    fireEvent.click(screen.getByRole("button",{name:"Vista previa del PDF de R-2026-001"}));
+    expect(await screen.findByTestId("visor-pdf")).toHaveTextContent("Recibo R-2026-001");
+    expect(previa.blob).toHaveBeenLastCalledWith(expect.objectContaining({numero:"R-2026-001"}),{borrador:false});
+    expect(screen.getByRole("button",{name:"Descargar PDF"})).toBeEnabled();
+    expect(mock.guardar).not.toHaveBeenCalled();
+  });
+
   it("exige confirmación antes de eliminar un recibo",async()=>{
     const documento=mock.data!.config!.documento;
     mock.data!.facturas=[{id:"emitida",numero:documento.numero,documento,creado_en:"2026-10-03",actualizado_en:"2026-10-03"}];
@@ -176,11 +201,16 @@ describe("editor de recibos",()=>{
 describe("pago mensual",()=>{
   const mes=mesDeFecha(new Date());
   const textoMes=textoMesRecibo(mes);
+  const total=()=>screen.getByText("Total:").closest("span");
+  const enRecibo=()=>within(screen.getByRole("list",{name:"Gastos de "+textoMes+" en el recibo"}));
+  const precio=(nombre:string)=>screen.getByLabelText("Precio de "+nombre+" (€)");
+  const descuento=(nombre:string)=>screen.getByLabelText("Descuento de "+nombre+" (%)");
   const nuevoMensual=async()=>{
     render(<EditorFacturacion/>);
     fireEvent.click(screen.getByRole("button",{name:"Nuevo pago mensual"}));
     await waitFor(()=>expect(screen.getByLabelText("Mes que se paga")).toHaveValue(mes));
     fireEvent.click(screen.getByRole("button",{name:"2. Conceptos"}));
+    await waitFor(()=>expect(enRecibo().getAllByRole("listitem")).toHaveLength(2));
   };
   it("una licencia no pide el mes ni consulta los gastos de Servicios",()=>{
     render(<EditorFacturacion/>);
@@ -190,66 +220,108 @@ describe("pago mensual",()=>{
   });
   it("nace con la cuota fija de las tarifas y los gastos del mes de Servicios, sin lo que cuesta 0 €",async()=>{
     await nuevoMensual();
-    await waitFor(()=>expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(3));
+    // La lista de conceptos lleva solo la cuota: los gastos de Servicios se editan en su bloque.
+    expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(1);
     expect(concepto(1).getByLabelText("Descripción")).toHaveValue("Cuota mensual · "+textoMes);
     expect(concepto(1).getByLabelText("Precio unitario (€)")).toHaveValue(800);
-    expect(concepto(2).getByLabelText("Descripción")).toHaveValue("OpenAI · IA");
-    expect(concepto(2).getByLabelText("Precio unitario (€)")).toHaveValue(42.36);
-    expect(concepto(3).getByLabelText("Descripción")).toHaveValue("Vercel · Hosting");
+    expect(precio("OpenAI")).toHaveValue(42.36);
+    expect(precio("Vercel")).toHaveValue(21.47);
+    expect(descuento("OpenAI")).toHaveValue(0);
     expect(mock.mesPedido).toContain(mes);
-    // El bloque de Servicios dice de dónde sale cada importe y lo que falta por meter.
-    const lista=within(screen.getByRole("list",{name:"Gastos de "+textoMes}));
-    expect(lista.getAllByRole("listitem")).toHaveLength(3);
-    expect(lista.getByText("Estimado")).toBeInTheDocument();
-    expect(lista.getByText("Metido a mano")).toBeInTheDocument();
+    // El bloque dice de dónde sale cada importe y lo que falta por meter en Servicios.
+    expect(enRecibo().getByText("Estimado")).toBeInTheDocument();
+    expect(enRecibo().getByText("Metido a mano")).toBeInTheDocument();
     expect(screen.getByText(/Falta meter en Servicios › Costes el importe de: Google Maps/)).toBeInTheDocument();
-    expect(screen.getByText("El recibo lleva estos mismos importes.")).toBeInTheDocument();
-    expect(screen.getByText("Total:").closest("span")).toHaveTextContent(/863,83/);
+    expect(screen.getByText("Los precios son los de Servicios.")).toBeInTheDocument();
+    expect(total()).toHaveTextContent(/863,83/);
   });
-  it("los gastos son editables (precio y descuento), se pueden volver a traer y se guardan como recibo mensual",async()=>{
+  it("cada gasto de Servicios se modifica en su bloque: precio y descuento, con lo que queda en el recibo a la vista",async()=>{
     mock.guardar.mockImplementation(async(documento)=>({config:{documento,actualizado_en:"v2"}}));
     await nuevoMensual();
-    await waitFor(()=>expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(3));
-    fireEvent.change(concepto(2).getByLabelText("Precio unitario (€)"),{target:{value:"30"}});
-    fireEvent.change(concepto(3).getByLabelText("Descuento (%)"),{target:{value:"100"}});
-    expect(screen.getByText("Total:").closest("span")).toHaveTextContent(/830,00/);
-    expect(screen.getByText(/El recibo lleva importes distintos/)).toBeInTheDocument();
+    fireEvent.change(descuento("OpenAI"),{target:{value:"50"}});
+    expect(screen.getByTestId("importe-servicio-openai")).toHaveTextContent(/21,18/);
+    expect(total()).toHaveTextContent(/842,65/); // 800 + 21,18 + 21,47
+    fireEvent.change(precio("Vercel"),{target:{value:"10"}});
+    expect(screen.getByTestId("importe-servicio-vercel")).toHaveTextContent(/10,00/);
+    expect(total()).toHaveTextContent(/831,18/);
+    expect(enRecibo().getByText(/En Servicios: 21,47\s€ \(precio cambiado\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Servicios en el recibo:/).closest("p")).toHaveTextContent(/31,18.*en Servicios: 63,83.*se descuentan 32,65/);
     fireEvent.click(screen.getByRole("button",{name:"Guardar borrador"}));
     await waitFor(()=>expect(mock.guardar).toHaveBeenCalled());
     const guardado=mock.guardar.mock.calls[0][0];
     expect(guardado).toMatchObject({tipo:"mensual",mes,aplicarIva:false,retencion:0});
     expect(guardado.lineas.map((l:{concepto:string;precio:number;descuento:number;proveedor?:string})=>[l.concepto,l.precio,l.descuento,l.proveedor])).toEqual([
-      ["Cuota mensual · "+textoMes,800,0,undefined],["OpenAI · IA",30,0,"openai"],["Vercel · Hosting",21.47,100,"vercel"],
+      ["Cuota mensual · "+textoMes,800,0,undefined],["OpenAI · IA",42.36,50,"openai"],["Vercel · Hosting",10,0,"vercel"],
     ]);
-    // «Volver a traer» repone el importe de Servicios y conserva el descuento.
+    // «Volver a traer» repone el precio de Servicios y conserva el descuento.
     fireEvent.click(screen.getByRole("button",{name:"Volver a traer los importes"}));
-    expect(concepto(2).getByLabelText("Precio unitario (€)")).toHaveValue(42.36);
-    expect(concepto(3).getByLabelText("Descuento (%)")).toHaveValue(100);
+    expect(precio("Vercel")).toHaveValue(21.47);
+    expect(descuento("OpenAI")).toHaveValue(50);
+    // Y el recibo que se revisa lleva el descuento.
+    fireEvent.click(screen.getByRole("button",{name:"3. Revisar"}));
+    const recibo=screen.getByRole("article",{name:"Vista previa del recibo"});
+    expect(recibo).toHaveTextContent("OpenAI · IA");expect(recibo).toHaveTextContent("Dto. 50%");
   });
-  it("si se quitan los gastos del recibo no vuelven solos: hay que pedirlos",async()=>{
+  it("«Descuento a todos» pone el mismo descuento a todos los servicios sin tocar la cuota",async()=>{
     await nuevoMensual();
-    await waitFor(()=>expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(3));
-    for(const n of [3,2]){
-      fireEvent.click(screen.getByRole("button",{name:"Eliminar concepto "+n}));
-      fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button",{name:"Eliminar concepto"}));
-      await waitFor(()=>expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(n-1));
-    }
+    const aplicar=screen.getByRole("button",{name:"Aplicar a todos"});
+    expect(aplicar).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Descuento a todos los servicios (%)"),{target:{value:"100"}});
+    fireEvent.click(aplicar);
+    expect(descuento("OpenAI")).toHaveValue(100);expect(descuento("Vercel")).toHaveValue(100);
+    expect(concepto(1).getByLabelText("Descuento (%)")).toHaveValue(0);
+    expect(total()).toHaveTextContent(/800,00/);
+    fireEvent.change(screen.getByLabelText("Descuento a todos los servicios (%)"),{target:{value:"150"}});
+    expect(aplicar).toBeDisabled();
+  });
+  it("un gasto se puede quitar del recibo y volver a añadir; quitado no vuelve solo",async()=>{
+    await nuevoMensual();
+    fireEvent.click(screen.getByRole("button",{name:"Quitar Vercel del recibo"}));
+    expect(enRecibo().getAllByRole("listitem")).toHaveLength(1);
+    expect(total()).toHaveTextContent(/842,36/);
+    const fuera=within(screen.getByRole("list",{name:"Gastos de Servicios que no están en el recibo"}));
+    expect(fuera.getByText(/Vercel.*21,47.*no está en el recibo/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"Añadir Vercel al recibo"}));
+    expect(precio("Vercel")).toHaveValue(21.47);
+    expect(screen.queryByRole("list",{name:"Gastos de Servicios que no están en el recibo"})).not.toBeInTheDocument();
+    // Quitados todos, el botón general los trae de nuevo.
+    fireEvent.click(screen.getByRole("button",{name:"Quitar Vercel del recibo"}));
+    fireEvent.click(screen.getByRole("button",{name:"Quitar OpenAI del recibo"}));
     expect(screen.getByText("Todavía no están en el recibo.")).toBeInTheDocument();
+    expect(total()).toHaveTextContent(/800,00/);
     fireEvent.click(screen.getByRole("button",{name:"Añadir al recibo"}));
-    expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(3);
+    expect(enRecibo().getAllByRole("listitem")).toHaveLength(2);
+  });
+  it("un concepto añadido a mano va antes de los servicios y se ordena solo entre los conceptos propios",async()=>{
+    mock.guardar.mockImplementation(async(documento)=>({config:{documento,actualizado_en:"v2"}}));
+    await nuevoMensual();
+    fireEvent.click(screen.getByRole("button",{name:"Añadir concepto"}));
+    expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(2);
+    fireEvent.change(concepto(2).getByLabelText("Descripción"),{target:{value:"Extra a mano"}});
+    expect(screen.getByRole("button",{name:"Bajar concepto 2"})).toBeDisabled();
+    fireEvent.click(screen.getByRole("button",{name:"Subir concepto 2"}));
+    expect(concepto(1).getByLabelText("Descripción")).toHaveValue("Extra a mano");
+    fireEvent.click(screen.getByRole("button",{name:"Guardar borrador"}));
+    await waitFor(()=>expect(mock.guardar).toHaveBeenCalled());
+    expect(mock.guardar.mock.calls[0][0].lineas.map((l:{concepto:string})=>l.concepto)).toEqual(["Extra a mano","Cuota mensual · "+textoMes,"OpenAI · IA","Vercel · Hosting"]);
   });
   it("sin costes de Servicios disponibles deja la cuota y avisa de que se añadan a mano",async()=>{
     mock.gastos={gastos:null,cargando:false,error:false,disponible:false};
-    await nuevoMensual();
+    render(<EditorFacturacion/>);
+    fireEvent.click(screen.getByRole("button",{name:"Nuevo pago mensual"}));
+    await waitFor(()=>expect(screen.getByLabelText("Mes que se paga")).toHaveValue(mes));
+    fireEvent.click(screen.getByRole("button",{name:"2. Conceptos"}));
     expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(1);
     expect(screen.getByText(/no están disponibles en este entorno/)).toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"Aplicar a todos"})).not.toBeInTheDocument();
   });
   it("pasar un recibo a pago mensual desde el paso 1 pone el mes, la cuota y los gastos",async()=>{
     render(<EditorFacturacion/>);
     fireEvent.click(screen.getByRole("button",{name:/Pago mensual/}));
     expect(screen.getByLabelText("Mes que se paga")).toHaveValue(mes);
     fireEvent.click(screen.getByRole("button",{name:"2. Conceptos"}));
-    await waitFor(()=>expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(3));
+    await waitFor(()=>expect(enRecibo().getAllByRole("listitem")).toHaveLength(2));
+    expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(1);
     expect(screen.queryByRole("button",{name:/Panel esencial/})).not.toBeInTheDocument();
   });
 });
