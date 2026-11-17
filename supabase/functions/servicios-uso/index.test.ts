@@ -8,6 +8,7 @@ import { olvidarTokenDrive } from "../_shared/google-drive.ts";
 import {
   CACHE_MS,
   LECTORES,
+  VERCEL_TEAM_POR_DEFECTO,
   aplicarLimites,
   crearManejador,
   metricasBd,
@@ -15,6 +16,7 @@ import {
   ocultarSecretos,
   refDeUrl,
   resumirAnaliticaVapi,
+  resumirFacturacionVercel,
   resumirSuscripcionesHostinger,
   resumirUsoGithub,
   resumirUsoVercel,
@@ -467,7 +469,7 @@ describe("lectores", () => {
     expect(sinLimite.detalles?.avisos).toEqual([expect.stringMatching(/no tiene límite/)]);
   });
 
-  it("Mapbox: cargas del mapa de vinos (logs de la web), coste a partir de 50.000; sin logs o sin migración, lo dice", async () => {
+  it("Mapbox: cargas del mapa de vinos (contador de la web), coste a partir de 50.000; sin contador o sin migración, lo dice", async () => {
     estado.cargasMapa = 1234;
     const r = await LECTORES.mapbox(ctx({}, {}));
     expect(r.metricas.cargas_mapa_web).toMatchObject({ valor: 1234, unidad: "cargas", limite: 50000, periodo: "mes en curso" });
@@ -475,9 +477,9 @@ describe("lectores", () => {
     estado.cargasMapa = 52_500;
     expect((await LECTORES.mapbox(ctx({}, {}))).coste_variable?.importe).toBe(12.5);
     estado.cargasMapa = null;
-    expect(await LECTORES.mapbox(ctx({}, {}))).toMatchObject({ error: "error_api", detalles: { avisos: [expect.stringMatching(/logs de la web/)] } });
+    expect(await LECTORES.mapbox(ctx({}, {}))).toMatchObject({ error: "error_api", detalles: { avisos: [expect.stringMatching(/contador de cargas/)] } });
     estado.cargasMapa = "error";
-    expect(await LECTORES.mapbox(ctx({}, {}))).toMatchObject({ error: "error_api", detalles: { avisos: [expect.stringMatching(/20261122153000/)] } });
+    expect(await LECTORES.mapbox(ctx({}, {}))).toMatchObject({ error: "error_api", detalles: { avisos: [expect.stringMatching(/20261209100000/)] } });
   });
 
   it("Vercel: si la API da el almacenamiento de despliegues y funciones, salen como métricas (Hobby hoy no lo da)", async () => {
@@ -524,10 +526,69 @@ describe("lectores", () => {
     const r = await LECTORES.vercel(ctx(SECRETOS, rutas));
     expect(r.metricas.peticiones_cdn).toMatchObject({ valor: 2000, nota: "Por proyecto: admin 60 % · web 40 %. 85 % servidas desde la caché del CDN." });
     expect(r.detalles).toMatchObject({ peticiones_por_proyecto: [{ proyecto: "admin-casatomas", peticiones: 1200 }, { proyecto: "web-casatomas", peticiones: 800 }], aciertos_cache: 85 });
-    expect(r.metricas.memoria_funciones).toMatchObject({ valor: 0.12, unidad: "GB-hora", limite: 360 });
+    expect(r.metricas.memoria_funciones).toMatchObject({ valor: 0.12, unidad: "GB-hora" });
+    expect(r.metricas.memoria_funciones.limite).toBeUndefined(); // en Pro no hay cupo: se paga por uso
     expect(r.metricas.compilaciones_30d).toMatchObject({ valor: 52, nota: expect.stringMatching(/^2 fallidas · 3,0 h compilando/) });
-    // El límite de servicios_contratados manda sobre el del plan que trae la lectura.
+    // Si servicios_contratados tiene un límite, se aplica.
     expect(aplicarLimites(r.metricas, { memoria_funciones: { limite: 1000, unidad: "GB-hora" } }).memoria_funciones.limite).toBe(1000);
+  });
+
+  it("Vercel Pro: uso del periodo de facturación frente a los 20 US$ incluidos, en qué se va y lo que se cobraría aparte", async () => {
+    const cargo = (servicio: string, usd: number, proyecto?: string, categoria = "Usage") =>
+      JSON.stringify({ BilledCost: 0, EffectiveCost: usd, ChargeCategory: categoria, ServiceName: servicio, Tags: proyecto ? { ProjectName: proyecto } : {} });
+    const jsonl = (lineas: string[]) => new Response(lineas.join("\n") + "\n", { status: 200, headers: { "Content-Type": "application/jsonl" } });
+    const inicio = Date.parse("2026-10-27T12:00:00Z"); // 7 días antes de AHORA; el periodo dura 28
+    const equipo = (plan: string) => () => resp({ id: "team_x", billing: { plan, period: { start: inicio, end: inicio + 28 * 86_400_000 } } });
+    const ruta = `api.vercel.com/v2/teams/${VERCEL_TEAM_POR_DEFECTO}`;
+    const rutas = (lineas: string[], plan = "pro") => rutasCompletas({
+      [ruta]: equipo(plan),
+      "api.vercel.com/v1/billing/charges": (url) => {
+        expect(url.searchParams.get("from")).toBe("2026-10-27T12:00:00.000Z");
+        expect(url.searchParams.get("to")).toBe(AHORA.toISOString());
+        return jsonl(lineas);
+      },
+    });
+
+    // 9 US$ en 7 días de 28: dentro de lo incluido, pero a este ritmo serán 36.
+    const r = await LECTORES.vercel(ctx(SECRETOS, rutas([
+      cargo("Pro", 4.67, undefined, "Purchase"), // la cuota no es uso
+      cargo("Build CPU Minutes", 5, "admin-casatomas"), cargo("Build CPU Minutes", 2.5, "web-casatomas"),
+      cargo("Function Storage", 1.5), cargo("CDN Requests", 0.001, "web-casatomas"), cargo("Blob", 0), "línea rota {",
+    ])));
+    expect(r.error).toBeFalsy();
+    expect(r.metricas.uso_periodo).toMatchObject({ valor: 9, unidad: "USD", limite: 20, periodo: "periodo de facturación (del 27/10/2026 al 24/11/2026)" });
+    expect(r.metricas.uso_periodo.nota).toContain("En qué se va: compilaciones 7,50 US$ · almacenamiento de funciones 1,50 US$.");
+    expect(r.metricas.uso_periodo.nota).toContain("Por proyecto: admin 5,00 US$ · web 2,50 US$.");
+    expect(r.metricas.uso_periodo.nota).toContain("A este ritmo, 36,00 US$ al acabar el periodo.");
+    expect(r.coste_variable).toMatchObject({ importe: 0, moneda: "USD", origen: "api" });
+    expect(r.detalles).toMatchObject({ plan_detectado: "Pro", facturacion: { uso_usd: 9.001, previsto_usd: 36 } });
+    expect(String(r.detalles?.avisos)).toMatch(/36,00 US\$ en el periodo: unos 16,00 US\$ más/);
+
+    // Ya por encima: lo que pasa de 20 es el gasto variable del mes.
+    const pasado = await LECTORES.vercel(ctx(SECRETOS, rutas([cargo("Build CPU Minutes", 27.5)])));
+    expect(pasado.coste_variable?.importe).toBe(7.5);
+    expect(pasado.detalles?.avisos).toBeUndefined();
+
+    // Hobby: no se pide la facturación. Token sin permiso o formato nuevo: aviso, y el resto sigue.
+    const hobby = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ [ruta]: equipo("hobby") })));
+    expect(hobby.metricas.uso_periodo).toBeUndefined();
+    expect(hobby.coste_variable).toBeUndefined();
+    const sinPermiso = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ [ruta]: equipo("pro"), "api.vercel.com/v1/billing/charges": () => resp({ error: {} }, 403) })));
+    expect(sinPermiso.metricas.uso_periodo).toBeUndefined();
+    expect(sinPermiso.metricas.peticiones_cdn.valor).toBe(3600);
+    expect(String(sinPermiso.detalles?.avisos)).toMatch(/no tiene permiso para leer la facturación/);
+    const raro = await LECTORES.vercel(ctx(SECRETOS, rutas(["nada"])));
+    expect(String(raro.detalles?.avisos)).toMatch(/formato de su facturación/);
+  });
+
+  it("resumirFacturacionVercel: líneas JSON o { data: [...] }; solo el uso con coste", () => {
+    expect(resumirFacturacionVercel("")).toBeNull();
+    const r = resumirFacturacionVercel(JSON.stringify({ data: [
+      { ChargeCategory: "Usage", EffectiveCost: 1.25, BilledCost: 0.5, ServiceName: "A" },
+      { ChargeCategory: "Usage", EffectiveCost: 0.75, ServiceName: "B", Tags: { ProjectName: "web-casatomas" } },
+      { ChargeCategory: "Purchase", EffectiveCost: 20, ServiceName: "Pro" },
+    ] }));
+    expect(r).toMatchObject({ usoUsd: 2, facturadoUsd: 0.5, filas: 3, porServicio: [{ servicio: "A", usd: 1.25 }, { servicio: "B", usd: 0.75 }], porProyecto: [{ proyecto: "web-casatomas", usd: 0.75 }] });
   });
 
   it("Vercel: equipo configurable", async () => {
