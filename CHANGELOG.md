@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.43.3] - 2026-11-17
+
+Objetivo: Informe de vinos: sin compras de otro formato (magnum), cajas por botella y sin textos cortados
+
+### Cambiado
+- Informes: «Vinos: facturas y carta» sin compras de otro formato, cajas por botella y sin textos cortados ([#282](https://github.com/restcasatomascrevillent/admin-casatomas/pull/282))
+
 ## [1.43.2] - 2026-11-17
 
 Objetivo: Estado de Servicios cabe en una pantalla sin scroll y abrir un servicio ya no descoloca la página
