@@ -15,6 +15,8 @@ import assert from "node:assert/strict";
 
 const MIGRACION = await readFile("supabase/migrations/20261209100000_servicios_cierre.sql", "utf8");
 const ROLLBACK = await readFile("supabase/rollbacks/20261209100000_servicios_cierre_ROLLBACK.sql", "utf8");
+const NOMBRES = await readFile("supabase/migrations/20261209110000_ia_acciones_nombres.sql", "utf8");
+const NOMBRES_ROLLBACK = await readFile("supabase/rollbacks/20261209110000_ia_acciones_nombres_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
@@ -58,6 +60,11 @@ const ANDAMIAJE = `
   create table public.ia_funciones (funcion text primary key, descripcion text not null, instrumentada boolean not null default false,
     unidad text not null default 'llamada', orden integer not null default 100, activo boolean not null default true, que_hace text, accion text);
   insert into public.ia_funciones (funcion, descripcion) values ('procesar-dibujo-perimetro', 'gpt-5.4-mini, en código');
+  insert into public.ia_funciones (funcion, descripcion, que_hace, accion) values
+    ('embeddings-nombres', 'vector de nombres', null, null),
+    ('analizar-peticion', 'peticiones', 'Lo que escribió el dueño', null),
+    ('buscar-precios-mercado', 'perplexity', 'Precios de lonja con Perplexity (ya no se usa).', null),
+    ('ocr-trabajo', 'ocr', 'Lee las facturas', 'Leer una factura');
 
   create table public.ia_uso (id bigserial primary key, funcion text not null, modelo text not null, coste_usd numeric, created_at timestamptz not null default now());
   create table public.chat_web_uso (id bigserial primary key, coste_usd numeric, created_at timestamptz not null default now());
@@ -165,6 +172,24 @@ await como("authenticated", U.STAFF, async () => {
   igual((await db.query("select public.ia_cuadre_openai('2026-11-01', '2026-11-30') as c")).rows[0].c.dias, 0, "Cuadre: quien no es super admin no ve nada (RLS)");
 });
 await como("anon", null, () => falla(() => db.query("select public.ia_cuadre_openai('2026-11-01', '2026-11-30')"), "anon no puede pedir el cuadre"));
+
+// ─── Nombres de las acciones de IA que no lo tenían (20261209110000) ────────
+const acciones = async () => Object.fromEntries((await db.query("select funcion, que_hace, accion from public.ia_funciones order by funcion")).rows.map((r) => [r.funcion, [r.que_hace, r.accion]]));
+await db.exec(NOMBRES);
+await db.exec(NOMBRES);
+const conNombre = await acciones();
+igual(conNombre["embeddings-nombres"][1], "Preparar una tanda de nombres de producto para el buscador", "embeddings-nombres: con su acción");
+ok(/buscarlos por parecido/.test(conNombre["embeddings-nombres"][0]), "embeddings-nombres: con su «qué hace»");
+igual(conNombre["analizar-peticion"], ["Lo que escribió el dueño", "Analizar una petición de mejora"], "analizar-peticion: la acción, sin pisar el «qué hace» del dueño");
+igual(conNombre["buscar-precios-mercado"][1], "Buscar precios de lonja", "buscar-precios-mercado: con su acción");
+igual(conNombre["ocr-trabajo"], ["Lee las facturas", "Leer una factura"], "Las que ya tenían nombre no se tocan");
+igual((await fila("select count(*)::int as n from public.ia_funciones where accion is null")).n, 0, "Ninguna función del catálogo sin acción");
+await db.exec(NOMBRES_ROLLBACK);
+await db.exec(NOMBRES_ROLLBACK);
+const sinNombre = await acciones();
+igual([sinNombre["embeddings-nombres"], sinNombre["analizar-peticion"], sinNombre["buscar-precios-mercado"][1]], [[null, null], ["Lo que escribió el dueño", null], null],
+  "Rollback de los nombres: como estaban");
+igual(sinNombre["ocr-trabajo"], ["Lee las facturas", "Leer una factura"], "Rollback de los nombres: lo demás, intacto");
 
 // ─── Rollback: todo como estaba ─────────────────────────────────────────────
 await db.exec(ROLLBACK);

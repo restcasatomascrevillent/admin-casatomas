@@ -427,6 +427,78 @@ export function totalesIa(filas: FilaCostePorUso[]): TotalesIa {
   };
 }
 
+// ─── 3a. Gasto de IA por acción ─────────────────────────────────────────────
+
+/** Una función del catálogo `ia_funciones` (lo que hace falta para nombrarla). */
+export interface FuncionCatalogo {
+  funcion: string;
+  accion?: string | null;
+  que_hace?: string | null;
+  descripcion?: string | null;
+  activo?: boolean | null;
+  instrumentada?: boolean | null;
+}
+
+export interface FilaGastoAccion extends FilaCostePorUso {
+  /** «Leer una factura»: la acción en palabras (del catálogo; si no la tiene, qué hace o el nombre de la función). */
+  nombre: string;
+  /** % del gasto de IA registrado este mes (null si no hay gasto o no tiene coste). */
+  pct: number | null;
+  anteriorUsd: number | null;
+}
+
+export interface GastoPorAccion {
+  /** Las acciones usadas este mes, de más a menos gasto. */
+  filas: FilaGastoAccion[];
+  /** Acciones del catálogo que este mes no se han usado (no han gastado nada). */
+  sinUso: Array<{ funcion: string; nombre: string }>;
+  /** Funciones que han gastado y no están en el catálogo: hay que darlas de alta para verlas con su nombre. */
+  sinCatalogar: string[];
+  /** Funciones del catálogo que usan IA pero no apuntan su gasto: lo que gasten no sale aquí. */
+  sinRegistro: Array<{ funcion: string; nombre: string }>;
+  totales: TotalesIa;
+}
+
+const nombreAccion = (funcion: string, fila: Pick<FilaCostePorUso, "accion" | "queHace"> | null, cat: FuncionCatalogo | null): string =>
+  fila?.accion?.trim() || cat?.accion?.trim() || fila?.queHace?.trim() || cat?.que_hace?.trim() || funcion;
+
+/**
+ * El gasto de IA del mes, acción por acción (dueño, 17/11/2026: «que detecte
+ * cuánto gasto hay por acción, leer facturas, chatbot facturas, traducir,
+ * novedades, recortes, lo que haya, pero que lo controle todo»). Cruza lo
+ * gastado (`ia_coste_por_uso`) con el catálogo (`ia_funciones`) para que no se
+ * escape nada: lo que no se ha usado, lo que gasta sin estar en el catálogo y
+ * lo que usa IA sin apuntar su gasto. Sin catálogo (aún cargando o sin
+ * permiso) salen solo las filas con gasto.
+ */
+export function gastoPorAccion(args: {
+  actual: FilaCostePorUso[];
+  anterior?: FilaCostePorUso[] | null;
+  catalogo?: FuncionCatalogo[] | null;
+}): GastoPorAccion {
+  const { actual, anterior = null, catalogo = null } = args;
+  const cat = new Map((catalogo ?? []).map((c) => [c.funcion, c]));
+  const antes = new Map((anterior ?? []).map((f) => [f.funcion, f]));
+  const totales = totalesIa(actual);
+  const filas = actual
+    .map((f): FilaGastoAccion => ({
+      ...f,
+      nombre: nombreAccion(f.funcion, f, cat.get(f.funcion) ?? null),
+      pct: f.costeUsd != null && totales.costeUsd > 0 ? Math.round((f.costeUsd / totales.costeUsd) * 1000) / 10 : null,
+      anteriorUsd: antes.get(f.funcion)?.costeUsd ?? null,
+    }))
+    .sort((a, b) => (b.costeUsd ?? -1) - (a.costeUsd ?? -1) || a.orden - b.orden || a.funcion.localeCompare(b.funcion));
+  const usadas = new Set(actual.map((f) => f.funcion));
+  const activas = (catalogo ?? []).filter((c) => c.activo !== false);
+  return {
+    filas,
+    sinUso: activas.filter((c) => !usadas.has(c.funcion)).map((c) => ({ funcion: c.funcion, nombre: nombreAccion(c.funcion, null, c) })),
+    sinCatalogar: catalogo ? actual.filter((f) => !cat.has(f.funcion)).map((f) => f.funcion).sort() : [],
+    sinRegistro: activas.filter((c) => c.instrumentada === false).map((c) => ({ funcion: c.funcion, nombre: nombreAccion(c.funcion, null, c) })),
+    totales,
+  };
+}
+
 // ─── 3b. Cuadre con la factura de OpenAI ────────────────────────────────────
 
 /** `ia_cuadre_openai(p_desde, p_hasta)`: los días que OpenAI ya ha publicado. */

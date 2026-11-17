@@ -299,3 +299,64 @@ describe("cuadre con la factura de OpenAI", () => {
     expect(resumirCuadreOpenai({ dias: 0, ultimoDia: null, realUsd: 0, registradoUsd: 0 }, 1).estado).toBe("sin_datos");
   });
 });
+
+describe("gasto de IA por acción", () => {
+  const fila = (p: Partial<FilaCostePorUso> & Pick<FilaCostePorUso, "funcion">): FilaCostePorUso => ({
+    queHace: null, accion: null, unidad: "llamada", orden: 100, llamadas: 1, usos: 1, usosConCoste: 1, costeUsd: 0, filasSinTarifa: 0,
+    modelosSinTarifa: [], medianaUsd: 0, mediaUsd: 0, servidorPropio: false, ...p,
+  });
+  const CATALOGO = [
+    { funcion: "ocr-trabajo", accion: "Leer una factura", que_hace: "Lee las facturas", activo: true, instrumentada: true },
+    { funcion: "chat-facturas", accion: "Contestar una pregunta en el chat de Facturas", activo: true, instrumentada: true },
+    { funcion: "traducir-contenido", accion: "Traducir un plato", activo: true, instrumentada: true },
+    { funcion: "format-novedad", accion: "Dar formato a una novedad", activo: true, instrumentada: true },
+    { funcion: "recortar-foto", accion: "Recortar una foto", activo: true, instrumentada: true },
+    { funcion: "embeddings-nombres", accion: null, que_hace: "Prepara el buscador", activo: true, instrumentada: true },
+    { funcion: "dibujo", accion: "Pasar a limpio un dibujo", activo: true, instrumentada: false },
+    { funcion: "ia-modelos-openai", accion: "Probar un modelo", activo: false, instrumentada: true },
+  ];
+
+  it("cada acción con su gasto, su parte del total y el mes anterior, de más a menos", async () => {
+    const { gastoPorAccion } = await import("@/lib/costesServicios");
+    const g = gastoPorAccion({
+      actual: [
+        fila({ funcion: "chat-facturas", accion: "Contestar una pregunta en el chat de Facturas", costeUsd: 1, usos: 40, llamadas: 90 }),
+        fila({ funcion: "ocr-trabajo", accion: "Leer una factura", costeUsd: 3, usos: 130, llamadas: 600 }),
+        fila({ funcion: "recortar-foto", accion: "Recortar una foto", costeUsd: 0, servidorPropio: true }),
+        fila({ funcion: "embeddings-nombres", costeUsd: null, filasSinTarifa: 2, modelosSinTarifa: ["modelo-nuevo"] }),
+      ],
+      anterior: [fila({ funcion: "ocr-trabajo", costeUsd: 2 })],
+      catalogo: CATALOGO,
+    });
+    expect(g.filas.map((f) => [f.funcion, f.nombre, f.pct, f.anteriorUsd])).toEqual([
+      ["ocr-trabajo", "Leer una factura", 75, 2],
+      ["chat-facturas", "Contestar una pregunta en el chat de Facturas", 25, null],
+      ["recortar-foto", "Recortar una foto", 0, null],
+      ["embeddings-nombres", "Prepara el buscador", null, null], // sin acción: lo que hace; sin tarifa: sin %
+    ]);
+    expect(g.totales).toMatchObject({ costeUsd: 4, llamadas: 692, filasSinTarifa: 2 });
+  });
+
+  it("no se escapa nada: lo que no se ha usado, lo que gasta sin catálogo y lo que no apunta su gasto", async () => {
+    const { gastoPorAccion } = await import("@/lib/costesServicios");
+    const g = gastoPorAccion({
+      actual: [fila({ funcion: "ocr-trabajo", costeUsd: 1 }), fila({ funcion: "funcion-nueva", costeUsd: 0.5 }), fila({ funcion: "ia-modelos-openai", costeUsd: 0.1 })],
+      catalogo: CATALOGO,
+    });
+    // Las activas sin uso este mes (la de pruebas de modelos, desactivada, no se lista).
+    expect(g.sinUso.map((f) => f.nombre)).toEqual([
+      "Contestar una pregunta en el chat de Facturas", "Traducir un plato", "Dar formato a una novedad", "Recortar una foto", "Prepara el buscador", "Pasar a limpio un dibujo",
+    ]);
+    expect(g.sinCatalogar).toEqual(["funcion-nueva"]);
+    expect(g.sinRegistro).toEqual([{ funcion: "dibujo", nombre: "Pasar a limpio un dibujo" }]);
+    expect(g.filas.find((f) => f.funcion === "funcion-nueva")?.nombre).toBe("funcion-nueva");
+    expect(g.filas.find((f) => f.funcion === "ocr-trabajo")?.nombre).toBe("Leer una factura"); // la RPC no la traía: sale del catálogo
+  });
+
+  it("sin catálogo (cargando o sin permiso) salen las filas con gasto y ningún aviso", async () => {
+    const { gastoPorAccion } = await import("@/lib/costesServicios");
+    const g = gastoPorAccion({ actual: [fila({ funcion: "x", queHace: "Hace X", costeUsd: 0 })] });
+    expect(g).toMatchObject({ sinUso: [], sinCatalogar: [], sinRegistro: [] });
+    expect(g.filas[0]).toMatchObject({ nombre: "Hace X", pct: null });
+  });
+});
