@@ -541,7 +541,10 @@ async function facturacionVercel(
   const fin = periodo ? numero(periodo.end) : null;
   if (ini == null || fin == null || fin <= ini) return { plan, aviso: "Vercel no ha dado el periodo de facturación: el uso del periodo se mira en su panel (Usage)." };
   const inicio = new Date(ini);
-  const url = `https://api.vercel.com/v1/billing/charges?teamId=${encodeURIComponent(equipo)}&from=${encodeURIComponent(inicio.toISOString())}&to=${encodeURIComponent(ctx.ahora.toISOString())}`;
+  // Vercel agrupa los cargos por días (de 08:00 a 08:00 UTC) y solo devuelve los días que acaban antes de `to`:
+  // con `to` = ahora se quedaba fuera el día en curso (17/11/2026: 9,83 US$ aquí frente a 10,34 en su panel).
+  const hasta = new Date(Math.min(fin, ctx.ahora.getTime() + 86_400_000));
+  const url = `https://api.vercel.com/v1/billing/charges?teamId=${encodeURIComponent(equipo)}&from=${encodeURIComponent(inicio.toISOString())}&to=${encodeURIComponent(hasta.toISOString())}`;
   let res: Response;
   try {
     res = await ctx.fetch(url, { headers: { ...cab, Accept: "application/jsonl, application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS * 2) });
