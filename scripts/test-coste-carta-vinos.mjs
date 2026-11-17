@@ -24,6 +24,8 @@ import assert from "node:assert/strict";
 const leer = (f) => readFile(f, "utf8");
 const MIG = await leer("supabase/migrations/20261207150000_coste_carta_vinos.sql");
 const RB = await leer("supabase/rollbacks/20261207150000_coste_carta_vinos_ROLLBACK.sql");
+const MIG2 = await leer("supabase/migrations/20261208213000_margenes_vinos_coste_efectivo.sql");
+const RB2 = await leer("supabase/rollbacks/20261208213000_margenes_vinos_coste_efectivo_ROLLBACK.sql");
 const M_ULTIMA = await leer("supabase/migrations/20261128140000_margenes_ultima_factura.sql");
 const M_ANALISIS = await leer("supabase/migrations/20261115200000_analisis_margenes_carta.sql");
 const M_SIN_IVA = await leer("supabase/migrations/20261125100000_margenes_sin_iva_tienda.sql");
@@ -387,6 +389,82 @@ const vino = (r, id) => r.vinos.find((v) => v.id === id);
   igual(r.vinos[0].coste_factura, undefined, "rollback: sin los campos nuevos");
   await db.exec(MIG);
   cerca((await datos()).vinos.find((v) => v.id === "seque").coste_efectivo, 16.0833, "se puede volver a aplicar tras el rollback");
+}
+
+// ─── 14. Una sola fuente: margenes_carta_datos con el coste efectivo (20261208213000) ───
+{
+  // Godeval 75 cl: 12 pagadas a 16,85 € (202,20 €) + 2 sin cargo → 202,20 ÷ 14 = 14,4429 (el caso de las 12 + 2).
+  await db.exec(`
+    insert into public.productos_catalogo (id, nombre, categoria_id, envase_cantidad, envase_unidad) values (12, 'Godeval 75 cl', 1, 0.75, 'l');
+    insert into public."Vinos" (id, nombre, categoria, precio_eur, orden) values ('godeval', 'Godeval', 'BLANCOS', 30, 12);
+    insert into public.vino_producto (vino_id, producto_id, origen) values ('godeval', 12, 'estimado');`);
+  await factura(1, 3, [
+    { producto: 12, cantidad: 12, precio: 16.85, total: 202.2 },
+    { producto: 12, cantidad: 2, precio: 0, total: 0 },
+  ]);
+  const antes = (await db.query(`select public.margenes_carta_datos() as r`)).rows[0].r;
+  const antesVino = (id) => antes.vinos.find((v) => v.id === id);
+  cerca(antesVino("godeval").coste, 16.85, "ANTES de aplicar: con la migración 20261207150000 la pestaña sigue con el precio de factura");
+  await db.exec(MIG2);
+  await db.exec(MIG2); // idempotente
+  const m = (await db.query(`select public.margenes_carta_datos() as r`)).rows[0].r;
+  const b = (await db.query(`select public.margenes_carta_datos_base() as r`)).rows[0].r;
+  const v = (await db.query(`select public.vinos_coste_carta_datos(null, null, null) as r`)).rows[0].r;
+  const mv = (id) => m.vinos.find((x) => x.id === id);
+  const bv = (id) => b.vinos.find((x) => x.id === id);
+  const vv = (id) => v.vinos.find((x) => x.id === id);
+
+  // Con regalo (12 + 2): el coste de la pestaña «Vinos» es el efectivo; el de factura, aparte.
+  cerca(bv("godeval").coste, 16.85, "base: precio de factura 16,85");
+  cerca(mv("godeval").coste, 14.4429, "Godeval 12 + 2: la pestaña «Vinos» usa 202,20 ÷ 14");
+  cerca(mv("godeval").coste_factura, 16.85, "Godeval: la factura queda como dato secundario");
+  igual([Number(mv("godeval").botellas_sin_cargo), Number(mv("godeval").botellas_pagadas)], [2, 12], "Godeval: 2 sin cargo, 12 pagadas");
+  cerca(mv("godeval").multiplicador, 1.89, "Godeval: multiplicador 27,27 ÷ 14,44 (con el precio de factura era 1,62)");
+  cerca(bv("godeval").multiplicador, 1.62, "Godeval base: ×1,62 con el precio de factura");
+  ok(mv("godeval").banderas.includes("multiplicador_bajo"), "Godeval: sigue por debajo de ×2,3");
+  cerca(mv("godeval").coste_iva, 15.8872, "Godeval: coste con IVA = efectivo × 1,10");
+  cerca(mv("godeval").margen, 12.83, "Godeval: margen con el coste efectivo");
+  // Sequé (30 + 6): de «×1,74» a «×2,09»; sigue bajo ×2,3 pero ya no con el multiplicador distinto.
+  cerca(bv("seque").multiplicador, 1.74, "Sequé base: ×1,74 con el precio de factura");
+  cerca(mv("seque").multiplicador, 2.09, "Sequé: ×2,09 con el coste efectivo");
+  // Sin regalo: idéntico a la base campo a campo (salvo las claves nuevas).
+  for (const id of ["ardanza", "nacar", "fefinanes", "salto", "pazo", "nido", "cristal"]) {
+    const { coste_factura, botellas_sin_cargo, botellas_pagadas, ...resto } = mv(id);
+    const { ...orig } = bv(id);
+    igual(resto, orig, `${id}: sin botellas sin cargo sale igual que antes`);
+    igual(Number(botellas_sin_cargo), 0, `${id}: 0 sin cargo`);
+  }
+  // Platos, peso y config: sin cambios.
+  igual(m.platos, b.platos, "platos: sin cambios");
+  igual(m.peso, b.peso, "al peso: sin cambios");
+  igual(m.config, b.config, "config: sin cambios");
+  // Las dos RPC, vino a vino: mismo coste y mismo multiplicador (donde «Coste vinos» da multiplicador).
+  let comparados = 0;
+  for (const x of v.vinos) {
+    if (x.coste_efectivo === null || x.coste_efectivo === undefined) continue;
+    cerca(mv(x.id).coste, x.coste_efectivo, `${x.id}: mismo coste en las dos pantallas`);
+    if (x.multiplicador !== null) { cerca(mv(x.id).multiplicador, x.multiplicador, `${x.id}: mismo multiplicador`); comparados++; }
+    if (x.estado === "bajo") ok(mv(x.id).banderas.includes("multiplicador_bajo"), `${x.id}: «bajo» en Coste vinos = margen bajo en Vinos`);
+  }
+  ok(comparados >= 5, `se compararon ${comparados} vinos`);
+  // Resumen de vinos recalculado con los nuevos multiplicadores.
+  const rojos = m.vinos.filter((x) => x.banderas.includes("multiplicador_bajo")).length;
+  igual(m.resumen.vinos.en_rojo, rojos, "resumen: en_rojo cuadra con las banderas");
+  igual(m.resumen.vinos.total, b.resumen.vinos.total, "resumen: mismo total");
+  // Vinos de «Coste vinos» siguen igual (el coste_factura sale del precio de factura, no del efectivo).
+  cerca(vv("seque").coste_factura, 19.3, "Coste vinos: el precio de factura sigue siendo el de la factura");
+  // El chat, que pasa el margenes ya corregido, tampoco duplica ni cambia el coste de factura.
+  const ag = (await db.query(`select public.margenes_carta_agente('seque', 'vinos', false, 5) as r`)).rows[0].r.vinos[0];
+  cerca(ag.coste_botella, 16.0833, "chat: coste efectivo");
+  cerca(ag.coste_factura, 19.3, "chat: el precio de factura sigue siendo 19,30 (no el efectivo)");
+  igual((await db.query(`select has_function_privilege('authenticated', 'public.margenes_carta_datos(date)', 'execute') as p`)).rows[0].p, false, "margenes_carta_datos sigue sin ser para authenticated");
+  igual((await db.query(`select has_function_privilege('service_role', 'public.margenes_carta_datos_base(date)', 'execute') as p`)).rows[0].p, true, "la base es de service_role");
+  // Rollback y reaplicado.
+  await db.exec(RB2);
+  cerca((await db.query(`select public.margenes_carta_datos() as r`)).rows[0].r.vinos.find((x) => x.id === "seque").coste, 19.3, "rollback: la pestaña vuelve al precio de factura");
+  igual((await db.query(`select to_regprocedure('public.margenes_carta_datos_base(date)') is null as n`)).rows[0].n, true, "rollback: no queda la base");
+  await db.exec(MIG2);
+  cerca((await db.query(`select public.margenes_carta_datos() as r`)).rows[0].r.vinos.find((x) => x.id === "seque").coste, 16.0833, "se puede volver a aplicar");
 }
 
 console.log(`OK · coste de la carta de vinos: ${comprobaciones} comprobaciones`);

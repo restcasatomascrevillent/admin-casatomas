@@ -17,6 +17,7 @@ import {
   puntosDispersion,
   razon,
   resumenFiable,
+  textoCosteFactura,
   textoFactura,
   textoMediana,
   textoMedianaIngrediente,
@@ -266,5 +267,30 @@ describe("última factura", () => {
   it("el % de coste dicho en corto: «37 % coste sobre venta»", () => {
     expect(textoPctCoste(37.2)).toBe("37 % coste sobre venta");
     expect(textoPctCoste(null)).toBe("coste sobre venta: —");
+  });
+});
+
+describe("vino con botellas sin cargo (coste efectivo, 20261208213000)", () => {
+  const base = { id: "v9", nombre: "Godeval", categoria: "BLANCOS", precio: 30, venta: 27.27, producto_id: 12, producto: "Godeval 75 cl" };
+  const vino = (extra: Record<string, unknown>) =>
+    normalizarMargenes({ vinos: [{ ...base, ...extra }], platos: [], peso: [] }).vinos[0];
+
+  it("coste es el efectivo y el precio de factura queda aparte, con las botellas sin cargo", () => {
+    const v = vino({ coste: 14.4429, coste_factura: 16.85, botellas_sin_cargo: 2, botellas_pagadas: 12, multiplicador: 1.89 });
+    expect(v.coste).toBe(14.4429);
+    expect(v.costeFactura).toBe(16.85);
+    expect(v.botellasSinCargo).toBe(2);
+    expect(textoCosteFactura(v)).toBe("factura 16,85 € · con 2 sin cargo");
+  });
+  it("sin botellas sin cargo (o sin la migración) no hay texto y la factura es el propio coste", () => {
+    const v = vino({ coste: 15.2, multiplicador: 1.8 });
+    expect(v.costeFactura).toBe(15.2);
+    expect(v.botellasSinCargo).toBe(0);
+    expect(textoCosteFactura(v)).toBeNull();
+    expect(textoCosteFactura(vino({ coste: 15.2, coste_factura: 15.2, botellas_sin_cargo: 0 }))).toBeNull();
+  });
+  it("no sale en platos ni al peso", () => {
+    const d = normalizarMargenes({ vinos: [], platos: [{ id: "p1", nombre: "Arroz", categoria: "ARROCES", precio: 12, coste: 3 }], peso: [] });
+    expect(textoCosteFactura(d.platos[0])).toBeNull();
   });
 });
