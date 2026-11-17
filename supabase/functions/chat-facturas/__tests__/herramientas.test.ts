@@ -28,6 +28,7 @@ import {
   METRICAS_FLEX,
   necesitaRespaldoSemantico,
   prepararLlamada,
+  esNombreDeCategoria,
   recortar,
   separarAdjunto,
   systemPrompt,
@@ -341,6 +342,13 @@ describe("prepararLlamada", () => {
     const fam = prepararLlamada("gasto_por_categoria", { categoria: "marisco" }, "gasto en marisco",
       { tipo: "familia", categoria: "Pescado y marisco" });
     expect(fam.tipo === "rpc" && fam.rpc).toBe("gasto_categorias_agente");
+    // «agua», «pan», «queso»: se asocian como producto pero existe una categoría con ese nombre: sigue siendo categoría
+    for (const [txt, cat] of [["agua", "Refrescos y aguas"], ["pan", "Panadería y repostería"], ["queso", "Lácteos y quesos"]]) {
+      const c = prepararLlamada("gasto_por_categoria", { categoria: txt }, `gasto en ${txt}`, { tipo: "producto", categoria: cat });
+      expect(c.tipo === "rpc" && c.rpc).toBe("gasto_categorias_agente");
+    }
+    expect(esNombreDeCategoria("pan de cristal", { tipo: "producto", categoria: "Panadería y repostería" })).toBe(false);
+    expect(esNombreDeCategoria("helado", { tipo: "producto", categoria: "Panadería y repostería" })).toBe(false);
   });
 
   it("filtrar_documentos: por defecto 'todos'; texto, tipo y fechas", () => {
