@@ -1,4 +1,13 @@
-import { erroresFactura, sinDatosFiscales, tituloRecibo, totalesRecibo, euros, type Factura } from "./modelo";
+import { erroresFactura, facturaSchema, sinDatosFiscales, tituloRecibo, totalesRecibo, euros, type Factura } from "./modelo";
+
+export interface OpcionesPdf {
+  /**
+   * Vista previa de un recibo SIN EMITIR (17/11/2026, «que dé vista previa del PDF»): no exige
+   * número, cliente ni descripciones (pone «pendiente»), y lo marca arriba como «BORRADOR · SIN
+   * EMITIR» para que no se confunda con un recibo emitido.
+   */
+  borrador?: boolean;
+}
 
 /**
  * PDF vectorial con paginación: no depende del tamaño de pantalla ni de capturas del DOM.
@@ -6,10 +15,16 @@ import { erroresFactura, sinDatosFiscales, tituloRecibo, totalesRecibo, euros, t
  * fiscal — ni NIF, ni dirección, ni IVA, ni retención, ni vencimiento —, aunque el documento
  * guardado los tuviera.
  */
-export async function crearPdfFactura(original: Factura) {
-  const f = sinDatosFiscales(original);
-  const errores = erroresFactura(f);
-  if (errores.length) throw new Error(errores.join(" "));
+export async function crearPdfFactura(original: Factura, { borrador = false }: OpcionesPdf = {}) {
+  let f = sinDatosFiscales(original);
+  if (borrador) {
+    if (!facturaSchema.safeParse(f).success) throw new Error("Revisa fechas, cantidades, precios y límites de los textos.");
+    f = { ...f, numero: f.numero.trim() || "Sin número", cliente: { ...f.cliente, nombre: f.cliente.nombre.trim() || "Cliente pendiente" },
+      lineas: f.lineas.map(l => (l.concepto.trim() ? l : { ...l, concepto: "Concepto pendiente" })) };
+  } else {
+    const errores = erroresFactura(f);
+    if (errores.length) throw new Error(errores.join(" "));
+  }
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const cargarBase64 = async (ruta: string) => {
@@ -50,6 +65,10 @@ export async function crearPdfFactura(original: Factura) {
     doc.setFont("OficiosSans", "normal"); doc.setFontSize(9);
     doc.text("Fecha: " + fecha(f.fecha), derecha, 27, { align: "right" });
     doc.setDrawColor(25, 25, 25); doc.line(izquierda, 31, derecha, 31);
+    if (borrador) {
+      doc.setFont("OficiosSans", "bold"); doc.setFontSize(9); doc.setTextColor(150, 150, 150);
+      doc.text("BORRADOR · SIN EMITIR", 105, 12, { align: "center" });
+    }
   };
   const pagina = () => { doc.addPage(); encabezado(); y = 40; };
   const espacio = (alto: number) => { if (y + alto > limite) pagina(); };
@@ -113,7 +132,21 @@ export async function crearPdfFactura(original: Factura) {
   doc.setProperties({ title: "Recibo " + f.numero, author: f.emisor.nombre });
   return doc;
 }
+const nombreArchivo = (f: Factura) => "Recibo-" + (f.numero.trim() || "borrador").replace(/[^a-zA-Z0-9_-]/g, "-") + ".pdf";
 export async function descargarFactura(f: Factura) {
   const doc = await crearPdfFactura(f);
-  doc.save("Recibo-" + f.numero.replace(/[^a-zA-Z0-9_-]/g, "-") + ".pdf");
+  doc.save(nombreArchivo(f));
+}
+/** El PDF como Blob, para enseñarlo en la vista previa sin descargarlo. */
+export async function blobPdfFactura(f: Factura, opciones: OpcionesPdf = {}): Promise<Blob> {
+  const doc = await crearPdfFactura(f, opciones);
+  return doc.output("blob");
+}
+/** Descarga un PDF ya generado (el de la vista previa de un recibo emitido). */
+export function descargarBlobPdf(blob: Blob, f: Factura) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = nombreArchivo(f);
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

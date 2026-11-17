@@ -81,6 +81,38 @@ export interface GastoServicio {
   origen: "manual" | "estimado" | "falta" | "gratis";
 }
 const esLineaVacia = (l: LineaFactura) => !l.concepto.trim() && l.precio === 0;
+/** El concepto del recibo de un gasto de Servicios («OpenAI · Inteligencia artificial», su importe y su descuento). */
+export function lineaDeGasto(g: GastoServicio, descuento = 0): LineaFactura {
+  return { ...nuevaLinea("Servicio"), concepto: g.categoria ? `${g.nombre} · ${g.categoria}` : g.nombre,
+    periodicidad: "Mensual", precio: redondear(g.importe), proveedor: g.proveedor, descuento };
+}
+/** Añade al recibo UN gasto de Servicios (al final, con los demás). No hace nada si ya está o cuesta 0 €. */
+export function anadirGastoServicio(f: Factura, g: GastoServicio): Factura {
+  if (g.importe <= 0 || f.lineas.some(l => l.proveedor === g.proveedor)) return f;
+  const lineas = [...f.lineas.filter(l => !esLineaVacia(l)), lineaDeGasto(g)];
+  if (lineas.length > 100) throw new Error("Un recibo admite hasta 100 conceptos.");
+  return { ...f, lineas };
+}
+/** Pone el mismo descuento (%) a todos los gastos de Servicios del recibo; lo demás no se toca. */
+export function descuentoAServicios(f: Factura, descuento: number): Factura {
+  const d = Math.min(100, Math.max(0, Number.isFinite(descuento) ? descuento : 0));
+  if (!f.lineas.some(l => l.proveedor && l.descuento !== d)) return f;
+  return { ...f, lineas: f.lineas.map(l => (l.proveedor ? { ...l, descuento: d } : l)) };
+}
+/**
+ * Añade un concepto a mano. En un pago mensual va antes de los gastos de Servicios: así el
+ * recibo queda siempre como cuota y conceptos propios primero, y los servicios al final.
+ */
+export function anadirConcepto(f: Factura): Factura {
+  const i = f.lineas.findIndex(l => l.proveedor);
+  const nueva = nuevaLinea();
+  return { ...f, lineas: i < 0 ? [...f.lineas, nueva] : [...f.lineas.slice(0, i), nueva, ...f.lineas.slice(i)] };
+}
+/** Quita un concepto; si era el último, deja una línea vacía para empezar. */
+export function quitarConcepto(f: Factura, id: string): Factura {
+  const lineas = f.lineas.filter(l => l.id !== id);
+  return { ...f, lineas: lineas.length ? lineas : [{ ...nuevaLinea("Otros"), concepto: "" }] };
+}
 /**
  * Pone en el recibo los gastos del mes: sustituye las líneas que ya venían de Servicios
  * (se reconocen por `proveedor`) y deja intactas las demás (cuota y conceptos a mano).
@@ -88,11 +120,7 @@ const esLineaVacia = (l: LineaFactura) => !l.concepto.trim() && l.precio === 0;
  */
 export function aplicarGastosServicios(f: Factura, gastos: GastoServicio[]): Factura {
   const previas = new Map(f.lineas.filter(l => l.proveedor).map(l => [l.proveedor!, l]));
-  const nuevas: LineaFactura[] = gastos.filter(g => g.importe > 0).map(g => ({
-    ...nuevaLinea("Servicio"), concepto: g.categoria ? `${g.nombre} · ${g.categoria}` : g.nombre,
-    periodicidad: "Mensual", precio: redondear(g.importe), proveedor: g.proveedor,
-    descuento: previas.get(g.proveedor)?.descuento ?? 0,
-  }));
+  const nuevas: LineaFactura[] = gastos.filter(g => g.importe > 0).map(g => lineaDeGasto(g, previas.get(g.proveedor)?.descuento ?? 0));
   const resto = f.lineas.filter(l => !l.proveedor && !esLineaVacia(l));
   const lineas = [...resto, ...nuevas];
   if (lineas.length > 100) throw new Error("Un recibo admite hasta 100 conceptos.");

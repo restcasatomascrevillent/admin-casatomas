@@ -3,7 +3,7 @@ import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { ConceptoOrdenable } from "./ConceptoOrdenable";
-import { Plus, Save, Download, RefreshCw, FilePlus2, CalendarPlus } from "lucide-react";
+import { Plus, Save, Download, Eye, RefreshCw, FilePlus2, CalendarPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,11 +12,12 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { useFacturacionOficiososia, type BorradorGuardado, type FacturaGuardada } from "@/hooks/useFacturacionOficiososia";
-import { categorias, periodicidades, nuevaFactura, nuevaLinea, totalesRecibo, erroresFactura, facturaSchema, euros, sinDatosFiscales, textoMesRecibo, tipoDeRecibo, tiposRecibo, TEXTO_TIPO_RECIBO, type Factura, type LineaFactura, type TipoRecibo } from "./modelo";
+import { categorias, periodicidades, nuevaFactura, totalesRecibo, erroresFactura, facturaSchema, euros, sinDatosFiscales, textoMesRecibo, tipoDeRecibo, tiposRecibo, TEXTO_TIPO_RECIBO, type Factura, type LineaFactura, type TipoRecibo } from "./modelo";
 import { VistaFactura } from "./VistaFactura";
+import { VistaPreviaPdf, type ReciboEnPrevia } from "./VistaPreviaPdf";
 import { SelectorServicios, EditarCatalogo } from "./SelectorServicios";
 import { FacturasEmitidas } from "./FacturasEmitidas";
-import { catalogoInicial, prepararNuevaFactura, agregarProductos, ultimaFacturaCliente, recuperarServicios, siguienteNumero, normalizar, aplicarGastosServicios, cambiarMes, cambiarTipo } from "./catalogo";
+import { catalogoInicial, prepararNuevaFactura, agregarProductos, ultimaFacturaCliente, recuperarServicios, siguienteNumero, normalizar, aplicarGastosServicios, cambiarMes, cambiarTipo, anadirConcepto, anadirGastoServicio, descuentoAServicios, quitarConcepto, type GastoServicio } from "./catalogo";
 import { GastosServiciosRecibo } from "./GastosServiciosRecibo";
 import { useGastosServiciosMes } from "@/hooks/useGastosServiciosMes";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
@@ -69,6 +70,8 @@ export function EditorFacturacion() {
   // si la página aún desplaza (móvil con teclado, bajo el suelo), la ventana también.
   const irPaso = (n: number) => { setPaso(n); if (regionPaso.current) regionPaso.current.scrollTop = 0; inicioEditor.current?.scrollIntoView?.({block:"start",behavior:"smooth"}); };
   const [tab, setTab] = useState("nueva");
+  // Recibo cuyo PDF se está viendo en la vista previa (no guarda ni emite nada).
+  const [previa, setPrevia] = useState<ReciboEnPrevia | null>(null);
   // Mes cuyos gastos de Servicios hay que poner solos en cuanto carguen (recibo mensual nuevo o cambio de mes).
   const autoServicios = useRef<string | null>(null);
   const esMensual = tipoDeRecibo(f) === "mensual";
@@ -114,7 +117,7 @@ export function EditorFacturacion() {
     const concepto=f.lineas.find(l=>l.id===id);
     if(busy || !concepto)return;
     if(!await confirmar("Eliminar concepto",`Vas a quitar «${concepto.concepto || "Concepto sin descripción"}» de este recibo. Guarda los cambios para conservar la eliminación.`,"Eliminar concepto"))return;
-    cambiar({...f,lineas:f.lineas.length===1 ? [{...nuevaLinea("Otros"),concepto:""}] : f.lineas.filter(l=>l.id!==id)});
+    cambiar(quitarConcepto(f,id));
   };
   const linea = (id: string, cambio: Partial<LineaFactura>) => cambiar({...f,lineas:f.lineas.map(l => l.id === id ? {...l,...cambio} : l)});
   const puedeCambiar = async () => !dirty || await confirmar("Cambios sin guardar", "Hay cambios sin guardar. ¿Quieres descartarlos para continuar?", "Descartar cambios");
@@ -228,7 +231,14 @@ export function EditorFacturacion() {
     setVersionConfig(r.data.config?.actualizado_en ?? null); setDirty(false);
     setFacturaModificada(!!archivada && JSON.stringify(archivada.documento) !== JSON.stringify(documento));
   };
+  const anadirGasto = (g: GastoServicio) => {
+    try { cambiar(anadirGastoServicio(f, g)); }
+    catch(e) { toast.error(mensajeUsuario(e, "No se ha podido añadir el gasto.")); }
+  };
   const total = totalesRecibo(f);
+  // En un pago mensual los gastos de Servicios se editan en su bloque (precio y descuento de cada uno):
+  // la lista de conceptos enseña solo la cuota y lo añadido a mano. `i` es su posición real en el recibo.
+  const conceptos = f.lineas.map((l,i)=>({l,i})).filter(({l})=>!(esMensual && l.proveedor));
   const deshabilitado = busy || q.isLoading || q.isError;
   const ultimaCliente = ultimaFacturaCliente(q.data?.facturas ?? [],f.cliente);
   const clientes = [...(q.data?.facturas ?? [])].sort((a,b)=>b.documento.fecha.localeCompare(a.documento.fecha))
@@ -241,6 +251,7 @@ export function EditorFacturacion() {
         <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className={confirmacion?.destructiva ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined} onClick={()=>cerrarConfirmacion(true)}>{confirmacion?.accion}</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    <VistaPreviaPdf recibo={previa} cerrar={()=>setPrevia(null)} />
     <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
       <div><h1 className="text-base font-semibold leading-tight">Gestor Gasto · OficiosOsIA</h1>
         <p className="mt-0.5 text-xs text-muted-foreground">Recibos de licencias y pagos mensuales · {dirty ? "Cambios sin guardar" : actual ? facturaModificada ? "Borrador guardado · recibo pendiente de actualizar" : "Recibo guardado" : q.data?.config ? "Borrador guardado" : "Nuevo borrador"}</p></div>
@@ -267,7 +278,7 @@ export function EditorFacturacion() {
       />
       <TabsContent value="emitidas" className={`${regionClass} space-y-4 pt-3 data-[state=inactive]:hidden`}>
         {q.isLoading ? <p role="status">Cargando recibos…</p> : q.isError ? <p className="text-sm text-muted-foreground">El historial no está disponible. Reintenta la carga.</p> :
-          <FacturasEmitidas eliminar={(g,estado)=>void eliminar(g,estado)} borradores={q.data?.borradores ?? []} editarBorrador={abrirBorrador} facturas={q.data?.facturas ?? []} busy={busy} editar={abrir} duplicar={duplicar} descargar={g=>void descargarEmitida(g)} nueva={()=>void nuevo("licencia")} />}
+          <FacturasEmitidas eliminar={(g,estado)=>void eliminar(g,estado)} borradores={q.data?.borradores ?? []} editarBorrador={abrirBorrador} facturas={q.data?.facturas ?? []} busy={busy} editar={abrir} duplicar={duplicar} descargar={g=>void descargarEmitida(g)} nueva={()=>void nuevo("licencia")} previsualizar={(g,estado)=>setPrevia({documento:g.documento,borrador:estado==="borrador"})} />}
       </TabsContent>
       <TabsContent value="nueva" className={`${pestanaClass} gap-5`}>
       {actual && <p className="shrink-0 text-sm font-medium">Editando el recibo {f.numero}</p>}
@@ -314,10 +325,11 @@ export function EditorFacturacion() {
           </>}
           {paso === 1 && <>
           {esMensual
-            ? <GastosServiciosRecibo mes={f.mes} gastos={gastosQ} enRecibo={f.lineas.filter(l=>l.proveedor)} poner={ponerGastosServicios} />
+            ? <GastosServiciosRecibo mes={f.mes} gastos={gastosQ} enRecibo={f.lineas.filter(l=>l.proveedor)} poner={ponerGastosServicios}
+                cambiar={(id,cambio)=>linea(id,cambio)} quitar={id=>cambiar(quitarConcepto(f,id))} anadir={anadirGasto} descuentoATodos={pct=>cambiar(descuentoAServicios(f,pct))} />
             : <details className="rounded-lg border p-3" open={!f.lineas.some(l=>l.concepto.trim())}><summary className="cursor-pointer text-sm font-medium">Añadir módulos o paquetes</summary><div className="mt-3"><SelectorServicios catalogo={f.catalogo ?? catalogoInicial()} lineas={f.lineas} agregar={agregar} /></div></details>}
-          <Card><CardHeader><CardTitle className="text-base">2. Conceptos del recibo</CardTitle><p className="text-xs text-muted-foreground">Todo se puede editar: descripción, precio y descuento de cada concepto. Arrastra desde el asa o usa las flechas para cambiar el orden.</p></CardHeader><CardContent className="space-y-4"><DndContext sensors={sensorsConceptos} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={({active,over})=>{if(over)moverConcepto(f.lineas.findIndex(l=>l.id===active.id),f.lineas.findIndex(l=>l.id===over.id));}}><SortableContext items={f.lineas.map(l=>l.id)} strategy={verticalListSortingStrategy}><div className="space-y-3">
-            {f.lineas.map((l,i) => <ConceptoOrdenable key={l.id} id={l.id} index={i} total={f.lineas.length} busy={busy} mover={moverConcepto} eliminar={()=>void eliminarConcepto(l.id)}>
+          <Card><CardHeader><CardTitle className="text-base">2. Conceptos del recibo</CardTitle><p className="text-xs text-muted-foreground">{esMensual ? "La cuota y lo que añadas a mano. Los gastos de Servicios se editan arriba, en su bloque. " : ""}Todo se puede editar: descripción, precio y descuento de cada concepto. Arrastra desde el asa o usa las flechas para cambiar el orden.</p></CardHeader><CardContent className="space-y-4"><DndContext sensors={sensorsConceptos} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={({active,over})=>{if(over)moverConcepto(f.lineas.findIndex(l=>l.id===active.id),f.lineas.findIndex(l=>l.id===over.id));}}><SortableContext items={conceptos.map(c=>c.l.id)} strategy={verticalListSortingStrategy}><div className="space-y-3">
+            {conceptos.map(({l,i},j) => <ConceptoOrdenable key={l.id} id={l.id} index={j} total={conceptos.length} busy={busy} mover={(a,b)=>{if(conceptos[a] && conceptos[b])moverConcepto(conceptos[a].i,conceptos[b].i);}} eliminar={()=>void eliminarConcepto(l.id)}>
               <div className="flex items-start gap-2"><div className="min-w-0 flex-1"><Campo titulo="Descripción"><Input maxLength={300} value={l.concepto} onChange={e => linea(l.id,{concepto:e.target.value})} /></Campo></div>
               </div>
 
@@ -331,7 +343,7 @@ export function EditorFacturacion() {
                 <Campo titulo="Periodicidad"><select aria-label="Periodicidad" className={selectClass} value={l.periodicidad} onChange={e => linea(l.id,{periodicidad:e.target.value as LineaFactura["periodicidad"]})}>{periodicidades.map(v => <option key={v}>{v}</option>)}</select></Campo></div>
               </details>
             </ConceptoOrdenable>)}
-            </div></SortableContext></DndContext><Button variant="outline" disabled={f.lineas.length >= 100} onClick={() => cambiar({...f,lineas:[...f.lineas,nuevaLinea()]})}><Plus className="mr-2 h-4 w-4" />Añadir concepto</Button>
+            </div></SortableContext></DndContext><Button variant="outline" disabled={f.lineas.length >= 100} onClick={() => cambiar(anadirConcepto(f))}><Plus className="mr-2 h-4 w-4" />Añadir concepto</Button>
           </CardContent></Card>
           <Card><CardHeader><CardTitle className="text-base">Descuento global</CardTitle></CardHeader><CardContent className="space-y-3">
             <Campo titulo="Descuento global (%)"><Input className="max-w-40" type="number" min={0} max={100} step="0.01" value={f.descuentoGlobal ?? 0} onChange={e=>cambiar({...f,descuentoGlobal:Number(e.target.value)})} /></Campo>
@@ -340,8 +352,10 @@ export function EditorFacturacion() {
           </CardContent></Card>
           </>}
           {paso === 2 && <div className="min-w-0 space-y-3">
-          <p className="text-sm font-medium">Vista previa del recibo</p><VistaFactura factura={f} />
-          <p className="text-xs text-muted-foreground">El PDF usa formato A4 y añade páginas cuando sea necesario.</p>
+          <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">Vista previa del recibo</p>
+            <Button type="button" variant="outline" className="h-10 gap-2 pointer-coarse:h-11" onClick={()=>setPrevia({documento:f,borrador:!actual || facturaModificada || dirty})}><Eye className="h-4 w-4" aria-hidden="true" />Vista previa del PDF</Button></div>
+          <VistaFactura factura={f} />
+          <p className="text-xs text-muted-foreground">El PDF usa formato A4 y añade páginas cuando sea necesario. «Vista previa del PDF» lo enseña tal cual, sin guardar ni emitir.</p>
         </div>}
         </fieldset>
       </div>
