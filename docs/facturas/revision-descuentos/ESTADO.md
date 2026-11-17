@@ -22,11 +22,11 @@ Reglas del encargo:
 ## Avance
 
 - [x] Fase 0: rama `feature/revision-descuentos`, este archivo, tarea programada de reanudación.
-- [ ] Fase 1.A: esquema y código actual (cómo se leen y guardan descuentos, regalos, abonos).
-- [ ] Fase 1.B: reglas SQL sobre todas las líneas de producción (solo lectura).
-- [ ] Fase 1.C: búsqueda en el texto de los originales de Drive.
+- [x] Fase 1.A: esquema y código actual (cómo se leen y guardan descuentos, regalos, abonos).
+- [x] Fase 1.B: reglas SQL sobre todas las líneas de producción (solo lectura).
+- [ ] Fase 1.C: búsqueda en el texto de los originales de Drive. **Bloqueado**: falta acceso a la carpeta del panel (pedido al dueño). `read_file_content` de Drive devuelve el texto OCR del PDF: barato.
 - [ ] Fase 1.D: verificación visual de los originales marcados.
-- [ ] Fase 1.E: informe completo.
+- [x] Fase 1.E: informe (`INFORME.md`), versión 1 sin el cotejo con originales (apartado 7 del informe).
 - [ ] Fase 2: correcciones, PR a staging, demo.
 
 ## Notas para retomar
