@@ -2,6 +2,20 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.43.0] - 2026-11-17
+
+Objetivo: Informe de subidas y proveedor más barato, diccionario de abreviaturas por proveedor y avisos de Telegram útiles
+
+### Añadido
+- Facturas: informe fijo «Subidas y proveedor» en Análisis ([#244](https://github.com/restcasatomascrevillent/admin-casatomas/pull/244))
+- Facturas: abreviaturas por proveedor que se aprenden solas y marca completa en el nombre ([#260](https://github.com/restcasatomascrevillent/admin-casatomas/pull/260))
+
+### Cambiado
+- Facturas: informe «Subidas y proveedor»: alto útil, errores y cálculos de envases y tallas ([#257](https://github.com/restcasatomascrevillent/admin-casatomas/pull/257))
+- Avisos: Telegram útil y sin ruido (resumen, reservas sin nombres, fallos graves, semanal, topes) ([#262](https://github.com/restcasatomascrevillent/admin-casatomas/pull/262))
+- Abreviaturas (B1-B3) y informe Subidas (A1-A2) ([#263](https://github.com/restcasatomascrevillent/admin-casatomas/pull/263))
+- Telegram: reservas de la revisión del #262 ([#267](https://github.com/restcasatomascrevillent/admin-casatomas/pull/267))
+
 ## [1.41.3] - 2026-11-17
 
 Objetivo: Estado de Servicios sin avisos falsos ni repetidos y con las fichas llenando cada fila
