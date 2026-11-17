@@ -43,3 +43,23 @@ Reglas del encargo:
   descuento NO llega al producto que descuenta → coste de producto inflado.
 - Asignaciones erróneas: «Mostaza de cerveza Rooftop 150 g» recibe 26 líneas de descuento (−3.054 €,
   «- 20 % BONIFICAC S/ …», «COMPRA MAS PAGA MENOS»).
+- **Fallo grave de clasificación IA (no solo descuentos)**: el producto 11 «Mostaza de cerveza Rooftop
+  150 g» tiene 191 alias ajenos y 252 líneas ajenas (13.530 €: alquileres, luz, fontanería, «- 20 %
+  BONIFICAC», «COMPRA MAS PAGA MENOS»…), creados desde el 08/11/2026. Causa: la categoría Servicios
+  tiene id 11 y el modelo pone ese 11 en `producto_id`; `validarAsignaciones`
+  (`supabase/functions/clasificar-productos/clasificacion.ts`) lo acepta porque el producto 11 existe.
+- Catral: 847 de 854 líneas «DESC./DESCUENTO <producto>» casan con su producto en el mismo documento
+  (similitud ≥ 0,6, línea anterior). 4 líneas de descuento de Catral están en POSITIVO (+128,52 €).
+- Makro: 516 líneas de promo en la página de resumen, sin el código que las une al artículo (la ficha
+  dice que el código de promo enlaza con la línea «Prec.Ud.*»): no se pueden asociar sin el original.
+- Descuentos de pie como línea: Riscal «- 20 % BONIFICAC S/ base» (−17.312 €, 11 facturas), Directas
+  9 % (−3.898 €), Disjover 5/10 %, Virola 20 %, Naturcid 10 %.
+- Regalos: 607 líneas a 0 € con cantidad; solo 101 marcadas `descuento_pct = 100`. La mayoría son
+  botellas bonificadas reales (Directas, Tabarca, Guillén, Hisumer, DIBOS, Calderón, Disjover S/C…);
+  otras son notas, material promocional o servicios a 0.
+- Descuento en la línea (`descuento_pct` parcial, 1.318): 1.308 guardan precio neto y cuadran; 7 no
+  cuadran; 74 tienen `importe_bruto = total` pese al descuento.
+- 20.046 líneas (2.611 facturas) llevan `albaran_ref`: la asociación descuento→producto debe hacerse
+  dentro del mismo albarán.
+- Originales: los `drive_url` (4.554) están en el Drive de la cuenta del panel, que el conector de Drive
+  de Claude NO ve. Pedido al dueño que comparta la carpeta «Facturas Casa Tomás» en lectura.
