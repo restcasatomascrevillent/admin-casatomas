@@ -111,7 +111,13 @@ function useTurnoAutomatico() {
   return [filtroTurno, elegir] as const;
 }
 
-export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } = {}) {
+export function VistaHoy({
+  onNuevaReserva,
+}: {
+  onAbrirSala?: (espacioId: string) => void;
+  /** Móvil (17/11/2026): abre «Nueva reserva» en el día que se ve. Sin permiso de crear, no se pasa. */
+  onNuevaReserva?: (fecha: string) => void;
+} = {}) {
   // Lo que comparten las dos vistas: el buscador y el turno de la fila de filtros, y la vista elegida.
   const [busqueda, setBusqueda] = useState("");
   const [filtroTurno, setFiltroTurno] = useTurnoAutomatico();
@@ -222,6 +228,7 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   if (esMovil) {
     // Móvil (07/11/2026): los controles (Reservas|Mesas, turno, buscador y «Sin reserva») van en UNA fila
     // dentro de `VistaHoyMovil`, que guarda su propio buscador y turno (por defecto el del reloj).
+    // 17/11/2026 (petición del dueño): también en el móvil se pasa de día y se apunta una reserva nueva.
     return (
       <ReservasEnVivoContexto.Provider value={true}>
         <div className="flex min-h-0 flex-col gap-1">
@@ -229,7 +236,13 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
           {errorReservasHoy ? (
             <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />
           ) : (
-            <VistaHoyMovil reservas={reservasHoy} fecha={hoy} canceladas={canceladasHoy} />
+            <VistaHoyMovil
+              reservas={reservasHoy}
+              fecha={hoy}
+              canceladas={canceladasHoy}
+              dia={{ hoy: hoyReal, onCambiar: irADia }}
+              onNuevaReserva={onNuevaReserva ? () => onNuevaReserva(hoy) : undefined}
+            />
           )}
         </div>
       </ReservasEnVivoContexto.Provider>

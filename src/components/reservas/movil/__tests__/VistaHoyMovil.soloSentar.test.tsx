@@ -93,6 +93,50 @@ describe("VistaHoyMovil · solo para sentar", () => {
 
 // 07/11/2026: en «Hoy» de escritorio esta MISMA lista va de columna a la izquierda del plano. El buscador y el
 // turno los manda la fila de filtros de la pestaña; sin la fila de controles del móvil ni la vista «Mesas».
+describe("VistaHoyMovil · día y «Nueva reserva» en el móvil (17/11/2026)", () => {
+  const montarDia = (fecha: string, extra: { onCambiar?: (f: string) => void; onNuevaReserva?: () => void } = {}) => {
+    const cliente = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const reservas = [res("a", "Ana Espera", "confirmada")] as never[];
+    return render(
+      <QueryClientProvider client={cliente}>
+        <VistaHoyMovil reservas={reservas} fecha={fecha} dia={{ hoy: "2026-11-07", onCambiar: extra.onCambiar ?? vi.fn() }} onNuevaReserva={extra.onNuevaReserva} />
+      </QueryClientProvider>,
+    );
+  };
+
+  it("las flechas pasan al día anterior y al siguiente del que se ve", () => {
+    const onCambiar = vi.fn();
+    montarDia("2026-11-07", { onCambiar });
+    expect(screen.getByTestId("dia-reservas-movil")).toHaveTextContent("Hoy · sáb 7 nov");
+    fireEvent.click(screen.getByRole("button", { name: "Día siguiente" }));
+    expect(onCambiar).toHaveBeenLastCalledWith("2026-11-08");
+    fireEvent.click(screen.getByRole("button", { name: "Día anterior" }));
+    expect(onCambiar).toHaveBeenLastCalledWith("2026-11-06");
+  });
+
+  it("fuera de hoy, tocar el día vuelve a hoy", () => {
+    const onCambiar = vi.fn();
+    montarDia("2026-11-09", { onCambiar });
+    fireEvent.click(screen.getByRole("button", { name: /Lun 9 nov\. Volver a hoy/ }));
+    expect(onCambiar).toHaveBeenLastCalledWith("2026-11-07");
+  });
+
+  it("«Nueva reserva» solo sale si se puede crear, y avisa al tocarla", () => {
+    const onNuevaReserva = vi.fn();
+    const { unmount } = montarDia("2026-11-07");
+    expect(screen.queryByRole("button", { name: "Nueva reserva" })).toBeNull();
+    unmount();
+    montarDia("2026-11-07", { onNuevaReserva });
+    fireEvent.click(screen.getByRole("button", { name: "Nueva reserva" }));
+    expect(onNuevaReserva).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin `dia` ni alta (pruebas sueltas, columna de escritorio) la fila no se pinta", () => {
+    montar();
+    expect(screen.queryByTestId("hoy-movil-dia")).toBeNull();
+  });
+});
+
 describe("VistaHoyMovil · como columna de escritorio", () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] });
