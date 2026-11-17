@@ -387,6 +387,19 @@ describe("Super Admin › Servicios › Estado", () => {
     expect(ubicacion()).toBe("/super-admin/servicios?tab=costes");
   });
 
+  it("una función de IA que apunta su gasto pero lleva días sin usarse no es un aviso (solo las que no lo apuntan)", async () => {
+    h.rpc.mockImplementation(async (fn: string) => fn === "ia_funciones_sin_registro"
+      ? { data: [
+        { funcion: "newsletter-ia", descripcion: "Newsletter", instrumentada: true, ultima_fila: null, dias_sin_registro: null },
+        { funcion: "chat-web", descripcion: "Chat", instrumentada: true, ultima_fila: "2026-11-09T10:00:00Z", dias_sin_registro: 8 },
+      ], error: null }
+      : { data: [], error: null });
+    pintar();
+    await screen.findByTestId("estado-general");
+    await waitFor(() => expect(h.rpc).toHaveBeenCalledWith("ia_funciones_sin_registro", expect.anything()));
+    expect(screen.queryByRole("button", { name: /no registran? su gasto/ })).toBeNull();
+  });
+
   it("todo bien: «Todo en orden» en verde, sin «Qué mirar»; lo que no tiene lectura automática no sale en Estado", async () => {
     h.servicios = [
       servicio({ proveedor: "supabase", nombre: "Supabase", limites: { bd_tamano: { etiqueta: "BD", limite: 500, unidad: "MB" } } }),
