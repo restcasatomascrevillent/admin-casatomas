@@ -213,7 +213,7 @@ export function ImportacionHistoricaDialog({ open, onOpenChange }: { open: boole
             <History className="h-5 w-5" /> Importación histórica
           </DialogTitle>
           <DialogDescription>
-            Facturas ya extraídas (JSON) con su PDF, sin volver a pasar el OCR. Elige la carpeta con{" "}
+            Facturas ya leídas (JSON) con su PDF, sin volver a leerlas. Elige la carpeta con{" "}
             <code>manifest.json</code>, <code>json/</code> y <code>pdf/</code>. Se importan de una en una; puedes parar y
             reanudar cuando quieras (lo ya importado no se repite).
           </DialogDescription>
