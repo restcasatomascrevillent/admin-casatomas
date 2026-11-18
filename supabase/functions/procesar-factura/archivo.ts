@@ -7,10 +7,12 @@
 //    - pendientes/{uid}/{trabajo}/…  lo que sube el panel para el OCR por
 //      trabajos (documentos largos). Se borra al archivar el original y al
 //      terminar o fallar el trabajo (limpiarPendientesTrabajo).
-//    - temporal/{factura}-{nombre}   el original de una factura cuando Drive
-//      falla al guardarla. La factura queda «pendiente de Drive»
-//      (archivo_path sin drive_url) y la función facturas-originales-drive
-//      (pg_cron cada 10 min) la sube a Drive y borra la copia.
+//    - temporal/{factura}-{nombre}   el original de una factura recién
+//      guardada. Desde el 18/11/2026 guardar NO espera a Drive (dejarParaDrive):
+//      la factura queda «pendiente de Drive» (archivo_path sin drive_url) y la
+//      función facturas-originales-drive (pg_cron cada 10 min) la sube a Drive
+//      y borra la copia. También acaba aquí si Drive falla (sustituir, añadir
+//      página, rescates).
 //  Las rutas antiguas (AAAA/MM/{factura}-…) siguen abriéndose en el panel
 //  mientras existan; el rescate las pasa a Drive y las borra.
 //
@@ -503,6 +505,67 @@ export async function archivarDesdeStorage(
   if (m.path) return { drive_url: null, archivo_path: m.path, error: null, drive_error: driveError };
   // No se pudo mover: sigue a salvo donde estaba y se apunta ahí.
   return { drive_url: null, archivo_path: desde, error: null, drive_error: `${driveError}; no se pudo mover a ${hasta}: ${m.error}` };
+}
+
+/** Original de una factura recién guardada (como OriginalDocumento de guardado.ts). */
+export type OriginalParaDrive =
+  | { tipo: "base64"; b64: string; mime: string; nombre: string }
+  | { tipo: "storage"; path: string; mime: string | null; nombre: string };
+
+/**
+ * El original de una factura recién guardada, a la copia TEMPORAL de Storage
+ * (temporal/{factura}-{nombre}) SIN esperar a Drive (18/11/2026): lo sube la
+ * función facturas-originales-drive (pg_cron cada 10 min, coge las facturas
+ * con archivo_path y sin drive_url) y borra la copia. Subirlo al guardar
+ * costaba ~3 s (token, dos carpetas, la subida) más dos lecturas del proveedor.
+ *   · base64 (camino síncrono, importación, trabajo de una pieza): se sube.
+ *   · storage (pendientes/… de un trabajo largo): se MUEVE (no se descarga).
+ * `drive_error` va a null: no es un fallo de Drive (no suma drive_intentos).
+ * Si Storage falla, se sube a Drive en el momento para no perder el original
+ * (`proveedor` solo se pide entonces). Nunca lanza.
+ */
+// deno-lint-ignore no-explicit-any
+export async function dejarParaDrive(
+  cfg: ConfigDrive,
+  supabase: any,
+  original: OriginalParaDrive,
+  fecha: string | null,
+  facturaId: number,
+  proveedor: () => Promise<string | null>,
+): Promise<ResultadoArchivo> {
+  if (original.tipo === "storage") {
+    const destino = rutaTemporal(facturaId, original.nombre);
+    const m = await moverPendiente(supabase, original.path, destino);
+    if (m.path) return { drive_url: null, archivo_path: m.path, error: null, drive_error: null };
+    console.warn(`[archivo] no se pudo mover ${original.path} a ${destino} (${m.error}); se sube a Drive ya`);
+    return await archivarDesdeStorage(
+      cfg, supabase, original.path, original.nombre, original.mime, fecha, facturaId, await proveedor(), destino,
+    );
+  }
+  let bytes: Uint8Array;
+  try {
+    bytes = aBytes(original.b64);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "base64 invalido";
+    console.error("[archivo] No se pudo decodificar el base64:", msg);
+    return { drive_url: null, archivo_path: null, error: msg, drive_error: null };
+  }
+  let errorStorage: string;
+  try {
+    const path = await guardarEnStorage(supabase, bytes, original.nombre, original.mime, facturaId);
+    return { drive_url: null, archivo_path: path, error: null, drive_error: null };
+  } catch (e) {
+    errorStorage = mensaje(e);
+    console.error(`[archivo] No se pudo dejar el original de la factura ${facturaId} en Storage (${errorStorage}); se sube a Drive ya`);
+  }
+  try {
+    const url = await subirADrive(cfg, bytes, original.nombre, original.mime, fecha, await proveedor());
+    return { drive_url: url, archivo_path: null, error: null, drive_error: null };
+  } catch (e) {
+    const driveError = mensaje(e);
+    console.error(`[archivo] PERDIDA DEL ORIGINAL de la factura ${facturaId} (${original.nombre}): Storage: ${errorStorage}; Drive: ${driveError}`);
+    return { drive_url: null, archivo_path: null, error: errorStorage, drive_error: driveError };
+  }
 }
 
 /**

@@ -14,8 +14,8 @@ import { type ClienteOpenAI, vec } from "./openai.ts";
 import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes } from "./costeLectura.ts";
 import {
   archivarDesdeStorage,
-  archivarOriginal,
   type ConfigDrive,
+  dejarParaDrive,
   driveActivo,
   limpiarPendientesTrabajo,
   marcarPendienteDrive,
@@ -449,16 +449,22 @@ export async function apuntarOriginal(
     const { error } = await escribirFactura(supabase, facturaId, extra, { reintento: opciones.reintento });
     if (error) console.error(`[guardado] factura ${facturaId}: no se guardaron ${Object.keys(extra).join(", ")}:`, error);
   }
-  if (!a.drive_url && a.archivo_path) await marcarPendienteDrive(supabase, facturaId, a.drive_error);
+  // Solo cuenta como fallo de Drive si lo hubo (dejarParaDrive no lo intenta: no es un fallo).
+  if (!a.drive_url && a.archivo_path && a.drive_error) await marcarPendienteDrive(supabase, facturaId, a.drive_error);
   return {
     ok: !!(a.drive_url || a.archivo_path),
-    estado: a.drive_url ? "drive" : a.archivo_path ? "temporal" : "perdido",
+    estado: a.drive_url ? "drive" : a.archivo_path ? (a.drive_error ? "temporal" : "en_cola") : "perdido",
     error: a.error ?? (a.drive_error ? `original pendiente de subir a Drive (${a.drive_error})` : null),
   };
 }
 
-/** Dónde quedó el original: Drive, copia temporal (pendiente de Drive) o en ningún sitio. */
-export type EstadoArchivo = "drive" | "temporal" | "perdido";
+/**
+ * Dónde quedó el original: Drive; «temporal» = Drive FALLÓ y espera en una
+ * copia temporal; «en_cola» = copia temporal a la espera del cron
+ * facturas-originales-drive, lo normal al guardar desde el 18/11/2026 (el
+ * panel no lo distingue de «drive»: no avisa de nada); o en ningún sitio.
+ */
+export type EstadoArchivo = "drive" | "temporal" | "en_cola" | "perdido";
 
 function respuestaExito(
   d: DatosNormalizados,
@@ -634,11 +640,11 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
       costeDeEntrada(e),
     ]);
 
-    // 9) Original: a Drive (carpeta del proveedor → mes). Storage solo como
-    //    copia TEMPORAL si Drive falla (el cron facturas-originales-drive la
-    //    sube después y la borra). Después, UNA escritura en la factura:
-    //    alertas (dispara la autoverificación), dónde está el original y coste.
-    //    Antes eran tres UPDATE seguidos de la misma fila (18/11/2026: ~8 s).
+    // 9) Original: a la copia TEMPORAL de Storage, sin esperar a Drive (lo
+    //    sube el cron facturas-originales-drive en ≤10 min, a la carpeta del
+    //    proveedor → mes, y borra la copia). Después, UNA escritura en la
+    //    factura: alertas (dispara la autoverificación), dónde está el
+    //    original y coste. Antes: Drive (~3 s) y tres UPDATE seguidos.
     const archivo = await archivarYApuntar(ctx, e, facturaId, columnasFinales(alertas, coste));
 
     console.log(
@@ -706,8 +712,9 @@ function columnasFinales(alertas: Alerta[], coste: CosteLectura | null): Record<
 }
 
 /**
- * Paso 9: el original a Drive (o copia temporal) y la referencia en la
- * factura, con `extra` (alertas, coste) en la MISMA escritura.
+ * Paso 9: el original a la copia temporal de Storage (Drive, después: cron
+ * facturas-originales-drive) y la referencia en la factura, con `extra`
+ * (alertas, coste) en la MISMA escritura.
  */
 async function archivarYApuntar(
   ctx: ContextoGuardado,
@@ -721,14 +728,9 @@ async function archivarYApuntar(
     const sinOriginal = { drive_url: null, archivo_path: null, error: "el original ya no estaba disponible para archivarlo", drive_error: null };
     return await apuntarOriginal(supabase, facturaId, sinOriginal, { extra });
   }
-  const proveedorCarpeta = driveActivo(ctx.drive) ? await nombreProveedorFactura(supabase, facturaId, d.proveedor) : null;
-  const a: ResultadoArchivo = e.original.tipo === "base64"
-    ? await archivarOriginal(
-      ctx.drive, supabase, e.original.b64, e.original.nombre, e.original.mime, d.fecha, facturaId, proveedorCarpeta,
-    )
-    : await archivarDesdeStorage(
-      ctx.drive, supabase, e.original.path, e.original.nombre, e.original.mime, d.fecha, facturaId, proveedorCarpeta,
-    );
+  // El proveedor (dos lecturas) solo hace falta si hay que subir a Drive ya (Storage falló).
+  const proveedor = () => (driveActivo(ctx.drive) ? nombreProveedorFactura(supabase, facturaId, d.proveedor) : Promise.resolve(null));
+  const a: ResultadoArchivo = await dejarParaDrive(ctx.drive, supabase, e.original, d.fecha, facturaId, proveedor);
   return await apuntarOriginal(supabase, facturaId, a, { extra });
 }
 
@@ -764,9 +766,8 @@ async function completarGuardada(
   if (ya.drive_url || ya.archivo_path) {
     const { error } = await escribirFactura(supabase, ya.id, extra);
     if (error) console.error(`[validacion] No se pudieron guardar las alertas de la factura ${ya.id}:`, error);
-    archivo = ya.drive_url
-      ? { ok: true, error: null, estado: "drive" }
-      : { ok: true, error: "original pendiente de subir a Drive", estado: "temporal" };
+    // Con copia temporal: la sube el cron facturas-originales-drive.
+    archivo = ya.drive_url ? { ok: true, error: null, estado: "drive" } : { ok: true, error: null, estado: "en_cola" };
   } else {
     console.warn(`[procesar-factura] factura ${ya.id} sin original tras un corte: se archiva ahora`);
     archivo = await archivarYApuntar(ctx, e, ya.id, extra);
