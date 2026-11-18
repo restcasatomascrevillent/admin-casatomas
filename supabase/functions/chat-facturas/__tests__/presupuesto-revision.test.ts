@@ -98,3 +98,22 @@ describe("confirmarParejas: la IA no pierde parejas buenas (revisión 18/11/2026
     expect(PROMPT_CONFIRMAR).toMatch(/C6 frente a C12/);
   });
 });
+
+describe("PDF y foto pasan por las reglas fijas y la confirmación (revisión 18/11/2026, punto 8)", () => {
+  it("una edición o un mini emparejados por texto pierden la pareja o salen como otro formato", async () => {
+    const { confirmarLineasEmparejadas } = await import("../adjuntar.ts");
+    const base = { formato: null, unidad: "ud", contenido_cantidad: null, contenido_unidad: null, cantidad: null, precio: 20, metodo: "texto", similitud: 0.8 };
+    const lineas = [
+      { ...base, producto: "Hendrick's Lunar 70 cl", producto_id: 8, producto_catalogo: "Hendrick's 70 cl", confianza: "alta" as const },
+      { ...base, producto: "Mini Hendrick's 5 cl", producto_id: 8, producto_catalogo: "Hendrick's 70 cl", confianza: "alta" as const },
+      { ...base, producto: "Hendrick's 70 cl", producto_id: 8, producto_catalogo: "Hendrick's 70 cl", confianza: "alta" as const },
+      { ...base, producto: "Cosa rara" },
+    ];
+    const f = iaDice([0, 1, 2].map((id) => ({ id, opcion: 1, decision: "mismo_formato", motivo: "" })));
+    const r = await confirmarLineasEmparejadas(lineas, [{ n: "GIN HENDRICKS 70CL", p: 8, c: "Hendrick's 70 cl" }], { clave: "k", fetchImpl: f });
+    expect(r.lineas[0].producto_id).toBeUndefined();
+    expect(r.lineas[1]).toMatchObject({ producto_id: 8, confianza: "formato_distinto" });
+    expect(r.lineas[2]).toMatchObject({ producto_id: 8, confianza: "alta" });
+    expect(r.lineas[3].producto_id).toBeUndefined();
+  });
+});

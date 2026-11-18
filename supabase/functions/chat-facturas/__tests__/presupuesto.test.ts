@@ -101,8 +101,8 @@ function openaiFalso(lectura: unknown) {
 
 function supabaseFalso(opts: { rpcError?: string } = {}) {
   const insertado: unknown[] = [];
-  const rpc = vi.fn(async (_n: string, p: { p_lineas: unknown[] }) =>
-    opts.rpcError
+  const rpc = vi.fn(async (n: string, p: { p_lineas: unknown[] }) =>
+    n === "nombres_compras_agente" ? { data: [{ n: "GAMBA ROJA HUELVA", p: 5, c: "Gamba" }], error: null } : opts.rpcError
       ? { data: null, error: { message: opts.rpcError } }
       : { data: p.p_lineas.map((_, i) => (i === 0 ? { i: 1, producto_id: 5, producto_catalogo: "Gamba", metodo: "texto", confianza: "alta" } : { i: i + 1 })), error: null });
   const from = vi.fn(() => ({
@@ -134,8 +134,8 @@ describe("procesarPresupuesto (turno de adjuntar)", () => {
     expect(r.presupuesto_id).toBe(ID);
     expect(r.respuesta).toMatch(/¿Este proveedor te aplica algún descuento\?/);
     expect(r.respuesta).toMatch(/2 productos, 1 de ellos/);
-    expect(sb.rpc).toHaveBeenCalledTimes(1);
-    expect(sb.rpc.mock.calls[0][0]).toBe("emparejar_presupuesto_agente"); // nada de comparar
+    // Emparejar, nombres de compra (para las reglas fijas y la confirmación) y nada de comparar.
+    expect(sb.rpc.mock.calls.map((c) => c[0])).toEqual(["emparejar_presupuesto_agente", "nombres_compras_agente"]);
     const fila = sb.insertado[0] as { session_id: string; lineas: Array<{ producto_id?: number }> };
     expect(fila.session_id).toBe("s1");
     expect(fila.lineas[0].producto_id).toBe(5);
