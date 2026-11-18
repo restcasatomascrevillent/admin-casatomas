@@ -143,7 +143,7 @@ begin
        set descuento_pct = null, importe_bruto = r.importe_bruto_antes,
            importe_bruto_estimado = coalesce(r.importe_bruto_estimado_antes, false)
       from public.productos_regalos_marcados_20261118 r
-     where r.linea_id = p.id and p.descuento_pct = 100 and p.total = 0;
+     where r.linea_id = p.id and p.descuento_pct = 100 and (p.total = 0 or p.total is null);
     drop table public.productos_regalos_marcados_20261118;
   end if;
   select array_agg(distinct p.factura_id) into v_ids

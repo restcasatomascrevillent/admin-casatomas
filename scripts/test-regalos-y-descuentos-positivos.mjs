@@ -50,6 +50,8 @@ await db.exec(`
     (12, 1, 'TANQUERAY 70 CL', 'tanqueray 70 cl', 'tanqueray 70 cl', 2, 0, 0, 2, 400, 30),
     (13, 1, 'PANES DE 1 KILO', 'panes de 1 kilo', 'panes de 1 kilo', 4, 2.5, 0, 3, 300, null),
     (14, 1, 'ENVASES C0SA', 'envases c0sa', 'envases c0sa', 3, 0, 0, 4, null, null),
+    (16, 1, 'Jamon Bellota 100% Iberico', 'jamon bellota 100% iberico', 'jamon bellota 100% iberico', 51.85, 44.5, 2307.33, 6, 400, null),
+    (17, 1, 'Jamon Bellota 100% Iberico', 'jamon bellota 100% iberico', 'jamon bellota 100% iberico', 8.72, null, null, 7, 400, null),
     (15, 1, 'Facturación por energía reactiva', 'facturacion por energia reactiva', 'facturacion por energia reactiva', 1, 0, 0, 5, 200, null),
     -- Catral: descuento en positivo bajo el producto (cobro de más) y bajo una devolución
     (20, 2, 'JUDAS 1/3 N.R. * 12', 'judas 1/3 n.r. * 12', 'judas 1/3 n.r. * 12', 3, 40.14, 120.42, 0, null, null),
@@ -76,7 +78,8 @@ igual([await fila(13), await fila(14), await fila(15)].map((f) => f.pct), [null,
 igual([await fila(20), await fila(21)].map((f) => f.neto), [135.24, 0], "Catral: el descuento cobrado de más sube el producto");
 igual([await fila(22), await fila(23)].map((f) => f.neto), [-49.56, 0], "Catral: el que deshace el descuento va con su devolución");
 igual((await fila(24)).neto, null, "una línea positiva que solo dice «oferta» no se toca");
-igual(Number((await db.query(`select count(*) n from productos_regalos_marcados_20261118`)).rows[0].n), 2, "respaldo: los 2 regalos marcados");
+igual(await fila(17), { pct: 100, bruto: 388.04, est: true, neto: null }, "Osborne: pieza sin importe del mismo jamón pagado → regalo, valor estimado");
+igual(Number((await db.query(`select count(*) n from productos_regalos_marcados_20261118`)).rows[0].n), 3, "respaldo: los 3 regalos marcados");
 
 await db.exec(`
   insert into productos_factura (id, factura_id, nombre, nombre_busqueda, nombre_normalizado, cantidad, precio_unitario, total, orden) values
