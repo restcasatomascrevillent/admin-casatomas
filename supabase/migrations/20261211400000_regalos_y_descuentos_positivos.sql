@@ -2,8 +2,9 @@ set client_encoding = 'UTF8';
 -- ============================================================================
 -- 20261211400000_regalos_y_descuentos_positivos · Facturas (18/11/2026)
 -- Cotejo con los originales (docs/facturas/revision-descuentos/INFORME.md, apartado 7):
---  1. Regalos. Las líneas a 0 € con cantidad que son regalo se guardaban sin marcar (482 en producción;
---     p. ej. Riscal regaló 270 botellas de Arienzo «Sin Cargo» en una factura). Ahora quedan con
+--  1. Regalos. Las líneas a 0 € (o sin importe) con cantidad que son regalo se guardaban sin marcar (482
+--     en producción; p. ej. Riscal regaló 270 botellas de Arienzo «Sin Cargo» en una factura; Osborne, una
+--     pieza de jamón sin precio). Ahora quedan con
 --     descuento_pct = 100 y su valor en importe_bruto (el impreso o, si no lo hay, el de la línea pagada
 --     del mismo producto, marcado como estimado), igual que la regla 6 de docs/facturas/README.md, si:
 --     ya tenían valor, el nombre lo dice («sin cargo», «S/C», «regalo», «bonif.», «gratis», «muestra»…) o
@@ -56,7 +57,7 @@ begin
    using public.productos_factura p
    where p.id = x.descuento_linea_id and p.factura_id = any(p_facturas) and x.regla <> 'manual';
 
-  -- Regalos (20261211400000): líneas a 0 € con cantidad que son regalo → 100 % de descuento y su
+  -- Regalos (20261211400000): líneas a 0 € o sin importe, con cantidad, que son regalo → 100 % de descuento y su
   -- valor (el impreso; si no hay, el de la línea pagada del mismo producto, marcado como estimado).
   update public.productos_factura p
      set descuento_pct = 100,
@@ -77,7 +78,7 @@ begin
         left join public.categorias_producto c on c.id = pc.categoria_id
         left join public.categorias_producto c2 on c2.id = c.padre_id
        where z.factura_id = any(p_facturas) and f.total > 0
-         and z.total = 0 and z.cantidad > 0 and z.descuento_pct is null
+         and (z.total = 0 or z.total is null) and z.cantidad > 0 and z.descuento_pct is null
          and coalesce(z.nombre_busqueda, lower(z.nombre)) !~ '(envase|palet|caja bn|retorn)'
          and coalesce(c2.clave, c.clave, '') <> 'servicios'
     ) r
@@ -228,13 +229,13 @@ begin
   insert into public.productos_regalos_marcados_20261118 (linea_id, importe_bruto_antes, importe_bruto_estimado_antes)
   select p.id, p.importe_bruto, p.importe_bruto_estimado
     from public.productos_factura p join public.facturas f on f.id = p.factura_id
-   where f.total > 0 and p.total = 0 and p.cantidad > 0 and p.descuento_pct is null
+   where f.total > 0 and (p.total = 0 or p.total is null) and p.cantidad > 0 and p.descuento_pct is null
   on conflict (linea_id) do nothing;
 
   select array_agg(distinct p.factura_id) into v_ids
     from public.productos_factura p join public.facturas f on f.id = p.factura_id
    where f.total > 0
-     and ((p.total = 0 and p.cantidad > 0 and p.descuento_pct is null)
+     and (((p.total = 0 or p.total is null) and p.cantidad > 0 and p.descuento_pct is null)
           or (p.total <> 0 and public.es_linea_descuento(coalesce(p.nombre_busqueda, lower(p.nombre)))));
   if v_auditoria then
     execute 'alter table public.productos_factura disable trigger trg_auditoria';
