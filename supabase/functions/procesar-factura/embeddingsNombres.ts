@@ -13,10 +13,16 @@
 // ============================================================================
 
 import { vec } from "./openai.ts";
+import { conReintentoPorTiempo, type OpcionesReintento } from "../_shared/reintento-bd.ts";
 
 export const TABLA_NOMBRES = "productos_nombre_embedding";
-/** Filas por UPSERT: 50 vectores de 1536 floats ≈ 1,5 MB de JSON. */
-export const LOTE_ESCRITURA = 50;
+/**
+ * Filas por UPSERT. Antes 50: cada vector entra en el índice HNSW y un lote de
+ * 50 tardaba de media 1,9 s y hasta 7,6 s (pg_stat_statements, 15–18/11/2026);
+ * con la base cargada pasaba de los 8 s de PostgREST y se cortaba. 10 por lote
+ * deja cada escritura muy por debajo del límite.
+ */
+export const LOTE_ESCRITURA = 10;
 /** Nombres por consulta `in (...)` (la URL de PostgREST tiene límite). */
 const LOTE_LECTURA = 100;
 
@@ -47,8 +53,18 @@ export async function nombresSinVector(supabase: Supa, nombres: string[]): Promi
   return unicos.filter((n) => !con.has(n));
 }
 
-/** Guarda (upsert por nombre) los vectores, en lotes pequeños. */
-export async function guardarVectoresNombres(supabase: Supa, nombres: string[], vectores: number[][]): Promise<number> {
+/**
+ * Guarda (upsert por nombre) los vectores, en lotes pequeños. Con `reintento`,
+ * un lote que la base corta por tiempo se repite tras esperar (el upsert se
+ * puede repetir); sin él, falla a la primera (al guardar una factura no se
+ * espera: lo completa el cron embeddings-nombres).
+ */
+export async function guardarVectoresNombres(
+  supabase: Supa,
+  nombres: string[],
+  vectores: number[][],
+  reintento: OpcionesReintento = { esperasMs: [] },
+): Promise<number> {
   if (nombres.length !== vectores.length) {
     throw new Error(`embeddings: ${nombres.length} nombres y ${vectores.length} vectores`);
   }
@@ -60,7 +76,10 @@ export async function guardarVectoresNombres(supabase: Supa, nombres: string[], 
       embedding: vec(vectores[i + j]),
       actualizado_en: ahora,
     }));
-    const { error } = await supabase.from(TABLA_NOMBRES).upsert(filas, { onConflict: "nombre" });
+    const { error } = await conReintentoPorTiempo(
+      () => supabase.from(TABLA_NOMBRES).upsert(filas, { onConflict: "nombre" }),
+      reintento,
+    );
     if (error) throw new Error(`guardar ${TABLA_NOMBRES}: ${error.message}`);
     n += filas.length;
   }
