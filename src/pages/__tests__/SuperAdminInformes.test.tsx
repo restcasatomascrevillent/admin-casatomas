@@ -2,7 +2,9 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { format } from "date-fns";
 import type { ResultadoInformeTabla } from "@/lib/informes/tabla";
+import { mesAnteriorA, mesesPorDefecto, rangoDeMes } from "@/lib/informes/periodo";
 import type { PropsGeneradorInforme } from "@/lib/informes/registro";
 
 vi.setConfig({ testTimeout: 15_000 });
@@ -40,7 +42,9 @@ vi.mock("@/components/informes/generadores/InformeTraficoGenerador", () => ({
 }));
 vi.mock("@/components/informes/generadores/InformeRrssGenerador", () => ({ default: () => <p>RRSS</p> }));
 
-import SuperAdminInformes from "../SuperAdminInformes";
+import SuperAdminInformes, { CLAVE_MES_INFORMES } from "../SuperAdminInformes";
+
+const hoy = () => format(new Date(), "yyyy-MM-dd");
 
 let ubicacion = "";
 function Ubicacion() {
@@ -86,6 +90,7 @@ beforeEach(() => {
   estado.permisos = [];
   estado.descargas = [];
   estado.facturas = vi.fn(async () => informeProveedores);
+  window.sessionStorage.clear();
 });
 
 describe("Super Admin › Informes", () => {
@@ -96,6 +101,9 @@ describe("Super Admin › Informes", () => {
     expect(within(lista).getByRole("button", { name: /Informe mensual de tráfico web/ })).toBeInTheDocument();
     expect(within(lista).getByRole("button", { name: /Gasto por proveedor/ })).toBeInTheDocument();
     expect(screen.getByText("Elige un informe")).toBeInTheDocument();
+    // Arriba, el mes de los informes: por defecto, el último mes cerrado.
+    expect(screen.getByRole("combobox", { name: "Mes de los informes" })).toBeInTheDocument();
+    expect(within(lista).getAllByText("Del mes elegido").length).toBeGreaterThan(0);
   });
 
   it("mientras se leen los permisos, esqueletos", () => {
@@ -131,9 +139,10 @@ describe("Super Admin › Informes", () => {
     expect(within(vista).getByText("Makro")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: "Gasto por proveedor", level: 2 }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Facturas › Análisis" })).toHaveAttribute("href", "/facturas?tab=chat");
-    // Por defecto, el mes anterior entero.
+    // Por defecto, el mes de la página (el último cerrado) entero.
     const [, periodo] = estado.facturas.mock.calls[0];
-    expect(periodo).toMatchObject({ tipo: "rango" });
+    expect(periodo).toEqual({ tipo: "rango", ...rangoDeMes(mesAnteriorA(hoy())) });
+    expect(ubicacion).toMatch(new RegExp(`mes=${mesAnteriorA(hoy())}`));
     fireEvent.click(screen.getByRole("button", { name: "Descargar CSV" }));
     expect(estado.descargas).toEqual(["informe-gasto-por-proveedor-2026-10.csv"]);
     expect(screen.getByRole("button", { name: "Descargar PDF" })).toBeEnabled();
@@ -171,17 +180,73 @@ describe("Super Admin › Informes", () => {
     pintar("/super-admin/informes?informe=carta-vino-favorito");
     expect(await screen.findByText("No hay datos para este informe")).toBeInTheDocument();
     expect(screen.getByText("Todavía no ha votado nadie.")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Periodo del informe")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Periodo del informe" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Periodo del informe: Todos los datos")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Descargar CSV" })).toBeDisabled();
   });
 
   it("un informe con diapositivas propias se carga en el mismo marco, con el mes elegido", async () => {
     pintar("/super-admin/informes?informe=trafico-web-mensual&mes=2026-09");
     expect(await screen.findByText("Tráfico de 2026-09")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Mes del informe" })).toBeInTheDocument();
+    // Sin selector propio: el mes es el de arriba.
+    expect(screen.queryByRole("combobox", { name: "Mes del informe" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Mes del informe: Septiembre de 2026")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Informes de septiembre de 2026/, level: 1 })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Tráfico web" })).toHaveAttribute("href", "/super-admin/trafico-web");
-    // Volver a la lista (móvil).
+    // Volver a la lista (móvil): el mes se queda.
     fireEvent.click(screen.getByRole("button", { name: "Todos los informes" }));
-    expect(ubicacion).toBe("/super-admin/informes");
+    expect(ubicacion).toBe("/super-admin/informes?mes=2026-09");
+  });
+
+  it("el mes elegido arriba vale para cualquier informe que se abra", async () => {
+    pintar("/super-admin/informes?informe=trafico-web-mensual&mes=2026-09");
+    expect(await screen.findByText("Tráfico de 2026-09")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Gasto por proveedor/ }));
+    await waitFor(() => expect(estado.facturas).toHaveBeenCalled());
+    expect(estado.facturas.mock.calls[0][1]).toEqual({ tipo: "rango", desde: "2026-09-01", hasta: "2026-09-30" });
+    expect(ubicacion).toMatch(/informe=facturas-gasto-proveedor/);
+    expect(ubicacion).toMatch(/mes=2026-09/);
+    expect(screen.getByRole("combobox", { name: "Periodo del informe" })).toHaveTextContent("Todo septiembre de 2026");
+    // Se recuerda en la pestaña para la próxima vez.
+    expect(window.sessionStorage.getItem(CLAVE_MES_INFORMES)).toBe("2026-09");
+  });
+
+  it("cambiar el mes de arriba cambia el informe abierto (y descarta las fechas a medida)", async () => {
+    pintar("/super-admin/informes?informe=trafico-web-mensual&mes=2026-09");
+    expect(await screen.findByText("Tráfico de 2026-09")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Mes anterior" }));
+    expect(await screen.findByText("Tráfico de 2026-08")).toBeInTheDocument();
+    expect(ubicacion).toMatch(/mes=2026-08/);
+    fireEvent.click(screen.getByRole("button", { name: "Mes siguiente" }));
+    expect(await screen.findByText("Tráfico de 2026-09")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Gasto por familia/ }));
+    await waitFor(() => expect(estado.facturas).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "Mes anterior" }));
+    await waitFor(() => expect(estado.facturas.mock.calls.at(-1)![1]).toEqual({ tipo: "rango", desde: "2026-08-01", hasta: "2026-08-31" }));
+    expect(ubicacion).not.toMatch(/desde=/);
+  });
+
+  it("sin mes en la URL, el último elegido en la pestaña", () => {
+    const opciones = mesesPorDefecto(hoy());
+    window.sessionStorage.setItem(CLAVE_MES_INFORMES, opciones[3].clave);
+    pintar();
+    expect(screen.getByRole("combobox", { name: "Mes de los informes" })).toHaveTextContent(opciones[3].etiqueta);
+  });
+
+  it("un mes de la URL que no se puede elegir no vale: se queda el guardado", () => {
+    const opciones = mesesPorDefecto(hoy());
+    window.sessionStorage.setItem(CLAVE_MES_INFORMES, opciones[2].clave);
+    pintar("/super-admin/informes?mes=1999-01");
+    expect(screen.getByRole("combobox", { name: "Mes de los informes" })).toHaveTextContent(opciones[2].etiqueta);
+  });
+
+  it("en el mes más nuevo, «Mes siguiente» está apagado", () => {
+    const opciones = mesesPorDefecto(hoy());
+    pintar(`/super-admin/informes?mes=${opciones[0].clave}`);
+    expect(screen.getByRole("button", { name: "Mes siguiente" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Mes anterior" })).toBeEnabled();
+    pintar(`/super-admin/informes?mes=${opciones.at(-1)!.clave}`);
+    expect(screen.getAllByRole("button", { name: "Mes anterior" }).at(-1)).toBeDisabled();
   });
 });
