@@ -5,6 +5,7 @@ import {
   pasosDeCoincidencias,
   pasosSiguientes,
   pieDeDatos,
+  textoErrorChat,
   textoErrorSubida,
   textoProgreso,
   textoSegundos,
@@ -112,5 +113,35 @@ describe("textoErrorSubida: nunca texto de base de datos", () => {
     expect(textoErrorSubida("El servidor ya no tiene el documento: vuelve a subirlo.")).toBe("El servidor ya no tiene el documento: vuelve a subirlo.");
     expect(textoErrorSubida("")).toMatch(/Reintentar/);
     expect(textoErrorSubida(undefined)).toMatch(/Reintentar/);
+  });
+});
+
+describe("F3: lista blanca (texto genérico por defecto, nunca el mensaje de máquina)", () => {
+  const TECNICOS = [
+    "permission denied for table facturas",
+    "invalid input syntax for type bigint: \"abc\"",
+    "OpenAI 400: invalid_request_error",
+    "TypeError: Cannot read properties of undefined (reading 'id')",
+    "Algo raro pasó con el JWT",
+    "ReferenceError: x is not defined",
+  ];
+  it("subida: ninguno de esos textos se enseña", () => {
+    for (const t of TECNICOS) {
+      const r = textoErrorSubida(t);
+      expect(r).toMatch(/Reintentar/);
+      expect(r).not.toMatch(/permission|invalid|OpenAI|TypeError|JWT|Reference/i);
+    }
+  });
+  it("subida: las frases de la lista blanca sí se enseñan; con jerga dentro, no", () => {
+    expect(textoErrorSubida("Elige al menos dos fotos para unirlas.")).toBe("Elige al menos dos fotos para unirlas.");
+    expect(textoErrorSubida("Ese trabajo pertenece a otro usuario")).toBe("Ese trabajo pertenece a otro usuario");
+    expect(textoErrorSubida("Elige al menos dos fotos TypeError")).not.toMatch(/TypeError/);
+  });
+  it("chat: texto genérico por defecto; tiempo, saturación y red se explican", () => {
+    for (const t of TECNICOS) expect(textoErrorChat(t)).not.toMatch(/permission|invalid|OpenAI|TypeError|JWT|Reference/i);
+    expect(textoErrorChat(undefined)).toMatch(/Reintentar/);
+    expect(textoErrorChat("OpenAI chat 429: rate limit")).toMatch(/saturado/);
+    expect(textoErrorChat("canceling statement due to statement timeout")).toMatch(/tardado/);
+    expect(textoErrorChat("Failed to fetch")).toMatch(/conexión/);
   });
 });
