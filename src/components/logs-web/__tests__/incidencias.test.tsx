@@ -9,7 +9,7 @@ import type { ConsultaFiltrable, EventoWeb, FiltrosIncidencias, IncidenciaWeb } 
 
 const llamadas: FiltrosIncidencias[] = [];
 let filas: IncidenciaWeb[] = [];
-let conteos: { web: number; externo: number; no_depende: number } | undefined;
+let conteos: { web: number; admin: number; externo: number; no_depende: number } | undefined;
 let sinOrigen = false;
 vi.mock("@/hooks/useLogsWeb", async (original) => {
   const real = await original<typeof import("@/hooks/useLogsWeb")>();
@@ -23,6 +23,7 @@ vi.mock("@/hooks/useLogsWeb", async (original) => {
 });
 
 const { aplicarFiltrosIncidencias } = await import("@/hooks/useLogsWeb");
+const { filtroAmbito } = await import("../../../../supabase/functions/_shared/logs-web/ambito");
 const { causaDeFila, repartoTexto, textoParaCopiar } = await import("../calculos");
 const { PestanaIncidencias } = await import("../PestanaIncidencias");
 
@@ -73,7 +74,9 @@ describe("filtros de incidencias", () => {
       return c.pasos;
     };
     expect(pasos("web_externos")).toEqual(["lte origen_prioridad<=2"]);
-    expect(pasos("web")).toEqual(["eq origen=web"]);
+    expect(pasos("web")).toEqual(["eq origen=web"]); // los fallos nuestros juntos (web y admin), como antes
+    expect(pasos("fallo_web")).toEqual(["eq origen=web", `or ${filtroAmbito("web")}`]);
+    expect(pasos("fallo_admin")).toEqual(["eq origen=web", `or ${filtroAmbito("admin")}`]);
     expect(pasos("externo")).toEqual(["eq origen=externo"]);
     expect(pasos("no_depende")).toEqual(["eq origen_prioridad=3"]);
     expect(pasos(null)).toEqual([]);
@@ -117,7 +120,7 @@ describe("colores y cuentas por origen", () => {
   beforeEach(() => {
     llamadas.length = 0;
     sinOrigen = false;
-    conteos = { web: 1, externo: 1, no_depende: 4 };
+    conteos = { web: 1, admin: 2, externo: 1, no_depende: 4 };
     filas = [
       inc({ id: 1, titulo: "TypeError: vino.precio is null", tipo: "error_js", fuente: "navegador", mensaje: "TypeError: vino.precio is null", origen: "web", gravedad: "critico" }),
       inc({ id: 2, titulo: "Google Maps JavaScript API error", tipo: "error_js", fuente: "navegador", mensaje: "Google Maps JavaScript API error", origen: "externo", origen_proveedor: "Google Maps" }),
@@ -130,9 +133,11 @@ describe("colores y cuentas por origen", () => {
     pintar();
     expect(llamadas.at(-1)?.origen).toBe("web_externos");
     expect(screen.getByTestId("conteo-web")).toHaveTextContent("Fallos de la web: 1");
+    expect(screen.getByTestId("conteo-admin")).toHaveTextContent("Fallos del admin: 2");
     expect(screen.getByTestId("conteo-externo")).toHaveTextContent("Externos: 1");
     expect(screen.getByTestId("conteo-no_depende")).toHaveTextContent("No dependen de la web: 4");
-    expect(screen.getByTestId("leyenda-origen")).toHaveTextContent(/Fallos de la web:.*Externos:.*No dependen de la web:/);
+    expect(screen.getByTestId("conteo-admin").className).toMatch(/destructive/); // también es un fallo nuestro (rojo)
+    expect(screen.getByTestId("leyenda-origen")).toHaveTextContent(/Fallos de la web y del admin:.*Externos:.*No dependen de la web:/);
   });
   it("cada fila con su color: rojo la de la web, ámbar la externa, gris las de conexión (las de la captura)", () => {
     pintar();
@@ -158,7 +163,38 @@ describe("colores y cuentas por origen", () => {
     expect(screen.getByTestId("conteo-no_depende")).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByTestId("conteo-no_depende")); // otra vez: vuelve al de siempre
     expect(llamadas.at(-1)?.origen).toBe("web_externos");
+    fireEvent.click(screen.getByTestId("conteo-admin"));
+    expect(llamadas.at(-1)?.origen).toBe("fallo_admin");
+    fireEvent.click(screen.getByTestId("conteo-web"));
+    expect(llamadas.at(-1)?.origen).toBe("fallo_web");
     expect(screen.getByRole("combobox", { name: "Origen" })).toBeInTheDocument();
+  });
+  it("fallo del admin (ejemplo real): insignia «Fallo del admin», título en llano, zona y el mensaje técnico debajo", () => {
+    const mensaje = "clasificar-productos: productos_aplicar_clasificacion_ia: canceling statement due to statement timeout";
+    filas = [inc({ id: 40, titulo: `${mensaje} · clasificar-productos`, tipo: "error_servidor", fuente: "servidor", proyecto: "supabase", mensaje, origen: "web",
+      rutas: [{ ruta: "(sin ruta)", n: 6 }], ocurrencias: 6, linear_estado: "sin_ticket", linear_identificador: null, linear_destino: null })];
+    pintar();
+    const fila = screen.getByTestId("fila-incidencia");
+    expect(within(fila).getByTestId("badge-origen")).toHaveTextContent("Fallo del admin");
+    expect(within(fila).getByTestId("titulo-fila")).toHaveTextContent("La clasificación automática de productos tardó demasiado y se cortó.");
+    expect(within(fila).getByTestId("datos-fila")).toHaveTextContent("Panel › Facturas · Error del servidor · gravedad error");
+    expect(within(fila).getByTestId("datos-fila")).not.toHaveTextContent("(sin ruta)");
+    expect(within(fila).getByTestId("tecnico-fila")).toHaveTextContent(mensaje);
+    expect(within(fila).getByTestId("sencillo-fila")).toHaveTextContent(/^La base de datos iba muy cargada/);
+  });
+  it("sin título en llano (error del navegador sin causa conocida): el mensaje técnico, como antes", () => {
+    pintar();
+    const fila = screen.getAllByTestId("fila-incidencia")[0];
+    expect(within(fila).getByTestId("titulo-fila")).toHaveTextContent("TypeError: vino.precio is null");
+    expect(within(fila).queryByTestId("tecnico-fila")).not.toBeInTheDocument();
+    expect(within(fila).getByTestId("badge-origen")).toHaveTextContent("Fallo de la web");
+  });
+  it("el filtro de origen deja ver los fallos de la web y del admin juntos o por separado", () => {
+    pintar();
+    fireEvent.click(screen.getByRole("combobox", { name: "Origen" }));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(
+      expect.arrayContaining(["Fallos (web y admin) y externos", "Fallos de la web y del admin", "Fallo de la web", "Fallo del admin", "Externos", "No dependen de la web"]),
+    );
   });
   it("debajo, plegadas: «No dependen de la web (N)» lleva a verlas", () => {
     pintar();

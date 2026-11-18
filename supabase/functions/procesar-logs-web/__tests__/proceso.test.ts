@@ -109,14 +109,17 @@ describe("ticket", () => {
     expect(descripcion).toContain("← **aquí falla**");
     expect(descripcion).toContain("Primera detección");
   });
-  it("empieza por «En pocas palabras» (qué pasa, a quién afecta, desde cuándo, qué hacer) y debajo lo técnico", () => {
+  it("empieza por «En pocas palabras» (cabecera, qué pasó, a quién afecta, desde cuándo, qué hacer) y debajo lo técnico", () => {
     const { descripcion } = construirTicket(entrada());
     const lineas = descripcion.split("\n");
     expect(lineas[0]).toBe("## En pocas palabras");
-    expect(lineas[1]).toMatch(/^- \*\*Qué pasa:\*\* Un fallo en el código de la página en la carta de vinos\./);
-    expect(lineas[2]).toBe("- **A quién afecta:** A 3 visitantes (4 veces en total; 4 veces en las últimas 24 h).");
-    expect(lineas[3]).toMatch(/^- \*\*Desde cuándo:\*\* Desde el 08\/11\/2026, 11:00 \(versión 0\.40\)\. La última vez, el 08\/11\/2026, 12:50\./);
-    expect(lineas[4]).toMatch(/^- \*\*Qué hacer:\*\* Reproducirlo con los pasos de abajo/);
+    expect(lineas[1]).toBe("**Fallo de la web · Web › Carta de vinos**"); // el mismo nombre que en el panel
+    expect(lineas[2]).toBe(""); // sin causa conocida no hay título en llano: el título del ticket es el mensaje técnico
+    expect(lineas[3]).toMatch(/^- \*\*Qué pasó:\*\* Un fallo en el código de la página en la carta de vinos\./);
+    expect(lineas[4]).toBe("- **A quién afecta:** A 3 visitantes (4 veces en total; 4 veces en las últimas 24 h).");
+    expect(lineas[5]).toMatch(/^- \*\*Desde cuándo:\*\* Desde el 08\/11\/2026, 11:00 \(versión 0\.40\)\. La última vez, el 08\/11\/2026, 12:50\./);
+    expect(lineas[6]).toMatch(/^- \*\*Qué hacer:\*\* Reproducirlo con los pasos de abajo/);
+    expect(descripcion).not.toContain("¿Se arregla solo?"); // no se sabe decir: no se inventa
     expect(descripcion.indexOf("## En pocas palabras")).toBeLessThan(descripcion.indexOf("## Impacto"));
   });
   it("en pocas palabras usa la causa conocida o la propuesta de la IA (marcada sin verificar)", () => {
@@ -189,6 +192,59 @@ describe("ticket con el origen", () => {
     const ext = construirTicket({ ...base, incidencia: incidencia({ origen: "externo", origen_proveedor: "Google Maps" }) }).descripcion;
     expect(ext).toContain("- **Origen:** Servicio externo (`Google Maps`). No es un fallo de nuestro código: depende de Google Maps.");
     expect(construirTicket({ ...base, incidencia: incidencia() }).descripcion).not.toContain("**Origen:**"); // sin la migración
+  });
+});
+
+describe("ticket de un fallo del admin (ejemplo real: clasificar-productos con statement timeout)", () => {
+  const MENSAJE = "clasificar-productos: productos_aplicar_clasificacion_ia: canceling statement due to statement timeout";
+  const muestra: EventoTicket = {
+    id: 200, tipo: "error_servidor", accion: null, categoria: "error", ruta: null, objetivo: "clasificar-productos", valor: 30000, ocurrido_en: "2026-11-08T11:50:00Z",
+    secuencia: null, navegador: null, so: null, dispositivo: null, version: null, propiedades: { status: 500 }, mensaje: MENSAJE,
+  };
+  const inc = incidencia({
+    tipo: "error_servidor", fuente: "servidor", proyecto: "supabase", titulo: `${MENSAJE} · clasificar-productos`, mensaje: MENSAJE, pila: null,
+    rutas: [{ ruta: "(sin ruta)", n: 6 }], sesiones_afectadas: 0, ocurrencias: 6, ocurrencias_24h: 3, version_primera: null, version_ultima: null, origen: "web",
+  });
+  const entrada: EntradaTicket = { incidencia: inc, muestras: [muestra], recorrido: [], eventoErrorId: null, analisis: null, motivoSinAnalisis: "x", urlPanel: "https://p", ahora: AHORA };
+
+  it("arriba, el mismo formato que el panel: Fallo del admin · zona, título en llano y los cuatro apartados", () => {
+    const lineas = construirTicket(entrada).descripcion.split("\n");
+    expect(lineas.slice(0, 9)).toEqual([
+      "## En pocas palabras",
+      "**Fallo del admin · Panel › Facturas**",
+      "**La clasificación automática de productos tardó demasiado y se cortó.**",
+      "",
+      "- **Qué pasó:** La base de datos iba muy cargada y la clasificación automática de productos tardó más de lo permitido, así que se canceló. Suele pasar cuando se guardan muchas facturas a la vez.",
+      "- **A quién afecta:** A nadie de fuera; los productos de las facturas nuevas se clasifican unos minutos más tarde. Ha pasado 6 veces (3 en las últimas 24 h).",
+      "- **¿Se arregla solo?** Sí: se reintenta sola cada 5 minutos y no se pierde nada.",
+      "- **Desde cuándo:** Desde el 08/11/2026, 11:00. La última vez, el 08/11/2026, 12:50.",
+      "- **Qué hacer:** Nada si es suelto. Si se repite, avisa al técnico.",
+    ]);
+  });
+  it("el origen dice «Fallo del admin» (no «Fallo de la web») y lo técnico sigue debajo", () => {
+    const d = construirTicket(entrada).descripcion;
+    expect(d).toContain("- **Origen:** Fallo del admin. Fallo del admin: algo del panel o de sus tareas automáticas no funcionó.");
+    expect(d).not.toContain("Fallo de la web");
+    expect(d).toContain("## Causa conocida");
+    expect(d).toContain(MENSAJE); // el mensaje técnico, en el bloque de evidencias
+    expect(d.indexOf(MENSAJE)).toBeGreaterThan(d.indexOf("## Evidencias técnicas"));
+  });
+  it("título del ticket en llano con la función detrás (para quien lo arregla)", () => {
+    expect(construirTicket(entrada).titulo).toBe("La clasificación automática de productos tardó demasiado y se cortó · clasificar-productos");
+    expect(construirTicket({ ...entrada, incidencia: { ...inc, entorno: "demo" } }).titulo).toBe("La clasificación automática de productos tardó demasiado y se cortó · clasificar-productos (Demo)");
+  });
+  it("embeddings-nombres: se reintenta cada 10 minutos", () => {
+    const m2 = "embeddings-nombres: guardar productos_nombre_embedding: canceling statement due to statement timeout";
+    const r = resumenSencillo({ ...entrada, incidencia: { ...inc, mensaje: m2, titulo: `${m2} · embeddings-nombres` }, muestras: [{ ...muestra, objetivo: "embeddings-nombres", mensaje: m2 }] });
+    expect(r.cabecera).toBe("Fallo del admin · Panel › Facturas");
+    expect(r.titulo).toBe("La preparación de los productos nuevos para el buscador tardó demasiado y se cortó.");
+    expect(r.seArregla).toBe("Sí: se reintenta sola cada 10 minutos y no se pierde nada.");
+  });
+  it("una función de la web dice «Fallo de la web» en el ticket", () => {
+    const m3 = "reservas-web/crear: HTTP 500";
+    const r = resumenSencillo({ ...entrada, incidencia: { ...inc, mensaje: m3, titulo: `${m3} · reservas-web/crear` }, muestras: [{ ...muestra, objetivo: "reservas-web/crear", mensaje: m3 }] });
+    expect(r.cabecera).toBe("Fallo de la web · Web › Reservas");
+    expect(r.quePasa).not.toContain("afecta a `"); // la función ya va nombrada en llano
   });
 });
 

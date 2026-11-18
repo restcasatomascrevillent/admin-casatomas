@@ -12,8 +12,10 @@ import {
   explicacionOrigen, grupoDeOrigen, NOMBRE_ORIGEN, origenDeError, origenDeOcurrencia, proveedorExterno, puedeAbrirTicket, type OrigenVisible,
 } from "../../../supabase/functions/_shared/logs-web/origen";
 import {
-  afectaTrasPublicar, listaTareas, nombrePagina, queFalloGenerico, resumirRecorrido, tareasDe, TEXTO_ACCION_RECARGA, TEXTO_TRAS_PUBLICAR,
+  afectaTrasPublicar, nombrePagina, queFalloGenerico, resumirRecorrido, TEXTO_ACCION_RECARGA, TEXTO_TRAS_PUBLICAR,
 } from "../../../supabase/functions/_shared/logs-web/sencillo";
+import { ambitoDeError, type Ambito } from "../../../supabase/functions/_shared/logs-web/ambito";
+import { fichaSencilla, type FichaSencilla } from "../../../supabase/functions/_shared/logs-web/ficha";
 
 export { TEXTO_ACCION_RECARGA, TEXTO_TRAS_PUBLICAR };
 
@@ -268,6 +270,11 @@ export function origenDeEvento(e: EventoOrigen): OrigenVisible {
   return origenDeOcurrencia(e);
 }
 
+/** Ámbito de UN evento de error (fallo de la web o del admin); el de una incidencia va en `fichaDeFila`. */
+export function ambitoDeEvento(e: Pick<EventoWeb, "tipo" | "fuente" | "objetivo" | "mensaje"> & Partial<Pick<EventoWeb, "proyecto">>): Ambito {
+  return ambitoDeError({ tipo: e.tipo, fuente: e.fuente, proyecto: e.proyecto ?? null, objetivo: e.objetivo, mensaje: e.mensaje });
+}
+
 /** ¿Puede abrir ticket solo? (fallo de la web; externo con el interruptor). */
 export const ticketAutomatico = (o: OrigenVisible, ticketsExternos = false) => puedeAbrirTicket(o, ticketsExternos);
 
@@ -278,25 +285,44 @@ export function causaDeFila(i: Pick<IncidenciaWeb, "tipo" | "fuente" | "mensaje"
   return causaConocida({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo, tareas });
 }
 
+/**
+ * Ficha en llano de una incidencia (ficha.ts, la misma que el ticket): cabecera
+ * «Fallo del admin · Panel › Facturas», título en llano, a quién afecta y
+ * ¿se arregla solo? El objetivo sale del título «mensaje · objetivo»; las
+ * tareas, de las muestras.
+ */
+export function fichaDeFila(i: IncidenciaWeb, muestras: Pick<EventoWeb, "propiedades">[] = []): FichaSencilla {
+  const origen = origenDeFila(i);
+  return fichaSencilla({
+    tipo: i.tipo, fuente: i.fuente, proyecto: i.proyecto, mensaje: i.mensaje, pila: i.pila,
+    objetivo: i.titulo.split(" · ").slice(1).join(" · ") || null,
+    tareas: [...new Set(muestras.map((e) => e.propiedades?.tarea).filter((t): t is string => typeof t === "string" && t !== ""))],
+    rutas: i.rutas, origen, proveedor: origen === "externo" ? proveedorDeFila(i) : null,
+    ocurrencias: i.ocurrencias, ocurrencias_24h: i.ocurrencias_24h, repetidas_tras_recargar: i.repetidas_tras_recargar ?? 0, causa: causaDeFila(i, muestras),
+  });
+}
+
 // ─── Explicación en sencillo (para el dueño) ────────────────────────────────
 export interface ExplicacionSencilla {
-  queHizo: string;
+  /** «Fallo del admin · Panel › Facturas» (solo incidencias). */
+  cabecera?: string;
+  /** Título en llano (catálogo + causa conocida); null o ausente si no se puede construir. */
+  titulo?: string | null;
+  /** «Qué hizo el cliente»; null en lo que no viene del navegador (no lo provoca un cliente). */
+  queHizo: string | null;
+  /** «Qué pasó». */
   queFallo: string;
+  /** «A quién afecta». */
   afecta: string;
+  /** «¿Se arregla solo?»; null o ausente si no se sabe decir. */
+  seArregla?: string | null;
   queHacer: string;
-  /** De dónde sale «Qué falló»: catálogo fijo, IA (sin comprobar) o texto genérico. */
+  /** De dónde sale «Qué pasó»: catálogo fijo, IA (sin comprobar) o texto genérico. */
   fuente: "conocida" | "ia" | "generica";
 }
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 const inicioDeHoy = (ahora: Date) => new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()).getTime();
-
-/** Quién lo provoca cuando no es un cliente. */
-function queHizoServidor(fuente: string): string {
-  if (fuente === "integracion") return "Ningún cliente: lo hace una tarea automática del panel, sin que nadie pulse nada.";
-  if (fuente === "hosting") return "Nadie de fuera: es la publicación de la web en Vercel.";
-  return "Ningún cliente directamente: es una función del servidor (la puede llamar la web o el panel).";
-}
 
 /**
  * «Qué hizo el cliente, qué falló, ¿afecta? y qué hacer» de una incidencia.
@@ -310,18 +336,17 @@ export function explicacionIncidencia(
   errorId: number | null = null,
   ahora: Date = new Date(),
 ): ExplicacionSencilla {
-  const causa = causaDeFila(i, muestras);
+  const ficha = fichaDeFila(i, muestras);
+  const causa = ficha.causa;
   const exp = !causa ? i.explicacion_ia ?? null : null;
   const navegador = i.fuente === "navegador";
   const origen = origenDeFila(i);
   const grupo = grupoDeOrigen(origen);
   const pagina = navegador ? nombrePagina(i.rutas[0]?.ruta) : null;
-  const tareas = listaTareas(tareasDe({ tareas: muestras.map((e) => String(e.propiedades?.tarea ?? "")).filter(Boolean), objetivo: i.titulo.split(" · ")[1] ?? null }));
 
-  // Qué hizo el cliente
-  let queHizo: string;
-  if (!navegador) queHizo = queHizoServidor(i.fuente);
-  else {
+  // Qué hizo el cliente (lo del servidor, tareas y despliegues no lo provoca un cliente: la cabecera ya lo dice)
+  let queHizo: string | null = null;
+  if (navegador) {
     const idx = recorrido && errorId !== null ? recorrido.findIndex((e) => e.id === errorId) : -1;
     const antes = recorrido ? (idx >= 0 ? recorrido.slice(0, idx) : recorrido) : [];
     const texto = resumirRecorrido(antes);
@@ -332,9 +357,7 @@ export function explicacionIncidencia(
 
   // Qué falló
   const fuente: ExplicacionSencilla["fuente"] = causa ? "conocida" : exp?.que_paso ? "ia" : "generica";
-  const queFallo = causa?.sencillo.quePasa
-    ?? exp?.que_paso
-    ?? queFalloGenerico({ tipo: i.tipo, fuente: i.fuente, rutas: i.rutas, objetivo: i.titulo.split(" · ")[1] ?? null, tareas: tareas.map((t) => t.nombre) });
+  const queFallo = causa?.sencillo.quePasa ?? exp?.que_paso ?? ficha.quePasoGenerico;
 
   // ¿Afecta?
   let afecta: string;
@@ -346,9 +369,8 @@ export function explicacionIncidencia(
       sinConexion: muestras.filter((e) => e.tras_publicar === "sin_conexion").length,
       otras: Math.max(i.ocurrencias - tras - repetidas, 0),
     });
-  } else if (!navegador) {
-    const consecuencia = tareas.find((t) => t.consecuencia)?.consecuencia;
-    afecta = `No se ve en la web: es del servidor. ${plural(i.ocurrencias_24h, "vez", "veces")} en las últimas 24 h (${i.ocurrencias} en total).${consecuencia ? ` Lo que se nota: ${consecuencia}.` : ""}`;
+  } else if (ficha.aQuienAfecta) {
+    afecta = ficha.aQuienAfecta;
   } else if (i.sesiones_afectadas === 0) {
     afecta = "No: solo lo han provocado robots o pruebas automáticas.";
   } else if (origen === "bots") {
@@ -377,7 +399,7 @@ export function explicacionIncidencia(
     else queHacer = "Nada por ahora: si se repite en más visitantes, se abrirá un ticket solo. Si te parece importante, pulsa «Pedir ticket».";
   } else if (ticket) queHacer = `${queHacer} ${ticket}`;
 
-  return { queHizo, queFallo, afecta, queHacer, fuente };
+  return { cabecera: ficha.cabecera, titulo: ficha.titulo, queHizo, queFallo, afecta, seArregla: ficha.seArregla, queHacer, fuente };
 }
 
 type EventoSesion = Pick<EventoWeb, "id" | "tipo" | "categoria" | "accion" | "ruta" | "objetivo" | "valor" | "propiedades" | "mensaje" | "pila" | "fuente" | "incidencia_id" | "tras_publicar" | "ocurrido_en">

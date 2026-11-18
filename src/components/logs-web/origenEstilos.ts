@@ -4,6 +4,7 @@
  * componentes de Origen.tsx para que el refresco en caliente funcione.
  */
 import { grupoDeOrigen, NOMBRE_ORIGEN, type GrupoOrigen, type OrigenVisible } from "../../../supabase/functions/_shared/logs-web/origen";
+import { nombreOrigen, type Ambito } from "../../../supabase/functions/_shared/logs-web/ambito";
 
 /** Clases de cada color (insignia, bloque, punto de la leyenda, fila y texto de la línea de tiempo). */
 export const ESTILO_GRUPO: Record<GrupoOrigen, { insignia: string; bloque: string; punto: string; fila: string; texto: string; icono: string }> = {
@@ -35,7 +36,7 @@ export const ESTILO_GRUPO: Record<GrupoOrigen, { insignia: string; bloque: strin
 
 export const estiloDe = (o: OrigenVisible | null | undefined) => ESTILO_GRUPO[grupoDeOrigen(o)];
 
-/** «Servicio externo · Google Maps», «Conexión del visitante»… */
-export function etiquetaOrigen(o: OrigenVisible, proveedor?: string | null): string {
-  return o === "externo" && proveedor ? `${NOMBRE_ORIGEN[o]} · ${proveedor}` : NOMBRE_ORIGEN[o];
+/** «Fallo de la web», «Fallo del admin», «Servicio externo · Google Maps», «Conexión del visitante»… */
+export function etiquetaOrigen(o: OrigenVisible, proveedor?: string | null, ambito?: Ambito | null): string {
+  return o === "externo" && proveedor ? `${NOMBRE_ORIGEN[o]} · ${proveedor}` : nombreOrigen(o, ambito);
 }

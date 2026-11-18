@@ -78,13 +78,28 @@ describe("explicación de una incidencia", () => {
     expect(e.afecta).toBe("No: las 3 veces fueron páginas antiguas abiertas durante una publicación y se recargó sola.");
     expect(e.queHacer).toMatch(/^Nada: es normal justo después de publicar/);
   });
-  it("tarea programada: nadie la provoca y se dice qué se nota", () => {
+  it("tarea programada: es del admin, se dice qué se nota y si se vuelve a lanzar sola", () => {
     const e = explicacionIncidencia(inc({ tipo: "error_integracion", fuente: "integracion", titulo: "job startup timeout · cron:reanudar-trabajos-ocr", mensaje: "job startup timeout",
       sesiones_afectadas: 0, rutas: [], linear_estado: "creado", linear_identificador: "PRUEBA-4", linear_destino: "prueba" }), [], null, null, AHORA);
-    expect(e.queHizo).toMatch(/^Ningún cliente: lo hace una tarea automática/);
+    expect(e.cabecera).toBe("Servicio externo · Supabase · Panel › Facturas"); // pg_cron sin arrancar: la plataforma
+    expect(e.titulo).toBe("La tarea que retoma la lectura de facturas atascadas no arrancó a tiempo.");
+    expect(e.queHizo).toBeNull(); // no lo provoca un cliente: la cabecera ya lo dice
     expect(e.queFallo).toMatch(/^La tarea que retoma la lectura de facturas atascadas no arrancó a tiempo; las facturas pueden tardar más en leerse\./);
-    expect(e.afecta).toMatch(/^No se ve en la web: es del servidor\. 3 veces en las últimas 24 h \(6 en total\)\. Lo que se nota: las facturas pueden tardar más en leerse\./);
+    expect(e.afecta).toBe("Lo que se nota: las facturas pueden tardar más en leerse. Ha pasado 6 veces (3 en las últimas 24 h).");
+    expect(e.seArregla).toBe("Sí: la tarea se vuelve a lanzar sola cada minuto.");
     expect(e.queHacer).toMatch(/Ya hay un ticket para el técnico \(PRUEBA-4, en el destino de pruebas\)\.$/);
+  });
+  it("fallo del admin (ejemplo real): clasificar-productos con «statement timeout»", () => {
+    const mensaje = "clasificar-productos: productos_aplicar_clasificacion_ia: canceling statement due to statement timeout";
+    const e = explicacionIncidencia(inc({ tipo: "error_servidor", fuente: "servidor", proyecto: "supabase", titulo: `${mensaje} · clasificar-productos`, mensaje,
+      sesiones_afectadas: 0, rutas: [{ ruta: "(sin ruta)", n: 6 }], origen: "web" }), [], null, null, AHORA);
+    expect(e.cabecera).toBe("Fallo del admin · Panel › Facturas");
+    expect(e.titulo).toBe("La clasificación automática de productos tardó demasiado y se cortó.");
+    expect(e.queFallo).toBe("La base de datos iba muy cargada y la clasificación automática de productos tardó más de lo permitido, así que se canceló. Suele pasar cuando se guardan muchas facturas a la vez.");
+    expect(e.afecta).toBe("A nadie de fuera; los productos de las facturas nuevas se clasifican unos minutos más tarde. Ha pasado 6 veces (3 en las últimas 24 h).");
+    expect(e.seArregla).toBe("Sí: se reintenta sola cada 5 minutos y no se pierde nada.");
+    expect(e.queHacer).toBe("Nada si es suelto. Si se repite, avisa al técnico.");
+    expect(e.fuente).toBe("conocida");
   });
   it("error nuevo: explicación de la IA, marcada «sin comprobar»", () => {
     const e = explicacionIncidencia(inc({ explicacion_ia: { que_paso: "La lista de vinos no se mostró.", a_quien_afecta: "A quien abre los vinos en el móvil.", que_hacer: "Avisa al técnico.", gravedad: "alta" } }), [], null, null, AHORA);
@@ -137,8 +152,12 @@ describe("detalle de la incidencia", () => {
     const tecnico = within(detalle).getByTestId("detalles-tecnicos");
     expect(bloque.compareDocumentPosition(tecnico) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(tecnico).not.toHaveAttribute("open");
-    for (const t of ["Qué hizo el cliente", "Qué falló", "¿Afecta?", "Qué hacer"]) expect(within(bloque).getByText(t)).toBeInTheDocument();
-    expect(within(bloque).getByTestId("sencillo-afecta")).toHaveTextContent("¿Afecta?Sí, a veces: 1 vez no se arregló al recargar (volvió a fallar o siguió con la versión antigua), así que a esa persona no le funcionó. La otra vez se arregló sola al recargar.");
+    for (const t of ["Qué hizo el cliente", "Qué pasó", "A quién afecta", "¿Se arregla solo?", "Qué hacer"]) expect(within(bloque).getByText(t)).toBeInTheDocument();
+    expect(within(bloque).getByTestId("sencillo-afecta")).toHaveTextContent("A quién afectaSí, a veces: 1 vez no se arregló al recargar (volvió a fallar o siguió con la versión antigua), así que a esa persona no le funcionó. La otra vez se arregló sola al recargar.");
+    // Alguna vez no bastó con recargar: no se dice «se arregla sola» a secas.
+    expect(within(bloque).getByTestId("sencillo-seArregla")).toHaveTextContent(/^¿Se arregla solo\?No siempre: casi siempre se recarga sola, pero alguna vez siguió fallando/);
+    expect(screen.getByTestId("titulo-incidencia")).toHaveTextContent("Página antigua abierta justo cuando publicamos.");
+    expect(within(tecnico).getByTestId("mensaje-tecnico")).toHaveTextContent("TypeError: Failed to fetch dynamically imported module");
     expect(within(tecnico).getAllByTestId("tras-publicar").map((x) => x.textContent)).toEqual(["no se arregló al recargar · revisar", "esperado tras publicar · sin impacto"]);
     expect(within(tecnico).getAllByTestId("accion-recarga").map((x) => x.textContent)).toEqual([" · se recargó pero siguió con la misma versión", " · se recargó sola con la versión nueva"]);
   });
@@ -166,6 +185,34 @@ describe("origen en el detalle y en las sesiones", () => {
     expect(aviso.className).toMatch(/amber/);
     expect(aviso).toHaveTextContent("No es un fallo de nuestro código: depende de Google Maps.");
     expect(screen.getByTestId("sin-ticket-origen")).toHaveTextContent(/Configuración › Incidencias y avisos/);
+  });
+  it("fallo del admin (ejemplo real): cabecera «Fallo del admin · Panel › Facturas», título en llano y lo técnico plegado", () => {
+    const mensaje = "clasificar-productos: productos_aplicar_clasificacion_ia: canceling statement due to statement timeout";
+    incidencia = inc({ tipo: "error_servidor", fuente: "servidor", proyecto: "supabase", titulo: `${mensaje} · clasificar-productos`, mensaje, sesiones_afectadas: 0,
+      rutas: [{ ruta: "(sin ruta)", n: 6 }], origen: "web" });
+    ocurrencias = [];
+    contexto = [];
+    render(<DetalleIncidencia id={12} onCerrar={vi.fn()} onAbrirSesion={vi.fn()} />);
+    const aviso = screen.getByTestId("aviso-origen");
+    expect(aviso.className).toMatch(/destructive/); // sigue siendo un fallo nuestro (rojo)
+    expect(within(aviso).getByTestId("badge-origen")).toHaveTextContent("Fallo del admin");
+    expect(within(aviso).getByTestId("badge-origen")).toHaveAttribute("data-ambito", "admin");
+    expect(within(aviso).getByTestId("zona-incidencia")).toHaveTextContent("· Panel › Facturas");
+    expect(aviso).not.toHaveTextContent("Fallo de la web");
+    const titulo = screen.getByTestId("titulo-incidencia");
+    expect(titulo).toHaveTextContent("La clasificación automática de productos tardó demasiado y se cortó.");
+    expect(aviso.compareDocumentPosition(titulo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // cabecera arriba, título debajo
+    const bloque = screen.getByTestId("explicacion-sencilla");
+    expect(within(bloque).queryByText("Qué hizo el cliente")).not.toBeInTheDocument();
+    expect(within(bloque).getByTestId("sencillo-queFallo")).toHaveTextContent(/^Qué pasóLa base de datos iba muy cargada/);
+    expect(within(bloque).getByTestId("sencillo-afecta")).toHaveTextContent(/^A quién afectaA nadie de fuera; los productos de las facturas nuevas se clasifican unos minutos más tarde\./);
+    expect(within(bloque).getByTestId("sencillo-seArregla")).toHaveTextContent("¿Se arregla solo?Sí: se reintenta sola cada 5 minutos y no se pierde nada.");
+    expect(within(bloque).getByTestId("sencillo-queHacer")).toHaveTextContent("Qué hacerNada si es suelto. Si se repite, avisa al técnico.");
+    expect(bloque).not.toHaveTextContent("canceling statement");
+    const tecnico = screen.getByTestId("detalles-tecnicos");
+    expect(tecnico).not.toHaveAttribute("open");
+    expect(tecnico).toHaveTextContent("Detalle técnico");
+    expect(within(tecnico).getByTestId("mensaje-tecnico")).toHaveTextContent(mensaje);
   });
   it("fallo de la web: rojo y sin aviso de «no abre ticket»", () => {
     incidencia = inc({ origen: "web" });
