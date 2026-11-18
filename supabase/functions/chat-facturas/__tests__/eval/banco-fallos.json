@@ -64,7 +64,11 @@
       "fallo_original": "26,10 €/kg: la línea estaba guardada como «79 kg × 26,10 €» (cantidad y precio intercambiados; el dato se corrigió el 17/11).",
       "correcto": "Última factura: 26,1 kg a 79 €/kg, Hermanos Narejos, factura 5151 del 28/09/2026.",
       "herramienta": { "nombre": "compras_producto", "argumentos": { "producto": "carabinero" } },
-      "rpc": { "debe": ["ultima_factura"], "prod": { "debe": ["\"numero\": ?\"5151\"", "\"precio_unitario\": ?79"] }, "max_ms": 3000 },
+      "rpc": { "debe": ["ultima_factura"], "max_ms": 3000 },
+      "esperado": [
+        { "ruta": "ultima_factura.numero", "tipo": "txt", "valor": "5151", "sql": "select f.numero_documento from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^carabinero$' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" },
+        { "ruta": "ultima_factura.precio_unitario", "tipo": "num", "tol": 0.01, "valor": 79, "sql": "select coalesce((to_jsonb(pf)->>'importe_neto')::numeric / nullif(pf.cantidad, 0), pf.precio_unitario) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^carabinero$' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" }
+      ],
       "ia": { "prod": { "debe": ["79"], "no_debe": ["26,10 ?€"] } },
       "sql": "select pf.cantidad, pf.unidad, pf.precio_unitario, f.fecha, f.numero_documento from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ilike '%carabinero%' order by f.fecha desc limit 3"
     },
@@ -75,7 +79,11 @@
       "fallo_original": "Mezclaba la caja (29,40 €) con la unidad (1,40 €) y salía una «subida» del 2.000 %.",
       "correcto": "Panadería García: la caja a 29,40 € (albarán del 13/11/2026); las pulgas de Nicolás y Valero van por unidad. Nunca una media de caja y unidad.",
       "herramienta": { "nombre": "compras_producto", "argumentos": { "producto": "pan de cristal" } },
-      "rpc": { "debe": ["ultima_factura"], "prod": { "debe": ["29\\.4", "caja", "unidades_mezcladas|por_variante"] }, "max_ms": 3000 },
+      "rpc": { "debe": ["ultima_factura", "unidades_mezcladas|por_variante"], "max_ms": 3000 },
+      "esperado": [
+        { "ruta": "ultima_factura.precio_unitario", "tipo": "num", "tol": 0.01, "valor": 29.4, "sql": "select coalesce((to_jsonb(pf)->>'importe_neto')::numeric / nullif(pf.cantidad, 0), pf.precio_unitario) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pan de cristal' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" },
+        { "ruta": "ultima_factura.unidad", "tipo": "txt", "valor": "caja", "sql": "select pf.unidad from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pan de cristal' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" }
+      ],
       "ia": { "prod": { "debe": ["29,40"], "no_debe": ["2\\.000 ?%"] } },
       "sql": "select pf.nombre, pf.cantidad, pf.unidad, pf.precio_unitario, f.fecha, f.proveedor from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ilike '%pan%cristal%' order by f.fecha desc limit 6"
     },
@@ -86,7 +94,11 @@
       "fallo_original": "«61,33 € por litro»: una botella se compra y se vende por botella.",
       "correcto": "Pintia 75 cl 2021: 46 € la botella, Distribuciones Guillén, factura 000860F2 del 30/04/2026.",
       "herramienta": { "nombre": "historial_precios", "argumentos": { "producto": "pintia" }, "asociacion": { "tipo": "producto", "categoria": "Vinos", "familia": "Bebidas" } },
-      "rpc": { "debe": ["ultima_factura"], "no_debe": ["61\\.33"], "prod": { "debe": ["000860F2", "46"] }, "max_ms": 3000 },
+      "rpc": { "debe": ["ultima_factura"], "no_debe": ["61\\.33"], "max_ms": 3000 },
+      "esperado": [
+        { "ruta": "ultima_factura.numero", "tipo": "txt", "valor": "000860F2", "sql": "select f.numero_documento from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pintia' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" },
+        { "ruta": "ultima_factura.precio_unitario", "tipo": "num", "tol": 0.01, "valor": 46, "sql": "select coalesce((to_jsonb(pf)->>'importe_neto')::numeric / nullif(pf.cantidad, 0), pf.precio_unitario) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pintia' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" }
+      ],
       "ia": { "debe": ["46"], "no_debe": ["61,33", "por litro", "€/l\\b"] },
       "sql": "select pf.nombre, pf.cantidad, pf.unidad, pf.precio_unitario, f.fecha, f.proveedor, f.numero_documento from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ilike '%pintia%' order by f.fecha desc"
     },
