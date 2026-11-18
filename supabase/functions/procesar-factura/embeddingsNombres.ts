@@ -7,9 +7,11 @@
 //  embedding NULL al insertar una línea con un nombre nuevo; aquí se calculan
 //  SOLO los nombres que aún no tienen vector y se guardan.
 //
-//  Lo usan procesar-factura / ocr-trabajo / importar-factura-historica al
-//  guardar (no rompe el guardado si falla: el cron embeddings-nombres lo
-//  completa) y la Edge Function embeddings-nombres (relleno por lotes).
+//  Lo usa la Edge Function embeddings-nombres (relleno por lotes, cron cada
+//  10 min). Desde el 18/11/2026 guardar una factura (procesar-factura,
+//  ocr-trabajo, importar-factura-historica, sustituir, añadir página) ya NO
+//  calcula estos vectores: iban en serie (~6 s con la base cargada) y el cron
+//  los completa igual, en ≤10 min.
 // ============================================================================
 
 import { vec } from "./openai.ts";
@@ -68,9 +70,10 @@ export async function guardarVectoresNombres(supabase: Supa, nombres: string[], 
 }
 
 /**
- * Al guardar un documento: calcula y guarda el vector de los nombres de sus
- * líneas que aún no lo tienen. NUNCA lanza: si falla (OpenAI, tabla sin
- * migrar…), lo deja pendiente para el cron embeddings-nombres.
+ * Calcula y guarda el vector de los nombres que aún no lo tienen. NUNCA lanza:
+ * si falla (OpenAI, tabla sin migrar…), lo deja pendiente para el cron
+ * embeddings-nombres. Ya no se llama al guardar un documento (18/11/2026):
+ * queda para usos puntuales (a mano, scripts).
  */
 export async function asegurarVectoresNombres(
   ctx: { supabase: Supa; openai: { embed(input: string | string[]): Promise<number[][]> } },
