@@ -207,6 +207,11 @@ export function tamanoVerificado(tarifa: string, catalogo: string, compras: stri
   return ft.cantidad !== null && fc.cantidad !== null && ft.unidad === fc.unidad && Math.abs(ft.cantidad - fc.cantidad) / fc.cantidad <= 0.04;
 }
 
+/** El catálogo ni sus facturas dicen el tamaño del envase («Ginebra Tanqueray Ten»): no se puede verificar, solo sugerir. */
+export function tamanoDesconocido(catalogo: string, compras: string[] = []): boolean {
+  return envaseDeReferencia(catalogo, compras).cantidad === null;
+}
+
 export interface Conflicto {
   tipo: "otro_producto" | "formato_distinto" | "dudosa";
   motivo: string;

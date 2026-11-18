@@ -59,6 +59,15 @@ describe("confirmarParejas: la IA no pierde parejas buenas (revisión 18/11/2026
     expect(r.candidatas.map((c) => [c.i, c.producto_id, c.confianza])).toEqual([[0, 4, "alta"], [1, 6, "alta"]]);
   });
 
+  it("Tanqueray Ten sin tamaño en el catálogo: no se pierde, sale en «Revisar»", async () => {
+    const c2 = comprasPorProducto([{ n: "GIN TANQUERAY TEN", p: 12, c: "Ginebra Tanqueray Ten" }]);
+    const lineas = [{ producto: "GIN.TANQUERAY TEN 70CL 47,3º C6" }];
+    const f = iaDice([{ id: 0, opcion: null, decision: "otro_producto", motivo: "edicion Ten" }]);
+    const r = await confirmarParejas(lineas, [cand(0, [op(12, "Ginebra Tanqueray Ten")])], { clave: "k", fetchImpl: f, compras: c2 });
+    expect(r.candidatas[0]).toMatchObject({ producto_id: 12, confianza: "media" });
+    expect(r.candidatas[0].nota).toContain("tamaño");
+  });
+
   it("no reabre los falsos positivos del 16/11: Hendrick's Lunar, minis, magnum frente a 75 cl, Mateus frente a Laurent-Perrier", async () => {
     const lineas = [
       { producto: "GIN.HENDRICKS LUNAR 70CL 44º C6" },

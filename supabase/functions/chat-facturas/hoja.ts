@@ -26,7 +26,7 @@
 //       formato no coincide, no se compara: «Revisar» con el motivo.
 // ============================================================================
 import { unidadCanonica, type LineaPresupuesto } from "./presupuesto.ts";
-import { conflictoDePareja, envaseDelNombre, tamanoVerificado } from "./pareja.ts";
+import { conflictoDePareja, envaseDelNombre, tamanoDesconocido, tamanoVerificado } from "./pareja.ts";
 
 export type Celda = string | number | boolean | null | undefined;
 export type Filas = Celda[][];
@@ -683,10 +683,17 @@ export async function confirmarParejas(
       conflictoDePareja(lineas[c.i].producto, x.producto_catalogo, nombres(x)) === null &&
       tamanoVerificado(lineas[c.i].producto, x.producto_catalogo, nombres(x));
     let decision = d.decision;
+    let sugerida: string | null = null;
     if (o.compras) {
       if (decision === "otro_producto" || !op) {
         const rescate = c.opciones.find(buenaPorReglas);
         if (rescate) { op = rescate; decision = "mismo_formato"; }
+        else {
+          // Sin tamaño en el catálogo no se puede dar por bueno, pero tampoco perder la pareja: «Revisar».
+          const sinTamano = c.opciones.find((x) => c.confianza === "alta" && tamanoDesconocido(x.producto_catalogo, nombres(x)) &&
+            conflictoDePareja(lineas[c.i].producto, x.producto_catalogo, nombres(x)) === null);
+          if (sinTamano) { op = sinTamano; decision = "mismo_formato"; sugerida = "el catálogo no dice el tamaño del envase: comprobarlo"; }
+        }
       } else if (decision === "formato_distinto") {
         // La IA ve «otro tamaño» donde las reglas ven el mismo (o hay otra opción con el tamaño bueno).
         const buena = buenaPorReglas(op) ? op : c.opciones.find(buenaPorReglas);
@@ -712,7 +719,9 @@ export async function confirmarParejas(
       out.push({ ...elegida, confianza: "formato_distinto", nota: k.motivo });
       continue;
     }
-    if (decision === "mismo_formato" && k?.tipo === "dudosa") {
+    if (decision === "mismo_formato" && sugerida && !k) {
+      out.push({ ...elegida, confianza: "media", nota: sugerida });
+    } else if (decision === "mismo_formato" && k?.tipo === "dudosa") {
       out.push({ ...elegida, confianza: "media", nota: k.motivo });
     } else if (decision === "mismo_formato") {
       out.push({ ...elegida, confianza: "alta" });
