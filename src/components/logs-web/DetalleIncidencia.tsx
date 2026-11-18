@@ -20,8 +20,8 @@ import {
   type IncidenciaWeb,
 } from "@/hooks/useLogsWeb";
 import {
-  causaDeFila, explicacionIncidencia, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO, origenDeEvento, origenDeFila, proveedorDeFila,
-  repartoTexto, TEXTO_ACCION_RECARGA, TEXTO_TRAS_PUBLICAR, textoParaCopiar,
+  ambitoDeEvento, causaDeFila, explicacionIncidencia, fichaDeFila, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO, origenDeEvento, origenDeFila,
+  proveedorDeFila, repartoTexto, TEXTO_ACCION_RECARGA, TEXTO_TRAS_PUBLICAR, textoParaCopiar,
 } from "./calculos";
 import { ExplicacionSencilla } from "./ExplicacionSencilla";
 import { AvisoOrigen, BadgeOrigen } from "./Origen";
@@ -204,6 +204,7 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
   const [nota, setNota] = useState("");
   const i = q.data;
   const origen = i ? origenDeFila(i) : null;
+  const ficha = i ? fichaDeFila(i, muestras.data ?? []) : null;
 
   useEffect(() => {
     setPagina(0);
@@ -226,9 +227,11 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
     <Sheet open={id !== null} onOpenChange={(o) => !o && onCerrar()}>
       <SheetContent side="right" className="w-full max-w-none sm:max-w-3xl" data-testid="detalle-incidencia">
         <SheetHeader>
-          <SheetTitle className="pr-8">{i ? `#${i.id} · ${i.titulo}` : "Incidencia"}</SheetTitle>
+          {/* Formato del dueño: «Fallo del admin · Panel › Facturas», debajo el título en llano y lo técnico, plegado, más abajo. */}
+          {i && origen && <AvisoOrigen origen={origen} proveedor={origen === "externo" ? proveedorDeFila(i) : null} ambito={ficha?.ambito} zona={ficha?.zona} />}
+          <SheetTitle className="pr-8" data-testid="titulo-incidencia">{i ? ficha?.titulo ?? i.titulo : "Incidencia"}</SheetTitle>
           <SheetDescription>
-            {i ? `${NOMBRE_TIPO[i.tipo] ?? i.tipo} · ${i.fuente} · ${i.entorno} · huella ${i.huella.slice(0, 12)}…` : ""}
+            {i ? `Incidencia #${i.id} · ${NOMBRE_TIPO[i.tipo] ?? i.tipo} · ${i.entorno}` : ""}
           </SheetDescription>
         </SheetHeader>
         {q.isError ? (
@@ -237,7 +240,6 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
           <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando…</p>
         ) : (
           <div className="mt-4 space-y-4">
-            {origen && <AvisoOrigen origen={origen} proveedor={origen === "externo" ? proveedorDeFila(i) : null} />}
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={origen === "web" && (i.gravedad === "critico" || i.gravedad === "error") ? "destructive" : "outline"}>{NOMBRE_GRAVEDAD[i.gravedad]}</Badge>
               <Badge variant="outline">{NOMBRE_ESTADO[i.estado]}</Badge>
@@ -248,11 +250,15 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
                 {(i.estado === "resuelta" || i.estado === "ignorada") && <Button variant="outline" className="h-11" onClick={() => cambiarEstado("abierta")} disabled={cambiar.isPending}>Reabrir</Button>}
               </div>
             </div>
-            <ExplicacionSencilla explicacion={explicacionIncidencia(i, muestras.data ?? [], contexto.data ?? null, eventoContexto)} />
+            <ExplicacionSencilla explicacion={explicacionIncidencia(i, muestras.data ?? [], contexto.data ?? null, eventoContexto)} titulo={null} />
             <Ticket i={i} origen={origen ?? "web"} />
             <details className="rounded-md border p-3" data-testid="detalles-tecnicos">
-              <summary className="cursor-pointer select-none text-sm font-semibold">Detalles técnicos (para quien lo arregle)</summary>
+              <summary className="cursor-pointer select-none text-sm font-semibold">Detalle técnico (para quien lo arregle)</summary>
               <div className="mt-3 space-y-4">
+                <section className="space-y-1 text-xs" data-testid="mensaje-tecnico">
+                  <p className="break-words font-mono">{i.titulo}</p>
+                  <p className="text-muted-foreground">{NOMBRE_TIPO[i.tipo] ?? i.tipo} · fuente {i.fuente} · proyecto {i.proyecto} · {i.entorno} · huella {i.huella.slice(0, 12)}…</p>
+                </section>
                 <TiraCifras
                   cifras={[
                     { etiqueta: "Ocurrencias", valor: i.ocurrencias, detalle: `${i.ocurrencias_24h} en 24 h` },
@@ -288,7 +294,7 @@ export function DetalleIncidencia({ id, onCerrar, onAbrirSesion }: DetalleIncide
                         </span>
                         {(e.es_bot || e.es_prueba) && <Badge variant="outline" className="text-[10px] font-normal">{e.es_bot ? "bot" : "prueba"}</Badge>}
                         {origen && !(e.es_bot || e.es_prueba) && origenDeEvento(e) !== origen && (
-                          <BadgeOrigen origen={origenDeEvento(e)} className="px-1.5 py-0 text-[10px]" />
+                          <BadgeOrigen origen={origenDeEvento(e)} ambito={ambitoDeEvento(e)} className="px-1.5 py-0 text-[10px]" />
                         )}
                         {e.tras_publicar && (
                           <Badge variant="outline" data-testid="tras-publicar" data-clase={e.tras_publicar}
