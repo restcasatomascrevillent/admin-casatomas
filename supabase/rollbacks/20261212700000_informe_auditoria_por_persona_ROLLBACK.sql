@@ -1,4 +1,4 @@
--- Vuelta atrás de 20261212100000_informe_auditoria_por_persona: deja la función como en
+-- Vuelta atrás de 20261212700000_informe_auditoria_por_persona: deja la función como en
 -- 20261205100100_informe_auditoria_rapido (sin el detalle por persona). Solo lectura: no hay datos que deshacer.
 -- El panel de antes no lee los campos nuevos; el de después, sin ellos, pinta las fichas por persona vacías.
 set lock_timeout = '5s';

@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- 20261212100000_informe_auditoria_por_persona — el informe de auditoría, persona a persona (18/11/2026)
+-- 20261212700000_informe_auditoria_por_persona — el informe de auditoría, persona a persona (18/11/2026)
 -- ===========================================================================
 -- Petición del dueño: «que se informe por lo que hace cada usuario, no gráfico
 -- por días global sino lo que hace cada usuario, cuándo lo hace… varias slides
@@ -23,7 +23,7 @@ set client_encoding = 'UTF8';
 -- Mismo permiso (solo super admin) y misma estrategia rápida de 20261205100100:
 -- el detalle (jsonb) solo se abre en las filas que lo necesitan (delicadas,
 -- botones del servidor y las 12 últimas de cada persona).
--- Vuelta atrás: supabase/rollbacks/20261212100000_informe_auditoria_por_persona_ROLLBACK.sql.
+-- Vuelta atrás: supabase/rollbacks/20261212700000_informe_auditoria_por_persona_ROLLBACK.sql.
 begin;
 
 create or replace function public.informe_auditoria_mensual(p_mes text)

@@ -7,7 +7,7 @@
 //  del servidor y sus últimas acciones). El informe se arma en
 //  ../auditoria/modelo.ts y se pinta en src/components/informes/auditoria/.
 //  Los datos salen de la RPC `informe_auditoria_mensual` (migraciones
-//  20261201100000, 20261205100100 y 20261212100000; solo super admin), que
+//  20261201100000, 20261205100100 y 20261212700000; solo super admin), que
 //  resume `audit_log_visible` en hora de Madrid.
 // ============================================================================
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +17,7 @@ export { dondeTabla };
 
 // ─── Lo que devuelve la RPC ─────────────────────────────────────────────────
 
-/** Una de sus últimas acciones (migración 20261212100000). */
+/** Una de sus últimas acciones (migración 20261212700000). */
 export interface RecienteAuditoria {
   created_at: string;
   accion: string;
@@ -36,7 +36,7 @@ export interface UsuarioAuditoria {
   borrados: number;
   precios: number;
   secciones: { tabla: string; n: number }[];
-  // Desde la migración 20261212100000 (opcionales: una base de datos sin ella no los manda).
+  // Desde la migración 20261212700000 (opcionales: una base de datos sin ella no los manda).
   primera?: string;
   entradas?: number;
   por_dia?: { dia: string; n: number }[];

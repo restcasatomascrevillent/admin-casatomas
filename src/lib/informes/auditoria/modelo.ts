@@ -258,7 +258,7 @@ function persona(u: UsuarioAuditoria, d: DatosAuditoria, mes: string, hoy: strin
   const mejor = (u.por_dia ?? []).reduce<{ dia: string; n: number } | null>((m, x) => (x.n > 0 && (!m || x.n > m.n) ? { dia: x.dia, n: x.n } : m), null);
   const franja = franjaHabitual(horas);
 
-  // Secciones: todo lo que tocó (migración 20261212100000) o, si no, sus 3 principales.
+  // Secciones: todo lo que tocó (migración 20261212700000) o, si no, sus 3 principales.
   const todas: SeccionPersona[] = u.tablas
     ? u.tablas.map((t) => ({ nombre: dondeTabla(t.tabla), crear: t.crear, cambiar: t.actualizar, borrar: t.eliminar, total: t.n }))
     : u.secciones.map((s) => ({ nombre: dondeTabla(s.tabla), crear: 0, cambiar: 0, borrar: 0, total: s.n }));

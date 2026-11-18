@@ -1,4 +1,4 @@
-// Prueba PGlite de public.informe_auditoria_mensual (migración 20261212100000_informe_auditoria_por_persona):
+// Prueba PGlite de public.informe_auditoria_mensual (migración 20261212700000_informe_auditoria_por_persona):
 // el informe de auditoría persona a persona. Comprueba que solo lo genera un super admin, que cada persona
 // trae sus días, horas, lo que tocó, los botones del servidor y sus últimas acciones (en hora de Madrid),
 // que lo automático va aparte y que lo que devolvía antes sigue ahí.
@@ -39,7 +39,7 @@ CREATE TABLE public."Vinos"(id bigint PRIMARY KEY, nombre text, precio_eur numer
 await db.exec(entre(leer("20261012153701_auditoria_legible_chat_reversion.sql"), "CREATE OR REPLACE FUNCTION public.audit_tabla_util", "\nCREATE") );
 await db.exec(entre(leer("20261013082609_bloquear_acceso_usuarios.sql"), "CREATE OR REPLACE VIEW public.audit_log_visible", "REVOKE ALL ON public.audit_log_visible"));
 await db.exec(leer("20261205100100_informe_auditoria_rapido.sql"));
-await db.exec(leer("20261212100000_informe_auditoria_por_persona.sql"));
+await db.exec(leer("20261212700000_informe_auditoria_por_persona.sql"));
 
 // Noviembre de 2026 (UTC+1). Ana: lunes 2 a las 9:30 y 10:10, martes 3 a las 23:30 (hora de Madrid), entra el 4 sin hacer nada.
 const filas = [
@@ -106,7 +106,7 @@ const vacio = await informe(admin, "2026-12");
 igual([vacio.usuarios.length, vacio.sistema_total, vacio.delicadas_total], [0, 0, 0], "mes sin nada");
 
 // La vuelta atrás deja la versión anterior (sin el detalle por persona) y funcionando.
-await db.exec(fs.readFileSync("supabase/rollbacks/20261212100000_informe_auditoria_por_persona_ROLLBACK.sql", "utf8"));
+await db.exec(fs.readFileSync("supabase/rollbacks/20261212700000_informe_auditoria_por_persona_ROLLBACK.sql", "utf8"));
 const antes = await informe(admin);
 igual([antes.usuarios[0].quien, antes.usuarios[0].acciones, antes.usuarios[0].tablas], ["ana@casa.es", 5, undefined], "vuelta atrás");
 
