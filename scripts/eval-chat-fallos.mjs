@@ -340,7 +340,8 @@ function valoresEnVivo(casos, o) {
   for (let k = 0; k < partes.length; k += 40) {
     const lote = partes.slice(k, k + 40);
     const consulta = lote.map((p) => `select ${p.i} as i, ${p.j} as j, to_jsonb((${p.sql})) as v`).join("\nunion all\n") + ";";
-    for (const f of consultar(consulta, o)) {
+    // Con --simular el valor esperado se calcula DENTRO de la misma transacción (las migraciones pueden añadir columnas que el SQL usa).
+    for (const f of consultar(sqlSimulado(consulta, o.simular.map((m) => readFileSync(m, "utf8"))), o)) {
       const c = casos[f.i];
       const e = c.esperado[f.j];
       const arr = sal.get(c.id) ?? [];
