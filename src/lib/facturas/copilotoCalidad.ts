@@ -251,6 +251,8 @@ const FRASES_PARA_PERSONA: RegExp[] = [
   /^El modelo rechazó procesar el documento/i,
   /^Caducado sin decidir/i,
   /^Esta factura ya estaba guardada/i,
+  /^tiempo agotado \(\d+ min\)/i,
+  /^No se pudo subir [^:]{1,120}: /i,
 ];
 
 /** Rastros de texto de máquina que invalidan incluso una frase de la lista blanca. */
