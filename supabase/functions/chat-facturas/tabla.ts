@@ -90,7 +90,8 @@ export function vistaDe(v: unknown): VistaPresupuesto {
 export function verDePregunta(p: unknown): VistaPresupuesto {
   const s = String(p ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   if (/\bno\s+(me\s+)?interesa/.test(s)) return "no_interesa";
-  if (/revis/.test(s)) return "revisar";
+  // Solo si PIDE VER la tabla («ver/enséñame/muéstrame … revisar», «los de Revisar»): «revisa esta tarifa y dime qué interesa» no.
+  if (/\b(ver|veo|ensen\w*|muestr\w*|dame|saca|abre|pon|quiero ver)\b[^.?!]{0,40}\brevisar\b|\b(los|las|lo|la|tabla|pestana|lista|vista)( \w+){0,2} (de|en|a) revisar\b/.test(s)) return "revisar";
   return "interesa";
 }
 

@@ -76,6 +76,7 @@
     "test:jueves-turnos:db": "node scripts/test-jueves-turnos.mjs",
     "test:logs-web:db": "node scripts/test-logs-web.mjs",
     "test:peticiones:db": "node scripts/test-peticiones.mjs",
+    "test:tickets-documentos:db": "node scripts/test-tickets-documentos.mjs",
     "test:costes-ia:db": "node scripts/test-costes-servicios-ia.mjs",
     "test:servicios-cierre:db": "node scripts/test-servicios-cierre.mjs",
     "test:ia-tarifas:db": "node scripts/test-ia-tarifas-sin-coste.mjs",

@@ -130,9 +130,10 @@
       "origen": "#59 (10/11/2026)",
       "mensaje": "Mira albaranes de liga sabor",
       "fallo_original": "«No hay»: errata en el nombre de Luga Sabores, que sí tiene albaranes.",
-      "correcto": "Los albaranes de Luga Sabores S.L. (4 en producción), avisando del nombre usado.",
+      "correcto": "Los albaranes de Luga Sabores S.L. (en vivo con el SQL de esperado; 5 el 18/11/2026), avisando del nombre usado.",
+      "esperado": [{"ruta": "sumas.albaranes.n", "tipo": "num", "tol": 0, "valor": 5, "sql": "select count(*) from facturas where proveedor ilike '%luga sabor%' and tipo = 'albaran'"}],
       "herramienta": { "nombre": "filtrar_documentos", "argumentos": { "filtro": "todos", "texto": "liga sabor", "tipo": "albaran", "desde": null, "hasta": null, "orden": null, "limite": null } },
-      "rpc": { "debe": ["Luga Sabores", "proveedor_corregido"], "no_debe": ["\"total_filas\": ?0"], "prod": { "debe": ["\"n\": ?4"] }, "max_ms": 3000 },
+      "rpc": { "debe": ["Luga Sabores", "proveedor_corregido"], "no_debe": ["\"total_filas\": ?0"], "max_ms": 3000 },
       "ia": { "debe": ["Luga"], "no_debe": ["no hay albaranes"] },
       "sql": "select count(*) from facturas where proveedor ilike '%luga sabor%' and tipo = 'albaran'"
     },
