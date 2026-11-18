@@ -26,7 +26,8 @@ const createClient = clienteConAuditoria(createClientBase, "clasificar-productos
 //
 //  Secretos: OPENAI_API_KEY, OCR_TRABAJOS_SECRET (ya existen) y, opcional,
 //  CLASIFICAR_PRODUCTOS_MODELO (por defecto gpt-5.6-luna).
-//  Respuesta: { ok, pendientes, textos, propuestas, aplicado:{productos_creados, alias_creados, lineas_asignadas} }
+//  Respuesta: { ok, pendientes, textos, propuestas, aplicado:{productos_creados, alias_creados, lineas_asignadas, lineas_pendientes} }
+//  La RPC va en tandas de 30 productos y reintenta si la base la corta por tiempo (clasificacion.ts).
 // ============================================================================
 
 const URL_SB = Deno.env.get("SUPABASE_URL")!;
