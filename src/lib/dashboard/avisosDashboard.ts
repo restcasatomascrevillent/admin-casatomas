@@ -3,17 +3,19 @@
 // notificaciones_dashboard): reservas, alertas diarias de Facturas, subidas de
 // precio de líneas de factura, originales sin Drive, encargos de Instagram,
 // modelos de IA…— con su enlace (`rutaDeAviso`). Cada uno se enseña solo a
-// quien puede ver su sección: la tabla la lee cualquiera con «Dashboard», así
-// que el filtro por sección se hace aquí. Sin React: se prueba suelto.
+// quien puede ver su sección. Lo decide la RLS (`seccion_aviso`, migración
+// 20261212100000: hasta el 18/11/2026 quien veía «Dashboard» leía TODOS y el
+// camarero veía los de Facturas en la campana); aquí se repite la misma lista
+// para las etiquetas y como segunda barrera. Sin React: se prueba suelto.
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { avisoCaducado, TIPOS_POR_FILTRO, tiposDeSeccion } from "@/lib/avisos";
 
-export type SeccionAviso = "reservas" | "facturas" | "rrss" | "super_admin" | "general";
+export type SeccionAviso = "reservas" | "facturas" | "rrss" | "super_admin";
 
 export interface PermisosAvisos {
   reservas: boolean;
   facturas: boolean;
-  /** Newsletter y RRSS, o la agencia de Instagram. */
+  /** Newsletter y RRSS (sección «marketing»). */
   rrss: boolean;
   superAdmin: boolean;
 }
@@ -23,26 +25,36 @@ export const ETIQUETA_SECCION_AVISO: Record<SeccionAviso, string> = {
   facturas: "Facturas",
   rrss: "RRSS",
   super_admin: "Super Admin",
-  general: "Panel",
 };
 
 // TIPOS_POR_FILTRO y no tiposDeSeccion: el botón «Avisos» de Reservas solo enseña nuevas y canceladas (10/11/2026),
-// pero solicitudes y «sin sala» siguen siendo avisos de Reservas (solo para quien ve Reservas).
-const RESERVAS = new Set(TIPOS_POR_FILTRO.reservas);
+// pero solicitudes y «sin sala» siguen siendo avisos de Reservas (solo para quien ve Reservas). Además, las
+// propuestas de espacios, los correos de reserva que no salen y las mesas borradas con reservas.
+const RESERVAS = new Set([
+  ...TIPOS_POR_FILTRO.reservas,
+  "propuesta_aceptada",
+  "propuesta_rechazada",
+  "propuesta_fallida",
+  "email_fallido",
+  "mesa_borrada_con_asignaciones",
+]);
 const FACTURAS = new Set(tiposDeSeccion("facturas"));
 
-/** De qué sección es un aviso (decide quién lo ve). */
+/**
+ * De qué sección es un aviso (decide quién lo ve). La misma lista que `public.seccion_aviso`
+ * (supabase/migrations/20261212100000_avisos_solo_su_seccion.sql): si se añade un tipo, en los dos sitios.
+ * Lo que no es de Reservas, Facturas ni RRSS (sistema, modelos de IA, peticiones, llamadas y cualquier
+ * tipo nuevo) es solo del super admin.
+ */
 export function seccionDeAviso(n: Pick<NotificacionDashboard, "tipo" | "referencia_tipo">): SeccionAviso {
-  if (RESERVAS.has(n.tipo) || n.referencia_tipo === "solicitud") return "reservas";
-  if (FACTURAS.has(n.tipo) || (n.referencia_tipo ?? "").startsWith("facturas_")) return "facturas";
-  if (n.tipo === "instagram_encargo" || n.referencia_tipo === "instagram_encargo") return "rrss";
-  if (n.tipo.startsWith("ia_modelo") || n.referencia_tipo === "ia_modelos") return "super_admin";
-  return "general";
+  if (RESERVAS.has(n.tipo)) return "reservas";
+  if (FACTURAS.has(n.tipo) || n.tipo.startsWith("facturas_")) return "facturas";
+  if (n.tipo.startsWith("instagram_")) return "rrss";
+  return "super_admin";
 }
 
 export function puedeVerAviso(n: Pick<NotificacionDashboard, "tipo" | "referencia_tipo">, p: PermisosAvisos): boolean {
   const s = seccionDeAviso(n);
-  if (s === "general") return true;
   if (s === "super_admin") return p.superAdmin;
   return p[s];
 }
@@ -64,7 +76,7 @@ export function avisosParaDashboard(
 
 /** Sin leer por sección (las fichas de arriba), en el orden del menú. */
 export function sinLeerPorSeccion(lista: NotificacionDashboard[]): { seccion: SeccionAviso; n: number }[] {
-  const orden: SeccionAviso[] = ["reservas", "facturas", "rrss", "super_admin", "general"];
+  const orden: SeccionAviso[] = ["reservas", "facturas", "rrss", "super_admin"];
   const cuenta = new Map<SeccionAviso, number>();
   for (const a of lista) if (!a.leida) cuenta.set(seccionDeAviso(a), (cuenta.get(seccionDeAviso(a)) ?? 0) + 1);
   return orden.flatMap((seccion) => (cuenta.get(seccion) ? [{ seccion, n: cuenta.get(seccion) as number }] : []));
