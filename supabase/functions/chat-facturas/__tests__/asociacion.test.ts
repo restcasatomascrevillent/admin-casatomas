@@ -193,7 +193,7 @@ describe("seguimiento y pista de la pregunta", () => {
 
   it("el prompt prohibe preguntar «¿quieres que consulte…?», mantiene el tema y fija «ultimo mes»", () => {
     const p = systemPrompt("2026-11-07");
-    expect(p).toMatch(/16\. Nunca preguntes «¿quieres que consulte…\?»: llama a las herramientas que falten y da la cifra\./);
+    expect(p).toMatch(/16\. Sin pregunta final ni «¿quieres…\?»: llama a las herramientas que falten; la app pone los botones\./);
     expect(p).toMatch(/17\. Seguimiento .*mismo tema, unidad y periodo/);
     expect(p).toMatch(/18\. «Ultimo mes» = mes natural anterior: di el periodo .* y si esta incompleto\./);
   });

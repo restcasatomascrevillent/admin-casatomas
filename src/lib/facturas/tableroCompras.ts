@@ -486,8 +486,12 @@ export function leerEnlaceCompras(p: URLSearchParams): { mes?: string; prov?: nu
 
 /**
  * 3-5 preguntas útiles para empezar: el mes que más subió frente al anterior,
- * comparar el producto que más ha subido entre proveedores y qué le compras al
- * primer proveedor. Si no hay datos, unas genéricas.
+ * comparar el producto que más ha subido entre proveedores y cuánto le has
+ * pagado al primer proveedor. Si no hay datos, unas genéricas.
+ * 18/11/2026: solo preguntas que con los datos reales SIEMPRE tienen respuesta
+ * (el proveedor y el producto salen del propio tablero). Fuera «¿Ha subido lo
+ * que pago a…?» (un suministro no tiene productos: «no hay datos») y
+ * «¿Qué le he comprado a…?» (daba una lista cortada).
  */
 export function sugerenciasDeTablero(t: TableroCompras | null | undefined, periodo: PeriodoAnalisis): string[] {
   const salida: string[] = [];
@@ -504,11 +508,9 @@ export function sugerenciasDeTablero(t: TableroCompras | null | undefined, perio
   if (producto) salida.push(`Compara el precio de ${producto.producto.toLowerCase()} entre proveedores`);
   const prov = t?.proveedores[0];
   const cuando = periodo === "mes" ? "este mes" : periodo === "trimestre" ? "este trimestre" : periodo === "anio" ? "este año" : "en total";
-  if (prov) salida.push(`¿Qué le he comprado a ${nombreCorto(prov.nombre)} ${cuando}?`);
-  const fijo = t?.fijos.proveedores[0];
-  if (fijo) salida.push(`¿Ha subido lo que pago a ${nombreCorto(fijo.nombre)}?`);
+  if (prov) salida.push(`¿Cuánto le he pagado a ${nombreCorto(prov.nombre)} ${cuando}?`);
   if (salida.length < 3) {
-    for (const g of ["¿Cuánto hemos gastado este mes?", "¿Qué productos han subido de precio?", "¿Qué albaranes faltan por facturar?"]) {
+    for (const g of ["¿Cuáles son mis mayores proveedores?", "¿Qué productos han subido de precio?", "¿Cuánto he gastado cada mes?"]) {
       if (salida.length >= 4) break;
       salida.push(g);
     }

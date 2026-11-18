@@ -195,15 +195,14 @@ describe("enlaces a Compras", () => {
 });
 
 describe("sugerencias del copiloto", () => {
-  it("salen de los datos: el mes que más subió, el producto que más sube, el primer proveedor y un fijo", () => {
+  it("salen de los datos: el mes que más subió, el producto que más sube, el primer proveedor (sin «¿Ha subido…?» de suministros: no tienen productos)", () => {
     expect(sugerenciasDeTablero(normalizarTablero(RPC), "anio")).toEqual([
       "¿Por qué subió el gasto en julio?",
       "Compara el precio de pan de cristal entre proveedores",
-      "¿Qué le he comprado a Embajadores Madrid este año?",
-      "¿Ha subido lo que pago a Acciona Green Energy Developments?",
+      "¿Cuánto le he pagado a Embajadores Madrid este año?",
     ]);
   });
-  it("sin datos, unas genéricas", () => {
-    expect(sugerenciasDeTablero(null, "mes")).toHaveLength(3);
+  it("sin datos, unas genéricas que siempre tienen respuesta (nada de albaranes por facturar ni «este mes»)", () => {
+    expect(sugerenciasDeTablero(null, "mes")).toEqual(["¿Cuáles son mis mayores proveedores?", "¿Qué productos han subido de precio?", "¿Cuánto he gastado cada mes?"]);
   });
 });
