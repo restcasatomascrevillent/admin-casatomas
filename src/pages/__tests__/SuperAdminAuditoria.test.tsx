@@ -286,3 +286,16 @@ it("sin resultados ofrece volver a ver toda la actividad", () => {
   fireEvent.click(screen.getByRole("button", { name: "Ver toda la actividad" }));
   expect(state.filtros.at(-1)).toEqual({ origen: "sin_servidor" });
 });
+
+it("al aplicar el panel con una búsqueda de 1 o 2 letras, aplica lo demás sin mandar la búsqueda", () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+  render(<SuperAdminAuditoria />);
+  fireEvent.change(screen.getByLabelText("Buscar en auditoría"), { target: { value: "ia" } });
+  fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
+  fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-11-01" } });
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+  expect(state.filtros.at(-1)).toMatchObject({ origen: "sin_servidor", desde: "2026-11-01" });
+  expect(state.filtros.at(-1)?.texto).toBeUndefined();
+  expect(screen.getByLabelText("Buscar en auditoría")).toHaveValue("ia");
+  expect(screen.getByText("Escribe al menos 3 letras para buscar.")).toBeInTheDocument();
+});
