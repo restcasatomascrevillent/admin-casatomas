@@ -1,0 +1,367 @@
+set client_encoding = 'UTF8';
+-- ============================================================================
+-- ROLLBACK 20261212610000_precios_netos_coherentes · Facturas (18/11/2026)
+-- Vuelve las funciones a bruto (la sustitución inversa de 20261212610000), productos_resumen y
+-- productos_gasto_por_categoria a su forma anterior, facturas_asociar_descuentos a la de
+-- 20261211400000, quita descuento_general y descuentos_sin_asociar_resumen, y recalcula el reparto.
+-- ============================================================================
+set lock_timeout = '5s';
+
+create or replace function public.facturas_asociar_descuentos(p_facturas bigint[])
+returns integer
+language plpgsql
+security definer
+set search_path to 'public', 'extensions'
+as $f$
+declare
+  v_n integer := 0;
+begin
+  if p_facturas is null or cardinality(p_facturas) = 0 then
+    return 0;
+  end if;
+
+  -- Lo automático se recalcula entero; lo 'manual' se respeta.
+  delete from public.productos_factura_descuentos x
+   using public.productos_factura p
+   where p.id = x.descuento_linea_id and p.factura_id = any(p_facturas) and x.regla <> 'manual';
+
+  -- Regalos (20261211400000): líneas a 0 € o sin importe, con cantidad, que son regalo → 100 % de descuento y su
+  -- valor (el impreso; si no hay, el de la línea pagada del mismo producto, marcado como estimado).
+  update public.productos_factura p
+     set descuento_pct = 100,
+         importe_bruto = coalesce(p.importe_bruto, round(p.cantidad * nullif(p.precio_unitario, 0), 2), round(p.cantidad * r.precio, 2)),
+         importe_bruto_estimado = case when p.importe_bruto is not null then p.importe_bruto_estimado
+                                       when nullif(p.precio_unitario, 0) is not null then false
+                                       else r.precio is not null end
+    from (
+      select z.id,
+             (select q.total / q.cantidad
+                from public.productos_factura q
+               where q.factura_id = z.factura_id and q.id <> z.id and q.total > 0 and q.cantidad > 0
+                 and ((q.producto_id is not null and q.producto_id = z.producto_id) or q.nombre_normalizado = z.nombre_normalizado)
+               order by q.id limit 1) as precio
+        from public.productos_factura z
+        join public.facturas f on f.id = z.factura_id
+        left join public.productos_catalogo pc on pc.id = z.producto_id
+        left join public.categorias_producto c on c.id = pc.categoria_id
+        left join public.categorias_producto c2 on c2.id = c.padre_id
+       where z.factura_id = any(p_facturas) and f.total > 0
+         and (z.total = 0 or z.total is null) and z.cantidad > 0 and z.descuento_pct is null
+         and coalesce(z.nombre_busqueda, lower(z.nombre)) !~ '(envase|palet|caja bn|retorn)'
+         and coalesce(c2.clave, c.clave, '') <> 'servicios'
+    ) r
+   where r.id = p.id
+     and (p.importe_bruto > 0
+          or coalesce(p.nombre_busqueda, lower(p.nombre)) ~ '(sin cargo|(^|[^a-z])s/c([^a-z]|$)|regalo|obsequio|bonif|gratis|muestra|cortesia)'
+          or r.precio is not null);
+
+  create temp table if not exists _pfd_reparto (
+    descuento_linea_id bigint, linea_id bigint, importe numeric, regla text
+  ) on commit drop;
+  truncate _pfd_reparto;
+
+  insert into _pfd_reparto
+  with lin as (
+    select p.id, p.factura_id, coalesce(p.nombre_busqueda, lower(p.nombre)) as nb, p.total,
+           coalesce(p.albaran_ref, '') as alb,
+           row_number() over (partition by p.factura_id order by p.pagina nulls first, p.orden nulls last, p.id) as rn
+      from public.productos_factura p
+      join public.facturas f on f.id = p.factura_id
+     where p.factura_id = any(p_facturas) and f.total > 0 and p.total is not null
+  ),
+  d as (
+    select l.*,
+           regexp_replace(l.nb, '^\W*(descuento|desc\.?|dto\.?|dcto\.?)\s+', '') as limpio,
+           replace(nullif(substring(l.nb from '(\d+(?:[.,]\d+)?)\s*%'), ''), ',', '.')::numeric as pct
+      from lin l
+     where l.total < 0 and public.es_linea_descuento(l.nb)
+       and not exists (select 1 from public.productos_factura_descuentos m where m.descuento_linea_id = l.id)
+  ),
+  candidatas as (
+    select d.id as did, l.id as lid, l.total as ltotal, extensions.similarity(l.nb, d.limpio) as s,
+           l.rn, d.rn as drn
+      from d join lin l on l.factura_id = d.factura_id and l.total > 0 and (d.alb = '' or l.alb = d.alb)
+  ),
+  por_nombre as (
+    select distinct on (did) did, lid
+      from candidatas
+     where s >= 0.5
+     order by did, s desc, (rn < drn) desc, abs(rn - drn), lid
+  ),
+  anterior as (
+    select d.id as did, l.id as lid, l.total as ltotal
+      from d join lin l on l.factura_id = d.factura_id and l.rn = d.rn - 1 and l.total > 0
+  ),
+  bloque as (
+    select did, sum(ltotal) as btotal from candidatas group by did
+  ),
+  regla as (
+    select d.id as did, d.total,
+           case
+             when d.nb ~ 'linea anterior' and a.lid is not null then 'linea_anterior'
+             when n.did is not null then 'nombre'
+             when d.pct is not null and a.lid is not null
+                  and abs(-d.total - a.ltotal * d.pct / 100) <= greatest(0.02, a.ltotal * d.pct / 100 * 0.02) then 'pct_linea'
+             when d.pct is not null and b.btotal > 0
+                  and abs(-d.total - b.btotal * d.pct / 100) <= greatest(0.05, b.btotal * d.pct / 100 * 0.02) then 'pie'
+             when d.pct is null and b.btotal > 0 and d.nb ~ '(comercial|pie|bonific)'
+                  and abs(round(-d.total / b.btotal * 200) / 2 - (-d.total / b.btotal * 100)) <= 0.05 then 'pie'
+             when d.pct is not null and f.total > 0
+                  and abs(-d.total - (f.total - d.total) * d.pct / 100) <= greatest(0.5, f.total * 0.01) then 'pie_con_iva'
+           end as regla,
+           case when d.nb ~ 'linea anterior' and a.lid is not null then a.lid else coalesce(n.lid, a.lid) end as lid_unica,
+           b.btotal
+      from d
+      join public.facturas f on f.id = d.factura_id
+      left join por_nombre n on n.did = d.id
+      left join anterior a on a.did = d.id
+      left join bloque b on b.did = d.id
+  )
+  select r.did, r.lid_unica, r.total, r.regla
+    from regla r
+   where r.regla in ('nombre', 'linea_anterior', 'pct_linea')
+  union all
+  select r.did, c.lid, round(r.total * c.ltotal / r.btotal, 2), r.regla
+    from regla r join candidatas c on c.did = r.did
+   where r.regla in ('pie', 'pie_con_iva');
+
+  -- Descuentos en POSITIVO (20261211400000): «DESC./DESCUENTO <producto>» con importe positivo justo
+  -- debajo de su línea (Catral: deshace el descuento de una devolución, o lo cobra de más). Va a esa
+  -- línea, sea positiva o negativa.
+  insert into _pfd_reparto
+  with lin as (
+    select p.id, p.factura_id, coalesce(p.nombre_busqueda, lower(p.nombre)) as nb, p.total,
+           row_number() over (partition by p.factura_id order by p.pagina nulls first, p.orden nulls last, p.id) as rn
+      from public.productos_factura p
+      join public.facturas f on f.id = p.factura_id
+     where p.factura_id = any(p_facturas) and f.total > 0 and p.total is not null
+  )
+  select d.id, a.id, d.total, 'nombre'
+    from lin d
+    join lin a on a.factura_id = d.factura_id and a.rn = d.rn - 1 and a.total <> 0
+   where d.total > 0
+     and d.nb ~ '^\W*(descuento|desc\.?|dto\.?|dcto\.?)\s'
+     and not public.es_linea_descuento(a.nb)
+     and not exists (select 1 from public.productos_factura_descuentos m where m.descuento_linea_id = d.id)
+     and extensions.similarity(a.nb, regexp_replace(d.nb, '^\W*(descuento|desc\.?|dto\.?|dcto\.?)\s+', '')) >= 0.5;
+
+  -- Céntimos del reparto: a la línea que más recibe, para que sume exactamente el descuento.
+  update _pfd_reparto t
+     set importe = t.importe + x.resto
+    from (
+      select r.descuento_linea_id, p.total - sum(r.importe) as resto,
+             (array_agg(r.linea_id order by abs(r.importe) desc, r.linea_id))[1] as linea_id
+        from _pfd_reparto r join public.productos_factura p on p.id = r.descuento_linea_id
+       group by r.descuento_linea_id, p.total
+    ) x
+   where t.descuento_linea_id = x.descuento_linea_id and t.linea_id = x.linea_id and x.resto <> 0;
+
+  insert into public.productos_factura_descuentos (descuento_linea_id, linea_id, importe, regla)
+  select descuento_linea_id, linea_id, importe, regla from _pfd_reparto
+  on conflict (descuento_linea_id, linea_id) do nothing;
+  get diagnostics v_n = row_count;
+
+  update public.productos_factura p
+     set importe_neto = x.neto
+    from (
+      select p2.id,
+             case
+               when exists (select 1 from public.productos_factura_descuentos m where m.descuento_linea_id = p2.id) then 0
+               when s.asignado is not null then p2.total + s.asignado
+             end as neto
+        from public.productos_factura p2
+        left join (
+          select m.linea_id, sum(m.importe) as asignado
+            from public.productos_factura_descuentos m
+            join public.productos_factura q on q.id = m.linea_id
+           where q.factura_id = any(p_facturas)
+           group by m.linea_id
+        ) s on s.linea_id = p2.id
+       where p2.factura_id = any(p_facturas)
+    ) x
+   where x.id = p.id and p.importe_neto is distinct from x.neto;
+
+  return v_n;
+end;
+$f$;
+revoke all on function public.facturas_asociar_descuentos(bigint[]) from public, anon, authenticated;
+grant execute on function public.facturas_asociar_descuentos(bigint[]) to service_role;
+
+drop table if exists pg_temp._cambios;
+create temp table _cambios (fn text, viejo text, nuevo text, veces int) on commit drop;
+insert into _cambios (fn, viejo, nuevo, veces) values
+  -- gasto por familia (chat)
+  ('gasto_categorias_agente', $q$pf.total::numeric as imp,$q$, $q$coalesce(pf.importe_neto, pf.total)::numeric as imp,$q$, 1),
+  -- ranking (chat): precio e importe de línea
+  ('ranking_agente', $q$pf.precio_unitario, pf.total,$q$,
+     $q$coalesce(pf.importe_neto / nullif(pf.cantidad, 0), pf.precio_unitario) as precio_unitario, coalesce(pf.importe_neto, pf.total) as total,$q$, 1),
+  ('ranking_agente', $q$as unidad, pf.total,$q$, $q$as unidad, coalesce(pf.importe_neto, pf.total) as total,$q$, 1),
+  -- resumen del periodo, ficha de proveedor (chat)
+  ('resumen_periodo_agente', $q$round(sum(pf.total)::numeric, 2)$q$, $q$round(sum(coalesce(pf.importe_neto, pf.total))::numeric, 2)$q$, 1),
+  ('ficha_proveedor_agente', $q$coalesce(pf.precio_unitario, pf.total / nullif(pf.cantidad, 0)) as precio$q$,
+     $q$coalesce(pf.importe_neto / nullif(pf.cantidad, 0), pf.precio_unitario, pf.total / nullif(pf.cantidad, 0)) as precio$q$, 1),
+  ('ficha_proveedor_agente', $q$pf.total as imp,$q$, $q$coalesce(pf.importe_neto, pf.total) as imp,$q$, 1),
+  -- alertas de compras
+  ('facturas_alertas_compras', $q$pf.cantidad, pf.precio_unitario, pf.total::numeric as importe$q$,
+     $q$pf.cantidad, coalesce(pf.importe_neto / nullif(pf.cantidad, 0), pf.precio_unitario) as precio_unitario, coalesce(pf.importe_neto, pf.total)::numeric as importe$q$, 1),
+  ('facturas_alertas_compras', $q$and pf.total > 0$q$, $q$and coalesce(pf.importe_neto, pf.total) > 0$q$, 1),
+  -- P2: neto 0 = regalo, no es un precio pagado
+  ('facturas_alertas_candidatas', $q$pf.precio_unitario > 0 and pf.total > 0$q$, $q$pf.precio_unitario > 0 and coalesce(pf.importe_neto, pf.total) > 0$q$, 1),
+  ('informe_precios_compras', $q$pf.precio_unitario > 0 and pf.total > 0$q$, $q$pf.precio_unitario > 0 and coalesce(pf.importe_neto, pf.total) > 0$q$, 1),
+  ('margenes_carta_costes', $q$pf.total > 0 and pf.cantidad > 0$q$, $q$coalesce(pf.importe_neto, pf.total) > 0 and pf.cantidad > 0$q$, 1),
+  ('margenes_carta_ultima', $q$pf.total > 0 and pf.cantidad > 0$q$, $q$coalesce(pf.importe_neto, pf.total) > 0 and pf.cantidad > 0$q$, 1),
+  ('margenes_compras_producto', $q$pf.total > 0 and pf.cantidad > 0$q$, $q$coalesce(pf.importe_neto, pf.total) > 0 and pf.cantidad > 0$q$, 1),
+  ('vinos_coste_carta_datos', $q$pf.producto_id = pc.id and pf.total > 0$q$, $q$pf.producto_id = pc.id and coalesce(pf.importe_neto, pf.total) > 0$q$, 1),
+  ('referencias_precio_lote_agente', $q$coalesce(pf.total, 0) > 0$q$, $q$coalesce(pf.importe_neto, pf.total, 0) > 0$q$, 1),
+  ('referencias_precio_lote_agente', $q$g.total = 0 and g.cantidad > 0$q$, $q$coalesce(g.importe_neto, g.total) = 0 and g.total >= 0 and g.cantidad > 0$q$, 1),
+  -- consulta flexible (chat): métricas de línea en neto; la base de IVA por tipo sigue en lo impreso
+  ('consulta_flexible_agente', $q$when 'precio_unitario' then 'l.precio_unitario'$q$,
+     $q$when 'precio_unitario' then 'coalesce(l.importe_neto / nullif(l.cantidad, 0), l.precio_unitario)'$q$, 1),
+  ('consulta_flexible_agente', $q$when 'total_linea'     then 'l.total'$q$, $q$when 'total_linea'     then 'coalesce(l.importe_neto, l.total)'$q$, 1),
+  ('consulta_flexible_agente', $q$if v_col like 'l.%' and not$q$, $q$if (v_col like 'l.%' or v_col like 'coalesce(l.%') and not$q$, 1),
+  -- búsqueda de líneas (chat): importe y precio netos y, si difieren, el impreso al lado
+  ('buscar_productos_agente', $q$round(pf.precio_unitario::numeric, case when abs(pf.precio_unitario) < 1 then 4 else 2 end),$q$,
+     $q$round(coalesce(pf.importe_neto / nullif(pf.cantidad, 0), pf.precio_unitario)::numeric, case when abs(coalesce(pf.importe_neto / nullif(pf.cantidad, 0), pf.precio_unitario)) < 1 then 4 else 2 end),$q$, 1),
+  ('buscar_productos_agente', $q$'importe',    round(pf.total::numeric, 2),$q$,
+     $q$'importe',    round(coalesce(pf.importe_neto, pf.total)::numeric, 2), 'importe_impreso', case when pf.importe_neto is not null and pf.importe_neto is distinct from pf.total then round(pf.total::numeric, 2) end,$q$, 1),
+  ('buscar_productos_texto_agente', $q$round(pf.precio_unitario::numeric, case when abs(pf.precio_unitario) < 1 then 4 else 2 end),$q$,
+     $q$round(coalesce(pf.importe_neto / nullif(pf.cantidad, 0), pf.precio_unitario)::numeric, case when abs(coalesce(pf.importe_neto / nullif(pf.cantidad, 0), pf.precio_unitario)) < 1 then 4 else 2 end),$q$, 1),
+  ('buscar_productos_texto_agente', $q$'importe',    round(pf.total::numeric, 2),$q$,
+     $q$'importe',    round(coalesce(pf.importe_neto, pf.total)::numeric, 2), 'importe_impreso', case when pf.importe_neto is not null and pf.importe_neto is distinct from pf.total then round(pf.total::numeric, 2) end,$q$, 1),
+  ('buscar_contexto_chatbot', $q$pf.precio_unitario,$q$,
+     $q$coalesce(pf.importe_neto / nullif(pf.cantidad, 0), pf.precio_unitario) AS precio_unitario, pf.precio_unitario AS precio_impreso,$q$, 1),
+  ('buscar_contexto_chatbot', $q$pf.total,$q$, $q$coalesce(pf.importe_neto, pf.total) AS total, pf.total AS total_impreso,$q$, 1),
+  -- detalle de un documento (chat): sigue en impreso (cuadra con la cabecera) y añade el neto si difiere
+  ('detalle_documento_agente', $q$'importe',  round(pf.total::numeric, 2),$q$,
+     $q$'importe',  round(pf.total::numeric, 2), 'importe_neto', case when pf.importe_neto is not null and pf.importe_neto is distinct from pf.total then round(pf.importe_neto::numeric, 2) end,$q$, 1);
+
+
+do $$
+declare
+  c record;
+  v_oid oid;
+  v_def text;
+  v_nuevo text;
+  v_fn text;
+begin
+  for v_fn in select distinct fn from _cambios loop
+    select p.oid into v_oid from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = v_fn;
+    if v_oid is null then
+      continue;
+    end if;
+    v_def := pg_get_functiondef(v_oid);
+    v_nuevo := v_def;
+    for c in select * from _cambios where fn = v_fn loop
+      v_nuevo := replace(v_nuevo, c.nuevo, c.viejo);
+    end loop;
+    if v_nuevo <> v_def then
+      execute v_nuevo;
+    end if;
+  end loop;
+end;
+$$;
+
+drop function if exists public.productos_resumen(date, date, text);
+create function public.productos_resumen(p_desde date default null, p_hasta date default null, p_tipo text default null)
+returns table(producto_id bigint, nombre text, categoria_id bigint, origen text, unidad_habitual text, compras integer,
+              documentos integer, cantidades jsonb, gasto numeric, lineas_sin_importe integer, ultimo_precio numeric,
+              ultima_fecha date, proveedores text[])
+language sql
+stable
+set search_path to 'public'
+as $function$
+  with l as (
+    select pf.id, pf.producto_id, pf.factura_id, pf.cantidad, coalesce(nullif(btrim(pf.unidad), ''), '') as unidad,
+           pf.total, pf.precio_unitario, f.fecha, f.proveedor
+      from public.productos_factura pf
+      join public.facturas f on f.id = pf.factura_id
+     where pf.producto_id is not null
+       and (p_desde is null or f.fecha >= p_desde)
+       and (p_hasta is null or f.fecha <= p_hasta)
+       and (p_tipo is null or f.tipo = p_tipo)
+       -- 20261106120000: el albarán ya facturado no suma (sus líneas ya están en la factura).
+       and not (f.tipo = 'albaran' and f.facturado_en_id is not null)
+  ),
+  cant as (
+    select x.producto_id, jsonb_object_agg(x.unidad, x.suma order by x.unidad) as c
+      from (select producto_id, unidad, round(sum(cantidad), 3) as suma from l group by producto_id, unidad) as x
+     group by x.producto_id
+  ),
+  ult as (
+    select distinct on (producto_id) producto_id, precio_unitario, fecha
+      from l where precio_unitario is not null
+     order by producto_id, fecha desc nulls last, id desc
+  )
+  select p.id, p.nombre, p.categoria_id, p.origen, p.unidad_habitual,
+         count(l.id)::integer,
+         count(distinct l.factura_id)::integer,
+         coalesce(cant.c, '{}'::jsonb),
+         round(coalesce(sum(l.total), 0), 2),
+         (count(l.id) filter (where l.total is null))::integer,
+         ult.precio_unitario,
+         max(l.fecha),
+         coalesce(array_agg(distinct l.proveedor) filter (where l.proveedor is not null), '{}'::text[])
+    from public.productos_catalogo p
+    left join l    on l.producto_id = p.id
+    left join cant on cant.producto_id = p.id
+    left join ult  on ult.producto_id = p.id
+   group by p.id, cant.c, ult.precio_unitario
+   order by round(coalesce(sum(l.total), 0), 2) desc, p.nombre;
+$function$;
+revoke all on function public.productos_resumen(date, date, text) from public, anon;
+grant execute on function public.productos_resumen(date, date, text) to authenticated, service_role;
+
+create or replace function public.productos_gasto_por_categoria(p_desde date default null, p_hasta date default null, p_tipo text default null)
+returns table(categoria_id bigint, categoria text, padre_id bigint, padre text, sin_clasificar boolean, gasto numeric,
+              lineas integer, productos integer, lineas_sin_importe integer)
+language sql
+stable
+set search_path to 'public'
+as $function$
+  select c.id,
+         coalesce(c.nombre, case when pf.producto_id is null then 'Sin clasificar' else 'Sin categoría' end),
+         c.padre_id,
+         pc.nombre,
+         pf.producto_id is null,
+         round(coalesce(sum(pf.total), 0), 2),
+         count(*)::integer,
+         count(distinct pf.producto_id)::integer,
+         (count(*) filter (where pf.total is null))::integer
+    from public.productos_factura pf
+    join public.facturas f on f.id = pf.factura_id
+    left join public.productos_catalogo p   on p.id = pf.producto_id
+    left join public.categorias_producto c  on c.id = p.categoria_id
+    left join public.categorias_producto pc on pc.id = c.padre_id
+   where (p_desde is null or f.fecha >= p_desde)
+     and (p_hasta is null or f.fecha <= p_hasta)
+     and (p_tipo is null or f.tipo = p_tipo)
+     -- 20261106120000: el albarán ya facturado no suma (sus líneas ya están en la factura).
+     and not (f.tipo = 'albaran' and f.facturado_en_id is not null)
+   group by c.id, c.nombre, c.padre_id, pc.nombre, pf.producto_id is null
+   order by round(coalesce(sum(pf.total), 0), 2) desc;
+$function$;
+
+drop function if exists public.descuentos_sin_asociar_resumen();
+
+-- Reparto como antes (sin tope ni cantidad coherente) y sin la marca de descuento general.
+do $$
+declare
+  v_ids bigint[];
+  v_auditoria boolean := exists (
+    select 1 from pg_trigger t where t.tgrelid = 'public.productos_factura'::regclass and t.tgname = 'trg_auditoria');
+begin
+  select array_agg(distinct p.factura_id) into v_ids
+    from public.productos_factura p
+   where p.importe_neto is not null
+      or (p.total < 0 and public.es_linea_descuento(coalesce(p.nombre_busqueda, lower(p.nombre))));
+  if v_auditoria then
+    execute 'alter table public.productos_factura disable trigger trg_auditoria';
+  end if;
+  perform public.facturas_asociar_descuentos(v_ids);
+  if v_auditoria then
+    execute 'alter table public.productos_factura enable trigger trg_auditoria';
+  end if;
+end;
+$$;
+alter table public.productos_factura drop column if exists descuento_general;

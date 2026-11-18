@@ -141,6 +141,9 @@ jobs:
       - name: Regalos y descuentos en positivo (PGlite)
         if: env.COMPLETA == 'true'
         run: node scripts/test-regalos-y-descuentos-positivos.mjs
+      - name: Precios netos coherentes en todas las pantallas (PGlite)
+        if: env.COMPLETA == 'true'
+        run: node scripts/test-precios-netos-coherentes.mjs
       - name: Indicaciones para la IA por proveedor (PGlite)
         if: env.COMPLETA == 'true'
         run: npm run test:proveedores-notas-ia:db
