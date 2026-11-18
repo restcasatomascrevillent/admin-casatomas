@@ -38,6 +38,13 @@ export interface FacturaPorPasar {
   proveedor: string | null;
   drive_intentos?: number | null;
   existe: boolean;
+  /**
+   * Nombre con el que se subió el documento (ocr_trabajos.nombre_original), si
+   * se conoce: es el que lleva en Drive. Sin él, el de la copia de Storage (sin
+   * acentos ni espacios). Lo rellena pasarLote (18/11/2026: desde que guardar
+   * no espera a Drive, casi todos los originales llegan a Drive por aquí).
+   */
+  nombre_original?: string | null;
 }
 
 export interface HuerfanoPorPasar {
@@ -114,7 +121,9 @@ export async function pasarFactura(
   if (subir) {
     try {
       const { bytes, mime } = await descargar(supabase, path);
-      const url = await subirADrive(drive, bytes, nombreEnDrive(path), mime, f.fecha, f.proveedor);
+      // Una página añadida conserva su «pagN-…»; el original, el nombre con el que se subió.
+      const nombre = (!esOriginalDePagina(path) && nombreSeguroDrive(f.nombre_original)) || nombreEnDrive(path);
+      const url = await subirADrive(drive, bytes, nombre, mime, f.fecha, f.proveedor);
       if (!f.drive_url) {
         // Ya está en Drive: si el UPDATE falla por un corte, se reintenta aquí
         // en vez de volver a subir otra copia en la próxima pasada.
@@ -184,6 +193,28 @@ export interface OpcionesLote {
   ahora?: () => number;
 }
 
+/**
+ * Nombre con el que se subió el documento de cada factura (el trabajo de
+ * lectura más reciente que lo tenga). Una consulta por lote. Nunca lanza: si
+ * falla, se sube con el nombre de la copia, como antes.
+ */
+export async function nombresOriginales(supabase: Supa, facturaIds: number[]): Promise<Map<number, string>> {
+  const nombres = new Map<number, string>();
+  if (facturaIds.length === 0) return nombres;
+  try {
+    const { data, error } = await supabase.from("ocr_trabajos")
+      .select("factura_id, nombre_original, created_at").in("factura_id", facturaIds);
+    if (error) throw new Error(error.message);
+    const filas = ((data ?? []) as { factura_id: number; nombre_original: string | null; created_at: string | null }[])
+      .filter((t) => t.nombre_original && t.nombre_original.trim())
+      .sort((a, b) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")));
+    for (const t of filas) nombres.set(t.factura_id, t.nombre_original!.trim());
+  } catch (e) {
+    console.warn("[originales-drive] no se pudo leer el nombre original; se usa el de la copia:", msg(e));
+  }
+  return nombres;
+}
+
 /** Pasa a Drive / limpia lotes hasta acabar o agotar el tiempo. */
 export async function pasarLote(o: OpcionesLote): Promise<InformeDrive> {
   const { supabase, drive } = o;
@@ -202,11 +233,13 @@ export async function pasarLote(o: OpcionesLote): Promise<InformeDrive> {
     const pendientes = (lote.pendientes ?? []).filter((p) => !vistas.has(`p${p}`));
     if (facturas.length + huerfanos.length + pendientes.length === 0) return informe;
 
+    const porSubir = facturas.filter((f) => f.existe && !f.drive_url && !esOriginalDePagina(f.archivo_path)).map((f) => f.id);
+    const nombres = await nombresOriginales(supabase, porSubir);
     for (const f of facturas) {
       if (ahora() > fin) return { ...informe, quedan: true };
       vistas.add(`f${f.id}`);
       try {
-        const r = await pasarFactura(supabase, drive, f);
+        const r = await pasarFactura(supabase, drive, { ...f, nombre_original: f.nombre_original ?? nombres.get(f.id) ?? null });
         if (r === "subida") informe.facturas.subidas++;
         else if (r === "copia_borrada") informe.facturas.copias_borradas++;
         else informe.facturas.sin_fichero++;

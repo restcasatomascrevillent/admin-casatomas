@@ -14,6 +14,8 @@ const createClient = clienteConAuditoria(createClientBase, "facturas-originales-
 //  función sube a Drive (carpeta del proveedor → mes) los originales que aún
 //  estén en el bucket facturas-originales, los borra de Storage y limpia los
 //  restos del OCR por trabajos (procesar-factura/originalesDrive.ts).
+//  Desde el 18/11/2026 es el camino NORMAL: guardar una factura deja su
+//  original en temporal/ (archivo_path sin drive_url) sin esperar a Drive.
 //
 //  La llaman:
 //    - pg_cron «facturas-originales-drive» cada 10 min (solo si hay algo que
