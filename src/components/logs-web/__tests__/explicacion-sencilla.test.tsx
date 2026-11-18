@@ -95,7 +95,7 @@ describe("explicación de una incidencia", () => {
       sesiones_afectadas: 0, rutas: [{ ruta: "(sin ruta)", n: 6 }], origen: "web" }), [], null, null, AHORA);
     expect(e.cabecera).toBe("Fallo del admin · Panel › Facturas");
     expect(e.titulo).toBe("La clasificación automática de productos tardó demasiado y se cortó.");
-    expect(e.queFallo).toBe("La base de datos iba muy cargada y la clasificación automática de productos tardó más de lo permitido, así que se canceló. Suele pasar cuando se guardan muchas facturas a la vez.");
+    expect(e.queFallo).toBe("La base de datos iba muy cargada y la clasificación automática de productos tardó más de lo permitido, así que se canceló. Suele pasar cuando la base de datos tiene mucho trabajo a la vez (por ejemplo, al subir muchas facturas).");
     expect(e.afecta).toBe("A nadie de fuera; los productos de las facturas nuevas se clasifican unos minutos más tarde. Ha pasado 6 veces (3 en las últimas 24 h).");
     expect(e.seArregla).toBe("Sí: se reintenta sola cada 5 minutos y no se pierde nada.");
     expect(e.queHacer).toBe("Nada si es suelto. Si se repite, avisa al técnico.");

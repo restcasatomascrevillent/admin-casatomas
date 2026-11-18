@@ -52,7 +52,7 @@ export interface FuncionConocida extends FuncionServidor {
 
 const PANEL = "hay que volver a intentarlo desde el panel";
 const CLIENTE = "el cliente tendría que volver a intentarlo";
-const FACTURAS = "suele pasar cuando se guardan muchas facturas a la vez";
+const FACTURAS = "suele pasar cuando la base de datos tiene mucho trabajo a la vez (por ejemplo, al subir muchas facturas)";
 
 const web = (zona: string, nombre: string, hace: string, afecta: string, reintento: string | null, repetir?: string): FuncionServidor =>
   ({ ambito: "web", zona, nombre, hace, afecta: `a los clientes: ${afecta}`, reintento, ...(repetir ? { repetir } : {}) });

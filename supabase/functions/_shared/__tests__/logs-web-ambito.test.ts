@@ -226,7 +226,7 @@ describe("causa conocida «canceling statement due to statement timeout» / «lo
     const c = causaConocida({ tipo: "error_servidor", fuente: "servidor", mensaje: CLASIFICAR, objetivo: "clasificar-productos" })!;
     expect(c.sencillo.titulo).toBe("La clasificación automática de productos tardó demasiado y se cortó.");
     expect(c.sencillo.quePasa).toBe(
-      "La base de datos iba muy cargada y la clasificación automática de productos tardó más de lo permitido, así que se canceló. Suele pasar cuando se guardan muchas facturas a la vez.",
+      "La base de datos iba muy cargada y la clasificación automática de productos tardó más de lo permitido, así que se canceló. Suele pasar cuando la base de datos tiene mucho trabajo a la vez (por ejemplo, al subir muchas facturas).",
     );
     expect(c.sencillo.seArregla).toBe("Sí: se reintenta sola cada 5 minutos y no se pierde nada.");
     expect(c.sencillo.queHacer).toBe("Nada si es suelto. Si se repite, avisa al técnico.");

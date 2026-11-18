@@ -214,7 +214,7 @@ describe("ticket de un fallo del admin (ejemplo real: clasificar-productos con s
       "**Fallo del admin · Panel › Facturas**",
       "**La clasificación automática de productos tardó demasiado y se cortó.**",
       "",
-      "- **Qué pasó:** La base de datos iba muy cargada y la clasificación automática de productos tardó más de lo permitido, así que se canceló. Suele pasar cuando se guardan muchas facturas a la vez.",
+      "- **Qué pasó:** La base de datos iba muy cargada y la clasificación automática de productos tardó más de lo permitido, así que se canceló. Suele pasar cuando la base de datos tiene mucho trabajo a la vez (por ejemplo, al subir muchas facturas).",
       "- **A quién afecta:** A nadie de fuera; los productos de las facturas nuevas se clasifican unos minutos más tarde. Ha pasado 6 veces (3 en las últimas 24 h).",
       "- **¿Se arregla solo?** Sí: se reintenta sola cada 5 minutos y no se pierde nada.",
       "- **Desde cuándo:** Desde el 08/11/2026, 11:00. La última vez, el 08/11/2026, 12:50.",
