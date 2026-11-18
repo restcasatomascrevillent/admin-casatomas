@@ -35,6 +35,7 @@ import {
   filasDeCsv,
   lineasDeHoja,
   prefiltrarLineas,
+  type Candidata,
   type Filas,
   type NombreCompra,
 } from "./hoja.ts";
@@ -112,7 +113,16 @@ export async function procesarPresupuesto(e: EntradaAdjuntar): Promise<Resultado
     p_lineas: leido.lineas.map((l, i) => ({ producto: l.producto, embedding: vectores[i] })),
   });
   if (errEmp) throw new Error(`emparejar_presupuesto_agente: ${errEmp.message}`);
-  const lineas = unirEmparejadas(leido.lineas, emparejadas ?? []);
+  let lineas = unirEmparejadas(leido.lineas, emparejadas ?? []);
+  // Como las hojas: reglas fijas (otro producto, otro tamaño) y confirmación por IA antes de comparar.
+  const avisosPdf: string[] = [];
+  if (lineas.some((l) => l.producto_id != null)) {
+    const { data: compras, error: errNom } = await e.supabase.rpc("nombres_compras_agente");
+    if (errNom) throw new Error(`nombres_compras_agente: ${errNom.message}`);
+    const r = await confirmarLineasEmparejadas(lineas, (Array.isArray(compras) ? compras : []) as NombreCompra[], e);
+    lineas = r.lineas;
+    if (r.lotesFallidos > 0) avisosPdf.push("No se ha podido confirmar el formato de algunos productos: salen como «Revisar».");
+  }
 
   const id = await guardar(e, { nombre, proveedor: leido.proveedor, fecha: leido.fecha, lineas, sinCompra: 0 });
   return {
@@ -123,7 +133,7 @@ export async function procesarPresupuesto(e: EntradaAdjuntar): Promise<Resultado
       proveedor: leido.proveedor,
       lineas: lineas.length,
       queCompras: lineas.filter((l) => l.producto_id != null).length,
-      avisos: leido.avisos,
+      avisos: [...leido.avisos, ...avisosPdf],
     }),
   };
 }
@@ -230,4 +240,49 @@ async function guardar(
     .single();
   if (errIns) throw new Error(`chat_presupuestos: ${errIns.message}`);
   return fila.id;
+}
+
+/**
+ * PDF y foto (revisión de producción 18/11/2026): antes solo pasaban por la similitud de texto de
+ * emparejar_presupuesto_agente y volvían los fallos del 16/11 (tamaño, edición, otra marca). Ahora cada línea
+ * emparejada pasa por las mismas reglas fijas (pareja.ts) y la misma confirmación por IA que las hojas.
+ * Lo que las reglas o la IA descartan pierde el emparejamiento (cuenta como «no lo compras»).
+ */
+export async function confirmarLineasEmparejadas<L extends LineaPresupuesto & Record<string, unknown>>(
+  lineas: L[],
+  nombresCompra: NombreCompra[],
+  e: Pick<EntradaAdjuntar, "clave" | "fetchImpl" | "alUsarConfirmar">,
+): Promise<{ lineas: L[]; lotesFallidos: number }> {
+  const porProducto = comprasPorProducto(nombresCompra);
+  const cands: Candidata[] = [];
+  lineas.forEach((l, i) => {
+    if (l.producto_id == null) return;
+    const pid = Number(l.producto_id);
+    if (!Number.isFinite(pid)) return;
+    const cat = String(l.producto_catalogo ?? "");
+    const similitud = Number(l.similitud ?? 0.9);
+    const opcion = { producto_id: pid, producto_catalogo: cat, nombre_compra: porProducto.get(pid)?.[0] ?? cat, cobertura: 1, similitud, trigramas: 0 };
+    cands.push({ i, producto_id: pid, producto_catalogo: cat, cobertura: 1, similitud, confianza: l.confianza === "alta" ? "alta" : "media", opciones: [opcion] });
+  });
+  if (cands.length === 0) return { lineas, lotesFallidos: 0 };
+  const dep = depurarCandidatas(lineas, cands, porProducto);
+  const conf = await confirmarParejas(lineas, dep.candidatas, { clave: e.clave, fetchImpl: e.fetchImpl, alUsar: e.alUsarConfirmar, compras: porProducto });
+  const final = new Map(conf.candidatas.map((c) => [c.i, c]));
+  const salida = lineas.map((l, i) => {
+    if (l.producto_id == null) return l;
+    const c = final.get(i);
+    // deno-lint-ignore no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const base: any = { ...l };
+    if (!c) {
+      for (const k of ["producto_id", "producto_catalogo", "metodo", "confianza", "similitud", "nota"]) delete base[k];
+      return base as L;
+    }
+    base.producto_id = c.producto_id;
+    base.producto_catalogo = c.producto_catalogo;
+    base.confianza = c.confianza;
+    if (c.nota) base.nota = c.nota;
+    return base as L;
+  });
+  return { lineas: salida, lotesFallidos: conf.lotesFallidos };
 }
