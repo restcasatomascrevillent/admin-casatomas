@@ -39,16 +39,16 @@ const MAX_FILAS = 15;
 
 function usePermisosAvisos(): PermisosAvisos & { cargando: boolean } {
   const reservas = useCanAccessSection("reservas");
+  // Solo «marketing», como la RLS (`seccion_aviso`): los avisos de encargos son para el restaurante, no para la agencia.
   const marketing = useCanAccessSection("marketing");
-  const agencia = useCanAccessSection("instagram_agencia");
   const facturas = usePermisosFacturas();
   const { isSuperAdmin, loading } = useSuperAdmin();
   return {
     reservas: reservas.canAccess,
     facturas: facturas.consultar,
-    rrss: marketing.canAccess || agencia.canAccess,
+    rrss: marketing.canAccess,
     superAdmin: isSuperAdmin,
-    cargando: reservas.loading || marketing.loading || agencia.loading || facturas.cargando || loading,
+    cargando: reservas.loading || marketing.loading || facturas.cargando || loading,
   };
 }
 

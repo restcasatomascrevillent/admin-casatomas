@@ -18,7 +18,7 @@ import {
   type Candidata,
   type Filas,
 } from "../hoja.ts";
-import { resumenParaModelo, tablaPresupuesto } from "../tabla.ts";
+import { resumenParaModelo, tablaPresupuesto, verDePregunta } from "../tabla.ts";
 import { prepararPresupuesto } from "../bucle.ts";
 
 describe("paquetes y contenido del nombre", () => {
@@ -117,26 +117,55 @@ const RESULTADO = {
 };
 
 describe("tablaPresupuesto (la tabla completa la monta el servidor)", () => {
-  it("todas las líneas en Interesa / Revisar / No interesa y el ahorro anual contado una vez por producto", () => {
+  it("por defecto solo Interesa (sin la otra referencia), con el total y el aviso de lo que queda", () => {
     const t = tablaPresupuesto(RESULTADO);
     expect(t).toContain("**Ahorro estimado al año: 216,35 €**");
-    expect(t).toContain("### Interesa (2)");
-    expect(t).toContain("### Revisar (2)");
-    expect(t).toContain("### No interesa (1)");
-    expect(t).toContain("otra ref. del mismo producto");
-    expect(t).toContain("5 cl frente a 70 cl");
-    expect(t).toContain("se compra en otra unidad (l, ud)");
+    expect(t).toContain("### Interesa: los 1 que más ahorran (de 1)");
+    expect(t).not.toContain("C12 N/REF");
+    expect(t).not.toContain("### Revisar");
+    expect(t).toContain("2 para revisar a mano");
+    expect(t).toContain("1 que no interesan");
     expect(t).toContain("descuento del 15 %");
     expect(t).toContain("2.669 artículos");
-    expect(t.indexOf("C6 ROSCA")).toBeLessThan(t.indexOf("C12 N/REF"));
-    // Una barra en un nombre no rompe la tabla.
-    expect(t).toContain("| MINI GIN RARO 5CL |");
-    // Cada fila de tabla con el mismo número de columnas que su cabecera.
     for (const bloque of t.split("\n\n").filter((b) => b.startsWith("|"))) {
       const filas = bloque.split("\n");
       const n = filas[0].split("|").length;
       for (const f of filas) expect(f.split("|").length).toBe(n);
     }
+  });
+
+  it("«ver los de Revisar» y «ver los que no interesan» enseñan esa tabla", () => {
+    const r = tablaPresupuesto(RESULTADO, "revisar");
+    expect(r).toContain("### Revisar (2)");
+    expect(r).toContain("5 cl frente a 70 cl");
+    expect(r).toContain("se compra en otra unidad (l, ud)");
+    expect(r).toContain("| MINI GIN RARO 5CL |"); // una barra en un nombre no rompe la tabla
+    expect(r).not.toContain("### Interesa");
+    expect(tablaPresupuesto(RESULTADO, "no_interesa")).toContain("CARMELO RODERO");
+    expect(verDePregunta("enséñame los de Revisar")).toBe("revisar");
+    expect(verDePregunta("ver los que no interesan")).toBe("no_interesa");
+    expect(verDePregunta("sin descuento")).toBe("interesa");
+  });
+
+  it("con la tarifa real (161 interesan, 299 revisar) la tabla por defecto cabe en el móvil: 30 filas y pocos caracteres", () => {
+    const lineas = [
+      ...Array.from({ length: 161 }, (_, i) => ({ producto: `ARTICULO NUMERO ${i} CON UN NOMBRE LARGO DE TARIFA 70CL C6`, coincide_con: "Producto del catalogo 70 cl", unidad: "ud", oferta: 10.5, ultimo: { precio: 12.25, proveedor: "Proveedor largo SL", fecha: "2026-10-01" }, dif_pct: -14.3, ahorro_anual: 500 - i, veredicto: "Interesa" })),
+      ...Array.from({ length: 299 }, (_, i) => ({ producto: `REVISAR ${i} 70CL`, coincide_con: "Otro 33 cl", veredicto: "Revisar", motivo: "formato_distinto", nota: "33 cl frente a 70 cl" })),
+      ...Array.from({ length: 4 }, (_, i) => ({ producto: `NO INTERESA ${i}`, oferta: 5, ultimo: { precio: 4 }, dif_pct: 25, veredicto: "No interesa" })),
+    ];
+    const t = tablaPresupuesto({ ...RESULTADO, lineas, resumen: { ...RESULTADO.resumen, lineas_total: 2669, ahorro_anual_interesa: 12085.68, productos_interesa: 161 } });
+    const filas = t.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Producto"));
+    expect(filas).toHaveLength(30);
+    expect(t.length).toBeLessThan(6_000);
+    expect(t).toContain("otros 131 que interesan");
+    // Ordenadas por ahorro: la primera es la que más ahorra.
+    expect(filas[0]).toContain("ARTICULO NUMERO 0 ");
+  });
+
+  it("descuento por importe: explica cómo se ha repartido", () => {
+    const t = tablaPresupuesto({ ...RESULTADO, descuento: { tipo: "importe", importe: 500, pct_equivalente: 0.57, aviso: "El importe fijo se ha repartido en proporcion al gasto de los ultimos 12 meses." } });
+    expect(t).toContain("descuento de 500,00 € (0,57 %)");
+    expect(t).toContain("repartido en proporcion al gasto");
   });
 
   it("al modelo solo le llega el resumen y las mejores (sin la otra referencia)", () => {
@@ -149,5 +178,6 @@ describe("tablaPresupuesto (la tabla completa la monta el servidor)", () => {
   it("prepararPresupuesto: con error no hay tabla (el modelo ve el error)", () => {
     expect(prepararPresupuesto({ error: "No hay ningun presupuesto adjunto" })).toBeNull();
     expect(prepararPresupuesto(RESULTADO)?.tabla).toContain("### Interesa");
+    expect(prepararPresupuesto(RESULTADO, "revisar")?.tabla).toContain("### Revisar");
   });
 });

@@ -186,6 +186,32 @@ function aparece(w: string, en: Set<string>): boolean {
   return false;
 }
 
+/** Envase de referencia del producto del catálogo: el del nombre o, si no lo dice, el tamaño más repetido en las facturas. */
+export function envaseDeReferencia(catalogo: string, compras: string[] = []): { cantidad: number | null; unidad: "kg" | "l" | "ud" | null } {
+  const fc = envaseDelNombre(catalogo);
+  if (fc.cantidad !== null) return fc;
+  const cuenta = new Map<string, { n: number; v: ReturnType<typeof envaseDelNombre> }>();
+  for (const n of compras) {
+    const v = envaseDelNombre(n);
+    if (v.cantidad === null) continue;
+    const k = `${v.cantidad}${v.unidad}`;
+    cuenta.set(k, { n: (cuenta.get(k)?.n ?? 0) + 1, v });
+  }
+  return [...cuenta.values()].sort((a, b) => b.n - a.n)[0]?.v ?? fc;
+}
+
+/** ¿La tarifa y el catálogo dicen el tamaño del envase y es el mismo? (entonces «C6 frente a C12» o «1 L frente a 70 cl» mal leídos no pesan). */
+export function tamanoVerificado(tarifa: string, catalogo: string, compras: string[] = []): boolean {
+  const ft = envaseDelNombre(tarifa);
+  const fc = envaseDeReferencia(catalogo, compras);
+  return ft.cantidad !== null && fc.cantidad !== null && ft.unidad === fc.unidad && Math.abs(ft.cantidad - fc.cantidad) / fc.cantidad <= 0.04;
+}
+
+/** El catálogo ni sus facturas dicen el tamaño del envase («Ginebra Tanqueray Ten»): no se puede verificar, solo sugerir. */
+export function tamanoDesconocido(catalogo: string, compras: string[] = []): boolean {
+  return envaseDeReferencia(catalogo, compras).cantidad === null;
+}
+
 export interface Conflicto {
   tipo: "otro_producto" | "formato_distinto" | "dudosa";
   motivo: string;

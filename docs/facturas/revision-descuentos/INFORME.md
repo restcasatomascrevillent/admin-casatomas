@@ -6,11 +6,9 @@ cruzado con las 60 fichas de proveedor de `conocimiento-facturas/fichas/`, con e
 (`procesar-factura`), con la clasificación de productos y con las funciones que calculan precios,
 costes y márgenes. Las reservas quedan fuera.
 
-> **Límite de esta versión.** Los PDF originales que guarda el panel están en el Drive de la cuenta
-> del panel, y el conector de Drive de Claude no tiene acceso a esa carpeta. Todo lo que sigue sale de
-> las líneas guardadas y de las fichas. Lo que hay que cotejar con el papel está en el apartado 7: se
-> hará en cuanto se comparta la carpeta «Facturas Casa Tomás» en solo lectura. Drive devuelve el texto
-> de cada PDF, así que el cotejo será rápido.
+> **Cotejado con los originales el 18/11/2026** (apartado 7): 36 documentos dirigidos (34 al céntimo,
+> 2 escaneos ilegibles que cuadran por total) y búsqueda en el texto de todos los PDF, con 132
+> documentos sospechosos revisados uno a uno. La lectura no se ha dejado descuentos con importe.
 
 ---
 
@@ -246,17 +244,13 @@ datos van como migraciones, con su vuelta atrás.
 
 **Pendiente:**
 
-- **Punto 4, regalos.** Que la lectura guarde la marca de regalo exige tocar `procesar-factura`
-  (`guardado.ts`) y las dos funciones de OCR por páginas (`ocr_anadir_pagina` y
-  `ocr_sustituir_factura`), que hoy no guardan `descuento_pct` ni `importe_bruto`. No conviene
-  marcar a ciegas el histórico: de las 607 líneas a 0 €, solo 61 tienen precio impreso sin marcar, y
-  muchas no son regalos (pan sin valorar, envases, remesas de Pluxee).
+- **Punto 4, regalos.** Hecho en #292 (apartado 7.3), por la base de datos: vale para cualquier forma de
+  guardar.
 - **Punto 5, lectura de documentos nuevos** (a qué línea va cada descuento; código de promoción de
   Makro). Conviene hacerlo después del cotejo con originales.
 - **Punto 6**, unir los 3 albaranes a su factura: es un arreglo de datos de producción (en la demo no
   están). Se hace con `vincular_albaran_factura` cuando se publique.
-- **Apartado 7**, cotejo con los originales: bloqueado hasta que la carpeta del panel en Drive se
-  comparta con la cuenta conectada a Claude.
+- **Apartado 7**, cotejo con los originales: hecho el 18/11/2026 (ver apartado 7).
 
 ---
 
@@ -269,19 +263,73 @@ datos van como migraciones, con su vuelta atrás.
 
 ---
 
-## 7. Pendiente de cotejar con los originales
+## 7. Cotejo con los originales (18/11/2026)
 
-En cuanto haya acceso a la carpeta del panel en Drive:
+Originales: carpeta «FACTURAS» del Drive del panel (restcasatomascrevillent@gmail.com), compartida en
+lectura. Ojo: los `drive_url` de la base de datos apuntan a una copia anterior que ya no se ve; los
+archivos se unen por la clave del nombre («… (R1711).pdf» = `import_clave` `zip2025:R1711.pdf`), y la
+misma clave R se repite en la serie 2025 y en la 2026, así que hace falta también la fecha.
 
-1. **Búsqueda en el texto de todos los originales** de «descuento», «dto», «bonif», «promoción»,
-   «regalo», «sin cargo», «rappel», «pronto pago»… y cruce con lo guardado. Es la prueba de que no se
-   ha escapado ningún descuento que la lectura no viera.
-2. **Makro**: los 237 tickets con promociones, para unir cada «DT nnnnn» con su artículo.
-3. **Riscal** (11), **Directas** (40), **Disjover** (9), **Virola** (11), **Noara** (3): base y % del
-   descuento del pie.
-4. **Catral**: las 4 líneas en positivo y las 7 sin asociar; y una muestra de 10 facturas.
-5. **Regalos sin marcar**: una muestra por proveedor (Directas, Tabarca, Guillén, Hisumer, Salzillo…).
-6. Las **7 líneas con descuento que no cuadran** y las **74 sin valor bruto**.
+### 7.1 Cotejo dirigido (36 documentos)
+
+34 coinciden con el papel al céntimo; los otros 2 (Directas R1306 y R1641) son escaneos ilegibles cuyo
+total sí cuadra.
+
+| Proveedor | Resultado |
+|---|---|
+| **Riscal** (11) | El 20 % es siempre «TOTAL − 20 % BONIFICAC S/ total bruto», sobre todas las líneas con precio. Cuadra en las 11. Los regalos están guardados como líneas a 0 €, pero estaban sin marcar: R229 (270 botellas de Arienzo 2022 «Sin Cargo»), R1374 (15 botellas «Sin Cargo»: La Cuvée, Millésime, Rosé…), y merchandising (copas, champaneras, sacacorchos, drop stop) en R228, R229, R1079, R1374 y R1579 |
+| **Directas** (4) | El 9 % es del pie, sobre las líneas con precio (las de 0 € no cuentan). En R2231, 16 botellas bonificadas a 0 € (Tanqueray, JW Black, Baileys), guardadas sin marcar |
+| **Disjover** (3) | Una sola línea por factura (LP Brut Cuvée): el 5 % del pie es de esa línea |
+| **Mª Carmen Virola** (3) | El 20 % está escrito a mano sobre el **total con IVA (4 %)**. El importe restado coincide, pero se restó de la base: la base guardada queda unos 2–3 € baja por factura (239,86 en vez de 242,29; 177,28 en vez de 179,07; 220,43 en vez de 222,66). Lo pagado es correcto. No se corrige: es un 1 % y lo impreso no se toca |
+| **Noara** (4) | Cada «PROMOCIÓN ESPECIAL» o «SIN CARGO» va justo debajo de la caja regalada (que se factura solo por el impuesto especial): la caja sale gratis |
+| **Catral** (5) | Cada «DESC. <producto>» va en la línea siguiente al producto, con la misma cantidad y signo contrario. Los 4 descuentos en positivo también van en positivo en el papel: 2 deshacen el descuento de una devolución (R1363 y R976, correctos) y **2 son un error del proveedor que cobra el descuento en vez de restarlo**: factura 000919 (28/03/2025, Judas, **29,64 €** de más) y 000619 (28/02/2025, La Rubia, **61,56 €** de más). **91,20 € a reclamar a Catral.** R976 trae además 20 vasos regalados («DTO ESPECIE S/C. CERVEZA», −72 €), que sí están guardados |
+| **Makro** (3) | Las promociones van al final del ticket y se unen a su artículo por un **código** (5 dígitos o «180_1»), que aparece al final de la línea del artículo, detrás de «Prec.Ud.*» (precio ya descontado), y al final de la línea de la promoción. Siempre se cumple promoción = cantidad × (Prec. Ud. − Prec.Ud.*). La lectura no guarda ni el código ni «Prec.Ud.*» |
+
+### 7.2 Búsqueda en el texto de todos los originales
+
+Búsqueda de «bonificación», «bonif», «regalo», «sin cargo», «rappel», «pronto pago», «obsequio»,
+«promoción», «oferta», «gratis» y «descuento» en el texto de los PDF (Drive), y cruce con lo guardado.
+La búsqueda de Drive es aproximada (no busca frases exactas, mezcla sinónimos y salta con columnas
+vacías como «BONIF» de Diper y Dialse o textos legales de la luz y la telefonía).
+
+Cruce: de los documentos de proveedores de género cuyo papel tiene alguna de esas palabras y en los
+que **no** se había guardado ningún descuento ni regalo, se revisaron uno a uno los **132**. Resultado:
+
+- **111 no tienen nada**: columnas «Dto», «BONIF», «Rappel» o «Pronto pago» vacías o a 0, textos
+  legales, «BRUTO/TARA/NETO» en kilos, avisos de subida de precio a 0 € (Frutos Secos El Llano).
+- **Descuento ya metido en el precio de la línea** (el coste guardado es correcto; solo falta el «valor
+  sin descuento»): Diper (13 facturas, columnas BONIF en €/ud + DTO %: ~31 % sobre tarifa, de 61,90 € a
+  516,30 € por factura), Congelados Pinto R295 (promoción 3×1 al 50 %: −96,75 €), Nicolás y Valero R396
+  (DtoM en €/ud: −14,70 €) y Central Hisumer R541 («precio neto de promoción 4+1»).
+- **Ya guardado bien**: promociones «venta por volumen» de Makro (R318, R1045), abono de Uriarte
+  (AB25/87, −243,75 €), devolución de pan y portes de Eladio Pazos (R1754), envases de Santacruz.
+- **Regalo guardado sin importe**: Osborne R1994, una pieza de jamón de bellota de 8,72 kg sin precio
+  (unos 388 € al precio de la factura). Ahora se marca como regalo (ver 7.3).
+- **Regalos que la lectura NO guardó** (revisar a mano): Diper R572 (6 panes de hot-dog «sin_cargo»),
+  R1167 (3 piononos «OFERTA-CPROMO», unos 48,78 €) y R1699 (3 kg de ragout de ciervo, unos 47,55 €, y 2
+  salsas kimuchi).
+- **Para mirar en el PDF**: Tomás Nicolás Riquelme R1265 trae «+3» a mano junto a las aceitunas que el
+  texto no deja interpretar (¿unidades de regalo?).
+
+Conclusión: **la lectura no se ha dejado descuentos con importe**. Lo que faltaba era asignarlos al
+producto (corregido en #288 y #289) y marcar los regalos (#292).
+
+### 7.3 Corregido tras el cotejo
+
+- [#292](https://github.com/restcasatomascrevillent/admin-casatomas/pull/292): los regalos (líneas a 0 €
+  o sin importe) quedan marcados con 100 % de descuento y su valor, y los descuentos en positivo de
+  Catral se asocian a su línea (`20261211400000`). En la demo: 86 regalos, 10.804 €.
+
+### 7.4 Pendiente
+
+- **Makro**: guardar en la lectura el código de promoción y «Prec.Ud.*» de cada artículo y asociar por
+  código; para el histórico, volver a leer sus 237 tickets. Importe afectado: 1.575 €.
+- **Merchandising sin precio** (copas, champaneras): no se marca como regalo porque no tiene valor; si se
+  quiere ver, haría falta una regla por proveedor.
+- **Reclamar a Catral** los 91,20 € (lo hace el dueño).
+- **Regalos de Diper sin leer** (3 facturas, apartado 7.2): añadirlos a mano en el panel si se quiere.
+- **«Valor sin descuento»** de Diper, Pinto, Nicolás y Valero: la lectura no guarda el % ni la tarifa
+  cuando el descuento va dentro del precio. No cambia ningún coste.
 
 ---
 

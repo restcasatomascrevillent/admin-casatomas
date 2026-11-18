@@ -1,11 +1,23 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { FiltrosAuditoria } from "@/components/auditoria/FiltrosAuditoria";
+import {
+  CATEGORIA_PROCESOS,
+  CategoriasAuditoria,
+} from "@/components/auditoria/CategoriasAuditoria";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { ScrollText, Loader2, Cog } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
+  ScrollText,
+  SearchX,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   useAuditLog,
   agruparEntradas,
@@ -102,7 +114,6 @@ export default function SuperAdminAuditoria() {
     pageSize,
     loading,
     error,
-    refetch,
     accesosActivos,
   } = useAuditLog(filtros, pagina);
   const grupos = useMemo(() => agruparEntradas(entradas), [entradas]);
@@ -111,6 +122,23 @@ export default function SuperAdminAuditoria() {
   // no. Sin medida (jsdom, primer pintado) cae al layout de siempre.
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_AUDITORIA);
+  // Al cambiar de página o de filtros, la lista vuelve arriba (si no, la página 2 se abre a media altura).
+  const listaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (listaRef.current) listaRef.current.scrollTop = 0;
+  }, [pagina, filtros, vista]);
+  // «Actualizar»: las dos cargas (lista y vistas agrupadas) escuchan este evento. El icono gira un momento para
+  // que se note que ha hecho algo (la lista se refresca sin parpadear).
+  const [girando, setGirando] = useState(false);
+  useEffect(() => {
+    if (!girando) return;
+    const t = window.setTimeout(() => setGirando(false), 700);
+    return () => window.clearTimeout(t);
+  }, [girando]);
+  const actualizar = () => {
+    window.dispatchEvent(new Event("auditoria-actualizada"));
+    setGirando(true);
+  };
 
   const alternarExpandida = (key: string) => {
     setExpandidas((prev) => {
@@ -132,6 +160,16 @@ export default function SuperAdminAuditoria() {
     setPagina(0);
   };
 
+  // La «×» de un chip quita ese filtro al momento (el origen vuelve a «sin procesos del servidor»).
+  const quitarFiltros = (campos: (keyof AuditLogFiltros)[]) => {
+    const siguientes: AuditLogFiltros = { ...filtros };
+    for (const campo of campos) delete siguientes[campo];
+    if (campos.includes("origen")) siguientes.origen = "sin_servidor";
+    setFiltros(siguientes);
+    setFiltrosPendientes(siguientes);
+    setPagina(0);
+  };
+
   // Cada acceso reemplaza acción, sección y origen para evitar combinar categorías
   // incompatibles. Conserva los filtros de fecha, persona, resultado y búsqueda.
   const filtroRapido = (accion?: string, tabla?: string, procesos = false) => {
@@ -145,6 +183,11 @@ export default function SuperAdminAuditoria() {
     setFiltrosPendientes(siguientes);
     setPagina(0);
   };
+  const elegirCategoria = (id: string) => {
+    if (id === CATEGORIA_PROCESOS) return filtroRapido(undefined, undefined, true);
+    const categoria = FILTROS_RAPIDOS.find((c) => c.id === id);
+    if (categoria) filtroRapido(categoria.accion, categoria.tabla);
+  };
   const procesosActivos = filtros.origen === "servidor";
   const categoriaActiva =
     filtros.origen === "sin_servidor"
@@ -154,8 +197,21 @@ export default function SuperAdminAuditoria() {
             (filtros.tabla || undefined) === categoria.tabla,
         )
       : undefined;
+  // Lo que ya dice la categoría elegida no se repite en los chips de filtros.
+  const ocultarEnResumen: (keyof AuditLogFiltros)[] = procesosActivos
+    ? ["origen"]
+    : categoriaActiva
+      ? ["accion", "tabla"]
+      : [];
+  const hayFiltros =
+    Object.entries(filtros).some(
+      ([campo, valor]) =>
+        Boolean(valor) && !(campo === "origen" && valor === "sin_servidor"),
+    ) || !filtros.origen;
 
   const totalPaginas = Math.max(1, Math.ceil(total / pageSize));
+  const primero = pagina * pageSize + 1;
+  const ultimo = Math.min(total, (pagina + 1) * pageSize);
 
   return (
     <SuperAdminLayout>
@@ -166,12 +222,12 @@ export default function SuperAdminAuditoria() {
       >
         <div className="flex shrink-0 items-center gap-3">
           <ScrollText className="h-6 w-6 shrink-0 text-destructive sm:h-8 sm:w-8" />
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold text-foreground">
               Auditoría
             </h1>
             <p className="hidden text-sm text-muted-foreground sm:block">
-              Accesos, intentos y acciones de todas las personas y dispositivos.
+              Quién ha hecho qué en el panel, cuándo y desde qué dispositivo.
             </p>
           </div>
         </div>
@@ -179,7 +235,7 @@ export default function SuperAdminAuditoria() {
         {accesosActivos === false && (
           <p
             role="status"
-            className="rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900"
+            className="shrink-0 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
           >
             Pendiente de activar el registro completo de accesos en el servidor.
             Todavía no se recogen todos los intentos ni las sesiones
@@ -193,115 +249,94 @@ export default function SuperAdminAuditoria() {
           onChange={setFiltrosPendientes}
           onAplicar={aplicarFiltros}
           onLimpiar={limpiarFiltros}
+          onQuitar={quitarFiltros}
+          ocultarEnResumen={ocultarEnResumen}
         />
 
-        <div className="min-w-0 shrink-0 space-y-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <nav
-              className="flex min-w-0 flex-1 gap-1 overflow-x-auto overscroll-x-contain border-b pb-1 lg:flex-wrap lg:overflow-visible lg:border-0 lg:pb-0"
-              aria-label="Filtros rápidos por tipo de acción"
-            >
-              {FILTROS_RAPIDOS.map((categoria) => (
-                <Button
-                  key={categoria.id}
-                  type="button"
-                  size="sm"
-                  className={`h-11 shrink-0 rounded-none border-b-2 px-3 lg:h-9 lg:rounded-lg lg:border ${categoriaActiva?.id === categoria.id ? "border-primary bg-primary/10 text-primary" : "border-transparent text-muted-foreground"}`}
-                  variant="ghost"
-                  aria-pressed={categoriaActiva?.id === categoria.id}
-                  onClick={() =>
-                    filtroRapido(categoria.accion, categoria.tabla)
-                  }
-                >
-                  {categoria.label}
-                </Button>
-              ))}
-            </nav>
-            <Button
-              type="button"
-              size="sm"
-              className="h-11 shrink-0 gap-1.5 px-3"
-              variant={procesosActivos ? "default" : "outline"}
-              aria-pressed={procesosActivos}
-              onClick={() => filtroRapido(undefined, undefined, true)}
-            >
-              <Cog className="h-4 w-4" aria-hidden="true" />
-              Procesos
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground" role="status">
-            {procesosActivos
+        <CategoriasAuditoria
+          categorias={FILTROS_RAPIDOS}
+          activa={categoriaActiva?.id}
+          procesos={procesosActivos}
+          onElegir={elegirCategoria}
+          descripcion={
+            procesosActivos
               ? "Procesos automáticos del servidor y de la base de datos"
               : (categoriaActiva?.descripcion ??
                 (filtros.origen === "sin_servidor"
                   ? "Procesos del servidor ocultos"
-                  : "Filtros personalizados"))}
-          </p>
-        </div>
+                  : "Filtros personalizados"))
+          }
+        />
 
         {/* Conserva espacio para los registros incluso al desplegar los filtros. */}
-        <Card className="flex min-h-48 min-w-0 flex-1 flex-col">
+        <Card className="flex min-h-48 min-w-0 flex-1 flex-col overflow-hidden">
           <Tabs value={vista} onValueChange={setVista} className="flex min-h-0 flex-1 flex-col">
-            <CardHeader className="shrink-0 gap-3 border-b bg-muted/20 p-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0 lg:px-4">
+            <div className="flex shrink-0 items-center gap-2 border-b bg-muted/20 px-3 py-2 lg:px-4">
               <ChipsSubnivel
                 aria-label="Vista"
-                className="sm:self-start"
+                className="min-w-0"
                 chips={[
                   { valor: "lista", etiqueta: "Lista" },
-                  { valor: "mes", etiqueta: "Por mes" },
                   { valor: "dia", etiqueta: "Por día" },
+                  { valor: "mes", etiqueta: "Por mes" },
                 ]}
               />
-              {vista === "lista" && (
-                <div className="flex items-center justify-between gap-3 lg:ml-auto">
-                  <p className="text-sm text-muted-foreground">
-                    {total.toLocaleString("es-ES")} registro{total === 1 ? "" : "s"}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void refetch()}
-                    disabled={loading}
-                  >
-                    Actualizar
-                  </Button>
-                </div>
-              )}
-            </CardHeader>
-            <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 lg:p-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto h-9 shrink-0 gap-2 px-2.5 text-muted-foreground hover:text-foreground pointer-coarse:h-11 pointer-coarse:min-w-11"
+                onClick={actualizar}
+                aria-label="Actualizar"
+                title="Actualizar"
+              >
+                <RefreshCw
+                  className={cn("h-4 w-4", girando && "animate-spin motion-reduce:animate-none")}
+                  aria-hidden="true"
+                />
+                <span className="hidden sm:inline">Actualizar</span>
+              </Button>
+            </div>
+            <div
+              ref={listaRef}
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+            >
               <TabsContent value="lista" className="mt-0">
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : error ? (
-                  <p className="text-sm text-destructive py-4">
+                  <p className="m-3 rounded-md bg-destructive/10 px-3 py-3 text-sm text-destructive">
                     Error al cargar la auditoría: {error}
                   </p>
                 ) : grupos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4">
-                    No hay registros con estos filtros.
-                  </p>
+                  <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
+                    <SearchX className="h-8 w-8 text-muted-foreground/60" aria-hidden="true" />
+                    <p className="text-sm font-medium text-foreground">
+                      No hay registros con estos filtros.
+                    </p>
+                    {hayFiltros && (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          Prueba con otra categoría o quita algún filtro.
+                        </p>
+                        <Button variant="outline" size="sm" className="mt-1" onClick={limpiarFiltros}>
+                          Ver toda la actividad
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 ) : (
                   <TablaEntradasAuditoria
                     grupos={grupos}
                     expandidas={expandidas}
                     onToggle={alternarExpandida}
+                    separarPorDia
                   />
                 )}
               </TabsContent>
 
-              <TabsContent value="mes" className="mt-0">
-                <VistaPorMes
-                  filtros={filtros}
-                  rango={rangoMeses}
-                  onRangoChange={setRangoMeses}
-                  expandidasFilas={expandidas}
-                  onToggleFila={alternarExpandida}
-                />
-              </TabsContent>
-
-              <TabsContent value="dia" className="mt-0">
+              <TabsContent value="dia" className="mt-0 p-3 lg:p-4">
                 <VistaPorDia
                   filtros={filtros}
                   rango={rangoMeses}
@@ -310,30 +345,53 @@ export default function SuperAdminAuditoria() {
                   onToggleFila={alternarExpandida}
                 />
               </TabsContent>
-            </CardContent>
-            {vista === "lista" && !loading && !error && grupos.length > 0 && (
-              <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t px-3 py-3 lg:px-4">
-                <p className="text-sm text-muted-foreground">
-                  Página {pagina + 1} de {totalPaginas}
+
+              <TabsContent value="mes" className="mt-0 p-3 lg:p-4">
+                <VistaPorMes
+                  filtros={filtros}
+                  rango={rangoMeses}
+                  onRangoChange={setRangoMeses}
+                  expandidasFilas={expandidas}
+                  onToggleFila={alternarExpandida}
+                />
+              </TabsContent>
+            </div>
+            {vista === "lista" && !error && total > 0 && (
+              <div className="flex shrink-0 items-center justify-between gap-3 border-t px-3 py-2 lg:px-4">
+                <p className="text-xs text-muted-foreground tabular-nums sm:text-sm">
+                  {primero.toLocaleString("es-ES")}–{ultimo.toLocaleString("es-ES")} de{" "}
+                  {total.toLocaleString("es-ES")}
+                  <span className="hidden sm:inline"> registro{total === 1 ? "" : "s"}</span>
                 </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pagina === 0}
-                    onClick={() => setPagina((p) => p - 1)}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pagina + 1 >= totalPaginas}
-                    onClick={() => setPagina((p) => p + 1)}
-                  >
-                    Siguiente
-                  </Button>
-                </div>
+                {totalPaginas > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-1 px-2.5 pointer-coarse:h-11 pointer-coarse:min-w-11"
+                      disabled={pagina === 0 || loading}
+                      onClick={() => setPagina((p) => p - 1)}
+                      aria-label="Anterior"
+                    >
+                      <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                      <span className="hidden sm:inline">Anterior</span>
+                    </Button>
+                    <span className="min-w-12 text-center text-xs text-muted-foreground tabular-nums">
+                      {pagina + 1} / {totalPaginas}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-1 px-2.5 pointer-coarse:h-11 pointer-coarse:min-w-11"
+                      disabled={pagina + 1 >= totalPaginas || loading}
+                      onClick={() => setPagina((p) => p + 1)}
+                      aria-label="Siguiente"
+                    >
+                      <span className="hidden sm:inline">Siguiente</span>
+                      <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </Tabs>

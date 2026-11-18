@@ -24,7 +24,7 @@ export function VistaPorMes({
   expandidasFilas: Set<string>;
   onToggleFila: (key: string) => void;
 }) {
-  const { entradas, loading, error, truncado, refetch } = useAuditLogAgrupado(filtros, rango);
+  const { entradas, loading, error, truncado } = useAuditLogAgrupado(filtros, rango);
   const meses = useMemo(() => agruparPorMes(entradas), [entradas]);
 
   return (
@@ -35,21 +35,19 @@ export function VistaPorMes({
         usandoFiltroFechas={Boolean(filtros.desde || filtros.hasta)}
         truncado={truncado}
         total={entradas.length}
-        loading={loading}
-        onActualizar={refetch}
       />
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : error ? (
-        <p className="text-sm text-destructive py-4">Error al cargar la auditoría: {error}</p>
+        <p className="rounded-md bg-destructive/10 px-3 py-3 text-sm text-destructive">No se pudo cargar la auditoría: {error}</p>
       ) : meses.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4">No hay registros en este rango.</p>
+        <p className="py-10 text-center text-sm text-muted-foreground">No hay registros en este periodo con estos filtros.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {meses.map((mes, indice) => (
-            <Collapsible key={mes.key} defaultOpen={indice === 0} className="rounded-lg border border-border bg-card">
+            <Collapsible key={mes.key} defaultOpen={indice === 0} className="overflow-hidden rounded-lg border border-border bg-card">
               <ResumenGrupoAuditoria
                 etiqueta={mes.etiqueta}
                 totalRegistros={mes.totalRegistros}
@@ -57,7 +55,7 @@ export function VistaPorMes({
                 actoresDistintos={new Set(mes.dias.flatMap((d) => d.entradas.map(identificarActor))).size}
                 nivel="mes"
               />
-              <CollapsibleContent className="flex flex-col gap-2 border-t border-border/60 p-2">
+              <CollapsibleContent className="divide-y divide-border/60 border-t border-border/60">
                 {mes.dias.map((dia, indiceDia) => (
                   <GrupoDiaAuditoria
                     key={dia.key}
