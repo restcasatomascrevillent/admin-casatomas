@@ -228,6 +228,54 @@ export function textoErrorSubida(error: string | null | undefined): string {
   if (/insert |update |select |relation |column |violates |constraint|postgres|pgrst|\bsql\b|\brpc\b|edge function|non-2xx|\b[0-9]{5}\b|\bat \w+\.\w+/i.test(e)) {
     return "No se ha podido guardar la factura. Pulsa «Reintentar»; si vuelve a fallar, avisa a quien lleve el panel.";
   }
-  // Frases ya escritas para el usuario (cortas y sin jerga): se respetan.
-  return e.length <= 200 ? e : "No se ha podido leer el documento. Pulsa «Reintentar».";
+  // Lista blanca: solo se enseñan tal cual las frases que el propio panel o las funciones escriben para la persona.
+  // Cualquier otra cosa («permission denied…», «invalid input syntax…», «OpenAI 400…», «TypeError…») va al texto genérico.
+  if (e.length <= 200 && FRASES_PARA_PERSONA.some((r) => r.test(e)) && !JERGA_TECNICA.test(e)) return e;
+  return TEXTO_GENERICO_SUBIDA;
+}
+
+/** Texto cuando no se sabe qué pasó: nunca se enseña el mensaje original. */
+const TEXTO_GENERICO_SUBIDA = "No se ha podido leer el documento. Pulsa «Reintentar»; si vuelve a fallar, avisa a quien lleve el panel.";
+
+/** Frases ya escritas para la persona (lista blanca; se amplía a mano, nunca con un «lo demás»). */
+const FRASES_PARA_PERSONA: RegExp[] = [
+  /^El servidor ya no tiene el documento/i,
+  /^Elige al menos dos fotos/i,
+  /^Solo se pueden unir fotos/i,
+  /^Como mucho \d+ páginas por documento/i,
+  /^Ese trabajo pertenece a otro usuario/i,
+  /^No autorizado$/i,
+  /^Usuario no autenticado$/i,
+  /^No se pudo leer el archivo$/i,
+  /^No se ha podido (leer|guardar) (el documento|la factura)b/i,
+  /^El modelo rechazó procesar el documento/i,
+  /^Caducado sin decidir/i,
+  /^Esta factura ya estaba guardada/i,
+  /^tiempo agotado \(\d+ min\)/i,
+  /^No se pudo subir [^:]{1,120}: /i,
+];
+
+/** Rastros de texto de máquina que invalidan incluso una frase de la lista blanca. */
+const JERGA_TECNICA = /\b(error|exception|denied|invalid|syntax|typeerror|undefined|null|openai|supabase|stack|trace|jwt|token|uuid)\b|[{}<>]|\bat \w+\.\w+/i;
+
+/**
+ * Error del chat o del tablero (mensaje de la base de datos, de OpenAI o de JavaScript) en palabras normales: nunca el
+ * texto original. Mismos casos que la subida y, por defecto, una frase genérica.
+ */
+export function textoErrorChat(error: string | null | undefined): string {
+  const e = (error ?? "").trim();
+  if (/statement timeout|canceling statement|timeout|aborted/i.test(e)) return "La consulta ha tardado demasiado. Pulsa «Reintentar» o prueba con una pregunta más concreta.";
+  if (/\b429\b|cr[eé]dito|quota|saturad/i.test(e)) return "El servicio de IA está saturado ahora mismo. Espera unos segundos y pulsa «Reintentar».";
+  if (/network|failed to fetch|fetch failed|conexi[oó]n|offline/i.test(e)) return "Se ha cortado la conexión. Comprueba la red y pulsa «Reintentar».";
+  return "Ha habido un problema del servicio. Pulsa «Reintentar»; si vuelve a fallar, avisa a quien lleve el panel.";
+}
+
+/**
+ * Error del tablero: «falta aplicar la migración …» (útil para quien administra: dice qué hacer, sin jerga; «…falta aplicar la migración 2026…_nombre») y «timeout» se
+ * enseñan tal cual; el resto, el texto genérico del chat.
+ */
+export function textoErrorTablero(error: string | null | undefined): string {
+  const e = (error ?? "").trim();
+  if (e.length <= 200 && (/falta aplicar la migraci[oó]n \d{10,14}_[a-z0-9_]+\.?$/i.test(e) || /^timeout$/i.test(e))) return e;
+  return textoErrorChat(e);
 }

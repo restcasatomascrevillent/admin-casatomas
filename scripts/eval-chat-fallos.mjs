@@ -299,10 +299,38 @@ function consultar(sql, o) {
   return json.rows;
 }
 
-/** El banco dentro de una transacción que crea antes las migraciones dadas y se deshace al final. */
+/**
+ * Quita las sentencias de control de transacción de NIVEL SUPERIOR (una línea sola: begin; commit; rollback; start transaction;)
+ * de una migración. Un `commit;` propio confirmaría la simulación en el entorno real. Devuelve el SQL limpio y las líneas quitadas.
+ */
+export function neutralizarTransaccion(sql) {
+  const quitadas = [];
+  const limpio = String(sql)
+    .split(/\r?\n/)
+    .map((l) => {
+      if (/^\s*(begin|start\s+transaction|commit|rollback)(\s+(work|transaction))?\s*;\s*(--.*)?$/i.test(l)) {
+        quitadas.push(l.trim());
+        return `-- [simulación] quitado: ${l.trim()}`;
+      }
+      return l;
+    })
+    .join("\n");
+  return { sql: limpio, quitadas };
+}
+
+/** El banco dentro de una transacción que crea antes las migraciones dadas y se deshace al final (sin begin/commit propios). */
 export function sqlSimulado(banco, migraciones) {
   if (!migraciones.length) return banco;
-  return ["begin;", ...migraciones, banco, "rollback;"].join(String.fromCharCode(10));
+  const avisadas = new Set();
+  const limpias = migraciones.map((m) => {
+    const { sql, quitadas } = neutralizarTransaccion(m);
+    if (quitadas.length && !avisadas.has(m)) {
+      avisadas.add(m);
+      console.warn(`AVISO: una migración trae ${quitadas.join(" ")} propios; se han quitado para que la simulación no confirme nada.`);
+    }
+    return sql;
+  });
+  return ["begin;", ...limpias, banco, "rollback;"].join(String.fromCharCode(10));
 }
 
 const SERVICIO = "(select set_config('request.jwt.claims', '{\"role\":\"service_role\"}', true))";

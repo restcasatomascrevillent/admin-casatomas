@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import banco from "./banco-fallos.json";
 import { prepararLlamada, TOOLS } from "../../herramientas.ts";
-import { comprobaciones, literalSql, mediana, problemas, problemasDelBanco, sqlDeLlamada, sqlSimulado } from "../../../../../scripts/eval-chat-fallos.mjs";
+import { comprobaciones, literalSql, mediana, neutralizarTransaccion, problemas, problemasDelBanco, sqlDeLlamada, sqlSimulado } from "../../../../../scripts/eval-chat-fallos.mjs";
 
 const nombres = new Set(TOOLS.map((t) => t.function.name));
 
@@ -71,6 +71,17 @@ describe("scripts/eval-chat-fallos.mjs", () => {
     expect(sqlSimulado("select 1;", [])).toBe("select 1;");
     const sql = sqlSimulado("select 1;", ["create function a();", "create function b();"]);
     expect(sql.split(/\n/)).toEqual(["begin;", "create function a();", "create function b();", "select 1;", "rollback;"]);
+  });
+
+  it("sqlSimulado neutraliza begin/commit/rollback propios de las migraciones (un commit confirmaría la simulación)", () => {
+    const mig = ["begin;", "create function a();", "COMMIT;", ""].join("\n");
+    const r = neutralizarTransaccion(mig);
+    expect(r.quitadas).toEqual(["begin;", "COMMIT;"]);
+    const sql = sqlSimulado("select 1;", [mig]);
+    expect(sql.split("\n").filter((l) => /^\s*(begin|commit|rollback);/i.test(l))).toEqual(["begin;", "rollback;"]);
+    expect(sql).toContain("create function a();");
+    // el `begin` de plpgsql (sin punto y coma) y el `end;` de un cuerpo no se tocan
+    expect(neutralizarTransaccion(["do $$", "begin", "  perform 1;", "end;", "$$;"].join("\n")).quitadas).toEqual([]);
   });
 
   it("mediana", () => {
