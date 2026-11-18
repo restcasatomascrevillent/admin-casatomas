@@ -8,7 +8,7 @@ import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { TAM_PAGINA, useIncidencias, type Entorno, type FiltroOrigen, type FiltrosIncidencias, type Gravedad, type OrdenIncidencias } from "@/hooks/useLogsWeb";
 import { cn } from "@/lib/utils";
-import { causaDeFila, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO, origenDeFila, proveedorDeFila, sencilloDeFila } from "./calculos";
+import { causaDeFila, fichaDeFila, fmtFechaHora, NOMBRE_ESTADO, NOMBRE_GRAVEDAD, NOMBRE_LINEAR, NOMBRE_TIPO, origenDeFila, proveedorDeFila, sencilloDeFila } from "./calculos";
 import { Buscador, FiltroSelect, Interruptor, Paginacion } from "./Controles";
 import { BadgeOrigen, LeyendaOrigen, ResumenOrigenes } from "./Origen";
 import { estiloDe } from "./origenEstilos";
@@ -20,10 +20,16 @@ const ORDENES: Array<{ valor: OrdenIncidencias; etiqueta: string }> = [
   { valor: "ocurrencias", etiqueta: "Más ocurrencias" },
   { valor: "sesiones", etiqueta: "Más sesiones" },
 ];
-/** «Origen: todos» es el null del FiltroSelect; por defecto, fallos de la web y externos. */
+/**
+ * «Origen: todos» es el null del FiltroSelect; por defecto, los fallos nuestros
+ * (de la web y del admin) y los externos. Los fallos nuestros se pueden ver
+ * juntos o separados por ámbito (ambito.ts).
+ */
 const OPCIONES_ORIGEN: Array<{ valor: FiltroOrigen; etiqueta: string }> = [
-  { valor: "web_externos", etiqueta: "Fallos de la web y externos" },
-  { valor: "web", etiqueta: "Fallo de la web" },
+  { valor: "web_externos", etiqueta: "Fallos (web y admin) y externos" },
+  { valor: "web", etiqueta: "Fallos de la web y del admin" },
+  { valor: "fallo_web", etiqueta: "Fallo de la web" },
+  { valor: "fallo_admin", etiqueta: "Fallo del admin" },
   { valor: "externo", etiqueta: "Externos" },
   { valor: "no_depende", etiqueta: "No dependen de la web" },
 ];
@@ -111,6 +117,7 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
                 {q.data.filas.map((i) => {
                   const causa = causaDeFila(i);
                   const o = origenDeFila(i);
+                  const ficha = fichaDeFila(i);
                   const noDepende = grupoDeOrigen(o) === "no_depende";
                   const sencillo = sencilloDeFila(i);
                   return (
@@ -118,11 +125,15 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
                     onKeyDown={(e) => e.key === "Enter" && onAbrirIncidencia(i.id)} data-testid="fila-incidencia" data-origen={o}>
                     <TableCell className={cn("border-l-4", o === "web" ? "border-l-destructive" : o === "externo" ? "border-l-amber-500" : "border-l-slate-300 dark:border-l-slate-600")}>
                       <span className="flex flex-wrap items-center gap-2">
-                        <BadgeOrigen origen={o} proveedor={o === "externo" ? proveedorDeFila(i) : null} />
+                        <BadgeOrigen origen={o} proveedor={o === "externo" ? proveedorDeFila(i) : null} ambito={ficha.ambito} />
                         {i.gravedad === "critico" && o === "web" && <Badge variant="destructive" className="shrink-0">{NOMBRE_GRAVEDAD.critico}</Badge>}
-                        <span className={cn("min-w-0 basis-full line-clamp-2 break-words sm:basis-auto", !noDepende && "text-foreground")}>{i.titulo}</span>
+                        {/* Título en llano si sale del catálogo y la causa; si no, el mensaje técnico de siempre. */}
+                        <span className={cn("min-w-0 basis-full line-clamp-2 break-words sm:basis-auto", !noDepende && "text-foreground")} data-testid="titulo-fila">{ficha.titulo ?? i.titulo}</span>
                       </span>
-                      <span className="text-xs text-muted-foreground">{NOMBRE_TIPO[i.tipo] ?? i.tipo} · {i.fuente}{i.rutas[0] ? ` · ${i.rutas[0].ruta}` : ""} · gravedad {NOMBRE_GRAVEDAD[i.gravedad]?.toLowerCase() ?? i.gravedad}</span>
+                      <span className="text-xs text-muted-foreground" data-testid="datos-fila">
+                        {[ficha.zona, NOMBRE_TIPO[i.tipo] ?? i.tipo, i.fuente === "navegador" && i.rutas[0] ? i.rutas[0].ruta : null, `gravedad ${NOMBRE_GRAVEDAD[i.gravedad]?.toLowerCase() ?? i.gravedad}`].filter(Boolean).join(" · ")}
+                      </span>
+                      {ficha.titulo && <span className="block font-mono text-[11px] text-muted-foreground line-clamp-1 break-all" data-testid="tecnico-fila" title={i.titulo}>{i.titulo}</span>}
                       {sencillo && <span className={cn("mt-0.5 block text-xs line-clamp-2", o === "externo" ? estiloDe(o).texto : noDepende ? "text-muted-foreground" : "text-foreground/80")} data-testid="sencillo-fila">{sencillo}</span>}
                       {causa && (
                         <span className="mt-1 flex flex-wrap gap-1">
@@ -149,7 +160,7 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
             </Table>
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground" data-testid="sin-incidencias">
-              {conOrigen && origen === "web_externos" ? "No hay fallos de la web ni de servicios externos con estos filtros." : "No hay incidencias con estos filtros."}
+              {conOrigen && origen === "web_externos" ? "No hay fallos (de la web o del admin) ni de servicios externos con estos filtros." : "No hay incidencias con estos filtros."}
             </p>
           )}
           {!q.isLoading && !q.isError && <Paginacion pagina={pagina} tam={TAM_PAGINA} total={q.data?.total ?? 0} onCambio={setPagina} cargando={q.isFetching} />}

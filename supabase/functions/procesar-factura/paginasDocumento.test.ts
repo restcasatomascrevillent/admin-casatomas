@@ -156,6 +156,15 @@ describe("sustituirFactura", () => {
     expect(sb.rpcs.find((r) => r.nombre === "ocr_sustituir_factura")!.args.p_archivo_path).toMatch(/^temporal\/352-sust-t1-/);
   });
 
+  it("no calcula el vector de los nombres (lo hace el cron embeddings-nombres): solo el de la cabecera", async () => {
+    const sb = supabaseFalso({ trabajo: trabajo(), rpc: { ocr_sustituir_factura: { lineas_antes: 2, lineas: 2 } } });
+    const openai = openaiFalso();
+    const ctx = { supabase: sb.supabase, openai, drive: DRIVE_OFF } as unknown as ContextoGuardado;
+    await sustituirFactura(ctx, { trabajoId: "t1", facturaId: 352, userId: "u", esperado: {} });
+    expect(openai.embed.mock.calls.map((c) => typeof c[0])).toEqual(["string"]);
+    expect(sb.consultas.filter((c) => c.tabla === "productos_nombre_embedding")).toEqual([]);
+  });
+
   it("QA S-9: si el original nuevo ya no está, la factura CONSERVA el suyo (no se le quita el drive_url)", async () => {
     const sb = supabaseFalso({ trabajo: trabajo(), rpc: { ocr_sustituir_factura: { lineas_antes: 2, lineas: 2 } }, sinOriginal: true });
     const ctx = { supabase: sb.supabase, openai: openaiFalso(), drive: DRIVE_OFF } as unknown as ContextoGuardado;
@@ -217,6 +226,9 @@ describe("anadirPagina", () => {
     expect(finales.map((a) => a.codigo)).toEqual(["descuadre_cabecera", "otro"]);
     expect(r.pagina_anadida).toBe(true);
     expect(r.message).toMatch(/Página 1 añadida a la factura P26\/24306/);
+    // Sin vectores de nombres al añadir (los completa el cron embeddings-nombres).
+    expect(ctx.openai.embed).not.toHaveBeenCalled();
+    expect(sb.consultas.filter((c) => c.tabla === "productos_nombre_embedding")).toEqual([]);
   });
 
   it("no añade si el documento no es una página de esa factura", async () => {

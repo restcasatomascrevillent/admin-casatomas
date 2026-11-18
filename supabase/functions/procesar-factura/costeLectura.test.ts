@@ -145,7 +145,7 @@ function iaUsoFalso(funcion: "procesar-factura" | "ocr-trabajo", disparador: str
 const EMB = "text-embedding-3-small";
 
 describe("ia_uso: TODAS las llamadas del extractor se registran, en los tres caminos", () => {
-  it("síncrono (procesar-factura): visión + relectura + pie + embeddings de cabecera y líneas", async () => {
+  it("síncrono (procesar-factura): visión + relectura + pie + embedding de la cabecera (los nombres, el cron)", async () => {
     const sb = supabaseFalso();
     const uso = iaUsoFalso("procesar-factura", "subida:abc");
     const oa = openaiFalso([doc({ total: 115 }), doc()]);
@@ -163,12 +163,11 @@ describe("ia_uso: TODAS las llamadas del extractor se registran, en los tres cam
       `procesar-factura|vision|subida:abc#relectura|${CFG.modelo}`,
       `procesar-factura|vision|subida:abc#pie|${CFG.modelo}`,
       `procesar-factura|embedding|subida:abc#embeddings|${EMB}`,
-      `procesar-factura|embedding|subida:abc#embeddings|${EMB}`,
     ]);
     expect(oa).toHaveBeenCalledTimes(uso.rpc.mock.calls.length);
   });
 
-  it("segundo plano (ocr-trabajo): la pieza única (lectura + pie) y la consolidación (embeddings)", async () => {
+  it("segundo plano (ocr-trabajo): la pieza única (lectura + pie) y la consolidación (embedding de la cabecera)", async () => {
     const trabajo = { id: TID, num_paginas: 1, contexto_p1: null, estado: "pagina1", nombre_original: "f.jpg" };
     let filaPagina: Record<string, unknown> | null = null;
     const sb = supabaseFalso({ trabajo, paginas: () => (filaPagina ? [filaPagina] : []) });
@@ -199,11 +198,10 @@ describe("ia_uso: TODAS las llamadas del extractor se registran, en los tres cam
     await usoCons.registro.esperar();
     expect(usoCons.filas()).toEqual([
       `ocr-trabajo|embedding|trabajo:${TID}#embeddings|${EMB}`,
-      `ocr-trabajo|embedding|trabajo:${TID}#embeddings|${EMB}`,
     ]);
   });
 
-  it("«sustituir» (procesar-factura): los embeddings de la sustitución", async () => {
+  it("«sustituir» (procesar-factura): el embedding de la cabecera de la sustitución", async () => {
     // Documento pendiente tal y como lo deja la lectura de un duplicado.
     const oaLectura = openaiFalso([doc()]);
     const listo = await leerDocumentoUnico(
@@ -225,12 +223,11 @@ describe("ia_uso: TODAS las llamadas del extractor se registran, en los tres cam
     await uso.registro.esperar();
     expect(uso.filas()).toEqual([
       `procesar-factura|embedding|trabajo:${TID}#embeddings|${EMB}`,
-      `procesar-factura|embedding|trabajo:${TID}#embeddings|${EMB}`,
     ]);
-    // Coste de la factura sustituida = la lectura del trabajo + 2 llamadas de embeddings (500 tokens a 0,02 $/M).
+    // Coste de la factura sustituida = la lectura del trabajo + 1 llamada de embeddings (500 tokens a 0,02 $/M).
     const upd = sb.consultas.find((c) => c.tabla === "facturas" && c.ops.some((x) => x.m === "update"))!;
-    expect(upd.ops.find((x) => x.m === "update")!.a[0]).toEqual({ coste_lectura_usd: 0.0123 + 0.00002, lectura_llamadas: 5, lectura_modelo: "gpt-5.6-luna" });
-    expect(r.coste_usd).toBeCloseTo(0.01232, 6);
+    expect(upd.ops.find((x) => x.m === "update")!.a[0]).toEqual({ coste_lectura_usd: 0.0123 + 0.00001, lectura_llamadas: 4, lectura_modelo: "gpt-5.6-luna" });
+    expect(r.coste_usd).toBeCloseTo(0.01231, 6);
   });
 });
 
