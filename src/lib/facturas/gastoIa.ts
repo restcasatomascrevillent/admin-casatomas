@@ -106,7 +106,7 @@ export function resumirGastoIa(filas: FilaGastoIa[], modo: ModoMonitor): Resumen
 
   const desglose: LineaDesglose[] = [
     { clave: "chat", etiqueta: "Chatbot de facturas", eur: eurChat, unidades: chat?.unidades ?? 0, unidad: plural(chat?.unidades ?? 0, "pregunta", "preguntas") },
-    { clave: "ocr", etiqueta: "Lectura de facturas (OCR)", eur: eurOcr, unidades: docsOcr, unidad: plural(docsOcr, "documento", "documentos") },
+    { clave: "ocr", etiqueta: "Lectura de facturas", eur: eurOcr, unidades: docsOcr, unidad: plural(docsOcr, "documento", "documentos") },
     { clave: "clasificacion", etiqueta: "Clasificación de productos", eur: eurClasif, unidades: clasif?.unidades ?? 0, unidad: plural(clasif?.unidades ?? 0, "tanda", "tandas") },
   ];
 

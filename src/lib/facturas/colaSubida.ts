@@ -36,6 +36,7 @@
 import type { AlertaValidacion } from "@/hooks/useFacturas";
 import { supabase } from "@/integrations/supabase/client";
 import { costeDeRespuesta } from "./costeLectura";
+import { textoErrorSubida } from "./copilotoCalidad";
 import {
   descartarTrabajo,
   describirParado,
@@ -145,7 +146,7 @@ export function normalizarTipo(v: unknown): TipoDocumento | null {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cuerpo JSON de la función, se valida campo a campo
 export function aResultado(nombre: string, data: any, piezas?: number, facturaIdTrabajo?: number | null): ResultadoProcesamiento {
   if (!data?.success) {
-    return { nombre, success: false, error: data?.error || "Error desconocido", piezas };
+    return { nombre, success: false, error: textoErrorSubida(data?.error), piezas };
   }
   return {
     nombre,
@@ -332,7 +333,8 @@ export const idToastTanda = (tanda: number) => `subida-tanda-${tanda}`;
 /** Por qué no se admite un fichero al añadirlo (cada causa, su aviso). */
 export type CausaRechazo = "tipo" | "tamano" | "vacio";
 
-const mensajeError = (err: unknown) => (err instanceof Error ? err.message : String(err ?? "Error desconocido"));
+/** Motivo de un fallo en palabras normales: nunca el texto crudo de la base de datos (18/11/2026). */
+const mensajeError = (err: unknown) => textoErrorSubida(err instanceof Error ? err.message : String(err ?? ""));
 
 /** El usuario canceló el documento: se corta en el siguiente punto seguro (antes de crear el trabajo). */
 class Cancelado extends Error {}
@@ -457,7 +459,7 @@ export function crearColaSubida(deps: DepsCola) {
     const total = piezas ?? fin.num_paginas;
     const n = total > 1 ? total : undefined;
     if (fin.estado === "fallido" || fin.estado === "cancelado") {
-      return { nombre, success: false, error: fin.error || "No se pudo leer el documento", piezas: n };
+      return { nombre, success: false, error: textoErrorSubida(fin.error), piezas: n };
     }
     return aResultado(nombre, fin.resultado, n, fin.factura_id);
   };
@@ -983,8 +985,8 @@ export async function procesarDocumentoUnico(file: File, nombre: string): Promis
       fecha: new Date().toISOString(),
     },
   });
-  if (error) return { nombre, success: false, error: await leerErrorFuncion(error, "No se pudo leer el documento") };
-  if (!data?.success) return { nombre, success: false, error: data?.error || "No se pudo leer el documento" };
+  if (error) return { nombre, success: false, error: textoErrorSubida(await leerErrorFuncion(error, "No se pudo leer el documento")) };
+  if (!data?.success) return { nombre, success: false, error: textoErrorSubida(data?.error) };
   return aResultado(nombre, data);
 }
 

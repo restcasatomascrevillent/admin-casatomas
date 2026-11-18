@@ -540,10 +540,10 @@ describe("copiloto plegado", () => {
     fireEvent.click(screen.getByRole("button", { name: /pregúntale a la ia/i }));
     const sugerencias = within(panel()).getByRole("list", { name: "Sugerencias para empezar" });
     expect(within(sugerencias).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Precio de…",
       "¿Por qué subió el gasto en julio?",
       "Compara el precio de pan de cristal entre proveedores",
-      "¿Qué le he comprado a Proveedor 1 este año?",
-      "¿Ha subido lo que pago a Acciona Green Energy Developments?",
+      "¿Cuánto le he pagado a Proveedor 1 este año?",
       "Enséñame la gráfica del precio de…",
     ]);
     // El tablero sigue a la vista (panel no modal) y se cierra con «Cerrar».
