@@ -10,8 +10,13 @@
 //      favorito: todos los votos que haya).
 //  La página guarda la elección en la URL (?informe=…&mes=… o &desde=…&hasta=…)
 //  para poder volver o compartir el enlace.
+//
+//  18/11/2026, petición del dueño: «que tú elijas el mes y ya cuando entres a
+//  cualquier informe te detecte ese mes». El mes se elige UNA vez, arriba de la
+//  página (`mesDeLaPagina`), y vale para todos: los «mes» lo usan tal cual, los
+//  «rango» empiezan por ese mes entero (`rangoDeMes`) y los «ninguno» lo ignoran.
 // ============================================================================
-import { format, parseISO, startOfMonth, subMonths } from "date-fns";
+import { endOfMonth, format, parseISO, startOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { atajosPeriodo, esFechaIso, textoRango } from "@/lib/facturas/periodoAnalisis";
 
@@ -50,6 +55,24 @@ export function mesesPorDefecto(hoy: string, cuantos = 12): OpcionMes[] {
 
 /** El último mes cerrado. */
 export const mesAnteriorA = (hoy: string): string => format(subMonths(startOfMonth(parseISO(hoy)), 1), "yyyy-MM");
+
+/** El mes entero como rango: «2026-02» → 1 al 28 de febrero. */
+export function rangoDeMes(mes: string): { desde: string; hasta: string } {
+  const inicio = parseISO(`${mes}-01`);
+  return { desde: format(inicio, "yyyy-MM-dd"), hasta: format(endOfMonth(inicio), "yyyy-MM-dd") };
+}
+
+/**
+ * El mes de la página de Informes: el de la URL si se puede elegir; si no, el último que se eligió en
+ * esta pestaña (`guardado`); si no, el último mes cerrado (o el primero de la lista si ese no está).
+ */
+export function mesDeLaPagina(hoy: string, url: string | null, guardado: string | null, meses: OpcionMes[] = mesesPorDefecto(hoy)): string {
+  const vale = (m: string | null): m is string => esMesIso(m) && meses.some((o) => o.clave === m);
+  if (vale(url)) return url;
+  if (vale(guardado)) return guardado;
+  const anterior = mesAnteriorA(hoy);
+  return vale(anterior) ? anterior : (meses[0]?.clave ?? anterior);
+}
 
 /** Atajos del periodo «rango» (los mismos de Facturas › Análisis). */
 export function atajosRango(hoy: string) {
