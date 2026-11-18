@@ -11,7 +11,6 @@
 import type { OrigenImporte } from "./esquema.ts";
 import type { DatosNormalizados } from "./extraccion.ts";
 import { type ClienteOpenAI, vec } from "./openai.ts";
-import { asegurarVectoresNombres } from "./embeddingsNombres.ts";
 import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes } from "./costeLectura.ts";
 import {
   archivarDesdeStorage,
@@ -269,7 +268,7 @@ function filasProductosSinIgualar(
     precio_unitario: p.precio_unitario,
     total: p.total,
     // Sin `embedding`: desde 20261203100000 el vector va por NOMBRE en
-    // productos_nombre_embedding (asegurarVectoresNombres, tras guardar).
+    // productos_nombre_embedding (lo calcula el cron embeddings-nombres).
     ...(conColumnas04b ? { pagina: p.pagina ?? 1, orden: p.orden ?? i, albaran_ref: p.albaran_ref ?? null } : {}),
     // Unidades/bultos de una línea guardada por peso (migración
     // 20261005150000). Solo se manda si hay valor: un documento sin líneas al
@@ -631,7 +630,7 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   const facturaId: number = ins.data.id;
 
   try {
-    // 7) Líneas (y el vector de sus nombres nuevos, aparte)
+    // 7) Líneas
     await insertarLineas(ctx, facturaId, d, conColumnas04b);
 
     // 8) Validación de cordura y coste de leer el documento, a la vez (solo
@@ -664,9 +663,11 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
 }
 
 /**
- * Paso 7: líneas. Un solo INSERT (todas o ninguna). Después, el vector de los
- * nombres que aún no lo tienen (uno por nombre, 20261203100000); si falla, no
- * rompe el guardado: lo completa el cron embeddings-nombres.
+ * Paso 7: líneas. Un solo INSERT (todas o ninguna). El vector de los nombres
+ * nuevos NO se calcula aquí (18/11/2026): el trigger deja su fila de
+ * productos_nombre_embedding pendiente (embedding NULL) y la completa el cron
+ * embeddings-nombres (cada 10 min). Antes iba en serie al guardar: ~6 s con la
+ * base cargada (upsert en un índice HNSW) y se cortaba por los 8 s de PostgREST.
  */
 async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: DatosNormalizados, conColumnas04b: boolean): Promise<void> {
   if (d.productos.length === 0) return;
@@ -692,7 +693,6 @@ async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: Datos
     ({ error } = await insertar(conBultos, conIvaPct));
   }
   if (error) throw new Error(`insert productos: ${error.message}`);
-  await asegurarVectoresNombres(ctx, d.productos.map((p) => p.nombre));
 }
 
 /** Coste que manda quien guarda (o null). Nunca lanza. */
@@ -916,8 +916,6 @@ export async function sustituirFactura(
     p_archivo_path: destino,
   });
   if (error) throw new Error(error.message.replace(/^.*SUSTITUCIÓN ABORTADA: /, "No se ha sustituido nada: "));
-  // Vector de los nombres nuevos (uno por nombre, 20261203100000). No rompe nada si falla.
-  await asegurarVectoresNombres({ supabase, openai }, d.productos.map((x) => x.nombre));
 
   // El original nuevo, a Drive; la RPC ya dejó la factura apuntando a la ruta
   // temporal (y sin drive_url) por si Drive falla.
@@ -1018,8 +1016,6 @@ export async function anadirPagina(
     p_archivo_path: destino,
   });
   if (error) throw new Error(error.message.replace(/^.*AÑADIDO ABORTADO: /, "No se ha añadido nada: "));
-  // Vector de los nombres nuevos (uno por nombre, 20261203100000). No rompe nada si falla.
-  await asegurarVectoresNombres({ supabase, openai }, d.productos.map((x) => x.nombre));
 
   // El original de la página, a Drive (misma carpeta proveedor → mes, como
   // «pagN-…»). La RPC solo apunta la factura a la ruta temporal si no tenía

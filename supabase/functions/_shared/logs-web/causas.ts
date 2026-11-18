@@ -13,12 +13,17 @@
 // ============================================================================
 
 import { PATRON_CHUNK_CADUCADO, PATRON_CRON_PLATAFORMA } from "./huella.ts";
-import { listaTareas, tareasDe, type TareaSencilla } from "./sencillo.ts";
+import { conMayuscula, listaTareas, tareasDe, type TareaSencilla } from "./sencillo.ts";
+import { funcionDeError, funcionSencilla } from "./funciones.ts";
 
 /** La misma causa dicha para el dueño (sin jerga): qué pasa y qué hacer. */
 export interface CausaSencilla {
   quePasa: string;
   queHacer: string;
+  /** Título en llano de la incidencia («La clasificación automática de productos tardó demasiado y se cortó.»). */
+  titulo?: string;
+  /** «¿Se arregla solo?» (si la causa lo sabe decir). */
+  seArregla?: string;
 }
 
 export interface CausaConocida {
@@ -69,6 +74,31 @@ function cronSencillo(tareas: TareaSencilla[]): string {
   return `${tareas.length} tareas automáticas no arrancaron a tiempo (entre ellas, la que ${principal.que})${principal.consecuencia ? `; ${principal.consecuencia}` : ""}`;
 }
 
+/** «La tarea que …» / «N tareas automáticas …» como sujeto de un título (sin la parte de la consecuencia). */
+function sujetoTareas(tareas: TareaSencilla[]): { texto: string; varias: boolean } {
+  const conocidas = tareas.filter((t) => t.conocida);
+  if (tareas.length > 1) return { texto: `${tareas.length} tareas automáticas`, varias: true };
+  if (conocidas.length === 1) return { texto: `la tarea que ${conocidas[0].que}`, varias: false };
+  return { texto: "una tarea automática", varias: false };
+}
+
+/** La base de datos canceló la consulta por tiempo (Postgres: statement_timeout / lock_timeout). */
+export const PATRON_BD_TIEMPO = /canceling statement due to (?:statement|lock) timeout|statement[ _]timeout|lock[ _]timeout/i;
+
+/** Quién falla, en llano y con el catálogo: la función, la tarea o «una operación del servidor». */
+function quienFalla(d: DatosCausa): { sujeto: string; carga: string | null; seArregla: string } {
+  const f = funcionSencilla(funcionDeError({ tipo: d.tipo, fuente: d.fuente, objetivo: d.objetivo, mensaje: d.mensaje }));
+  if (f) {
+    const seArregla = f.reintento
+      ? `Sí: ${f.reintento} y no se pierde nada.`
+      : f.repetir ? `No se reintenta sola: ${f.repetir}.` : "No consta que se reintente sola: si era algo importante, avisa al técnico.";
+    return { sujeto: f.nombre, carga: f.carga ?? null, seArregla };
+  }
+  const t = listaTareas(tareasDe(d)).find((x) => x.conocida);
+  if (t) return { sujeto: `la tarea que ${t.que}`, carga: null, seArregla: t.cada ? `Sí: la tarea se vuelve a lanzar sola ${t.cada} y no se pierde nada.` : "Sí: la tarea se vuelve a lanzar sola en su siguiente turno." };
+  return { sujeto: "una operación del servidor", carga: null, seArregla: "No consta que se reintente sola: si se repite, avisa al técnico." };
+}
+
 const txt = (d: DatosCausa) => `${d.mensaje ?? ""}\n${d.pila ?? ""}`;
 const esAssetDeDespliegue = (url: string) => /\/assets\/[^/?#]+-[A-Za-z0-9_-]{8}\.(?:m?js|css)(?:$|[?#])/.test(url);
 
@@ -82,6 +112,8 @@ const REGLAS: Regla[] = [
     sencillo: () => ({
       quePasa: "El visitante se quedó sin conexión mientras cargaba la página. No es un fallo de la web.",
       queHacer: "Nada: es la conexión del visitante.",
+      titulo: "El visitante se quedó sin conexión mientras cargaba la página.",
+      seArregla: "Sí, en cuanto el visitante recupera la conexión.",
     }),
     coincide: (d) => d.accion === "sin_conexion",
   },
@@ -98,6 +130,7 @@ const REGLAS: Regla[] = [
     sencillo: () => ({
       quePasa: "Una parte de la web no se pudo cargar y no era por una publicación: o falló la conexión del visitante o falta un fichero en la web publicada.",
       queHacer: "Si se repite en varias personas, avisa al técnico. Si son casos sueltos, es la conexión del visitante.",
+      titulo: "Una parte de la web no se pudo cargar.",
     }),
     coincide: (d) => d.accion === "sin_version_nueva",
   },
@@ -114,6 +147,8 @@ const REGLAS: Regla[] = [
     sencillo: () => ({
       quePasa: "La página tenía una versión antigua abierta justo cuando publicamos; se recarga sola.",
       queHacer: "Nada: es normal justo después de publicar. Solo hay que avisar al técnico si sale «se repite tras recargar».",
+      titulo: "Página antigua abierta justo cuando publicamos.",
+      seArregla: "Sí: la página se recarga sola con la versión nueva.",
     }),
     coincide: (d) =>
       (["error_js", "error_promesa", "error_react"].includes(d.tipo) && PATRON_CHUNK_CADUCADO.test(txt(d)))
@@ -130,11 +165,39 @@ const REGLAS: Regla[] = [
       "Las tareas se vuelven a lanzar solas en el siguiente turno: comprobar que no queda trabajo atascado (OCR, Instagram, emails).",
     ],
     ruidoSiAislado: false,
-    sencillo: (d) => ({
-      quePasa: `${cronSencillo(listaTareas(tareasDe(d)))}. No es culpa de la tarea: en ese momento la base de datos estaba saturada o en mantenimiento.`,
-      queHacer: "Nada si no se repite: se vuelve a lanzar sola en unos minutos. Si pasa a menudo, avisa al técnico (habría que espaciar las tareas o revisar la base de datos).",
-    }),
+    sencillo: (d) => {
+      const tareas = listaTareas(tareasDe(d));
+      const s = sujetoTareas(tareas);
+      const cada = tareas.length === 1 ? tareas[0].cada : null;
+      return {
+        quePasa: `${cronSencillo(tareas)}. No es culpa de la tarea: en ese momento la base de datos estaba saturada o en mantenimiento.`,
+        queHacer: "Nada si no se repite: se vuelve a lanzar sola en unos minutos. Si pasa a menudo, avisa al técnico (habría que espaciar las tareas o revisar la base de datos).",
+        titulo: `${conMayuscula(s.texto)} no ${s.varias ? "arrancaron" : "arrancó"} a tiempo.`,
+        seArregla: cada ? `Sí: la tarea se vuelve a lanzar sola ${cada}.` : "Sí: cada tarea se vuelve a lanzar sola en su siguiente turno.",
+      };
+    },
     coincide: (d) => d.tipo === "error_integracion" && PATRON_CRON_PLATAFORMA.test(d.mensaje ?? ""),
+  },
+  {
+    id: "bd_tiempo_agotado",
+    titulo: "La base de datos canceló la operación por tardar demasiado (statement_timeout / lock_timeout)",
+    explicacion:
+      "Postgres cancela una consulta cuando pasa de statement_timeout o espera un bloqueo más de lock_timeout («canceling statement due to statement/lock timeout»). Suele coincidir con la base de datos muy cargada (muchas escrituras a la vez, otra operación larga bloqueando las mismas filas) o con una consulta que se ha vuelto lenta.",
+    acciones: [
+      "Si es suelto y la función o la tarea se reintenta sola, nada: no se pierde trabajo.",
+      "Si se repite: mirar en Supabase › Reports la CPU, las conexiones y las consultas lentas de esa franja, y revisar la consulta o RPC nombrada en el mensaje (índices, lotes más pequeños o menos trabajo por llamada).",
+    ],
+    ruidoSiAislado: false,
+    sencillo: (d) => {
+      const q = quienFalla(d);
+      return {
+        quePasa: `La base de datos iba muy cargada y ${q.sujeto} tardó más de lo permitido, así que se canceló.${q.carga ? ` ${conMayuscula(q.carga)}.` : ""}`,
+        queHacer: "Nada si es suelto. Si se repite, avisa al técnico.",
+        titulo: `${conMayuscula(q.sujeto)} tardó demasiado y se cortó.`,
+        seArregla: q.seArregla,
+      };
+    },
+    coincide: (d) => (d.tipo === "error_servidor" || d.tipo === "error_integracion") && PATRON_BD_TIEMPO.test(txt(d)),
   },
   {
     id: "react_hidratacion",
@@ -149,6 +212,8 @@ const REGLAS: Regla[] = [
     sencillo: () => ({
       quePasa: "La página se dibuja dos veces al cargar (lo que llega ya preparado no coincide con lo que pinta el navegador). Funciona, pero tarda un poco más.",
       queHacer: "No es urgente: avisa al técnico para que lo corrija cuando pueda.",
+      titulo: "La página se dibuja dos veces al cargar.",
+      seArregla: "No, pero la página funciona: solo tarda un poco más.",
     }),
     coincide: (d) => /minified react error #(418|423|425)\b|hydrat/i.test(txt(d)),
   },
@@ -165,6 +230,8 @@ const REGLAS: Regla[] = [
     sencillo: () => ({
       quePasa: "La web pidió datos al servidor y no llegó respuesta. Casi siempre es la conexión del visitante (se quedó sin cobertura o cambió de página mientras cargaba).",
       queHacer: "Nada si son pocos casos. Si salen muchos a la vez, el problema es del servidor: avisa al técnico.",
+      titulo: "La web pidió datos al servidor y no le llegó respuesta.",
+      seArregla: "Normalmente sí: casi siempre es la conexión del visitante.",
     }),
     coincide: (d) => d.tipo === "error_peticion" && (Number(d.propiedades?.status) === 0 || /^sin respuesta/i.test(d.mensaje ?? "")),
   },
@@ -177,10 +244,15 @@ const REGLAS: Regla[] = [
       "Buscar la URL en el código de la función y sustituirla por la variable de entorno correspondiente, o retirar la llamada.",
     ],
     ruidoSiAislado: false,
-    sencillo: () => ({
-      quePasa: "Una función del servidor intenta conectar con una dirección que ya no existe (un servicio antiguo dado de baja).",
-      queHacer: "Avisa al técnico: hay que cambiar esa dirección o quitar la llamada.",
-    }),
+    sencillo: (d) => {
+      const f = funcionSencilla(funcionDeError({ tipo: d.tipo, fuente: d.fuente, objetivo: d.objetivo, mensaje: d.mensaje }));
+      return {
+        quePasa: "Una función del servidor intenta conectar con una dirección que ya no existe (un servicio antiguo dado de baja).",
+        queHacer: "Avisa al técnico: hay que cambiar esa dirección o quitar la llamada.",
+        titulo: `${conMayuscula(f?.nombre ?? "una función del servidor")} intentó conectar con una dirección que ya no existe.`,
+        seArregla: "No: seguirá fallando hasta que el técnico lo corrija.",
+      };
+    },
     coincide: (d) => /dns error|failed to lookup address|ENOTFOUND|name or service not known/i.test(txt(d)),
   },
   {
@@ -192,10 +264,15 @@ const REGLAS: Regla[] = [
       "Si es una petición sin firma (bots o sondeos), se puede ignorar.",
     ],
     ruidoSiAislado: false,
-    sencillo: () => ({
-      quePasa: "A una función del servidor le falta una clave para funcionar.",
-      queHacer: "Avisa al técnico para que añada la clave que falta en Supabase. Si son robots probando la función sin firma, se puede ignorar.",
-    }),
+    sencillo: (d) => {
+      const f = funcionSencilla(funcionDeError({ tipo: d.tipo, fuente: d.fuente, objetivo: d.objetivo, mensaje: d.mensaje }));
+      return {
+        quePasa: "A una función del servidor le falta una clave para funcionar.",
+        queHacer: "Avisa al técnico para que añada la clave que falta en Supabase. Si son robots probando la función sin firma, se puede ignorar.",
+        titulo: `${conMayuscula(f?.nombre ?? "una función del servidor")} no pudo funcionar: falta una clave en el servidor.`,
+        seArregla: "No: seguirá fallando hasta que el técnico lo corrija.",
+      };
+    },
     coincide: (d) => /falta_secreto|falta (el )?secreto|falta firma|missing (secret|api key)/i.test(txt(d)),
   },
 ];

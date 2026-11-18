@@ -1,9 +1,10 @@
 // ============================================================================
 //  procesar-logs-web / ticket.ts — título y descripción del ticket (Markdown)
 // ----------------------------------------------------------------------------
-//  Arriba del todo, «En pocas palabras»: qué pasa, a quién afecta, desde
-//  cuándo y qué hacer, en lenguaje llano (para el dueño). Debajo, los
-//  detalles técnicos para quien lo vaya a arreglar.
+//  Arriba del todo, «En pocas palabras» con el formato del panel (ficha.ts):
+//  «Fallo del admin · Panel › Facturas», el título en llano y qué pasó, a
+//  quién afecta, ¿se arregla solo?, desde cuándo y qué hacer (para el dueño).
+//  Debajo, los detalles técnicos para quien lo vaya a arreglar.
 //  Todo lo que es HECHO sale de los datos (incidencia, muestras, recorrido);
 //  lo que aporta la IA va en apartados marcados «IA · sin verificar». Si no
 //  hay análisis o falta contexto, el ticket lo dice en vez de inventar.
@@ -18,8 +19,10 @@
 import { sanearPila, sanearTexto } from "../_shared/logs-web/saneado.ts";
 import { marcoPrincipal } from "../_shared/logs-web/huella.ts";
 import { causaConocida, type CausaConocida } from "../_shared/logs-web/causas.ts";
-import { explicacionOrigen, NOMBRE_ORIGEN, type OrigenVisible } from "../_shared/logs-web/origen.ts";
-import { afectaTrasPublicar, aQuienAfectaSencillo, conMayuscula, desdeCuandoSencillo, nombrePagina, queFalloGenerico, queHacerPorDefecto } from "../_shared/logs-web/sencillo.ts";
+import { NOMBRE_ORIGEN, origenDeError, type OrigenVisible } from "../_shared/logs-web/origen.ts";
+import { explicacionOrigenAmbito, nombreOrigen } from "../_shared/logs-web/ambito.ts";
+import { fichaSencilla, type FichaSencilla } from "../_shared/logs-web/ficha.ts";
+import { afectaTrasPublicar, aQuienAfectaSencillo, desdeCuandoSencillo, nombrePagina, queHacerPorDefecto } from "../_shared/logs-web/sencillo.ts";
 
 export interface IncidenciaTicket {
   id: number;
@@ -178,6 +181,26 @@ export function causaDeIncidencia(i: IncidenciaTicket, muestras: EventoTicket[])
   return causaConocida({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo: m?.objetivo ?? null, propiedades: m?.propiedades ?? null, tareas: [...new Set(tareas)] });
 }
 
+/** Origen de la incidencia: el guardado (20261130100000) o, sin la migración, el que dicen las mismas reglas (como origenDeFila del panel). */
+export function origenDeIncidencia(i: IncidenciaTicket, muestras: EventoTicket[]): OrigenVisible {
+  if (i.origen && i.origen in NOMBRE_ORIGEN) return i.origen as OrigenVisible;
+  if (i.ocurrencias === 0) return "bots";
+  const m = muestras[0];
+  const o = origenDeError({ tipo: i.tipo, fuente: i.fuente, mensaje: i.mensaje, pila: i.pila, objetivo: m?.objetivo ?? null, propiedades: m?.propiedades ?? null });
+  return o === "version_antigua" && (i.repetidas_tras_recargar ?? 0) > 0 ? "web" : o;
+}
+
+/** Ficha en llano (la misma que enseña el panel): cabecera «Fallo del admin · Panel › Facturas», título, a quién afecta… */
+export function fichaDeIncidencia(i: IncidenciaTicket, muestras: EventoTicket[]): FichaSencilla {
+  const m = muestras[0];
+  const tareas = [...new Set(muestras.map((e) => e.propiedades?.tarea).filter((t): t is string => typeof t === "string" && t !== ""))];
+  return fichaSencilla({
+    tipo: i.tipo, fuente: i.fuente, proyecto: i.proyecto, mensaje: i.mensaje, pila: i.pila, objetivo: m?.objetivo ?? null, propiedades: m?.propiedades ?? null,
+    tareas, rutas: i.rutas, origen: origenDeIncidencia(i, muestras), proveedor: i.origen_proveedor ?? null,
+    ocurrencias: i.ocurrencias, ocurrencias_24h: i.ocurrencias_24h, repetidas_tras_recargar: i.repetidas_tras_recargar ?? 0, causa: causaDeIncidencia(i, muestras),
+  });
+}
+
 /** Una línea legible de un evento del recorrido (sin datos personales: todo viene saneado). */
 export function describirEvento(e: EventoTicket): string {
   const obj = e.objetivo ? ` ${enLinea(e.objetivo, 80)}` : "";
@@ -231,21 +254,30 @@ export function pasosDesdeRecorrido(entrada: EntradaTicket): string[] {
 }
 
 export interface ResumenSencillo {
+  /** «Fallo del admin · Panel › Facturas» (el mismo nombre que en el panel). */
+  cabecera: string;
+  /** Título en llano; null si no se puede construir con el catálogo y la causa. */
+  titulo: string | null;
+  /** «Qué pasó». */
   quePasa: string;
   aQuienAfecta: string;
+  /** «¿Se arregla solo?»; null si no se sabe decir. */
+  seArregla: string | null;
   desdeCuando: string;
   queHacer: string;
 }
 
 /**
- * «En pocas palabras» del ticket. Primero la causa conocida (texto fijo en
- * llano), si no la explicación de la IA en sencillo, y si no un texto
- * genérico. Lo de los logs (endpoint, tarea, página desconocida) va como
- * `código`; lo de la IA, marcado «sin verificar».
+ * «En pocas palabras» del ticket, con la misma ficha que el panel (ficha.ts).
+ * Primero la causa conocida (texto fijo en llano), si no la explicación de la
+ * IA en sencillo, y si no un texto genérico con el catálogo. Lo de los logs
+ * (endpoint, tarea, página desconocida) va como `código`; lo de la IA,
+ * marcado «sin verificar».
  */
 export function resumenSencillo(entrada: EntradaTicket): ResumenSencillo {
   const { incidencia: i, muestras, analisis } = entrada;
-  const causa = causaDeIncidencia(i, muestras);
+  const ficha = fichaDeIncidencia(i, muestras);
+  const causa = ficha.causa;
   const exp = i.explicacion_ia ?? null;
   const objetivo = objetivosAfectados(muestras)[0]?.objetivo ?? null;
   const ruta = i.rutas[0]?.ruta ?? null;
@@ -255,27 +287,38 @@ export function resumenSencillo(entrada: EntradaTicket): ResumenSencillo {
   } else if (exp?.que_paso) {
     quePasa = `${textoIa(exp.que_paso, 300)} _(explicación de la IA, sin verificar)_`;
   } else {
-    const generico = queFalloGenerico({ tipo: i.tipo, fuente: i.fuente, rutas: i.rutas, objetivo, tareas: muestras.map((e) => String(e.propiedades?.tarea ?? "")).filter(Boolean) });
-    // Página desconocida: se nombra como código (viene de los logs).
+    // Página desconocida: se nombra como código (viene de los logs). La función del catálogo ya va en el texto.
     const paginaRara = esDeNavegador(i) && ruta && !nombrePagina(ruta) ? ` en la página ${enLinea(ruta, 80)}` : "";
-    const que = objetivo && i.tipo !== "error_integracion" ? ` (afecta a ${enLinea(objetivo, 80)})` : "";
-    quePasa = `${generico.replace(/\.$/, "")}${paginaRara}${que}.`;
+    const que = objetivo && i.tipo !== "error_integracion" && !ficha.funcion ? ` (afecta a ${enLinea(objetivo, 80)})` : "";
+    quePasa = `${ficha.quePasoGenerico.replace(/\.$/, "")}${paginaRara}${que}.`;
     if (analisis?.impacto) quePasa += ` Según la IA (sin verificar): ${textoIa(analisis.impacto, 240)}`;
   }
   const tras = i.ocurrencias_tras_publicar ?? 0;
+  const base = ficha.aQuienAfecta ?? aQuienAfectaSencillo(i);
   const aQuienAfecta = causa?.id === "chunk_caducado" && tras > 0
     ? afectaTrasPublicar(tras, i.repetidas_tras_recargar ?? 0, { otras: Math.max(i.ocurrencias - tras - (i.repetidas_tras_recargar ?? 0), 0) })
-    : exp?.a_quien_afecta && !causa ? `${aQuienAfectaSencillo(i)} ${textoIa(exp.a_quien_afecta, 240)} _(IA)_` : aQuienAfectaSencillo(i);
+    : exp?.a_quien_afecta && !causa ? `${base} ${textoIa(exp.a_quien_afecta, 240)} _(IA)_` : base;
   const queHacer = causa?.sencillo.queHacer
     ?? (exp?.que_hacer ? `${textoIa(exp.que_hacer, 240)} _(IA, sin verificar)_` : null)
     ?? (analisis?.propuesta[0] ? `${textoIa(analisis.propuesta[0], 240)} _(propuesta de la IA, sin verificar)_` : queHacerPorDefecto(i));
-  return { quePasa, aQuienAfecta, desdeCuando: desdeCuandoSencillo(i, fecha), queHacer };
+  return { cabecera: ficha.cabecera, titulo: ficha.titulo, quePasa, aQuienAfecta, seArregla: ficha.seArregla, desdeCuando: desdeCuandoSencillo(i, fecha), queHacer };
 }
 
-export function construirTitulo(i: IncidenciaTicket): string {
+/**
+ * Título del ticket. En los fallos del servidor, tareas y despliegues con
+ * título en llano (catálogo + causa), ese título y, detrás, la función o la
+ * tarea (para quien lo arregla); en el resto, el mensaje técnico de siempre
+ * (en el navegador, dos errores distintos con la misma causa tendrían el mismo
+ * título en llano).
+ */
+export function construirTitulo(i: IncidenciaTicket, muestras: EventoTicket[] = []): string {
   const prefijo = i.gravedad === "critico" ? "[Crítico] " : "";
   const entorno = i.entorno === "produccion" ? "" : ` (${NOMBRE_ENTORNO[i.entorno] ?? i.entorno})`;
-  const base = sanearTexto(i.titulo, 140) ?? i.tipo;
+  const ficha = esDeNavegador(i) ? null : fichaDeIncidencia(i, muestras);
+  const ancla = sanearTexto(ficha?.funcion?.id ?? objetivosAfectados(muestras)[0]?.objetivo ?? i.titulo.split(" · ").slice(1).join(" · "), 60);
+  const base = ficha?.titulo
+    ? `${ficha.titulo.replace(/\.$/, "")}${ancla ? ` · ${ancla}` : ""}`
+    : sanearTexto(i.titulo, 140) ?? i.tipo;
   return `${prefijo}${base}${entorno}`.slice(0, 200);
 }
 
@@ -291,8 +334,12 @@ export function construirTicket(entrada: EntradaTicket): { titulo: string; descr
 
   const sencillo = resumenSencillo(entrada);
   l.push("## En pocas palabras");
-  l.push(`- **Qué pasa:** ${sencillo.quePasa}`);
+  l.push(`**${sencillo.cabecera}**`);
+  if (sencillo.titulo) l.push(`**${sencillo.titulo}**`);
+  l.push("");
+  l.push(`- **Qué pasó:** ${sencillo.quePasa}`);
   l.push(`- **A quién afecta:** ${sencillo.aQuienAfecta}`);
+  if (sencillo.seArregla) l.push(`- **¿Se arregla solo?** ${sencillo.seArregla}`);
   l.push(`- **Desde cuándo:** ${sencillo.desdeCuando}`);
   l.push(`- **Qué hacer:** ${sencillo.queHacer}`);
   l.push("");
@@ -304,7 +351,8 @@ export function construirTicket(entrada: EntradaTicket): { titulo: string; descr
   l.push(`- **Gravedad:** ${NOMBRE_GRAVEDAD[i.gravedad] ?? i.gravedad} · **Tipo:** ${NOMBRE_TIPO[i.tipo] ?? i.tipo} · **Fuente:** ${i.fuente}`);
   if (i.origen && i.origen in NOMBRE_ORIGEN) {
     const o = i.origen as OrigenVisible;
-    l.push(`- **Origen:** ${NOMBRE_ORIGEN[o]}${o === "externo" && i.origen_proveedor ? ` (${enLinea(i.origen_proveedor, 60)})` : ""}. ${explicacionOrigen(o, i.origen_proveedor ? i.origen_proveedor.replace(/[`*_[\]<>]/g, "") : null)}`);
+    const ambito = fichaDeIncidencia(i, muestras).ambito;
+    l.push(`- **Origen:** ${nombreOrigen(o, ambito)}${o === "externo" && i.origen_proveedor ? ` (${enLinea(i.origen_proveedor, 60)})` : ""}. ${explicacionOrigenAmbito(o, i.origen_proveedor ? i.origen_proveedor.replace(/[`*_[\]<>]/g, "") : null, ambito)}`);
   }
   l.push(navegador
     ? `- **Frecuencia:** ${i.ocurrencias} ocurrencias (${i.ocurrencias_24h} en las últimas 24 h) en ${pct(i.sesiones_afectadas)} observadas.`
@@ -399,7 +447,7 @@ export function construirTicket(entrada: EntradaTicket): { titulo: string; descr
   l.push(`- En Super Admin › Logs, la incidencia no debe recibir ocurrencias nuevas en la versión corregida durante 48 h. Si reaparece tras marcarla resuelta, se reabre sola y se avisa en este ticket.`);
   l.push("");
   l.push(`**Detalle en Super Admin:** ${enlace}`);
-  return { titulo: construirTitulo(i), descripcion: l.join("\n").slice(0, 60000) };
+  return { titulo: construirTitulo(i, muestras), descripcion: l.join("\n").slice(0, 60000) };
 }
 
 /** Comentario de actualización por repeticiones. */
