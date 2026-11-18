@@ -24,11 +24,12 @@ Reglas del encargo:
 - [x] Fase 0: rama `feature/revision-descuentos`, este archivo, tarea programada de reanudación.
 - [x] Fase 1.A: esquema y código actual (cómo se leen y guardan descuentos, regalos, abonos).
 - [x] Fase 1.B: reglas SQL sobre todas las líneas de producción (solo lectura).
-- [ ] Fase 1.C: búsqueda en el texto de los originales de Drive. **Bloqueado**: falta acceso a la carpeta del panel (pedido al dueño). `read_file_content` de Drive devuelve el texto OCR del PDF: barato.
-- [ ] Fase 1.D: verificación visual de los originales marcados.
+- [x] Fase 1.C: búsqueda en el texto de los originales de Drive (18/11, carpeta FACTURAS de restcasatomascrevillent@gmail.com compartida con oficiososia@gmail.com). **Bloqueado**: falta acceso a la carpeta del panel (pedido al dueño). `read_file_content` de Drive devuelve el texto OCR del PDF: barato.
+- [x] Fase 1.D: cotejo de 36 documentos dirigidos y 132 sospechosos (INFORME.md § 7).
 - [x] Fase 1.E: informe (`INFORME.md`), versión 1 sin el cotejo con originales (apartado 7 del informe).
 - [x] Fase 2 (parte posible sin originales): #287 clasificación IA, #288 descuentos asociados, #289 precios netos; todo en la demo (funciones y migraciones aplicadas, panel READY).
-- [ ] Pendiente: regalos en la lectura (procesar-factura + ocr_anadir_pagina/ocr_sustituir_factura), lectura de nuevos descuentos y Makro, 3 albaranes de producción, cotejo con originales (bloqueado por acceso a Drive). Ver INFORME.md § 5.1.
+- [x] #291 regalos marcados y descuentos en positivo (tras el cotejo), en la demo.
+- [ ] Pendiente: Makro (lectura con código de promoción + releer 237 tickets), 3 albaranes de producción, regalos de Diper sin leer (a mano). Ver INFORME.md § 7.4.
 
 ## Notas para retomar
 
