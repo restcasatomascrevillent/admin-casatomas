@@ -11,7 +11,7 @@ import {
   rutaTemporal,
 } from "./archivo.ts";
 import { apuntarOriginal } from "./guardado.ts";
-import { type FacturaPorPasar, pasarFactura, pasarLote } from "./originalesDrive.ts";
+import { type FacturaPorPasar, nombresOriginales, pasarFactura, pasarLote } from "./originalesDrive.ts";
 
 const DRIVE = { clientId: "id", clientSecret: "s", refreshToken: "r", parentFolder: "raiz" };
 const URL_DRIVE = "https://drive.google.com/file/d/nuevo/view";
@@ -220,6 +220,21 @@ describe("pasarFactura (reintento del cron y rescate)", () => {
     expect(sb.ops[1].filtros).toContainEqual(["eq", "archivo_path", "temporal/11-f.jpg"]);
   });
 
+  it("con el nombre original → llega a Drive con él, con acentos y espacios (18/11/2026)", async () => {
+    const fich: Record<string, Uint8Array> = { "temporal/11-Albaran_N_5_Makro.jpg": bytes("jpg") };
+    const sb = supabaseFalso(fich);
+    const f = { ...base, archivo_path: "temporal/11-Albaran_N_5_Makro.jpg", nombre_original: "Albarán Nº 5 Makro.jpg" };
+    expect(await pasarFactura(sb.cliente, DRIVE, f)).toBe("subida");
+    expect(subidas.map((s) => s.nombre)).toEqual(["Albarán Nº 5 Makro.jpg"]);
+  });
+
+  it("sin nombre original (o en blanco) → el de la copia, como antes", async () => {
+    const fich: Record<string, Uint8Array> = { "temporal/11-f.jpg": bytes("jpg") };
+    const sb = supabaseFalso(fich);
+    expect(await pasarFactura(sb.cliente, DRIVE, { ...base, nombre_original: "  " })).toBe("subida");
+    expect(subidas.map((s) => s.nombre)).toEqual(["f.jpg"]);
+  });
+
   it("con drive_url → solo borra la copia (no sube nada)", async () => {
     const fich: Record<string, Uint8Array> = { "2026/10/11-f.jpg": bytes("jpg") };
     const sb = supabaseFalso(fich);
@@ -325,5 +340,28 @@ describe("limpiarPendientesTrabajo (al terminar o fallar un trabajo)", () => {
     });
     expect(await limpiarPendientesTrabajo(sb.cliente, "t")).toBe(2);
     expect(Object.keys(fich)).toEqual(["pendientes/u/t/01.jpg"]);
+  });
+});
+
+describe("nombresOriginales (nombre con el que se subió, para Drive)", () => {
+  it("una consulta por lote; el trabajo más reciente con nombre manda", async () => {
+    const sb = supabaseFalso({}, (op) => op.tabla === "ocr_trabajos"
+      ? { data: [
+        { factura_id: 7, nombre_original: "viejo.jpg", created_at: "2026-11-18T10:00:00Z" },
+        { factura_id: 7, nombre_original: "Albarán bueno.jpg", created_at: "2026-11-18T11:00:00Z" },
+        { factura_id: 8, nombre_original: null, created_at: "2026-11-18T11:00:00Z" },
+      ] }
+      : { data: null });
+    const m = await nombresOriginales(sb.cliente, [7, 8]);
+    expect([...m.entries()]).toEqual([[7, "Albarán bueno.jpg"]]);
+    expect(sb.ops).toHaveLength(1);
+    expect(sb.ops[0].filtros).toEqual([["in", "factura_id", [7, 8]]]);
+  });
+
+  it("sin facturas no consulta; si la consulta falla, mapa vacío (no lanza)", async () => {
+    const sb = supabaseFalso({}, () => ({ error: { message: "statement timeout" } }));
+    expect((await nombresOriginales(sb.cliente, [])).size).toBe(0);
+    expect(sb.ops).toHaveLength(0);
+    expect((await nombresOriginales(sb.cliente, [1])).size).toBe(0);
   });
 });
