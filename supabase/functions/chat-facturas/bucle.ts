@@ -14,7 +14,7 @@
 // ============================================================================
 import type { AcumuladorUso, UsageBruto } from "../_shared/registrar-uso-ia.ts";
 import { esErrorDeModelo } from "../_shared/modelo-funcion.ts";
-import { resumenParaModelo, tablaPresupuesto } from "./tabla.ts";
+import { resumenParaModelo, tablaPresupuesto, verDePregunta } from "./tabla.ts";
 import {
   type Adjunto,
   type DocRef,
@@ -397,9 +397,9 @@ interface ResultadoTool {
  */
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function prepararPresupuesto(data: any): { tabla: string; paraModelo: unknown } | null {
+export function prepararPresupuesto(data: any, ver?: unknown): { tabla: string; paraModelo: unknown } | null {
   if (!data || typeof data !== "object" || Array.isArray(data) || data.error) return null;
-  return { tabla: tablaPresupuesto(data), paraModelo: resumenParaModelo(data) };
+  return { tabla: tablaPresupuesto(data, ver), paraModelo: resumenParaModelo(data) };
 }
 
 /** Documentos (con enlace al original) para los ids dados. Best-effort: si falla, sin referencias. */
@@ -587,7 +587,7 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
     if (vino && data && typeof data === "object" && !Array.isArray(data)) data = { vino_carta: vino, ...(data as Record<string, unknown>) };
 
     if (nombre === "comparar_presupuesto") {
-      const p = prepararPresupuesto(data);
+      const p = prepararPresupuesto(data, args?.ver ?? verDePregunta(ctx.pregunta));
       if (p) return { fallo: false, tabla: p.tabla, contenido: JSON.stringify(p.paraModelo) };
     }
 
