@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { normalizarAdjuntos, type AdjuntoChat } from "@/lib/facturas/seriePrecio";
 import { componerMensaje } from "@/lib/facturas/graficasCopiloto";
 import { archivoABase64, problemaConPresupuesto } from "@/lib/facturas/presupuestoAdjunto";
 import { registrarFalloInterno } from "@/lib/facturas/fallosInternos";
+import { normalizarAyuda, textoErrorChat, type AyudaRespuesta } from "@/lib/facturas/copilotoCalidad";
 
 // ─── Tipos alineados con las tablas reales de Supabase ───────────────────────
 // Tablas: chat_facturas_conversaciones, chat_facturas_mensajes
@@ -50,13 +51,21 @@ export interface MensajeChat {
 export type AvisoChat = "error" | "sin_datos";
 
 /** Texto del mensaje cuando la función no devuelve nada (red, tiempo agotado del navegador…). */
-export const TEXTO_SIN_RESPUESTA = "⚠️ No he podido responder: la consulta no ha llegado o ha tardado demasiado. Pulsa «Reintentar».";
+export const TEXTO_SIN_RESPUESTA = "⚠️ La consulta no ha llegado o ha tardado demasiado, así que no tengo respuesta. Tus facturas están bien. Pulsa «Reintentar».";
+
+/** Cuando el servidor contesta sin texto (18/11/2026: causa en palabras normales y una salida). */
+export const TEXTO_RESPUESTA_VACIA = "⚠️ No he conseguido sacar una respuesta de esta consulta. Pulsa «Reintentar» o prueba con un proveedor, un producto o un mes concretos.";
+
+/** El usuario pulsó «Parar» (la consulta se cancela en el navegador; puede seguir un momento en el servidor). */
+export const TEXTO_PARADA = "Has parado la consulta. Escribe otra pregunta o pulsa «Reintentar» para volver a lanzarla.";
 
 /** Traza de herramientas de una respuesta (chat-facturas/hilo.ts, trazaParaPanel). */
 export interface TrazaChat {
   modelo: string | null;
   herramientas: unknown[];
   aviso?: AvisoChat;
+  /** Nombres parecidos y fecha de los datos (chat-facturas, `ayuda`); alimentan los botones y el pie. */
+  ayuda?: AyudaRespuesta;
 }
 
 const avisoValido = (v: unknown): AvisoChat | undefined => (v === "error" || v === "sin_datos" ? v : undefined);
@@ -72,25 +81,27 @@ export const MAX_HISTORIAL_FEEDBACK = 10;
 export function trazaDeAdjuntos(adjuntos: unknown): TrazaChat | undefined {
   if (!Array.isArray(adjuntos)) return undefined;
   const a = adjuntos.find((x) => x && typeof x === "object" && (x as { tipo?: unknown }).tipo === "contexto") as
-    { datos?: { modelo?: unknown; herramientas?: unknown; aviso?: unknown } } | undefined;
+    { datos?: { modelo?: unknown; herramientas?: unknown; aviso?: unknown; ayuda?: unknown } } | undefined;
   if (!a?.datos || !Array.isArray(a.datos.herramientas)) return undefined;
   const aviso = avisoValido(a.datos.aviso);
-  return { modelo: typeof a.datos.modelo === "string" ? a.datos.modelo : null, herramientas: a.datos.herramientas, ...(aviso ? { aviso } : {}) };
+  const ayuda = normalizarAyuda(a.datos.ayuda);
+  return { modelo: typeof a.datos.modelo === "string" ? a.datos.modelo : null, herramientas: a.datos.herramientas, ...(aviso ? { aviso } : {}), ...(ayuda ? { ayuda } : {}) };
 }
 
 /** La traza que devuelve chat-facturas (`traza` + `modelo`), o undefined si no viene (función sin desplegar). */
 export function trazaDeRespuesta(data: unknown): TrazaChat | undefined {
-  const d = data as { traza?: { herramientas?: unknown }; modelo?: unknown; success?: unknown; incidencia?: unknown; sin_datos?: unknown } | null;
+  const d = data as { traza?: { herramientas?: unknown }; modelo?: unknown; success?: unknown; incidencia?: unknown; sin_datos?: unknown; ayuda?: unknown } | null;
   if (!d) return undefined;
   // `incidencia` (o success = false) = la petición falló; `sin_datos` = la respuesta es un «no hay».
   const aviso: AvisoChat | undefined = d.incidencia || d.success === false ? "error" : d.sin_datos === true ? "sin_datos" : undefined;
   const herramientas = d.traza && Array.isArray(d.traza.herramientas) ? d.traza.herramientas : null;
+  const ayuda = normalizarAyuda(d.ayuda);
   if (!herramientas && !aviso) return undefined;
-  return { modelo: typeof d.modelo === "string" ? d.modelo : null, herramientas: herramientas ?? [], ...(aviso ? { aviso } : {}) };
+  return { modelo: typeof d.modelo === "string" ? d.modelo : null, herramientas: herramientas ?? [], ...(aviso ? { aviso } : {}), ...(ayuda ? { ayuda } : {}) };
 }
 
 const adjuntoContexto = (t: TrazaChat | undefined) =>
-  t ? [{ tipo: "contexto", datos: { modelo: t.modelo, herramientas: t.herramientas, ...(t.aviso ? { aviso: t.aviso } : {}) } }] : [];
+  t ? [{ tipo: "contexto", datos: { modelo: t.modelo, herramientas: t.herramientas, ...(t.aviso ? { aviso: t.aviso } : {}), ...(t.ayuda ? { ayuda: t.ayuda } : {}) } }] : [];
 
 /**
  * La función no ha devuelto nada (red caída, tiempo agotado en el navegador): se avisa a
@@ -118,6 +129,11 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
   const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  // «Parar»: cancela la petición en curso (AbortController) y deja escribir de nuevo.
+  const controlRef = useRef<AbortController | null>(null);
+  const pararRespuesta = useCallback(() => {
+    controlRef.current?.abort();
+  }, []);
 
   // ─── Cargar lista de conversaciones ──────────────────────────────────────────
   const cargarConversaciones = useCallback(async () => {
@@ -282,7 +298,7 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
       toast.error("El mensaje no se ha guardado", {
         description:
           "La respuesta se muestra aqui, pero no quedara en el historial ni el asistente la recordara. " +
-          (error.message || "Error desconocido"),
+          textoErrorChat(error.message),
       });
       return null;
     }
@@ -347,6 +363,8 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
     }
 
     const inicio = Date.now();
+    const control = new AbortController();
+    controlRef.current = control;
     try {
       // Llamar a la edge function con session_id = conv.session_id
       const { data, error } = await supabase.functions.invoke("chat-facturas", {
@@ -354,11 +372,12 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
           mensaje: texto,
           session_id: conv.session_id,
         },
+        signal: control.signal,
       });
 
       if (error) throw new Error(error.message);
 
-      const respuesta = data?.respuesta || "No pude obtener una respuesta.";
+      const respuesta = data?.respuesta || TEXTO_RESPUESTA_VACIA;
       const adjuntos = normalizarAdjuntos(data?.adjuntos);
       const traza = trazaDeRespuesta(data);
 
@@ -384,13 +403,16 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
       };
       setMensajes((prev) => [...prev, msgAsistente]);
     } catch (error) {
-      console.error("Error en chat:", error);
-      toast.error("No se pudo enviar el mensaje");
-      avisarChatSinRespuesta(texto, Date.now() - inicio, error instanceof Error ? error.message : String(error));
+      const parada = control.signal.aborted;
+      if (!parada) {
+        console.error("Error en chat:", error);
+        toast.error("No se pudo enviar el mensaje");
+        avisarChatSinRespuesta(texto, Date.now() - inicio, error instanceof Error ? error.message : String(error));
+      }
 
       const msgError: MensajeChat = {
         id: crypto.randomUUID(),
-        contenido: TEXTO_SIN_RESPUESTA,
+        contenido: parada ? TEXTO_PARADA : TEXTO_SIN_RESPUESTA,
         rol: "assistant",
         conversacion_id: conv.id,
         created_at: new Date().toISOString(),
@@ -431,6 +453,8 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
     }]);
     if (mensajes.length === 0) await actualizarTitulo(conv.id, `Presupuesto ${archivo.name}`);
 
+    const control = new AbortController();
+    controlRef.current = control;
     try {
       const base64 = await archivoABase64(archivo);
       const { data, error } = await supabase.functions.invoke("chat-facturas", {
@@ -439,9 +463,10 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
           session_id: conv.session_id,
           presupuesto: { nombre: archivo.name, mime: archivo.type, base64 },
         },
+        signal: control.signal,
       });
       if (error) throw new Error(error.message);
-      const respuesta = data?.respuesta || "No he podido leer el presupuesto.";
+      const respuesta = data?.respuesta || "⚠️ No he podido leer el presupuesto. Prueba con otro formato (PDF, Excel o una foto nítida).";
       const traza = trazaDeRespuesta(data);
       const saved = await guardarMensaje(conv, respuesta, "assistant", [], traza);
       await supabase
@@ -458,11 +483,14 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
         traza,
       }]);
     } catch (error) {
-      console.error("Error adjuntando el presupuesto:", error);
-      toast.error("No se pudo leer el presupuesto");
+      const parada = control.signal.aborted;
+      if (!parada) {
+        console.error("Error adjuntando el presupuesto:", error);
+        toast.error("No se pudo leer el presupuesto");
+      }
       setMensajes((prev) => [...prev, {
         id: crypto.randomUUID(),
-        contenido: "⚠️ No he podido leer el presupuesto. Inténtalo de nuevo o prueba con otro formato.",
+        contenido: parada ? "Has parado la lectura del presupuesto. Puedes volver a adjuntarlo." : "⚠️ No he podido leer el presupuesto: la lectura ha fallado o ha tardado demasiado. Inténtalo de nuevo o prueba con otro formato (PDF, Excel o una foto nítida).",
         rol: "assistant",
         conversacion_id: conv.id,
         created_at: new Date().toISOString(),
@@ -522,12 +550,15 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
     if (!conversacionActiva) return;
     setIsSending(true);
     const inicio = Date.now();
+    const control = new AbortController();
+    controlRef.current = control;
     try {
       const { data, error } = await supabase.functions.invoke("chat-facturas", {
         body: { mensaje: lastUserMsg.contenido, session_id: conversacionActiva.session_id, tipo_interaccion: "regeneracion" },
+        signal: control.signal,
       });
       if (error) throw new Error(error.message);
-      const respuesta = data?.respuesta || "No pude obtener una respuesta.";
+      const respuesta = data?.respuesta || TEXTO_RESPUESTA_VACIA;
       const adjuntos = normalizarAdjuntos(data?.adjuntos);
       const traza = trazaDeRespuesta(data);
       const savedMsg = await guardarMensaje(conversacionActiva, respuesta, "assistant", adjuntos, traza);
@@ -551,12 +582,15 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
         },
       ]);
     } catch (error) {
-      toast.error("No se pudo regenerar la respuesta");
-      avisarChatSinRespuesta(lastUserMsg.contenido, Date.now() - inicio, error instanceof Error ? error.message : String(error));
+      const parada = control.signal.aborted;
+      if (!parada) {
+        toast.error("No se pudo regenerar la respuesta");
+        avisarChatSinRespuesta(lastUserMsg.contenido, Date.now() - inicio, error instanceof Error ? error.message : String(error));
+      }
       // El aviso se queda en el hilo para poder volver a reintentar.
       setMensajes((prev) => [...prev, {
         id: crypto.randomUUID(),
-        contenido: TEXTO_SIN_RESPUESTA,
+        contenido: parada ? TEXTO_PARADA : TEXTO_SIN_RESPUESTA,
         rol: "assistant",
         conversacion_id: conversacionActiva.id,
         created_at: new Date().toISOString(),
@@ -621,6 +655,7 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
     enviarMensaje,
     adjuntarPresupuesto,
     regenerarRespuesta,
+    pararRespuesta,
     valorarRespuesta,
     eliminarConversacion,
     cargarConversaciones,

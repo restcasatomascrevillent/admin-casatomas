@@ -156,7 +156,7 @@ export function EstadoDocumento({ alertas, verificada, origen = null, onRevisar,
               </ul>
               {lista.length > 4 && <p className="mt-1 text-xs text-muted-foreground">y {lista.length - 4} más…</p>}
               <p className="mt-2 text-xs text-muted-foreground">
-                Lo leyó el OCR: comprueba el documento original y corrígelo en "Editar".
+                Se leyó de la foto o el PDF: comprueba el documento original y corrígelo en "Editar".
               </p>
             </PopoverContent>
           </Popover>

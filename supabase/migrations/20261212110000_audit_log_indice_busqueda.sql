@@ -17,7 +17,7 @@
 -- que cambiar la otra o el índice deja de usarse. Va con `||` y `coalesce` y no
 -- con `concat_ws` porque `concat_ws` no es IMMUTABLE y no se puede indexar.
 --
--- SIN transacción y en UNA sentencia, como 20261212100000 (`concurrently` no
+-- SIN transacción y en UNA sentencia, como 20261212105000 (`concurrently` no
 -- bloquea las escrituras ni puede ir dentro de una transacción). Si se corta a
 -- medias deja un índice inválido: bórralo con el rollback y vuelve a lanzarlo.
 -- Vuelta atrás: supabase/rollbacks/20261212110000_audit_log_indice_busqueda_ROLLBACK.sql.

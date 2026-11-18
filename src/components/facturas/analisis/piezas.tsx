@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import type { Tamano } from "@/lib/facturas/widgetsTablero";
 import { Cifra } from "./Cifra";
+import { textoErrorTablero } from "@/lib/facturas/copilotoCalidad";
 
 export const FOCO =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -470,7 +471,7 @@ export function ErrorTablero({ mensaje, onReintentar }: { mensaje: string; onRei
       <p className="flex items-start gap-2 text-sm text-foreground">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
         <span>
-          No se ha podido cargar el tablero. <span className="text-muted-foreground">{mensaje}</span>
+          No se ha podido cargar el tablero. <span className="text-muted-foreground">{textoErrorTablero(mensaje)}</span>
         </span>
       </p>
       <Button type="button" variant="outline" className="h-11" onClick={onReintentar}>

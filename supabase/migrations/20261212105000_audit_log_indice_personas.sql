@@ -1,5 +1,5 @@
 -- ===========================================================================
--- 20261212100000_audit_log_indice_personas — la lista de Auditoría daba «statement timeout» (18/11/2026)
+-- 20261212105000_audit_log_indice_personas — la lista de Auditoría daba «statement timeout» (18/11/2026)
 -- ===========================================================================
 -- Super Admin › Auditoría abre la lista sin procesos del servidor
 -- (`actor_origin in ('usuario','intento','historico')`), ordenada por fecha y de
@@ -24,7 +24,7 @@
 -- `supabase db query -f` manda el fichero entero junto y con dos sentencias
 -- fallaría con «cannot run inside a transaction block». Si se corta a medias deja
 -- un índice inválido: bórralo con el rollback y vuelve a lanzar este fichero.
--- Vuelta atrás: supabase/rollbacks/20261212100000_audit_log_indice_personas_ROLLBACK.sql.
+-- Vuelta atrás: supabase/rollbacks/20261212105000_audit_log_indice_personas_ROLLBACK.sql.
 create index concurrently if not exists idx_audit_log_personas
   on public.audit_log (created_at desc, id desc)
   include (accion, tabla)

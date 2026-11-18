@@ -75,8 +75,38 @@ const descuentoTexto = (d: Json): string => {
   return "";
 };
 
-/** La tabla completa en Markdown (GFM), lista para pintar en el panel. */
-export function tablaPresupuesto(r: Json): string {
+/** Filas que se enseñan por defecto (las que más ahorran) y como mucho en «ver más». */
+export const FILAS_POR_DEFECTO = 30;
+export const FILAS_VER_MAS = 60;
+
+export type VistaPresupuesto = "interesa" | "revisar" | "no_interesa";
+
+export function vistaDe(v: unknown): VistaPresupuesto {
+  const s = String(v ?? "").toLowerCase().replace(/\s+/g, "_");
+  return s === "revisar" ? "revisar" : s === "no_interesa" ? "no_interesa" : "interesa";
+}
+
+/** «ver los de Revisar», «enséñame los que no interesan»: qué tabla pide el usuario (por defecto, Interesa). */
+export function verDePregunta(p: unknown): VistaPresupuesto {
+  const s = String(p ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (/\bno\s+(me\s+)?interesa/.test(s)) return "no_interesa";
+  // Solo si PIDE VER la tabla («ver/enséñame/muéstrame … revisar», «los de Revisar»): «revisa esta tarifa y dime qué interesa» no.
+  if (/\b(ver|veo|ensen\w*|muestr\w*|dame|saca|abre|pon|quiero ver)\b[^.?!]{0,40}\brevisar\b|\b(los|las|lo|la|tabla|pestana|lista|vista)( \w+){0,2} (de|en|a) revisar\b/.test(s)) return "revisar";
+  return "interesa";
+}
+
+const ultimoTxt = (l: Json, u: string): string =>
+  l?.ultimo ? `${eur(l.ultimo.precio)}${u}${l.ultimo.proveedor ? ` (${celda(l.ultimo.proveedor, 18)})` : ""}` : "—";
+
+const tablaMd = (cab: string, alin: string, filas: string[]) => [cab, alin, ...filas].join("\n");
+
+/**
+ * La tabla en Markdown (GFM). Por defecto solo «Interesa»: las 30 que más ahorran y el total (la tabla real de la
+ * revisión de producción tenía 470 filas y 77.000 caracteres: no cabía en el móvil ni se leía). «Revisar» y
+ * «No interesa» se piden con `ver` («ver los de Revisar»).
+ */
+export function tablaPresupuesto(r: Json, ver: unknown = "interesa"): string {
+  const vista = vistaDe(ver);
   const lineas: Json[] = Array.isArray(r?.lineas) ? r.lineas : [];
   const res = r?.resumen ?? {};
   const interesa = lineas.filter((l) => l?.veredicto === "Interesa");
@@ -85,6 +115,7 @@ export function tablaPresupuesto(r: Json): string {
   const porAhorro = (a: Json, b: Json) => (Number(b?.ahorro_anual ?? -Infinity) - Number(a?.ahorro_anual ?? -Infinity));
   interesa.sort(porAhorro);
   noInteresa.sort((a, b) => Number(b?.dif_pct ?? 0) - Number(a?.dif_pct ?? 0));
+  revisar.sort(porAhorro);
 
   const out: string[] = [];
   const quien = r?.proveedor ? ` de ${celda(r.proveedor, 60)}` : "";
@@ -92,42 +123,40 @@ export function tablaPresupuesto(r: Json): string {
     `**Tarifa «${celda(r?.archivo ?? "presupuesto", 80)}»${quien}** · ${descuentoTexto(r?.descuento)} · precios sin IVA. ` +
       `${entero(res.lineas_total)} artículos: ${entero(res.lineas_que_compras)} se parecen a lo que compras y ${entero(res.no_los_compras)} no.`,
   );
+  if (r?.descuento?.aviso) out.push(`_${celda(r.descuento.aviso, 400)}_`);
   out.push(
     `**Ahorro estimado al año: ${eur(res.ahorro_anual_interesa, 2)}** si compras a este proveedor los ${entero(res.productos_interesa ?? interesa.length)} productos que interesan ` +
       `(con lo que gastaste en los últimos 12 meses; cada producto se cuenta una vez).`,
   );
 
-  if (interesa.length > 0) {
-    out.push(`### Interesa (${interesa.length})`);
-    const t = ["| Producto de la tarifa | Lo que compras | Oferta | Último pagado | Media 12 m | Mejor actual | Dif. | Ahorro/año |", "|---|---|---:|---|---:|---|---:|---:|"];
-    for (const l of interesa) {
-      const u = porUnidad(l?.unidad);
-      const ult = l?.ultimo ? `${eur(l.ultimo.precio)}${u} (${celda(l.ultimo.proveedor, 28)})` : "—";
-      const mej = l?.mejor_actual ? `${eur(l.mejor_actual.precio)} (${celda(l.mejor_actual.proveedor, 28)})` : "—";
-      const ahorro = l?.otra_referencia ? "otra ref. del mismo producto" : eur(l?.ahorro_anual, 2);
-      t.push(`| ${celda(l?.producto)} | ${celda(l?.coincide_con, 50)} | ${eur(l?.oferta)}${u} | ${ult} | ${l?.media_12m ? eur(l.media_12m.precio) : "—"} | ${mej} | ${pct(l?.dif_pct)} | ${ahorro} |`);
+  const u = (l: Json) => porUnidad(l?.unidad);
+  if (vista === "interesa") {
+    // Las «otra referencia» (el mismo producto en otra línea) no suman: fuera de la lista corta.
+    const principales = interesa.filter((l) => !l?.otra_referencia);
+    const otras = interesa.length - principales.length;
+    const mostrar = principales.slice(0, FILAS_POR_DEFECTO);
+    if (mostrar.length > 0) {
+      out.push(`### Interesa: los ${mostrar.length} que más ahorran (de ${principales.length})`);
+      out.push(tablaMd("| Producto de la tarifa | Oferta | Último pagado | Ahorro/año |", "|---|---:|---|---:|",
+        mostrar.map((l) => `| ${celda(l?.producto, 46)} | ${eur(l?.oferta)}${u(l)} (${pct(l?.dif_pct)}) | ${ultimoTxt(l, u(l))} | ${eur(l?.ahorro_anual, 2)} |`)));
     }
-    out.push(t.join("\n"));
-  }
-  if (revisar.length > 0) {
-    out.push(`### Revisar (${revisar.length})`);
-    const t = ["| Producto de la tarifa | Lo que compras | Oferta | Último pagado | Por qué |", "|---|---|---:|---|---|"];
-    for (const l of revisar) {
-      const u = porUnidad(l?.unidad);
-      const ult = l?.ultimo ? `${eur(l.ultimo.precio)}${u} (${celda(l.ultimo.proveedor, 28)})` : "—";
-      t.push(`| ${celda(l?.producto)} | ${celda(l?.coincide_con, 50)} | ${l?.oferta != null ? `${eur(l.oferta)}${u}` : "—"} | ${ult} | ${celda(motivoLegible(l), 110)} |`);
-    }
-    out.push(t.join("\n"));
-  }
-  if (noInteresa.length > 0) {
-    out.push(`### No interesa (${noInteresa.length})`);
-    const t = ["| Producto de la tarifa | Lo que compras | Oferta | Último pagado | Dif. |", "|---|---|---:|---|---:|"];
-    for (const l of noInteresa) {
-      const u = porUnidad(l?.unidad);
-      const ult = l?.ultimo ? `${eur(l.ultimo.precio)}${u} (${celda(l.ultimo.proveedor, 28)})` : "—";
-      t.push(`| ${celda(l?.producto)} | ${celda(l?.coincide_con, 50)} | ${eur(l?.oferta)}${u} | ${ult} | ${pct(l?.dif_pct)} |`);
-    }
-    out.push(t.join("\n"));
+    const resto = principales.length - mostrar.length;
+    const notas: string[] = [];
+    if (resto > 0) notas.push(`otros ${entero(resto)} que interesan${otras > 0 ? ` (y ${entero(otras)} segundas referencias del mismo producto)` : ""} suman el resto del ahorro`);
+    if (revisar.length > 0) notas.push(`${entero(revisar.length)} para revisar a mano`);
+    if (noInteresa.length > 0) notas.push(`${entero(noInteresa.length)} que no interesan`);
+    if (notas.length > 0) out.push(`Además: ${notas.join(", ")}. Pídeme «ver los de Revisar» o «ver los que no interesan» y te los enseño.`);
+  } else if (vista === "revisar") {
+    const mostrar = revisar.slice(0, FILAS_VER_MAS);
+    out.push(`### Revisar (${mostrar.length}${revisar.length > mostrar.length ? ` de ${revisar.length}` : ""})`);
+    out.push(tablaMd("| Producto de la tarifa | Lo que compras | Por qué |", "|---|---|---|",
+      mostrar.map((l) => `| ${celda(l?.producto, 46)} | ${celda(l?.coincide_con, 40)} | ${celda(motivoLegible(l), 110)} |`)));
+    if (revisar.length > mostrar.length) out.push(`Faltan ${entero(revisar.length - mostrar.length)} más, con motivos parecidos (formato u otra unidad en su mayoría).`);
+  } else {
+    const mostrar = noInteresa.slice(0, FILAS_VER_MAS);
+    out.push(`### No interesa (${mostrar.length}${noInteresa.length > mostrar.length ? ` de ${noInteresa.length}` : ""})`);
+    out.push(tablaMd("| Producto de la tarifa | Oferta | Último pagado | Dif. |", "|---|---:|---|---:|",
+      mostrar.map((l) => `| ${celda(l?.producto, 46)} | ${eur(l?.oferta)}${u(l)} | ${ultimoTxt(l, u(l))} | ${pct(l?.dif_pct)} |`)));
   }
   if (lineas.length === 0) out.push("Ningún artículo de la tarifa se parece a lo que compras.");
   return out.join("\n\n");
@@ -146,9 +175,10 @@ export function resumenParaModelo(r: Json): Json {
     descuento: r?.descuento ?? null,
     resumen: r?.resumen ?? {},
     mejores: top,
-    tabla: "YA ESTA HECHA: la app la añade debajo de tu respuesta con TODAS las lineas (Interesa, Revisar, No interesa).",
+    tabla: "YA ESTA HECHA: la app la añade debajo de tu respuesta (los 30 que mas ahorran; Revisar y No interesa, si el usuario los pide).",
     como_responder: "Escribe SOLO 2-4 lineas: cuantos productos interesan, el ahorro estimado al año (resumen.ahorro_anual_interesa, " +
-      "con el consumo de los ultimos 12 meses), los 2-3 mejores de «mejores» y cuantos hay que revisar. NO hagas tabla ni listas largas " +
-      "y no digas que el resultado esta recortado.",
+      "con el consumo de los ultimos 12 meses), los 2-3 mejores de «mejores» y cuantos hay que revisar. NO hagas tabla ni listas largas. " +
+      "La app enseña los 30 que mas ahorran; si el usuario pide ver los de Revisar o los que no interesan, vuelve a llamar a comparar_presupuesto " +
+      "con los mismos datos (la app ya mira si pide Revisar o No interesa). Si el descuento es un importe (descuento.aviso), di en una frase como se ha repartido.",
   };
 }

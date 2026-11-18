@@ -349,11 +349,11 @@ await db.exec("set test.actor='99999999-0000-0000-0000-000000000009';");
 check(await count(),0,'ordinary account cannot read any audit records');
 await reject("insert into public.audit_log(accion,actor_user_id) values('login','"+admin+"')",'client cannot insert fake login of a verified account');
 await db.exec('reset role');
-// Lista de Auditoría (20261212100000): con muchos registros de procesos y pocos de personas, la lista por defecto
+// Lista de Auditoría (20261212105000): con muchos registros de procesos y pocos de personas, la lista por defecto
 // (sin procesos del servidor, por fecha, de 25 en 25) usa el índice parcial de personas en vez de recorrer los procesos.
 // `create index concurrently` no puede ir en un bloque de transacción: cada sentencia del fichero va por separado.
 // Los dos índices van en UNA sentencia por fichero (así los aplica `supabase db query -f` sin transacción).
-for (const fichero of ['20261212100000_audit_log_indice_personas.sql','20261212110000_audit_log_indice_busqueda.sql']) {
+for (const fichero of ['20261212105000_audit_log_indice_personas.sql','20261212110000_audit_log_indice_busqueda.sql']) {
  const sentencias=(await readFile(`supabase/migrations/${fichero}`,'utf8')).replace(/^\s*--.*$/gm,'').split(';').map(t=>t.trim()).filter(Boolean);
  check(sentencias.length,1,`${fichero} has a single statement`);
  await db.exec(sentencias[0]);
