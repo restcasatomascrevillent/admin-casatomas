@@ -104,7 +104,8 @@ export function BotonAvisosSeccion({ seccion, className, compacto = false }: { s
 
 /**
  * Color de cada fila en los avisos de Reservas (CAS-9, 17/11/2026, petición del dueño: «diferentes tipos de colores
- * de filas»): azul la reserva nueva (hay que verificarla), rojo la cancelada (solo revisar). Revisada, más clara.
+ * de filas»): azul la reserva nueva (hay que verificarla), rojo la cancelada (solo revisar) y, desde el 18/11/2026,
+ * verde la que ha confirmado el cliente con el enlace del correo (solo revisar). Revisada, más clara.
  */
 const TONO_AVISO_RESERVA: Record<string, { borde: string; fondo: string; fondoRevisado: string; icono: string }> = {
   reserva_nueva: {
@@ -112,6 +113,12 @@ const TONO_AVISO_RESERVA: Record<string, { borde: string; fondo: string; fondoRe
     fondo: "bg-sky-50 dark:bg-sky-950/40",
     fondoRevisado: "bg-sky-50/40 dark:bg-sky-950/15",
     icono: "text-sky-700 dark:text-sky-300",
+  },
+  reserva_confirmada: {
+    borde: "border-l-emerald-500",
+    fondo: "bg-emerald-50 dark:bg-emerald-950/40",
+    fondoRevisado: "bg-emerald-50/40 dark:bg-emerald-950/15",
+    icono: "text-emerald-700 dark:text-emerald-300",
   },
   reserva_cancelada: {
     borde: "border-l-red-500",
@@ -153,6 +160,7 @@ function ModalAvisos({
   abreFicha: ReturnType<typeof useAbrirAviso>["abreFicha"];
 }) {
   const config = SECCIONES_AVISOS[seccion];
+  const esReservas = seccion === "reservas";
   // Se abre en «Sin revisar» si hay alguno; si no, en «Todos» (para ver el historial).
   const [filtros, setFiltros] = useState<FiltrosAvisosSeccion>({
     // Siempre en «Sin revisar» (12/11/2026, petición del dueño: «que salgan los sin revisar por defecto»).
@@ -161,13 +169,21 @@ function ModalAvisos({
   });
   const { avisos, loading, cargandoMas, hayMas, error, cargarMas, marcarRevisado, marcarTodosRevisados } =
     useAvisosSeccion(seccion, filtros, abierto);
-  const grupos = agruparPorDia(avisos);
   // Cada reserva avisada (12/11/2026: su estado; 17/11/2026, CAS-9: también lo que necesita «Verificar»).
   const reservas = useReservasAvisos(avisos);
+  // 18/11/2026, petición del dueño: en azul solo las reservas que hay que verificar. Una «Reserva nueva» cuya reserva
+  // ya no está pendiente (verificada, confirmada, cancelada) no sale en «Sin revisar»; la base de datos ya la da por
+  // revisada (20261212100000), esto lo cubre mientras la lista abierta no se relee.
+  const yaNoPorVerificar = (n: NotificacionDashboard) => {
+    if (!esReservas || n.tipo !== "reserva_nueva" || filtros.estado !== "sin_revisar") return false;
+    const id = reservaDeAviso(n);
+    const estado = id ? reservas.get(id)?.estado : undefined;
+    return estado !== undefined && estado !== "pendiente";
+  };
+  const grupos = agruparPorDia(avisos.filter((n) => !yaNoPorVerificar(n)));
   const estados = new Map([...reservas].map(([id, r]) => [id, r.estado]));
   const { canAccess: puedeEditarReservas } = useCanAccessSection("reservas", "edit");
   const { aceptar, estaEnCurso } = useAccionesServicioReserva();
-  const esReservas = seccion === "reservas";
   const haySinRevisar = avisos.some((n) => !n.leida) || pendientes > 0;
   const etiquetaTipo = (tipo: string) => config.tipos.find((t) => t.tipo === tipo)?.etiqueta ?? tipo;
 
@@ -205,7 +221,8 @@ function ModalAvisos({
           </DialogDescription>
           {esReservas && (
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" data-testid="leyenda-avisos-reservas">
-              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border-l-4 border-l-sky-500 bg-sky-100 dark:bg-sky-900/60" aria-hidden="true" />Reserva nueva: verificar</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border-l-4 border-l-sky-500 bg-sky-100 dark:bg-sky-900/60" aria-hidden="true" />Nueva: verificar</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border-l-4 border-l-emerald-500 bg-emerald-100 dark:bg-emerald-900/60" aria-hidden="true" />Confirmada por el cliente: revisar</span>
               <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border-l-4 border-l-red-500 bg-red-100 dark:bg-red-900/60" aria-hidden="true" />Cancelada: revisar</span>
             </p>
           )}
@@ -279,7 +296,7 @@ function ModalAvisos({
             <p className="p-6 text-center text-sm text-destructive" role="alert">
               No se pudieron cargar los avisos. Inténtalo de nuevo más tarde.
             </p>
-          ) : avisos.length === 0 ? (
+          ) : grupos.length === 0 ? (
             <p className="p-6 text-center text-sm text-muted-foreground">
               {filtros.estado === "sin_revisar" ? "No hay avisos sin revisar." : "No hay avisos."}
             </p>

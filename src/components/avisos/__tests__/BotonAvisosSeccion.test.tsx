@@ -123,7 +123,7 @@ describe("Botón «Avisos» de cada sección", () => {
     expect(within(modal).getByText("Aviso r2")).toBeInTheDocument();
     fireEvent.click(within(modal).getByRole("button", { name: "Marcar todos como revisados" }));
     await waitFor(() => expect(bd.revisados).toHaveLength(1));
-    expect(bd.revisados[0]).toEqual({ p_ids: null, p_tipos: ["reserva_nueva", "reserva_cancelada"] });
+    expect(bd.revisados[0]).toEqual({ p_ids: null, p_tipos: ["reserva_nueva", "reserva_confirmada", "reserva_cancelada"] });
     // Los de otras secciones (y los retirados) no se tocan.
     expect(bd.filas.filter((f) => !f.leida).map((f) => f.id)).toEqual(["s1", "s2", "f1", "o1"]);
     // El botón queda detrás del modal (aria-hidden): `hidden: true`.
@@ -217,7 +217,7 @@ describe("Reservas › Avisos: colores, «Verificar» y «Revisado» (CAS-9, 17/
 
   it("cada tipo tiene su color de fila y su leyenda: azul la reserva nueva, rojo la cancelada", async () => {
     const modal = await abrir();
-    expect(within(modal).getByTestId("leyenda-avisos-reservas")).toHaveTextContent(/Reserva nueva: verificar.*Cancelada: revisar/);
+    expect(within(modal).getByTestId("leyenda-avisos-reservas")).toHaveTextContent(/Nueva: verificar.*Confirmada por el cliente: revisar.*Cancelada: revisar/);
     expect(fila(modal, "Aviso r1")).toHaveAttribute("data-tipo-aviso", "reserva_nueva");
     expect(fila(modal, "Aviso r1").className).toMatch(/border-l-sky-500/);
     expect(fila(modal, "Aviso r2")).toHaveAttribute("data-tipo-aviso", "reserva_cancelada");
@@ -268,14 +268,43 @@ describe("Reservas › Avisos: colores, «Verificar» y «Revisado» (CAS-9, 17/
     }
   });
 
-  it("si la reserva ya no está pendiente (verificada en la ficha), en vez de «Verificar» sale «Revisado»", async () => {
+  it("si la reserva ya no está pendiente (verificada en la ficha), su «Reserva nueva» no sale en «Sin revisar»; en «Todos», sin «Verificar» (18/11/2026)", async () => {
     permiso.editaReservas = true;
     reservasAvisadas.estado = "verificada";
     try {
-      const modal = await abrir();
+      pintar("reservas");
+      fireEvent.click(await screen.findByRole("button", { name: "Avisos: 2 sin revisar" }));
+      const modal = await screen.findByRole("dialog", { name: /Avisos de reservas/ });
+      await waitFor(() => expect(within(modal).getByText("Aviso r2")).toBeInTheDocument());
+      expect(within(modal).queryByText("Aviso r1")).toBeNull();
+      fireEvent.click(within(modal).getByRole("button", { name: "Todos" }));
+      await waitFor(() => expect(within(modal).getByText("Aviso r1")).toBeInTheDocument());
       const nueva = within(fila(modal, "Aviso r1"));
       expect(nueva.queryByRole("button", { name: /^Verificar/ })).toBeNull();
       expect(nueva.getByRole("button", { name: "Marcar como revisado: Aviso r1" })).toBeInTheDocument();
+    } finally {
+      permiso.editaReservas = false;
+    }
+  });
+
+  it("confirmada por el cliente: fila verde con «Ver» y «Revisado», sin «Verificar» (18/11/2026)", async () => {
+    permiso.editaReservas = true;
+    bd.filas.push(aviso("c1", "reserva_confirmada", false, { referencia_tipo: "reserva", referencia_id: "res-c1", titulo: "Confirmada por el cliente" }));
+    try {
+      pintar("reservas");
+      fireEvent.click(await screen.findByRole("button", { name: "Avisos: 3 sin revisar" }));
+      const modal = await screen.findByRole("dialog", { name: /Avisos de reservas/ });
+      await waitFor(() => expect(within(modal).getAllByRole("listitem")).toHaveLength(3));
+      const verde = fila(modal, "Confirmada por el cliente");
+      expect(verde).toHaveAttribute("data-tipo-aviso", "reserva_confirmada");
+      expect(verde.className).toMatch(/border-l-emerald-500/);
+      expect(within(verde).getByRole("button", { name: "Ver: Confirmada por el cliente" })).toBeInTheDocument();
+      expect(within(verde).queryByRole("button", { name: /^Verificar/ })).toBeNull();
+      fireEvent.click(within(verde).getByRole("button", { name: "Marcar como revisado: Confirmada por el cliente" }));
+      await waitFor(() => expect(bd.revisados).toEqual([{ p_ids: ["c1"], p_tipos: null }]));
+      await waitFor(() => expect(within(modal).queryByText("Confirmada por el cliente")).not.toBeInTheDocument());
+      // Filtro por tipo: «Confirmadas por el cliente».
+      expect(within(modal).getByRole("button", { name: "Confirmadas por el cliente" })).toBeInTheDocument();
     } finally {
       permiso.editaReservas = false;
     }
