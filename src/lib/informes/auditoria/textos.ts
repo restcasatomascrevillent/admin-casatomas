@@ -176,7 +176,6 @@ export const BOTONES: Record<string, string> = {
   "ia-modelos-openai": "Cambiar los modelos de IA",
   "avisos-telegram": "Configurar o probar los avisos por Telegram",
   "analizar-peticion": "Analizar con IA una petición del panel",
-  "recortar-fondo-vino": "Quitar el fondo a la foto de un vino",
   "buscar-puntuacion-parker": "Buscar la puntuación Parker de un vino",
   "auditoria-revertir": "Deshacer un cambio desde Auditoría",
   "cambiar-mi-contrasena": "Cambiar su propia contraseña",
