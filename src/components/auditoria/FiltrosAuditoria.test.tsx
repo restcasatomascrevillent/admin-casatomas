@@ -197,3 +197,19 @@ it("no repite como chip lo que ya dice la categoría rápida", () => {
   expect(screen.queryByText("Sección: Platos")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Mostrar filtros" })).toHaveTextContent("1");
 });
+
+it("no busca con menos de 3 letras y lo explica (la búsqueda va por un índice de grupos de 3 letras)", () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 375 });
+  render(<Harness conQuitar />);
+  const buscador = screen.getByRole("searchbox", { name: "Buscar en auditoría" });
+  fireEvent.change(buscador, { target: { value: "ia" } });
+  expect(screen.getByText("Escribe al menos 3 letras para buscar.")).toBeInTheDocument();
+  expect(buscador).toHaveAccessibleDescription("Escribe al menos 3 letras para buscar.");
+  expect(screen.getByRole("button", { name: "Buscar" })).toBeDisabled();
+  fireEvent.submit(buscador);
+  expect(aplicar).not.toHaveBeenCalled();
+  fireEvent.change(buscador, { target: { value: "iaf" } });
+  expect(screen.queryByText("Escribe al menos 3 letras para buscar.")).not.toBeInTheDocument();
+  fireEvent.submit(buscador);
+  expect(aplicar).toHaveBeenLastCalledWith({ origen: "sin_servidor", texto: "iaf" });
+});
