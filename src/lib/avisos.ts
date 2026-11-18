@@ -148,7 +148,7 @@ export const SECCIONES_AVISOS: Record<SeccionAvisos, { titulo: string; tipos: { 
       // 18/11/2026, petición del dueño: «solo tienen que salir las canceladas (rojo), las nuevas para verificar
       // (azul) y las que confirme luego el cliente (verdes)». Una «Reserva nueva» se da por revisada sola en
       // cuanto la reserva deja de estar pendiente (20261212100000).
-      { tipo: "reserva_nueva", etiqueta: "Nuevas por verificar" },
+      { tipo: "reserva_nueva", etiqueta: "Reservas nuevas" },
       { tipo: "reserva_confirmada", etiqueta: "Confirmadas por el cliente" },
       { tipo: "reserva_cancelada", etiqueta: "Canceladas" },
     ],
