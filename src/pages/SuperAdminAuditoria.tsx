@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
-import { FiltrosAuditoria } from "@/components/auditoria/FiltrosAuditoria";
+import { FiltrosAuditoria, sinBusquedaCorta } from "@/components/auditoria/FiltrosAuditoria";
 import {
   CATEGORIA_PROCESOS,
   CategoriasAuditoria,
@@ -149,8 +149,9 @@ export default function SuperAdminAuditoria() {
     });
   };
 
+  // Una búsqueda de 1 o 2 letras no se manda (sería lenta); el borrador se queda en el campo con su aviso.
   const aplicarFiltros = () => {
-    setFiltros(filtrosPendientes);
+    setFiltros(sinBusquedaCorta(filtrosPendientes));
     setPagina(0);
   };
 
