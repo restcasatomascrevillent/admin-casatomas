@@ -1,0 +1,5506 @@
+{
+ "descripcion": "Batería ampliada del copiloto de Facturas: las 121 preguntas reales distintas de producción (chat_facturas_mensajes, rol user, hasta el 17/11/2026), casos nuevos por tema y casos de trampa. Cada caso lleva categoría, herramienta esperada y «esperado»: ruta en el resultado + valor + tolerancia, calculados con SQL propio contra producción (campo sql: se recalcula con --en-vivo). Sin datos personales de clientes. Se lanza con scripts/eval-chat-fallos.mjs --bateria.",
+ "fecha_referencia": "2026-11-17",
+ "casos": [
+  {
+   "id": "r001",
+   "categoria": "documentos",
+   "origen": "real #1 (21/02)",
+   "mensaje": "¿De qué proveedor es mi última factura?",
+   "herramienta": {
+    "nombre": "estadisticas_globales",
+    "argumentos": {}
+   },
+   "esperado": [
+    {
+     "ruta": "ultimos[tipo=factura].proveedor",
+     "sql": "select proveedor from facturas where tipo='factura' order by fecha desc, id desc limit 1",
+     "tipo": "txt",
+     "valor": "MUSGRAVE ESPAÑA, S.A.U."
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«última» = la de fecha más reciente; los últimos documentos pueden ser albaranes"
+  },
+  {
+   "id": "r003",
+   "categoria": "documentos",
+   "origen": "real #3 (24/02)",
+   "mensaje": "cuantas facturas tengo",
+   "herramienta": {
+    "nombre": "estadisticas_globales",
+    "argumentos": {}
+   },
+   "esperado": [
+    {
+     "ruta": "facturas.n",
+     "sql": "select count(*) from facturas where tipo='factura'",
+     "tol": 0,
+     "valor": 4420,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r009",
+   "categoria": "proveedores",
+   "origen": "real #9 (25/02)",
+   "mensaje": "que porductos tiene la de salazones garre",
+   "herramienta": {
+    "nombre": "ficha_proveedor",
+    "argumentos": {
+     "proveedor": "salazones garre"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "docs",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'salazones? garre' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 37,
+     "tipo": "num"
+    },
+    {
+     "ruta": "proveedor",
+     "sql": "select 'Salazones Garre'",
+     "tipo": "txt",
+     "valor": "Salazones Garre"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r010",
+   "categoria": "documentos",
+   "origen": "real #10 (25/02)",
+   "mensaje": "Hola, quiero hacerte una consulta sobre el albarán número 0000427 del proveedor DISTRIBUCIONES GUILLEN, S.L..",
+   "herramienta": {
+    "nombre": "detalle_documento",
+    "argumentos": {
+     "id": null,
+     "numero": "0000427"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "documento.total",
+     "sql": "select total from facturas where numero_documento='0000427' and proveedor ~* 'guill' order by id limit 1",
+     "tol": 0.01,
+     "valor": 941.99,
+     "tipo": "num"
+    },
+    {
+     "ruta": "total_lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id=pf.factura_id where f.numero_documento='0000427' and f.proveedor ~* 'guill'",
+     "tol": 0,
+     "valor": 1,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r012",
+   "categoria": "documentos",
+   "origen": "real #12 (02/10)",
+   "mensaje": "Hola, quiero hacerte una consulta sobre el factura número 1 - 701405 del proveedor GRUPO INSULA ROMA S.L..",
+   "herramienta": {
+    "nombre": "detalle_documento",
+    "argumentos": {
+     "id": null,
+     "numero": "1 - 701405"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "documento.total",
+     "sql": "select total from facturas where numero_documento='1 - 701405' order by id limit 1",
+     "tol": 0.01,
+     "valor": 15141.34,
+     "tipo": "num"
+    },
+    {
+     "ruta": "total_lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id=pf.factura_id where f.numero_documento='1 - 701405'",
+     "tol": 0,
+     "valor": 23,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r014",
+   "categoria": "documentos",
+   "origen": "real #14 (06/10)",
+   "mensaje": "¿Qué albaranes de Racionalismo Dulce, S.L. hay esta semana?",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "racionalismo dulce",
+     "tipo": "albaran",
+     "desde": "2026-10-05",
+     "hasta": "2026-10-11",
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total_filas",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'racionalismo dulce' and f.tipo = 'albaran' and f.fecha >= '2026-10-05' and f.fecha <= '2026-10-11'",
+     "tol": 0,
+     "valor": 1,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«esta semana» (martes 6/10) fijada a 5-11/10: el modelo debe calcular el lunes-domingo"
+  },
+  {
+   "id": "r015",
+   "categoria": "precio_producto",
+   "origen": "real #15 (06/10)",
+   "mensaje": "Quien me suministra las navajas",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "navajas"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "por_proveedor[proveedor=ENCHENTA SLU].importe",
+     "sql": "select round(sum(pf.total),2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'navaja' and f.proveedor ~* 'enchenta' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "tol_pct": 3,
+     "valor": 7047.5,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r017",
+   "categoria": "cantidades",
+   "origen": "real #17 (06/10)",
+   "mensaje": "Cuantos kilos de centollo he comprado en total",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "centollo"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "por_unidad[unidad=kg].cantidad",
+     "sql": "select round(sum(pf.cantidad), 3) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'centoll' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "tol_pct": 3,
+     "valor": 249.55,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "centollo = centolla"
+  },
+  {
+   "id": "r018",
+   "categoria": "cantidades",
+   "origen": "real #18 (06/10)",
+   "mensaje": "De racionalismo dulce en albarán cuantos unidades de yema quemada",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "yema quemada",
+     "tipo": "albaran",
+     "proveedor": "racionalismo dulce"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'yema quemada' and f.tipo = 'albaran' and f.proveedor ~* 'racionalismo'",
+     "tol": 0,
+     "valor": 1,
+     "tipo": "num"
+    },
+    {
+     "ruta": "por_unidad[unidad=ud].cantidad",
+     "sql": "select round(sum(pf.cantidad), 3) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'yema quemada' and f.tipo = 'albaran' and f.proveedor ~* 'racionalismo' and pf.unidad = 'ud'",
+     "tol": 0.05,
+     "valor": 2,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r019",
+   "categoria": "documentos",
+   "origen": "real #19 (06/10)",
+   "mensaje": "Hola, quiero hacerte una consulta sobre el albarán número AL2602425 del proveedor Racionalismo Dulce, S.L..",
+   "herramienta": {
+    "nombre": "detalle_documento",
+    "argumentos": {
+     "id": null,
+     "numero": "AL2602425"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "documento.total",
+     "sql": "select total from facturas where numero_documento='AL2602425' order by id limit 1",
+     "tol": 0.01,
+     "valor": 315.66,
+     "tipo": "num"
+    },
+    {
+     "ruta": "total_lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id=pf.factura_id where f.numero_documento='AL2602425'",
+     "tol": 0,
+     "valor": 6,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r021",
+   "categoria": "gasto",
+   "origen": "real #21 (08/10)",
+   "mensaje": "¿Cuánto hemos gastado en Octubre?",
+   "herramienta": {
+    "nombre": "resumen_periodo",
+    "argumentos": {
+     "desde": "2026-10-01",
+     "hasta": "2026-10-31"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "facturas.gasto",
+     "sql": "select round(sum(f.total), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-10-01' and f.fecha <= '2026-10-31'",
+     "tol": 0.05,
+     "valor": 59129.34,
+     "tipo": "num"
+    },
+    {
+     "ruta": "facturas.n",
+     "sql": "select count(*) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-10-01' and f.fecha <= '2026-10-31'",
+     "tol": 0,
+     "valor": 59,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r022",
+   "categoria": "gasto",
+   "origen": "real #22 (09/10)",
+   "mensaje": "Que fruta me ha llegado este año",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "frutas",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "tipo": null,
+     "agrupar": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total),2) from productos_factura pf join facturas f on f.id=pf.factura_id join productos_catalogo p on p.id=pf.producto_id join categorias_producto cp on cp.id=p.categoria_id where cp.clave='frutas_verduras' and f.fecha between '2026-01-01' and '2026-12-31'",
+     "tol": 0,
+     "tol_pct": 1,
+     "valor": 39439.94,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "la categoría del catálogo es frutas_verduras (frutas y verduras juntas)"
+  },
+  {
+   "id": "r023",
+   "categoria": "cantidades",
+   "origen": "real #23 (10/10)",
+   "mensaje": "Me puedes decir cuántos kg de gamba roja se han comprado y a quien y el precio",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "gamba roja"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "por_unidad[unidad=kg].cantidad",
+     "sql": "select round(sum(pf.cantidad), 3) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'gamba roja' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "tol_pct": 3,
+     "valor": 257.45,
+     "tipo": "num"
+    },
+    {
+     "ruta": "por_unidad[unidad=kg].importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'gamba roja' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "tol_pct": 3,
+     "valor": 29798.67,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r024",
+   "categoria": "cantidades",
+   "origen": "real #24 (10/10)",
+   "mensaje": "Hola me puedes decir cuántos kilos de atún rojo hemos comprado",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "atún rojo"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "por_unidad[unidad=kg].cantidad",
+     "sql": "select round(sum(pf.cantidad), 3) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'at[uú]n (rojo|bluefin)|ventresca at[uú]n almadraba|bluefin' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0.1,
+     "valor": 1418.664,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r025",
+   "categoria": "proveedores",
+   "origen": "real #25 (11/10)",
+   "mensaje": "Dime a quien le compramos el atún rojo",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "atún rojo"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'at[uú]n (rojo|bluefin)|ventresca at[uú]n almadraba|bluefin' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 59147.87,
+     "tipo": "num"
+    },
+    {
+     "ruta": "total.proveedores",
+     "sql": "select count(distinct f.proveedor_id) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'at[uú]n (rojo|bluefin)|ventresca at[uú]n almadraba|bluefin' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 7,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r026",
+   "categoria": "precio_producto",
+   "origen": "real #26 (11/10)",
+   "mensaje": "A qué precio conpranos el arroz molino roca",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "arroz molino roca"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'molino roca' and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 8.2,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'molino roca' and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-11-10"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r027",
+   "categoria": "cantidades",
+   "origen": "real #27 (11/10)",
+   "mensaje": "Cuál es el producto que más hemos comprado en el mes de octubre",
+   "herramienta": {
+    "nombre": "ranking",
+    "argumentos": {
+     "criterio": "cantidad",
+     "tipo": null,
+     "limite": 5,
+     "desde": "2026-10-01",
+     "hasta": "2026-10-31",
+     "orden": "desc",
+     "incluir_servicios": null,
+     "unidad": null,
+     "categoria": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "filas[0].cantidad",
+     "sql": "select round(sum(pf.cantidad),2) from productos_factura pf join facturas f on f.id=pf.factura_id where f.fecha between '2026-10-01' and '2026-10-31' group by pf.producto_id, pf.unidad order by 1 desc nulls last limit 1",
+     "tol": 1,
+     "valor": 8181,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "pregunta ambigua: sumar cantidades de cosas distintas (servilletas, kilos) no vale; se compara con el mayor por producto y unidad"
+  },
+  {
+   "id": "r028",
+   "categoria": "precio_producto",
+   "origen": "real #28 (11/10)",
+   "mensaje": "Qué precio tienen las bobinas de papel",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "bobinas de papel"
+    }
+   },
+   "esperado": [],
+   "rpc": {
+    "debe": [
+     "MECHA|CELULOSA"
+    ],
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r029",
+   "categoria": "proveedores",
+   "origen": "real #29 (11/10)",
+   "mensaje": "Si suministros Altamira también a traído bobinas de papel pero quizás lleve otro nombre lo puedes mirar y comparar",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "bobina",
+     "proveedor": "altamira"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'bobina' and f.proveedor ~* 'altamira' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "tol_pct": 10,
+     "valor": 1445.91,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r030",
+   "categoria": "cantidades",
+   "origen": "real #30 (11/10)",
+   "mensaje": "Cuántos kg de atún rojo hemos gastado esta semana",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "atún rojo",
+     "desde": "2026-10-05",
+     "hasta": "2026-10-11"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "por_unidad[unidad=kg].cantidad",
+     "sql": "select round(sum(pf.cantidad), 3) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'at[uú]n rojo' and pf.unidad = 'kg' and f.fecha >= '2026-10-05' and f.fecha <= '2026-10-11' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0.05,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "semana del 11/10 fijada a 5-11/10"
+  },
+  {
+   "id": "r031",
+   "categoria": "precio_producto",
+   "origen": "real #31 (11/10)",
+   "mensaje": "A qué precio hemos comprado el chuletón de vaca",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "chuletón de vaca"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'chulet[oó]n.*vaca' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 30.2,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'chulet[oó]n.*vaca' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-05-31"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r032",
+   "categoria": "gasto",
+   "origen": "real #32 (20/10)",
+   "mensaje": "Cuánto me he gastado en helado este añi",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "helado",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "tipo": null,
+     "agrupar": null,
+     "denominacion": null
+    },
+    "asociacion": {
+     "categoria": "Panadería y repostería",
+     "familia": "Panadería y repostería",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id left join productos_catalogo pc on pc.id = pf.producto_id where (pc.nombre ~* '^helado' or pf.nombre ~* 'helado') and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 5799.18,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "helado = producto (catálogo «Helado de…»), no la categoría Panadería (39.636 €): va por compras_producto"
+  },
+  {
+   "id": "r033",
+   "categoria": "precio_producto",
+   "origen": "real #33 (03/11)",
+   "mensaje": "Dime la última vez que compre atún rojo",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "atún rojo"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'at[uú]n rojo' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-11-14"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "la última compra puede ser un albarán (más reciente que la última factura)"
+  },
+  {
+   "id": "r034",
+   "categoria": "vinos_botella",
+   "origen": "real #34 (03/11)",
+   "mensaje": "Dime a qué proveedor le compramos el vino lagar de cervera",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "lagar de cervera"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'lagar cervera' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0.5,
+     "valor": 5329,
+     "tipo": "num"
+    },
+    {
+     "ruta": "total.proveedores",
+     "sql": "select count(distinct f.proveedor_id) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'lagar cervera' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 2,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r037",
+   "categoria": "documentos",
+   "origen": "real #37 (03/11)",
+   "mensaje": "Dime qué factura o albarán tenía un descuadre",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "con_alertas",
+     "texto": null,
+     "tipo": null,
+     "desde": null,
+     "hasta": null,
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total_filas",
+     "sql": "select count(*) from facturas where jsonb_array_length(coalesce(alertas_validacion,'[]'::jsonb))>0",
+     "tol": 0,
+     "valor": 2299,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«descuadre» no es una alerta con nombre propio: el filtro con_alertas devuelve todas (hoy más de 2.000)"
+  },
+  {
+   "id": "r038",
+   "categoria": "gasto",
+   "origen": "real #38 (04/11)",
+   "mensaje": "¿Cuánto hemos gastado en Noviembre?",
+   "herramienta": {
+    "nombre": "resumen_periodo",
+    "argumentos": {
+     "desde": "2026-11-01",
+     "hasta": "2026-11-30"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "facturas.gasto",
+     "sql": "select round(sum(f.total), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-11-01' and f.fecha <= '2026-11-30'",
+     "tol": 0.05,
+     "valor": 24118.04,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r039",
+   "categoria": "cantidades",
+   "origen": "real #39 (04/11)",
+   "mensaje": "y cuantas unidades de vino he comprado en 2026",
+   "herramienta": {
+    "nombre": "volumen_comprado",
+    "argumentos": {
+     "categoria": "vino",
+     "producto": null,
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "unidad": null,
+     "orden": "envases",
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "envases",
+     "sql": "select round(sum(pf.cantidad)) from productos_factura pf join facturas f on f.id=pf.factura_id join productos_catalogo p on p.id=pf.producto_id join categorias_producto cp on cp.id=p.categoria_id where cp.clave='bebidas.vinos' and f.fecha between '2026-01-01' and '2026-12-31' and pf.unidad in ('botella','ud')",
+     "tol": 0,
+     "op": ">=",
+     "valor": 6095,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "botellas+unidades de la categoría Vinos; tolerancia de 60 por cajas y formatos grandes"
+  },
+  {
+   "id": "r042",
+   "categoria": "cantidades",
+   "origen": "real #42 (04/11)",
+   "mensaje": "cuantas cervezas hemos com`prado",
+   "herramienta": {
+    "nombre": "volumen_comprado",
+    "argumentos": {
+     "categoria": "cerveza",
+     "producto": null,
+     "desde": null,
+     "hasta": null,
+     "unidad": null,
+     "orden": "envases",
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "sql": "select false",
+     "tol": 0,
+     "tipo": "bool",
+     "valor": false
+    }
+   ],
+   "rpc": {
+    "no_debe": [
+     "mostaza"
+    ],
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r044",
+   "categoria": "cantidades",
+   "origen": "real #44 (04/11)",
+   "mensaje": "Cuanto he consumido luz",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "acciona",
+     "tipo": "factura",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sumas.base",
+     "sql": "select round(sum(f.subtotal), 2) from facturas f where true and f.proveedor ~* 'acciona' and f.tipo = 'factura' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31'",
+     "tol": 0.05,
+     "valor": 26858.89,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«consumo» pide kWh, que están en las líneas; aquí solo se comprueba la base en euros"
+  },
+  {
+   "id": "r045",
+   "categoria": "documentos",
+   "origen": "real #45 (06/11)",
+   "mensaje": "Hola, quiero hacerte una consulta sobre el albarán número SN-ACEITES-20261105 del proveedor Aceites Crevillent",
+   "herramienta": {
+    "nombre": "detalle_documento",
+    "argumentos": {
+     "id": null,
+     "numero": "SN-ACEITES-20261105"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "documento.total",
+     "sql": "select total from facturas where numero_documento='SN-ACEITES-20261105' order by id limit 1",
+     "tol": 0.01,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r046",
+   "categoria": "vinos_botella",
+   "origen": "real #46 (06/11)",
+   "mensaje": "Q me ha costado el vino gran rodma",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "gran rodma"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'gran rodma' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 38.95,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«Gran Rodma» es un tinto real (Bodega Campoluz, 38,95 €)"
+  },
+  {
+   "id": "r047",
+   "categoria": "cantidades",
+   "origen": "real #47 (09/11)",
+   "mensaje": "Dime cuantos kilos de atún e comprado del día 3/11 a hoy",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "atún",
+     "desde": "2026-11-03",
+     "hasta": "2026-11-17"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "por_unidad[unidad=kg].cantidad",
+     "sql": "select round(sum(pf.cantidad), 3) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'at[uú]n' and pf.nombre !~* 'ventresca|lata|conserva|bonito' and pf.unidad = 'kg' and f.fecha >= '2026-11-03' and f.fecha <= '2026-11-17' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "tol_pct": 40,
+     "valor": 59.61,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«atún» a secas incluye atún rojo y de otros tipos; tolerancia de 3 kg"
+  },
+  {
+   "id": "r048",
+   "categoria": "precio_producto",
+   "origen": "real #48 (09/11)",
+   "mensaje": "Dime a qué precio compre las castañas congeladas",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "castañas congeladas"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'casta[ñn]a.*congel' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 12.66,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'casta[ñn]a.*congel' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-11-04"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r049",
+   "categoria": "documentos",
+   "origen": "real #49 (09/11)",
+   "mensaje": "Hola, quiero hacerte una consulta sobre el albarán número A26/68654 del proveedor DISTRIBUCIONES GASTRONÓMICAS",
+   "herramienta": {
+    "nombre": "detalle_documento",
+    "argumentos": {
+     "id": null,
+     "numero": "A26/68654"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "documento.total",
+     "sql": "select total from facturas where numero_documento='A26/68654' order by id limit 1",
+     "tol": 0.01,
+     "valor": 43.45,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r050",
+   "categoria": "trampas_abreviaturas",
+   "subcategoria": "abreviatura",
+   "origen": "real #50 (09/11)",
+   "mensaje": "Me puedes decir el precio del queso curado con teufa",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "queso curado trufa"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'Q[.]OVEJA CURADO TRUFADO' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 25.01,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'Q[.]OVEJA CURADO TRUFADO' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-07-29"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "errata «teufa» + abreviatura Q.OVEJA en la factura"
+  },
+  {
+   "id": "r051",
+   "categoria": "precio_producto",
+   "origen": "real #51 (10/11)",
+   "mensaje": "A cómo e comprado las alcachofas confitadas",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "alcachofas confitadas"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'alcachofa.*confit' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0.05,
+     "valor": 325.5,
+     "tipo": "num"
+    },
+    {
+     "ruta": "total.lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'alcachofa.*confit' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 2,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r052",
+   "categoria": "trampas_proveedores_parecidos",
+   "subcategoria": "proveedor",
+   "origen": "real #52 (10/11)",
+   "mensaje": "Mira albaranes de liga sabor",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "liga sabor",
+     "tipo": "albaran",
+     "desde": null,
+     "hasta": null,
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total_filas",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'luga sabores' and f.tipo = 'albaran'",
+     "tol": 0,
+     "valor": 4,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "errata del proveedor: Luga Sabores"
+  },
+  {
+   "id": "r053",
+   "categoria": "cantidades",
+   "origen": "real #53 (10/11)",
+   "mensaje": "cuantos litros de cerveza hemos comprado este año",
+   "herramienta": {
+    "nombre": "volumen_comprado",
+    "argumentos": {
+     "categoria": "cerveza",
+     "producto": null,
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "unidad": null,
+     "orden": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total",
+     "sql": "select round(sum(case when pf.unidad = 'barril' then pf.cantidad * coalesce(pf.contenido_cantidad, 0) when pf.unidad = 'caja' then pf.cantidad * coalesce(substring(pf.nombre from '[*][ ]*([0-9]+)')::numeric, 0) * (case when pf.nombre ~ '1/3' then 0.33 when pf.nombre ~ '1/2' then 0.5 when pf.nombre ~ '1/4' then 0.25 else 0 end) else 0 end), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'bebidas.cervezas' and f.fecha between '2026-01-01' and '2026-12-31'",
+     "tol": 40,
+     "valor": 21022.32,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "litros por línea (barril 50 l, caja de 24 tercios…); se preguntó 4 veces y salían 79.459 l por leer 1/3 L como 3 litros"
+  },
+  {
+   "id": "r059",
+   "categoria": "precio_producto",
+   "origen": "real #59 (11/11)",
+   "mensaje": "Dime a qué precio e comprado chuletero de ternera a grupo embajadores",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "chuletero de ternera",
+     "proveedor": "grupo embajadores"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'lomo ternera c/h' and f.proveedor ~* 'embajadores' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 31993.91,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "chuletero de ternera = lomo de ternera con hueso (C/H)"
+  },
+  {
+   "id": "r062",
+   "categoria": "precio_producto",
+   "origen": "real #62 (11/11)",
+   "mensaje": "Bonito limpio garre",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "bonito limpio",
+     "proveedor": "garre"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'bonito.*limpi|limpi.*bonito' and f.proveedor ~* 'garre' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 5,
+     "valor": 123.6,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«limpio» filtra variantes"
+  },
+  {
+   "id": "r063",
+   "categoria": "precio_producto",
+   "origen": "real #63 (11/11)",
+   "mensaje": "Dime el precio del bonito",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "bonito"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'bonito' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-11-11"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r065",
+   "categoria": "trampas_proveedores_parecidos",
+   "subcategoria": "proveedor",
+   "origen": "real #65 (11/11)",
+   "mensaje": "Dime los productos y precios de salazones garro",
+   "herramienta": {
+    "nombre": "ficha_proveedor",
+    "argumentos": {
+     "proveedor": "salazones garro"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "docs",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'salazones? garre' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 37,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "errata de una letra: Garre"
+  },
+  {
+   "id": "r067",
+   "categoria": "subidas_precio",
+   "origen": "real #67 (11/11)",
+   "mensaje": "¿Ha subido lo que pago a Acciona Green Energy Developments?",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "acciona",
+     "tipo": "factura",
+     "desde": null,
+     "hasta": null,
+     "orden": "fecha_asc",
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sumas.facturas.n",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'acciona' and f.tipo = 'factura'",
+     "tol": 0,
+     "valor": 29,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "la herramienta de variaciones mira precio de productos, no el importe mensual de un proveedor",
+   "herramienta_alternativa": "variacion_precios o alertas_precio por proveedor"
+  },
+  {
+   "id": "r068",
+   "categoria": "documentos",
+   "origen": "real #68 (11/11)",
+   "mensaje": "Lista facturas 2026 distribución bebida catral",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "catral",
+     "tipo": "factura",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sumas.facturas.n",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'catral' and f.tipo = 'factura' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31'",
+     "tol": 0,
+     "valor": 25,
+     "tipo": "num"
+    },
+    {
+     "ruta": "sumas.base",
+     "sql": "select round(sum(f.subtotal), 2) from facturas f where true and f.proveedor ~* 'catral' and f.tipo = 'factura' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31'",
+     "tol": 0.05,
+     "valor": 50568.62,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r069",
+   "categoria": "proveedores",
+   "origen": "real #69 (11/11)",
+   "mensaje": "¿Qué le he comprado a Embajadores Madrid este año?",
+   "herramienta": {
+    "nombre": "ficha_proveedor",
+    "argumentos": {
+     "proveedor": "embajadores madrid"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "docs",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'embajadores madrid' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 27,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r070",
+   "categoria": "documentos",
+   "origen": "real #70 (11/11)",
+   "mensaje": "Consumo luz acciona año 2026",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "acciona",
+     "tipo": null,
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sumas.base",
+     "sql": "select round(sum(f.subtotal), 2) from facturas f where true and f.proveedor ~* 'acciona' and f.tipo = 'factura' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31'",
+     "tol": 0.05,
+     "valor": 26858.89,
+     "tipo": "num"
+    },
+    {
+     "ruta": "sumas.facturas.n",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'acciona' and f.tipo = 'factura' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31'",
+     "tol": 0,
+     "valor": 11,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r073",
+   "categoria": "documentos",
+   "origen": "real #73 (11/11)",
+   "mensaje": "Lista facturas acciona año 2026 y suma las bases imponible",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "acciona",
+     "tipo": "factura",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sumas.base",
+     "sql": "select round(sum(f.subtotal), 2) from facturas f where true and f.proveedor ~* 'acciona' and f.tipo = 'factura' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31'",
+     "tol": 0.05,
+     "valor": 26858.89,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r074",
+   "categoria": "vinos_botella",
+   "origen": "real #74 (11/11)",
+   "mensaje": "Dime precio gran reserva",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "gran reserva"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'gran reserva' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 10,
+     "valor": 69,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«gran reserva» es una calidad, no un vino: 70 líneas de bodegas y añadas distintas; no debe dar un único precio sin avisar"
+  },
+  {
+   "id": "r075",
+   "categoria": "trampas_packs_unidades",
+   "subcategoria": "litro_botella",
+   "origen": "real #75 (11/11)",
+   "mensaje": "Precio pintia",
+   "herramienta": {
+    "nombre": "historial_precios",
+    "argumentos": {
+     "producto": "pintia"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pintia' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 46,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.unidad",
+     "sql": "select pf.unidad from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pintia' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "ud"
+    }
+   ],
+   "rpc": {
+    "no_debe": [
+     "61[,.]33"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "se compra por botella (46 €), no por litro (61,33 €/l)"
+  },
+  {
+   "id": "r076",
+   "categoria": "vinos_botella",
+   "origen": "real #76 (12/11)",
+   "mensaje": "Precio vino corullon",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "corullon"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'corull' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 71,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "solo hay Corullón MAGNUM 2023 a 71 €"
+  },
+  {
+   "id": "r077",
+   "categoria": "proveedores",
+   "origen": "real #77 (12/11)",
+   "mensaje": "Ínsula roma",
+   "herramienta": {
+    "nombre": "ficha_proveedor",
+    "argumentos": {
+     "proveedor": "ínsula roma"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "docs",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'insula roma' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 7,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r078",
+   "categoria": "trampas_anadas_magnum",
+   "subcategoria": "magnum",
+   "origen": "real #78 (12/11)",
+   "mensaje": "Corullon botella pequeña",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "corullon"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [],
+   "rpc": {
+    "debe": [
+     "MAGNUM"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "no hay formato pequeño (75 cl): solo magnum. El resultado debe dejar claro que es magnum"
+  },
+  {
+   "id": "r079",
+   "categoria": "vinos_botella",
+   "origen": "real #79 (12/11)",
+   "mensaje": "Negralada",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "negralada"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "valor": true,
+     "tol": 0,
+     "tipo": "bool"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "sin_datos"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "no hay compras (dato que falta, no error)"
+  },
+  {
+   "id": "r081",
+   "categoria": "vinos_botella",
+   "origen": "real #81 (12/11)",
+   "mensaje": "Abadía retuerta selecion",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "abadía retuerta selección"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'abad[ií]a retuerta' and pf.nombre !~* 'magnum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 20.09,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'abad[ií]a retuerta' and pf.nombre !~* 'magnum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-09-26"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r083",
+   "categoria": "vinos_botella",
+   "origen": "real #83 (12/11)",
+   "mensaje": "Botella gordura precio",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "gordura"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "valor": true,
+     "tol": 0,
+     "tipo": "bool"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«Gordura» no existe en las compras; (la pregunta 84, «garduña», tampoco)"
+  },
+  {
+   "id": "r085",
+   "categoria": "trampas_vinos_regalo",
+   "subcategoria": "regalo",
+   "origen": "real #85 (12/11)",
+   "mensaje": "Precio botella el seque",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "el seque"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "valor": 16.08,
+     "tol": 0.02,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "El Seque 2022: 30 botellas a 19,30 € + 6 sin cargo en cada pedido: el coste real es 579/36 = 16,08 €. Se espera ese coste efectivo, no los 19,30 € de la línea"
+  },
+  {
+   "id": "r086",
+   "categoria": "vinos_botella",
+   "origen": "real #86 (12/11)",
+   "mensaje": "Precio botella hombros",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "hombros"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "valor": true,
+     "tol": 0,
+     "tipo": "bool"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r087",
+   "categoria": "vinos_botella",
+   "origen": "real #87 (12/11)",
+   "mensaje": "Precio botella la faraona",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "la faraona"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "valor": true,
+     "tol": 0,
+     "tipo": "bool"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r088",
+   "categoria": "trampas_proveedores_parecidos",
+   "subcategoria": "proveedor",
+   "origen": "real #88 (13/11)",
+   "mensaje": "Buscar abono distribución guillem producto gran reserva",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "guillem",
+     "tipo": "abono",
+     "desde": null,
+     "hasta": null,
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total_filas",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'guill[eé]n' and f.tipo = 'factura' and f.total < 0",
+     "tol": 0,
+     "valor": 0,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "Guillem/Guillén; no existe el tipo «abono»: un abono es una factura con total negativo"
+  },
+  {
+   "id": "r089",
+   "categoria": "precio_producto",
+   "origen": "real #89 (13/11)",
+   "mensaje": "A qué precio a venido el salmonete",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "salmonete"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'salmonete' and pf.nombre !~* 'espina' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-11-11"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "las espinas de salmonete no son salmonete"
+  },
+  {
+   "id": "r090",
+   "categoria": "vinos_botella",
+   "origen": "real #90 (13/11)",
+   "mensaje": "A cueanto hemos comprado el EL PUNTIDO 25 PRIMEUR",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "el puntido 25 primeur"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'puntido 25 primeur' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0.05,
+     "valor": 3694.86,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "hay 3/4x6b, MAGNUM y «Calados del Puntido»: se suman las tres"
+  },
+  {
+   "id": "r092",
+   "categoria": "precio_producto",
+   "origen": "real #92 (13/11)",
+   "mensaje": "A cuanto compro el carabinero",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "carabinero"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'carabinero' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 79,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.cantidad",
+     "sql": "select pf.cantidad from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'carabinero' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 26.1,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "antes salía 79 kg × 26,10 €; lo real es 26,1 kg × 79 €"
+  },
+  {
+   "id": "r094",
+   "categoria": "trampas_anadas_magnum",
+   "subcategoria": "magnum",
+   "origen": "real #94 (13/11)",
+   "mensaje": "Psi magnum precio",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "psi magnum"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'psi mgn' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 63.7,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«PSI Mgn. 2023» a 63,70 € (Mgn. = magnum); el PSI normal es otro precio"
+  },
+  {
+   "id": "r095",
+   "categoria": "vinos_botella",
+   "origen": "real #95 (13/11)",
+   "mensaje": "Precio Paramo corcos",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "páramo de corcos"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'corcos' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 27.75,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r096",
+   "categoria": "trampas_anadas_magnum",
+   "subcategoria": "magnum",
+   "origen": "real #96 (13/11)",
+   "mensaje": "XR magnum precio",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "xr magnum"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'xr reserva 1,5l' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 35,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "MARQUES DE RISCAL XR RESERVA 1,5L (magnum)"
+  },
+  {
+   "id": "r097",
+   "categoria": "cantidades",
+   "origen": "real #97 (14/11)",
+   "mensaje": "Cuantos litros de cerveza hemos comprado en 2026",
+   "herramienta": {
+    "nombre": "volumen_comprado",
+    "argumentos": {
+     "categoria": "cerveza",
+     "producto": null,
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "unidad": null,
+     "orden": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total",
+     "sql": "select round(sum(case when pf.unidad = 'barril' then pf.cantidad * coalesce(pf.contenido_cantidad, 0) when pf.unidad = 'caja' then pf.cantidad * coalesce(substring(pf.nombre from '[*][ ]*([0-9]+)')::numeric, 0) * (case when pf.nombre ~ '1/3' then 0.33 when pf.nombre ~ '1/2' then 0.5 when pf.nombre ~ '1/4' then 0.25 else 0 end) else 0 end), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'bebidas.cervezas' and f.fecha between '2026-01-01' and '2026-12-31'",
+     "tol": 40,
+     "valor": 21022.32,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r099",
+   "categoria": "vinos_botella",
+   "origen": "real #99 (14/11)",
+   "mensaje": "Precio botella alabasrer",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "alabaster"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'alabaster 75' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 105.25,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'alabaster 75' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-09-26"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "errata «alabasrer»; hay 75 cl, magnum y primeur"
+  },
+  {
+   "id": "r100",
+   "categoria": "trampas_anadas_magnum",
+   "subcategoria": "magnum",
+   "origen": "real #100 (14/11)",
+   "mensaje": "Hormiga magnitud botella",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "hormiga magnum"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'hormiga.*magnum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 42.85,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r101",
+   "categoria": "vinos_botella",
+   "origen": "real #101 (14/11)",
+   "mensaje": "Hormiga botella",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "la hormiga"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'hormiga' and pf.nombre !~* 'magnum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 22.3,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'hormiga' and pf.nombre !~* 'magnum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-07-29"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r104",
+   "categoria": "vinos_botella",
+   "origen": "real #104 (14/11)",
+   "mensaje": "Champagne alexander",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "champagne alexander"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "valor": true,
+     "tol": 0,
+     "tipo": "bool"
+    }
+   ],
+   "rpc": {
+    "no_debe": [
+     "Silla"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "«Alexander» solo existe como una silla (mobiliario): no es champagne"
+  },
+  {
+   "id": "r106",
+   "categoria": "trampas_abreviaturas",
+   "subcategoria": "abreviatura",
+   "origen": "real #106 (14/11)",
+   "mensaje": "A cuánto compro el laurent Perrier",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "laurent perrier"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total),2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id where p.nombre ~* 'laurent' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "tol_pct": 1,
+     "valor": 94439.99,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "CUVEE"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "la marca no está en el nombre del catálogo («La Cuvée»)"
+  },
+  {
+   "id": "r107",
+   "categoria": "precio_producto",
+   "origen": "real #107 (14/11)",
+   "mensaje": "Cuando se compró buey?",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "buey"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'chuletero buey|lomo buey|^buey' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-09-26"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«buey» es carne de buey, no buey de mar (marisco)"
+  },
+  {
+   "id": "r108",
+   "categoria": "precio_producto",
+   "origen": "real #108 (14/11)",
+   "mensaje": "Chuletón de buey",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "chuletón de buey"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'chulet[oó]n.*buey|chuletero buey' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 3019.01,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r109",
+   "categoria": "trampas_proveedores_parecidos",
+   "subcategoria": "proveedor",
+   "origen": "real #109 (14/11)",
+   "mensaje": "De Nicolás y Valero debería de aver 2 referencias y dime precio",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "chuletón",
+     "proveedor": "nicolás y valero"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'chulet' and f.proveedor ~* 'nicol[aá]s y valero' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 14704.5,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "mismo proveedor con 2 escrituras"
+  },
+  {
+   "id": "r110",
+   "categoria": "cantidades",
+   "origen": "real #110 (14/11)",
+   "mensaje": "Cuantos kilos de atún e gastado en octubre",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "atún",
+     "desde": "2026-10-01",
+     "hasta": "2026-10-31"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "por_unidad[unidad=kg].cantidad",
+     "sql": "select round(sum(pf.cantidad), 3) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'at[uú]n' and pf.nombre !~* 'ventresca|lata|conserva|bonito' and pf.unidad = 'kg' and f.fecha >= '2026-10-01' and f.fecha <= '2026-10-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 5,
+     "valor": 27.48,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "r111",
+   "categoria": "trampas_abreviaturas",
+   "subcategoria": "abreviatura",
+   "origen": "real #111 (15/11)",
+   "mensaje": "Precio botella Sierra Cantabria",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "sierra cantabria"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'cantabria 25 primeur' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 27.93,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'cantabria 25 primeur' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-09-22"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "S. CANTABRIA 25 PRIMEUR a 27,93 € (22/09/2026); también hay Colección Privada"
+  },
+  {
+   "id": "r112",
+   "categoria": "gasto",
+   "origen": "real #112 (15/11)",
+   "mensaje": "cuanto me he gastado en vinos de rioja en septiembre",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "vino",
+     "desde": "2026-09-01",
+     "hasta": "2026-09-30",
+     "tipo": null,
+     "agrupar": null,
+     "denominacion": "rioja"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total),2) from productos_factura pf join facturas f on f.id=pf.factura_id join productos_catalogo p on p.id=pf.producto_id join categorias_producto cp on cp.id=p.categoria_id where cp.clave='bebidas.vinos' and f.fecha between '2026-09-01' and '2026-09-30' and p.denominacion_origen ilike '%rioja%'",
+     "tol": 1,
+     "valor": 4999.98,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "solo 55 de 425 vinos del catálogo tienen denominación: lo no rellenado se pierde (dato que falta)"
+  },
+  {
+   "id": "r113",
+   "categoria": "trampas_packs_unidades",
+   "subcategoria": "caja_unidad",
+   "origen": "real #113 (16/11)",
+   "mensaje": "precio  compra pan de cristal",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "pan de cristal"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pan (de )?cristal' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0.5,
+     "valor": 8513.4,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "caja"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "caja de 21 barras a 29,40 € frente a unidad suelta a 1,40 €: no mezclar; y no mezclar las «Tostadas Cristal» (2.146 €), que no son pan de cristal"
+  },
+  {
+   "id": "r114",
+   "categoria": "precio_producto",
+   "origen": "real #114 (16/11)",
+   "mensaje": "Precio kilo gamba Roja",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "gamba roja"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'gamba roja' and f.tipo = 'factura' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-10-31"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "la última factura con precio por kilo, no la «GAMBA ROJA 1» sin precio ni el albarán sin proveedor"
+  },
+  {
+   "id": "r115",
+   "categoria": "vinos_botella",
+   "origen": "real #115 (17/11)",
+   "mensaje": "Dime precio fefiñanes y fefiñanes magnum",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "fefiñanes"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'fefi' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0.05,
+     "valor": 2122.35,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "no hay magnum de Fefiñanes en las compras; el chat debe decirlo"
+  },
+  {
+   "id": "r120",
+   "categoria": "trampas_packs_unidades",
+   "subcategoria": "caja_unidad",
+   "origen": "real #120 (17/11)",
+   "mensaje": "PRECIO COMPRA 1/3 HEINEKEN",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "heineken 1/3"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'heineken 1/3 long net' and pf.nombre !~* 'envase|plastico|desc' and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 41.85,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "caja"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "caja de 24 a 41,82 €; la botella (tercio) sale a 1,74 €"
+  },
+  {
+   "id": "r002",
+   "categoria": "conversacional",
+   "origen": "real #2 (22/02)",
+   "mensaje": "hola",
+   "evaluable": false,
+   "motivo_no_evaluable": "saludo"
+  },
+  {
+   "id": "r004",
+   "categoria": "conversacional",
+   "origen": "real #4 (25/02)",
+   "mensaje": "me puedes responder",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r005",
+   "categoria": "conversacional",
+   "origen": "real #5 (25/02)",
+   "mensaje": "me lo puedes repetir",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r006",
+   "categoria": "conversacional",
+   "origen": "real #6 (25/02)",
+   "mensaje": "me puedes decir la respuesta porfa",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r007",
+   "categoria": "conversacional",
+   "origen": "real #7 (25/02)",
+   "mensaje": "de que proveedores",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r008",
+   "categoria": "conversacional",
+   "origen": "real #8 (25/02)",
+   "mensaje": "cual es el total de ellas",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r011",
+   "categoria": "conversacional",
+   "origen": "real #11 (01/03)",
+   "mensaje": "puedes volver a intentarlo",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r013",
+   "categoria": "conversacional",
+   "origen": "real #13 (02/10)",
+   "mensaje": "Hay un gasto atipico?",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r016",
+   "categoria": "conversacional",
+   "origen": "real #16 (06/10)",
+   "mensaje": "A cuánto la unidad",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r020",
+   "categoria": "conversacional",
+   "origen": "real #20 (06/10)",
+   "mensaje": "Porque es más caro que el anterior",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r035",
+   "categoria": "ia_solo",
+   "origen": "real #35 (03/11)",
+   "mensaje": "Dime qué facturas de vino tienes archivadas",
+   "evaluable": false,
+   "motivo_no_evaluable": "búsqueda semántica (necesita OpenAI): solo nivel --ia"
+  },
+  {
+   "id": "r036",
+   "categoria": "conversacional",
+   "origen": "real #36 (03/11)",
+   "mensaje": "Dime qué vinos trajeron en ese pedido",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r040",
+   "categoria": "conversacional",
+   "origen": "real #40 (04/11)",
+   "mensaje": "las unidades con cajas o botellas?",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r041",
+   "categoria": "conversacional",
+   "origen": "real #41 (04/11)",
+   "mensaje": "si",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r043",
+   "categoria": "repetida",
+   "origen": "real #43 (04/11)",
+   "mensaje": "cuantos litros de vino h ecomprado",
+   "evaluable": false,
+   "motivo_no_evaluable": "como r053 pero de vino: la conversión a litros del vino se prueba en las pruebas de volumen (sin cifra independiente fiable)"
+  },
+  {
+   "id": "r054",
+   "categoria": "conversacional",
+   "origen": "real #54 (10/11)",
+   "mensaje": "categorizalo",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r055",
+   "categoria": "conversacional",
+   "origen": "real #55 (10/11)",
+   "mensaje": "cuaantos litros entonces",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r056",
+   "categoria": "repetida",
+   "origen": "real #56 (10/11)",
+   "mensaje": "cuantos litros de cerveza hemos pedido en 2026",
+   "evaluable": false,
+   "motivo_no_evaluable": "repetida de r053/r097 con otras palabras (cuenta como la misma)"
+  },
+  {
+   "id": "r057",
+   "categoria": "repetida",
+   "origen": "real #57 (10/11)",
+   "mensaje": "Cuantos litros de cerveza hemos comrpado en 2026",
+   "evaluable": false,
+   "motivo_no_evaluable": "repetida de r053/r097"
+  },
+  {
+   "id": "r058",
+   "categoria": "conversacional",
+   "origen": "real #58 (10/11)",
+   "mensaje": "Dame detalle por mes y producto",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r060",
+   "categoria": "conversacional",
+   "origen": "real #60 (11/11)",
+   "mensaje": "Dime precio de toda la ternera de embajadores",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r061",
+   "categoria": "conversacional",
+   "origen": "real #61 (11/11)",
+   "mensaje": "Y de vaca",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r064",
+   "categoria": "conversacional",
+   "origen": "real #64 (11/11)",
+   "mensaje": "Bonito",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r066",
+   "categoria": "conversacional",
+   "origen": "real #66 (11/11)",
+   "mensaje": "Lomos de bonito",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r071",
+   "categoria": "conversacional",
+   "origen": "real #71 (11/11)",
+   "mensaje": "Sin iva",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r072",
+   "categoria": "conversacional",
+   "origen": "real #72 (11/11)",
+   "mensaje": "Calcula total sin iva",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r080",
+   "categoria": "conversacional",
+   "origen": "real #80 (12/11)",
+   "mensaje": "Pago negralada",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r082",
+   "categoria": "repetida",
+   "origen": "real #82 (12/11)",
+   "mensaje": "Precio botella abadía retuerta seleccion",
+   "evaluable": false,
+   "motivo_no_evaluable": "repetida de r081"
+  },
+  {
+   "id": "r084",
+   "categoria": "repetida",
+   "origen": "real #84 (12/11)",
+   "mensaje": "Precio botella garduña",
+   "evaluable": false,
+   "motivo_no_evaluable": "como r083: no existe en las compras"
+  },
+  {
+   "id": "r091",
+   "categoria": "conversacional",
+   "origen": "real #91 (13/11)",
+   "mensaje": "y cuantas botellas",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r093",
+   "categoria": "conversacional",
+   "origen": "real #93 (13/11)",
+   "mensaje": "dame la factura para abrirla",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r098",
+   "categoria": "conversacional",
+   "origen": "real #98 (14/11)",
+   "mensaje": "Dame el detalle por mes y producto",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r102",
+   "categoria": "conversacional",
+   "origen": "real #102 (14/11)",
+   "mensaje": "Dime las facturas",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r103",
+   "categoria": "conversacional",
+   "origen": "real #103 (14/11)",
+   "mensaje": "Precio magnum",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r105",
+   "categoria": "conversacional",
+   "origen": "real #105 (14/11)",
+   "mensaje": "Revisalo",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r116",
+   "categoria": "conversacional",
+   "origen": "real #116 (17/11)",
+   "mensaje": "Que error",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r117",
+   "categoria": "presupuestos_real",
+   "origen": "real #117 (17/11)",
+   "mensaje": "📎 Presupuesto adjunto: Artículos de lista de precio - 2026-11-16T091755.919.xlsx",
+   "evaluable": false,
+   "motivo_no_evaluable": "necesita el fichero adjunto (en producción no hay ninguno guardado)"
+  },
+  {
+   "id": "r118",
+   "categoria": "presupuestos_real",
+   "origen": "real #118 (17/11)",
+   "mensaje": "Fijate en lo que si que compro, no me aplica descuento, hay algo que me interese comprarle?",
+   "evaluable": false,
+   "motivo_no_evaluable": "necesita el presupuesto adjunto"
+  },
+  {
+   "id": "r119",
+   "categoria": "conversacional",
+   "origen": "real #119 (17/11)",
+   "mensaje": "Por que",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "r121",
+   "categoria": "conversacional",
+   "origen": "real #121 (17/11)",
+   "mensaje": "Y EL PRECIO POR BOTELLA",
+   "evaluable": false,
+   "motivo_no_evaluable": "depende de la conversación anterior (sin ella no hay pregunta)"
+  },
+  {
+   "id": "n01",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Qué margen me deja Ostras en la carta?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": "ostras",
+     "vista": "platos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "platos[nombre=Ostras].precio_carta",
+     "sql": "select precio_eur::numeric from \"Platos\" where nombre = 'Ostras' limit 1",
+     "tol": 0.01,
+     "valor": 4.9,
+     "tipo": "num"
+    },
+    {
+     "ruta": "platos[nombre=Ostras].coste",
+     "sql": "select round(sum(e.cantidad / case when e.unidad = 'g' then 1000 else 1 end * (select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.producto_id = e.producto_id and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1)), 2) from escandallo_platos e join \"Platos\" pl on pl.id = e.plato_id where pl.nombre = 'Ostras'",
+     "tol": 0.05,
+     "valor": 2.8,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "coste = escandallo (cantidad × último precio de compra) calculado aparte; solo platos de un ingrediente"
+  },
+  {
+   "id": "n02",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Qué margen me deja Carabinero en la carta?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": "carabinero",
+     "vista": "platos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "platos[nombre=Carabinero].precio_carta",
+     "sql": "select precio_eur::numeric from \"Platos\" where nombre = 'Carabinero' limit 1",
+     "tol": 0.01,
+     "valor": 19.5,
+     "tipo": "num"
+    },
+    {
+     "ruta": "platos[nombre=Carabinero].coste",
+     "sql": "select round(sum(e.cantidad / case when e.unidad = 'g' then 1000 else 1 end * (select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.producto_id = e.producto_id and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1)), 2) from escandallo_platos e join \"Platos\" pl on pl.id = e.plato_id where pl.nombre = 'Carabinero'",
+     "tol": 0.05,
+     "valor": 7.9,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "coste = escandallo (cantidad × último precio de compra) calculado aparte; solo platos de un ingrediente"
+  },
+  {
+   "id": "n03",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Qué margen me deja Gamba roja en la carta?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": "gamba roja",
+     "vista": "platos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "platos[nombre=Gamba roja].precio_carta",
+     "sql": "select precio_eur::numeric from \"Platos\" where nombre = 'Gamba roja' limit 1",
+     "tol": 0.01,
+     "valor": 28,
+     "tipo": "num"
+    },
+    {
+     "ruta": "platos[nombre=Gamba roja].coste",
+     "sql": "select round(sum(e.cantidad / case when e.unidad = 'g' then 1000 else 1 end * (select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.producto_id = e.producto_id and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1)), 2) from escandallo_platos e join \"Platos\" pl on pl.id = e.plato_id where pl.nombre = 'Gamba roja'",
+     "tol": 0.05,
+     "valor": 12.36,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "coste = escandallo (cantidad × último precio de compra) calculado aparte; solo platos de un ingrediente"
+  },
+  {
+   "id": "n04",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Qué margen me deja Percebes en la carta?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": "percebes",
+     "vista": "platos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "platos[nombre=Percebes].precio_carta",
+     "sql": "select precio_eur::numeric from \"Platos\" where nombre = 'Percebes' limit 1",
+     "tol": 0.01,
+     "valor": 24,
+     "tipo": "num"
+    },
+    {
+     "ruta": "platos[nombre=Percebes].coste",
+     "sql": "select round(sum(e.cantidad / case when e.unidad = 'g' then 1000 else 1 end * (select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.producto_id = e.producto_id and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1)), 2) from escandallo_platos e join \"Platos\" pl on pl.id = e.plato_id where pl.nombre = 'Percebes'",
+     "tol": 0.05,
+     "valor": 13,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "coste = escandallo (cantidad × último precio de compra) calculado aparte; solo platos de un ingrediente"
+  },
+  {
+   "id": "n05",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Qué margen me deja Quisquilla de la bahía en la carta?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": "quisquilla",
+     "vista": "platos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "platos[nombre=Quisquilla de la bahía].precio_carta",
+     "sql": "select precio_eur::numeric from \"Platos\" where nombre = 'Quisquilla de la bahía' limit 1",
+     "tol": 0.01,
+     "valor": 14,
+     "tipo": "num"
+    },
+    {
+     "ruta": "platos[nombre=Quisquilla de la bahía].coste",
+     "sql": "select round(sum(e.cantidad / case when e.unidad = 'g' then 1000 else 1 end * (select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.producto_id = e.producto_id and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1)), 2) from escandallo_platos e join \"Platos\" pl on pl.id = e.plato_id where pl.nombre = 'Quisquilla de la bahía'",
+     "tol": 0.05,
+     "valor": 7.4,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "coste = escandallo (cantidad × último precio de compra) calculado aparte; solo platos de un ingrediente"
+  },
+  {
+   "id": "n06",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Qué margen me deja Chuletón vaca madurada 60 días en la carta?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": "chuletón vaca madurada",
+     "vista": "platos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "platos[nombre=Chuletón vaca madurada 60 días].precio_carta",
+     "sql": "select precio_eur::numeric from \"Platos\" where nombre = 'Chuletón vaca madurada 60 días' limit 1",
+     "tol": 0.01,
+     "valor": 88,
+     "tipo": "num"
+    },
+    {
+     "ruta": "platos[nombre=Chuletón vaca madurada 60 días].coste",
+     "sql": "select round(sum(e.cantidad / case when e.unidad = 'g' then 1000 else 1 end * (select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.producto_id = e.producto_id and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1)), 2) from escandallo_platos e join \"Platos\" pl on pl.id = e.plato_id where pl.nombre = 'Chuletón vaca madurada 60 días'",
+     "tol": 0.05,
+     "valor": 34,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "coste = escandallo (cantidad × último precio de compra) calculado aparte; solo platos de un ingrediente"
+  },
+  {
+   "id": "n07",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto me cuesta y a cuánto vendo el vino PSI 2023?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": "psi 2023",
+     "vista": "vinos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "vinos[nombre=PSI 2023].precio_carta",
+     "sql": "select precio_eur::numeric from \"Vinos\" where nombre = 'PSI 2023' limit 1",
+     "tol": 0.01,
+     "valor": 65,
+     "tipo": "num"
+    },
+    {
+     "ruta": "vinos[nombre=PSI 2023].coste_botella",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^psi 2023' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.05,
+     "valor": 24.2,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "coste = último precio por botella de la factura"
+  },
+  {
+   "id": "n08",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto me cuesta y a cuánto vendo el vino La Hormiga (Antídoto)?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": "hormiga",
+     "vista": "vinos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "vinos[nombre=La Hormiga (Antídoto)].precio_carta",
+     "sql": "select precio_eur::numeric from \"Vinos\" where nombre = 'La Hormiga (Antídoto)' limit 1",
+     "tol": 0.01,
+     "valor": 48,
+     "tipo": "num"
+    },
+    {
+     "ruta": "vinos[nombre=La Hormiga (Antídoto)].coste_botella",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'hormiga' and pf.nombre !~* 'magnum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.05,
+     "valor": 22.3,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "coste = último precio por botella de la factura"
+  },
+  {
+   "id": "n09",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto me cuesta y a cuánto vendo el vino Riscal XR 2021?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": "xr",
+     "vista": "vinos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "vinos[nombre=Riscal XR 2021].precio_carta",
+     "sql": "select precio_eur::numeric from \"Vinos\" where nombre = 'Riscal XR 2021' limit 1",
+     "tol": 0.01,
+     "valor": 32,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "solo precio de carta (el coste depende del formato de compra, caja o botella)"
+  },
+  {
+   "id": "n10",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto me cuesta y a cuánto vendo el vino Lagar de Cervera 2024?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": "lagar de cervera",
+     "vista": "vinos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "vinos[nombre=Lagar de Cervera 2024].precio_carta",
+     "sql": "select precio_eur::numeric from \"Vinos\" where nombre = 'Lagar de Cervera 2024' limit 1",
+     "tol": 0.01,
+     "valor": 21.9,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "solo precio de carta (el coste depende del formato de compra, caja o botella)"
+  },
+  {
+   "id": "n11",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto me cuesta y a cuánto vendo el vino Fefiñanes 2024?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": "fefiñanes",
+     "vista": "vinos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "vinos[nombre=Fefiñanes 2024].precio_carta",
+     "sql": "select precio_eur::numeric from \"Vinos\" where nombre = 'Fefiñanes 2024' limit 1",
+     "tol": 0.01,
+     "valor": 26.5,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "solo precio de carta (el coste depende del formato de compra, caja o botella)"
+  },
+  {
+   "id": "n12",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Cuántos vinos tienen coste y cuántos no?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": null,
+     "vista": "vinos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "resumen.vinos.vinos",
+     "sql": "select count(*) from \"Vinos\" where activado",
+     "tol": 0,
+     "valor": 188,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "el total de vinos activos de la carta"
+  },
+  {
+   "id": "n13",
+   "categoria": "margenes",
+   "origen": "nuevo",
+   "mensaje": "¿Cuántos platos tengo en la carta con coste calculado?",
+   "herramienta": {
+    "nombre": "margenes_carta",
+    "argumentos": {
+     "texto": null,
+     "vista": "platos",
+     "solo_problemas": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "resumen.platos.platos",
+     "sql": "select count(*) from \"Platos\" where activado and restaurante",
+     "tol": 0,
+     "valor": 131,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "platos activos del restaurante (Touza no entra)"
+  },
+  {
+   "id": "n14",
+   "categoria": "presupuestos",
+   "origen": "nuevo",
+   "mensaje": "Presupuesto: Heineken 1/3 caja 24, Carabinero, Pan de cristal",
+   "rpc_directo": {
+    "rpc": "emparejar_presupuesto_agente",
+    "params": {
+     "p_lineas": [
+      {
+       "producto": "Heineken 1/3 caja 24"
+      },
+      {
+       "producto": "Carabinero"
+      },
+      {
+       "producto": "Pan de cristal"
+      }
+     ]
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "[i=1].producto_catalogo",
+     "sql": "select nombre from productos_catalogo where nombre = 'Heineken 1/3 L caja 24'",
+     "tipo": "txt",
+     "valor": "Heineken 1/3 L caja 24"
+    },
+    {
+     "ruta": "[i=2].producto_catalogo",
+     "sql": "select nombre from productos_catalogo where nombre = 'Carabinero'",
+     "tipo": "txt",
+     "valor": "Carabinero"
+    },
+    {
+     "ruta": "[i=3].producto_catalogo",
+     "sql": "select nombre from productos_catalogo where nombre = 'Pan de cristal'",
+     "tipo": "txt",
+     "valor": "Pan de cristal"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n15",
+   "categoria": "presupuestos",
+   "origen": "nuevo",
+   "mensaje": "Presupuesto con un producto que no existe",
+   "rpc_directo": {
+    "rpc": "emparejar_presupuesto_agente",
+    "params": {
+     "p_lineas": [
+      {
+       "producto": "zzqq wxyv"
+      },
+      {
+       "producto": "Carabinero"
+      }
+     ]
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "[i=1].producto_catalogo",
+     "valor": null,
+     "tol": 0,
+     "tipo": "nulo"
+    },
+    {
+     "ruta": "[i=2].producto_catalogo",
+     "sql": "select nombre from productos_catalogo where nombre = 'Carabinero'",
+     "tipo": "txt",
+     "valor": "Carabinero"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n16",
+   "categoria": "presupuestos",
+   "origen": "nuevo",
+   "mensaje": "Presupuesto con abreviaturas: S. Cantabria 25 primeur, Q. oveja curado trufado",
+   "rpc_directo": {
+    "rpc": "emparejar_presupuesto_agente",
+    "params": {
+     "p_lineas": [
+      {
+       "producto": "S. Cantabria 25 primeur"
+      },
+      {
+       "producto": "Q. oveja curado trufado Campollano"
+      }
+     ]
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "[i=1].producto_catalogo",
+     "sql": "select p.nombre from productos_catalogo p join productos_factura pf on pf.producto_id = p.id where pf.nombre ~* 'S[.] CANTABRIA 25 PRIMEUR' limit 1",
+     "tipo": "txt",
+     "valor": "S. Cantabria 2025"
+    },
+    {
+     "ruta": "[i=2].producto_catalogo",
+     "sql": "select p.nombre from productos_catalogo p join productos_factura pf on pf.producto_id = p.id where pf.nombre ~* 'Q[.]OVEJA CURADO TRUFADO' limit 1",
+     "tipo": "txt",
+     "valor": "Queso de oveja curado trufado Campollano"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n17",
+   "categoria": "presupuestos",
+   "origen": "nuevo",
+   "mensaje": "Presupuesto con vinos: Laurent Perrier La Cuvée, Pintia",
+   "rpc_directo": {
+    "rpc": "emparejar_presupuesto_agente",
+    "params": {
+     "p_lineas": [
+      {
+       "producto": "Laurent Perrier La Cuvée 75 cl"
+      },
+      {
+       "producto": "Pintia 75 cl"
+      }
+     ]
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "[i=1].producto_catalogo",
+     "sql": "select nombre from productos_catalogo where nombre = 'Laurent-Perrier La Cuvée 75 cl'",
+     "tipo": "txt",
+     "valor": "Laurent-Perrier La Cuvée 75 cl"
+    },
+    {
+     "ruta": "[i=2].producto_catalogo",
+     "sql": "select nombre from productos_catalogo where nombre = 'Pintia 75 cl' limit 1",
+     "tipo": "txt",
+     "valor": "Pintia 75 cl"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n18",
+   "categoria": "presupuestos",
+   "origen": "nuevo",
+   "mensaje": "Presupuesto de limpieza y menaje: bobina mecha gofrada, film PVC",
+   "rpc_directo": {
+    "rpc": "emparejar_presupuesto_agente",
+    "params": {
+     "p_lineas": [
+      {
+       "producto": "Bobina mecha gofrada 800 gr"
+      },
+      {
+       "producto": "Bobina film PVC 45x300"
+      }
+     ]
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "[i=1].confianza",
+     "sql": "select 'alta'",
+     "tipo": "txt",
+     "valor": "alta"
+    },
+    {
+     "ruta": "[i=2].metodo",
+     "sql": "select 'texto'",
+     "tipo": "txt",
+     "valor": "texto"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "producto_catalogo"
+    ],
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n19",
+   "categoria": "subidas_precio",
+   "origen": "nuevo",
+   "mensaje": "¿Ha subido el percebe?",
+   "herramienta": {
+    "nombre": "variacion_precios",
+    "argumentos": {
+     "desde": null,
+     "hasta": null,
+     "umbral_pct": null,
+     "categoria": null,
+     "producto": "percebe",
+     "sentido": "ambas"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "productos[producto=Percebe].precio",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^percebe$' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 130,
+     "tipo": "num"
+    },
+    {
+     "ruta": "productos[producto=Percebe].anterior.precio",
+     "sql": "select x.precio_unitario from (select distinct on (f.id) pf.precio_unitario, f.fecha, f.id from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^percebe$' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.id, pf.id desc) x order by x.fecha desc, x.id desc offset 1 limit 1",
+     "tol": 0.01,
+     "valor": 90,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "última compra frente a la anterior"
+  },
+  {
+   "id": "n20",
+   "categoria": "subidas_precio",
+   "origen": "nuevo",
+   "mensaje": "¿Ha subido el bogavante?",
+   "herramienta": {
+    "nombre": "variacion_precios",
+    "argumentos": {
+     "desde": null,
+     "hasta": null,
+     "umbral_pct": null,
+     "categoria": null,
+     "producto": "bogavante",
+     "sentido": "ambas"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "productos[producto=BOGAVANTE].precio",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^bogavante$' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 35,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n21",
+   "categoria": "subidas_precio",
+   "origen": "nuevo",
+   "mensaje": "¿Qué ha subido más de un 10 % este año?",
+   "herramienta": {
+    "nombre": "variacion_precios",
+    "argumentos": {
+     "desde": "2026-01-01",
+     "hasta": null,
+     "umbral_pct": 10,
+     "categoria": null,
+     "producto": null,
+     "sentido": "subidas"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "productos[0].variacion_pct",
+     "valor": 10,
+     "tol": 0,
+     "op": ">=",
+     "tipo": "num"
+    },
+    {
+     "ruta": "productos[0].variacion_pct",
+     "valor": 1000,
+     "tol": 0,
+     "op": "<=",
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "una «subida» del 11.900 % es un error de unidades (caja contra kilo): ningún aviso debería pasar de ×10"
+  },
+  {
+   "id": "n22",
+   "categoria": "trampas_packs_unidades",
+   "subcategoria": "subida_absurda",
+   "origen": "nuevo",
+   "mensaje": "¿Ha subido la servilleta blanca 40x40?",
+   "herramienta": {
+    "nombre": "variacion_precios",
+    "argumentos": {
+     "desde": null,
+     "hasta": null,
+     "umbral_pct": null,
+     "categoria": null,
+     "producto": "servilleta blanca 40x40",
+     "sentido": "ambas"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "productos[0].variacion_pct",
+     "valor": 200,
+     "tol": 0,
+     "op": "<=",
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "de 0,82 € a 16,99 € (+1.972 %): precio de caja contra unidad"
+  },
+  {
+   "id": "n23",
+   "categoria": "subidas_precio",
+   "origen": "nuevo",
+   "mensaje": "¿Qué subidas de precio llevo este año? (informe anual)",
+   "herramienta": {
+    "nombre": "alertas_precio",
+    "argumentos": {
+     "tipo": "subidas_anuales",
+     "producto": null,
+     "local": null,
+     "desde": null,
+     "hasta": null
+    }
+   },
+   "esperado": [],
+   "rpc": {
+    "debe": [
+     "subidas|total|productos"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "informe «Subidas y proveedor»: pendiente de desplegar en producción (existe en el código de staging)"
+  },
+  {
+   "id": "n24",
+   "categoria": "subidas_precio",
+   "origen": "nuevo",
+   "mensaje": "¿Qué avisos de subida de precio hay ahora?",
+   "herramienta": {
+    "nombre": "alertas_precio",
+    "argumentos": {
+     "tipo": "sube",
+     "producto": null,
+     "local": null,
+     "desde": null,
+     "hasta": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "avisos.sube.lista[producto=Percebe].precio",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^percebe$' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 130,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n25",
+   "categoria": "proveedor_barato",
+   "origen": "nuevo",
+   "mensaje": "¿Quién me vende más barato el berberecho?",
+   "herramienta": {
+    "nombre": "alertas_precio",
+    "argumentos": {
+     "tipo": "mejor",
+     "producto": "berberecho",
+     "local": null,
+     "desde": null,
+     "hasta": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "avisos.mejor.lista[producto=Berberecho].precio_otro",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^berberecho$' and f.tipo = 'factura' and f.proveedor ~* 'enchenta' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 31.5,
+     "tipo": "num"
+    },
+    {
+     "ruta": "avisos.mejor.lista[producto=Berberecho].precio",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^berberecho$' and f.tipo = 'factura' and f.proveedor ~* 'casimiro' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 32,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n26",
+   "categoria": "proveedor_barato",
+   "origen": "nuevo",
+   "mensaje": "¿Dónde puedo ahorrar cambiando de proveedor? (informe)",
+   "herramienta": {
+    "nombre": "alertas_precio",
+    "argumentos": {
+     "tipo": "proveedor_barato",
+     "producto": null,
+     "local": null,
+     "desde": null,
+     "hasta": null
+    }
+   },
+   "esperado": [],
+   "rpc": {
+    "debe": [
+     "proveedor|ahorro"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "informe «proveedor más barato»: pendiente de desplegar en producción"
+  },
+  {
+   "id": "n27",
+   "categoria": "proveedor_barato",
+   "origen": "nuevo",
+   "mensaje": "¿Qué proveedor me da más barato el atún rojo?",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "atún rojo",
+     "orden": "precio",
+     "unidad": "kg"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "por_proveedor[0].ultimo_precio",
+     "sql": "select min(up) from (select distinct on (f.proveedor_id) pf.precio_unitario as up from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^at[uú]n rojo' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.proveedor_id, f.fecha desc, f.id desc, pf.id desc) x",
+     "tol": 0.01,
+     "valor": 15,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "con orden = precio, el primero debe ser el proveedor con el último precio más bajo"
+  },
+  {
+   "id": "n28",
+   "categoria": "proveedor_barato",
+   "origen": "nuevo",
+   "mensaje": "¿A quién compro más barato el mismo producto en bobinas de papel?",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "bobina mecha gofrada",
+     "orden": "precio"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.proveedores",
+     "sql": "select count(distinct f.proveedor_id) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'bobina mecha' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 1,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n29",
+   "categoria": "gasto",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto gasto en vinos al mes? (septiembre)",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "vinos",
+     "desde": "2026-09-01",
+     "hasta": "2026-09-30",
+     "tipo": null,
+     "agrupar": "mes",
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "cruce[mes=2026-09].importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'bebidas.vinos' and f.fecha between '2026-09-01' and '2026-09-30' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 34790.45,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n30",
+   "categoria": "gasto",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto gasté en marisco en octubre?",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "marisco",
+     "desde": "2026-10-01",
+     "hasta": "2026-10-31",
+     "tipo": null,
+     "agrupar": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'pescado_marisco.marisco' and f.fecha between '2026-10-01' and '2026-10-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 3554.77,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n31",
+   "categoria": "gasto",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto gasté en pescado en 2026?",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "pescado",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "tipo": null,
+     "agrupar": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'pescado_marisco.pescado' and f.fecha between '2026-01-01' and '2026-12-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 121409.17,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n32",
+   "categoria": "gasto",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto gasté en carne en 2026?",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "carne",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "tipo": null,
+     "agrupar": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'carnes.carne' and f.fecha between '2026-01-01' and '2026-12-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 211951.82,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n33",
+   "categoria": "gasto",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto gasté en limpieza en 2026?",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "limpieza",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "tipo": null,
+     "agrupar": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'limpieza' and f.fecha between '2026-01-01' and '2026-12-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 23417.31,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n34",
+   "categoria": "gasto",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto gasté en bebidas en 2026?",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "bebidas",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "tipo": null,
+     "agrupar": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave like 'bebidas.%' and f.fecha between '2026-01-01' and '2026-12-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 361090.13,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "la familia Bebidas suma vinos, cervezas, licores, refrescos y café"
+  },
+  {
+   "id": "n35",
+   "categoria": "gasto",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto gasté en cerveza cada mes de 2026?",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "cerveza",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "tipo": null,
+     "agrupar": "mes",
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "cruce[mes=2026-08].importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'bebidas.cervezas' and f.fecha between '2026-08-01' and '2026-08-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 11558.44,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n36",
+   "categoria": "gasto",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto gasté en licores en 2026?",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "licores",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "tipo": null,
+     "agrupar": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'bebidas.licores' and f.fecha between '2026-01-01' and '2026-12-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 37607.26,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n37",
+   "categoria": "gasto",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto gasté en total en septiembre?",
+   "herramienta": {
+    "nombre": "resumen_periodo",
+    "argumentos": {
+     "desde": "2026-09-01",
+     "hasta": "2026-09-30"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "facturas.base",
+     "sql": "select round(sum(f.subtotal), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-09-01' and f.fecha <= '2026-09-30'",
+     "tol": 0.05,
+     "valor": 116097.66,
+     "tipo": "num"
+    },
+    {
+     "ruta": "facturas.n",
+     "sql": "select count(*) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-09-01' and f.fecha <= '2026-09-30'",
+     "tol": 0,
+     "valor": 169,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n38",
+   "categoria": "gasto",
+   "origen": "nuevo",
+   "mensaje": "¿Quién es mi mayor proveedor este año?",
+   "herramienta": {
+    "nombre": "ranking",
+    "argumentos": {
+     "criterio": "gasto_proveedor",
+     "tipo": null,
+     "limite": 3,
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "orden": "desc",
+     "incluir_servicios": null,
+     "unidad": null,
+     "categoria": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "filas[0].importe",
+     "sql": "select round(max(s),2) from (select sum(f.total) s from facturas f where f.tipo='factura' and f.fecha between '2026-01-01' and '2026-12-31' group by f.proveedor_id) x",
+     "tol": 1,
+     "valor": 124781.25,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n39",
+   "categoria": "iva",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto IVA he soportado cada mes de 2026? (julio)",
+   "herramienta": {
+    "nombre": "consulta_flexible",
+    "argumentos": {
+     "fuente": "documentos",
+     "metricas": [
+      "sum_iva",
+      "count_documentos"
+     ],
+     "agrupar": [
+      "mes"
+     ],
+     "filtros": {
+      "desde": "2026-01-01",
+      "hasta": "2026-12-31",
+      "proveedor": null,
+      "tipo": "factura",
+      "numero": null,
+      "producto": null,
+      "con_total": null,
+      "verificada": null,
+      "con_alertas": null,
+      "excluir_servicios": null,
+      "importe_min": null,
+      "importe_max": null
+     },
+     "orden_por": null,
+     "orden_dir": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "filas[mes=2026-07].sum_iva",
+     "sql": "select round(sum(f.iva), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-07-01' and f.fecha <= '2026-07-31'",
+     "tol": 0.05,
+     "valor": 23122.31,
+     "tipo": "num"
+    },
+    {
+     "ruta": "filas[mes=2026-07].count_documentos",
+     "sql": "select count(*) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-07-01' and f.fecha <= '2026-07-31'",
+     "tol": 0,
+     "valor": 237,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n40",
+   "categoria": "iva",
+   "origen": "nuevo",
+   "mensaje": "IVA del tercer trimestre de 2026",
+   "herramienta": {
+    "nombre": "resumen_periodo",
+    "argumentos": {
+     "desde": "2026-07-01",
+     "hasta": "2026-09-30"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "facturas.iva",
+     "sql": "select round(sum(f.iva), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-07-01' and f.fecha <= '2026-09-30'",
+     "tol": 0.05,
+     "valor": 63447.72,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n41",
+   "categoria": "iva",
+   "origen": "nuevo",
+   "mensaje": "IVA de octubre",
+   "herramienta": {
+    "nombre": "resumen_periodo",
+    "argumentos": {
+     "desde": "2026-10-01",
+     "hasta": "2026-10-31"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "facturas.iva",
+     "sql": "select round(sum(f.iva), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-10-01' and f.fecha <= '2026-10-31'",
+     "tol": 0.05,
+     "valor": 6666.12,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n42",
+   "categoria": "iva",
+   "origen": "nuevo",
+   "mensaje": "IVA de las facturas de Catral en 2026",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "catral",
+     "tipo": "factura",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sumas.iva",
+     "sql": "select round(sum(f.iva), 2) from facturas f where true and f.proveedor ~* 'catral' and f.tipo = 'factura' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31'",
+     "tol": 0.05,
+     "valor": 10612.8,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n43",
+   "categoria": "iva",
+   "origen": "nuevo",
+   "mensaje": "¿Cuántas facturas no tienen IVA leído?",
+   "herramienta": {
+    "nombre": "estadisticas_globales",
+    "argumentos": {}
+   },
+   "esperado": [
+    {
+     "ruta": "facturas.si_das_importes.sin_iva.n",
+     "sql": "select count(*) from facturas where tipo='factura' and iva is null and total is not null",
+     "tol": 0,
+     "valor": 1,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n44",
+   "categoria": "iva",
+   "origen": "nuevo",
+   "mensaje": "IVA total soportado en 2026 por año",
+   "herramienta": {
+    "nombre": "consulta_flexible",
+    "argumentos": {
+     "fuente": "documentos",
+     "metricas": [
+      "sum_iva",
+      "sum_subtotal"
+     ],
+     "agrupar": [
+      "anio"
+     ],
+     "filtros": {
+      "desde": "2025-01-01",
+      "hasta": "2026-12-31",
+      "proveedor": null,
+      "tipo": "factura",
+      "numero": null,
+      "producto": null,
+      "con_total": null,
+      "verificada": null,
+      "con_alertas": null,
+      "excluir_servicios": null,
+      "importe_min": null,
+      "importe_max": null
+     },
+     "orden_por": null,
+     "orden_dir": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "filas[anio=2026].sum_iva",
+     "sql": "select round(sum(f.iva), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31'",
+     "tol": 0.05,
+     "valor": 176319.29,
+     "tipo": "num"
+    },
+    {
+     "ruta": "filas[anio=2025].sum_iva",
+     "sql": "select round(sum(f.iva), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2025-01-01' and f.fecha <= '2025-12-31'",
+     "tol": 0.05,
+     "valor": 234028.06,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n45",
+   "categoria": "albaranes_sin_factura",
+   "origen": "nuevo",
+   "mensaje": "¿Cuántos albaranes tengo sin factura?",
+   "herramienta": {
+    "nombre": "albaranes_sin_factura",
+    "argumentos": {
+     "proveedor": null,
+     "desde": null,
+     "hasta": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "albaranes_sin_factura",
+     "sql": "select count(*) from facturas where tipo='albaran' and facturado_en_id is null",
+     "tol": 0,
+     "valor": 113,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n46",
+   "categoria": "albaranes_sin_factura",
+   "origen": "nuevo",
+   "mensaje": "Albaranes sin facturar de Catral",
+   "herramienta": {
+    "nombre": "albaranes_sin_factura",
+    "argumentos": {
+     "proveedor": "catral",
+     "desde": null,
+     "hasta": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "albaranes_sin_factura",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'catral' and f.tipo = 'albaran' and f.facturado_en_id is null",
+     "tol": 0,
+     "valor": 0,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n47",
+   "categoria": "albaranes_sin_factura",
+   "origen": "nuevo",
+   "mensaje": "Albaranes sin facturar de Luga Sabores",
+   "herramienta": {
+    "nombre": "albaranes_sin_factura",
+    "argumentos": {
+     "proveedor": "luga sabores",
+     "desde": null,
+     "hasta": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "albaranes_sin_factura",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'luga sabores' and f.tipo = 'albaran' and f.facturado_en_id is null",
+     "tol": 0,
+     "valor": 3,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n48",
+   "categoria": "albaranes_sin_factura",
+   "origen": "nuevo",
+   "mensaje": "Albaranes sin factura desde octubre",
+   "herramienta": {
+    "nombre": "albaranes_sin_factura",
+    "argumentos": {
+     "proveedor": null,
+     "desde": "2026-10-01",
+     "hasta": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "albaranes_sin_factura",
+     "sql": "select count(*) from facturas f where true and f.tipo = 'albaran' and f.fecha >= '2026-10-01' and f.facturado_en_id is null",
+     "tol": 0,
+     "valor": 104,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n49",
+   "categoria": "albaranes_sin_factura",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto dinero hay en albaranes sin facturar?",
+   "herramienta": {
+    "nombre": "albaranes_sin_factura",
+    "argumentos": {
+     "proveedor": null,
+     "desde": null,
+     "hasta": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "suma_con_iva",
+     "sql": "select round(sum(total),2) from facturas where tipo='albaran' and facturado_en_id is null",
+     "tol": 0.05,
+     "valor": 46734.15,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n50",
+   "categoria": "comparativas_anios",
+   "origen": "nuevo",
+   "mensaje": "Gasto de 2025 (para comparar con 2026)",
+   "herramienta": {
+    "nombre": "resumen_periodo",
+    "argumentos": {
+     "desde": "2025-01-01",
+     "hasta": "2025-12-31"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "facturas.base",
+     "sql": "select round(sum(f.subtotal), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2025-01-01' and f.fecha <= '2025-12-31'",
+     "tol": 0.05,
+     "valor": 1665543.17,
+     "tipo": "num"
+    },
+    {
+     "ruta": "facturas.n",
+     "sql": "select count(*) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2025-01-01' and f.fecha <= '2025-12-31'",
+     "tol": 0,
+     "valor": 2516,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n51",
+   "categoria": "comparativas_anios",
+   "origen": "nuevo",
+   "mensaje": "Gasto de 2026 (para comparar con 2025)",
+   "herramienta": {
+    "nombre": "resumen_periodo",
+    "argumentos": {
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "facturas.base",
+     "sql": "select round(sum(f.subtotal), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31'",
+     "tol": 0.05,
+     "valor": 1271782.84,
+     "tipo": "num"
+    },
+    {
+     "ruta": "facturas.n",
+     "sql": "select count(*) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31'",
+     "tol": 0,
+     "valor": 1899,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n52",
+   "categoria": "comparativas_anios",
+   "origen": "nuevo",
+   "mensaje": "¿Cuánto más gasto este año que el pasado, por año?",
+   "herramienta": {
+    "nombre": "consulta_flexible",
+    "argumentos": {
+     "fuente": "documentos",
+     "metricas": [
+      "sum_total",
+      "count_documentos"
+     ],
+     "agrupar": [
+      "anio"
+     ],
+     "filtros": {
+      "desde": "2025-01-01",
+      "hasta": "2026-12-31",
+      "proveedor": null,
+      "tipo": "factura",
+      "numero": null,
+      "producto": null,
+      "con_total": null,
+      "verificada": null,
+      "con_alertas": null,
+      "excluir_servicios": null,
+      "importe_min": null,
+      "importe_max": null
+     },
+     "orden_por": null,
+     "orden_dir": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "filas[anio=2025].sum_total",
+     "sql": "select round(sum(f.total), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2025-01-01' and f.fecha <= '2025-12-31'",
+     "tol": 0.05,
+     "valor": 1892842.2,
+     "tipo": "num"
+    },
+    {
+     "ruta": "filas[anio=2026].sum_total",
+     "sql": "select round(sum(f.total), 2) from facturas f where true and f.tipo = 'factura' and f.fecha >= '2026-01-01' and f.fecha <= '2026-12-31'",
+     "tol": 0.05,
+     "valor": 1443719.79,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n53",
+   "categoria": "comparativas_anios",
+   "origen": "nuevo",
+   "mensaje": "Vinos: gasto de 2025",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "vinos",
+     "desde": "2025-01-01",
+     "hasta": "2025-12-31",
+     "tipo": null,
+     "agrupar": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'bebidas.vinos' and f.fecha between '2025-01-01' and '2025-12-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 211683.59,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n54",
+   "categoria": "comparativas_anios",
+   "origen": "nuevo",
+   "mensaje": "Vinos: gasto de 2026",
+   "herramienta": {
+    "nombre": "gasto_por_categoria",
+    "argumentos": {
+     "categoria": "vinos",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "tipo": null,
+     "agrupar": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'bebidas.vinos' and f.fecha between '2026-01-01' and '2026-12-31' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 186601.69,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n55",
+   "categoria": "comparativas_anios",
+   "origen": "nuevo",
+   "mensaje": "Litros de cerveza comprados en 2025",
+   "herramienta": {
+    "nombre": "volumen_comprado",
+    "argumentos": {
+     "categoria": "cerveza",
+     "producto": null,
+     "desde": "2025-01-01",
+     "hasta": "2025-12-31",
+     "unidad": null,
+     "orden": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total",
+     "sql": "select round(sum(case when pf.unidad = 'barril' then pf.cantidad * coalesce(pf.contenido_cantidad, 0) when pf.unidad = 'caja' then pf.cantidad * coalesce(substring(pf.nombre from '[*][ ]*([0-9]+)')::numeric, 0) * (case when pf.nombre ~ '1/3' then 0.33 when pf.nombre ~ '1/2' then 0.5 when pf.nombre ~ '1/4' then 0.25 else 0 end) else 0 end), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'bebidas.cervezas' and f.fecha between '2025-01-01' and '2025-12-31'",
+     "tol": 40,
+     "valor": 29966.12,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "n56",
+   "categoria": "comparativas_anios",
+   "origen": "nuevo",
+   "mensaje": "Acciona: total de 2025 frente a 2026",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "acciona",
+     "tipo": "factura",
+     "desde": "2025-01-01",
+     "hasta": "2025-12-31",
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sumas.base",
+     "sql": "select round(sum(f.subtotal), 2) from facturas f where true and f.proveedor ~* 'acciona' and f.tipo = 'factura' and f.fecha >= '2025-01-01' and f.fecha <= '2025-12-31'",
+     "tol": 0.05,
+     "valor": 37330.83,
+     "tipo": "num"
+    },
+    {
+     "ruta": "sumas.facturas.n",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'acciona' and f.tipo = 'factura' and f.fecha >= '2025-01-01' and f.fecha <= '2025-12-31'",
+     "tol": 0,
+     "valor": 18,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "t01",
+   "categoria": "trampas_abreviaturas",
+   "subcategoria": "abreviatura",
+   "origen": "nuevo",
+   "mensaje": "Precio de la ventresca de bonito del norte",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "ventresca de bonito del norte"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'ventresca bonito del norte' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 5.66,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'ventresca bonito del norte' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-11-11"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "RP-VENTRESCA BONITO DEL NORTE A/OLIVA en factura"
+  },
+  {
+   "id": "t02",
+   "categoria": "trampas_abreviaturas",
+   "subcategoria": "abreviatura",
+   "origen": "nuevo",
+   "mensaje": "Precio de los canelones de carne, trufa y foie",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "canelones de carne trufa foie"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'canelon carne/trufa/foie' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 38,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'canelon carne/trufa/foie' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-11-10"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "CANELON (singular) CARNE/TRUFA/FOIE AUDENS"
+  },
+  {
+   "id": "t03",
+   "categoria": "trampas_abreviaturas",
+   "subcategoria": "abreviatura",
+   "origen": "nuevo",
+   "mensaje": "Precio de la trufa de verano",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "trufa de verano"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'trufa (de )?verano|tuber aestivum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 170,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'trufa (de )?verano|tuber aestivum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-08-31"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "t04",
+   "categoria": "trampas_abreviaturas",
+   "subcategoria": "abreviatura",
+   "origen": "nuevo",
+   "mensaje": "A cuánto compro la Heineken sin alcohol",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "heineken sin alcohol"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'heineken 0''0 % 1/3' and pf.nombre !~* 'desc|envase' and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 43.55,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "HEINEKEN 0'0 % 1/3 * 24"
+  },
+  {
+   "id": "t05",
+   "categoria": "trampas_abreviaturas",
+   "subcategoria": "abreviatura",
+   "origen": "nuevo",
+   "mensaje": "Precio del pimiento del piquillo en tiras",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "pimiento del piquillo en tiras"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.fecha",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'piquillo.*tiras' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tipo": "txt",
+     "valor": "2026-11-13"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "t06",
+   "categoria": "trampas_siglas",
+   "subcategoria": "sigla",
+   "origen": "nuevo",
+   "mensaje": "Compras de PSI",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "psi"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '[[:<:]]psi[[:>:]]' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0.05,
+     "valor": 3577.4,
+     "tipo": "num"
+    },
+    {
+     "ruta": "total.lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '[[:<:]]psi[[:>:]]' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 4,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "PSI es una marca de vino; no debe casar «psi» dentro de otras palabras"
+  },
+  {
+   "id": "t07",
+   "categoria": "trampas_siglas",
+   "subcategoria": "sigla",
+   "origen": "nuevo",
+   "mensaje": "Compras de XR",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "xr"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '[[:<:]]xr[[:>:]]' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0.05,
+     "valor": 3262.32,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "XR = Marqués de Riscal XR, solo como palabra"
+  },
+  {
+   "id": "t08",
+   "categoria": "trampas_siglas",
+   "subcategoria": "sigla",
+   "origen": "nuevo",
+   "mensaje": "Compras de LP",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "lp"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '[[:<:]]lp[[:>:]]' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 1,
+     "valor": 47,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "LP = Laurent Perrier en las facturas del Marqués de Riscal"
+  },
+  {
+   "id": "t09",
+   "categoria": "trampas_siglas",
+   "subcategoria": "sigla",
+   "origen": "nuevo",
+   "mensaje": "Compras de AOVE",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "aove"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '[[:<:]]aove[[:>:]]' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 3,
+     "valor": 60,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "AOVE = aceite de oliva virgen extra (sigla de producto)"
+  },
+  {
+   "id": "t10",
+   "categoria": "trampas_siglas",
+   "subcategoria": "sigla",
+   "origen": "nuevo",
+   "mensaje": "Compras de ML",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "ml"
+    }
+   },
+   "esperado": [],
+   "rpc": {
+    "debe": [
+     "Falta el nombre del producto"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "«ml» es una unidad, no un producto: la herramienta dice que falta el nombre (antes devolvía 668 líneas)"
+  },
+  {
+   "id": "t11",
+   "categoria": "trampas_proveedores_parecidos",
+   "subcategoria": "proveedor",
+   "origen": "nuevo",
+   "mensaje": "Ficha de Suministros Hosteleros Benissa",
+   "herramienta": {
+    "nombre": "ficha_proveedor",
+    "argumentos": {
+     "proveedor": "suministros hosteleros benissa"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "docs",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'suministros hosteleros benissa' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 8,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "hay también Equipalia y Altamira con casi el mismo nombre: no mezclar"
+  },
+  {
+   "id": "t12",
+   "categoria": "trampas_proveedores_parecidos",
+   "subcategoria": "proveedor",
+   "origen": "nuevo",
+   "mensaje": "Ficha de Suministros Hosteleros Altamira",
+   "herramienta": {
+    "nombre": "ficha_proveedor",
+    "argumentos": {
+     "proveedor": "suministros hosteleros altamira"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "docs",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'suministros hosteleros altamira' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 25,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "t13",
+   "categoria": "trampas_proveedores_parecidos",
+   "subcategoria": "proveedor",
+   "origen": "nuevo",
+   "mensaje": "Facturas de Chacopino Carrillo José Tomás",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "chacopino carrillo, jose tomas",
+     "tipo": null,
+     "desde": null,
+     "hasta": null,
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total_filas",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'chacopino carrillo, jose tomas'",
+     "tol": 0,
+     "valor": 8,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "otro proveedor casi igual: Chacopino Carrillo C.B."
+  },
+  {
+   "id": "t14",
+   "categoria": "trampas_proveedores_parecidos",
+   "subcategoria": "proveedor",
+   "origen": "nuevo",
+   "mensaje": "Facturas de López Sempere",
+   "herramienta": {
+    "nombre": "filtrar_documentos",
+    "argumentos": {
+     "filtro": "todos",
+     "texto": "lopez sempere",
+     "tipo": null,
+     "desde": null,
+     "hasta": null,
+     "orden": null,
+     "limite": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total_filas",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'lopez sempere'",
+     "tol": 0,
+     "valor": 20,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "dos escrituras del mismo proveedor: se esperan las dos"
+  },
+  {
+   "id": "t15",
+   "categoria": "trampas_proveedores_parecidos",
+   "subcategoria": "proveedor",
+   "origen": "nuevo",
+   "mensaje": "A cuánto compro la cerveza a Mahou",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "cerveza",
+     "proveedor": "mahou"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "proveedor_no_encontrado",
+     "valor": true,
+     "tol": 0,
+     "tipo": "bool"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "no hay proveedor Mahou; el parecido (Mamadou) no es el mismo"
+  },
+  {
+   "id": "t16",
+   "categoria": "trampas_proveedores_parecidos",
+   "subcategoria": "proveedor",
+   "origen": "nuevo",
+   "mensaje": "Ficha de Distribuciones Guillem",
+   "herramienta": {
+    "nombre": "ficha_proveedor",
+    "argumentos": {
+     "proveedor": "distribuciones guillem"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "docs",
+     "sql": "select count(*) from facturas f where true and f.proveedor ~* 'distribuciones guill[eé]n' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 14,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "Guillem / Guillén"
+  },
+  {
+   "id": "t17",
+   "categoria": "trampas_genericos_lonja",
+   "subcategoria": "lonja",
+   "origen": "nuevo",
+   "mensaje": "A cuánto compro los macruros",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "macruros"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'macruros' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 5,
+     "valor": 68116.03,
+     "tipo": "num"
+    },
+    {
+     "ruta": "total.lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'macruros' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 0,
+     "valor": 261,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "«Macruros» es un cajón de la lonja (rape, congrio, merluza…): 30.000 € sin especie"
+  },
+  {
+   "id": "t18",
+   "categoria": "trampas_genericos_lonja",
+   "subcategoria": "lonja",
+   "origen": "nuevo",
+   "mensaje": "A cuánto compro los cefalópodos",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "cefalópodos"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.importe",
+     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'cef[aá]l[oó]podos' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 5,
+     "valor": 4313.63,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "t19",
+   "categoria": "trampas_genericos_lonja",
+   "subcategoria": "lonja",
+   "origen": "nuevo",
+   "mensaje": "A cuánto compro el rape",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "rape"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '[[:<:]]rape[[:>:]]' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 5,
+     "valor": 155,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "el rape comprado en lonja entra como «Macruros»: solo salen las líneas que dicen rape"
+  },
+  {
+   "id": "t20",
+   "categoria": "trampas_genericos_lonja",
+   "subcategoria": "lonja",
+   "origen": "nuevo",
+   "mensaje": "Kilos de pulpo comprados",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "pulpo"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "por_unidad[unidad=kg].cantidad",
+     "sql": "select round(sum(pf.cantidad), 3) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pulpo' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 30,
+     "valor": 4462.618,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "el pulpo de lonja entra como «Cefalópodos»"
+  },
+  {
+   "id": "t21",
+   "categoria": "trampas_packs_unidades",
+   "subcategoria": "litro_botella",
+   "origen": "nuevo",
+   "mensaje": "A cuánto compro el litro de cerveza de barril Cruzcampo 50 L",
+   "herramienta": {
+    "nombre": "volumen_comprado",
+    "argumentos": {
+     "categoria": null,
+     "producto": "barril cruzcampo 50 l",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "unidad": "l",
+     "orden": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "precio",
+     "valor": 4.08,
+     "tol": 0.05,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "203,98 € el barril de 50 l = 4,08 €/l"
+  },
+  {
+   "id": "t22",
+   "categoria": "trampas_packs_unidades",
+   "subcategoria": "caja_unidad",
+   "origen": "nuevo",
+   "mensaje": "Precio de los crepes (C/50 U)",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "crepe"
+    }
+   },
+   "esperado": [],
+   "rpc": {
+    "debe": [
+     "C/50|0[.,]79|50 u"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "«Crepe (C/50 U)» a 39,60 € guardado como unidad suelta: es una caja de 50 (0,79 € cada uno)"
+  },
+  {
+   "id": "t23",
+   "categoria": "trampas_packs_unidades",
+   "subcategoria": "caja_unidad",
+   "origen": "nuevo",
+   "mensaje": "Precio de la gilda (80 unidades)",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "gilda"
+    }
+   },
+   "esperado": [],
+   "rpc": {
+    "debe": [
+     "80"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "«Gilda 80 unidades» a 63,50 € guardada como unidad: es el pack de 80"
+  },
+  {
+   "id": "t24",
+   "categoria": "trampas_packs_unidades",
+   "subcategoria": "caja_unidad",
+   "origen": "nuevo",
+   "mensaje": "Precio de los huevos: docena frente a unidad",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "huevos"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total.lineas",
+     "sql": "select count(*) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'huevo' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "tol": 30,
+     "valor": 172,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "unidades mezcladas (docena, unidad, caja): no deben compararse sin convertir"
+  },
+  {
+   "id": "t25",
+   "categoria": "trampas_packs_unidades",
+   "subcategoria": "litro_botella",
+   "origen": "nuevo",
+   "mensaje": "Litros de agua comprados en 2026",
+   "herramienta": {
+    "nombre": "volumen_comprado",
+    "argumentos": {
+     "categoria": null,
+     "producto": "agua",
+     "desde": "2026-01-01",
+     "hasta": "2026-12-31",
+     "unidad": "l",
+     "orden": null,
+     "denominacion": null
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "total",
+     "sql": "select round(sum(pf.cantidad * pf.contenido_cantidad) filter (where pf.contenido_unidad = 'l'), 1) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^agua' and f.fecha between '2026-01-01' and '2026-12-31'",
+     "tol": 0,
+     "op": ">=",
+     "valor": 2112.9,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "aproximado (nombre que empieza por «agua»); 30 l de tolerancia"
+  },
+  {
+   "id": "t26",
+   "categoria": "trampas_vinos_regalo",
+   "subcategoria": "regalo",
+   "origen": "nuevo",
+   "mensaje": "Coste real de la botella de Lagar de Cervera 75 cl",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "lagar cervera albariño 75cl",
+     "desde": "2026-09-01",
+     "hasta": "2026-09-30"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "valor": 9.54,
+     "tol": 0.02,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "factura 002111F2: 15 botellas pagadas + 3 sin cargo → 9,54 € de coste real (la línea dice 11,45 €)"
+  },
+  {
+   "id": "t27",
+   "categoria": "trampas_vinos_regalo",
+   "subcategoria": "regalo",
+   "origen": "nuevo",
+   "mensaje": "Coste real de la botella de Fefiñanes 2025",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "fefiñanes 2025"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "valor": 12.79,
+     "tol": 0.02,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "FV26063190: 33 pagadas + 3 sin cargo → 12,79 € (la línea dice 13,95 €)"
+  },
+  {
+   "id": "t28",
+   "categoria": "trampas_vinos_regalo",
+   "subcategoria": "regalo",
+   "origen": "nuevo",
+   "mensaje": "Coste real de la botella de Viña Arana Gran Reserva",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "viña arana gran reserva"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "valor": 24.64,
+     "tol": 0.02,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "002111F2: 60 pagadas + 6 sin cargo → 24,64 € (la línea dice 27,10 €)"
+  },
+  {
+   "id": "t29",
+   "categoria": "trampas_anadas_magnum",
+   "subcategoria": "anada",
+   "origen": "nuevo",
+   "mensaje": "Precio del Gran Reserva 75 cl añada 2016",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "gran reserva 75cl 2016"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'gran reserva 75cl 2016' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 49.6,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "49,60 € la 2016; la 2011 cuesta 137,95 €: la añada manda"
+  },
+  {
+   "id": "t30",
+   "categoria": "trampas_anadas_magnum",
+   "subcategoria": "anada",
+   "origen": "nuevo",
+   "mensaje": "Precio del Gran Reserva 75 cl añada 2010",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "gran reserva 75cl 2010"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'gran reserva 75cl 2010' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 95,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "95 € (albarán del 10/11/2026)"
+  },
+  {
+   "id": "t31",
+   "categoria": "trampas_anadas_magnum",
+   "subcategoria": "magnum",
+   "origen": "nuevo",
+   "mensaje": "Precio del Lagar de Cervera magnum",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "lagar de cervera magnum"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select sum(pf.total) / sum(pf.cantidad) from productos_factura pf where pf.factura_id = (select f.id from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'lagar cervera.*magnum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1) and pf.nombre ~* 'lagar cervera.*magnum' and pf.total >= 0",
+     "tol": 0.01,
+     "valor": 19.08,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "coste real del magnum: 343,50 € / (15 pagadas + 3 sin cargo) = 19,08 €; la línea dice 22,90 €. La misma factura trae el 75 cl: no se mezclan los formatos (antes 14,31 €)"
+  },
+  {
+   "id": "t32",
+   "categoria": "trampas_anadas_magnum",
+   "subcategoria": "magnum",
+   "origen": "nuevo",
+   "mensaje": "Precio del Lagar de Cervera 75 cl (no magnum)",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "lagar de cervera 75 cl"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select sum(pf.total) / sum(pf.cantidad) from productos_factura pf where pf.factura_id = (select f.id from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'lagar cervera albari.o 75cl' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1) and pf.nombre ~* 'lagar cervera albari.o 75cl' and pf.total >= 0",
+     "tol": 0.01,
+     "valor": 9.54,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "coste real del 75 cl: 171,75 € / (15 + 3 sin cargo) = 9,54 €, igual que t26; la línea dice 11,45 €"
+  },
+  {
+   "id": "t33",
+   "categoria": "trampas_anadas_magnum",
+   "subcategoria": "magnum",
+   "origen": "nuevo",
+   "mensaje": "Precio del Abadía Retuerta Selección Especial magnum",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "abadía retuerta selección especial magnum"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'abad[ií]a retuerta.*magnum' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 35.42,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "t34",
+   "categoria": "trampas_anadas_magnum",
+   "subcategoria": "magnum",
+   "origen": "nuevo",
+   "mensaje": "Precio del PSI 2023 75 cl",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "psi 2023"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^psi 2023 ' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 24.2,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "no confundir con PSI Mgn. 2023 (magnum) ni PSI 3 L"
+  },
+  {
+   "id": "t35",
+   "categoria": "trampas_anadas_magnum",
+   "subcategoria": "anada",
+   "origen": "nuevo",
+   "mensaje": "Precio de El Seque 2021",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "el seque 2021"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select sum(pf.total) / sum(pf.cantidad) from productos_factura pf where pf.factura_id = (select f.id from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'seque 2021' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1) and pf.nombre ~* 'seque 2021' and pf.total >= 0",
+     "tol": 0.01,
+     "valor": 15.58,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "coste real: 561 € / 36 botellas (pagadas + sin cargo) = 15,58 €; la línea dice 18,70 €"
+  }
+ ]
+}
