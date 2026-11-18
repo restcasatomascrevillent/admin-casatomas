@@ -13,7 +13,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 // GFM: la IA contesta con TABLAS markdown (`| a | b |`) y sin esto salían en crudo (QA 05/11/2026).
 import remarkGfm from "remark-gfm";
-import { ArrowUp, Check, Paperclip, Copy, Crosshair, FileText, LineChart, Pin, PinOff, RefreshCw, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ArrowUp, Check, Paperclip, Copy, Crosshair, FileText, LineChart, Pin, PinOff, RefreshCw, Share2, Sparkles, Square, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { COMPONENTES_MARKDOWN_SEGUROS, urlMarkdownSegura } from "@/lib/markdown-seguro";
@@ -23,6 +23,7 @@ import type { DocumentoCitado } from "@/lib/facturas/seriePrecio";
 import { formatFechaEs } from "@/lib/facturas/preguntasRapidas";
 import { enlazarDocumentos } from "@/lib/facturas/enlacesDocumentos";
 import { ACEPTA_PRESUPUESTO } from "@/lib/facturas/presupuestoAdjunto";
+import { aTextoPlano, pasosDeCoincidencias, pasosSiguientes, pieDeDatos, textoProgreso, textoSegundos, type PasoSiguiente } from "@/lib/facturas/copilotoCalidad";
 import { BotonOriginal } from "../shared/BotonOriginal";
 import { GraficoSeriePrecio } from "../GraficoSeriePrecio";
 import { desplazarA } from "../analisis/desplazar";
@@ -35,6 +36,9 @@ export interface Sugerencia {
   /** Solo rellena la caja (falta un dato, p. ej. el producto) en vez de preguntar ya. */
   rellenar?: boolean;
 }
+
+/** Siempre la primera: el usuario pone el producto (un «no hay» no puede salir de aquí). */
+const SUGERENCIA_PRECIO: Sugerencia = { texto: "Precio de ", rellenar: true };
 
 /** Siempre la última: la IA dibuja el precio de un producto. */
 const SUGERENCIA_GRAFICA: Sugerencia = { texto: "Enséñame la gráfica del precio de ", rellenar: true };
@@ -52,6 +56,8 @@ interface Props {
   /** Adjuntar un presupuesto de proveedor: la IA pregunta el descuento y dice qué productos interesan. */
   onAdjuntar?: (archivo: File) => void;
   onRegenerar?: () => void;
+  /** «Parar»: cancela la consulta en curso y deja escribir otra vez. */
+  onParar?: () => void;
   /** 👍/👎 de una respuesta (chat_feedback). true si quedó guardado. */
   onValorar?: (mensajeId: string, valoracion: 1 | -1, comentario?: string) => Promise<boolean>;
   /** Ids de las gráficas ya fijadas en el tablero. */
@@ -101,28 +107,54 @@ function DocumentosCitados({ documentos }: { documentos: DocumentoCitado[] }) {
   );
 }
 
-function Escribiendo() {
+/**
+ * Mientras se espera: los tres puntos, un texto que cambia con los segundos
+ * («Buscando…», «Calculando…», «Casi está…») y «Parar». `cargando`: solo se
+ * abre una conversación del historial (sin texto de consulta ni «Parar»).
+ */
+export function Escribiendo({ onParar, cargando }: { onParar?: () => void; cargando?: boolean }) {
+  const [segundos, setSegundos] = useState(0);
+  useEffect(() => {
+    const inicio = Date.now();
+    const id = setInterval(() => setSegundos((Date.now() - inicio) / 1000), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const texto = cargando ? "Abriendo la conversación…" : textoProgreso(segundos);
+  const tiempo = cargando ? "" : textoSegundos(segundos);
   return (
-    <div className="flex items-center gap-1 py-2" role="status" aria-label="La IA está escribiendo…">
-      {[0, 180, 360].map((ms) => (
-        <span
-          key={ms}
-          className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50"
-          style={{ animationDelay: `${ms}ms`, animationDuration: "1s" }}
-        />
-      ))}
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1" role="status" aria-live="polite">
+      <span className="flex items-center gap-1" aria-hidden>
+        {[0, 180, 360].map((ms) => (
+          <span
+            key={ms}
+            className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/50"
+            style={{ animationDelay: `${ms}ms`, animationDuration: "1s" }}
+          />
+        ))}
+      </span>
+      <span className="min-w-0 text-sm text-muted-foreground">
+        {texto}
+        {tiempo && <span className="ml-1.5 tabular-nums text-muted-foreground/70">{tiempo}</span>}
+      </span>
+      {onParar && !cargando && (
+        <button type="button" onClick={onParar} className={cn(BOTON_PIE, "border border-border/70 px-3 text-foreground")}>
+          <Square className="h-3 w-3 fill-current" aria-hidden />
+          Parar
+        </button>
+      )}
     </div>
   );
 }
 
-function BotonCopiar({ texto }: { texto: string }) {
+/** «Copiar»: texto plano y legible (sin ** ni |), listo para pegar en WhatsApp. */
+export function BotonCopiar({ texto }: { texto: string }) {
   const [copiado, setCopiado] = useState(false);
   return (
     <button
       type="button"
       onClick={async () => {
         try {
-          await navigator.clipboard.writeText(texto);
+          await navigator.clipboard.writeText(aTextoPlano(texto));
           setCopiado(true);
           setTimeout(() => setCopiado(false), 2000);
         } catch {
@@ -134,6 +166,28 @@ function BotonCopiar({ texto }: { texto: string }) {
     >
       {copiado ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
       {copiado ? "Copiado" : "Copiar"}
+    </button>
+  );
+}
+
+/** «Compartir» con el menú del móvil (WhatsApp…); solo donde el navegador lo ofrece. */
+export function BotonCompartir({ texto }: { texto: string }) {
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function") return null;
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.share({ text: aTextoPlano(texto) });
+        } catch {
+          // Cerró el menú o no hay permiso: nada que avisar.
+        }
+      }}
+      title="Compartir respuesta"
+      className={BOTON_PIE}
+    >
+      <Share2 className="h-3.5 w-3.5" aria-hidden />
+      Compartir
     </button>
   );
 }
@@ -224,6 +278,7 @@ export function PanelCopiloto({
   onEnviar,
   onAdjuntar,
   onRegenerar,
+  onParar,
   onValorar,
   fijadas,
   onFijar,
@@ -241,7 +296,7 @@ export function PanelCopiloto({
   const hiloRef = useRef<HTMLDivElement>(null);
   const cajaRef = useRef<HTMLTextAreaElement>(null);
   const archivoRef = useRef<HTMLInputElement>(null);
-  const lista: Sugerencia[] = [...sugerencias.map((texto) => ({ texto })), SUGERENCIA_GRAFICA];
+  const lista: Sugerencia[] = [SUGERENCIA_PRECIO, ...sugerencias.map((texto) => ({ texto })), SUGERENCIA_GRAFICA];
   const ultimoAsistente = mensajes.reduce((u, m, i) => (m.rol === "assistant" ? i : u), -1);
 
   // Al final del hilo moviendo SOLO el hilo (scrollIntoView movía también la página).
@@ -314,10 +369,10 @@ export function PanelCopiloto({
             </ul>
           </div>
         ) : (
-          <ol className={cn("space-y-3 py-3", columna, completa && "space-y-5 py-6")} aria-label="Conversación con la IA">
+          <ol className={cn("space-y-3 py-3", columna, completa && "space-y-5 py-6")} role="log" aria-live="polite" aria-label="Conversación con la IA">
             {isLoading && mensajes.length === 0 && (
               <li>
-                <Escribiendo />
+                <Escribiendo cargando />
               </li>
             )}
             {mensajes.map((m, i) => (
@@ -333,13 +388,14 @@ export function PanelCopiloto({
                     onQuitarFijada={onQuitarFijada}
                     onRegenerar={i === ultimoAsistente && !isSending ? onRegenerar : undefined}
                     onValorar={onValorar}
+                    pasos={i === ultimoAsistente && !isSending ? { onEnviar } : undefined}
                   />
                 )}
               </li>
             ))}
             {isSending && (
               <li>
-                <Escribiendo />
+                <Escribiendo onParar={onParar} />
               </li>
             )}
           </ol>
@@ -482,9 +538,12 @@ function MensajeAsistente({
   onQuitarFijada,
   onRegenerar,
   onValorar,
+  pasos,
 }: {
   mensaje: MensajeChat;
   completa?: boolean;
+  /** Solo en la última respuesta: botones de «paso siguiente» que mandan la pregunta ya hecha. */
+  pasos?: { onEnviar: (texto: string) => void };
   fijadas: ReadonlySet<string>;
   onFijar: (g: GraficaIa) => void;
   onQuitarFijada: (id: string) => void;
@@ -493,6 +552,9 @@ function MensajeAsistente({
 }) {
   const documentos = (mensaje.adjuntos ?? []).flatMap((a) => (a.tipo === "documentos" ? a.datos : []));
   const graficas = graficasDeMensaje(mensaje);
+  const coincidencias = mensaje.aviso === "error" ? [] : pasosDeCoincidencias(mensaje.traza?.ayuda?.sugerencias);
+  const siguientes = coincidencias.length > 0 ? [] : pasosSiguientes(mensaje.traza?.herramientas, mensaje.aviso);
+  const pie = pieDeDatos(mensaje.traza?.herramientas, mensaje.traza?.ayuda, mensaje.aviso);
   return (
     <div className="flex flex-col gap-1">
       <div className={cn(CLASES_PROSA, "prose prose-sm max-w-none text-foreground dark:prose-invert prose-p:my-1", completa && "sm:prose-base sm:prose-p:my-1.5")}>
@@ -521,6 +583,9 @@ function MensajeAsistente({
         );
       })}
       {documentos.length > 0 && <DocumentosCitados documentos={documentos} />}
+      {pie && <p className="text-xs text-muted-foreground/80">{pie}</p>}
+      {pasos && coincidencias.length > 0 && <BotonesPaso titulo="¿Es alguno de estos?" pasos={coincidencias} onEnviar={pasos.onEnviar} />}
+      {pasos && siguientes.length > 0 && <BotonesPaso pasos={siguientes} onEnviar={pasos.onEnviar} />}
       {mensaje.aviso === "error" && onRegenerar && (
         <div>
           <button
@@ -538,6 +603,7 @@ function MensajeAsistente({
       )}
       <div className="-ml-2 flex flex-wrap items-center gap-x-0.5 text-xs text-muted-foreground/80">
         <BotonCopiar texto={mensaje.contenido} />
+        <BotonCompartir texto={mensaje.contenido} />
         {onValorar && (
           <BotonesValoracion valoracion={mensaje.valoracion} onValorar={(v, c) => onValorar(mensaje.id, v, c)} />
         )}
@@ -552,6 +618,25 @@ function MensajeAsistente({
           {hora(mensaje.created_at)}
         </span>
       </div>
+    </div>
+  );
+}
+
+/** Botones de «paso siguiente» (o de nombres parecidos) bajo la respuesta: mandan la pregunta ya hecha. */
+export function BotonesPaso({ pasos, onEnviar, titulo }: { pasos: PasoSiguiente[]; onEnviar: (texto: string) => void; titulo?: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={titulo ?? "Siguiente paso"}>
+      {titulo && <span className="text-xs text-muted-foreground">{titulo}</span>}
+      {pasos.map((p) => (
+        <button
+          key={p.texto}
+          type="button"
+          onClick={() => onEnviar(p.pregunta)}
+          className={cn("min-h-9 max-w-full rounded-full border border-border/70 px-3 text-left text-sm text-foreground hover:bg-muted", FOCO)}
+        >
+          <span className="line-clamp-2 break-words">{p.texto}</span>
+        </button>
+      ))}
     </div>
   );
 }

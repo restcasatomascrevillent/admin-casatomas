@@ -77,3 +77,38 @@ export function contextoDeAdjuntos(adjuntos: unknown): ContextoHerramienta[] {
   }
   return salida;
 }
+
+// ─── Ayuda para el panel (18/11/2026) ────────────────────────────────────────
+//  Lo que el panel convierte en botones («¿Es alguno de estos?») y en el pie
+//  «Datos hasta dd/mm/aaaa». Solo lo que la herramienta ya devuelve: nunca
+//  se calcula ni se inventa nada.
+
+export interface AyudaPanel { sugerencias?: string[]; datos_hasta?: string }
+const MAX_SUGERENCIAS_PANEL = 5;
+
+/** Nombres parecidos (`sugerencias`, `posibles_coincidencias`) y `ultima_fecha` de un resultado (JSON) de herramienta. */
+export function ayudaDeResultado(contenido: string): AyudaPanel {
+  let d: unknown;
+  try { d = JSON.parse(contenido); } catch { return {}; }
+  if (!d || typeof d !== "object" || Array.isArray(d)) return {};
+  const o = d as Record<string, unknown>;
+  const nombres: string[] = [];
+  if (Array.isArray(o.sugerencias)) for (const s of o.sugerencias) if (typeof s === "string") nombres.push(s);
+  if (Array.isArray(o.posibles_coincidencias)) {
+    for (const p of o.posibles_coincidencias) {
+      const n = p && typeof p === "object" ? (p as Record<string, unknown>).nombre : null;
+      if (typeof n === "string") nombres.push(n);
+    }
+  }
+  const limpios = [...new Set(nombres.map((n) => n.replace(/\s+/g, " ").trim().slice(0, 80)).filter(Boolean))].slice(0, MAX_SUGERENCIAS_PANEL);
+  const hasta = typeof o.ultima_fecha === "string" && /^\d{4}-\d{2}-\d{2}/.test(o.ultima_fecha) ? o.ultima_fecha.slice(0, 10) : undefined;
+  return { ...(limpios.length ? { sugerencias: limpios } : {}), ...(hasta ? { datos_hasta: hasta } : {}) };
+}
+
+/** Une la ayuda de varias herramientas: sugerencias sin repetir y la fecha más reciente. */
+export function unirAyuda(listas: AyudaPanel[]): AyudaPanel {
+  const sug = [...new Set(listas.flatMap((a) => a.sugerencias ?? []))].slice(0, MAX_SUGERENCIAS_PANEL);
+  const fechas = listas.map((a) => a.datos_hasta).filter((f): f is string => !!f).sort();
+  const hasta = fechas[fechas.length - 1];
+  return { ...(sug.length ? { sugerencias: sug } : {}), ...(hasta ? { datos_hasta: hasta } : {}) };
+}
