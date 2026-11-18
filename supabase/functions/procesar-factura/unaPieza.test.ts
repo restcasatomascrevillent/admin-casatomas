@@ -248,20 +248,21 @@ async function caminoTrabajo(e: (typeof ESCENARIOS)[string]) {
   return { fin: fin!.args, cierre: a, inicio, oaUnico, oaPiezas, sb, ruta };
 }
 
-// UPDATE de facturas con el coste de leer el documento (migración 20261010120000).
-const esCosteLectura = (c: Escrito) =>
-  c.tabla === "facturas" &&
-  c.ops.some((o) => o.m === "update" && !!o.a[0] && typeof o.a[0] === "object" && "coste_lectura_usd" in (o.a[0] as object));
+// Columnas del coste de leer el documento (migración 20261010120000). Desde el 18/11/2026 van
+// en la MISMA escritura que las alertas y el original.
+const COLUMNAS_COSTE = ["coste_lectura_usd", "lectura_llamadas", "lectura_modelo"] as const;
+const datosUpdate = (c: Escrito) => c.ops.find((o) => o.m === "update")?.a[0] as Record<string, unknown> | undefined;
+const updatesFacturas = (sb: ReturnType<typeof supabaseFalso>) =>
+  sb.consultas.filter((c) => c.tabla === "facturas" && !!datosUpdate(c));
 const costeGuardado = (sb: ReturnType<typeof supabaseFalso>) =>
-  sb.consultas.filter(esCosteLectura).map((c) => ({
-    ...(c.ops.find((o) => o.m === "update")!.a[0] as Record<string, unknown>),
+  updatesFacturas(sb).filter((c) => "coste_lectura_usd" in datosUpdate(c)!).map((c) => ({
+    ...Object.fromEntries(COLUMNAS_COSTE.map((k) => [k, datosUpdate(c)![k]])),
     factura: c.ops.find((o) => o.m === "eq")?.a[1],
   }));
 
 // Lo que se escribe en la BD, sin la hora ni el id del trabajo (ni el coste de lectura, que se prueba aparte).
 const escrituras = (sb: ReturnType<typeof supabaseFalso>) =>
   sb.consultas
-    .filter((c) => !esCosteLectura(c))
     .filter((c) => ["facturas", "productos_factura"].includes(c.tabla) && c.ops.some((o) => o.m === "insert" || o.m === "update"))
     .map((c) => ({
       tabla: c.tabla,
@@ -270,6 +271,7 @@ const escrituras = (sb: ReturnType<typeof supabaseFalso>) =>
         a: o.a.map((x) => {
           if (x && typeof x === "object" && !Array.isArray(x)) {
             const { procesado_en: _h, ocr_trabajo_id: _t, ...resto } = x as Record<string, unknown>;
+            for (const k of COLUMNAS_COSTE) delete resto[k];
             return resto;
           }
           return x;
@@ -306,8 +308,18 @@ describe("una página: camino síncrono ≡ trabajo de una pieza", () => {
       // 2) MISMAS comprobaciones y escrituras (cabecera, líneas, alertas, archivo).
       expect(rpcsGuardado(t.sb)).toEqual(rpcsGuardado(s.sb));
       expect(escrituras(t.sb)).toEqual(escrituras(s.sb));
-      // (cabecera + líneas + alertas + archivo_path; nada si es duplicado)
-      expect(escrituras(s.sb)).toHaveLength(e.existente ? 0 : 4);
+      // (cabecera + líneas + UNA escritura con alertas, archivo_path y coste; nada si es duplicado)
+      expect(escrituras(s.sb)).toHaveLength(e.existente ? 0 : 3);
+      if (!e.existente) {
+        // 18/11/2026: un solo UPDATE de la factura tras insertarla (antes, alertas, original y coste por separado).
+        for (const sb of [s.sb, t.sb]) {
+          const ups = updatesFacturas(sb);
+          expect(ups).toHaveLength(1);
+          expect(Object.keys(datosUpdate(ups[0])!).sort()).toEqual(
+            ["alertas_validacion", "archivo_path", "coste_lectura_usd", "lectura_llamadas", "lectura_modelo"],
+          );
+        }
+      }
 
       if (e.existente) {
         // 3a) Duplicado: mismo documento pendiente y mismo resumen para decidir.
