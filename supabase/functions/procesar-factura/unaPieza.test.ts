@@ -330,12 +330,12 @@ describe("una página: camino síncrono ≡ trabajo de una pieza", () => {
         expect(t.fin.p_estado).toBe("completado");
         expect(t.fin.p_factura_id).toBe(101);
         expect(sinComun(t.fin.p_resultado as Record<string, unknown>)).toEqual(sinComun(JSON.parse(JSON.stringify(s.respuesta))));
-        // Coste de lectura por documento. Síncrono: visión (e.llamadas × 0,00044 $) + 2 llamadas de
-        // embeddings (cabecera y líneas) sin tokens simulados; llamadas = visión + 2.
+        // Coste de lectura por documento. Síncrono: visión (e.llamadas × 0,00044 $) + 1 llamada de
+        // embeddings (la cabecera; los nombres los pone el cron) sin tokens simulados; llamadas = visión + 1.
         const costeVision = Math.round(e.llamadas * 0.00044 * 1e6) / 1e6;
         expect(s.respuesta.coste_usd).toBeCloseTo(costeVision, 6);
         expect(costeGuardado(s.sb)).toEqual([
-          { coste_lectura_usd: s.respuesta.coste_usd, lectura_llamadas: e.llamadas + 2, lectura_modelo: "gpt-5.6-luna", factura: 101 },
+          { coste_lectura_usd: s.respuesta.coste_usd, lectura_llamadas: e.llamadas + 1, lectura_modelo: "gpt-5.6-luna", factura: 101 },
         ]);
         // Trabajo: lo que sumaron las piezas (0,0123 simulado en ocr_trabajos) + embeddings; sin `llamadas`
         // en el simulacro del trabajo → null. El panel recibe el mismo total que se guarda.
@@ -350,6 +350,12 @@ describe("una página: camino síncrono ≡ trabajo de una pieza", () => {
         // La copia de pendientes/ se borra una vez archivado el original.
         expect(t.sb.borrados).toEqual([[t.ruta]]);
       }
+      // 18/11/2026: guardar NO calcula ni guarda el vector de los nombres de las líneas (lo
+      // completa el cron embeddings-nombres): ni una consulta a productos_nombre_embedding y,
+      // de embeddings, solo la cabecera (texto suelto; nada si es duplicado).
+      for (const sb of [s.sb, t.sb]) expect(sb.consultas.filter((c) => c.tabla === "productos_nombre_embedding")).toEqual([]);
+      const embeddingsS = s.oa.cuerpos.filter((c) => c.url.endsWith("/embeddings")).map((c) => typeof c.body.input);
+      expect(embeddingsS).toEqual(e.existente ? [] : ["string"]);
       // La factura del trabajo lleva su id (idempotencia ante reintentos).
       const insT = t.sb.consultas.find((c) => c.tabla === "facturas" && c.ops[0].m === "insert")?.ops[0].a[0] as Record<string, unknown> | undefined;
       if (!e.existente) expect(insT).toMatchObject({ ocr_trabajo_id: TID, paginas: 1 });
