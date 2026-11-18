@@ -4,7 +4,7 @@
 //   npm run test:avisos-confirmada:db
 //
 // Aplica las migraciones REALES 20261122160000 y 20261205100200 (lo que hay antes) y luego
-// 20261212100000 dos veces (idempotente), y demuestra:
+// 20261212720000 dos veces (idempotente), y demuestra:
 //   · al aplicarla, las «Reserva nueva» sin revisar cuya reserva ya no está pendiente quedan revisadas;
 //     las de reservas pendientes siguen sin revisar;
 //   · verificar una reserva (desde el panel o con la clave de servicio) revisa su «Reserva nueva»
@@ -21,8 +21,8 @@ import assert from "node:assert/strict";
 
 const AVISOS = await readFile("supabase/migrations/20261122160000_avisos_reservas_nuevas_canceladas.sql", "utf8");
 const CANCELADA_POR = await readFile("supabase/migrations/20261205100200_reservas_cancelada_por.sql", "utf8");
-const MIGRACION = await readFile("supabase/migrations/20261212100000_avisos_reserva_confirmada_cliente.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261212100000_avisos_reserva_confirmada_cliente_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261212720000_avisos_reserva_confirmada_cliente.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261212720000_avisos_reserva_confirmada_cliente_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const igual = (a, b, msg) => { assert.deepEqual(a, b, msg); comprobaciones++; };
@@ -119,6 +119,12 @@ igual(await sinRevisar(7), 1, "una reserva web nueva sigue creando «Reserva nue
 
 igual((await db.query(`select public.seccion_aviso('reserva_confirmada') s`)).rows[0].s, "reservas", "«Confirmada por el cliente» es de la sección Reservas");
 igual((await db.query(`select public.seccion_aviso('reserva_nueva') s, public.seccion_aviso('facturas_revision') f`)).rows[0], { s: "reservas", f: "facturas" }, "el resto de secciones no cambia");
+// #293 (20261212100000_avisos_solo_su_seccion): esta migración no deshace «cada aviso solo para quien ve su sección».
+igual(
+  (await db.query(`select public.seccion_aviso('email_fallido') r, public.seccion_aviso('instagram_encargo') m, public.seccion_aviso('sistema') s, public.seccion_aviso('tipo_nuevo') n`)).rows[0],
+  { r: "reservas", m: "marketing", s: "solo_super_admin", n: "solo_super_admin" },
+  "sigue la lista de #293: lo que no es de una sección, solo el super admin",
+);
 
 // Rollback: sin aviso verde y sin revisar sola la azul.
 await db.exec(ROLLBACK);
@@ -127,6 +133,6 @@ await comoPanel(`update public.reservas set estado = 'verificada' where id = '${
 igual(await sinRevisar(7), 1, "tras el rollback, verificar ya no revisa la «Reserva nueva»");
 await comoServicio(`update public.reservas set estado = 'confirmada' where id = '${id(7)}'`);
 igual((await avisos(7, "reserva_confirmada")).length, 0, "ni hay aviso «Confirmada por el cliente»");
-igual((await db.query(`select public.seccion_aviso('reserva_confirmada') s`)).rows[0].s, "dashboard", "y seccion_aviso vuelve a ser la de antes");
+igual((await db.query(`select public.seccion_aviso('reserva_confirmada') s`)).rows[0].s, "solo_super_admin", "y seccion_aviso vuelve a ser la de #293 (sin sección: solo el super admin)");
 
 console.log(`✔ avisos de reservas (confirmada por el cliente): ${comprobaciones} comprobaciones`);

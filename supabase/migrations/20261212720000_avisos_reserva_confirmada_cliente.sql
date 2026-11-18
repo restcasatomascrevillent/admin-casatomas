@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- 20261212100000_avisos_reserva_confirmada_cliente — avisos de Reservas: solo lo que hay que mirar (18/11/2026)
+-- 20261212720000_avisos_reserva_confirmada_cliente — avisos de Reservas: solo lo que hay que mirar (18/11/2026)
 -- ===========================================================================
 -- Petición del dueño: «En avisos solo tienen que salir las canceladas (rojo), las nuevas para
 -- verificar (azul) y las que confirme luego el cliente (verdes)».
@@ -18,7 +18,10 @@ set client_encoding = 'UTF8';
 --   3. Las «Reserva nueva» que ya estaban sin revisar con la reserva fuera de 'pendiente' (o borrada)
 --      se dan por revisadas ahora (una vez).
 --   4. `seccion_aviso` lleva `reserva_confirmada` a la sección Reservas (quién lo ve y quién lo puede
---      marcar como revisado, igual que los demás avisos de reservas).
+--      marcar como revisado, igual que los demás avisos de reservas). Parte de la versión de
+--      20261212100000_avisos_solo_su_seccion (#293: cada aviso solo para quien ve su sección; lo que no
+--      tiene sección, solo el super admin) y solo añade `reserva_confirmada`. Por eso va DESPUÉS de
+--      ella: con la lista anterior (resto → 'dashboard') desharía ese arreglo.
 --   El resto de `fn_aviso_reserva_nueva_cancelada` es idéntico a 20261205100200.
 --
 -- TRIGGERS: los mismos de 20261122160000 (`trg_aviso_reserva_nueva` AFTER INSERT y
@@ -32,7 +35,7 @@ set client_encoding = 'UTF8';
 --
 -- APLICAR (nunca `db push`): demo primero (sfonaclosuafvlhutkon), producción (haqmmdfdzzatdnrrcgez)
 -- solo con el «sí» del dueño. Idempotente.
--- Deshacer: supabase/rollbacks/20261212100000_avisos_reserva_confirmada_cliente_ROLLBACK.sql
+-- Deshacer: supabase/rollbacks/20261212720000_avisos_reserva_confirmada_cliente_ROLLBACK.sql
 -- Pruebas: npm run test:avisos-confirmada:db (PGlite).
 -- ===========================================================================
 begin;
@@ -127,10 +130,14 @@ immutable
 set search_path = public
 as $$
   select case
-    when p_tipo in ('reserva_nueva', 'reserva_cancelada', 'reserva_confirmada', 'reserva_sin_asignar', 'solicitud_pendiente') then 'reservas'
+    when p_tipo in (
+      'reserva_nueva', 'reserva_cancelada', 'reserva_confirmada', 'reserva_sin_asignar', 'solicitud_pendiente',
+      'propuesta_aceptada', 'propuesta_rechazada', 'propuesta_fallida',
+      'email_fallido', 'mesa_borrada_con_asignaciones'
+    ) then 'reservas'
     when p_tipo like 'facturas\_%' or p_tipo in ('subida_precio', 'original_sin_drive') then 'facturas'
-    when p_tipo like 'peticion\_%' then 'solo_super_admin'
-    else 'dashboard'
+    when p_tipo like 'instagram\_%' then 'marketing'
+    else 'solo_super_admin'
   end
 $$;
 revoke all on function public.seccion_aviso(text) from public, anon;

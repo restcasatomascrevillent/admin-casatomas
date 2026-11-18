@@ -173,7 +173,7 @@ function ModalAvisos({
   const reservas = useReservasAvisos(avisos);
   // 18/11/2026, petición del dueño: en azul solo las reservas que hay que verificar. Una «Reserva nueva» cuya reserva
   // ya no está pendiente (verificada, confirmada, cancelada) no sale en «Sin revisar»; la base de datos ya la da por
-  // revisada (20261212100000), esto lo cubre mientras la lista abierta no se relee.
+  // revisada (20261212720000), esto lo cubre mientras la lista abierta no se relee.
   const yaNoPorVerificar = (n: NotificacionDashboard) => {
     if (!esReservas || n.tipo !== "reserva_nueva" || filtros.estado !== "sin_revisar") return false;
     const id = reservaDeAviso(n);

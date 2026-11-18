@@ -1,11 +1,11 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- ROLLBACK de 20261212100000_avisos_reserva_confirmada_cliente
+-- ROLLBACK de 20261212720000_avisos_reserva_confirmada_cliente
 -- ===========================================================================
 -- Deja `fn_aviso_reserva_nueva_cancelada` como en 20261205100200 (sin aviso «Confirmada por el
 -- cliente» y sin revisar sola la «Reserva nueva» al verificarla) y `seccion_aviso` como en
--- 20261129100000. Los avisos `reserva_confirmada` que ya existan se quedan (pasan a la sección
--- Dashboard). Las «Reserva nueva» que la migración dio por revisadas siguen revisadas: era lo
+-- 20261212100000_avisos_solo_su_seccion (#293). Los avisos `reserva_confirmada` que ya existan se
+-- quedan (pasan a verlos solo el super admin, como cualquier tipo sin sección). Las «Reserva nueva» que la migración dio por revisadas siguen revisadas: era lo
 -- correcto (su reserva ya no estaba pendiente). Idempotente.
 -- ===========================================================================
 begin;
@@ -78,10 +78,14 @@ immutable
 set search_path = public
 as $$
   select case
-    when p_tipo in ('reserva_nueva', 'reserva_cancelada', 'reserva_sin_asignar', 'solicitud_pendiente') then 'reservas'
+    when p_tipo in (
+      'reserva_nueva', 'reserva_cancelada', 'reserva_sin_asignar', 'solicitud_pendiente',
+      'propuesta_aceptada', 'propuesta_rechazada', 'propuesta_fallida',
+      'email_fallido', 'mesa_borrada_con_asignaciones'
+    ) then 'reservas'
     when p_tipo like 'facturas\_%' or p_tipo in ('subida_precio', 'original_sin_drive') then 'facturas'
-    when p_tipo like 'peticion\_%' then 'solo_super_admin'
-    else 'dashboard'
+    when p_tipo like 'instagram\_%' then 'marketing'
+    else 'solo_super_admin'
   end
 $$;
 revoke all on function public.seccion_aviso(text) from public, anon;

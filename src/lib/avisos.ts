@@ -15,7 +15,7 @@ export function rutaDeAviso(
   if (n.referencia_tipo === "facturas_alerta") return rutaAlerta(n.datos) ?? "/facturas?tab=chat";
   // Reserva sin sala o mesa dentro de la ventana: pestaña «Asignación» de /reservas.
   if (n.tipo === "reserva_sin_asignar") return "/reservas?tab=reservas";
-  // Reserva nueva, cancelada (20261122160000) o confirmada por el cliente (20261212100000): la lista de reservas.
+  // Reserva nueva, cancelada (20261122160000) o confirmada por el cliente (20261212720000): la lista de reservas.
   if (n.referencia_tipo === "reserva" && (n.tipo === "reserva_nueva" || n.tipo === "reserva_cancelada" || n.tipo === "reserva_confirmada")) return "/reservas?tab=reservas";
   // Las solicitudes viven en la pestaña unificada «Reservas», filtradas por «Solicitudes sin resolver».
   if (n.referencia_tipo === "solicitud") return "/reservas?tab=reservas&status=solicitudes";
@@ -94,7 +94,7 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   solicitud_pendiente: AlertTriangle,
   reserva_nueva: Clock,
   reserva_cancelada: XCircle,
-  // El cliente ha confirmado su reserva con el enlace del correo (20261212100000).
+  // El cliente ha confirmado su reserva con el enlace del correo (20261212720000).
   reserva_confirmada: CheckCheck,
   // Aviso del cron `reservas-aviso-sin-asignar`: reserva dentro de la ventana
   // de asignación que aún no tiene sala o mesa.
@@ -147,7 +147,7 @@ export const SECCIONES_AVISOS: Record<SeccionAvisos, { titulo: string; tipos: { 
       // canceladas (trigger 20261122160000). Solicitudes y «Sin sala o mesa» ya no salen aquí.
       // 18/11/2026, petición del dueño: «solo tienen que salir las canceladas (rojo), las nuevas para verificar
       // (azul) y las que confirme luego el cliente (verdes)». Una «Reserva nueva» se da por revisada sola en
-      // cuanto la reserva deja de estar pendiente (20261212100000).
+      // cuanto la reserva deja de estar pendiente (20261212720000).
       { tipo: "reserva_nueva", etiqueta: "Reservas nuevas" },
       { tipo: "reserva_confirmada", etiqueta: "Confirmadas por el cliente" },
       { tipo: "reserva_cancelada", etiqueta: "Canceladas" },
