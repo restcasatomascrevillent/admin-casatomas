@@ -75,11 +75,11 @@ export default function SuperAdminLogs() {
   const autoRefresco = auto ? AUTO_MS : false;
 
   const estado = useEstadoRecogida(entorno, autoRefresco);
-  // El número de la pestaña: solo los FALLOS DE LA WEB activos (en rojo). Los externos y lo que no depende
+  // El número de la pestaña: solo los FALLOS NUESTROS activos (en rojo: de la web y del admin). Los externos y lo que no depende
   // de la web se cuentan aparte dentro de la pestaña. Sin la migración del origen, todas las activas (como antes).
   const activas = useIncidencias({ entorno, estado: "activas", gravedad: null, fuente: null, texto: "", ocultarRuido: true, origen: "web" }, 0, autoRefresco);
   const fallosWeb = activas.data?.total ?? 0;
-  const etiquetaFallos = activas.data?.sinOrigen ? `${fallosWeb} activas` : `${fallosWeb} ${fallosWeb === 1 ? "fallo de la web activo" : "fallos de la web activos"}`;
+  const etiquetaFallos = activas.data?.sinOrigen ? `${fallosWeb} activas` : `${fallosWeb} ${fallosWeb === 1 ? "fallo activo (web o admin)" : "fallos activos (web o admin)"}`;
 
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA);

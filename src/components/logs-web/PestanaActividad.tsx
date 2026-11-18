@@ -18,7 +18,7 @@ import {
 } from "@/hooks/useLogsWeb";
 import { NOMBRE_DISPOSITIVO, NOMBRE_ORIGEN } from "@/components/trafico-web/comportamiento/definiciones";
 import { cn } from "@/lib/utils";
-import { describirEvento, fmtDuracion, fmtFechaHora, NOMBRE_CATEGORIA, NOMBRE_TIPO, origenDeEvento } from "./calculos";
+import { ambitoDeEvento, describirEvento, fmtDuracion, fmtFechaHora, NOMBRE_CATEGORIA, NOMBRE_TIPO, origenDeEvento } from "./calculos";
 import { BadgeOrigen } from "./Origen";
 import { ESTILO_GRUPO, estiloDe } from "./origenEstilos";
 import { Buscador, FiltroSelect, Interruptor, Paginacion } from "./Controles";
@@ -176,7 +176,7 @@ export function PestanaActividad({ desde, hasta, entorno, autoRefresco, onAbrirS
                 <TableCell className="whitespace-nowrap tabular-nums text-xs">{fmtFechaHora(e.ocurrido_en)}</TableCell>
                 <TableCell className="space-y-1 text-xs">
                   <Badge variant="outline" className={cn("whitespace-nowrap", origen && estiloDe(origen).insignia)}>{NOMBRE_TIPO[e.tipo] ?? e.tipo}</Badge>
-                  {origen && <BadgeOrigen origen={origen} className="flex w-fit px-1.5 py-0 text-[10px]" />}
+                  {origen && <BadgeOrigen origen={origen} ambito={ambitoDeEvento(e)} className="flex w-fit px-1.5 py-0 text-[10px]" />}
                 </TableCell>
                 <TableCell className="max-w-[28rem] text-sm">
                   <span className="break-words">{describirEvento(e)}</span>

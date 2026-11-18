@@ -2,7 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { ResultadoConexionLinear } from "../../supabase/functions/procesar-logs-web/linear";
-import type { GrupoOrigen, Origen, OrigenVisible } from "../../supabase/functions/_shared/logs-web/origen";
+import type { Origen, OrigenVisible } from "../../supabase/functions/_shared/logs-web/origen";
+import { filtroAmbito } from "../../supabase/functions/_shared/logs-web/ambito";
 
 export type { EquipoLinear, ResultadoConexionLinear } from "../../supabase/functions/procesar-logs-web/linear";
 
@@ -261,10 +262,15 @@ export interface FiltrosActividad {
 export type OrdenIncidencias = "recientes" | "ocurrencias" | "sesiones";
 
 /**
- * Filtro de origen: fallos de la web y externos (por defecto), solo uno de los
- * tres grupos, o null = todos.
+ * Filtro de origen: fallos nuestros y externos (por defecto), solo uno de los
+ * tres grupos, o null = todos. Los fallos nuestros (origen «web») se pueden
+ * ver juntos («web») o separados por ámbito (ambito.ts, sin migración):
+ * «fallo_web» (lo que usan los clientes) y «fallo_admin» (el panel y sus tareas).
  */
-export type FiltroOrigen = "web_externos" | "web" | "externo" | "no_depende";
+export type FiltroOrigen = "web_externos" | "web" | "fallo_web" | "fallo_admin" | "externo" | "no_depende";
+
+/** Las cuentas de la pestaña: fallos de la web, fallos del admin, externos y lo que no depende de la web. */
+export type GrupoConteo = "web" | "admin" | "externo" | "no_depende";
 
 export interface FiltrosIncidencias {
   entorno: Entorno | null;
@@ -307,6 +313,7 @@ export function aplicarFiltrosIncidencias(q: ConsultaFiltrable, f: FiltrosIncide
   if (f.ocultarRuido) q = q.gt("ocurrencias", 0);
   if (f.origen !== undefined) {
     if (f.origen === "web" || f.origen === "externo") q = q.eq("origen", f.origen);
+    else if (f.origen === "fallo_web" || f.origen === "fallo_admin") q = q.eq("origen", "web").or(filtroAmbito(f.origen === "fallo_web" ? "web" : "admin"));
     else if (f.origen === "web_externos") q = q.lte("origen_prioridad", 2);
     else if (f.origen === "no_depende") q = q.eq("origen_prioridad", 3);
     // «Ocultar las de solo bots y pruebas» también oculta las de origen «Bots y pruebas»
@@ -322,8 +329,8 @@ const COLUMNA_ORDEN: Record<OrdenIncidencias, string> = { recientes: "ultima_vez
 
 export const TAM_PAGINA = 25;
 
-/** Filtro de cada grupo de origen (para contarlos aparte). */
-const FILTRO_DE_GRUPO: Record<GrupoOrigen, FiltroOrigen> = { web: "web", externo: "externo", no_depende: "no_depende" };
+/** Filtro de cada cuenta (para contarlas aparte). */
+const FILTRO_DE_CONTEO: Record<GrupoConteo, FiltroOrigen> = { web: "fallo_web", admin: "fallo_admin", externo: "externo", no_depende: "no_depende" };
 
 /** ¿Falta la columna de origen (migración 20261130100000 sin aplicar)? */
 export function esSinOrigen(error: unknown): boolean {
@@ -334,8 +341,8 @@ export function esSinOrigen(error: unknown): boolean {
 export interface ResultadoIncidencias {
   filas: IncidenciaWeb[];
   total: number;
-  /** Cuántas hay de cada grupo con los mismos filtros (sin el de origen). Solo si se piden y hay migración. */
-  conteos?: Record<GrupoOrigen, number>;
+  /** Cuántas hay de cada clase con los mismos filtros (sin el de origen). Solo si se piden y hay migración. */
+  conteos?: Record<GrupoConteo, number>;
   /** La migración del origen no está aplicada: se lista como antes, sin colores ni filtro de origen. */
   sinOrigen?: boolean;
 }
@@ -498,9 +505,9 @@ export function useIncidencias(f: FiltrosIncidencias, pagina: number, autoRefres
         if (columna !== "ultima_vez") ordenada = ordenada.order("ultima_vez", { ascending: false });
         return ordenada.range(pagina * TAM_PAGINA, pagina * TAM_PAGINA + TAM_PAGINA - 1);
       };
-      const contar = async (grupo: GrupoOrigen) => {
+      const contar = async (grupo: GrupoConteo) => {
         const base = sb.from("web_incidencias").select("id", { count: "exact", head: true });
-        const q = aplicarFiltrosIncidencias(base as unknown as ConsultaFiltrable, { ...f, origen: FILTRO_DE_GRUPO[grupo] }) as unknown as typeof base;
+        const q = aplicarFiltrosIncidencias(base as unknown as ConsultaFiltrable, { ...f, origen: FILTRO_DE_CONTEO[grupo] }) as unknown as typeof base;
         const { error, count } = await q;
         lanzar(error);
         return count ?? 0;
@@ -515,8 +522,8 @@ export function useIncidencias(f: FiltrosIncidencias, pagina: number, autoRefres
       lanzar(r.error);
       const salida: ResultadoIncidencias = { filas: (r.data ?? []) as IncidenciaWeb[], total: r.count ?? 0 };
       if (opciones.conteos && f.origen !== undefined) {
-        const [web, externo, no_depende] = await Promise.all((["web", "externo", "no_depende"] as const).map(contar));
-        salida.conteos = { web, externo, no_depende };
+        const [web, admin, externo, no_depende] = await Promise.all((["web", "admin", "externo", "no_depende"] as const).map(contar));
+        salida.conteos = { web, admin, externo, no_depende };
       }
       return salida;
     },
