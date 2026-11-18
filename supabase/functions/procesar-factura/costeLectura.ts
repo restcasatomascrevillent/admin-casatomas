@@ -74,14 +74,24 @@ export async function leerCosteTrabajo(supabase: Supa, trabajoId: string): Promi
   }
 }
 
+/**
+ * Columnas de `facturas` con el coste de leerla. Para mandarlas en la MISMA
+ * escritura que otras de la factura (guardado.ts, 18/11/2026: cada UPDATE de
+ * facturas deja su fila de auditoría y, con la base cargada, tardaba 1-2 s).
+ */
+export function columnasCoste(c: CosteLectura): { coste_lectura_usd: number; lectura_llamadas: number | null; lectura_modelo: string | null } {
+  return { coste_lectura_usd: r6(c.usd), lectura_llamadas: c.llamadas, lectura_modelo: c.modelo };
+}
+
+/** ¿El error es que faltan las columnas del coste (migración 20261010120000 sin aplicar)? */
+export function faltanColumnasCoste(msg: string | null | undefined): boolean {
+  return !!msg && /coste_lectura_usd|lectura_llamadas|lectura_modelo/i.test(msg) && /column|columna|schema cache/i.test(msg);
+}
+
 /** Escribe el coste de leer una factura. Nunca lanza. */
 export async function guardarCosteLectura(supabase: Supa, facturaId: number, c: CosteLectura): Promise<void> {
   try {
-    const { error } = await supabase.from("facturas").update({
-      coste_lectura_usd: r6(c.usd),
-      lectura_llamadas: c.llamadas,
-      lectura_modelo: c.modelo,
-    }).eq("id", facturaId);
+    const { error } = await supabase.from("facturas").update(columnasCoste(c)).eq("id", facturaId);
     if (error) console.warn("[coste-lectura] no se pudo guardar el coste de la factura (¿migración sin aplicar?):", error.message);
   } catch (e) {
     console.warn("[coste-lectura] no se pudo guardar el coste de la factura:", e);
