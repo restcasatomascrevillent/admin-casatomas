@@ -244,7 +244,7 @@ datos van como migraciones, con su vuelta atrás.
 
 **Pendiente:**
 
-- **Punto 4, regalos.** Hecho en #291 (apartado 7.3), por la base de datos: vale para cualquier forma de
+- **Punto 4, regalos.** Hecho en #292 (apartado 7.3), por la base de datos: vale para cualquier forma de
   guardar.
 - **Punto 5, lectura de documentos nuevos** (a qué línea va cada descuento; código de promoción de
   Makro). Conviene hacerlo después del cotejo con originales.
@@ -312,11 +312,11 @@ que **no** se había guardado ningún descuento ni regalo, se revisaron uno a un
   texto no deja interpretar (¿unidades de regalo?).
 
 Conclusión: **la lectura no se ha dejado descuentos con importe**. Lo que faltaba era asignarlos al
-producto (corregido en #288 y #289) y marcar los regalos (#291).
+producto (corregido en #288 y #289) y marcar los regalos (#292).
 
 ### 7.3 Corregido tras el cotejo
 
-- [#291](https://github.com/restcasatomascrevillent/admin-casatomas/pull/291): los regalos (líneas a 0 €
+- [#292](https://github.com/restcasatomascrevillent/admin-casatomas/pull/292): los regalos (líneas a 0 €
   o sin importe) quedan marcados con 100 % de descuento y su valor, y los descuentos en positivo de
   Catral se asocian a su línea (`20261211400000`). En la demo: 86 regalos, 10.804 €.
 

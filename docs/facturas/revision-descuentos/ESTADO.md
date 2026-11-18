@@ -28,7 +28,7 @@ Reglas del encargo:
 - [x] Fase 1.D: cotejo de 36 documentos dirigidos y 132 sospechosos (INFORME.md § 7).
 - [x] Fase 1.E: informe (`INFORME.md`), versión 1 sin el cotejo con originales (apartado 7 del informe).
 - [x] Fase 2 (parte posible sin originales): #287 clasificación IA, #288 descuentos asociados, #289 precios netos; todo en la demo (funciones y migraciones aplicadas, panel READY).
-- [x] #291 regalos marcados y descuentos en positivo (tras el cotejo), en la demo.
+- [x] #292 regalos marcados y descuentos en positivo (tras el cotejo), en la demo.
 - [ ] Pendiente: Makro (lectura con código de promoción + releer 237 tickets), 3 albaranes de producción, regalos de Diper sin leer (a mano). Ver INFORME.md § 7.4.
 
 ## Notas para retomar
