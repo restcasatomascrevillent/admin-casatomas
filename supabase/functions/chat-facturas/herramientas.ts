@@ -583,6 +583,48 @@ export const NOTA_RESPUESTA_VOLUMEN_LITRO =
   "tabla por proveedor (por_proveedor) y por formato (por_envase, por_proveedor_formato); mismo producto en " +
   "varios proveedores: comparables (mas caro/barato). " + NOTA_VOLUMEN_UN_PROVEEDOR;
 
+// ─── Formato y añada de la pregunta (batería del chat, caso t34, 18/11/2026) ─────────────────────
+//  «Precio del PSI 2023 75 cl»: el modelo manda producto «psi 2023» y el formato se quedaba fuera, así que la
+//  búsqueda sumaba la botella y el magnum («PSI Mgn. 2023», 63,70 €). El formato y la añada de la pregunta
+//  filtran el producto: la botella normal (75 cl) excluye magnum/jeroboam; una añada pegada al producto en la
+//  pregunta pasa a la búsqueda aunque el modelo la haya omitido.
+
+const normalizarPregunta = (v: string): string =>
+  v.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9,.\s]/g, " ").replace(/\s+/g, " ").trim();
+
+/** ¿La pregunta pide la botella normal (75 cl, 0,75 l, 750 ml, «no magnum»)? Si pide magnum o un formato grande, no. */
+export function pideBotellaNormal(pregunta?: string): boolean {
+  const p = normalizarPregunta(pregunta ?? "");
+  if (!p) return false;
+  const niMagnum = /\b(no|sin)\s+(el\s+)?(magnum|mgn)\b/.test(p);
+  if (!niMagnum && /\b(magnum|mgn|jeroboam|jerobo)\b|\b(1[,.]5|3|6)\s*(l|lt|lts|litros?)\b/.test(p)) return false;
+  return niMagnum || /\b75\s*cl\b|\b0[,.]75\s*(l|lt|lts|litros?)?\b|\b750\s*ml\b/.test(p);
+}
+
+/** Palabras a excluir: las del modelo más las de los formatos grandes cuando la pregunta es de la botella normal. */
+export function excluirPorFormato(excluirModelo: string | null, producto: string, pregunta?: string): string | null {
+  if (!pideBotellaNormal(pregunta)) return excluirModelo;
+  // Si el propio producto ya dice magnum (el modelo lo puso) no se excluye nada.
+  if (/\b(magnum|mgn|jeroboam)\b/.test(normalizarPregunta(producto))) return excluirModelo;
+  const grandes = "magnum mgn jeroboam jerobo";
+  return excluirModelo ? `${excluirModelo} ${grandes}` : grandes;
+}
+
+/**
+ * Añada («2023») que va pegada al producto en la pregunta y el modelo omitió: se añade a la búsqueda.
+ * Solo sin periodo (desde/hasta): «compras de PSI en 2023» es un periodo, no una añada.
+ */
+export function conAnada(producto: string, pregunta: string | undefined, hayPeriodo: boolean): string {
+  if (hayPeriodo || !pregunta || /\b(19[89]\d|20[0-3]\d)\b/.test(producto)) return producto;
+  const p = normalizarPregunta(pregunta);
+  const q = normalizarPregunta(producto);
+  if (!q) return producto;
+  const i = p.indexOf(q);
+  if (i < 0) return producto;
+  const m = p.slice(i + q.length).match(/^\s+(?:del\s+|de\s+)?((?:19[89]|20[0-3])\d)\b/);
+  return m ? `${producto} ${m[1]}` : producto;
+}
+
 /** compras_producto e historial_precios (sin pregunta de litro/kilo: esa va a volumen_comprado). */
 export const NOTA_RESPUESTA_PRECIO_COMPRA =
   "Primero el precio de la ULTIMA factura (ultima_factura: fecha, proveedor y numero); medias y otras compras, despues " +
@@ -981,13 +1023,13 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string, as
         tipo: "rpc",
         rpc: "compras_producto_agente",
         params: {
-          p_texto: producto,
+          p_texto: conAnada(producto, pregunta, desde !== null || hasta !== null),
           p_desde: desde,
           p_hasta: hasta,
           p_tipo: tipoDeProducto(args.tipo, pregunta),
           p_limite: LIMITES.compras_producto,
           p_orden: texto(args.orden),
-          p_excluir: texto(args.excluir),
+          p_excluir: excluirPorFormato(texto(args.excluir), producto, pregunta),
           ...opcionales({ p_unidad: texto(args.unidad), p_proveedor: texto(args.proveedor) }),
           // Tal como se compra: precio_comparable solo si hay formatos distintos.
           p_base: false,
