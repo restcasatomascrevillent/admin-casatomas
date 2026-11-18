@@ -14,7 +14,8 @@
 //  mismo prompt, modelo OCR_MODELO, relectura por cuadre, verificador de pie,
 //  contador, citas, deducción y normalización) y para guardar
 //  (guardarLecturaUnica → guardarDocumento: duplicado, embeddings, cabecera,
-//  líneas, validación de cordura y archivo en Drive o Storage). Lo único que
+//  líneas, validación de cordura y original a la copia temporal de Storage,
+//  que el cron facturas-originales-drive sube a Drive). Lo único que
 //  cambia es de dónde salen los bytes (base64 del panel o Storage) y que el
 //  trabajo deja `ocr_trabajo_id` en la factura (idempotencia de reintentos).
 //  Sin Deno.env: todo llega por parámetro (vitest y el banco local lo usan).
@@ -37,8 +38,8 @@ import {
 type Supa = any;
 
 /**
- * Pasos 4-9 para un documento de una página: el original va en base64 (Drive
- * si está configurado, Storage si no), una página, y en el camino de trabajos
+ * Pasos 4-9 para un documento de una página: el original va en base64 (a la
+ * copia temporal de Storage; Drive, después), una página, y en el camino de trabajos
  * el id del trabajo para que un reintento no cree otra factura. `costeLectura`:
  * el coste de leerlo, que se guarda en la misma escritura que las alertas.
  */
