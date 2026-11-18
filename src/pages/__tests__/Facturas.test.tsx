@@ -258,7 +258,7 @@ describe("Facturas · gasto de IA a la derecha de la barra de pestañas", () => 
     // El desglose de la pestaña IA es solo el del chatbot.
     expect(screen.getByText("Chatbot de facturas")).toBeInTheDocument();
     expect(screen.queryByText("Clasificación de productos")).not.toBeInTheDocument();
-    expect(screen.queryByText("Lectura de facturas (OCR)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Lectura de facturas")).not.toBeInTheDocument();
     expect(screen.getByText(/1 USD ≈ 0,92 EUR/)).toBeInTheDocument();
   });
 

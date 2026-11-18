@@ -114,7 +114,7 @@ describe("MonitorGastoIA", () => {
     const boton = screen.getByTestId("monitor-gasto-ia-ocr");
     expect(boton).toHaveTextContent("1,00 € · 4 documentos · 0,25 € por documento");
     fireEvent.click(boton);
-    expect(screen.getByText("Lectura de facturas (OCR)")).toBeInTheDocument();
+    expect(screen.getByText("Lectura de facturas")).toBeInTheDocument();
     expect(screen.getByText("Clasificación de productos")).toBeInTheDocument();
     expect(screen.queryByText("Chatbot de facturas")).not.toBeInTheDocument();
     expect(screen.getByText(/1 USD ≈ 0,92 EUR/)).toBeInTheDocument();

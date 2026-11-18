@@ -112,7 +112,7 @@ describe("camino de una página", () => {
     cola.enviar();
     await vuelta();
     const e = cola.getEstado().elementos[0];
-    expect(e.resultado).toMatchObject({ success: false, error: "Failed to fetch" });
+    expect(e.resultado).toMatchObject({ success: false, error: "Se ha cortado la conexión. Comprueba la red y pulsa «Reintentar»." });
     expect(cola.reintentar()).toBe(1);
     await vuelta();
     expect(cola.getEstado().elementos[0].resultado?.success).toBe(true);

@@ -14,7 +14,8 @@
 // ============================================================================
 import type { AcumuladorUso, UsageBruto } from "../_shared/registrar-uso-ia.ts";
 import { esErrorDeModelo } from "../_shared/modelo-funcion.ts";
-import { resumenParaModelo, tablaPresupuesto } from "./tabla.ts";
+import { resumenParaModelo, tablaPresupuesto, verDePregunta } from "./tabla.ts";
+import { ayudaDeResultado, unirAyuda, type AyudaPanel } from "./hilo.ts";
 import {
   type Adjunto,
   type DocRef,
@@ -150,6 +151,8 @@ export interface ResultadoBucle {
   sinRespuesta: boolean;
   /** Todas las consultas volvieron sin datos (un «no hay»): el panel anima a decir si debería haberlos. */
   sinDatos: boolean;
+  /** Nombres parecidos y fecha de los datos, para los botones y el pie del panel (18/11/2026). */
+  ayuda: AyudaPanel;
 }
 
 /** Estado por peticion: deadline compartido y memo de embeddings. */
@@ -397,9 +400,9 @@ interface ResultadoTool {
  */
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function prepararPresupuesto(data: any): { tabla: string; paraModelo: unknown } | null {
+export function prepararPresupuesto(data: any, ver?: unknown): { tabla: string; paraModelo: unknown } | null {
   if (!data || typeof data !== "object" || Array.isArray(data) || data.error) return null;
-  return { tabla: tablaPresupuesto(data), paraModelo: resumenParaModelo(data) };
+  return { tabla: tablaPresupuesto(data, ver), paraModelo: resumenParaModelo(data) };
 }
 
 /** Documentos (con enlace al original) para los ids dados. Best-effort: si falla, sin referencias. */
@@ -587,7 +590,7 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
     if (vino && data && typeof data === "object" && !Array.isArray(data)) data = { vino_carta: vino, ...(data as Record<string, unknown>) };
 
     if (nombre === "comparar_presupuesto") {
-      const p = prepararPresupuesto(data);
+      const p = prepararPresupuesto(data, args?.ver ?? verDePregunta(ctx.pregunta));
       if (p) return { fallo: false, tabla: p.tabla, contenido: JSON.stringify(p.paraModelo) };
     }
 
@@ -729,6 +732,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   const referenciasAcum: DocRef[][] = [];
   let tablaPresupuestoFinal: string | null = null;
   const nombradosAcum: DocNombrado[] = [];
+  const ayudaAcum: AyudaPanel[] = [];
   const apuntar = (h: HerramientaEjecutada, error?: string, resumen?: ResumenResultado) => {
     o.alEjecutarHerramienta?.(h);
     o.traza?.herramientas.push({
@@ -798,6 +802,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
           textoError || undefined,
           textoError ? undefined : resumenDeResultado(r.contenido),
         );
+        if (!r.fallo && !textoError) ayudaAcum.push(ayudaDeResultado(r.contenido));
         if (r.fallo) huboFalloDeHerramienta = true;
         else if (!textoError) { if (resultadoVacio(r.contenido)) consultasVacias++; else consultasConDatos++; }
         if (r.adjunto) adjuntos.push(r.adjunto);
@@ -837,7 +842,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
     // El modelo agoto los pasos sin redactar. Mejor decirlo que devolver vacio.
     sinRespuesta = true;
     respuesta = huboFalloDeHerramienta
-      ? "No he podido consultar los datos de facturas en este momento. Vuelve a intentarlo en unos segundos."
+      ? "No he podido consultar las facturas: la consulta ha tardado demasiado o no estaba disponible. Pulsa «Reintentar» y la vuelvo a lanzar."
       : "No he conseguido resolver la consulta. Prueba a preguntarlo de forma mas concreta, por ejemplo indicando un proveedor, un numero de documento o un mes.";
   }
 
@@ -847,5 +852,5 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   const refs = unirReferencias([citados, ...referenciasAcum]);
   if (refs.length > 0 && respuesta.trim()) adjuntos.push({ tipo: "documentos", datos: refs });
 
-  return { respuesta, adjuntos, modelo, huboFalloDeHerramienta, sinRespuesta, sinDatos: consultasVacias > 0 && consultasConDatos === 0 };
+  return { respuesta, adjuntos, modelo, huboFalloDeHerramienta, sinRespuesta, sinDatos: consultasVacias > 0 && consultasConDatos === 0, ayuda: unirAyuda(ayudaAcum) };
 }
