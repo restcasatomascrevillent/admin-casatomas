@@ -269,3 +269,13 @@ export function textoErrorChat(error: string | null | undefined): string {
   if (/network|failed to fetch|fetch failed|conexi[oó]n|offline/i.test(e)) return "Se ha cortado la conexión. Comprueba la red y pulsa «Reintentar».";
   return "Ha habido un problema del servicio. Pulsa «Reintentar»; si vuelve a fallar, avisa a quien lleve el panel.";
 }
+
+/**
+ * Error del tablero: «falta aplicar la migración …» (útil para quien administra: dice qué hacer, sin jerga; «…falta aplicar la migración 2026…_nombre») y «timeout» se
+ * enseñan tal cual; el resto, el texto genérico del chat.
+ */
+export function textoErrorTablero(error: string | null | undefined): string {
+  const e = (error ?? "").trim();
+  if (e.length <= 200 && (/falta aplicar la migraci[oó]n \d{10,14}_[a-z0-9_]+\.?$/i.test(e) || /^timeout$/i.test(e))) return e;
+  return textoErrorChat(e);
+}

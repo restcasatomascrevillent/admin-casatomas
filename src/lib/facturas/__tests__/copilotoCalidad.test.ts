@@ -6,6 +6,7 @@ import {
   pasosSiguientes,
   pieDeDatos,
   textoErrorChat,
+  textoErrorTablero,
   textoErrorSubida,
   textoProgreso,
   textoSegundos,
@@ -143,5 +144,14 @@ describe("F3: lista blanca (texto genérico por defecto, nunca el mensaje de má
     expect(textoErrorChat("OpenAI chat 429: rate limit")).toMatch(/saturado/);
     expect(textoErrorChat("canceling statement due to statement timeout")).toMatch(/tardado/);
     expect(textoErrorChat("Failed to fetch")).toMatch(/conexión/);
+  });
+});
+
+describe("textoErrorTablero", () => {
+  it("enseña el aviso de migración y «timeout»; el resto, genérico", () => {
+    const m = "El tablero aún no está activado en esta base de datos: falta aplicar la migración 20261105150500_tablero_compras.";
+    expect(textoErrorTablero(m)).toBe(m);
+    expect(textoErrorTablero("timeout")).toBe("timeout");
+    expect(textoErrorTablero("permission denied for table facturas")).toMatch(/Reintentar/);
   });
 });
