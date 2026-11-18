@@ -4008,6 +4008,7 @@ export type Database = {
           id: number
           importe_bruto: number | null
           importe_bruto_estimado: boolean
+          importe_neto: number | null
           iva_pct: number | null
           nombre: string
           nombre_normalizado: string | null
@@ -4032,6 +4033,7 @@ export type Database = {
           id?: number
           importe_bruto?: number | null
           importe_bruto_estimado?: boolean
+          importe_neto?: number | null
           iva_pct?: number | null
           nombre: string
           nombre_normalizado?: string | null
@@ -4056,6 +4058,7 @@ export type Database = {
           id?: number
           importe_bruto?: number | null
           importe_bruto_estimado?: boolean
+          importe_neto?: number | null
           iva_pct?: number | null
           nombre?: string
           nombre_normalizado?: string | null
@@ -6344,6 +6347,7 @@ export type Database = {
           compras: number
           documentos: number
           gasto: number
+          gasto_impreso: number
           lineas_sin_importe: number
           nombre: string
           origen: string
@@ -6351,6 +6355,7 @@ export type Database = {
           proveedores: string[]
           ultima_fecha: string | null
           ultimo_precio: number | null
+          ultimo_precio_impreso: number | null
           unidad_habitual: string | null
         }[]
       }
