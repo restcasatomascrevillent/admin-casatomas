@@ -373,10 +373,11 @@ async function consolidarUnico(ctx: ContextoGuardado, trabajo: any, f: any): Pro
     b64 = "";
   }
   const fichero: FicheroUnico = { b64, mime: f.mime ?? trabajo.original_mime ?? "image/jpeg", nombre: trabajo.nombre_original };
-  const g = await guardarLecturaUnica(ctx, listo, fichero, trabajo.id);
-
   // Coste de leer el documento: lo que sumaron las piezas + los embeddings de esta consolidación.
-  const lectura = sumarCostes(await leerCosteTrabajo(supabase, trabajo.id), costeDeCliente(ctx.openai.uso, null));
+  // Se guarda en la misma escritura que las alertas y el original (guardarDocumento).
+  const costeLectura = async () => sumarCostes(await leerCosteTrabajo(supabase, trabajo.id), costeDeCliente(ctx.openai.uso, null));
+  const g = await guardarLecturaUnica(ctx, listo, fichero, trabajo.id, costeLectura);
+  const lectura = g.estado === "guardado" && g.coste ? g.coste : await costeLectura();
   const comun = {
     paginas: [{
       numero: 1, pieza: "pagina", franja: null, estado: f.estado, lineas: f.filas_extraidas, contadas: f.filas_contadas,
@@ -387,7 +388,7 @@ async function consolidarUnico(ctx: ContextoGuardado, trabajo: any, f: any): Pro
   };
 
   if (g.estado === "guardado") {
-    await guardarCosteLectura(supabase, g.facturaId, lectura);
+    if (!g.coste) await guardarCosteLectura(supabase, g.facturaId, lectura);
     let respuesta = g.respuesta;
     // La copia de pendientes/ la borra terminar() (limpiarPendientesTrabajo)
     // salvo que la factura tenga que apuntar a ella:
@@ -471,11 +472,15 @@ export async function procesarConsolidacion(ctx: ContextoGuardado, trabajo: any)
         mime: piezasArchivo[0]?.mime ?? mimeDeNombre(piezasArchivo[0]?.storage_path ?? ""),
         nombre: nombrePieza(trabajo.nombre_original, piezasArchivo[0], piezasArchivo.length),
       };
+    // Coste de leer el documento (piezas + embeddings de esta consolidación): va en la
+    // misma escritura que las alertas y el original.
+    const costeLectura = async () => sumarCostes(await leerCosteTrabajo(supabase, trabajo.id), costeDeCliente(ctx.openai.uso, null));
     const g = await guardarDocumento(ctx, {
       ...listo,
       original,
       paginas: c.paginasDocumento,
       ocrTrabajoId: trabajo.id,
+      costeLectura,
     });
     if (g.estado === "guardado" && !trabajo.original_path && piezasArchivo.length > 1) {
       await archivarPiezasExtra(ctx, g.facturaId, listo.datos, trabajo.nombre_original, piezasArchivo.slice(1), piezasArchivo.length);
@@ -492,11 +497,11 @@ export async function procesarConsolidacion(ctx: ContextoGuardado, trabajo: any)
       relecturas: f.relecturas,
       duracion_ms: f.duracion_ms,
     }));
-    const lectura = sumarCostes(await leerCosteTrabajo(supabase, trabajo.id), costeDeCliente(ctx.openai.uso, null));
+    const lectura = g.estado === "guardado" && g.coste ? g.coste : await costeLectura();
     const comun = { paginas: infoPaginas, consolidacion: c.stats, coste_usd: lectura.usd, modelo: lectura.modelo };
 
     if (g.estado === "guardado") {
-      await guardarCosteLectura(supabase, g.facturaId, lectura);
+      if (!g.coste) await guardarCosteLectura(supabase, g.facturaId, lectura);
       await terminar(supabase, trabajo.id, "completado", { ...g.respuesta, ...comun }, g.facturaId, null, null);
     } else {
       const pendiente: DocumentoPendiente | null = g.existente

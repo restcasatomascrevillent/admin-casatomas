@@ -25,6 +25,8 @@ import {
 } from "./archivo.ts";
 import { decidirCoincidencia, leerPagina, type PaginaDocumento } from "./paginasDocumento.ts";
 import { esOtraFacturaConNumeroDistinto } from "./reglasCarga.ts";
+import { columnasCoste, type CosteLectura, faltanColumnasCoste } from "./costeLectura.ts";
+import { conReintentoPorTiempo, esCortePorTiempo, type OpcionesReintento } from "../_shared/reintento-bd.ts";
 
 // deno-lint-ignore no-explicit-any
 type Supa = any;
@@ -57,6 +59,13 @@ export interface EntradaGuardado {
   documentoCompleto?: boolean;
   /** Columnas extra de la cabecera, en el MISMO insert (importación: local, import_clave). */
   cabeceraExtra?: Record<string, unknown>;
+  /**
+   * Coste de leer el documento (facturas.coste_lectura_usd…). Se pide al
+   * final, cuando este guardado ya no hace más llamadas a OpenAI, y va en la
+   * MISMA escritura que las alertas y el original (18/11/2026). Si falla, la
+   * factura se guarda igual, sin coste.
+   */
+  costeLectura?: () => CosteLectura | Promise<CosteLectura>;
 }
 
 /** Resumen de la factura que ya existe (ocr_factura_existente). */
@@ -122,7 +131,8 @@ export interface RespuestaProcesado {
 }
 
 export type ResultadoGuardado =
-  | { estado: "guardado"; facturaId: number; respuesta: RespuestaProcesado }
+  /** `coste`: el que se mandó con la escritura final (null = no llegó `costeLectura` o falló). */
+  | { estado: "guardado"; facturaId: number; respuesta: RespuestaProcesado; coste?: CosteLectura | null }
   | { estado: "duplicado"; existente: ResumenExistente | null; respuesta: RespuestaProcesado };
 
 const COLUMNAS_04B = /\b(paginas|ocr_trabajo_id|pagina|orden|albaran_ref)\b/;
@@ -295,27 +305,95 @@ export function faltaColumnaIvaPct(msg: string | undefined | null): boolean {
   return !!msg && /iva_pct/i.test(msg) && /column|columna|schema cache/i.test(msg);
 }
 
-/** Mezcla alertas pre-guardado con las de validar_cordura_factura (manda SQL por código). */
-export async function validarYGuardarAlertas(
+/**
+ * Mezcla alertas pre-guardado con las de validar_cordura_factura (manda SQL
+ * por código). Solo lee; nunca lanza (si la RPC falla, quedan las previas).
+ */
+export async function calcularAlertas(
   supabase: Supa,
   facturaId: number,
   previas: Alerta[],
   extrasTotal = 0,
 ): Promise<Alerta[]> {
-  let alertas: Alerta[] = [];
   try {
     const { data, error } = await supabase.rpc("validar_cordura_factura", { p_factura_id: facturaId });
     if (error) throw new Error(error.message);
     const sql = quitarIvaExplicadoPorExtras(Array.isArray(data) ? data : [], extrasTotal);
     const codigosSql = new Set(sql.map((a: Alerta) => a?.codigo));
-    alertas = [...sql, ...previas.filter((a) => !codigosSql.has(a?.codigo))];
+    return [...sql, ...previas.filter((a) => !codigosSql.has(a?.codigo))];
   } catch (e) {
     console.error("[validacion] Error validando importes:", e);
-    alertas = previas;
+    return previas;
   }
-  const { error: updErr } = await supabase.from("facturas")
-    .update({ alertas_validacion: alertas.length > 0 ? alertas : null }).eq("id", facturaId);
-  if (updErr) console.error("[validacion] No se pudieron guardar las alertas:", updErr.message);
+}
+
+/**
+ * Columna de las alertas (null si no hay). Escribirla dispara
+ * trg_facturas_autoverificar (AFTER UPDATE OF alertas_validacion, …): salta
+ * siempre que la columna vaya en el UPDATE, aunque vaya con otras.
+ */
+export function columnasAlertas(alertas: Alerta[]): { alertas_validacion: Alerta[] | null } {
+  return { alertas_validacion: alertas.length > 0 ? alertas : null };
+}
+
+export interface OpcionesEscritura {
+  /** Reintento ante un corte por tiempo (por defecto a los 3 s y a los 8 s; _shared/reintento-bd.ts). */
+  reintento?: OpcionesReintento;
+}
+
+/**
+ * UNA escritura (UPDATE) de varias columnas de la factura. Cada UPDATE de
+ * `facturas` deja su fila de auditoría (con la fila entera, embedding
+ * incluido) y reescribe los índices parciales: con la base cargada costaba
+ * 1-3 s cada uno (18/11/2026), así que se juntan. Si la base la corta por
+ * tiempo (57014/55P03) se repite a los 3 s y a los 8 s: Postgres deshizo la
+ * anterior y los valores son los mismos. Si faltan las columnas del coste
+ * (migración 20261010120000 sin aplicar), se repite sin ellas. Nunca lanza:
+ * devuelve el error final (o null).
+ */
+export async function escribirFactura(
+  supabase: Supa,
+  facturaId: number,
+  cambios: Record<string, unknown>,
+  opciones: OpcionesEscritura = {},
+): Promise<{ error: string | null }> {
+  const escribir = (c: Record<string, unknown>) =>
+    conReintentoPorTiempo(() => supabase.from("facturas").update(c).eq("id", facturaId), {
+      alReintentar: (n, ms, e) =>
+        console.warn(`[guardado] factura ${facturaId}: escritura cortada por tiempo (${e.message}); reintento ${n} en ${ms / 1000} s`),
+      ...opciones.reintento,
+    });
+  try {
+    let { error } = await escribir(cambios);
+    if (error && "coste_lectura_usd" in cambios && faltanColumnasCoste(error.message)) {
+      console.warn("[coste-lectura] faltan las columnas del coste (¿migración sin aplicar?); se guarda sin él:", error.message);
+      const { coste_lectura_usd: _u, lectura_llamadas: _l, lectura_modelo: _m, ...resto } = cambios;
+      ({ error } = await escribir(resto));
+    }
+    return { error: error ? (error.message ?? String(error)) : null };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * Calcula las alertas y las guarda; `extra` son otras columnas de la factura
+ * que van en la MISMA escritura (p. ej. el coste de leerla). Esa escritura
+ * dispara la autoverificación: si la base la corta por tiempo, se reintenta
+ * (18/11/2026: las facturas 5167 y 5177 se quedaron sin autoverificar porque
+ * este UPDATE se cortó y solo se apuntó en el log).
+ */
+export async function validarYGuardarAlertas(
+  supabase: Supa,
+  facturaId: number,
+  previas: Alerta[],
+  extrasTotal = 0,
+  extra: Record<string, unknown> = {},
+  opciones: OpcionesEscritura = {},
+): Promise<Alerta[]> {
+  const alertas = await calcularAlertas(supabase, facturaId, previas, extrasTotal);
+  const { error } = await escribirFactura(supabase, facturaId, { ...columnasAlertas(alertas), ...extra }, opciones);
+  if (error) console.error(`[validacion] No se pudieron guardar las alertas de la factura ${facturaId}:`, error);
   return alertas;
 }
 
@@ -336,34 +414,40 @@ export function quitarIvaExplicadoPorExtras(alertas: Alerta[], extrasTotal: numb
 /**
  * Guarda en la factura dónde quedó su original (drive_url, o archivo_path
  * temporal + «pendiente de Drive») y devuelve lo que se cuenta al panel.
+ * `extra`: otras columnas de la factura que van en la MISMA escritura (al
+ * guardar: alertas y coste, 18/11/2026); si no hay original que apuntar, se
+ * escriben solas.
  */
 export async function apuntarOriginal(
   supabase: Supa,
   facturaId: number,
   a: ResultadoArchivo,
-  opciones: { esperaMs?: number } = {},
+  opciones: { esperaMs?: number; extra?: Record<string, unknown>; reintento?: OpcionesReintento } = {},
 ): Promise<{ ok: boolean; error: string | null; estado: EstadoArchivo }> {
+  const extra = opciones.extra ?? {};
   if (a.drive_url || a.archivo_path) {
     // QA 05/11/2026 (S-7): si el UPDATE falla, la factura NO apunta a su
     // original aunque esté en Drive. Se reintenta (un corte puntual) en vez
     // de volver a subir otra copia, y si no hay manera se devuelve el error.
-    const cambios = a.drive_url ? { drive_url: a.drive_url, archivo_path: null } : { archivo_path: a.archivo_path };
+    // Un corte por tiempo ya lo reintenta escribirFactura (3 s y 8 s).
+    const cambios = { ...extra, ...(a.drive_url ? { drive_url: a.drive_url, archivo_path: null } : { archivo_path: a.archivo_path }) };
     let ultimo: string | null = null;
     for (let intento = 0; intento < 3; intento++) {
       if (intento > 0) await new Promise((r) => setTimeout(r, (opciones.esperaMs ?? 500) * intento));
-      const { error } = await supabase.from("facturas").update(cambios).eq("id", facturaId);
-      if (!error) {
-        ultimo = null;
-        break;
-      }
-      ultimo = error.message ?? String(error);
+      ({ error: ultimo } = await escribirFactura(supabase, facturaId, cambios, { reintento: opciones.reintento }));
+      if (!ultimo) break;
       console.error(`[archivo] No se pudo guardar la referencia al original de la factura ${facturaId} (intento ${intento + 1}):`, ultimo);
+      if (esCortePorTiempo({ message: ultimo })) break;
     }
     if (ultimo) {
       const donde = a.drive_url ? `está en Drive: ${a.drive_url}` : `copia temporal en ${a.archivo_path}`;
-      console.error(`[archivo] PERDIDA DE LA REFERENCIA AL ORIGINAL de la factura ${facturaId} (${donde})`);
+      const tambien = Object.keys(extra).length > 0 ? ` (tampoco se guardaron: ${Object.keys(extra).join(", ")})` : "";
+      console.error(`[archivo] PERDIDA DE LA REFERENCIA AL ORIGINAL de la factura ${facturaId} (${donde})${tambien}`);
       return { ok: false, estado: "perdido", error: `no se pudo apuntar el original en la factura (${ultimo}); ${donde}` };
     }
+  } else if (Object.keys(extra).length > 0) {
+    const { error } = await escribirFactura(supabase, facturaId, extra, { reintento: opciones.reintento });
+    if (error) console.error(`[guardado] factura ${facturaId}: no se guardaron ${Object.keys(extra).join(", ")}:`, error);
   }
   if (!a.drive_url && a.archivo_path) await marcarPendienteDrive(supabase, facturaId, a.drive_error);
   return {
@@ -543,18 +627,29 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     // 7) Líneas
     await insertarLineas(ctx, facturaId, d, conColumnas04b);
 
-    // 8) Validación de cordura
-    const alertas = await validarYGuardarAlertas(supabase, facturaId, alertasPrevias, d.extras_total ?? 0);
+    // 8) Validación de cordura y coste de leer el documento, a la vez (solo
+    //    leen): se guardan en la escritura del paso 9.
+    const [alertas, coste] = await Promise.all([
+      calcularAlertas(supabase, facturaId, alertasPrevias, d.extras_total ?? 0),
+      costeDeEntrada(e),
+    ]);
 
     // 9) Original: a Drive (carpeta del proveedor → mes). Storage solo como
     //    copia TEMPORAL si Drive falla (el cron facturas-originales-drive la
-    //    sube después y la borra).
-    const archivo = await archivarYApuntar(ctx, e, facturaId);
+    //    sube después y la borra). Después, UNA escritura en la factura:
+    //    alertas (dispara la autoverificación), dónde está el original y coste.
+    //    Antes eran tres UPDATE seguidos de la misma fila (18/11/2026: ~8 s).
+    const archivo = await archivarYApuntar(ctx, e, facturaId, columnasFinales(alertas, coste));
 
     console.log(
       `[procesar-factura] OK ${d.tipo} ${d.numero_documento} · ${d.productos.length} productos · alertas: ${alertas.length}`,
     );
-    return { estado: "guardado", facturaId, respuesta: respuestaExito(d, e.original.nombre, facturaId, alertas, e.totalOrigen, archivo) };
+    return {
+      estado: "guardado",
+      facturaId,
+      coste,
+      respuesta: respuestaExito(d, e.original.nombre, facturaId, alertas, e.totalOrigen, archivo),
+    };
   } catch (err) {
     await compensarFacturaHuerfana(supabase, facturaId, err);
     throw err;
@@ -594,16 +689,37 @@ async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: Datos
   if (error) throw new Error(`insert productos: ${error.message}`);
 }
 
-/** Paso 9: el original a Drive (o copia temporal) y la referencia en la factura. */
+/** Coste que manda quien guarda (o null). Nunca lanza. */
+async function costeDeEntrada(e: EntradaGuardado): Promise<CosteLectura | null> {
+  if (!e.costeLectura) return null;
+  try {
+    return await e.costeLectura();
+  } catch (err) {
+    console.warn("[coste-lectura] no se pudo calcular el coste de leer el documento; se guarda sin él:", err);
+    return null;
+  }
+}
+
+/** Lo que va en la escritura final de la factura junto al original: alertas y (si lo hay) coste. */
+function columnasFinales(alertas: Alerta[], coste: CosteLectura | null): Record<string, unknown> {
+  return { ...columnasAlertas(alertas), ...(coste ? columnasCoste(coste) : {}) };
+}
+
+/**
+ * Paso 9: el original a Drive (o copia temporal) y la referencia en la
+ * factura, con `extra` (alertas, coste) en la MISMA escritura.
+ */
 async function archivarYApuntar(
   ctx: ContextoGuardado,
   e: EntradaGuardado,
   facturaId: number,
+  extra: Record<string, unknown> = {},
 ): Promise<{ ok: boolean; error: string | null; estado: EstadoArchivo }> {
   const { supabase } = ctx;
   const d = e.datos;
   if (e.original.tipo === "base64" && !e.original.b64) {
-    return { ok: false, estado: "perdido", error: "el original ya no estaba disponible para archivarlo" };
+    const sinOriginal = { drive_url: null, archivo_path: null, error: "el original ya no estaba disponible para archivarlo", drive_error: null };
+    return await apuntarOriginal(supabase, facturaId, sinOriginal, { extra });
   }
   const proveedorCarpeta = driveActivo(ctx.drive) ? await nombreProveedorFactura(supabase, facturaId, d.proveedor) : null;
   const a: ResultadoArchivo = e.original.tipo === "base64"
@@ -613,7 +729,7 @@ async function archivarYApuntar(
     : await archivarDesdeStorage(
       ctx.drive, supabase, e.original.path, e.original.nombre, e.original.mime, d.fecha, facturaId, proveedorCarpeta,
     );
-  return await apuntarOriginal(supabase, facturaId, a);
+  return await apuntarOriginal(supabase, facturaId, a, { extra });
 }
 
 /**
@@ -641,17 +757,24 @@ async function completarGuardada(
       await insertarLineas(ctx, ya.id, d, true);
     }
   }
-  const alertas = await validarYGuardarAlertas(supabase, ya.id, e.alertasPrevias);
+  // Alertas y coste en UNA escritura (con el original, si hay que archivarlo).
+  const [alertas, coste] = await Promise.all([calcularAlertas(supabase, ya.id, e.alertasPrevias), costeDeEntrada(e)]);
+  const extra = columnasFinales(alertas, coste);
   let archivo: { ok: boolean; error: string | null; estado: EstadoArchivo };
-  if (ya.drive_url) archivo = { ok: true, error: null, estado: "drive" };
-  else if (ya.archivo_path) archivo = { ok: true, error: "original pendiente de subir a Drive", estado: "temporal" };
-  else {
+  if (ya.drive_url || ya.archivo_path) {
+    const { error } = await escribirFactura(supabase, ya.id, extra);
+    if (error) console.error(`[validacion] No se pudieron guardar las alertas de la factura ${ya.id}:`, error);
+    archivo = ya.drive_url
+      ? { ok: true, error: null, estado: "drive" }
+      : { ok: true, error: "original pendiente de subir a Drive", estado: "temporal" };
+  } else {
     console.warn(`[procesar-factura] factura ${ya.id} sin original tras un corte: se archiva ahora`);
-    archivo = await archivarYApuntar(ctx, e, ya.id);
+    archivo = await archivarYApuntar(ctx, e, ya.id, extra);
   }
   return {
     estado: "guardado",
     facturaId: ya.id,
+    coste,
     respuesta: respuestaExito(d, e.original.nombre, ya.id, alertas, e.totalOrigen, archivo),
   };
 }
@@ -929,7 +1052,8 @@ export async function anadirPagina(
     llamadas: fa?.lectura_llamadas === null || fa?.lectura_llamadas === undefined ? null : Number(fa.lectura_llamadas),
     modelo: fa?.lectura_modelo ?? null,
   };
-  await guardarCosteLectura(supabase, a.facturaId, sumarCostes(previo, lectura));
+  // Se guarda con los avisos, en UNA escritura (antes, dos UPDATE seguidos de la misma factura).
+  const costeTotal = sumarCostes(previo, lectura);
 
   // Avisos: los que ya tenía (menos «página suelta») + los de la página nueva;
   // si siguen faltando páginas, el aviso vuelve con lo que falta.
@@ -945,7 +1069,7 @@ export async function anadirPagina(
       mensaje: `Faltan la${faltan.length > 1 ? "s" : ""} página${faltan.length > 1 ? "s" : ""} ${faltan.join(", ")} de ${pag.total}.`,
     });
   }
-  const alertas = await validarYGuardarAlertas(supabase, a.facturaId, previas);
+  const alertas = await validarYGuardarAlertas(supabase, a.facturaId, previas, 0, columnasCoste(costeTotal));
   console.log(
     `[procesar-factura] PÁGINA ${pag.actual}/${pag.total} añadida a la factura ${a.facturaId}: ` +
       `${res?.lineas_antes} + ${res?.lineas_anadidas} líneas; total ${res?.total}`,

@@ -203,9 +203,10 @@ describe("QA Cargar · servidor (arreglado)", () => {
         ? { data: null, error: { message: "canceling statement due to statement timeout" } }
         : { data: null, error: null }
     );
+    // Un corte por tiempo se reintenta a los 3 s y a los 8 s (escribirFactura, 18/11/2026): aquí sin esperar.
     const r = await apuntarOriginal(f.supabase, 101, {
       drive_url: URL_DRIVE, archivo_path: null, error: null, drive_error: null,
-    }, { esperaMs: 0 });
+    }, { esperaMs: 0, reintento: { dormir: async () => {} } });
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/statement timeout/);
     expect(r.error).toContain(URL_DRIVE); // el enlace no se pierde: queda en el error/log
