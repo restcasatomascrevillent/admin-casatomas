@@ -5,7 +5,7 @@ import { normalizarAdjuntos, type AdjuntoChat } from "@/lib/facturas/seriePrecio
 import { componerMensaje } from "@/lib/facturas/graficasCopiloto";
 import { archivoABase64, problemaConPresupuesto } from "@/lib/facturas/presupuestoAdjunto";
 import { registrarFalloInterno } from "@/lib/facturas/fallosInternos";
-import { normalizarAyuda, type AyudaRespuesta } from "@/lib/facturas/copilotoCalidad";
+import { normalizarAyuda, textoErrorChat, type AyudaRespuesta } from "@/lib/facturas/copilotoCalidad";
 
 // ─── Tipos alineados con las tablas reales de Supabase ───────────────────────
 // Tablas: chat_facturas_conversaciones, chat_facturas_mensajes
@@ -298,7 +298,7 @@ export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
       toast.error("El mensaje no se ha guardado", {
         description:
           "La respuesta se muestra aqui, pero no quedara en el historial ni el asistente la recordara. " +
-          (error.message || "Error desconocido"),
+          textoErrorChat(error.message),
       });
       return null;
     }
