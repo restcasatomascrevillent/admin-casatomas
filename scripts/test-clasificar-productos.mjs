@@ -3,13 +3,16 @@
 //
 //   npm run test:clasificar-productos:db
 //
-// Cubre la migración REAL 20261208100000 (aplicada dos veces) y su rollback:
+// Cubre las migraciones REALES 20261208100000 y 20261212600000 (cada una
+// aplicada dos veces) y sus rollbacks:
 //   - productos_asignar_por_alias: tandas, tope de tiempo, «quedan», no pisa
 //     líneas con producto, solo service_role.
 //   - productos_aplicar_clasificacion_ia: crea productos y alias, asigna SOLO
 //     las líneas de sus textos y un alias que ya existe manda.
 //   - productos_despachar_clasificacion: asigna sin IA lo que ya tiene alias y
 //     solo llama a la función si queda algo sin alias.
+//   - 20261212600000: la RPC asigna con 1,5 s de tope y tandas de 50 (antes 4 s
+//     y 150), con el mismo resultado; su rollback devuelve la versión anterior.
 // net.http_post y Vault son stubs que apuntan las llamadas.
 import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
@@ -17,6 +20,8 @@ import assert from "node:assert/strict";
 
 const MIGRACION = await readFile("supabase/migrations/20261208100000_clasificar_productos_por_tandas.sql", "utf8");
 const ROLLBACK = await readFile("supabase/rollbacks/20261208100000_clasificar_productos_por_tandas_ROLLBACK.sql", "utf8");
+const MARGEN = await readFile("supabase/migrations/20261212600000_clasificar_productos_mas_margen.sql", "utf8");
+const ROLLBACK_MARGEN = await readFile("supabase/rollbacks/20261212600000_clasificar_productos_mas_margen_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
@@ -70,6 +75,10 @@ const idDe = async (nombre) => Number((await uno(`select id from public.producto
 
 await db.exec(MIGRACION);
 await db.exec(MIGRACION); // idempotente
+await db.exec(MARGEN);
+await db.exec(MARGEN); // idempotente
+const defRpc = async () => (await uno(`select pg_get_functiondef('public.productos_aplicar_clasificacion_ia(jsonb)'::regprocedure) d`)).d;
+ok((await defRpc()).includes("productos_asignar_por_alias(v_todos, 1500, 50)"), "20261212600000: la RPC asigna con 1,5 s de tope y tandas de 50");
 
 const merluza = await idDe("Merluza");
 const gamba = await idDe("Gamba roja");
@@ -161,6 +170,16 @@ await limpiar();
 await lineas("recien llegada", 1, 0);
 r = Number((await uno(`select public.productos_despachar_clasificacion() r`)).r);
 ok(r === 0, "una línea de hace menos de un minuto aún no dispara la función");
+
+// ─── Rollback de 20261212600000 (vuelve a 4 s y tandas de 150) ───────────────
+await db.exec(ROLLBACK_MARGEN);
+ok((await defRpc()).includes("productos_asignar_por_alias(v_todos, 4000)"), "el rollback de 20261212600000 devuelve el tope de 4 s");
+await limpiar();
+await lineas("rape cola", 2);
+r = (await uno(`select public.productos_aplicar_clasificacion_ia($1::jsonb) r`, [JSON.stringify([items[0]])])).r;
+igual(r, { productos_creados: 1, alias_creados: 1, lineas_asignadas: 2, lineas_pendientes: false }, "tras ese rollback la RPC sigue funcionando igual");
+await db.exec(MARGEN);
+ok((await defRpc()).includes("productos_asignar_por_alias(v_todos, 1500, 50)"), "y 20261212600000 se puede volver a aplicar");
 
 // ─── Rollback ────────────────────────────────────────────────────────────────
 await db.exec(ROLLBACK);
