@@ -2,6 +2,29 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.45.0] - 2026-11-18
+
+Objetivo: Revisión de descuentos, promociones y regalos de las compras: cada descuento rebaja su producto (precios, márgenes, carta de vinos, Análisis y copiloto con el precio real), los regalos quedan marcados y la IA de clasificación ya no mete líneas ajenas en «Mostaza»
+
+### Añadido
+- Facturas: cada descuento se asocia al producto que descuenta ([1003db8](https://github.com/restcasatomascrevillent/admin-casatomas/commit/1003db82bcc08fd77db30d290327dead9afdb9c3))
+- Facturas: precios, costes y márgenes con los descuentos asociados ([f0a8c6d](https://github.com/restcasatomascrevillent/admin-casatomas/commit/f0a8c6d29f72ba56c698877d3a7ad0d9a925be2f))
+- Facturas: los regalos quedan marcados y los descuentos en positivo se asocian ([16d0d2b](https://github.com/restcasatomascrevillent/admin-casatomas/commit/16d0d2bafd2dc34d6e1a049967491fc1e8545880))
+
+### Cambiado
+- Facturas: la IA de clasificación ya no mete líneas ajenas en el producto 11 ([03f1758](https://github.com/restcasatomascrevillent/admin-casatomas/commit/03f17587dedd5b19c7336f708252cefdfeb2e90b))
+- Facturas: también son regalo las líneas sin importe del mismo producto pagado (Osborne) ([ef1c944](https://github.com/restcasatomascrevillent/admin-casatomas/commit/ef1c9446311d9e39848b4b48416f38cdfa95aca4))
+
+### Otros
+- Facturas: la prueba PGlite de la reparación se lanza con node, sin tocar package.json ([f45a3eb](https://github.com/restcasatomascrevillent/admin-casatomas/commit/f45a3ebe27f9f16149cc598ab6f909b09930aee3))
+- Facturas: arranca la revisión de descuentos, promociones y regalos ([afc889e](https://github.com/restcasatomascrevillent/admin-casatomas/commit/afc889e7238eefd40b7ba6dbe3157bf05d1b2ae3))
+- Facturas: hallazgos provisionales de la revisión de descuentos ([912d37b](https://github.com/restcasatomascrevillent/admin-casatomas/commit/912d37bfee37c2f29bcb249efd8bf042ca4aa32e))
+- Facturas: más hallazgos de la revisión de descuentos ([6c4a2ae](https://github.com/restcasatomascrevillent/admin-casatomas/commit/6c4a2ae38448aa42d90403d074f2c6c2bddaa0e3))
+- Facturas: informe de la revisión de descuentos, promociones y regalos ([d0cfb9b](https://github.com/restcasatomascrevillent/admin-casatomas/commit/d0cfb9b0c2598e2c2b9e68c05abd95b52e11eeb0))
+- Facturas: estado de las correcciones de la revisión de descuentos ([38fd71c](https://github.com/restcasatomascrevillent/admin-casatomas/commit/38fd71c274d3a843a499e0985f78f6f8c7e4f89c))
+- Facturas: resultado del cotejo de descuentos con los PDF originales ([d99cf55](https://github.com/restcasatomascrevillent/admin-casatomas/commit/d99cf554982d4dc0689b8c9d8e19fe8342cd3346))
+- Facturas: número de PR de los regalos en el informe ([65aaec3](https://github.com/restcasatomascrevillent/admin-casatomas/commit/65aaec31f8a86b5e18622910f9fa6cd908b8bedd))
+
 ## [1.44.1] - 2026-11-17
 
 Objetivo: Informe de vinos: sin compras de otro formato (magnum), cajas por botella y sin textos cortados
