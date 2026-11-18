@@ -67,7 +67,17 @@ export function nombrePagina(ruta: string | null | undefined): string | null {
   return null;
 }
 
+/** Zona de una página conocida de la web: «/carta/vinos» → «Web › Carta de vinos»; desconocida → «Web». */
+export function zonaDePagina(ruta: string | null | undefined): string {
+  const nombre = nombrePagina(ruta);
+  return nombre ? `Web › ${conMayuscula(nombre.replace(/^(la|el|una|un) /, ""))}` : "Web";
+}
+
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+
+/** «Ha pasado 6 veces (3 en las últimas 24 h).» */
+export const vecesSencillo = (ocurrencias: number, ocurrencias24h: number) =>
+  `Ha pasado ${plural(ocurrencias, "vez", "veces")} (${ocurrencias24h} en las últimas 24 h).`;
 
 export const esDeNavegador = (fuente: string) => fuente === "navegador";
 
@@ -108,38 +118,52 @@ export interface TareaSencilla {
   /** Qué nota el restaurante si falla; null si no se nota nada. */
   consecuencia: string | null;
   conocida: boolean;
+  /** Cada cuánto se vuelve a lanzar sola («cada 5 minutos»), según su pg_cron; null si no se sabe. */
+  cada: string | null;
+  /** «Panel › Facturas» (las tareas automáticas son del panel). */
+  zona: string | null;
 }
 
-const TAREAS: Record<string, [string, string | null]> = {
-  "reanudar-trabajos-ocr": ["retoma la lectura de facturas atascadas", "las facturas pueden tardar más en leerse"],
-  "clasificar-productos": ["clasifica los productos de las facturas", "algunos productos pueden tardar más en clasificarse"],
-  "facturas-alertas": ["revisa las facturas y prepara las alertas de precios", "las alertas pueden llegar con retraso"],
-  "facturas-originales-drive": ["copia los originales de las facturas a Google Drive", "las copias en Drive pueden retrasarse"],
-  "avisos-telegram-pendientes": ["manda los avisos pendientes por Telegram", "algún aviso de Telegram puede llegar tarde"],
-  "avisos-telegram-resumen": ["manda el resumen por Telegram", "el resumen de Telegram puede llegar tarde"],
-  "ia-modelos-openai": ["actualiza la lista de modelos de IA", null],
-  "sincronizar-costes-openai": ["trae el gasto real de OpenAI", "las cifras de gasto de IA pueden ir con retraso"],
-  "ia-uso-retencion": ["borra el registro antiguo de uso de IA", null],
-  "levantar-mesas-fin-turno": ["libera las mesas al terminar el turno", "alguna mesa puede seguir ocupada en el plano hasta la siguiente vuelta"],
-  "chat-web-conversaciones-retencion": ["borra las conversaciones antiguas del chat de la web", null],
-  "chat-web-uso-retencion": ["borra el registro antiguo de uso del chat de la web", null],
-  "delete-old-call-logs": ["borra los registros antiguos de llamadas", null],
-  "emails-reserva-detectar-ausencias": ["marca los clientes que no se presentaron", "esas marcas pueden retrasarse"],
-  "emails-reserva-recordatorios-t2": ["manda los recordatorios de reserva", "algún recordatorio puede salir tarde"],
-  "emails-reserva-reintentar-fallidos": ["reintenta los correos de reserva que fallaron", "algún correo puede tardar más en salir"],
-  "instagram-limpieza-bucket": ["borra fotos viejas de Instagram", null],
-  "instagram-metricas-diarias": ["trae las cifras diarias de Instagram", "las cifras de Instagram pueden ir con retraso"],
-  "instagram-programador": ["publica las entradas programadas de Instagram", "una publicación programada puede salir tarde"],
-  "procesar-logs-web": ["agrupa los errores de la web y prepara los tickets", "los avisos de errores pueden ir con retraso"],
-  "resenas-ciclo": ["revisa y contesta las reseñas", "alguna reseña puede tardar más en contestarse"],
-  "reservas-aviso-sin-asignar": ["avisa de las reservas sin mesa asignada", "ese aviso puede llegar tarde"],
-  "reservas-web-keep-warm": ["mantiene despierta la función de reservas de la web", "la primera reserva puede tardar un poco más en cargar"],
-  "sync-trafico-web": ["trae las visitas de la web desde Vercel", "las cifras de Tráfico web pueden ir con retraso"],
+const DIA = "una vez al día";
+/** [qué hace, qué se nota si falla, cada cuánto (supabase/migrations: cron.schedule), zona]. */
+const TAREAS: Record<string, [string, string | null, string, string]> = {
+  "reanudar-trabajos-ocr": ["retoma la lectura de facturas atascadas", "las facturas pueden tardar más en leerse", "cada minuto", "Facturas"],
+  "clasificar-productos": ["clasifica los productos de las facturas", "algunos productos pueden tardar más en clasificarse", "cada 5 minutos", "Facturas"],
+  "embeddings-nombres": ["prepara los productos nuevos para el buscador del chat de Facturas", "el chat de Facturas puede tardar más en encontrar los productos nuevos", "cada 10 minutos", "Facturas"],
+  "facturas-alertas": ["revisa las facturas y prepara las alertas de precios", "las alertas pueden llegar con retraso", DIA, "Facturas"],
+  "facturas-alertas-recalculo": ["recalcula las alertas de precios pendientes", "las alertas de precios pueden ir con retraso", "cada minuto", "Facturas"],
+  "facturas-originales-drive": ["copia los originales de las facturas a Google Drive", "las copias en Drive pueden retrasarse", "cada 10 minutos", "Facturas"],
+  "avisos-telegram-pendientes": ["manda los avisos pendientes por Telegram", "algún aviso de Telegram puede llegar tarde", "cada 5 minutos", "Avisos"],
+  "avisos-telegram-fallos": ["manda por Telegram los avisos de fallos", "algún aviso de fallo puede llegar tarde", "cada 5 minutos", "Avisos"],
+  "avisos-telegram-resumen": ["manda el resumen por Telegram", "el resumen de Telegram puede llegar tarde", "cada hora", "Avisos"],
+  "avisos-telegram-semanal": ["manda el resumen semanal por Telegram", "el resumen semanal de Telegram puede llegar tarde", "cada hora", "Avisos"],
+  "avisos-telegram-vigilante": ["comprueba que los avisos de Telegram están saliendo", "si los avisos dejaran de salir, se tardaría más en saberlo", "cada 15 minutos", "Avisos"],
+  "ia-modelos-openai": ["actualiza la lista de modelos de IA", null, DIA, "Super Admin"],
+  "sincronizar-costes-openai": ["trae el gasto real de OpenAI", "las cifras de gasto de IA pueden ir con retraso", "cada 6 horas", "Super Admin"],
+  "ia-uso-retencion": ["borra el registro antiguo de uso de IA", null, DIA, "Mantenimiento"],
+  "levantar-mesas-fin-turno": ["libera las mesas al terminar el turno", "alguna mesa puede seguir ocupada en el plano hasta la siguiente vuelta", "cada 10 minutos", "Reservas"],
+  "chat-web-conversaciones-retencion": ["borra las conversaciones antiguas del chat de la web", null, DIA, "Mantenimiento"],
+  "chat-web-uso-retencion": ["borra el registro antiguo de uso del chat de la web", null, DIA, "Mantenimiento"],
+  "delete-old-call-logs": ["borra los registros antiguos de llamadas", null, DIA, "Mantenimiento"],
+  "emails-reserva-detectar-ausencias": ["marca los clientes que no se presentaron", "esas marcas pueden retrasarse", DIA, "Reservas"],
+  "emails-reserva-recordatorios-t2": ["manda los recordatorios de reserva", "algún recordatorio puede salir tarde", DIA, "Reservas"],
+  "emails-reserva-reintentar-fallidos": ["reintenta los correos de reserva que fallaron", "algún correo puede tardar más en salir", "cada 15 minutos", "Reservas"],
+  "instagram-limpieza-bucket": ["borra fotos viejas de Instagram", null, DIA, "Instagram"],
+  "instagram-metricas-diarias": ["trae las cifras diarias de Instagram", "las cifras de Instagram pueden ir con retraso", DIA, "Instagram"],
+  "instagram-programador": ["publica las entradas programadas de Instagram", "una publicación programada puede salir tarde", "cada 5 minutos", "Instagram"],
+  "newsletter-sync-resend-diario": ["copia los suscriptores de la newsletter a Resend", "la lista de Resend puede ir desfasada", DIA, "Newsletter"],
+  "procesar-logs-web": ["agrupa los errores de la web y prepara los tickets", "los avisos de errores pueden ir con retraso", "cada 5 minutos", "Logs"],
+  "resenas-ciclo": ["revisa y contesta las reseñas", "alguna reseña puede tardar más en contestarse", "dos veces al día", "Reseñas"],
+  "reservas-aviso-sin-asignar": ["avisa de las reservas sin mesa asignada", "ese aviso puede llegar tarde", "cada 15 minutos", "Reservas"],
+  "reservas-web-keep-warm": ["mantiene despierta la función de reservas de la web", "la primera reserva puede tardar un poco más en cargar", "cada 5 minutos", "Reservas"],
+  "sync-trafico-web": ["trae las visitas de la web desde Vercel", "las cifras de Tráfico web pueden ir con retraso", DIA, "Tráfico web"],
 };
 
 export function tareaSencilla(nombre: string): TareaSencilla {
-  const t = TAREAS[nombre];
-  return t ? { nombre, que: t[0], consecuencia: t[1], conocida: true } : { nombre, que: `«${nombre}»`, consecuencia: null, conocida: false };
+  const t = Object.prototype.hasOwnProperty.call(TAREAS, nombre) ? TAREAS[nombre] : undefined;
+  return t
+    ? { nombre, que: t[0], consecuencia: t[1], conocida: true, cada: t[2], zona: `Panel › ${t[3]}` }
+    : { nombre, que: `«${nombre}»`, consecuencia: null, conocida: false, cada: null, zona: null };
 }
 
 /** Nombres de tarea de una incidencia: los de las muestras, el de las propiedades o el del objetivo «cron:…». */

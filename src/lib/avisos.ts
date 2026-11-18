@@ -1,4 +1,4 @@
-import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Percent, Bot, CalendarClock, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, MessageSquareWarning, PieChart, Receipt, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
+import { TrendingDown, Handshake, AlertTriangle, BadgePercent, Percent, Bot, CalendarClock, CheckCheck, Clock, CloudOff, FileQuestion, Info, KanbanSquare, LayoutGrid, MessageSquareWarning, PieChart, Receipt, ScanSearch, TrendingUp, UserPlus, XCircle } from "lucide-react";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { rutaAlerta, TIPOS_ALERTA_FACTURAS } from "@/lib/facturas/alertas";
 
@@ -15,8 +15,8 @@ export function rutaDeAviso(
   if (n.referencia_tipo === "facturas_alerta") return rutaAlerta(n.datos) ?? "/facturas?tab=chat";
   // Reserva sin sala o mesa dentro de la ventana: pestaña «Asignación» de /reservas.
   if (n.tipo === "reserva_sin_asignar") return "/reservas?tab=reservas";
-  // Reserva nueva o cancelada (20261122160000): la lista de reservas.
-  if (n.referencia_tipo === "reserva" && (n.tipo === "reserva_nueva" || n.tipo === "reserva_cancelada")) return "/reservas?tab=reservas";
+  // Reserva nueva, cancelada (20261122160000) o confirmada por el cliente (20261212720000): la lista de reservas.
+  if (n.referencia_tipo === "reserva" && (n.tipo === "reserva_nueva" || n.tipo === "reserva_cancelada" || n.tipo === "reserva_confirmada")) return "/reservas?tab=reservas";
   // Las solicitudes viven en la pestaña unificada «Reservas», filtradas por «Solicitudes sin resolver».
   if (n.referencia_tipo === "solicitud") return "/reservas?tab=reservas&status=solicitudes";
   if (n.referencia_tipo === "facturas_cargar") return "/facturas?tab=cargar";
@@ -47,7 +47,7 @@ export const TIPO_MARGEN_BAJO = "facturas_margen_bajo";
 export type FiltroAvisos = "todos" | "sin_leer" | "reservas" | "facturas" | "otros";
 
 export const TIPOS_POR_FILTRO: Record<"reservas" | "facturas", string[]> = {
-  reservas: ["solicitud_pendiente", "reserva_nueva", "reserva_cancelada", "reserva_sin_asignar"],
+  reservas: ["solicitud_pendiente", "reserva_nueva", "reserva_confirmada", "reserva_cancelada", "reserva_sin_asignar"],
   facturas: ["facturas_subida", "facturas_abreviatura", "subida_precio", "original_sin_drive", ...TIPOS_ALERTA_FACTURAS.map((t) => t.tipo), TIPO_MARGEN_BAJO],
 };
 
@@ -94,6 +94,8 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   solicitud_pendiente: AlertTriangle,
   reserva_nueva: Clock,
   reserva_cancelada: XCircle,
+  // El cliente ha confirmado su reserva con el enlace del correo (20261212720000).
+  reserva_confirmada: CheckCheck,
   // Aviso del cron `reservas-aviso-sin-asignar`: reserva dentro de la ventana
   // de asignación que aún no tiene sala o mesa.
   reserva_sin_asignar: LayoutGrid,
@@ -143,7 +145,11 @@ export const SECCIONES_AVISOS: Record<SeccionAvisos, { titulo: string; tipos: { 
     tipos: [
       // 10/11/2026, petición del dueño: el botón «Avisos» de Reservas es solo para reservas nuevas y
       // canceladas (trigger 20261122160000). Solicitudes y «Sin sala o mesa» ya no salen aquí.
+      // 18/11/2026, petición del dueño: «solo tienen que salir las canceladas (rojo), las nuevas para verificar
+      // (azul) y las que confirme luego el cliente (verdes)». Una «Reserva nueva» se da por revisada sola en
+      // cuanto la reserva deja de estar pendiente (20261212720000).
       { tipo: "reserva_nueva", etiqueta: "Reservas nuevas" },
+      { tipo: "reserva_confirmada", etiqueta: "Confirmadas por el cliente" },
       { tipo: "reserva_cancelada", etiqueta: "Canceladas" },
     ],
   },
@@ -174,7 +180,7 @@ export function avisoCaducado(n: Pick<NotificacionDashboard, "caduca_en">, ahora
  */
 export const PARAM_ABRIR_AVISOS = "avisos";
 export const rutaAvisosReservas = () => `/reservas?${PARAM_ABRIR_AVISOS}=reservas`;
-/** Avisos que se atienden en Reservas › Avisos (reservas nuevas y canceladas). */
+/** Avisos que se atienden en Reservas › Avisos (por verificar, confirmadas por el cliente y canceladas). */
 export const esAvisoDeReservas = (n: { tipo: string; referencia_tipo?: string | null }) =>
   n.referencia_tipo === "reserva" && tiposDeSeccion("reservas").includes(n.tipo);
 

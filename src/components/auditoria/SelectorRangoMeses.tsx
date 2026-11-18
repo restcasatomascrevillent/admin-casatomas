@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RANGOS_MESES_AGRUPADO, type RangoMesesAuditoria } from "@/hooks/useAuditLog";
 
@@ -13,7 +12,8 @@ const ETIQUETA_RANGO: Record<RangoMesesAuditoria, string> = {
  * Ventana de fechas de las pestañas "Por mes" y "Por día": agrupar bien
  * necesita el rango completo cargado (no una página de 25), así que en vez
  * de paginar se elige cuánto atrás mirar. Si ya hay un filtro de fechas
- * ("Desde"/"Hasta") puesto arriba, manda ese y este selector queda inerte.
+ * ("Desde"/"Hasta") puesto en los filtros, manda ese y este selector se oculta.
+ * El botón «Actualizar» es el de la cabecera de la tarjeta (sirve para las tres vistas).
  */
 export function SelectorRangoMeses({
   rango,
@@ -21,26 +21,22 @@ export function SelectorRangoMeses({
   usandoFiltroFechas,
   truncado,
   total,
-  loading,
-  onActualizar,
 }: {
   rango: RangoMesesAuditoria;
   onRangoChange: (rango: RangoMesesAuditoria) => void;
   usandoFiltroFechas: boolean;
   truncado: boolean;
   total: number;
-  loading: boolean;
-  onActualizar: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-border px-1 pb-3">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
       {usandoFiltroFechas ? (
-        <p className="text-sm text-muted-foreground">Usando el filtro de fechas («Desde» / «Hasta») de arriba.</p>
+        <p className="text-sm text-muted-foreground">Usando las fechas «Desde» / «Hasta» de los filtros.</p>
       ) : (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Mostrar</span>
+          <span className="text-sm text-muted-foreground">Periodo</span>
           <Select value={String(rango)} onValueChange={(v) => onRangoChange(Number(v) as RangoMesesAuditoria)}>
-            <SelectTrigger className="w-44" aria-label="Meses a mostrar">
+            <SelectTrigger className="h-9 w-auto min-w-[10.5rem] gap-2 pointer-coarse:h-11" aria-label="Meses a mostrar">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -53,16 +49,14 @@ export function SelectorRangoMeses({
           </Select>
         </div>
       )}
-      <p className="text-sm text-muted-foreground">
-        {total} registro{total === 1 ? "" : "s"} cargado{total === 1 ? "" : "s"}
+      <p className="ml-auto text-xs text-muted-foreground tabular-nums sm:text-sm">
+        {total.toLocaleString("es-ES")} registro{total === 1 ? "" : "s"}
+        <span className="hidden sm:inline"> cargado{total === 1 ? "" : "s"}</span>
       </p>
-      <Button variant="outline" size="sm" className="ml-auto" onClick={onActualizar} disabled={loading}>
-        Actualizar
-      </Button>
       {truncado && (
-        <p role="status" className="w-full text-xs text-amber-600">
+        <p role="status" className="w-full rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
           Hay más registros en este rango de los que se muestran (tope de 1000). Acota con «Desde»/«Hasta» o con un
-          rango más corto para verlos todos.
+          periodo más corto para verlos todos.
         </p>
       )}
     </div>

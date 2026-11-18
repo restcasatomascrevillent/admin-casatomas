@@ -220,7 +220,6 @@ it("conserva búsqueda y fechas al elegir una categoría rápida", () => {
   fireEvent.change(screen.getByLabelText("Buscar en auditoría"), {
     target: { value: "paella" },
   });
-  fireEvent.click(screen.getByRole("button", { name: /Persona, fechas/ }));
   fireEvent.change(screen.getByLabelText("Desde"), {
     target: { value: "2026-10-01" },
   });
@@ -233,7 +232,70 @@ it("conserva búsqueda y fechas al elegir una categoría rápida", () => {
     texto: "paella",
     desde: "2026-10-01",
   });
-  expect(screen.getByText("Sección: Platos")).toBeInTheDocument();
+  // La categoría ya lo dice: no se repite como chip; los demás filtros siguen a la vista.
+  expect(screen.getByRole("button", { name: "Platos" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.queryByText("Sección: Platos")).not.toBeInTheDocument();
+  expect(screen.getByText("Búsqueda: paella")).toBeInTheDocument();
+  expect(screen.getByText("Desde: 1 oct 2026")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
   expect(screen.getByLabelText("Sección")).toHaveValue("Platos");
+});
+
+it("la «×» de un chip quita ese filtro al momento y conserva la categoría", () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+  render(<SuperAdminAuditoria />);
+  fireEvent.click(screen.getByRole("button", { name: "Bebidas" }));
+  const buscador = screen.getByLabelText("Buscar en auditoría");
+  fireEvent.change(buscador, { target: { value: "vermut" } });
+  fireEvent.submit(buscador);
+  expect(state.filtros.at(-1)).toMatchObject({ tabla: "Bebidas", texto: "vermut" });
+  fireEvent.click(screen.getByRole("button", { name: "Quitar el filtro Búsqueda: vermut" }));
+  expect(state.filtros.at(-1)).toEqual({ origen: "sin_servidor", accion: "actualizar", tabla: "Bebidas" });
+  expect(screen.getByRole("button", { name: "Bebidas" })).toHaveAttribute("aria-pressed", "true");
+});
+
+it("en el móvil las categorías rápidas son un desplegable, con «Procesos» entre ellas", () => {
+  render(<SuperAdminAuditoria />);
+  const ver = screen.getByLabelText("Ver");
+  expect(ver).toHaveValue("todos");
+  fireEvent.change(ver, { target: { value: "ia" } });
+  expect(state.filtros.at(-1)).toEqual({ origen: "sin_servidor", accion: "grupo_ia", tabla: undefined });
+  fireEvent.change(ver, { target: { value: "procesos" } });
+  expect(state.filtros.at(-1)).toEqual({ origen: "servidor", accion: undefined, tabla: undefined });
+  expect(screen.getByLabelText("Ver")).toHaveValue("procesos");
+});
+
+it("la lista separa los registros por día y enseña la hora en cada fila", () => {
+  state.entradas = [
+    entry({ id: "a", created_at: "2026-10-07T10:15:00Z", actor_label: "Ana", actor_origin: "usuario" }),
+    entry({ id: "b", created_at: "2026-10-07T08:00:00Z", actor_label: "Luis", actor_origin: "usuario" }),
+    entry({ id: "c", created_at: "2026-10-05T18:30:00Z", actor_label: "Ana", actor_origin: "usuario" }),
+  ];
+  render(<SuperAdminAuditoria />);
+  const dias = screen.getAllByRole("heading", { level: 2 });
+  expect(dias).toHaveLength(2);
+  expect(dias[0]).toHaveTextContent(/7 de octubre/i);
+  expect(dias[1]).toHaveTextContent(/5 de octubre/i);
+  expect(screen.getAllByRole("article")).toHaveLength(3);
+});
+
+it("sin resultados ofrece volver a ver toda la actividad", () => {
+  render(<SuperAdminAuditoria />);
+  fireEvent.click(screen.getByRole("button", { name: "Reversiones" }));
+  expect(screen.getByText("No hay registros con estos filtros.")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Ver toda la actividad" }));
+  expect(state.filtros.at(-1)).toEqual({ origen: "sin_servidor" });
+});
+
+it("al aplicar el panel con una búsqueda de 1 o 2 letras, aplica lo demás sin mandar la búsqueda", () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+  render(<SuperAdminAuditoria />);
+  fireEvent.change(screen.getByLabelText("Buscar en auditoría"), { target: { value: "ia" } });
+  fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
+  fireEvent.change(screen.getByLabelText("Desde"), { target: { value: "2026-11-01" } });
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+  expect(state.filtros.at(-1)).toMatchObject({ origen: "sin_servidor", desde: "2026-11-01" });
+  expect(state.filtros.at(-1)?.texto).toBeUndefined();
+  expect(screen.getByLabelText("Buscar en auditoría")).toHaveValue("ia");
+  expect(screen.getByText("Escribe al menos 3 letras para buscar.")).toBeInTheDocument();
 });

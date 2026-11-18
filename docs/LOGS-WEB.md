@@ -146,20 +146,45 @@ Cada error (`web_eventos.origen`) y cada incidencia (`web_incidencias.origen`, `
 
 - **Incidencia**: basta una ocurrencia real de la web para que sea «Fallo de la web»; si no, externo; si no hay ninguna real, «Bots y pruebas»; si no, la que más se repite. Para los umbrales solo cuentan las ocurrencias de la web (y las externas con el interruptor).
 - **Tickets ya creados** de lo que ahora no depende de la web: no se cierran ni se tocan (no se reabren ni se comentan); solo se sigue leyendo su estado. Las pendientes que ya no pueden se devuelven a «sin ticket» con el motivo. **«Pedir ticket» a mano vale para cualquiera** (el motivo empieza siempre por «Pedido a mano» y el proceso lo respeta).
-- **Panel**: por defecto, «Errores e incidencias» enseña los fallos de la web y los externos (primero los de la web), con las cuentas de cada color, una leyenda y, abajo, «No dependen de la web (N)». Filtro «Origen: todos / Fallos de la web y externos / Fallo de la web / Externos / No dependen de la web». «Ocultar las de solo bots y pruebas» también quita las de origen «Bots y pruebas». Los mismos colores en el detalle (con una línea en llano de qué es y qué hacer), en la línea de tiempo de las sesiones, en los eventos sueltos y en los errores de cada sesión (`web_sesiones.errores_web`, `errores_externos`).
+- **Panel**: por defecto, «Errores e incidencias» enseña los fallos de la web y los externos (primero los de la web), con las cuentas de cada color, una leyenda y, abajo, «No dependen de la web (N)». Filtro de origen (ver «Fallo de la web o fallo del admin», abajo). «Ocultar las de solo bots y pruebas» también quita las de origen «Bots y pruebas». Los mismos colores en el detalle (con una línea en llano de qué es y qué hacer), en la línea de tiempo de las sesiones, en los eventos sueltos y en los errores de cada sesión (`web_sesiones.errores_web`, `errores_externos`).
 - **IA**: lo que no depende de la web no se explica con IA (ya tiene su texto fijo).
 - **Sin la migración** el panel funciona como antes (calcula los colores con las mismas reglas, sin filtro ni cuentas por origen) y `procesar-logs-web` trata todas como antes.
 
+### Fallo de la web o fallo del admin (ámbito)
+
+Petición del dueño (18/11/2026): todo lo que era culpa nuestra salía como «Fallo de la web», aunque fallara una función del panel («Fallo de la web · clasificar-productos: … statement timeout»). Ahora los fallos nuestros se separan solos según **dónde** fallan (`supabase/functions/_shared/logs-web/ambito.ts`, sin migración):
+
+- **Fallo de la web**: lo que usan los clientes. Errores del navegador de la web pública, funciones que sirve la web o que llegan al cliente (`FUNCIONES_WEB` en `funciones.ts`: `reservas-web`, `chat-web`, `cheques-regalo-web`, `stripe-webhook-cheques-regalo`, `emails-reserva`, `notify-reservation-change`, `newsletter-baja`, `registrar-actividad-web`) y despliegues del proyecto de Vercel de la web.
+- **Fallo del admin**: funciones del panel (todas las demás), tareas automáticas e integraciones (`error_integracion`: pg_cron, Tráfico web) y despliegues de `admin-casatomas`. Los errores del navegador del panel contarían aquí (proyecto `admin-casatomas*`), pero hoy **no se recogen**: `registrar-actividad-web` solo acepta la web pública y el panel no lleva el rastreador.
+- `origen = 'web'` en la base de datos **no cambia**: sigue significando «culpa nuestra» y decide los tickets (`puedeAbrirTicket`, espejo SQL). El ámbito se deriva de `fuente`, `proyecto` y el principio del mensaje («función/subruta: …»). `filtroAmbito()` es la misma regla como filtro de PostgREST; un test comprueba que los dos dicen lo mismo y que ningún nombre de función empieza por el de una de la web.
+- **Panel**: cuentas «Fallos de la web: N · Fallos del admin: N · Externos · No dependen de la web» (las dos primeras en rojo) y filtro «Origen: todos / Fallos (web y admin) y externos / Fallos de la web y del admin / Fallo de la web / Fallo del admin / Externos / No dependen de la web». El número de la pestaña cuenta los dos.
+- **Ticket**: la línea «Origen» y la cabecera de «En pocas palabras» dicen lo mismo que el panel.
+
 ## Explicación en sencillo (para el dueño)
 
-Cada incidencia y cada sesión empiezan con un bloque en español llano; lo técnico va debajo, plegado («Detalles técnicos», «Paso a paso y datos técnicos»):
+Formato elegido por el dueño (18/11/2026), igual en el detalle de la incidencia y, adaptado, arriba del ticket de Linear (`supabase/functions/_shared/logs-web/ficha.ts`):
 
-- **Qué hizo el cliente**: del recorrido de su sesión («Entró en la carta, abrió 2 vinos y pulsó «Reservar»»). Sin consentimiento, lo dice en vez de inventarlo. En los errores del servidor: «Ningún cliente: lo hace una tarea automática…».
-- **Qué falló**: los errores conocidos tienen un texto fijo (`causas.ts`, campo `sencillo`). Por ejemplo, la versión antigua: «La página tenía una versión antigua abierta justo cuando publicamos; se recarga sola». Las tareas programadas se nombran en llano (`sencillo.ts`, `TAREAS`): «La tarea que retoma la lectura de facturas atascadas no arrancó a tiempo; las facturas pueden tardar más en leerse». Los errores nuevos llevan una **explicación de la IA escrita una vez por incidencia** y guardada en `web_incidencias.explicacion_ia`, marcada «Explicación de la IA · sin comprobar».
-- **¿Afecta?**: cuántos visitantes en total y hoy, veces en 24 h, si es grave, y en la versión antigua si se arregló sola o se repitió.
+```
+Fallo del admin · Panel › Facturas
+La clasificación automática de productos tardó demasiado y se cortó.
+
+Qué pasó: la base de datos iba muy cargada y … tardó más de lo permitido, así que se canceló.
+A quién afecta: a nadie de fuera; los productos de las facturas nuevas se clasifican unos minutos más tarde.
+¿Se arregla solo? Sí: se reintenta sola cada 5 minutos y no se pierde nada.
+Qué hacer: nada si es suelto. Si se repite, avisa al técnico.
+
+▸ Detalle técnico (plegado)
+```
+
+- **Cabecera**: el origen con su ámbito y la zona («Panel › Facturas», «Web › Reservas»…).
+- **Título en llano**: sale del catálogo de funciones (`funciones.ts`: zona, qué hace, a quién afecta, si se reintenta sola y cada cuánto según los `cron.schedule` de `supabase/migrations`), de las tareas programadas (`sencillo.ts`, `TAREAS`, con su intervalo) y de la causa conocida (`causas.ts`, `sencillo.titulo`). Si no se puede construir (p. ej. un error del navegador sin causa conocida), arriba sigue el mensaje técnico. El mensaje técnico, la pila y lo demás quedan en «Detalle técnico», plegado. En la lista, el título en llano con el mensaje técnico debajo, en pequeño.
+- **Qué hizo el cliente**: solo en los errores del navegador, del recorrido de su sesión («Entró en la carta, abrió 2 vinos y pulsó «Reservar»»). Sin consentimiento, lo dice en vez de inventarlo.
+- **Qué pasó**: los errores conocidos tienen un texto fijo (`causas.ts`, campo `sencillo`). Por ejemplo, la versión antigua: «La página tenía una versión antigua abierta justo cuando publicamos; se recarga sola», o la base de datos que cancela por tiempo («canceling statement due to statement/lock timeout», causa `bd_tiempo_agotado`). Las tareas programadas se nombran en llano: «La tarea que retoma la lectura de facturas atascadas no arrancó a tiempo; las facturas pueden tardar más en leerse». Los errores nuevos llevan una **explicación de la IA escrita una vez por incidencia** y guardada en `web_incidencias.explicacion_ia`, marcada «Explicación de la IA · sin comprobar»; lo fijo (catálogo y causa) manda.
+- **A quién afecta**: en el navegador, cuántos visitantes en total y hoy, veces en 24 h, si es grave, y en la versión antigua si se arregló sola o se repitió; en el servidor y las tareas, lo que dice el catálogo y cuántas veces ha pasado.
+- **¿Se arregla solo?**: si la función o la tarea se vuelve a lanzar sola (y cada cuánto) o hay que repetirla; si no se sabe decir, no sale.
 - **Qué hacer**: qué tiene que hacer el dueño (casi siempre «nada» o «avisa al técnico»), y si ya hay ticket.
 
-El ticket de Linear empieza con el mismo resumen.
+En los textos llanos no entra texto libre de los logs: solo cifras, nombres del catálogo y proveedores de la lista fija. El ticket de Linear empieza con el mismo resumen y, en los fallos del servidor, tareas y despliegues con título en llano, ese es su título (con la función detrás: «La clasificación automática de productos tardó demasiado y se cortó · clasificar-productos»).
 
 ## IA
 

@@ -12,7 +12,8 @@
 //    segundo plano con el código del camino síncrono (unico.ts). La pieza se
 //    lee con leerDocumentoUnico y lo leído (DocumentoListo) se guarda como
 //    resultado de la pieza; la «consolidación» es trivial: guardarLecturaUnica
-//    con el original en base64 (Drive o Storage, como el síncrono).
+//    con el original en base64 (copia temporal en Storage, como el síncrono;
+//    a Drive lo sube después el cron facturas-originales-drive).
 //  Sin Deno.env: todo llega por parámetro.
 // ============================================================================
 
@@ -23,7 +24,7 @@ import { type ContextoGuardado, type DocumentoPendiente, guardarDocumento, ofert
 import { bloqueContenido, type ClienteOpenAI } from "./openai.ts";
 import type { MotivoRelectura, PaginaCerrada } from "./pagina.ts";
 import { leerPieza } from "./pieza.ts";
-import { archivarDesdeStorage, limpiarPendientesTrabajo, mimeDeNombre, rutaTemporal, STORAGE_BUCKET } from "./archivo.ts";
+import { archivarDesdeStorage, limpiarPendientesTrabajo, mimeDeNombre, moverPendiente, rutaTemporal, STORAGE_BUCKET } from "./archivo.ts";
 import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes, sumarGastoTrabajo } from "./costeLectura.ts";
 import { guardarLecturaUnica, pendienteUnico } from "./unico.ts";
 
@@ -373,10 +374,11 @@ async function consolidarUnico(ctx: ContextoGuardado, trabajo: any, f: any): Pro
     b64 = "";
   }
   const fichero: FicheroUnico = { b64, mime: f.mime ?? trabajo.original_mime ?? "image/jpeg", nombre: trabajo.nombre_original };
-  const g = await guardarLecturaUnica(ctx, listo, fichero, trabajo.id);
-
   // Coste de leer el documento: lo que sumaron las piezas + los embeddings de esta consolidación.
-  const lectura = sumarCostes(await leerCosteTrabajo(supabase, trabajo.id), costeDeCliente(ctx.openai.uso, null));
+  // Se guarda en la misma escritura que las alertas y el original (guardarDocumento).
+  const costeLectura = async () => sumarCostes(await leerCosteTrabajo(supabase, trabajo.id), costeDeCliente(ctx.openai.uso, null));
+  const g = await guardarLecturaUnica(ctx, listo, fichero, trabajo.id, costeLectura);
+  const lectura = g.estado === "guardado" && g.coste ? g.coste : await costeLectura();
   const comun = {
     paginas: [{
       numero: 1, pieza: "pagina", franja: null, estado: f.estado, lineas: f.filas_extraidas, contadas: f.filas_contadas,
@@ -387,7 +389,7 @@ async function consolidarUnico(ctx: ContextoGuardado, trabajo: any, f: any): Pro
   };
 
   if (g.estado === "guardado") {
-    await guardarCosteLectura(supabase, g.facturaId, lectura);
+    if (!g.coste) await guardarCosteLectura(supabase, g.facturaId, lectura);
     let respuesta = g.respuesta;
     // La copia de pendientes/ la borra terminar() (limpiarPendientesTrabajo)
     // salvo que la factura tenga que apuntar a ella:
@@ -471,11 +473,15 @@ export async function procesarConsolidacion(ctx: ContextoGuardado, trabajo: any)
         mime: piezasArchivo[0]?.mime ?? mimeDeNombre(piezasArchivo[0]?.storage_path ?? ""),
         nombre: nombrePieza(trabajo.nombre_original, piezasArchivo[0], piezasArchivo.length),
       };
+    // Coste de leer el documento (piezas + embeddings de esta consolidación): va en la
+    // misma escritura que las alertas y el original.
+    const costeLectura = async () => sumarCostes(await leerCosteTrabajo(supabase, trabajo.id), costeDeCliente(ctx.openai.uso, null));
     const g = await guardarDocumento(ctx, {
       ...listo,
       original,
       paginas: c.paginasDocumento,
       ocrTrabajoId: trabajo.id,
+      costeLectura,
     });
     if (g.estado === "guardado" && !trabajo.original_path && piezasArchivo.length > 1) {
       await archivarPiezasExtra(ctx, g.facturaId, listo.datos, trabajo.nombre_original, piezasArchivo.slice(1), piezasArchivo.length);
@@ -492,11 +498,11 @@ export async function procesarConsolidacion(ctx: ContextoGuardado, trabajo: any)
       relecturas: f.relecturas,
       duracion_ms: f.duracion_ms,
     }));
-    const lectura = sumarCostes(await leerCosteTrabajo(supabase, trabajo.id), costeDeCliente(ctx.openai.uso, null));
+    const lectura = g.estado === "guardado" && g.coste ? g.coste : await costeLectura();
     const comun = { paginas: infoPaginas, consolidacion: c.stats, coste_usd: lectura.usd, modelo: lectura.modelo };
 
     if (g.estado === "guardado") {
-      await guardarCosteLectura(supabase, g.facturaId, lectura);
+      if (!g.coste) await guardarCosteLectura(supabase, g.facturaId, lectura);
       await terminar(supabase, trabajo.id, "completado", { ...g.respuesta, ...comun }, g.facturaId, null, null);
     } else {
       const pendiente: DocumentoPendiente | null = g.existente
@@ -549,12 +555,14 @@ export function nombrePieza(nombreOriginal: string, pieza: PiezaArchivo | undefi
 }
 
 /**
- * Fotos unidas sin PDF: las piezas 2..N también son el original. Cada una va
- * a Drive (misma carpeta proveedor → mes); si Drive falla, se mueven a
- * temporal/{factura}-pagN-… y el cron facturas-originales-drive las sube.
- * Nunca lanza.
+ * Fotos unidas sin PDF: las piezas 2..N también son el original. Se mueven a
+ * temporal/{factura}-pagN-… sin esperar a Drive (18/11/2026); el cron
+ * facturas-originales-drive las sube (misma carpeta proveedor → mes, como
+ * «pagN-…») y las borra: al no ser el archivo_path de la factura, cuando
+ * tienen más de 1 h. Si no se pueden mover, se suben a Drive ya. Nunca lanza.
+ * (Exportada para las pruebas.)
  */
-async function archivarPiezasExtra(
+export async function archivarPiezasExtra(
   ctx: ContextoGuardado,
   facturaId: number,
   datos: { fecha?: string | null; proveedor?: string | null },
@@ -565,9 +573,13 @@ async function archivarPiezasExtra(
   for (const p of piezas) {
     const nombre = nombrePieza(nombreOriginal, p, total);
     try {
+      const destino = rutaTemporal(facturaId, `pag${p.pagina_doc ?? p.numero}-${nombre}`);
+      const m = await moverPendiente(ctx.supabase, p.storage_path, destino);
+      if (m.path) continue;
+      console.warn(`[ocr-trabajo] no se pudo mover la pieza ${p.numero} de la factura ${facturaId} (${m.error}); se sube a Drive ya`);
       const r = await archivarDesdeStorage(
         ctx.drive, ctx.supabase, p.storage_path, nombre, p.mime ?? null, datos?.fecha ?? null, facturaId, datos?.proveedor ?? null,
-        rutaTemporal(facturaId, `pag${p.pagina_doc ?? p.numero}-${nombre}`),
+        destino,
       );
       if (!r.drive_url) console.warn(`[ocr-trabajo] pieza ${p.numero} de la factura ${facturaId} pendiente de Drive: ${r.drive_error}`);
     } catch (e) {

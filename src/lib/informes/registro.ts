@@ -27,7 +27,6 @@ import { mesesSeleccionables as mesesTrafico, mesPorDefecto as mesPorDefectoTraf
 import { obtenerInformeFacturas } from "./fuentes/facturas";
 import { obtenerInformeVinoFavorito } from "./fuentes/vinoFavorito";
 import { obtenerInformeServicios } from "./fuentes/servicios";
-import { obtenerInformeAuditoria } from "./fuentes/auditoria";
 import { obtenerInformeAccionesWeb } from "./fuentes/accionesWeb";
 import { obtenerInformeCartaFacturas, type TipoCartaFacturas } from "./fuentes/cartaFacturas";
 
@@ -213,15 +212,16 @@ export const INFORMES: DefinicionInforme[] = [
   {
     id: "auditoria-mensual",
     // 14/11/2026, petición del dueño: quién usa el panel, qué toca y qué hace el sistema solo.
+    // 18/11/2026: persona a persona (varias diapositivas cada una) y lo automático al final, explicado.
     titulo: "Informe mensual de auditoría",
     descripcion:
-      "Quién ha usado el panel en el mes: acciones, días que entró y dónde trabaja más; gráfico por días y horas; lo delicado (borrados, precios, permisos) y, aparte, lo que hace el sistema solo.",
+      "Lo que hace cada persona en el panel: cuántas cosas, qué días y a qué horas, dónde trabaja, lo último y lo delicado (borrados, precios, permisos). Al final, lo que hace el sistema solo, proceso a proceso y explicado.",
     seccion: "auditoria",
     permiso: { tipo: "superadmin" },
     periodo: "mes",
     formatos: ["pdf", "csv"],
     origen: { etiqueta: "Super Admin › Auditoría", ruta: "/super-admin/auditoria" },
-    generador: { tipo: "tabla", obtener: (periodo) => obtenerInformeAuditoria(periodo) },
+    generador: { tipo: "componente", cargar: () => import("@/components/informes/generadores/InformeAuditoriaGenerador") },
   },
   {
     id: "cheques-mensual",

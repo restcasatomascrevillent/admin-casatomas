@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   agruparPendientes,
   anadaDe,
+  aplicarPorTandas,
+  type ElementoClasificacion,
+  TANDA_RPC,
+  trocear,
   type Categoria,
   clasificarPendientes,
   construirMensajes,
@@ -90,6 +94,62 @@ describe("validarAsignaciones", () => {
       categorias,
     );
     expect(items).toEqual([{ textos: ["raro"], producto_id: null, nombre: "Cosa rara", categoria_id: null, unidad: "ud" }]);
+  });
+
+  describe("id de categoría en producto_id (el «11» de Servicios caía en la mostaza)", () => {
+    const cats: Categoria[] = [
+      { id: 6, nombre: "Despensa", padre_id: null, descripcion: null, activa: true },
+      { id: 11, nombre: "Servicios", padre_id: null, descripcion: null, activa: true },
+      { id: 1, nombre: "Bebidas", padre_id: null, descripcion: null, activa: true },
+      { id: 12, nombre: "Vinos", padre_id: 1, descripcion: null, activa: true },
+    ];
+    const cat: ProductoCatalogo[] = [
+      { id: 11, nombre: "Mostaza de cerveza Rooftop 150 g", categoria_id: 6 },
+      { id: 40, nombre: "Marqués de Riscal Reserva 75 cl", categoria_id: 12 },
+    ];
+    const pend = agruparPendientes([
+      linea(1, "ALQUILER LOCAL FEBRERO", "alquiler local febrero"),
+      linea(2, "- 20 % BONIFICAC S/ 12.975,5", "- 20 % bonificac s/ 12.975,5"),
+      linea(3, "MOSTAZA DE CERVEZA 150G -ROOFTOP-", "mostaza de cerveza 150g -rooftop-"),
+      linea(4, "RISCAL RVA 75", "riscal rva 75"),
+    ]);
+
+    it("con nombre y categoría propios, el 11 se descarta y se crea el producto de Servicios", () => {
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "alquiler local febrero", producto_id: 11, nombre_nuevo: "Alquiler del local", categoria_id: 11 }] },
+        pend, cat, cats,
+      );
+      expect(items).toEqual([{ textos: ["alquiler local febrero"], producto_id: null, nombre: "Alquiler del local", categoria_id: 11, unidad: "ud" }]);
+    });
+
+    it("sin nombre propio y sin nada en común con la mostaza, la línea se queda sin clasificar", () => {
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "- 20 % bonificac s/ 12.975,5", producto_id: 11, nombre_nuevo: null, categoria_id: null }] },
+        pend, cat, cats,
+      );
+      expect(items).toEqual([]);
+    });
+
+    it("la mostaza de verdad sigue entrando en el producto 11", () => {
+      const items = validarAsignaciones(
+        { asignaciones: [{ texto: "mostaza de cerveza 150g -rooftop-", producto_id: 11, nombre_nuevo: null, categoria_id: null }] },
+        pend, cat, cats,
+      );
+      expect(items).toEqual([{ textos: ["mostaza de cerveza 150g -rooftop-"], producto_id: 11, nombre: null, categoria_id: null, unidad: null }]);
+    });
+
+    it("un producto de otra familia que la categoría propuesta no se acepta; la misma familia sí", () => {
+      const otra = validarAsignaciones(
+        { asignaciones: [{ texto: "riscal rva 75", producto_id: 40, nombre_nuevo: "Riscal Reserva 75 cl", categoria_id: 11 }] },
+        pend, cat, cats,
+      );
+      expect(otra).toEqual([{ textos: ["riscal rva 75"], producto_id: null, nombre: "Riscal Reserva 75 cl", categoria_id: 11, unidad: "ud" }]);
+      const misma = validarAsignaciones(
+        { asignaciones: [{ texto: "riscal rva 75", producto_id: 40, nombre_nuevo: null, categoria_id: 1 }] },
+        pend, cat, cats,
+      );
+      expect(misma).toEqual([{ textos: ["riscal rva 75"], producto_id: 40, nombre: null, categoria_id: null, unidad: null }]);
+    });
   });
 
   describe("añadas: otra añada es otro producto; la misma añada sigue siendo el mismo", () => {
@@ -216,5 +276,55 @@ describe("clasificarPendientes", () => {
       p_items: [{ textos: ["natop"], producto_id: 10, nombre: null, categoria_id: null, unidad: null }],
     });
     expect(r).toMatchObject({ pendientes: 2, textos: 1, propuestas: 1, aplicado: { lineas_asignadas: 2 } });
+  });
+});
+
+describe("aplicarPorTandas (CAS-7: la RPC en tandas y con reintento)", () => {
+  const CORTE = { code: "57014", message: "canceling statement due to statement timeout" };
+  const elementos = (n: number): ElementoClasificacion[] =>
+    Array.from({ length: n }, (_, i) => ({ textos: [`t${i}`], producto_id: null, nombre: `P${i}`, categoria_id: null, unidad: null }));
+  const dormir = vi.fn(async () => {});
+
+  it("trocear: tandas del tamaño pedido, la última con lo que quede", () => {
+    expect(trocear([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+    expect(trocear([], 30)).toEqual([]);
+    expect(TANDA_RPC).toBe(30);
+  });
+
+  it("manda tandas de 30 y suma lo aplicado", async () => {
+    const rpc = vi.fn(async (_f: string, a: { p_items: unknown[] }) => ({
+      data: { productos_creados: a.p_items.length, alias_creados: a.p_items.length, lineas_asignadas: 2 * a.p_items.length, lineas_pendientes: a.p_items.length === 5 },
+      error: null,
+    }));
+    const r = await aplicarPorTandas({ rpc }, elementos(65), { dormir });
+    expect(rpc.mock.calls.map((c) => (c[1] as { p_items: unknown[] }).p_items.length)).toEqual([30, 30, 5]);
+    expect(rpc.mock.calls.every((c) => c[0] === "productos_aplicar_clasificacion_ia")).toBe(true);
+    expect(r).toEqual({ productos_creados: 65, alias_creados: 65, lineas_asignadas: 130, lineas_pendientes: true });
+  });
+
+  it("si la base corta una tanda por tiempo, la reintenta y sigue", async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: { productos_creados: 30, alias_creados: 30, lineas_asignadas: 30 }, error: null })
+      .mockResolvedValueOnce({ data: null, error: CORTE })
+      .mockResolvedValueOnce({ data: { productos_creados: 3, alias_creados: 3, lineas_asignadas: 3 }, error: null });
+    const r = await aplicarPorTandas({ rpc }, elementos(33), { dormir, esperasMs: [7] });
+    expect(rpc).toHaveBeenCalledTimes(3);
+    expect(dormir).toHaveBeenCalledWith(7);
+    expect(r).toEqual({ productos_creados: 33, alias_creados: 33, lineas_asignadas: 33, lineas_pendientes: false });
+  });
+
+  it("si no entra tras los reintentos, lanza con el mismo mensaje de siempre (agrupa en la misma incidencia)", async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: { productos_creados: 30, alias_creados: 30, lineas_asignadas: 30 }, error: null })
+      .mockResolvedValue({ data: null, error: CORTE });
+    await expect(aplicarPorTandas({ rpc }, elementos(40), { dormir, esperasMs: [1, 1] }))
+      .rejects.toThrow("productos_aplicar_clasificacion_ia: canceling statement due to statement timeout");
+    expect(rpc).toHaveBeenCalledTimes(4); // tanda 1 bien + tanda 2 tres veces
+  });
+
+  it("otro error no se reintenta", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: { code: "22023", message: "p_items tiene que ser una lista" } }));
+    await expect(aplicarPorTandas({ rpc }, elementos(2), { dormir, esperasMs: [1] })).rejects.toThrow(/tiene que ser una lista/);
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 });

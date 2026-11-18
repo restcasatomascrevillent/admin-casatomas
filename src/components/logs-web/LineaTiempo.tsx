@@ -2,7 +2,7 @@ import { AlertOctagon, CheckCircle2, MousePointerClick, FileText, Wrench } from 
 import { Badge } from "@/components/ui/badge";
 import type { EventoWeb } from "@/hooks/useLogsWeb";
 import { cn } from "@/lib/utils";
-import { describirEvento, desplazamiento, fmtHora, NOMBRE_CATEGORIA, origenDeEvento } from "./calculos";
+import { ambitoDeEvento, describirEvento, desplazamiento, fmtHora, NOMBRE_CATEGORIA, origenDeEvento } from "./calculos";
 import { BadgeOrigen } from "./Origen";
 import { estiloDe } from "./origenEstilos";
 
@@ -53,7 +53,7 @@ export function LineaTiempo({ eventos, resaltado, onAbrirIncidencia, onAbrirSesi
               <span className="tabular-nums text-xs text-muted-foreground" title={e.ocurrido_en}>
                 {fmtHora(e.ocurrido_en)} · {i === 0 ? "inicio" : desplazamiento(inicio, e.ocurrido_en)}
               </span>
-              {origen && <BadgeOrigen origen={origen} className="px-1.5 py-0 text-[10px]" />}
+              {origen && <BadgeOrigen origen={origen} ambito={ambitoDeEvento(e)} className="px-1.5 py-0 text-[10px]" />}
               <span className={cn("min-w-0 break-words", estilo?.texto, e.categoria === "operacion" && "font-medium")}>{describirEvento(e)}</span>
               {e.ruta && e.tipo !== "pagina_vista" && e.tipo !== "pagina_salida" && <span className="text-xs text-muted-foreground">en {e.ruta}</span>}
               {e.incidencia_id && onAbrirIncidencia && (
