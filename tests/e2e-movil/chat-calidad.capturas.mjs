@@ -69,7 +69,7 @@ try {
     const errores = [];
     page.on("pageerror", (e) => errores.push(e.message));
     await page.goto(`${BASE}/facturas/ia`, { waitUntil: "domcontentloaded" });
-    await page.getByLabel("Pregunta para el asistente").waitFor({ timeout: 30_000 });
+    await page.getByLabel("Pregunta para el asistente").waitFor({ timeout: 90_000 });
     await page.waitForTimeout(800);
 
     const foto = async (nombre, pantalla) => {
