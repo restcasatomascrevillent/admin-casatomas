@@ -3,13 +3,15 @@
 // ----------------------------------------------------------------------------
 //  Toma hasta LIMITE nombres de productos_nombre_embedding con embedding NULL
 //  (los más antiguos primero), pide sus vectores a OpenAI en UNA llamada y los
-//  guarda en lotes pequeños (guardarVectoresNombres).
+//  guarda en lotes pequeños (guardarVectoresNombres), reintentando un lote si la
+//  base lo corta por tiempo.
 // ============================================================================
 
 import { guardarVectoresNombres, TABLA_NOMBRES } from "../procesar-factura/embeddingsNombres.ts";
 import { textoEmbedding } from "../procesar-factura/guardado.ts";
 import type { DatosNormalizados } from "../procesar-factura/extraccion.ts";
 import { vec } from "../procesar-factura/openai.ts";
+import { ESPERAS_REINTENTO_MS } from "../_shared/reintento-bd.ts";
 
 export const FUNCION = "embeddings-nombres";
 export const MODELO = "text-embedding-3-small";
@@ -25,6 +27,10 @@ export interface DepsRelleno {
   /** Devuelve un vector por texto, en el mismo orden. Una llamada a OpenAI. */
   embed: (textos: string[]) => Promise<number[][]>;
   limite?: number;
+  /** Esperas antes de reintentar un lote cortado por tiempo (por defecto 3 s y 8 s). */
+  esperasReintentoMs?: readonly number[];
+  /** Para los tests. */
+  dormir?: (ms: number) => Promise<void>;
 }
 
 /** Texto que se manda a OpenAI: el nombre tal cual (un nombre vacío no se admite). */
@@ -40,7 +46,12 @@ export async function rellenarPendientes(deps: DepsRelleno): Promise<{ pendiente
   const nombres: string[] = (data ?? []).map((f: { nombre: string }) => f.nombre);
   if (nombres.length === 0) return { pendientes: 0, guardados: 0 };
   const vectores = await deps.embed(nombres.map(textoParaEmbedding));
-  const guardados = await guardarVectoresNombres(deps.supabase, nombres, vectores);
+  // El cron sí reintenta un lote cortado por tiempo (3 s y 8 s): la base pudo ir cargada un momento.
+  const guardados = await guardarVectoresNombres(deps.supabase, nombres, vectores, {
+    esperasMs: deps.esperasReintentoMs ?? ESPERAS_REINTENTO_MS,
+    dormir: deps.dormir,
+    alReintentar: (n, ms, e) => console.warn(`[${FUNCION}] lote cortado por tiempo (${e.message}); reintento ${n} en ${ms / 1000} s`),
+  });
   return { pendientes: nombres.length, guardados };
 }
 

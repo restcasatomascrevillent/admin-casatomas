@@ -14,7 +14,8 @@ const createClient = clienteConAuditoria(createClientBase, FUNCION);
 //  (productos_nombre_embedding). Un trigger crea la fila con embedding NULL
 //  cuando entra un nombre nuevo (p. ej. facturas importadas por SQL, sin
 //  OpenAI). Esta función toma hasta 500 pendientes, pide sus vectores en UNA
-//  llamada y los guarda en lotes de 50. Sin pendientes no llama a OpenAI.
+//  llamada y los guarda en lotes de 10 (si la base corta uno por tiempo, lo
+//  reintenta). Sin pendientes no llama a OpenAI.
 //
 //  Quién la llama (verify_jwt = false en config.toml, autenticación propia):
 //    · El cron «embeddings-nombres» (pg_net, cada 10 min y solo si hay

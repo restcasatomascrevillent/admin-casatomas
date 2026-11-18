@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   agruparPendientes,
   anadaDe,
+  aplicarPorTandas,
+  type ElementoClasificacion,
+  TANDA_RPC,
+  trocear,
   type Categoria,
   clasificarPendientes,
   construirMensajes,
@@ -272,5 +276,55 @@ describe("clasificarPendientes", () => {
       p_items: [{ textos: ["natop"], producto_id: 10, nombre: null, categoria_id: null, unidad: null }],
     });
     expect(r).toMatchObject({ pendientes: 2, textos: 1, propuestas: 1, aplicado: { lineas_asignadas: 2 } });
+  });
+});
+
+describe("aplicarPorTandas (CAS-7: la RPC en tandas y con reintento)", () => {
+  const CORTE = { code: "57014", message: "canceling statement due to statement timeout" };
+  const elementos = (n: number): ElementoClasificacion[] =>
+    Array.from({ length: n }, (_, i) => ({ textos: [`t${i}`], producto_id: null, nombre: `P${i}`, categoria_id: null, unidad: null }));
+  const dormir = vi.fn(async () => {});
+
+  it("trocear: tandas del tamaño pedido, la última con lo que quede", () => {
+    expect(trocear([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+    expect(trocear([], 30)).toEqual([]);
+    expect(TANDA_RPC).toBe(30);
+  });
+
+  it("manda tandas de 30 y suma lo aplicado", async () => {
+    const rpc = vi.fn(async (_f: string, a: { p_items: unknown[] }) => ({
+      data: { productos_creados: a.p_items.length, alias_creados: a.p_items.length, lineas_asignadas: 2 * a.p_items.length, lineas_pendientes: a.p_items.length === 5 },
+      error: null,
+    }));
+    const r = await aplicarPorTandas({ rpc }, elementos(65), { dormir });
+    expect(rpc.mock.calls.map((c) => (c[1] as { p_items: unknown[] }).p_items.length)).toEqual([30, 30, 5]);
+    expect(rpc.mock.calls.every((c) => c[0] === "productos_aplicar_clasificacion_ia")).toBe(true);
+    expect(r).toEqual({ productos_creados: 65, alias_creados: 65, lineas_asignadas: 130, lineas_pendientes: true });
+  });
+
+  it("si la base corta una tanda por tiempo, la reintenta y sigue", async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: { productos_creados: 30, alias_creados: 30, lineas_asignadas: 30 }, error: null })
+      .mockResolvedValueOnce({ data: null, error: CORTE })
+      .mockResolvedValueOnce({ data: { productos_creados: 3, alias_creados: 3, lineas_asignadas: 3 }, error: null });
+    const r = await aplicarPorTandas({ rpc }, elementos(33), { dormir, esperasMs: [7] });
+    expect(rpc).toHaveBeenCalledTimes(3);
+    expect(dormir).toHaveBeenCalledWith(7);
+    expect(r).toEqual({ productos_creados: 33, alias_creados: 33, lineas_asignadas: 33, lineas_pendientes: false });
+  });
+
+  it("si no entra tras los reintentos, lanza con el mismo mensaje de siempre (agrupa en la misma incidencia)", async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: { productos_creados: 30, alias_creados: 30, lineas_asignadas: 30 }, error: null })
+      .mockResolvedValue({ data: null, error: CORTE });
+    await expect(aplicarPorTandas({ rpc }, elementos(40), { dormir, esperasMs: [1, 1] }))
+      .rejects.toThrow("productos_aplicar_clasificacion_ia: canceling statement due to statement timeout");
+    expect(rpc).toHaveBeenCalledTimes(4); // tanda 1 bien + tanda 2 tres veces
+  });
+
+  it("otro error no se reintenta", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: { code: "22023", message: "p_items tiene que ser una lista" } }));
+    await expect(aplicarPorTandas({ rpc }, elementos(2), { dormir, esperasMs: [1] })).rejects.toThrow(/tiene que ser una lista/);
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 });
