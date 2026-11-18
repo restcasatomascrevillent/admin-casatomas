@@ -14,6 +14,9 @@ import {
   AGRUPAR_FLEX,
   anotarRuta,
   construirConsultaFlexible,
+  conAnada,
+  excluirPorFormato,
+  pideBotellaNormal,
   esErrorCorregible,
   familiaDeBebida,
   FILTROS_FLEX,
@@ -1061,5 +1064,43 @@ describe("precio de referencia = la ULTIMA factura (dueño, 13/11/2026)", () => 
       rpc: "variacion_precios_agente",
       params: { p_producto: "percebe", p_comparar: "anterior" },
     });
+  });
+});
+
+describe("compras_producto: formato y añada de la pregunta (batería t34, 18/11/2026)", () => {
+  it("pideBotellaNormal: 75 cl y «no magnum» sí; magnum, 1,5 l o 3 l no; sin formato no", () => {
+    expect(pideBotellaNormal("Precio del PSI 2023 75 cl")).toBe(true);
+    expect(pideBotellaNormal("Precio del Lagar de Cervera 75 cl (no magnum)")).toBe(true);
+    expect(pideBotellaNormal("la botella de 0,75 l de Viña Arana")).toBe(true);
+    expect(pideBotellaNormal("el magnum de PSI 2023")).toBe(false);
+    expect(pideBotellaNormal("PSI 2023 1,5 l")).toBe(false);
+    expect(pideBotellaNormal("PSI 2023 de 3 L")).toBe(false);
+    expect(pideBotellaNormal("Precio del PSI 2023")).toBe(false);
+    expect(pideBotellaNormal(undefined)).toBe(false);
+  });
+
+  it("excluirPorFormato: suma magnum/jeroboam a lo que ya excluya el modelo; si el producto ya es magnum, nada", () => {
+    expect(excluirPorFormato(null, "psi 2023", "Precio del PSI 2023 75 cl")).toBe("magnum mgn jeroboam jerobo");
+    expect(excluirPorFormato("caja", "psi 2023", "psi 2023 75 cl")).toBe("caja magnum mgn jeroboam jerobo");
+    expect(excluirPorFormato(null, "psi magnum 2023", "psi magnum 2023 75 cl")).toBeNull();
+    expect(excluirPorFormato("caja", "psi 2023", "Precio del PSI 2023")).toBe("caja");
+  });
+
+  it("conAnada: la añada pegada al producto en la pregunta pasa a la búsqueda; un periodo no", () => {
+    expect(conAnada("psi", "Precio del PSI 2023", false)).toBe("psi 2023");
+    expect(conAnada("psi", "Precio del PSI del 2023 75 cl", false)).toBe("psi 2023");
+    expect(conAnada("psi 2023", "Precio del PSI 2023", false)).toBe("psi 2023");
+    expect(conAnada("psi", "Precio del PSI 2023", true)).toBe("psi");
+    expect(conAnada("psi", "Cuánto compré de PSI en 2023", false)).toBe("psi");
+    expect(conAnada("psi", undefined, false)).toBe("psi");
+  });
+
+  it("prepararLlamada: la pregunta de la botella normal excluye el magnum y conserva la añada", () => {
+    const ll = prepararLlamada("compras_producto", { producto: "psi 2023" }, "Precio del PSI 2023 75 cl");
+    expect(ll).toMatchObject({ rpc: "compras_producto_agente", params: { p_texto: "psi 2023", p_excluir: "magnum mgn jeroboam jerobo" } });
+    const sin = prepararLlamada("compras_producto", { producto: "psi 2023" }, "Precio del PSI 2023");
+    expect(sin).toMatchObject({ params: { p_texto: "psi 2023", p_excluir: null } });
+    const ana = prepararLlamada("compras_producto", { producto: "psi" }, "Precio del PSI 2023 75 cl");
+    expect(ana).toMatchObject({ params: { p_texto: "psi 2023" } });
   });
 });
