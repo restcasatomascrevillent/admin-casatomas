@@ -12,11 +12,18 @@
  * informe no hay que tocar esta página.
  *
  * El informe y el periodo van en la URL (?informe=…&mes=… o &desde=…&hasta=…).
+ *
+ * 18/11/2026, petición del dueño: «que tú elijas el mes y ya cuando entres a
+ * cualquier informe te detecte ese mes». Arriba de la página va el MES DE LOS
+ * INFORMES (◀ desplegable ▶): se elige una vez y se queda al cambiar de informe
+ * (en la URL y, para volver luego en la misma pestaña, en sessionStorage). Los
+ * informes por meses salen de ese mes sin más selector; los de fechas empiezan
+ * por ese mes entero (y se pueden ajustar); los que no van por fechas lo ignoran.
  */
-import { createContext, lazy, Suspense, useContext, useMemo, useState, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
+import { createContext, lazy, Suspense, useContext, useEffect, useMemo, useState, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, ChevronRight, FileBarChart2, FileSpreadsheet, FileText } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, FileBarChart2, FileSpreadsheet, FileText } from "lucide-react";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
@@ -24,19 +31,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MarcoInforme, SelectorMes } from "@/components/informes/MarcoInforme";
+import { MarcoInforme } from "@/components/informes/MarcoInforme";
 import { GeneradorTabla } from "@/components/informes/GeneradorTabla";
 import { useFuenteInforme } from "@/components/informes/useFuenteInforme";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useUserRole } from "@/hooks/useUserRole";
-import { atajosRango, mesesPorDefecto, periodoEnUrl, periodoInicial, validarRango, type Periodo } from "@/lib/informes/periodo";
+import { atajosRango, mesDeLaPagina, mesesPorDefecto, periodoEnUrl, rangoDeMes, textoMes, textoPeriodo, validarRango, type OpcionMes, type Periodo } from "@/lib/informes/periodo";
 import { buscarInforme, informesPorSeccion, type DefinicionInforme, type PropsGeneradorInforme } from "@/lib/informes/registro";
 import { cn } from "@/lib/utils";
 
 const ISO = "yyyy-MM-dd";
 /** Suelo (px) del alto de la página: por debajo vuelve el scroll de página. */
 const ALTURA_MINIMA_INFORMES = 480;
+/** Último mes elegido en esta pestaña (sessionStorage): al volver a Informes sigue el mismo. */
+export const CLAVE_MES_INFORMES = "casa-tomas:informes:mes";
+
+function leerMesGuardado(): string | null {
+  try {
+    return window.sessionStorage.getItem(CLAVE_MES_INFORMES);
+  } catch {
+    return null;
+  }
+}
+function guardarMes(mes: string) {
+  try {
+    window.sessionStorage.setItem(CLAVE_MES_INFORMES, mes);
+  } catch {
+    /* modo privado o almacenamiento bloqueado: se queda solo en la URL */
+  }
+}
 
 // ─── Marco de la página ──────────────────────────────────────────────────────
 // Cada generador pinta su contenido dentro de `Marco`. Es un componente fijo (no
@@ -99,8 +123,24 @@ function Esqueletos() {
 // ─── Selector de periodo ─────────────────────────────────────────────────────
 const PERSONALIZADO = "personalizado";
 
-function SelectorRango({ desde, hasta, hoy, onCambio }: { desde: string; hasta: string; hoy: string; onCambio: (r: { desde: string; hasta: string }) => void }) {
-  const atajos = useMemo(() => atajosRango(hoy), [hoy]);
+function SelectorRango({
+  desde,
+  hasta,
+  hoy,
+  mes,
+  onCambio,
+}: {
+  desde: string;
+  hasta: string;
+  hoy: string;
+  /** El mes de la página: primera opción, «Todo octubre de 2026». */
+  mes: string;
+  onCambio: (r: { desde: string; hasta: string }) => void;
+}) {
+  const atajos = useMemo(() => {
+    const delMes = { id: "mes-elegido", etiqueta: `Todo ${textoMes(mes)}`, ...rangoDeMes(mes) };
+    return [delMes, ...atajosRango(hoy).filter((a) => a.desde !== delMes.desde || a.hasta !== delMes.hasta)];
+  }, [hoy, mes]);
   const atajo = atajos.find((a) => a.desde === desde && a.hasta === hasta)?.id;
   const [personalizado, setPersonalizado] = useState(!atajo);
   const [borrador, setBorrador] = useState({ desde, hasta });
@@ -131,7 +171,7 @@ function SelectorRango({ desde, hasta, hoy, onCambio }: { desde: string; hasta: 
           onCambio({ desde: a.desde, hasta: a.hasta });
         }}
       >
-        <SelectTrigger aria-label="Periodo del informe" className="h-11 w-full sm:w-[200px]">
+        <SelectTrigger aria-label="Periodo del informe" className="h-11 w-full sm:w-[230px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -169,15 +209,43 @@ function SelectorRango({ desde, hasta, hoy, onCambio }: { desde: string; hasta: 
 }
 
 // ─── Panel del informe elegido ───────────────────────────────────────────────
-function PanelInforme({ definicion, hoy, periodo, onPeriodo }: { definicion: DefinicionInforme; hoy: string; periodo: Periodo; onPeriodo: (p: Periodo) => void }) {
+/** Lo que se ve en la cabecera del informe cuando no hay nada que elegir: el mes de la página o «Todos los datos». */
+function ChipPeriodo({ texto, etiqueta, soloEscritorio = false }: { texto: string; etiqueta: string; soloEscritorio?: boolean }) {
+  return (
+    <span
+      aria-label={`${etiqueta}: ${texto}`}
+      // En el móvil, el mes ya se ve justo encima (barra del mes): no se repite.
+      className={cn("h-11 w-full items-center gap-2 rounded-md border bg-muted/40 px-3 text-sm font-medium sm:w-auto", soloEscritorio ? "hidden sm:inline-flex" : "inline-flex")}
+    >
+      <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      {texto}
+    </span>
+  );
+}
+
+function PanelInforme({
+  definicion,
+  hoy,
+  mes,
+  periodo,
+  onPeriodo,
+}: {
+  definicion: DefinicionInforme;
+  hoy: string;
+  mes: string;
+  periodo: Periodo;
+  onPeriodo: (p: Periodo) => void;
+}) {
   const fuenteLista = useFuenteInforme(true);
-  const meses = useMemo(() => definicion.meses?.(hoy) ?? mesesPorDefecto(hoy), [definicion, hoy]);
   const selector =
-    periodo.tipo === "mes" ? (
-      <SelectorMes valor={periodo.mes} onCambio={(mes) => onPeriodo({ tipo: "mes", mes })} meses={meses} />
-    ) : periodo.tipo === "rango" ? (
-      <SelectorRango desde={periodo.desde} hasta={periodo.hasta} hoy={hoy} onCambio={(r) => onPeriodo({ tipo: "rango", ...r })} />
-    ) : null;
+    periodo.tipo === "rango" ? (
+      // key: al cambiar el mes de la página, el selector vuelve a «Todo <mes>».
+      <SelectorRango key={mes} desde={periodo.desde} hasta={periodo.hasta} hoy={hoy} mes={mes} onCambio={(r) => onPeriodo({ tipo: "rango", ...r })} />
+    ) : periodo.tipo === "mes" ? (
+      <ChipPeriodo etiqueta="Mes del informe" texto={textoPeriodo(periodo)} soloEscritorio />
+    ) : (
+      <ChipPeriodo etiqueta="Periodo del informe" texto="Todos los datos" />
+    );
   const Generador = generadorDe(definicion);
   // Se crea en cada render (el selector cambia): solo re-renderiza el marco, no monta de nuevo la vista previa.
   const contexto = { definicion, selector, fuenteLista };
@@ -248,7 +316,7 @@ function ListaInformes({
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium leading-snug">{def.titulo}</span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {def.periodo === "mes" ? "Por meses" : def.periodo === "rango" ? "Del periodo que elijas" : "Todos los datos"}
+                        {def.periodo === "mes" ? "Del mes elegido" : def.periodo === "rango" ? "Del mes elegido o de las fechas que quieras" : "Sin fechas: todos los datos"}
                       </span>
                     </span>
                     <IconoFormatos def={def} />
@@ -281,8 +349,61 @@ function EstadoElige() {
     <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-background px-6 py-14 text-center">
       <FileBarChart2 className="h-8 w-8 text-muted-foreground" aria-hidden />
       <p className="font-medium">Elige un informe</p>
-      <p className="max-w-sm text-sm text-muted-foreground">Escoge uno de la lista y su periodo: saldrá la vista previa y podrás descargarlo en PDF (o en CSV para Excel).</p>
+      <p className="max-w-sm text-sm text-muted-foreground">Escoge uno de la lista: saldrá del mes que tienes arriba, con su vista previa, y podrás descargarlo en PDF (o en CSV para Excel).</p>
     </div>
+  );
+}
+
+// ─── Mes de la página ────────────────────────────────────────────────────────
+/** ◀ desplegable ▶. `meses` va del más nuevo (el que está en curso) al más viejo. */
+function SelectorMesPagina({ mes, meses, onCambio }: { mes: string; meses: OpcionMes[]; onCambio: (mes: string) => void }) {
+  const i = meses.findIndex((m) => m.clave === mes);
+  const anterior = i >= 0 && i < meses.length - 1 ? meses[i + 1].clave : null;
+  const siguiente = i > 0 ? meses[i - 1].clave : null;
+  return (
+    <div className="flex w-full items-center gap-1.5 sm:w-auto">
+      <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" aria-label="Mes anterior" disabled={!anterior} onClick={() => anterior && onCambio(anterior)}>
+        <ChevronLeft className="h-4 w-4" aria-hidden />
+      </Button>
+      <Select value={mes} onValueChange={onCambio}>
+        <SelectTrigger aria-label="Mes de los informes" className="h-11 min-w-0 flex-1 gap-2 font-medium sm:w-[250px] sm:flex-none">
+          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="min-w-0 flex-1 truncate text-left">
+            <SelectValue />
+          </span>
+        </SelectTrigger>
+        <SelectContent>
+          {meses.map((m) => (
+            <SelectItem key={m.clave} value={m.clave}>
+              {m.etiqueta}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" aria-label="Mes siguiente" disabled={!siguiente} onClick={() => siguiente && onCambio(siguiente)}>
+        <ChevronRight className="h-4 w-4" aria-hidden />
+      </Button>
+    </div>
+  );
+}
+
+function BarraMes({ mes, meses, onCambio }: { mes: string; meses: OpcionMes[]; onCambio: (mes: string) => void }) {
+  const enCurso = meses.find((m) => m.clave === mes)?.enCurso ?? false;
+  const nombre = textoMes(mes);
+  return (
+    <section
+      aria-label="Mes de los informes"
+      className="flex shrink-0 flex-col gap-2 rounded-lg border bg-background px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4"
+    >
+      <div className="min-w-0">
+        <h1 className="text-base font-semibold leading-tight">
+          Informes de {nombre}
+          {enCurso && <span className="ml-1.5 text-sm font-normal text-muted-foreground">(mes en curso)</span>}
+        </h1>
+        <p className="mt-0.5 text-xs text-muted-foreground">Elige el mes una vez: cualquier informe que abras sale de ese mes.</p>
+      </div>
+      <SelectorMesPagina mes={mes} meses={meses} onCambio={onCambio} />
+    </section>
   );
 }
 
@@ -298,21 +419,35 @@ export default function SuperAdminInformes() {
   const visibles = useMemo(() => grupos.flatMap((g) => g.informes), [grupos]);
   const elegido = buscarInforme(params.get("informe"), visibles);
 
+  // El mes de la página: el de la URL, el último elegido en esta pestaña o el último mes cerrado.
+  const meses = useMemo(() => mesesPorDefecto(hoy), [hoy]);
+  const mesUrl = params.get("mes");
+  const mes = mesDeLaPagina(hoy, mesUrl, leerMesGuardado(), meses);
+  useEffect(() => guardarMes(mes), [mes]);
+
   const periodo = useMemo<Periodo | null>(() => {
     if (!elegido) return null;
-    return periodoInicial(
-      elegido.periodo,
-      hoy,
-      { mes: params.get("mes"), desde: params.get("desde"), hasta: params.get("hasta") },
-      elegido.periodo === "mes" ? { meses: elegido.meses?.(hoy), mesPorDefecto: elegido.mesPorDefecto?.(hoy) } : undefined,
-    );
-  }, [elegido, hoy, params]);
+    if (elegido.periodo === "ninguno") return { tipo: "ninguno" };
+    if (elegido.periodo === "mes") {
+      // Un informe con su propia lista de meses: si el de la página no está, el suyo por defecto.
+      const propios = elegido.meses?.(hoy);
+      const vale = !propios || propios.some((m) => m.clave === mes);
+      return { tipo: "mes", mes: vale ? mes : (elegido.mesPorDefecto?.(hoy) ?? propios[0]?.clave ?? mes) };
+    }
+    // Fechas a medida en la URL (si las hay); si no, el mes de la página entero.
+    const rango = validarRango(params.get("desde"), params.get("hasta"));
+    return { tipo: "rango", ...(rango ?? rangoDeMes(mes)) };
+  }, [elegido, hoy, mes, params]);
 
-  const elegir = (id: string | null, p?: Periodo) => {
+  /** Cambia la URL conservando siempre el mes de la página. */
+  const ir = (siguiente: Record<string, string>, reemplazar: boolean) => setParams({ ...siguiente, mes }, { replace: reemplazar });
+  const elegir = (id: string | null) => {
     const def = buscarInforme(id, visibles);
-    const siguiente: Record<string, string> = def ? { informe: def.id, ...(p ? periodoEnUrl(p) : {}) } : {};
-    setParams(siguiente, { replace: !!(def && elegido && def.id === elegido.id) });
+    ir(def ? { informe: def.id } : {}, false);
   };
+  const cambiarPeriodo = (p: Periodo) => elegido && ir({ informe: elegido.id, ...(p.tipo === "rango" ? periodoEnUrl(p) : {}) }, true);
+  // Otro mes: las fechas a medida de un informe de rango se descartan (vuelve a «Todo <mes>»).
+  const cambiarMes = (m: string) => setParams({ ...(elegido ? { informe: elegido.id } : {}), mes: m }, { replace: true });
 
   // Alto de la pantalla (regla del dueño, 2026-10-07: sin scroll de página): la lista y la vista previa con scroll propio.
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
@@ -320,42 +455,45 @@ export default function SuperAdminInformes() {
 
   return (
     <SuperAdminLayout>
-      <div ref={setRaiz} className="flex min-h-0 flex-col gap-3 lg:flex-row lg:gap-4" style={alto ? { height: alto } : undefined}>
-        <aside
-          aria-label="Lista de informes"
-          className={cn("flex min-h-0 flex-col gap-3 lg:w-80 lg:shrink-0 lg:overflow-y-auto lg:pr-1", elegido && "max-lg:hidden")}
-        >
-          <p className="px-1 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">Todos los informes del panel.</span> Elige uno y su periodo para verlo y descargarlo.
-          </p>
-          {cargando ? (
-            <div className="flex flex-col gap-2" aria-busy="true" aria-label="Cargando informes">
-              {Array.from({ length: 5 }, (_, i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : grupos.length === 0 ? (
-            <EstadoSinInformes />
-          ) : (
-            <ListaInformes grupos={grupos} elegido={elegido?.id ?? null} onElegir={(id) => elegir(id)} />
-          )}
-        </aside>
-
-        <main className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", !elegido && "max-lg:hidden")}>
-          {elegido && periodo ? (
-            <>
-              <Button variant="ghost" className="h-11 w-fit gap-2 px-2 lg:hidden" onClick={() => elegir(null)}>
-                <ArrowLeft className="h-4 w-4" aria-hidden />
-                Todos los informes
-              </Button>
-              <div className="flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-lg border bg-background lg:min-h-0">
-                <PanelInforme key={elegido.id} definicion={elegido} hoy={hoy} periodo={periodo} onPeriodo={(p) => elegir(elegido.id, p)} />
+      <div ref={setRaiz} className="flex min-h-0 flex-col gap-3" style={alto ? { height: alto } : undefined}>
+        {!cargando && grupos.length > 0 && <BarraMes mes={mes} meses={meses} onCambio={cambiarMes} />}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row lg:gap-4">
+          <aside
+            aria-label="Lista de informes"
+            className={cn("flex min-h-0 flex-col gap-3 lg:w-80 lg:shrink-0 lg:overflow-y-auto lg:pr-1", elegido && "max-lg:hidden")}
+          >
+            <p className="px-1 text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Todos los informes del panel.</span> Elige uno para verlo y descargarlo.
+            </p>
+            {cargando ? (
+              <div className="flex flex-col gap-2" aria-busy="true" aria-label="Cargando informes">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                ))}
               </div>
-            </>
-          ) : !cargando && grupos.length > 0 ? (
-            <EstadoElige />
-          ) : null}
-        </main>
+            ) : grupos.length === 0 ? (
+              <EstadoSinInformes />
+            ) : (
+              <ListaInformes grupos={grupos} elegido={elegido?.id ?? null} onElegir={(id) => elegir(id)} />
+            )}
+          </aside>
+
+          <main className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", !elegido && "max-lg:hidden")}>
+            {elegido && periodo ? (
+              <>
+                <Button variant="ghost" className="h-11 w-fit gap-2 px-2 lg:hidden" onClick={() => elegir(null)}>
+                  <ArrowLeft className="h-4 w-4" aria-hidden />
+                  Todos los informes
+                </Button>
+                <div className="flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-lg border bg-background lg:min-h-0">
+                  <PanelInforme key={elegido.id} definicion={elegido} hoy={hoy} mes={mes} periodo={periodo} onPeriodo={cambiarPeriodo} />
+                </div>
+              </>
+            ) : !cargando && grupos.length > 0 ? (
+              <EstadoElige />
+            ) : null}
+          </main>
+        </div>
       </div>
     </SuperAdminLayout>
   );

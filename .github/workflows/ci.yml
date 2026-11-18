@@ -257,10 +257,11 @@ jobs:
         run: npx vitest run api/
         env:
           RECORTE_INFERENCIA: "1"
-      - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
+      - name: Reversión de auditoría, informe de auditoría, bloqueo de usuarios y superadmin (PGlite)
         if: env.COMPLETA == 'true'
         run: |
           node scripts/verificar-auditoria.mjs
+          node scripts/verificar-informe-auditoria.mjs
           node scripts/verificar-bloqueo-usuarios.mjs
           node scripts/verificar-gestion-superadmin.mjs
       - name: Build de producción
