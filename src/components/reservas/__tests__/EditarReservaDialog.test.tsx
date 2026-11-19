@@ -479,6 +479,24 @@ describe("EditarReservaDialog · Verificar, Confirmar y Cancelar", () => {
     expect(mocks.cancelar).toHaveBeenCalled();
   });
 
+  it("con email, «Cancelar sin enviar correo» cancela sin avisar al cliente (19/11/2026)", async () => {
+    mocks.reserva = fila({ estado: "confirmada", email: "ana@ejemplo.com" });
+    const { onClose } = montar();
+    fireEvent.click(await screen.findByRole("button", { name: "Cancelar reserva" }));
+    expect(await screen.findByRole("button", { name: "Sí, cancelar y avisar" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar sin enviar correo" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mocks.cancelar).toHaveBeenCalledWith(expect.objectContaining({ id: "res-1" }), { sinCorreo: true });
+  });
+
+  it("sin email no ofrece «Cancelar sin enviar correo»", async () => {
+    mocks.reserva = fila({ estado: "confirmada", email: null });
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: "Cancelar reserva" }));
+    expect(await screen.findByRole("button", { name: "Sí, cancelar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancelar sin enviar correo" })).toBeNull();
+  });
+
   it("una reserva terminada (llegó, no vino, cancelada) enseña su estado pero no tiene botones de estado", async () => {
     mocks.reserva = fila({ estado: "completada" });
     montar();
