@@ -14,7 +14,7 @@
 // ============================================================================
 import type { AcumuladorUso, UsageBruto } from "../_shared/registrar-uso-ia.ts";
 import { esErrorDeModelo } from "../_shared/modelo-funcion.ts";
-import { resumenParaModelo, tablaPresupuesto, verDePregunta } from "./tabla.ts";
+import { claveDescuento, detalleParaModelo, mostrarTablaPresupuesto, resumenParaModelo, tablaPresupuesto, verDePregunta, type DescuentoPedido } from "./tabla.ts";
 import { ayudaDeResultado, unirAyuda, type AyudaPanel } from "./hilo.ts";
 import {
   type Adjunto,
@@ -172,6 +172,8 @@ interface Ctx {
   fetchImpl: typeof fetch;
   /** Id del presupuesto adjunto de la conversacion (comparar_presupuesto). */
   presupuestoId?: string | null;
+  /** Descuento de la última comparación de esa tarifa en el hilo (null = aún no se comparó): decide si va la tabla. */
+  comparacionPrevia?: DescuentoPedido | null;
 }
 
 // ─── Hilo de la conversación (11/11/2026) ────────────────────────────────────
@@ -397,13 +399,41 @@ interface ResultadoTool {
  * comparar_presupuesto (auditoría 16/11/2026): la tabla la monta el servidor
  * con TODAS las líneas y el modelo solo ve el resumen. Antes el resultado se
  * recortaba y el modelo enseñaba 4 ofertas de 143.
+ * Seguimientos (19/11/2026): con `conTabla: false` no hay tabla y el modelo
+ * recibe el detalle (precio por envase con y sin IVA, último pagado) para
+ * contestar SOLO lo que se pregunta.
  */
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function prepararPresupuesto(data: any, ver?: unknown): { tabla: string; paraModelo: unknown } | null {
+export function prepararPresupuesto(data: any, ver?: unknown, opciones?: { conTabla?: boolean; pregunta?: string }): { tabla: string | null; paraModelo: unknown } | null {
   if (!data || typeof data !== "object" || Array.isArray(data) || data.error) return null;
+  if (opciones?.conTabla === false) return { tabla: null, paraModelo: detalleParaModelo(data, opciones.pregunta) };
   return { tabla: tablaPresupuesto(data, ver), paraModelo: resumenParaModelo(data) };
 }
+
+/** El aviso de la primera tarifa adjunta: «📎 Presupuesto adjunto: …» (lo escribe useChatFacturas). */
+export const MARCA_ADJUNTO_PRESUPUESTO = "📎 Presupuesto adjunto";
+
+/**
+ * Descuento de la última comparación de la tarifa adjunta en el hilo (los argumentos de comparar_presupuesto que
+ * guardó el panel con la respuesta), o null si desde el último adjunto aún no se comparó.
+ */
+export function comparacionPreviaDelHilo(historial: TurnoHistorial[] | undefined): DescuentoPedido | null {
+  for (const t of [...(historial ?? [])].reverse()) {
+    if (t.role === "user" && t.content.startsWith(MARCA_ADJUNTO_PRESUPUESTO)) return null;
+    if (t.role !== "assistant") continue;
+    const h = [...(t.herramientas ?? [])].reverse().find((x) => x.nombre === "comparar_presupuesto" && !x.error);
+    if (h) return h.argumentos && typeof h.argumentos === "object" ? h.argumentos as DescuentoPedido : { descuento_tipo: "ninguno" };
+  }
+  return null;
+}
+
+const textoDescuento = (d: DescuentoPedido): string => {
+  const c = claveDescuento(d);
+  if (c === "ninguno") return "ninguno";
+  const [tipo, valor] = c.split(":");
+  return tipo === "porcentaje" ? `${valor} %` : `${valor} EUR`;
+};
 
 /** Documentos (con enlace al original) para los ids dados. Best-effort: si falla, sin referencias. */
 async function cargarReferencias(ids: number[], supabase: Cliente): Promise<DocRef[]> {
@@ -590,8 +620,9 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
     if (vino && data && typeof data === "object" && !Array.isArray(data)) data = { vino_carta: vino, ...(data as Record<string, unknown>) };
 
     if (nombre === "comparar_presupuesto") {
-      const p = prepararPresupuesto(data, args?.ver ?? verDePregunta(ctx.pregunta));
-      if (p) return { fallo: false, tabla: p.tabla, contenido: JSON.stringify(p.paraModelo) };
+      const conTabla = mostrarTablaPresupuesto(ctx.pregunta, args, ctx.comparacionPrevia);
+      const p = prepararPresupuesto(data, args?.ver ?? verDePregunta(ctx.pregunta), { conTabla, pregunta: ctx.pregunta });
+      if (p) return { fallo: false, ...(p.tabla ? { tabla: p.tabla } : {}), contenido: JSON.stringify(p.paraModelo) };
     }
 
     let referencias: DocRef[] = [];
@@ -673,11 +704,17 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   const aviso: string[] = [`FECHA: hoy es ${o.hoy ?? hoyMadrid()}.`];
   const hilo = pistaDelHilo(historial, String(mensaje));
   if (hilo) aviso.push(hilo);
+  // Con el historial sin recortar por tamaño: las respuestas con tabla pesan y el recorte podría dejar fuera la comparación.
+  const comparacionPrevia = o.presupuesto ? comparacionPreviaDelHilo(o.historial) : null;
   if (o.presupuesto) {
     const p = o.presupuesto;
     aviso.push(
       `PRESUPUESTO adjunto: «${p.archivo ?? "presupuesto"}»${p.proveedor ? ` de ${p.proveedor}` : ""}, ${p.lineas} lineas. ` +
-      (p.proveedor
+      (comparacionPrevia
+        // Seguimiento (19/11/2026): sin esto el modelo no sabía con qué descuento volver a mirar la tarifa.
+        ? `Ya se comparo con descuento ${textoDescuento(comparacionPrevia)}. Si pregunta algo de esta tarifa (que interesa, precios, ` +
+          "IVA, un articulo), llama a comparar_presupuesto con ese descuento (salvo que diga otro) y contesta SOLO lo que pregunta."
+        : p.proveedor
         ? "Ya se pregunto por el descuento: si el mensaje del usuario lo contesta, llama a comparar_presupuesto."
         : "El fichero no dice el proveedor: ya se pregunto por el proveedor y el descuento; si el mensaje lo contesta, " +
           "llama a comparar_presupuesto con el proveedor que diga (null si no lo dice)."),
@@ -722,6 +759,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
     clave: o.claveOpenAI,
     fetchImpl: f,
     presupuestoId: o.presupuesto?.id ?? null,
+    comparacionPrevia,
   };
   let respuesta = "";
   let huboFalloDeHerramienta = false;

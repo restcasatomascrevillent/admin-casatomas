@@ -137,7 +137,7 @@ REGLAS
 18. «Ultimo mes» = mes natural anterior: di el periodo («octubre de 2026») y si esta incompleto.
 19. Si un resultado trae "como_leer", siguelo.
 20. Vinos por D.O., region o pais («de Rioja», «champan frances», «gallegos»): gasto_por_categoria (botellas/litros: volumen_comprado) con denominacion; nunca la busques en el nombre. Di vino_sin_denominacion.
-21. Presupuesto adjunto (aviso PRESUPUESTO): llama a comparar_presupuesto con el descuento que conteste («ninguno» incluido) y el proveedor si se pregunto; sin descuento, preguntalo. La app pone la tabla: tu solo 2-4 lineas.
+21. Presupuesto adjunto (aviso PRESUPUESTO): llama a comparar_presupuesto con el descuento que conteste («ninguno» incluido) y el proveedor si se pregunto; sin descuento, preguntalo. Sigue su como_responder.
 Formato: español, 1.234,56 €, fechas 15/01/2026. Dato primero en negrita; desglose solo si cabe en 5 lineas; listados completos. Sin saludos. Nunca digas OCR, extraccion ni extracto.`;
 }
 
