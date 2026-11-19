@@ -428,6 +428,58 @@ export function comparacionPreviaDelHilo(historial: TurnoHistorial[] | undefined
   return null;
 }
 
+// ─── Comparación guardada (19/11/2026) ──────────────────────────────────────
+//  comparar_presupuesto_agente tarda 1-4 s con una tarifa grande y se repetía
+//  en cada pregunta sobre ella: con la demo cargada se cortó dos veces por el
+//  «statement timeout» de 8 s («No puedo consultar ahora los cinco mejores…»).
+//  La primera comparación se guarda en chat_presupuestos_comparaciones (por
+//  tarifa y descuento) y los seguimientos la leen. Todo es best-effort: si la
+//  tabla no está (BD sin migrar) o falla, se calcula como antes.
+
+/** Cuánto vale una comparación guardada (y además, solo el mismo día). */
+export const VIGENCIA_COMPARACION_MS = 6 * 60 * 60 * 1000;
+
+/** Tarifa + descuento + proveedor dicho: lo que cambia el resultado de la comparación. */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function claveComparacion(params: any): string {
+  const n = (v: unknown) => (v === null || v === undefined || v === "" ? "" : String(Math.round(Number(v) * 10000) / 10000));
+  const prov = String(params?.p_proveedor ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+  return `pct:${n(params?.p_descuento_pct)}|imp:${n(params?.p_descuento_importe)}|prov:${prov}`.slice(0, 200);
+}
+
+/** La comparación guardada si sigue valiendo (menos de 6 h y del mismo día), o null. */
+export async function comparacionGuardada(supabase: Cliente, presupuestoId: string, clave: string, hoy = hoyMadrid()): Promise<unknown | null> {
+  try {
+    const { data, error } = await supabase
+      .from("chat_presupuestos_comparaciones")
+      .select("datos, creado_en")
+      .eq("presupuesto_id", presupuestoId)
+      .eq("clave", clave)
+      .maybeSingle();
+    if (error || !data?.datos || typeof data.datos !== "object") return null;
+    const edad = Date.now() - Date.parse(String(data.creado_en));
+    if (!Number.isFinite(edad) || edad > VIGENCIA_COMPARACION_MS) return null;
+    if (data.datos.hoy && data.datos.hoy !== hoy) return null;
+    return data.datos;
+  } catch {
+    return null;
+  }
+}
+
+/** Guarda la comparación para los seguimientos. Nunca lanza: sin guardar, se recalcula la próxima vez. */
+export async function guardarComparacion(supabase: Cliente, presupuestoId: string, clave: string, datos: unknown): Promise<void> {
+  if (!datos || typeof datos !== "object" || Array.isArray(datos) || (datos as { error?: unknown }).error) return;
+  try {
+    const { error } = await supabase
+      .from("chat_presupuestos_comparaciones")
+      .upsert({ presupuesto_id: presupuestoId, clave, datos, creado_en: new Date().toISOString() });
+    if (error) console.warn("[chat-facturas] comparación sin guardar:", error.message ?? error);
+  } catch (e) {
+    console.warn("[chat-facturas] comparación sin guardar:", e instanceof Error ? e.message : e);
+  }
+}
+
 const textoDescuento = (d: DescuentoPedido): string => {
   const c = claveDescuento(d);
   if (c === "ninguno") return "ninguno";
@@ -567,7 +619,11 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       : null;
 
     if (ll.tipo === "rpc") {
-      let r = await supabase.rpc(ll.rpc, ll.params);
+      // Tarifa adjunta: la comparación ya hecha (mismo descuento) se reutiliza.
+      const tarifa = ll.rpc === "comparar_presupuesto_agente" && ctx.presupuestoId ? ctx.presupuestoId : null;
+      const claveTarifa = tarifa ? claveComparacion(ll.params) : "";
+      const guardada = tarifa ? await comparacionGuardada(supabase, tarifa, claveTarifa) : null;
+      let r = guardada ? { data: guardada, error: null } : await supabase.rpc(ll.rpc, ll.params);
       // Tiempo agotado en la BD (corta a los 8 s): UN reintento si queda margen. El
       // segundo intento encuentra los datos ya en memoria y suele entrar en plazo;
       // así el usuario espera unos segundos más en vez de leer «no he podido consultar».
@@ -577,6 +633,7 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       }
       if (r.error) throw r.error;
       data = r.data;
+      if (tarifa && !guardada) await guardarComparacion(supabase, tarifa, claveTarifa, data);
       // historial_precios / grafico_precio sin ninguna compra: antes de decir «no hay» se busca
       // como compras_producto (abreviaturas, erratas, sugerencias por texto y por significado).
       if (sinCompras(nombre, data)) {

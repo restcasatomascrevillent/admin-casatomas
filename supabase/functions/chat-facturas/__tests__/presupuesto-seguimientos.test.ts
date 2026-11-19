@@ -14,8 +14,11 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
+  claveComparacion,
+  comparacionGuardada,
   comparacionPreviaDelHilo,
   ejecutarConversacion,
+  VIGENCIA_COMPARACION_MS,
   MARCA_ADJUNTO_PRESUPUESTO,
   prepararPresupuesto,
   type EstadoUso,
@@ -230,6 +233,88 @@ describe("la conversación del dueño, de punta a punta", () => {
     expect(r.respuesta).toContain("21,77 € · 75 cl");
     const avisos = ai.cuerpos[0].messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
     expect(avisos).toMatch(/ya se pregunto por el proveedor y el descuento/);
+  });
+});
+
+// ─── La comparación se guarda para los seguimientos (19/11/2026) ────────────
+//  08:22 en la demo: «dime los cinco mejores…» → «No puedo consultar ahora…». La comparación se repetía en cada
+//  pregunta y se cortó dos veces por el «statement timeout» de 8 s. Ahora se reutiliza la ya hecha.
+
+/** Supabase con la tabla chat_presupuestos_comparaciones (lectura por clave y upsert). */
+function supabaseConGuardadas(guardada: { datos: unknown; creado_en: string } | null) {
+  const rpcs: string[] = [];
+  const upserts: Array<Record<string, unknown>> = [];
+  const filtros: Array<[string, unknown]> = [];
+  const consulta = {
+    select() { return consulta; },
+    eq(c: string, v: unknown) { filtros.push([c, v]); return consulta; },
+    maybeSingle: async () => ({ data: guardada, error: null }),
+  };
+  return {
+    rpcs, upserts, filtros,
+    rpc(fn: string) {
+      rpcs.push(fn);
+      if (fn === "comparar_presupuesto_agente") return Promise.resolve({ data: { ...RESULTADO, hoy: "2026-11-19" }, error: null });
+      return Promise.resolve({ data: [], error: null });
+    },
+    from(tabla: string) {
+      if (tabla !== "chat_presupuestos_comparaciones") throw new Error(`tabla inesperada ${tabla}`);
+      return { ...consulta, upsert: async (fila: Record<string, unknown>) => { upserts.push(fila); return { error: null }; } };
+    },
+  };
+}
+
+describe("la comparación ya hecha se reutiliza", () => {
+  const ahora = new Date().toISOString();
+  const preguntar = (sb: ReturnType<typeof supabaseConGuardadas>) => ejecutarConversacion({
+    supabase: sb, claveOpenAI: "x", mensaje: "Dime los cinco mejores artículos para comprarle a este nuevo proveedor.",
+    historial: HILO, modelo: "gpt-x", uso: estado("gpt-x"), presupuesto: PRESUPUESTO, fetchImpl: openaiFalso("1. Viña Arana…").f,
+  });
+
+  it("la clave cambia con el descuento y el proveedor, no con cómo se escribe", () => {
+    const base = { p_presupuesto_id: ID, p_descuento_pct: null, p_descuento_importe: null, p_proveedor: null };
+    expect(claveComparacion(base)).toBe("pct:|imp:|prov:");
+    expect(claveComparacion({ ...base, p_descuento_pct: 5 })).not.toBe(claveComparacion(base));
+    expect(claveComparacion({ ...base, p_proveedor: " Bodegas  Nuevas " })).toBe(claveComparacion({ ...base, p_proveedor: "bodegas nuevas" }));
+  });
+
+  it("guardada y vigente: no se vuelve a calcular", async () => {
+    const sb = supabaseConGuardadas({ datos: { ...RESULTADO, hoy: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date()) }, creado_en: ahora });
+    const r = await preguntar(sb);
+    expect(sb.rpcs).not.toContain("comparar_presupuesto_agente");
+    expect(sb.upserts).toHaveLength(0);
+    expect(sb.filtros).toEqual([["presupuesto_id", ID], ["clave", "pct:|imp:|prov:"]]);
+    expect(r.huboFalloDeHerramienta).toBe(false);
+    expect(r.respuesta).not.toContain("### Interesa");
+  });
+
+  it("sin guardar o caducada: se calcula y se guarda para la siguiente", async () => {
+    const sb = supabaseConGuardadas(null);
+    await preguntar(sb);
+    expect(sb.rpcs).toContain("comparar_presupuesto_agente");
+    expect(sb.upserts).toHaveLength(1);
+    expect(sb.upserts[0]).toMatchObject({ presupuesto_id: ID, clave: "pct:|imp:|prov:" });
+    expect((sb.upserts[0].datos as { lineas: unknown[] }).lineas).toHaveLength(RESULTADO.lineas.length);
+    const vieja = new Date(Date.now() - VIGENCIA_COMPARACION_MS - 60_000).toISOString();
+    const sb2 = supabaseConGuardadas({ datos: RESULTADO, creado_en: vieja });
+    await preguntar(sb2);
+    expect(sb2.rpcs).toContain("comparar_presupuesto_agente");
+  });
+
+  it("de otro día no vale aunque tenga menos de 6 horas (los precios de referencia pueden haber cambiado)", async () => {
+    const sb = supabaseConGuardadas({ datos: { ...RESULTADO, hoy: "2026-11-18" }, creado_en: ahora });
+    expect(await comparacionGuardada(sb, ID, "pct:|imp:|prov:", "2026-11-19")).toBeNull();
+    expect(await comparacionGuardada(sb, ID, "pct:|imp:|prov:", "2026-11-18")).not.toBeNull();
+  });
+
+  it("si la tabla no está (BD sin migrar), se calcula como antes", async () => {
+    const sb = supabaseFalso(); // su from() lanza
+    const r = await ejecutarConversacion({
+      supabase: sb, claveOpenAI: "x", mensaje: PREGUNTA_2, historial: HILO, modelo: "gpt-x", uso: estado("gpt-x"),
+      presupuesto: PRESUPUESTO, fetchImpl: openaiFalso("1. Viña Arana…").f,
+    });
+    expect(sb.rpcs.map((x) => x.fn)).toContain("comparar_presupuesto_agente");
+    expect(r.huboFalloDeHerramienta).toBe(false);
   });
 });
 
