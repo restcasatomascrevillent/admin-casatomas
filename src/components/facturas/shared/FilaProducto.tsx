@@ -5,7 +5,7 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
 import { Pencil, AlertCircle, Check, X } from "lucide-react";
-import { formatCantidadLinea, formatImporte, formatNumero, precioAnomalo, valorSinDescuento } from "./formatters";
+import { desgloseNeto, formatCantidadLinea, formatImporte, formatNumero, precioAnomalo, valorSinDescuento } from "./formatters";
 import { normalizarUnidadFactura } from "./unidad";
 import { esLineaRegalo } from "@/lib/facturas/resumenCompras";
 
@@ -15,6 +15,41 @@ const InsigniaRegalo = () => (
     Regalo
   </span>
 );
+
+/**
+ * Importe de la línea con su coste real. Sin `importe_neto` (o igual al impreso)
+ * es la cifra de siempre; con descuento, el neto es la cifra principal y lo
+ * impreso queda en gris y tachado con el descuento al lado.
+ */
+const ImporteLinea = ({ p }: { p: ProductoFactura }) => {
+  const d = desgloseNeto(p);
+  if (!d) return <>{formatImporte(p.precio)}</>;
+  const nota = "block whitespace-normal text-right text-xs font-normal text-muted-foreground";
+  if (d.tipo === "repartido") {
+    return (
+      <span className="inline-flex max-w-[12rem] flex-col items-end">
+        <span className="font-normal text-muted-foreground">{formatImporte(p.precio)}</span>
+        <span className={nota}>descuento repartido en sus productos</span>
+      </span>
+    );
+  }
+  if (d.tipo === "regalo") {
+    return (
+      <span className="inline-flex max-w-[12rem] flex-col items-end">
+        <span className="font-normal text-muted-foreground line-through">{formatImporte(p.precio)}</span>
+        <span className={nota}>Regalo / 100 % de descuento</span>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex max-w-[12rem] flex-col items-end">
+      <span>Neto {formatImporte(d.neto)}</span>
+      <span className={nota}>
+        <span className="line-through">{formatImporte(p.precio)}</span> impreso · {formatImporte(d.descuento)} de descuento
+      </span>
+    </span>
+  );
+};
 
 /** «Valor sin descuento …» a la vista y su explicación en un popover táctil (no en `title`). */
 const ValorSinDescuento = ({ v, className = "" }: { v: { texto: string; titulo: string }; className?: string }) => (
@@ -207,7 +242,7 @@ export const FilaProducto = ({
         <span className="flex items-center justify-end gap-1.5 whitespace-nowrap text-sm font-semibold tabular-nums text-foreground">
           {regalo && <InsigniaRegalo />}
           {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-600" aria-hidden="true" />}>Más del doble de lo que suele cobrar este proveedor (media {formatImporte(avgPrice ?? null)})</AyudaPopover>}
-          {formatImporte(p.precio)}
+          <ImporteLinea p={p} />
         </span>
         {editable ? (
           <Button
@@ -311,7 +346,7 @@ export const FilaProducto = ({
       <TableCell className="py-2.5 text-right font-semibold tabular-nums whitespace-nowrap text-foreground">
         <span className="inline-flex items-center justify-end gap-1.5">
           {regalo && <InsigniaRegalo />}
-          {formatImporte(p.precio)}
+          <ImporteLinea p={p} />
         </span>
         {sinDescuento && (
           <span className="block whitespace-normal text-xs font-normal text-muted-foreground">
