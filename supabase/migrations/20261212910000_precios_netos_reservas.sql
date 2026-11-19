@@ -10,8 +10,15 @@ set client_encoding = 'UTF8';
 --      igual que el último precio; n_con_precio_unitario cuenta las mismas. Las unidades (sum_cantidad) sí cuentan.
 --  R3  detalle_documento_agente: si una pasada doble de 20261212900000 dejó la clave 'importe_neto' duplicada, queda una.
 --      Las sustituciones de texto de esta migración se saltan si el trozo nuevo ya está: reaplicable.
---  R6  productos_resumen devuelve es_descuento (líneas de descuento convertidas en «producto»: Descuento comercial…):
---      el panel las enseña aparte, sin precio unitario; el ranking del chat no las trata como producto. Ningún total cambia.
+--  R6  productos_resumen devuelve es_descuento (líneas de descuento convertidas en «producto»: Descuento comercial…),
+--      solo si el nombre lo dice Y su gasto es <= 0 (la «Caja regalo de jamón» es una compra): el panel las enseña aparte,
+--      sin precio unitario. El ranking del chat deja fuera las líneas de neto <= 0 (no por el nombre). Ningún total cambia.
+--  S3  compras_producto: con unidades sin cargo, ultima_factura separa el descuento de la línea (precio_linea con
+--      precio_impreso y descuento_pct) del coste real (coste_efectivo, unidades_sin_cargo); como_leer lo explica.
+--  S4  consulta_flexible: la media de precio_unitario tampoco cuenta las líneas de cantidad <= 0 (abonos con precio positivo).
+--  S6  productos_resumen.ultimo_precio redondeado a 4 decimales.
+--  Revisión: facturas-conocimiento/revision-pr322-precios-netos-reservas-2026-11-19.md. Esta versión corrige la primera de
+--  la migración (aplicada en la demo): devuelve primero sus sustituciones a la forma de 20261212900000 (_previas).
 -- Rollback: supabase/rollbacks/20261212910000_precios_netos_reservas_ROLLBACK.sql
 -- ============================================================================
 set lock_timeout = '5s';
@@ -74,27 +81,45 @@ $$;
 -- ─── 3. Sustituciones de texto en las funciones del chat (R2, R4, R6) ───
 -- Cada trozo debe aparecer exactamente `veces` veces; si ya está el nuevo, se salta (reaplicable); si no aparece ni el
 -- uno ni el otro, se aborta sin cambiar nada. Una función que no existe en la base se salta.
+-- Versión anterior de esta misma migración (ya aplicada en la demo): se devuelve primero a la forma de 20261212900000 para
+-- que las sustituciones de abajo, que son las definitivas, se apliquen limpias. En una base sin ella no hace nada.
+drop table if exists pg_temp._previas;
+create temp table _previas (fn text, anterior text, original text) on commit drop;
+insert into _previas (fn, anterior, original) values
+  ('compras_producto_agente', $q$'precio_linea', case when e.coste is not null then trim_scale(round(x.pu, case when x.pu < 1 then 4 else 2 end)) end, 'precio_impreso', precio_impreso_linea_agente(x.id) -> 'precio_impreso', 'descuento_pct', precio_impreso_linea_agente(x.id) -> 'descuento_pct',$q$,
+     $q$'precio_linea', case when e.coste is not null then trim_scale(round(x.pu, case when x.pu < 1 then 4 else 2 end)) end,$q$),
+  ('compras_producto_agente', $q$(y precio_linea). Precios = coste real con los descuentos; precio_impreso, descuento_pct y precios_impreso (en el orden de precios) = lo que dice la factura.' end$q$,
+     $q$(y precio_linea).' end$q$),
+  ('ranking_agente', $q$validas as (select * from l where valor is not null and valor > 0 and (v_uni is null or unidad = v_uni) and not es_linea_descuento(lower(nombre)))$q$,
+     $q$validas as (select * from l where valor is not null and valor > 0 and (v_uni is null or unidad = v_uni))$q$),
+  ('consulta_flexible_agente', $q$v_expr := format('round(%s(%s)::numeric, 2)', v_func, v_col); if v_func = 'avg' and v_col like 'coalesce(l.importe_neto / nullif(l.cantidad%' then v_expr := format('round(avg(%s) filter (where coalesce(l.importe_neto, l.total, 1) > 0)::numeric, 2)', v_col); end if;$q$,
+     $q$v_expr := format('round(%s(%s)::numeric, 2)', v_func, v_col);$q$),
+  ('consulta_flexible_agente', $q$v_sel := v_sel || case when v_func = 'avg' and v_col like 'coalesce(l.importe_neto / nullif(l.cantidad%' then format('count(%s) filter (where coalesce(l.importe_neto, l.total, 1) > 0) as %I', v_col, 'n_con_' || substr(k, 5)) else format('count(%s) as %I', v_col, 'n_con_' || substr(k, 5)) end;$q$,
+     $q$v_sel := v_sel || format('count(%s) as %I', v_col, 'n_con_' || substr(k, 5));$q$);
+
 drop table if exists pg_temp._cambios;
 create temp table _cambios (fn text, viejo text, nuevo text, veces int) on commit drop;
 insert into _cambios (fn, viejo, nuevo, veces) values
   ('compras_producto_agente', $q$'precio_linea', case when e.coste is not null then trim_scale(round(x.pu, case when x.pu < 1 then 4 else 2 end)) end,$q$,
-     $q$'precio_linea', case when e.coste is not null then trim_scale(round(x.pu, case when x.pu < 1 then 4 else 2 end)) end, 'precio_impreso', precio_impreso_linea_agente(x.id) -> 'precio_impreso', 'descuento_pct', precio_impreso_linea_agente(x.id) -> 'descuento_pct',$q$, 1),
+     $q$'precio_linea', case when e.coste is not null then trim_scale(round(x.pu, case when x.pu < 1 then 4 else 2 end)) end, 'coste_efectivo', case when e.coste is not null then trim_scale(round(e.coste, case when e.coste < 1 then 4 else 2 end)) end, 'unidades_sin_cargo', case when e.coste is not null then trim_scale(round(e.gratis, 3)) end, 'precio_impreso', precio_impreso_linea_agente(x.id) -> 'precio_impreso', 'descuento_pct', precio_impreso_linea_agente(x.id) -> 'descuento_pct',$q$, 1),
   ('compras_producto_agente', $q$'precios', jsonb_agg(trim_scale(round(y.pu, case when y.pu < 1 then 4 else 2 end)) order by y.pu),$q$,
      $q$'precios', jsonb_agg(trim_scale(round(y.pu, case when y.pu < 1 then 4 else 2 end)) order by y.pu), 'precios_impreso', case when bool_or(precio_impreso_linea_agente(y.id) is not null) then jsonb_agg(precio_impreso_linea_agente(y.id) -> 'precio_impreso' order by y.pu) end,$q$, 1),
   ('compras_producto_agente', $q$(y precio_linea).' end$q$,
-     $q$(y precio_linea). Precios = coste real con los descuentos; precio_impreso, descuento_pct y precios_impreso (en el orden de precios) = lo que dice la factura.' end$q$, 1),
+     $q$(y precio_linea). Precios = coste real con los descuentos; precio_impreso, descuento_pct y precios_impreso (en el orden de precios) = lo que dice la factura (el descuento_pct explica precio_linea, no el coste). Con sin_cargo hay DOS efectos distintos: precio_linea (descuento_pct sobre precio_impreso) y coste_efectivo (menor, porque ademas hay unidades_sin_cargo): da cada uno con su causa, nunca el descuento_pct junto al coste_efectivo.' end$q$, 1),
+  ('compras_producto_agente', $q$'precio_unitario = COSTE REAL por unidad (total pagado / pagadas + sin cargo). precio_linea es el de la linea, sin las sin cargo: da el coste real y di que hay unidades sin cargo.'$q$,
+     $q$'precio_unitario = coste_efectivo = COSTE REAL por unidad (total pagado / pagadas + sin cargo). precio_linea es el de la linea, ya con su descuento (descuento_pct sobre precio_impreso) pero sin repartir las sin cargo: da el coste real y di que hay unidades sin cargo; el descuento_pct NO explica la diferencia entre precio_linea y el coste real.'$q$, 1),
   ('ranking_agente', $q$'importe',         round(total::numeric, 2),$q$,
      $q$'importe',         round(total::numeric, 2), 'precio_impreso', case when desde is null then precio_impreso_linea_agente(id) -> 'precio_impreso' end, 'descuento_pct', case when desde is null then precio_impreso_linea_agente(id) -> 'descuento_pct' end,$q$, 1),
   ('ranking_agente', $q$validas as (select * from l where valor is not null and valor > 0 and (v_uni is null or unidad = v_uni))$q$,
-     $q$validas as (select * from l where valor is not null and valor > 0 and (v_uni is null or unidad = v_uni) and not es_linea_descuento(lower(nombre)))$q$, 1),
+     $q$validas as (select * from l where valor is not null and valor > 0 and (v_uni is null or unidad = v_uni) and total > 0)$q$, 1),
   ('ranking_agente', $q$'Precio unitario de linea SIN IVA'$q$,
      $q$'Precio unitario de linea SIN IVA y con descuentos (coste real; precio_impreso = el de la factura)'$q$, 1),
   ('ranking_agente', $q$'Importe de linea (cantidad x precio) SIN IVA'$q$,
      $q$'Importe de linea (cantidad x precio) SIN IVA y con descuentos aplicados'$q$, 1),
   ('consulta_flexible_agente', $q$v_expr := format('round(%s(%s)::numeric, 2)', v_func, v_col);$q$,
-     $q$v_expr := format('round(%s(%s)::numeric, 2)', v_func, v_col); if v_func = 'avg' and v_col like 'coalesce(l.importe_neto / nullif(l.cantidad%' then v_expr := format('round(avg(%s) filter (where coalesce(l.importe_neto, l.total, 1) > 0)::numeric, 2)', v_col); end if;$q$, 1),
+     $q$v_expr := format('round(%s(%s)::numeric, 2)', v_func, v_col); if v_func = 'avg' and v_col like 'coalesce(l.importe_neto / nullif(l.cantidad%' then v_expr := format('round(avg(%s) filter (where coalesce(l.importe_neto, l.total, 1) > 0 and coalesce(l.cantidad, 1) > 0)::numeric, 2)', v_col); end if;$q$, 1),
   ('consulta_flexible_agente', $q$v_sel := v_sel || format('count(%s) as %I', v_col, 'n_con_' || substr(k, 5));$q$,
-     $q$v_sel := v_sel || case when v_func = 'avg' and v_col like 'coalesce(l.importe_neto / nullif(l.cantidad%' then format('count(%s) filter (where coalesce(l.importe_neto, l.total, 1) > 0) as %I', v_col, 'n_con_' || substr(k, 5)) else format('count(%s) as %I', v_col, 'n_con_' || substr(k, 5)) end;$q$, 1),
+     $q$v_sel := v_sel || case when v_func = 'avg' and v_col like 'coalesce(l.importe_neto / nullif(l.cantidad%' then format('count(%s) filter (where coalesce(l.importe_neto, l.total, 1) > 0 and coalesce(l.cantidad, 1) > 0) as %I', v_col, 'n_con_' || substr(k, 5)) else format('count(%s) as %I', v_col, 'n_con_' || substr(k, 5)) end;$q$, 1),
   ('consulta_flexible_agente', $q$'; precios e importes de linea SIN IVA'$q$,
      $q$'; precios e importes de linea SIN IVA y con descuentos (coste real, no el impreso); la media de precio_unitario no cuenta las lineas a 0 (regalos)'$q$, 1),
   ('buscar_productos_agente', $q$'importe_impreso', case when pf.importe_neto is not null and pf.importe_neto is distinct from pf.total then round(pf.total::numeric, 2) end,$q$,
@@ -128,6 +153,9 @@ begin
     end if;
     v_def := pg_get_functiondef(v_oid);
     v_nuevo := v_def;
+    for c in select * from _previas where fn = v_fn loop
+      v_nuevo := replace(v_nuevo, c.anterior, c.original);
+    end loop;
     for c in select * from _cambios where fn = v_fn loop
       if position(c.nuevo in v_nuevo) > 0 then
         continue;
@@ -158,6 +186,8 @@ set search_path to 'public'
 as $function$
   -- 20261212910000: es_descuento marca los «productos» sintéticos que son líneas de descuento (Descuento comercial,
   -- Descuento Heineken…): no se compran, el panel los enseña aparte y sin precio unitario; su gasto sigue en el total.
+  -- Solo si además su gasto es <= 0: un producto con «regalo» u «oferta» en el nombre que se compra de verdad
+  -- (Caja regalo de jamón, +15.300 €) no es un descuento. ultimo_precio va redondeado a 4 decimales.
   -- 20261212900000: gasto y último precio con los descuentos asociados (importe_neto), como Análisis y el chat;
   -- gasto_impreso y ultimo_precio_impreso son lo que dicen los documentos. Una línea a neto 0 (regalo) no
   -- cuenta como último precio.
@@ -191,12 +221,12 @@ as $function$
          coalesce(cant.c, '{}'::jsonb),
          round(coalesce(sum(l.neto), 0), 2),
          (count(l.id) filter (where l.total is null))::integer,
-         ult.pu_neto,
+         round(ult.pu_neto, 4),
          max(l.fecha),
          coalesce(array_agg(distinct l.proveedor) filter (where l.proveedor is not null), '{}'::text[]),
          round(coalesce(sum(l.total), 0), 2),
          ult.pu_impreso,
-         public.es_linea_descuento(lower(p.nombre))
+         (public.es_linea_descuento(lower(p.nombre)) and coalesce(sum(l.neto), 0) <= 0)
     from public.productos_catalogo p
     left join l    on l.producto_id = p.id
     left join cant on cant.producto_id = p.id

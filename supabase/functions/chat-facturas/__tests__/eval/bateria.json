@@ -5521,6 +5521,109 @@
     "max_ms": 8000
    },
    "nota": "coste real: 561 € / 36 botellas (pagadas + sin cargo) = 15,58 €; la línea dice 18,70 €"
+  },
+  {
+   "id": "pn01",
+   "categoria": "precios_netos",
+   "origen": "nuevo (19/11/2026, revisión del PR #322)",
+   "mensaje": "¿A cuánto está el Martini Bianco?",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "Martini Bianco 1 L"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_impreso",
+     "sql": "select round(pf.total / pf.cantidad, 2) from productos_factura pf where pf.id = (select pf2.id from productos_factura pf2 join facturas f on f.id = pf2.factura_id where pf2.producto_id = 7475 and pf2.cantidad > 0 and pf2.importe_neto > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf2.id desc limit 1)",
+     "tol": 0.01,
+     "valor": 8.83,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.descuento_pct",
+     "sql": "select round(100 * (1 - pf.importe_neto / pf.total), 1) from productos_factura pf where pf.id = (select pf2.id from productos_factura pf2 join facturas f on f.id = pf2.factura_id where pf2.producto_id = 7475 and pf2.cantidad > 0 and pf2.importe_neto > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf2.id desc limit 1)",
+     "tol": 0.1,
+     "valor": 9,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.precio_linea",
+     "sql": "select round(pf.importe_neto / pf.cantidad, 2) from productos_factura pf where pf.id = (select pf2.id from productos_factura pf2 join facturas f on f.id = pf2.factura_id where pf2.producto_id = 7475 and pf2.cantidad > 0 and pf2.importe_neto > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf2.id desc limit 1)",
+     "tol": 0.01,
+     "valor": 8.03,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "con descuento: impreso 8,83, 9 % y precio de la línea 8,03 cuadran entre sí (8,83 × 0,91); el coste real 6,43 (coste_efectivo) es otro efecto: 6 botellas sin cargo"
+  },
+  {
+   "id": "pn02",
+   "categoria": "precios_netos",
+   "origen": "nuevo (19/11/2026, revisión del PR #322)",
+   "mensaje": "¿Cuánto cuesta el Martini Bianco de verdad?",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "Martini Bianco 1 L"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.coste_efectivo",
+     "sql": "select round(sum(pf.importe_neto) / (sum(pf.cantidad) + 6), 2) from productos_factura pf where pf.factura_id = 4412 and pf.producto_id = 7475 and pf.importe_neto > 0",
+     "tol": 0.01,
+     "valor": 6.43,
+     "tipo": "num"
+    },
+    {
+     "ruta": "ultima_factura.unidades_sin_cargo",
+     "sql": "select 6",
+     "tol": 0,
+     "valor": 6,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "unidades sin cargo separadas del descuento: coste_efectivo 6,43 con unidades_sin_cargo 6 (24 pagadas); el 9 % NO explica 6,43"
+  },
+  {
+   "id": "pn03",
+   "categoria": "precios_netos",
+   "origen": "nuevo (19/11/2026, revisión del PR #322)",
+   "mensaje": "¿A cuánto está el Jose Cuervo Reposado?",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "Jose Cuervo Especial Reposado"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_impreso",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    },
+    {
+     "ruta": "ultima_factura.descuento_pct",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "sin descuento: la línea no trae precio_impreso ni descuento_pct (las claves ni aparecen)"
   }
  ]
 }
