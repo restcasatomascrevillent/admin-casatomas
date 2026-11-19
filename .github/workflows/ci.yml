@@ -3,11 +3,14 @@
 # tests usan un host local inalcanzable (vitest.config.ts) y las pruebas SQL
 # corren en Postgres en memoria (PGlite).
 #
-# BLOQUEAN: instalación reproducible, tests unitarios, pruebas SQL, build y el
-# TOPE DE DEUDA de calidad: typecheck con 20 errores y ESLint con 479 errores
-# (cifras del 30/10/2026, CT-REM-OPS-09). Es un "trinquete": el job falla si el
-# recuento SUBE; si baja, hay que bajar también el tope en este fichero (los dos
-# valores TOPE_* de abajo). Cuando lleguen a cero, sustituir por el check normal.
+# BLOQUEAN: instalación reproducible, tests unitarios, pruebas SQL, build, el
+# typecheck y el TOPE DE DEUDA de ESLint: 479 errores (cifra del 30/10/2026,
+# CT-REM-OPS-09). El tope es un "trinquete": el job falla si el recuento SUBE; si
+# baja, hay que bajar también TOPE_ESLINT en este fichero. Cuando llegue a cero,
+# sustituir por el check normal.
+# El typecheck tuvo el mismo trinquete (tope 20) hasta el 19/11/2026: con 14 errores
+# pasaba en verde, y nadie bajó el tope porque el aviso solo salía en modo completo.
+# Desde entonces exige 0 errores en los dos modos, como pide CLAUDE.md.
 #
 # DOS MODOS (pedido del dueño 10/11/2026: menos tests, que solo se revise lo que se modifica,
 # para no agotar los minutos de GitHub Actions):
@@ -58,19 +61,9 @@ jobs:
           cache: npm
       - run: npm ci
       # ---- Modo LIGERO (staging y ramas de trabajo) ----
-      - name: Typecheck (no puede superar el tope)
+      - name: Typecheck (0 errores)
         if: env.COMPLETA != 'true'
-        env:
-          TOPE_TSC: "20"
-        run: |
-          npx tsc --noEmit -p tsconfig.app.json > tsc.log || true
-          n=$(grep -c "error TS" tsc.log || true)
-          echo "Errores de tipos: $n (tope $TOPE_TSC)"
-          if [ "$n" -gt "$TOPE_TSC" ]; then
-            grep "error TS" tsc.log | head -50
-            echo "::error::Typecheck: $n errores, el tope es $TOPE_TSC. No se puede aumentar la deuda."
-            exit 1
-          fi
+        run: npx tsc --noEmit -p tsconfig.app.json
       - name: ESLint de lo cambiado (ningún fichero puede empeorar)
         if: env.COMPLETA != 'true'
         run: npm run lint:cambios
@@ -274,7 +267,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      TOPE_TSC: "20"
       TOPE_ESLINT: "479"
     steps:
       - uses: actions/checkout@v4
@@ -285,19 +277,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Typecheck (no puede superar el tope)
-        run: |
-          npx tsc --noEmit -p tsconfig.app.json > tsc.log || true
-          n=$(grep -c "error TS" tsc.log || true)
-          echo "Errores de tipos: $n (tope $TOPE_TSC)"
-          if [ "$n" -gt "$TOPE_TSC" ]; then
-            grep "error TS" tsc.log | head -50
-            echo "::error::Typecheck: $n errores, el tope es $TOPE_TSC. No se puede aumentar la deuda."
-            exit 1
-          fi
-          if [ "$n" -lt "$TOPE_TSC" ]; then
-            echo "::warning::Bajaste a $n errores de tipos: baja TOPE_TSC a $n en .github/workflows/ci.yml."
-          fi
+      - name: Typecheck (0 errores)
+        run: npx tsc --noEmit -p tsconfig.app.json
       - name: ESLint (no puede superar el tope)
         run: |
           npx eslint . -f json -o eslint.json || true
