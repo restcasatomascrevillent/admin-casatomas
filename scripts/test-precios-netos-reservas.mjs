@@ -41,7 +41,8 @@ await db.exec(`
   create trigger trg_auditoria after insert or update or delete on public.productos_factura for each row execute function public.fn_auditoria();
 
   insert into categorias_producto values (1, 'bebidas', null, 'bebidas');
-  insert into productos_catalogo values (1, 'Cruzcampo 20 L', 1, 'ia', 'barril'), (2, 'Fenomenal verdejo', 1, 'ia', 'botella'), (3, 'Descuento comercial', 1, 'ia', 'ud');
+  insert into productos_catalogo values (1, 'Cruzcampo 20 L', 1, 'ia', 'barril'), (2, 'Fenomenal verdejo', 1, 'ia', 'botella'), (3, 'Descuento comercial', 1, 'ia', 'ud'),
+    (4, 'Caja regalo de jamón (Navidad)', 1, 'ia', 'ud'), (5, 'Promoción especial', 1, 'ia', 'ud');
   insert into facturas values
     (1, 1000, 'DISTRIBUCIONES DE BEBIDAS CATRAL, S.L.', '2026-05-10'),   -- P1: cantidad incoherente
     (2, 1000, 'DISTRIBUCIONES DE BEBIDAS CATRAL, S.L.', '2026-06-10'),   -- P1: los descuentos superan la línea
@@ -73,7 +74,9 @@ await db.exec(`
 await db.exec(BASE);
 await db.exec(REGALOS);
 await db.exec(`insert into productos_factura (id, factura_id, nombre, nombre_busqueda, nombre_normalizado, cantidad, precio_unitario, total, orden, producto_id, unidad)
-  values (81, 8, 'Descuento comercial', 'descuento comercial', 'descuento comercial', 1, 5, 5, 1, 3, 'ud')`);
+  values (81, 8, 'Descuento comercial', 'descuento comercial', 'descuento comercial', 1, 5, -5, 1, 3, 'ud'),
+    (82, 8, 'Caja regalo de jamón (Navidad)', 'caja regalo de jamon (navidad)', 'caja regalo de jamon navidad', 1, 4500, 4500, 2, 4, 'ud'),
+    (83, 8, 'Promoción especial', 'promocion especial', 'promocion especial', 1, 0, 0, 3, 5, 'ud')`);
 await db.exec(M900);   // estado de partida: 20261212900000 ya aplicada
 await db.exec(`update productos_factura set importe_neto = 0 where id = 70`);   // 100 % de descuento: neto 0, impreso 25
 
@@ -127,7 +130,8 @@ igual((await cuerpo("buscar_productos_texto_agente")).split("'precio_impreso'").
 
 // R6: es_descuento sin cambiar totales
 const r = (await db.query(`select producto_id, es_descuento, gasto::float8 g, ultimo_precio::float8 u from productos_resumen() order by 1`)).rows;
-igual(r.map((x) => [x.producto_id, x.es_descuento]), [[1, false], [2, false], [3, true]], "Descuento comercial sale marcado como descuento");
+igual(r.map((x) => [x.producto_id, x.es_descuento]), [[1, false], [2, false], [3, true], [4, false], [5, true]], "Descuento comercial (gasto negativo) y Promoción especial (gasto 0) salen marcados; la Caja regalo de jamón (gasto +4.500) NO");
+igual(r.filter((x) => x.es_descuento && x.g > 0).length, 0, "ningún producto con gasto positivo queda marcado como descuento");
 igual(r.map((x) => [x.producto_id, x.g, x.u]), resumenAntesFilas.map((x) => [x.producto_id, x.g, x.u]), "ninguna cifra de Productos cambia");
 igual(await totales(), totAntes, "los totales (líneas, Productos, categorías) son los mismos");
 
