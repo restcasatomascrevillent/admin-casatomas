@@ -45,7 +45,7 @@ order by created_at desc;
 Pruebas del cliente y del ciclo de Auth:
 
 ```sh
-npm test -- src/hooks/__tests__/useAuditLog.test.ts src/hooks/__tests__/audit-auth.test.ts src/pages/__tests__/SuperAdminAuditoria.test.tsx
+npm test -- src/hooks/__tests__/useAuditLog.test.ts supabase/functions/_shared/__tests__/audit-auth.test.ts src/pages/__tests__/SuperAdminAuditoria.test.tsx
 ```
 
 
@@ -224,7 +224,7 @@ un archivo. Un usuario normal no debe poder consultar `audit_log`.
 
 ```sh
 npm run test:auditoria:db
-npm test -- src/hooks/__tests__/audit-client.test.ts src/hooks/__tests__/audit-auth.test.ts src/hooks/__tests__/useAuth.auditoria.test.tsx src/hooks/__tests__/useAuditLog.test.ts src/hooks/__tests__/panel-auth.test.ts src/pages/__tests__/SuperAdminAuditoria.test.tsx
+npm test -- src/hooks/__tests__/audit-client.test.ts supabase/functions/_shared/__tests__/audit-auth.test.ts src/hooks/__tests__/useAuth.auditoria.test.tsx src/hooks/__tests__/useAuditLog.test.ts src/hooks/__tests__/panel-auth.test.ts src/pages/__tests__/SuperAdminAuditoria.test.tsx
 ```
 
 El banco de PostgreSQL usa PGlite en memoria: aplica las migraciones y comprueba
