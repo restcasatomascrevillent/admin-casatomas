@@ -655,12 +655,12 @@ export function ListaReservasAvanzada({
     }
   };
 
-  /** Cancela de verdad — solo se llega aquí desde el "sí" del diálogo. */
-  const confirmarCancelacion = async () => {
+  /** Cancela de verdad — solo se llega aquí desde uno de los dos «sí» del diálogo (con o sin correo al cliente). */
+  const confirmarCancelacion = async (opciones: { sinCorreo?: boolean } = {}) => {
     const reserva = reservaACancelar;
     if (!reserva) return;
     setReservaACancelar(null);
-    await acciones.cancelar(reserva);
+    await acciones.cancelar(reserva, opciones);
   };
 
   // Un clic: acepta la reserva pendiente TAL COMO ESTÁ, sin tocar su hora ni su
@@ -1508,13 +1508,28 @@ const anchoAcciones = ANCHO_SELECCION;
                 </span>
               )}
               <span className="mt-2 block">
-                Pasará a estado «cancelada» y se enviará el aviso de cambio al cliente. Para recuperarla habría
-                que volver a cambiarle el estado a mano.
+                {reservaACancelar?.email?.trim()
+                  ? "Pasará a estado «cancelada». Puedes avisar al cliente por correo o cancelarla sin enviarle nada (p. ej. si es una reserva duplicada). "
+                  : "Pasará a estado «cancelada». No tiene email: no se le envía ningún correo. "}
+                Para recuperarla habría que volver a cambiarle el estado a mano.
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {/* «Cancelar sin enviar correo» (19/11/2026, petición del dueño): solo si tiene email; sin él no se
+              manda nada de todas formas. */}
           <AlertDialogFooter>
             <AlertDialogCancel>No, volver</AlertDialogCancel>
+            {reservaACancelar?.email?.trim() ? (
+              <AlertDialogAction
+                className="border border-destructive bg-background text-destructive hover:bg-destructive/10"
+                onClick={(e) => {
+                  e.preventDefault();
+                  void confirmarCancelacion({ sinCorreo: true });
+                }}
+              >
+                Cancelar sin enviar correo
+              </AlertDialogAction>
+            ) : null}
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={(e) => {
@@ -1522,7 +1537,7 @@ const anchoAcciones = ANCHO_SELECCION;
                 void confirmarCancelacion();
               }}
             >
-              Sí, cancelar la reserva
+              {reservaACancelar?.email?.trim() ? "Sí, cancelar y avisar al cliente" : "Sí, cancelar la reserva"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

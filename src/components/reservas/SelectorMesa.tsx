@@ -129,6 +129,8 @@ export interface Pendiente {
   ejecutar: () => Promise<unknown>;
   /** Texto del botón de confirmar (por defecto «Sentar igualmente»). */
   boton?: string;
+  /** Otra forma de confirmar, en un botón aparte debajo (p. ej. «Anular sin enviar correo», 19/11/2026). */
+  alternativa?: { boton: string; ejecutar: () => Promise<unknown> };
 }
 
 export function ConfirmarDesplazamiento({
@@ -153,6 +155,11 @@ export function ConfirmarDesplazamiento({
           {pendiente.boton ?? "Sentar igualmente"}
         </Button>
       </div>
+      {pendiente.alternativa && (
+        <Button variant="outline" className="h-12 w-full" disabled={ocupado} onClick={() => void pendiente.alternativa?.ejecutar()}>
+          {pendiente.alternativa.boton}
+        </Button>
+      )}
     </div>
   );
 }

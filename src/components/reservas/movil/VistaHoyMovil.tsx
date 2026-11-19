@@ -1932,13 +1932,19 @@ export function PanelReservaMovil({
           className="h-12 w-full text-base text-destructive hover:text-destructive"
           disabled={ocupado}
           data-testid="ficha-anular-mesa"
-          onClick={() =>
+          onClick={() => {
+            const fila = reserva as unknown as Parameters<typeof cancelar>[0];
+            const conEmail = Boolean((reserva as { email?: string | null }).email?.trim());
             setPendiente({
-              texto: `¿Anular la reserva de ${reserva.nombre || "esta persona"}? Sigue en la lista como «Anulada»${(reserva as { email?: string | null }).email ? " y se le avisa por correo" : ""}.`,
+              texto: `¿Anular la reserva de ${reserva.nombre || "esta persona"}? Sigue en la lista como «Anulada»${conEmail ? " y se le avisa por correo" : ""}.`,
               boton: "Sí, anular",
-              ejecutar: () => ejecutar(() => cancelar(reserva as unknown as Parameters<typeof cancelar>[0])),
-            })
-          }
+              ejecutar: () => ejecutar(() => cancelar(fila)),
+              // «Anular sin enviar correo» (19/11/2026, petición del dueño): solo si tiene email.
+              alternativa: conEmail
+                ? { boton: "Anular sin enviar correo", ejecutar: () => ejecutar(() => cancelar(fila, { sinCorreo: true })) }
+                : undefined,
+            });
+          }}
         >
           <CircleSlash className="mr-2 h-5 w-5" aria-hidden="true" /> Anular reserva
         </Button>
