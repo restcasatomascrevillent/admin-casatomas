@@ -2,6 +2,15 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.49.1] - 2026-11-19
+
+Objetivo: Facturas: el mismo coste real (neto de descuentos) en Productos, Análisis y el chat, con el precio impreso al lado; presupuestos con medida y tipos del panel a 0 errores
+
+### Cambiado
+- Chat-facturas: batería, formato de la pregunta, presupuesto con medida y banco en vivo ([#295](https://github.com/restcasatomascrevillent/admin-casatomas/pull/295))
+- Tipos: typecheck del panel a 0 errores y CI que lo exige ([#318](https://github.com/restcasatomascrevillent/admin-casatomas/pull/318))
+- Facturas: precios en neto en todo el panel y desglose impreso / descuento / neto ([#300](https://github.com/restcasatomascrevillent/admin-casatomas/pull/300))
+
 ## [1.49.0] - 2026-11-19
 
 Objetivo: IA de Facturas: dictado por voz, espera más clara y tarifas de proveedor que contestan lo que se pregunta (precio por botella con y sin IVA)
