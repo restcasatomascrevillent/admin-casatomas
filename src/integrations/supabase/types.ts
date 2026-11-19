@@ -5370,6 +5370,30 @@ export type Database = {
       }
     }
     Views: {
+      audit_log_visible: {
+        Row: {
+          accion: string | null
+          actor_email: string | null
+          actor_label: string | null
+          actor_origin: string | null
+          actor_user_id: string | null
+          created_at: string | null
+          detalles: Json | null
+          device_id: string | null
+          id: string | null
+          ip_address: string | null
+          registro_id: string | null
+          request_id: string | null
+          resultado: string | null
+          session_id: string | null
+          tabla: string | null
+          texto_busqueda: string | null
+          tipo_evento: string | null
+          user_agent: string | null
+          visible_por_defecto: boolean | null
+        }
+        Relationships: []
+      }
       chat_facturas_conversaciones: {
         Row: {
           created_at: string | null
