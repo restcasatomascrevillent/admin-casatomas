@@ -141,7 +141,21 @@ interface OpcionesEjecucion {
   enBloque?: boolean;
   /** Segundo botón del aviso de éxito (p. ej. «Cambiar mesa» tras «Llegó», 07/11/2026). */
   accionAviso?: AccionAviso;
+  /**
+   * No mandar el correo al cliente aunque la acción lo mande normalmente («Cancelar sin enviar correo»,
+   * 19/11/2026, petición del dueño: p. ej. para anular una reserva duplicada sin escribir al cliente).
+   */
+  sinCorreo?: boolean;
 }
+
+/** Opciones de «Cancelar» desde los diálogos de confirmación. */
+export interface OpcionesCancelar {
+  /** Cancelar sin mandar el aviso por correo al cliente. */
+  sinCorreo?: boolean;
+}
+
+/** Lo que se le dice al personal al cancelar sin correo (en lugar del detalle normal del aviso). */
+export const DESCRIPCION_SIN_CORREO = "Sin correo: no se ha avisado al cliente.";
 
 /** Un botón extra en el aviso de éxito de una acción. */
 export interface AccionAviso {
@@ -307,7 +321,7 @@ export function useAccionesServicioReserva() {
       id: K,
       reserva: ReservaEjecutable,
       entrada?: EntradasAccion[K],
-      { enBloque = false, accionAviso }: OpcionesEjecucion = {},
+      { enBloque = false, accionAviso, sinCorreo = false }: OpcionesEjecucion = {},
     ): Promise<ResultadoAccion> => {
       const def = ACCIONES_EJECUTABLES[id] as unknown as DefinicionAccion<K>;
 
@@ -344,7 +358,10 @@ export function useAccionesServicioReserva() {
       const vista = escrito.estadoReal ? { ...reserva, estado: escrito.estadoReal } : reserva;
       if (def.recuerdaEstadoPrevio) recordarEstadoPrevio(reserva.id, vista.estado);
       if (def.olvidaEstadoPrevio) olvidarEstadoPrevio(reserva.id);
-      if (!enBloque) mostrarAviso(def.aviso(vista, entrada as EntradasAccion[K], cambios), reserva.id, accionAviso);
+      // Sin correo: el aviso lo dice, para que nadie dé por hecho que el cliente ya lo sabe.
+      const aviso = def.aviso(vista, entrada as EntradasAccion[K], cambios);
+      const avisoFinal = aviso && sinCorreo && def.avisaCliente ? { ...aviso, descripcion: DESCRIPCION_SIN_CORREO } : aviso;
+      if (!enBloque) mostrarAviso(avisoFinal, reserva.id, accionAviso);
 
       // Responder a la reserva (verificarla o rechazarla) atiende su aviso «Reserva nueva»: deja de contar como
       // sin revisar sin tener que pulsar también «Revisado» en Avisos (CAS-9, 17/11/2026). En segundo plano.
@@ -352,7 +369,7 @@ export function useAccionesServicioReserva() {
         void marcarAvisosDeReserva(reserva.id).then((n) => { if (n > 0) avisarReservaAtendida(reserva.id); });
       }
 
-      const correo = def.avisaCliente
+      const correo = def.avisaCliente && !sinCorreo
         ? enBloque
           ? notificarAlCliente(reserva.id, cambios)
           : notificarYAvisarSiFalla(reserva.id, cambios, { nombre: reserva.nombre })
@@ -516,9 +533,13 @@ export function useAccionesServicioReserva() {
     [ejecutarAccion],
   );
 
-  /** Cancela de verdad: solo se llega aquí desde el «sí» del diálogo de confirmación de la Lista. */
+  /**
+   * Cancela de verdad: solo se llega aquí desde el «sí» de un diálogo de confirmación (Lista, ficha de la
+   * reserva, ficha del móvil). Con `sinCorreo`, el cliente no recibe el aviso por correo.
+   */
   const cancelar = useCallback(
-    (reserva: ReservaEjecutable) => ejecutarAccion("cancelar", reserva),
+    (reserva: ReservaEjecutable, opciones: OpcionesCancelar = {}) =>
+      ejecutarAccion("cancelar", reserva, undefined, { sinCorreo: opciones.sinCorreo }),
     [ejecutarAccion],
   );
 
