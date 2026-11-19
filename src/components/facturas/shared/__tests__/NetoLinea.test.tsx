@@ -40,20 +40,33 @@ describe.each([
   it("neto distinto del impreso: Neto como cifra principal, impreso tachado y descuento", () => {
     pintar(linea({ importe_neto: 24.97 }), isMobile);
     expect(screen.getByText("Neto 24,97 €")).toBeInTheDocument();
-    const impreso = screen.getByText("41,56 €");
-    expect(impreso).toHaveClass("line-through");
-    expect(screen.getByText(/−16,59 € de descuento/)).toBeInTheDocument();
+    // En móvil la nota está dos veces: bajo el nombre (fila estrecha) y junto al importe (fila ancha); el CSS enseña una.
+    const impresos = screen.getAllByText("41,56 €");
+    expect(impresos).toHaveLength(isMobile ? 2 : 1);
+    for (const impreso of impresos) expect(impreso).toHaveClass("line-through");
+    expect(screen.getAllByText(/−16,59 € de descuento/)).toHaveLength(isMobile ? 2 : 1);
+  });
+
+  it.runIf(isMobile)("móvil: el desglose va bajo el nombre con la fila estrecha y junto al importe solo con la ancha (R5)", () => {
+    pintar(linea({ importe_neto: 24.97 }), true);
+    const [bajoNombre, junto] = screen.getAllByText(/impreso/);
+    // Bajo el nombre: visible mientras el contenedor mide menos de 30 rem.
+    expect(bajoNombre.closest("p")).toHaveClass("[@container(min-width:30rem)]:hidden");
+    // Junto al importe: oculta con la fila estrecha, para no quitarle el ancho al nombre.
+    expect(junto).toHaveClass("hidden", "[@container(min-width:30rem)]:block");
+    // El importe de la fila estrecha es solo «Neto …»: corto, no hasta 12 rem.
+    expect(screen.getByText("Neto 24,97 €")).toBeInTheDocument();
   });
 
   it("línea de descuento ya repartida: gris y con su nota", () => {
     pintar(linea({ precio: -10, precio_unitario: -10, cantidad: 1, importe_neto: 0 }), isMobile);
-    expect(screen.getByText("descuento repartido en sus productos")).toBeInTheDocument();
+    expect(screen.getAllByText("descuento repartido en sus productos")).toHaveLength(isMobile ? 2 : 1);
     expect(screen.queryByText(/Neto/)).toBeNull();
   });
 
   it("neto 0 con importe impreso: regalo / 100 % de descuento", () => {
     pintar(linea({ importe_neto: 0 }), isMobile);
-    expect(screen.getByText("Regalo / 100 % de descuento")).toBeInTheDocument();
+    expect(screen.getAllByText("Regalo / 100 % de descuento")).toHaveLength(isMobile ? 2 : 1);
   });
 
   it("sin neto o igual al impreso: nada extra", () => {
@@ -79,6 +92,13 @@ describe("desglose neto / impreso", () => {
     expect(difiereNeto(25.02, 25.025)).toBe(false);
     expect(difiereNeto(25, null)).toBe(false);
     expect(textoNetoImpreso(25.02, 41.85)).toMatch(/^25,02\s€ neto · 41,85\s€ impreso$/);
+  });
+
+  it("aResumen: un descuento convertido en producto (es_descuento) no tiene precio unitario y su gasto se conserva (R6)", () => {
+    const f = { producto_id: 531, nombre: "Descuento comercial", gasto: "-1067.15", gasto_impreso: "-7174.37", ultimo_precio: "32.93", ultimo_precio_impreso: "32.93" };
+    expect(aResumen({ ...f, es_descuento: true })).toMatchObject({ es_descuento: true, gasto: -1067.15, gasto_impreso: -7174.37, ultimo_precio: null, ultimo_precio_impreso: null });
+    expect(aResumen({ ...f, es_descuento: false })).toMatchObject({ es_descuento: false, ultimo_precio: 32.93 });
+    expect(aResumen(f)).toMatchObject({ es_descuento: false, ultimo_precio: 32.93 });
   });
 
   it("aResumen lee las columnas nuevas y, sin ellas, toma el neto como impreso", () => {

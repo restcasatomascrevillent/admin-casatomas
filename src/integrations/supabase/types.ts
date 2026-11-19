@@ -6370,6 +6370,7 @@ export type Database = {
           categoria_id: number | null
           compras: number
           documentos: number
+          es_descuento: boolean
           gasto: number
           gasto_impreso: number
           lineas_sin_importe: number
