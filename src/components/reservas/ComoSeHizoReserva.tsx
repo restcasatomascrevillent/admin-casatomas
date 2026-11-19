@@ -52,7 +52,7 @@ export interface CambioHistorial {
 
 async function cargarHistorial(reservaId: string): Promise<CambioHistorial[] | "sin_permiso"> {
   const { data, error } = await supabase
-    .from("audit_log_visible" as "audit_log")
+    .from("audit_log_visible")
     .select("id, created_at, accion, actor_label, actor_email, detalles")
     .eq("tabla", "reservas")
     .eq("registro_id", reservaId)

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ejecutarOperacionAuthAuditada } from "../../../supabase/functions/_shared/audit-auth";
+import { ejecutarOperacionAuthAuditada } from "../audit-auth";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 function clientMock(error: unknown = null) {
