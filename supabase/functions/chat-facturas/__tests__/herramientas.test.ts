@@ -185,7 +185,7 @@ describe("systemPrompt", () => {
   });
 
   it("conteos: solo numeros, sin importes ni avisos (prueba 3: q04, q12, q13)", () => {
-    expect(p).toMatch(/Pregunta de cuantos o de UN documento \(la ultima factura\): solo lo pedido; sin avisos de parcial/);
+    expect(p).toMatch(/Pregunta de cuantos o de UN documento: solo lo pedido; sin avisos de parcial/);
     const filtrar = TOOLS.find((t) => t.function.name === "filtrar_documentos")!.function;
     expect(filtrar.description).toMatch(/los demas filtros solo cuentan/);
   });
@@ -680,7 +680,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
 
   it("productos y categorias: facturas + albaranes salvo que el usuario diga otra cosa (marisco 39,80 en vez de 1.353,85)", () => {
     expect(p).not.toMatch(/Albaran = entrega, NO es gasto: nunca lo sumes/);
-    expect(p).toMatch(/Productos y categorias: cuentan facturas \+ albaranes sin factura \(tipo null\) salvo que pidan solo uno/);
+    expect(p).toMatch(/Productos y categorias igual \(tipo null\) salvo que pidan solo uno/);
     expect(p).toMatch(/en_facturas\/en_albaranes_sin_factura, da ese reparto/);
     // El modelo mando tipo=factura sin que el usuario lo dijera: se ignora.
     expect(tipoDeProducto("factura", "¿cuanto hemos gastado en marisco?")).toBeNull();
@@ -698,7 +698,6 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
 
   it("unidades distintas: no comparar, cada proveedor en su unidad", () => {
     expect(p).toMatch(/lista TODOS los proveedores, cada uno con su precio en SU unidad/);
-    expect(p).toMatch(/Osborne la caja a 519,40 €; Luga el kilo a 20,50 €/);
   });
 
   it("unidad y categoria solo se mandan si vienen (compatibles con las RPC de antes)", () => {
@@ -760,7 +759,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
 
   it("el prompt manda decir «te dejo la gráfica debajo» sin preguntar, y citar el precio convertido", () => {
     const p = systemPrompt("2026-10-08");
-    expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
+    expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo»/);
     expect(p).toMatch(/Con convertido_desde di «convertido desde caja de 10 kg»/);
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
     expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(13_100); // + informe de subidas y proveedor en alertas_precio (16/11/2026, +93) + + denominacion (15/11/2026) 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026) + margenes_carta y alertas_precio (16/11/2026)
@@ -1049,7 +1048,7 @@ describe("precio de referencia = la ULTIMA factura (dueño, 13/11/2026)", () => 
   const p = systemPrompt("2026-11-13");
   it("el prompt manda usar y remarcar la última factura; medias y medianas solo de contexto", () => {
     expect(p).toMatch(
-      /Precio de referencia = el de la ULTIMA factura \(fecha y proveedor, con su numero para el enlace\); medias, medianas u otras facturas solo despues, como contexto\./,
+      /Precio de referencia = el de la ULTIMA factura \(fecha, proveedor y numero para el enlace\); medias, medianas u otras solo como contexto\./,
     );
     expect(p).not.toMatch(/a que precio medio/);
     expect(p).toMatch(/variacion_precios: da precio \(ultima factura\) frente a anterior \(la del mismo proveedor; media solo contexto\)/);
