@@ -15,7 +15,7 @@ export function textoProgreso(segundos: number): string {
   if (s < 10) return "Calculando…";
   if (s < 20) return "Casi está…";
   if (s < 35) return "Esta consulta es larga, unos segundos más…";
-  return "Sigue trabajando. Si prefieres, pulsa «Parar» y pregunta de otra forma.";
+  return "Sigue trabajando. Si prefieres, pulsa el botón de parar (■) y pregunta de otra forma.";
 }
 
 /** «12 s» desde los 5 segundos (antes solo molesta). */

@@ -1,4 +1,5 @@
-// Calidad percibida del chat (18/11/2026): espera con información y «Parar»,
+// Calidad percibida del chat (18/11/2026): espera con información y «Parar»
+// (desde el 19/11/2026, el botón de enviar se convierte en «Parar» mientras piensa),
 // «Copiar» en texto plano, «Compartir», botones de paso siguiente, nombres
 // parecidos y pie de datos.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,7 +13,7 @@ describe("Escribiendo: la espera con información", () => {
   afterEach(() => vi.useRealTimers());
 
   it("el texto cambia con los segundos y sale el contador", () => {
-    render(<Escribiendo onParar={() => {}} />);
+    render(<Escribiendo />);
     expect(screen.getByRole("status")).toHaveTextContent("Buscando en las facturas…");
     act(() => void vi.advanceTimersByTime(5000));
     expect(screen.getByRole("status")).toHaveTextContent("Calculando…");
@@ -21,15 +22,11 @@ describe("Escribiendo: la espera con información", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Casi está…");
   });
 
-  it("«Parar» llama a onParar; sin onParar o al cargar un historial no hay botón", () => {
-    const onParar = vi.fn();
-    const { rerender } = render(<Escribiendo onParar={onParar} />);
-    fireEvent.click(screen.getByRole("button", { name: "Parar" }));
-    expect(onParar).toHaveBeenCalledTimes(1);
-    rerender(<Escribiendo />);
-    expect(screen.queryByRole("button", { name: "Parar" })).toBeNull();
-    rerender(<Escribiendo cargando onParar={onParar} />);
-    expect(screen.queryByRole("button", { name: "Parar" })).toBeNull();
+  it("la espera ya no lleva un botón «Parar» suelto junto a los puntos (dueño, 19/11/2026)", () => {
+    const { rerender } = render(<Escribiendo />);
+    expect(screen.queryByRole("button")).toBeNull();
+    rerender(<Escribiendo cargando />);
+    expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getByRole("status")).toHaveTextContent("Abriendo la conversación…");
   });
 });
@@ -105,12 +102,24 @@ describe("PanelCopiloto: lo que nota el usuario", () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
-  it("esperando: texto de progreso y «Parar» que cancela", () => {
+  it("esperando: texto de progreso y el botón de enviar se convierte en «Parar», que cancela", () => {
     const onParar = vi.fn();
     panel([MSG({ rol: "user", contenido: "Precio heineken" })], { isSending: true, onParar });
     expect(within(screen.getByRole("log")).getByRole("status")).toHaveTextContent("Buscando en las facturas…");
-    fireEvent.click(screen.getByRole("button", { name: "Parar" }));
-    expect(onParar).toHaveBeenCalled();
+    // Solo uno: en la caja de la pregunta, donde estaba «Enviar»; nada junto a los puntos.
+    expect(screen.getAllByRole("button", { name: /parar/i }).filter((b) => b.getAttribute("aria-label") !== "Parar el dictado")).toHaveLength(1);
+    expect(within(screen.getByRole("log")).queryByRole("button", { name: /parar/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Enviar pregunta" })).toBeNull();
+    const parar = screen.getByRole("button", { name: "Parar la respuesta" });
+    expect(parar).toBeEnabled();
+    fireEvent.click(parar);
+    expect(onParar).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin consulta en curso vuelve el botón de enviar (y no hay «Parar»)", () => {
+    panel([MSG({ rol: "user", contenido: "Precio heineken" })], { isSending: false, onParar: vi.fn() });
+    expect(screen.getByRole("button", { name: "Enviar pregunta" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Parar la respuesta" })).toBeNull();
   });
 
   it("tras una respuesta con herramienta: botones de paso siguiente que mandan la pregunta, y pie con la fecha", () => {
