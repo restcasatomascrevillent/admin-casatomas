@@ -372,7 +372,7 @@ describe("textos", () => {
     expect(textoIndicador(0, 0)).toBe("");
     expect(textoResumenTanda({
       tanda: 1, total: 5,
-      porClase: { guardada: 2, sustituida: 0, avisos: 1, sin_original: 0, pendiente: 1, duplicada: 0, fallida: 1 },
+      porClase: { guardada: 2, sustituida: 0, avisos: 1, sin_original: 0, pendiente: 1, duplicada: 0, en_servidor: 0, fallida: 1 },
     })).toBe("2 guardadas · 1 con avisos · 1 por decidir (ya existían) · 1 fallida");
     expect(debeAvisarEnCampana("/facturas", "?tab=cargar", false)).toBe(false);
     expect(debeAvisarEnCampana("/facturas", "?tab=cargar", true)).toBe(true);
