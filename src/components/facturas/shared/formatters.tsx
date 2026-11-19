@@ -71,6 +71,39 @@ export const valorSinDescuento = (
   };
 };
 
+/**
+ * Desglose del coste real de una línea (`importe_neto`, NULL = igual que lo
+ * impreso). Devuelve null si no hay nada que enseñar:
+ *  - `repartido`: línea de descuento (impreso < 0) ya repartida en sus productos (neto 0).
+ *  - `regalo`: neto 0 con importe impreso > 0 («Regalo / 100 % de descuento»).
+ *  - `descuento`: neto distinto del impreso; `descuento` = neto − impreso (negativo).
+ */
+export type DesgloseNeto =
+  | { tipo: "repartido" }
+  | { tipo: "regalo" }
+  | { tipo: "descuento"; neto: number; descuento: number };
+
+export const desgloseNeto = (p: { precio: number | null; importe_neto?: number | null }): DesgloseNeto | null => {
+  const neto = p.importe_neto;
+  if (neto === null || neto === undefined) return null;
+  const precio = p.precio ?? 0;
+  if (Math.abs(neto) < 0.005) {
+    if (precio < -0.005) return { tipo: "repartido" };
+    if (precio > 0.005) return { tipo: "regalo" };
+    return null;
+  }
+  if (Math.abs(neto - precio) < 0.005) return null;
+  return { tipo: "descuento", neto, descuento: neto - precio };
+};
+
+/** ¿Difieren el neto y el impreso en más de 1 céntimo? (pestaña Productos) */
+export const difiereNeto = (neto: number | null | undefined, impreso: number | null | undefined): boolean =>
+  neto != null && impreso != null && Math.abs(neto - impreso) > 0.01;
+
+/** «25,02 € neto · 41,85 € impreso». */
+export const textoNetoImpreso = (neto: number, impreso: number): string =>
+  `${formatImporte(neto)} neto · ${formatImporte(impreso)} impreso`;
+
 export const formatDate = (dateString: string | null): string => {
   if (!dateString) return "-";
   try {

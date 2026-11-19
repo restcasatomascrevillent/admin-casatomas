@@ -38,6 +38,12 @@ export interface ProductoFactura {
   importe_bruto?: number | null;
   importe_bruto_estimado?: boolean;
   /**
+   * Coste real de la línea (descuentos ya repartidos). null/ausente = igual que
+   * el importe impreso (`precio`); 0 en un regalo o en una línea de descuento ya
+   * repartida en sus productos.
+   */
+  importe_neto?: number | null;
+  /**
    * Precio de referencia de la línea: media del precio unitario de las DEMÁS
    * líneas con el mismo nombre, del mismo proveedor y tipo de documento (lo
    * calcula `documento_compras()`, migración 20261105190000). null = sin con
@@ -131,7 +137,7 @@ const columnasDocumento = (conBultos: boolean, conProducto: boolean, conFacturad
       alertas_validacion, procesado_en, created_at, verificada, verificacion_origen,
       productos_factura (
         id, nombre, precio_unitario, cantidad, unidad, total${conBultos ? ", bultos" : ""}${
-          conBruto ? ", descuento_pct, importe_bruto, importe_bruto_estimado" : ""
+          conBruto ? ", descuento_pct, importe_bruto, importe_bruto_estimado, importe_neto" : ""
         }${
           conProducto ? ", producto_id, productos_catalogo ( nombre, categoria_id )" : ""
         }
@@ -209,7 +215,7 @@ export const leerDocumentosCompletos = async (tipo: 'factura' | 'albaran'): Prom
       // listado de facturas vacío.
       else if (conBultos && /bultos/i.test(msg)) conBultos = false;
       else if (conFacturado && /facturado_en_id/i.test(msg)) conFacturado = false;
-      else if (conBruto && /importe_bruto|descuento_pct/i.test(msg)) conBruto = false;
+      else if (conBruto && /importe_bruto|descuento_pct|importe_neto/i.test(msg)) conBruto = false;
       // «column facturas.local does not exist»
       else if (conLocal && /\blocal\b/i.test(msg)) conLocal = false;
       else break;
@@ -240,6 +246,7 @@ export const leerDocumentosCompletos = async (tipo: 'factura' | 'albaran'): Prom
           descuento_pct: p.descuento_pct != null ? Number(p.descuento_pct) : null,
           importe_bruto: p.importe_bruto != null ? Number(p.importe_bruto) : null,
           importe_bruto_estimado: p.importe_bruto_estimado === true,
+          importe_neto: p.importe_neto != null ? Number(p.importe_neto) : null,
         };
       });
 

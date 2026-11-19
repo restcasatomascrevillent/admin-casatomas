@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { formatDateCorta, formatEntero, formatImporte, plural } from "@/components/facturas/shared/formatters";
+import { difiereNeto, formatDateCorta, formatEntero, formatImporte, plural, textoNetoImpreso } from "@/components/facturas/shared/formatters";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   useCategoriasProducto,
@@ -568,6 +568,8 @@ function FilaResumen({
   onAbrir: () => void;
 }) {
   const nombresProv = nombresProveedores(p, resolver);
+  const gastoDifiere = difiereNeto(p.gasto, p.gasto_impreso);
+  const precioDifiere = difiereNeto(p.ultimo_precio, p.ultimo_precio_impreso);
   // `lg:` solo en la lista ancha de siempre; en Compras la lista es una columna estrecha.
   const lg = (clases: string) => (compacta ? "" : clases);
   if (compacta) {
@@ -578,7 +580,10 @@ function FilaResumen({
       nombresProv.length > 0 ? nombresProv.join(", ") : null,
       plural(p.compras, "compra", "compras"),
       formatCantidades(p.cantidades),
-      p.ultimo_precio !== null ? `últ. ${formatImporte(p.ultimo_precio)}` : null,
+      p.ultimo_precio !== null
+        ? `últ. ${difiereNeto(p.ultimo_precio, p.ultimo_precio_impreso) ? textoNetoImpreso(p.ultimo_precio, p.ultimo_precio_impreso as number) : formatImporte(p.ultimo_precio)}`
+        : null,
+      difiereNeto(p.gasto, p.gasto_impreso) ? `${formatImporte(p.gasto_impreso)} impreso` : null,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -654,10 +659,14 @@ function FilaResumen({
         </span>
       </button>
       {/* Móvil, tablet y Compras: gasto a la derecha; el resto debajo. lg+ (lista ancha): columnas. */}
-      <span className={`text-right font-semibold tabular-nums ${lg("lg:hidden")}`}>{formatImporte(p.gasto)}</span>
+      <span className={`text-right font-semibold tabular-nums ${lg("lg:hidden")}`}>
+        {formatImporte(p.gasto)}
+        {gastoDifiere && <span className="block text-xs font-normal text-muted-foreground">{formatImporte(p.gasto_impreso)} impreso</span>}
+      </span>
       <span className={`col-start-2 col-end-4 text-xs text-muted-foreground ${lg("lg:hidden")}`}>
         {plural(p.compras, "compra", "compras")} · {formatCantidades(p.cantidades)}
-        {p.ultimo_precio !== null && ` · últ. ${formatImporte(p.ultimo_precio)}`}
+        {p.ultimo_precio !== null &&
+          ` · últ. ${precioDifiere ? textoNetoImpreso(p.ultimo_precio, p.ultimo_precio_impreso as number) : formatImporte(p.ultimo_precio)}`}
       </span>
       {!compacta && (
         <>
@@ -665,9 +674,13 @@ function FilaResumen({
           <span className="hidden truncate text-right text-sm tabular-nums lg:block" title={formatCantidades(p.cantidades)}>
             {formatCantidades(p.cantidades)}
           </span>
-          <span className="hidden text-right text-sm font-semibold tabular-nums lg:block">{formatImporte(p.gasto)}</span>
+          <span className="hidden text-right text-sm font-semibold tabular-nums lg:block">
+            {formatImporte(p.gasto)}
+            {gastoDifiere && <span className="block truncate text-xs font-normal text-muted-foreground">{formatImporte(p.gasto_impreso)} impreso</span>}
+          </span>
           <span className="hidden text-right text-sm tabular-nums lg:block" title={p.ultima_fecha ? `Última compra ${formatDateCorta(p.ultima_fecha)}` : undefined}>
             {p.ultimo_precio === null ? "—" : formatImporte(p.ultimo_precio)}
+            {precioDifiere && <span className="block truncate text-xs text-muted-foreground">{formatImporte(p.ultimo_precio_impreso)} impreso</span>}
           </span>
         </>
       )}
