@@ -288,6 +288,10 @@ verify_jwt = true
 [functions.interpretar-reserva-manuscrita]
 verify_jwt = true
 
+# Dictado por voz del panel (Safari/Firefox sin Web Speech): audio corto a texto. JWT + getUser; no guarda audio.
+[functions.transcribir-dictado]
+verify_jwt = true
+
 [functions.buscar-puntuacion-parker]
 verify_jwt = true
 

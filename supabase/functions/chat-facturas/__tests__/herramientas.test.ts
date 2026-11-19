@@ -249,7 +249,7 @@ describe("systemPrompt", () => {
     expect(p).toMatch(/compras_producto: cuanto se compro de UN producto, a quien y a que precio \(tambien el proveedor mas barato\)/);
     expect(p).toMatch(/12\. compras_producto: di unidad, periodo y variantes contadas \(productos_coincidentes\); nunca sumes unidades distintas/);
     expect(p).toMatch(/"aproximada": avisa de que no es el nombre exacto/);
-    expect(p).toMatch(/sin_datos: dilo y da ultimo_dato \(fecha, cantidad, proveedor\) si viene; con sugerencias pregunta si es alguna/);
+    expect(p).toMatch(/sin_datos: da ultimo_dato \(fecha, cantidad, proveedor\) si viene y nombra sugerencias o posibles_coincidencias \(botones\)/);
     expect(p).toMatch(/una_compra: solo hubo una, no hay evolucion/);
     expect(p).not.toMatch(/incluye_albaranes/);
     const d = TOOLS.find((t) => t.function.name === "compras_producto")!.function.description;

@@ -1753,15 +1753,15 @@
    "esperado": [
     {
      "ruta": "ultima_factura.fecha",
-     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'salmonete' and pf.nombre !~* 'espina' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'salmonete' and pf.nombre !~* 'espina' and f.proveedor_id is not null and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tipo": "txt",
-     "valor": "2026-11-11"
+     "valor": "2026-09-11"
     }
    ],
    "rpc": {
     "max_ms": 8000
    },
-   "nota": "las espinas de salmonete no son salmonete"
+   "nota": "las espinas de salmonete no son salmonete · la última factura es la última con proveedor identificado (decisión del dueño 18/11: el albarán SN-DESCONOCIDO del 11/11 va aparte como dudoso)"
   },
   {
    "id": "r090",
@@ -1905,7 +1905,7 @@
    "esperado": [
     {
      "ruta": "ultima_factura.precio_unitario",
-     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'xr reserva 1,5l' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "sql": "select coalesce((to_jsonb(pf)->>'importe_neto')::numeric / nullif(pf.cantidad, 0), pf.precio_unitario) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'xr reserva 1,5l' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tol": 0.01,
      "valor": 35,
      "tipo": "num"
@@ -1914,7 +1914,7 @@
    "rpc": {
     "max_ms": 8000
    },
-   "nota": "MARQUES DE RISCAL XR RESERVA 1,5L (magnum)"
+   "nota": "MARQUES DE RISCAL XR RESERVA 1,5L (magnum) · esperado con precio neto si existe importe_neto."
   },
   {
    "id": "r097",
@@ -2099,7 +2099,7 @@
    "esperado": [
     {
      "ruta": "total.importe",
-     "sql": "select round(sum(pf.total),2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id where p.nombre ~* 'laurent' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "sql": "select round(sum(coalesce((to_jsonb(pf)->>'importe_neto')::numeric, pf.total)),2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id where p.nombre ~* 'laurent' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
      "tol": 0,
      "tol_pct": 1,
      "valor": 94439.99,
@@ -2178,16 +2178,20 @@
    "esperado": [
     {
      "ruta": "total.importe",
-     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'chulet' and f.proveedor ~* 'nicol[aá]s y valero' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "sql": "select round(sum(coalesce((to_jsonb(pf)->>'importe_neto')::numeric, pf.total)), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where f.proveedor ~* 'nicol[aá]s y valero' and regexp_replace(lower(pf.nombre), '^(\\s*(\\([^)]{1,4}\\)|[a-z]{2,3}\\s*-|sel\\.|[0-9][0-9/,.]*(\\s|-)))*', '') ~ '^chulet' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
      "tol": 1,
-     "valor": 14704.5,
+     "valor": 5383.05,
      "tipo": "num"
     }
    ],
    "rpc": {
+    "debe": [
+     "variante_cercana",
+     "se_compra_como"
+    ],
     "max_ms": 8000
    },
-   "nota": "mismo proveedor con 2 escrituras"
+   "nota": "Decisión del dueño (18/11): el proveedor factura chuleta/chuletero, no «chuletón»; se cuentan (misma raíz, mismo tipo de producto, mismo proveedor) y el chat AVISA con qué nombre se compra. El tataki (plato elaborado) no suma: va aparte."
   },
   {
    "id": "r110",
@@ -2324,8 +2328,8 @@
    },
    "esperado": [
     {
-     "ruta": "ultima_factura.fecha",
-     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'gamba roja' and f.tipo = 'factura' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "ruta": "ultima_compra.fecha",
+     "sql": "select v.fecha::text from volumen_lineas v where v.nombre_linea ~* 'gamba roja' and v.nombre_linea !~* 'extracto' and v.medida = 'kg' and v.proveedor_id is not null and v.importe > 0 and v.cantidad_base > 0 order by v.fecha desc, v.doc_id desc, v.linea_id desc limit 1",
      "tipo": "txt",
      "valor": "2026-10-31"
     }
@@ -2333,7 +2337,7 @@
    "rpc": {
     "max_ms": 8000
    },
-   "nota": "la última factura con precio por kilo, no la «GAMBA ROJA 1» sin precio ni el albarán sin proveedor"
+   "nota": "Decisión del dueño (18/11): el «último precio» sale de la última compra con proveedor identificado (ultima_compra); un documento más nuevo sin identificar (SN-DESCONOCIDO) va aparte como dudoso (ultima_sin_identificar) y no es referencia."
   },
   {
    "id": "r115",
@@ -2380,7 +2384,7 @@
    "esperado": [
     {
      "ruta": "ultima_factura.precio_unitario",
-     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'heineken 1/3 long net' and pf.nombre !~* 'envase|plastico|desc' and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "sql": "select coalesce((to_jsonb(pf)->>'importe_neto')::numeric / nullif(pf.cantidad, 0), pf.precio_unitario) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'heineken 1/3 long net' and pf.nombre !~* 'envase|plastico|desc' and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tol": 0.01,
      "valor": 41.85,
      "tipo": "num"
@@ -3517,9 +3521,9 @@
    "esperado": [
     {
      "ruta": "avisos.mejor.lista[producto=Berberecho].precio_otro",
-     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^berberecho$' and f.tipo = 'factura' and f.proveedor ~* 'enchenta' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '^(be )?berberecho$' and f.tipo = 'factura' and f.proveedor ~* 'enchenta' and pf.unidad = 'kg' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tol": 0.01,
-     "valor": 31.5,
+     "valor": 27,
      "tipo": "num"
     },
     {
@@ -3532,7 +3536,8 @@
    ],
    "rpc": {
     "max_ms": 8000
-   }
+   },
+   "nota": "«BE BERBERECHO» de Enchenta es el mismo berberecho: 27 € el kg (09/10/2026). Alias en facturas-conocimiento/calidad-dato-2026-11-16/alias_berberecho.sql."
   },
   {
    "id": "n26",
@@ -4446,15 +4451,30 @@
    "esperado": [
     {
      "ruta": "total",
-     "sql": "select round(sum(case when pf.unidad = 'barril' then pf.cantidad * coalesce(pf.contenido_cantidad, 0) when pf.unidad = 'caja' then pf.cantidad * coalesce(substring(pf.nombre from '[*][ ]*([0-9]+)')::numeric, 0) * (case when pf.nombre ~ '1/3' then 0.33 when pf.nombre ~ '1/2' then 0.5 when pf.nombre ~ '1/4' then 0.25 else 0 end) else 0 end), 2) from productos_factura pf join facturas f on f.id = pf.factura_id join productos_catalogo p on p.id = pf.producto_id join categorias_producto cp on cp.id = p.categoria_id where cp.clave = 'bebidas.cervezas' and f.fecha between '2025-01-01' and '2025-12-31'",
+     "sql": "select round(sum(cantidad_base), 2) from volumen_lineas where categoria = 'Cervezas' and medida = 'l' and fecha between '2025-01-01' and '2025-12-31'",
+     "tol": 1,
+     "valor": 30152.48,
+     "tipo": "num"
+    },
+    {
+     "ruta": "desglose_envase[grupo=barril].total",
+     "sql": "select round(sum(cantidad_base), 2) from volumen_lineas where categoria = 'Cervezas' and medida = 'l' and fecha between '2025-01-01' and '2025-12-31' and (nombre_linea || ' ' || coalesce(unidad, '')) ~* 'barril|keg'",
      "tol": 40,
-     "valor": 29966.12,
+     "valor": 18130,
+     "tipo": "num"
+    },
+    {
+     "ruta": "desglose_envase[grupo=botella_lata].total",
+     "sql": "select round(sum(cantidad_base), 2) from volumen_lineas where categoria = 'Cervezas' and medida = 'l' and fecha between '2025-01-01' and '2025-12-31' and (nombre_linea || ' ' || coalesce(unidad, '')) !~* 'barril|keg'",
+     "tol": 40,
+     "valor": 12022.48,
      "tipo": "num"
     }
    ],
    "rpc": {
     "max_ms": 8000
-   }
+   },
+   "nota": "Decisión del dueño (18/11): TODO (barriles, botellas, latas y packs) pero DESGLOSADO: el total y, debajo, barril por un lado y botella/lata por otro (desglose_envase)."
   },
   {
    "id": "n56",
@@ -4603,7 +4623,7 @@
    "esperado": [
     {
      "ruta": "ultima_factura.precio_unitario",
-     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'heineken 0''0 % 1/3' and pf.nombre !~* 'desc|envase' and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "sql": "select coalesce((to_jsonb(pf)->>'importe_neto')::numeric / nullif(pf.cantidad, 0), pf.precio_unitario) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'heineken 0''0 % 1/3' and pf.nombre !~* 'desc|envase' and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and pf.precio_unitario > 0 order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tol": 0.01,
      "valor": 43.55,
      "tipo": "num"
@@ -4696,7 +4716,7 @@
    "esperado": [
     {
      "ruta": "total.importe",
-     "sql": "select round(sum(pf.total), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '[[:<:]]xr[[:>:]]' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "sql": "select round(sum(coalesce((to_jsonb(pf)->>'importe_neto')::numeric, pf.total)), 2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* '[[:<:]]xr[[:>:]]' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
      "tol": 0.05,
      "valor": 3262.32,
      "tipo": "num"

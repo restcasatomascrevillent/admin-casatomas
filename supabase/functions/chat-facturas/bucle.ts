@@ -14,7 +14,8 @@
 // ============================================================================
 import type { AcumuladorUso, UsageBruto } from "../_shared/registrar-uso-ia.ts";
 import { esErrorDeModelo } from "../_shared/modelo-funcion.ts";
-import { resumenParaModelo, tablaPresupuesto } from "./tabla.ts";
+import { claveDescuento, detalleParaModelo, mostrarTablaPresupuesto, resumenParaModelo, tablaPresupuesto, verDePregunta, type DescuentoPedido } from "./tabla.ts";
+import { ayudaDeResultado, unirAyuda, type AyudaPanel } from "./hilo.ts";
 import {
   type Adjunto,
   type DocRef,
@@ -150,6 +151,8 @@ export interface ResultadoBucle {
   sinRespuesta: boolean;
   /** Todas las consultas volvieron sin datos (un «no hay»): el panel anima a decir si debería haberlos. */
   sinDatos: boolean;
+  /** Nombres parecidos y fecha de los datos, para los botones y el pie del panel (18/11/2026). */
+  ayuda: AyudaPanel;
 }
 
 /** Estado por peticion: deadline compartido y memo de embeddings. */
@@ -169,6 +172,8 @@ interface Ctx {
   fetchImpl: typeof fetch;
   /** Id del presupuesto adjunto de la conversacion (comparar_presupuesto). */
   presupuestoId?: string | null;
+  /** Descuento de la última comparación de esa tarifa en el hilo (null = aún no se comparó): decide si va la tabla. */
+  comparacionPrevia?: DescuentoPedido | null;
 }
 
 // ─── Hilo de la conversación (11/11/2026) ────────────────────────────────────
@@ -394,13 +399,93 @@ interface ResultadoTool {
  * comparar_presupuesto (auditoría 16/11/2026): la tabla la monta el servidor
  * con TODAS las líneas y el modelo solo ve el resumen. Antes el resultado se
  * recortaba y el modelo enseñaba 4 ofertas de 143.
+ * Seguimientos (19/11/2026): con `conTabla: false` no hay tabla y el modelo
+ * recibe el detalle (precio por envase con y sin IVA, último pagado) para
+ * contestar SOLO lo que se pregunta.
  */
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function prepararPresupuesto(data: any): { tabla: string; paraModelo: unknown } | null {
+export function prepararPresupuesto(data: any, ver?: unknown, opciones?: { conTabla?: boolean; pregunta?: string }): { tabla: string | null; paraModelo: unknown } | null {
   if (!data || typeof data !== "object" || Array.isArray(data) || data.error) return null;
-  return { tabla: tablaPresupuesto(data), paraModelo: resumenParaModelo(data) };
+  if (opciones?.conTabla === false) return { tabla: null, paraModelo: detalleParaModelo(data, opciones.pregunta) };
+  return { tabla: tablaPresupuesto(data, ver), paraModelo: resumenParaModelo(data) };
 }
+
+/** El aviso de la primera tarifa adjunta: «📎 Presupuesto adjunto: …» (lo escribe useChatFacturas). */
+export const MARCA_ADJUNTO_PRESUPUESTO = "📎 Presupuesto adjunto";
+
+/**
+ * Descuento de la última comparación de la tarifa adjunta en el hilo (los argumentos de comparar_presupuesto que
+ * guardó el panel con la respuesta), o null si desde el último adjunto aún no se comparó.
+ */
+export function comparacionPreviaDelHilo(historial: TurnoHistorial[] | undefined): DescuentoPedido | null {
+  for (const t of [...(historial ?? [])].reverse()) {
+    if (t.role === "user" && t.content.startsWith(MARCA_ADJUNTO_PRESUPUESTO)) return null;
+    if (t.role !== "assistant") continue;
+    const h = [...(t.herramientas ?? [])].reverse().find((x) => x.nombre === "comparar_presupuesto" && !x.error);
+    if (h) return h.argumentos && typeof h.argumentos === "object" ? h.argumentos as DescuentoPedido : { descuento_tipo: "ninguno" };
+  }
+  return null;
+}
+
+// ─── Comparación guardada (19/11/2026) ──────────────────────────────────────
+//  comparar_presupuesto_agente tarda 1-4 s con una tarifa grande y se repetía
+//  en cada pregunta sobre ella: con la demo cargada se cortó dos veces por el
+//  «statement timeout» de 8 s («No puedo consultar ahora los cinco mejores…»).
+//  La primera comparación se guarda en chat_presupuestos_comparaciones (por
+//  tarifa y descuento) y los seguimientos la leen. Todo es best-effort: si la
+//  tabla no está (BD sin migrar) o falla, se calcula como antes.
+
+/** Cuánto vale una comparación guardada (y además, solo el mismo día). */
+export const VIGENCIA_COMPARACION_MS = 6 * 60 * 60 * 1000;
+
+/** Tarifa + descuento + proveedor dicho: lo que cambia el resultado de la comparación. */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function claveComparacion(params: any): string {
+  const n = (v: unknown) => (v === null || v === undefined || v === "" ? "" : String(Math.round(Number(v) * 10000) / 10000));
+  const prov = String(params?.p_proveedor ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+  return `pct:${n(params?.p_descuento_pct)}|imp:${n(params?.p_descuento_importe)}|prov:${prov}`.slice(0, 200);
+}
+
+/** La comparación guardada si sigue valiendo (menos de 6 h y del mismo día), o null. */
+export async function comparacionGuardada(supabase: Cliente, presupuestoId: string, clave: string, hoy = hoyMadrid()): Promise<unknown | null> {
+  try {
+    const { data, error } = await supabase
+      .from("chat_presupuestos_comparaciones")
+      .select("datos, creado_en")
+      .eq("presupuesto_id", presupuestoId)
+      .eq("clave", clave)
+      .maybeSingle();
+    if (error || !data?.datos || typeof data.datos !== "object") return null;
+    const edad = Date.now() - Date.parse(String(data.creado_en));
+    if (!Number.isFinite(edad) || edad > VIGENCIA_COMPARACION_MS) return null;
+    if (data.datos.hoy && data.datos.hoy !== hoy) return null;
+    return data.datos;
+  } catch {
+    return null;
+  }
+}
+
+/** Guarda la comparación para los seguimientos. Nunca lanza: sin guardar, se recalcula la próxima vez. */
+export async function guardarComparacion(supabase: Cliente, presupuestoId: string, clave: string, datos: unknown): Promise<void> {
+  if (!datos || typeof datos !== "object" || Array.isArray(datos) || (datos as { error?: unknown }).error) return;
+  try {
+    const { error } = await supabase
+      .from("chat_presupuestos_comparaciones")
+      .upsert({ presupuesto_id: presupuestoId, clave, datos, creado_en: new Date().toISOString() });
+    if (error) console.warn("[chat-facturas] comparación sin guardar:", error.message ?? error);
+  } catch (e) {
+    console.warn("[chat-facturas] comparación sin guardar:", e instanceof Error ? e.message : e);
+  }
+}
+
+const textoDescuento = (d: DescuentoPedido): string => {
+  const c = claveDescuento(d);
+  if (c === "ninguno") return "ninguno";
+  const [tipo, valor] = c.split(":");
+  return tipo === "porcentaje" ? `${valor} %` : `${valor} EUR`;
+};
 
 /** Documentos (con enlace al original) para los ids dados. Best-effort: si falla, sin referencias. */
 async function cargarReferencias(ids: number[], supabase: Cliente): Promise<DocRef[]> {
@@ -534,7 +619,11 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       : null;
 
     if (ll.tipo === "rpc") {
-      let r = await supabase.rpc(ll.rpc, ll.params);
+      // Tarifa adjunta: la comparación ya hecha (mismo descuento) se reutiliza.
+      const tarifa = ll.rpc === "comparar_presupuesto_agente" && ctx.presupuestoId ? ctx.presupuestoId : null;
+      const claveTarifa = tarifa ? claveComparacion(ll.params) : "";
+      const guardada = tarifa ? await comparacionGuardada(supabase, tarifa, claveTarifa) : null;
+      let r = guardada ? { data: guardada, error: null } : await supabase.rpc(ll.rpc, ll.params);
       // Tiempo agotado en la BD (corta a los 8 s): UN reintento si queda margen. El
       // segundo intento encuentra los datos ya en memoria y suele entrar en plazo;
       // así el usuario espera unos segundos más en vez de leer «no he podido consultar».
@@ -544,6 +633,7 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
       }
       if (r.error) throw r.error;
       data = r.data;
+      if (tarifa && !guardada) await guardarComparacion(supabase, tarifa, claveTarifa, data);
       // historial_precios / grafico_precio sin ninguna compra: antes de decir «no hay» se busca
       // como compras_producto (abreviaturas, erratas, sugerencias por texto y por significado).
       if (sinCompras(nombre, data)) {
@@ -587,8 +677,9 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
     if (vino && data && typeof data === "object" && !Array.isArray(data)) data = { vino_carta: vino, ...(data as Record<string, unknown>) };
 
     if (nombre === "comparar_presupuesto") {
-      const p = prepararPresupuesto(data);
-      if (p) return { fallo: false, tabla: p.tabla, contenido: JSON.stringify(p.paraModelo) };
+      const conTabla = mostrarTablaPresupuesto(ctx.pregunta, args, ctx.comparacionPrevia);
+      const p = prepararPresupuesto(data, args?.ver ?? verDePregunta(ctx.pregunta), { conTabla, pregunta: ctx.pregunta });
+      if (p) return { fallo: false, ...(p.tabla ? { tabla: p.tabla } : {}), contenido: JSON.stringify(p.paraModelo) };
     }
 
     let referencias: DocRef[] = [];
@@ -670,11 +761,17 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   const aviso: string[] = [`FECHA: hoy es ${o.hoy ?? hoyMadrid()}.`];
   const hilo = pistaDelHilo(historial, String(mensaje));
   if (hilo) aviso.push(hilo);
+  // Con el historial sin recortar por tamaño: las respuestas con tabla pesan y el recorte podría dejar fuera la comparación.
+  const comparacionPrevia = o.presupuesto ? comparacionPreviaDelHilo(o.historial) : null;
   if (o.presupuesto) {
     const p = o.presupuesto;
     aviso.push(
       `PRESUPUESTO adjunto: «${p.archivo ?? "presupuesto"}»${p.proveedor ? ` de ${p.proveedor}` : ""}, ${p.lineas} lineas. ` +
-      (p.proveedor
+      (comparacionPrevia
+        // Seguimiento (19/11/2026): sin esto el modelo no sabía con qué descuento volver a mirar la tarifa.
+        ? `Ya se comparo con descuento ${textoDescuento(comparacionPrevia)}. Si pregunta algo de esta tarifa (que interesa, precios, ` +
+          "IVA, un articulo), llama a comparar_presupuesto con ese descuento (salvo que diga otro) y contesta SOLO lo que pregunta."
+        : p.proveedor
         ? "Ya se pregunto por el descuento: si el mensaje del usuario lo contesta, llama a comparar_presupuesto."
         : "El fichero no dice el proveedor: ya se pregunto por el proveedor y el descuento; si el mensaje lo contesta, " +
           "llama a comparar_presupuesto con el proveedor que diga (null si no lo dice)."),
@@ -719,6 +816,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
     clave: o.claveOpenAI,
     fetchImpl: f,
     presupuestoId: o.presupuesto?.id ?? null,
+    comparacionPrevia,
   };
   let respuesta = "";
   let huboFalloDeHerramienta = false;
@@ -729,6 +827,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   const referenciasAcum: DocRef[][] = [];
   let tablaPresupuestoFinal: string | null = null;
   const nombradosAcum: DocNombrado[] = [];
+  const ayudaAcum: AyudaPanel[] = [];
   const apuntar = (h: HerramientaEjecutada, error?: string, resumen?: ResumenResultado) => {
     o.alEjecutarHerramienta?.(h);
     o.traza?.herramientas.push({
@@ -798,6 +897,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
           textoError || undefined,
           textoError ? undefined : resumenDeResultado(r.contenido),
         );
+        if (!r.fallo && !textoError) ayudaAcum.push(ayudaDeResultado(r.contenido));
         if (r.fallo) huboFalloDeHerramienta = true;
         else if (!textoError) { if (resultadoVacio(r.contenido)) consultasVacias++; else consultasConDatos++; }
         if (r.adjunto) adjuntos.push(r.adjunto);
@@ -837,7 +937,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
     // El modelo agoto los pasos sin redactar. Mejor decirlo que devolver vacio.
     sinRespuesta = true;
     respuesta = huboFalloDeHerramienta
-      ? "No he podido consultar los datos de facturas en este momento. Vuelve a intentarlo en unos segundos."
+      ? "No he podido consultar las facturas: la consulta ha tardado demasiado o no estaba disponible. Pulsa «Reintentar» y la vuelvo a lanzar."
       : "No he conseguido resolver la consulta. Prueba a preguntarlo de forma mas concreta, por ejemplo indicando un proveedor, un numero de documento o un mes.";
   }
 
@@ -847,5 +947,5 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   const refs = unirReferencias([citados, ...referenciasAcum]);
   if (refs.length > 0 && respuesta.trim()) adjuntos.push({ tipo: "documentos", datos: refs });
 
-  return { respuesta, adjuntos, modelo, huboFalloDeHerramienta, sinRespuesta, sinDatos: consultasVacias > 0 && consultasConDatos === 0 };
+  return { respuesta, adjuntos, modelo, huboFalloDeHerramienta, sinRespuesta, sinDatos: consultasVacias > 0 && consultasConDatos === 0, ayuda: unirAyuda(ayudaAcum) };
 }

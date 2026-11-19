@@ -243,7 +243,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       // Traza de las herramientas: vuelve al panel para guardarla con la
       // respuesta (hilo) y con el 👍/👎 (chat_feedback).
       const traza = trazaActual;
-      const { respuesta, adjuntos, modelo: modeloUsado, huboFalloDeHerramienta, sinRespuesta, sinDatos } = await ejecutarConversacion({
+      const { respuesta, adjuntos, modelo: modeloUsado, huboFalloDeHerramienta, sinRespuesta, sinDatos, ayuda } = await ejecutarConversacion({
         supabase,
         claveOpenAI: OPENAI_KEY,
         mensaje,
@@ -272,6 +272,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
         ...(incidencia ? { incidencia } : {}),
         ...(sinDatos && !incidencia ? { sin_datos: true } : {}),
         ...(adjuntos.length > 0 ? { adjuntos } : {}),
+        ...(ayuda.sugerencias || ayuda.datos_hasta ? { ayuda } : {}),
         modelo: modeloUsado,
         traza: trazaParaPanel(traza),
       }, 200);
@@ -285,15 +286,15 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       // "hubo un error" generico que no dice si reintentar o avisar a alguien.
       const motivo = motivoDeError(msg);
       await registrarIncidencia(motivo, msg);
-      let visible = "Ha habido un problema al procesar tu consulta. Pulsa «Reintentar».";
+      let visible = "No he podido responder esta vez por un problema del servicio. Tus facturas están bien. Pulsa «Reintentar».";
       if (msg.includes("aborted") || msg.toLowerCase().includes("timeout")) {
-        visible = "La consulta ha tardado demasiado y se ha cancelado. Pulsa «Reintentar» o prueba con una pregunta mas concreta.";
+        visible = "La consulta ha tardado demasiado y se ha cancelado. Pulsa «Reintentar» o prueba con una pregunta mas concreta (un producto, un proveedor o un mes).";
       } else if (msg.includes("OpenAI chat 429") || msg.includes("OpenAI embeddings 429")) {
-        visible = "El servicio de IA esta saturado ahora mismo. Espera unos segundos y vuelve a intentarlo.";
+        visible = "El servicio de IA esta saturado ahora mismo. Espera unos segundos y pulsa «Reintentar».";
       } else if (msg.includes("OpenAI chat 401") || msg.includes("OpenAI embeddings 401")) {
         visible = "El asistente no esta bien configurado (clave de OpenAI no valida). Avisa al administrador.";
       } else if (msg.startsWith("OpenAI")) {
-        visible = "El servicio de IA no ha respondido. Intentalo de nuevo en un momento.";
+        visible = "El servicio de IA no ha respondido. Pulsa «Reintentar» en un momento.";
       }
 
       return json({ success: false, respuesta: visible, error: msg, incidencia: motivo }, 200);
