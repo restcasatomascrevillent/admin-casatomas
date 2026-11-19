@@ -185,7 +185,7 @@
    "esperado": [
     {
      "ruta": "por_proveedor[proveedor=ENCHENTA SLU].importe",
-     "sql": "select round(sum(pf.total),2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'navaja' and f.proveedor ~* 'enchenta' and not (f.tipo = 'albaran' and f.facturado_en_id is not null)",
+     "sql": "select round(sum(pf.total),2) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'navaja' and f.proveedor ~* 'enchenta' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) and unidad_agente(coalesce(nullif(btrim(pf.unidad), ''), 'ud')) = 'kg'",
      "tol": 0,
      "tol_pct": 3,
      "valor": 7047.5,
@@ -338,7 +338,7 @@
    "esperado": [
     {
      "ruta": "total.importe",
-     "sql": "select round(sum(pf.total),2) from productos_factura pf join facturas f on f.id=pf.factura_id join productos_catalogo p on p.id=pf.producto_id join categorias_producto cp on cp.id=p.categoria_id where cp.clave='frutas_verduras' and f.fecha between '2026-01-01' and '2026-12-31'",
+     "sql": "select round(sum(pf.total),2) from productos_factura pf join facturas f on f.id=pf.factura_id join productos_catalogo p on p.id=pf.producto_id join categorias_producto cp on cp.id=p.categoria_id where cp.clave='frutas_verduras' and f.fecha between '2026-01-01' and '2026-12-31' and not (f.tipo='albaran' and f.facturado_en_id is not null)",
      "tol": 0,
      "tol_pct": 1,
      "valor": 39439.94,
@@ -452,14 +452,14 @@
    "esperado": [
     {
      "ruta": "ultima_factura.precio_unitario",
-     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'molino roca' and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.producto_id in (select x.producto_id from productos_factura x where x.nombre ~* 'molino roca' and x.producto_id is not null) and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tol": 0.01,
      "valor": 8.2,
      "tipo": "num"
     },
     {
      "ruta": "ultima_factura.fecha",
-     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'molino roca' and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.producto_id in (select x.producto_id from productos_factura x where x.nombre ~* 'molino roca' and x.producto_id is not null) and f.tipo = 'factura' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tipo": "txt",
      "valor": "2026-11-10"
     }
@@ -2275,7 +2275,7 @@
    "esperado": [
     {
      "ruta": "total.importe",
-     "sql": "select round(sum(pf.total),2) from productos_factura pf join facturas f on f.id=pf.factura_id join productos_catalogo p on p.id=pf.producto_id join categorias_producto cp on cp.id=p.categoria_id where cp.clave='bebidas.vinos' and f.fecha between '2026-09-01' and '2026-09-30' and p.denominacion_origen ilike '%rioja%'",
+     "sql": "select round(sum(pf.total),2) from productos_factura pf join facturas f on f.id=pf.factura_id join productos_catalogo p on p.id=pf.producto_id join categorias_producto cp on cp.id=p.categoria_id where cp.clave='bebidas.vinos' and f.fecha between '2026-09-01' and '2026-09-30' and p.denominacion_origen ilike '%rioja%' and not (f.tipo='albaran' and f.facturado_en_id is not null)",
      "tol": 1,
      "valor": 4999.98,
      "tipo": "num"
