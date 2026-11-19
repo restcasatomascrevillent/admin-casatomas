@@ -1,4 +1,4 @@
-// Prueba la migración 20261212610000_precios_netos_coherentes (sobre 20261211200000 y 20261211400000) y su
+// Prueba la migración 20261212900000_precios_netos_coherentes (sobre 20261211200000 y 20261211400000) y su
 // rollback contra un Postgres en memoria (PGlite) con pg_trgm. Nunca toca Supabase.
 //
 //   node scripts/test-precios-netos-coherentes.mjs
@@ -19,8 +19,8 @@ import assert from "node:assert/strict";
 
 const BASE = await readFile("supabase/migrations/20261211200000_descuentos_asociados.sql", "utf8");
 const REGALOS = await readFile("supabase/migrations/20261211400000_regalos_y_descuentos_positivos.sql", "utf8");
-const MIGRACION = await readFile("supabase/migrations/20261212610000_precios_netos_coherentes.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261212610000_precios_netos_coherentes_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261212900000_precios_netos_coherentes.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261212900000_precios_netos_coherentes_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const igual = (a, b, msg) => { assert.deepEqual(a, b, msg); comprobaciones++; };
