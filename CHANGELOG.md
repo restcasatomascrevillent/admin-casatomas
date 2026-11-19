@@ -2,6 +2,16 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.48.0] - 2026-11-19
+
+Objetivo: Reservas web sin duplicados por reintento (CAS-13) y cancelar sin enviar correo al cliente
+
+### Añadido
+- Reservas: cancelar una reserva sin enviar el correo al cliente ([#315](https://github.com/restcasatomascrevillent/admin-casatomas/pull/315))
+
+### Cambiado
+- Reservas: una solicitud web repetida devuelve la reserva que ya existe (CAS-13) ([#314](https://github.com/restcasatomascrevillent/admin-casatomas/pull/314))
+
 ## [1.47.0] - 2026-11-18
 
 Objetivo: Informes con mes único y auditoría persona a persona, Auditoría más clara y rápida, descuentos y regalos en Facturas, cada aviso solo para quien ve su sección, guardado de facturas sin cortes por tiempo y monitor de fallos de web y admin
