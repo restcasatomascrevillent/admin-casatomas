@@ -402,3 +402,79 @@ export function motivoHoraNoOfrecidaWeb(
   if (esMismoDiaSoloTelefono(fecha, hora, fechaHoy)) return CODIGO_MISMO_DIA_TELEFONO;
   return null;
 }
+
+// ============================================================================
+// SOLICITUD REPETIDA (CAS-13, 19/11/2026)
+// ----------------------------------------------------------------------------
+// El 18/11/2026 un cliente reservó por la web, la página le enseñó un error
+// justo después de guardarse (el traductor del navegador tiraba React) y
+// volvió a reservar: dos reservas iguales, un minuto entre ellas. El límite por
+// teléfono (2 al día) no lo frenó.
+//
+// Si llega una solicitud igual a una reserva web viva hecha hace poco (mismo
+// día, hora y comensales, mismo email o teléfono), no se crea otra: se devuelve
+// la que ya hay, con el mismo 201 de siempre. El cliente ve su resguardo y el
+// personal no tiene que buscar y anular el duplicado. No se manda nada (el alta
+// web no manda correo, ver handleCrear) ni se registra solicitud pendiente.
+// ============================================================================
+
+/** Minutos durante los que una solicitud igual cuenta como repetida. */
+export const MINUTOS_SOLICITUD_REPETIDA = 30;
+/** Estados en los que la reserva sigue viva (una cancelada o rechazada no cuenta). */
+export const ESTADOS_SOLICITUD_REPETIDA: ReadonlyArray<string> = ["pendiente", "verificada", "confirmada"];
+
+export interface ReservaCandidataRepetida {
+  id: string;
+  estado: string | null;
+  hora: string | null;
+  numero_comensales: number | null;
+  telefono: string | null;
+  email: string | null;
+  created_at: string | null;
+}
+
+export interface SolicitudWeb {
+  hora: string;
+  comensales: number;
+  telefono: string | null;
+  email: string | null;
+}
+
+const soloDigitos = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
+
+/** Mismo teléfono: mismos dígitos, o los mismos 9 últimos (con y sin prefijo de país). */
+function mismoTelefono(a: string | null, b: string | null): boolean {
+  const x = soloDigitos(a);
+  const y = soloDigitos(b);
+  if (x.length < 9 || y.length < 9) return false;
+  return x === y || x.slice(-9) === y.slice(-9);
+}
+
+function mismoEmail(a: string | null, b: string | null): boolean {
+  const x = (a ?? "").trim().toLowerCase();
+  return x !== "" && x === (b ?? "").trim().toLowerCase();
+}
+
+/**
+ * De las reservas web de ese día (ya filtradas por fecha, canal y marca), la
+ * que hace que `nueva` sea una repetición; `null` si no hay ninguna. Si hay
+ * varias, la más reciente.
+ */
+export function buscarSolicitudRepetida(
+  existentes: ReadonlyArray<ReservaCandidataRepetida> | null | undefined,
+  nueva: SolicitudWeb,
+  ahora: Date,
+): ReservaCandidataRepetida | null {
+  if (!nueva.telefono && !nueva.email) return null;
+  const desde = ahora.getTime() - MINUTOS_SOLICITUD_REPETIDA * 60_000;
+  const coinciden = (existentes ?? []).filter((r) => {
+    if (!r.estado || !ESTADOS_SOLICITUD_REPETIDA.includes(r.estado)) return false;
+    if (String(r.hora ?? "").slice(0, 5) !== nueva.hora.slice(0, 5)) return false;
+    if (Number(r.numero_comensales) !== nueva.comensales) return false;
+    const creada = r.created_at ? Date.parse(r.created_at) : NaN;
+    if (!Number.isFinite(creada) || creada < desde || creada > ahora.getTime() + 60_000) return false;
+    return mismoEmail(r.email, nueva.email) || mismoTelefono(r.telefono, nueva.telefono);
+  });
+  if (coinciden.length === 0) return null;
+  return coinciden.reduce((a, b) => (Date.parse(b.created_at!) > Date.parse(a.created_at!) ? b : a));
+}

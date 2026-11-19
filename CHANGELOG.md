@@ -2,6 +2,57 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.49.0] - 2026-11-19
+
+Objetivo: IA de Facturas: dictado por voz, espera más clara y tarifas de proveedor que contestan lo que se pregunta (precio por botella con y sin IVA)
+
+### Añadido
+- Facturas: dictado por voz en el chat de Facturas ([#265](https://github.com/restcasatomascrevillent/admin-casatomas/pull/265))
+- Facturas: calidad percibida del chat (espera, errores, pistas, copiar) ([#296](https://github.com/restcasatomascrevillent/admin-casatomas/pull/296))
+- Chat-facturas: investigación de adjuntos — los seguimientos de una tarifa contestan lo que se pregunta y «Parar» en el botón de enviar ([#317](https://github.com/restcasatomascrevillent/admin-casatomas/pull/317))
+
+### Cambiado
+- Presupuestos: revisión en producción (envases, precio de referencia, IA, velocidad, tabla corta) ([#297](https://github.com/restcasatomascrevillent/admin-casatomas/pull/297))
+- Chat-facturas: decisiones del dueño (r109, r114, n25, n55) y tickets automáticos de documentos ([#298](https://github.com/restcasatomascrevillent/admin-casatomas/pull/298))
+- Chat-facturas: hallazgos F1-F7 de la revisión independiente + trampa de --simular ([#299](https://github.com/restcasatomascrevillent/admin-casatomas/pull/299))
+- Chat-facturas: las preguntas sobre una tarifa reutilizan la comparación ya hecha ([#319](https://github.com/restcasatomascrevillent/admin-casatomas/pull/319))
+
+## [1.48.0] - 2026-11-19
+
+Objetivo: Reservas web sin duplicados por reintento (CAS-13) y cancelar sin enviar correo al cliente
+
+### Añadido
+- Reservas: cancelar una reserva sin enviar el correo al cliente ([#315](https://github.com/restcasatomascrevillent/admin-casatomas/pull/315))
+
+### Cambiado
+- Reservas: una solicitud web repetida devuelve la reserva que ya existe (CAS-13) ([#314](https://github.com/restcasatomascrevillent/admin-casatomas/pull/314))
+
+## [1.47.0] - 2026-11-18
+
+Objetivo: Informes con mes único y auditoría persona a persona, Auditoría más clara y rápida, descuentos y regalos en Facturas, cada aviso solo para quien ve su sección, guardado de facturas sin cortes por tiempo y monitor de fallos de web y admin
+
+### Añadido
+- Facturas: cada descuento se asocia al producto que descuenta ([#288](https://github.com/restcasatomascrevillent/admin-casatomas/pull/288))
+- Facturas: precios, costes y márgenes con los descuentos asociados ([#289](https://github.com/restcasatomascrevillent/admin-casatomas/pull/289))
+- Auditoria: pantalla más clara e intuitiva, también en móvil y tablet ([#291](https://github.com/restcasatomascrevillent/admin-casatomas/pull/291))
+- Facturas: los regalos quedan marcados y los descuentos en positivo se asocian ([#292](https://github.com/restcasatomascrevillent/admin-casatomas/pull/292))
+- Informes: mes único para todos los informes y auditoría persona a persona ([#303](https://github.com/restcasatomascrevillent/admin-casatomas/pull/303))
+- Logs-web: «Fallo de la web» y «Fallo del admin», y cada incidencia explicada en llano ([#304](https://github.com/restcasatomascrevillent/admin-casatomas/pull/304))
+- Facturas: la cola de subida guarda de 2 en 2 y lee 6 piezas a la vez ([#302](https://github.com/restcasatomascrevillent/admin-casatomas/pull/302))
+- Reservas: avisos por verificar (azul), confirmadas por el cliente (verde) y canceladas (rojo) ([#306](https://github.com/restcasatomascrevillent/admin-casatomas/pull/306))
+
+### Cambiado
+- Facturas: la IA de clasificación ya no mete líneas ajenas en el producto 11 ([#287](https://github.com/restcasatomascrevillent/admin-casatomas/pull/287))
+- Avisos: cada aviso solo para quien ve su sección ([#293](https://github.com/restcasatomascrevillent/admin-casatomas/pull/293))
+- Facturas: clasificar-productos y embeddings-nombres ya no van justas de tiempo (CAS-7) ([#301](https://github.com/restcasatomascrevillent/admin-casatomas/pull/301))
+- Auditoria: la lista y el buscador ya no dan «statement timeout» ([#305](https://github.com/restcasatomascrevillent/admin-casatomas/pull/305))
+- Facturas: el guardado ya no calcula los vectores de los nombres ([#307](https://github.com/restcasatomascrevillent/admin-casatomas/pull/307))
+- Facturas: el guardado escribe alertas, original y coste en un solo UPDATE ([#308](https://github.com/restcasatomascrevillent/admin-casatomas/pull/308))
+- Facturas: guardar una factura ya no espera a Google Drive ([#310](https://github.com/restcasatomascrevillent/admin-casatomas/pull/310))
+
+### Otros
+- Facturas: informe de la revisión de descuentos, promociones y regalos ([#290](https://github.com/restcasatomascrevillent/admin-casatomas/pull/290))
+
 ## [1.44.2] - 2026-11-18
 
 Objetivo: Chat de facturas más preciso: vinos con botellas sin cargo, sin variaciones absurdas, búsqueda exacta y erratas, y batería de 212 preguntas

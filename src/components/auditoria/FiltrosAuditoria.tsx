@@ -92,6 +92,18 @@ const ETIQUETA_CAMPO: Record<keyof AuditLogFiltros, string> = {
 };
 const ORIGENES: Record<string, string> = { usuario: "Personas", servidor: "Procesos", intento: "Intentos", historico: "Histórico" };
 const RESULTADOS: Record<string, string> = { completada: "Completado", fallida: "Fallido", parcial: "Parcial", pendiente: "Pendiente" };
+/**
+ * Letras mínimas para buscar: la búsqueda va por un índice de trigramas (grupos de 3 letras); con 1 o 2 no puede
+ * usarlo y la consulta recorre todos los registros (4,5 s en la demo el 18/11/2026, cerca del límite de 8 s).
+ */
+export const MIN_LETRAS_BUSQUEDA = 3;
+
+/** Quita una búsqueda de 1 o 2 letras (no se manda: ver `MIN_LETRAS_BUSQUEDA`); el resto de filtros, igual. */
+export function sinBusquedaCorta(filtros: AuditLogFiltros): AuditLogFiltros {
+  const letras = filtros.texto?.trim().length ?? 0;
+  return letras > 0 && letras < MIN_LETRAS_BUSQUEDA ? { ...filtros, texto: undefined } : filtros;
+}
+
 /** Campos de «Más opciones»: si alguno está puesto, el bloque se abre solo. */
 const CAMPOS_AVANZADOS = ["origen", "resultado", "dispositivo"] as const;
 
@@ -166,6 +178,7 @@ export function FiltrosAuditoria({
   const cambiar = (campo: keyof AuditLogFiltros, valor: string) =>
     onChange({ ...pendientes, [campo]: valor || undefined });
   const textoSinAplicar = (pendientes.texto ?? "") !== (activos.texto ?? "");
+  const busquedaCorta = sinBusquedaCorta(pendientes) !== pendientes;
   // Borrador del formulario sin aplicar (la búsqueda tiene su propio aviso: el botón «Buscar» dentro del campo).
   const formularioSinAplicar = Object.keys({ ...pendientes, ...activos }).some(
     (campo) =>
@@ -182,7 +195,7 @@ export function FiltrosAuditoria({
       className="relative min-w-0 flex-1 md:max-w-md"
       onSubmit={(e) => {
         e.preventDefault();
-        onAplicar();
+        if (!busquedaCorta) onAplicar();
       }}
     >
       <Label htmlFor="auditoria-texto" className="sr-only">
@@ -201,9 +214,15 @@ export function FiltrosAuditoria({
         placeholder={mobile ? "Buscar…" : "Buscar plato, vino, persona…"}
         value={pendientes.texto ?? ""}
         onChange={(e) => cambiar("texto", e.target.value)}
+        aria-describedby={busquedaCorta ? "auditoria-texto-aviso" : undefined}
       />
       {textoSinAplicar ? (
-        <Button type="submit" size="sm" className="absolute right-1 top-1/2 h-8 -translate-y-1/2 px-3 pointer-coarse:h-9">
+        <Button
+          type="submit"
+          size="sm"
+          disabled={busquedaCorta}
+          className="absolute right-1 top-1/2 h-8 -translate-y-1/2 px-3 pointer-coarse:h-9"
+        >
           Buscar
         </Button>
       ) : (
@@ -476,6 +495,11 @@ export function FiltrosAuditoria({
             <span className="shrink-0 text-xs font-medium text-amber-700 dark:text-amber-400">Cambios sin aplicar</span>
           )}
         </div>
+        {busquedaCorta && (
+          <p id="auditoria-texto-aviso" role="status" className="text-xs text-amber-700 dark:text-amber-400">
+            Escribe al menos {MIN_LETRAS_BUSQUEDA} letras para buscar.
+          </p>
+        )}
         {chips}
         {open && (
           <div id="auditoria-filtros-escritorio" className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -502,6 +526,11 @@ export function FiltrosAuditoria({
           {contador}
         </Button>
       </div>
+      {busquedaCorta && (
+        <p id="auditoria-texto-aviso" role="status" className="text-xs text-amber-700 dark:text-amber-400">
+          Escribe al menos {MIN_LETRAS_BUSQUEDA} letras para buscar.
+        </p>
+      )}
       {chips}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="left-0 top-auto bottom-0 h-[88dvh] w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-t-2xl p-0 overflow-hidden pointer-coarse:top-auto pointer-coarse:h-[min(88dvh,calc(var(--vv-h,100dvh)_-_1rem))] pointer-coarse:bottom-[max(0px,calc(100dvh_-_var(--vv-top,0px)_-_var(--vv-h,100dvh)))] pointer-coarse:max-h-none">

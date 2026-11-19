@@ -1,7 +1,8 @@
 import { PGlite } from '@electric-sql/pglite';
+import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
-const db = new PGlite();
+const db = new PGlite({ extensions: { pg_trgm } });
 const admin = '10000000-0000-0000-0000-000000000001';
 const target = '20000000-0000-0000-0000-000000000002';
 const deleted = '30000000-0000-0000-0000-000000000003';
@@ -13,6 +14,7 @@ const sql = (s, p) => db.query(s, p);
 // a veces leía la fila anterior ("API · anon" en vez de "Base de datos").
 const last = async () => (await sql('select * from public.audit_log order by created_at desc, xmin::text::bigint desc, id desc limit 1')).rows[0];
 await db.exec(`
+ create schema extensions; create extension pg_trgm with schema extensions;
  create role anon; create role authenticated; create role service_role bypassrls;
  create role supabase_auth_admin superuser;
  create schema auth;
@@ -347,5 +349,36 @@ await db.exec("set test.actor='99999999-0000-0000-0000-000000000009';");
 check(await count(),0,'ordinary account cannot read any audit records');
 await reject("insert into public.audit_log(accion,actor_user_id) values('login','"+admin+"')",'client cannot insert fake login of a verified account');
 await db.exec('reset role');
+// Lista de Auditoría (20261212105000): con muchos registros de procesos y pocos de personas, la lista por defecto
+// (sin procesos del servidor, por fecha, de 25 en 25) usa el índice parcial de personas en vez de recorrer los procesos.
+// `create index concurrently` no puede ir en un bloque de transacción: cada sentencia del fichero va por separado.
+// Los dos índices van en UNA sentencia por fichero (así los aplica `supabase db query -f` sin transacción).
+for (const fichero of ['20261212105000_audit_log_indice_personas.sql','20261212110000_audit_log_indice_busqueda.sql']) {
+ const sentencias=(await readFile(`supabase/migrations/${fichero}`,'utf8')).replace(/^\s*--.*$/gm,'').split(';').map(t=>t.trim()).filter(Boolean);
+ check(sentencias.length,1,`${fichero} has a single statement`);
+ await db.exec(sentencias[0]);
+}
+await db.exec("alter table public.audit_log disable trigger user; insert into public.audit_log(accion,actor_origin,actor_label,tabla,created_at) select 'ejecutar','servicio','Proceso · prueba','acciones_servidor',now()-make_interval(secs=>g) from generate_series(1,4000) g; insert into public.audit_log(accion,actor_origin,actor_label,actor_user_id,tabla,created_at) select 'actualizar','usuario','admin@staff.local','"+admin+"','Platos',now()-make_interval(days=>30,secs=>g) from generate_series(1,40) g; alter table public.audit_log enable trigger user; analyze public.audit_log;");
+const plan=(await sql("explain select * from public.audit_log where accion not in ('acceso','intento_login') and actor_origin = any('{usuario,intento,historico}') order by created_at desc, id desc limit 25")).rows.map(r=>r['QUERY PLAN']).join('\n');
+check(/idx_audit_log_personas/.test(plan),true,'default audit list uses the people-only index:\n'+plan);
+const planTotal=(await sql("explain select count(*) from public.audit_log where actor_origin = any('{usuario,intento,historico}')")).rows.map(r=>r['QUERY PLAN']).join('\n');
+check(/idx_audit_log_personas/.test(planTotal),true,'audit list total counts from the people-only index:\n'+planTotal);
+// Buscador (20261212110000 + 20261212120000): la vista calcula `texto_busqueda` con la misma expresión que el
+// índice de trigramas, así que el `ilike` del buscador lo usa, y encuentra lo mismo que con `concat_ws`.
+const migracionUtil=await readFile('supabase/migrations/20261012153701_auditoria_legible_chat_reversion.sql','utf8');
+await db.exec(migracionUtil.slice(migracionUtil.indexOf('CREATE OR REPLACE FUNCTION public.audit_tabla_util'),migracionUtil.indexOf(']::text[]) $$;')+']::text[]) $$;'.length));
+const vistaVieja=await readFile('supabase/rollbacks/20261212120000_audit_log_texto_busqueda_indexable_ROLLBACK.sql','utf8');
+const vistaNueva=await readFile('supabase/migrations/20261212120000_audit_log_texto_busqueda_indexable.sql','utf8');
+await db.exec("alter table public.audit_log disable trigger user; insert into public.audit_log(accion,actor_origin,actor_label,actor_user_id,tabla,detalles,created_at) select 'actualizar','usuario','admin@staff.local','"+admin+"','Platos',jsonb_build_object('antes',jsonb_build_object('nombre','Arroz a banda','precio_eur',16.5),'despues',jsonb_build_object('nombre','Arroz a banda','precio_eur',17.5)),now()-make_interval(days=>40,secs=>g) from generate_series(1,3) g; insert into public.audit_log(accion,actor_origin,actor_label,actor_user_id,tabla,detalles,created_at) values ('ejecutar','usuario','admin@staff.local','"+admin+"','consultas_ia','{\"pregunta\":\"¿Cuánto marisco y ARROZ compramos?\",\"respuesta\":\"Poco\"}',now()-interval '41 days'); alter table public.audit_log enable trigger user; analyze public.audit_log;");
+const buscar="select id from public.audit_log_visible where actor_origin = any('{usuario,intento,historico}') and texto_busqueda ilike '%arroz%' order by id";
+await db.exec(vistaVieja);
+const antes=(await sql(buscar)).rows;
+await db.exec(vistaNueva);
+const despues=(await sql(buscar)).rows;
+check(despues.length,4,'search finds dish changes and AI questions');
+check(despues,antes,'indexable search text finds the same rows as concat_ws');
+const planBusqueda=(await sql("explain select count(*) from public.audit_log_visible where actor_origin = any('{usuario,intento,historico}') and texto_busqueda ilike '%arroz%'")).rows.map(r=>r['QUERY PLAN']).join('\n');
+check(/idx_audit_log_busqueda/.test(planBusqueda),true,'audit search uses the trigram index:\n'+planBusqueda);
+check((await sql("select reloptions from pg_class where oid='public.audit_log_visible'::regclass")).rows[0].reloptions,['security_invoker=true'],'view keeps security_invoker');
 console.log(checks+' PostgreSQL checks passed');
 await db.close();

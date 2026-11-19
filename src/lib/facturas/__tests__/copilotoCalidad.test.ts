@@ -18,7 +18,7 @@ describe("textoProgreso: lo que se lee mientras se espera", () => {
     expect(textoProgreso(5)).toBe("Calculando…");
     expect(textoProgreso(12)).toBe("Casi está…");
     expect(textoProgreso(25)).toMatch(/consulta es larga/);
-    expect(textoProgreso(60)).toMatch(/Parar/);
+    expect(textoProgreso(60)).toMatch(/botón de parar \(■\)/);
   });
   it("los segundos solo salen a partir de 5", () => {
     expect(textoSegundos(3)).toBe("");

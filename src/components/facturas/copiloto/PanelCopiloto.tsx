@@ -108,11 +108,13 @@ function DocumentosCitados({ documentos }: { documentos: DocumentoCitado[] }) {
 }
 
 /**
- * Mientras se espera: los tres puntos, un texto que cambia con los segundos
- * («Buscando…», «Calculando…», «Casi está…») y «Parar». `cargando`: solo se
- * abre una conversación del historial (sin texto de consulta ni «Parar»).
+ * Mientras se espera: los tres puntos y un texto que cambia con los segundos
+ * («Buscando…», «Calculando…», «Casi está…»). `cargando`: solo se abre una
+ * conversación del historial (sin texto de consulta).
+ * «Parar» ya no va aquí (dueño, 19/11/2026: no le gustaba el botón suelto junto a
+ * los puntos): el botón de enviar se convierte en «Parar» mientras piensa.
  */
-export function Escribiendo({ onParar, cargando }: { onParar?: () => void; cargando?: boolean }) {
+export function Escribiendo({ cargando }: { cargando?: boolean }) {
   const [segundos, setSegundos] = useState(0);
   useEffect(() => {
     const inicio = Date.now();
@@ -136,12 +138,6 @@ export function Escribiendo({ onParar, cargando }: { onParar?: () => void; carga
         {texto}
         {tiempo && <span className="ml-1.5 tabular-nums text-muted-foreground/70">{tiempo}</span>}
       </span>
-      {onParar && !cargando && (
-        <button type="button" onClick={onParar} className={cn(BOTON_PIE, "border border-border/70 px-3 text-foreground")}>
-          <Square className="h-3 w-3 fill-current" aria-hidden />
-          Parar
-        </button>
-      )}
     </div>
   );
 }
@@ -395,7 +391,7 @@ export function PanelCopiloto({
             ))}
             {isSending && (
               <li>
-                <Escribiendo onParar={onParar} />
+                <Escribiendo />
               </li>
             )}
           </ol>
@@ -443,19 +439,35 @@ export function PanelCopiloto({
             </>
           )}
           <BotonDictado valor={input} onCambio={setInput} disabled={isSending} className="absolute bottom-1 right-12" />
-          <button
-            type="button"
-            onClick={enviar}
-            disabled={isSending || !hayTexto}
-            aria-label="Enviar pregunta"
-            className={cn(
-              "absolute bottom-1 right-1 flex h-11 w-11 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed",
-              FOCO,
-              hayTexto && !isSending ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-muted text-muted-foreground",
-            )}
-          >
-            <ArrowUp className="h-4 w-4" aria-hidden />
-          </button>
+          {isSending && onParar ? (
+            // Mientras piensa, el botón de enviar es «Parar» (en el mismo sitio, como en ChatGPT).
+            <button
+              type="button"
+              onClick={onParar}
+              aria-label="Parar la respuesta"
+              title="Parar"
+              className={cn(
+                "absolute bottom-1 right-1 flex h-11 w-11 items-center justify-center rounded-full bg-foreground text-background transition-colors hover:bg-foreground/85",
+                FOCO,
+              )}
+            >
+              <Square className="h-3.5 w-3.5 fill-current" aria-hidden />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={enviar}
+              disabled={isSending || !hayTexto}
+              aria-label="Enviar pregunta"
+              className={cn(
+                "absolute bottom-1 right-1 flex h-11 w-11 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed",
+                FOCO,
+                hayTexto && !isSending ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-muted text-muted-foreground",
+              )}
+            >
+              <ArrowUp className="h-4 w-4" aria-hidden />
+            </button>
+          )}
         </div>
       </div>
     </div>

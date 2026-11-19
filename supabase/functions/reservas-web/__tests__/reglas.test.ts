@@ -14,6 +14,9 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  buscarSolicitudRepetida,
+  MINUTOS_SOLICITUD_REPETIDA,
+  type ReservaCandidataRepetida,
   rechazarPorSala,
   salaDelCliente,
   contarEspaciosQueCaben,
@@ -250,5 +253,62 @@ describe("salvaguarda del doble opt-in (sin 20261003184500 el trigger antiguo su
     expect(consentimientoNewsletterParaGuardar(si, "inactivo")).toBe(false);
     expect(consentimientoNewsletterParaGuardar(si, "desconocido")).toBe(false);
     expect(consentimientoNewsletterParaGuardar(no, "activo")).toBe(false);
+  });
+});
+
+// ============================================================================
+// Solicitud repetida (CAS-13, 19/11/2026): el cliente vio un error tras guardar
+// su reserva y la volvió a pedir; se le devuelve la suya en vez de crear otra.
+// ============================================================================
+describe("buscarSolicitudRepetida", () => {
+  const AHORA_R = new Date("2026-11-18T21:07:47.000Z");
+  const previa: ReservaCandidataRepetida = {
+    id: "r-1",
+    estado: "pendiente",
+    hora: "20:00:00",
+    numero_comensales: 2,
+    telefono: "+34612345678",
+    email: "Cliente@Example.com",
+    created_at: "2026-11-18T21:06:40.199Z",
+  };
+  const nueva = { hora: "20:00", comensales: 2, telefono: "+34612345678", email: "cliente@example.com" };
+
+  it("misma hora, comensales y contacto un minuto después: es la misma solicitud", () => {
+    expect(buscarSolicitudRepetida([previa], nueva, AHORA_R)?.id).toBe("r-1");
+  });
+
+  it("basta con el mismo email o el mismo teléfono (con o sin prefijo, con espacios)", () => {
+    expect(buscarSolicitudRepetida([previa], { ...nueva, telefono: null }, AHORA_R)?.id).toBe("r-1");
+    expect(buscarSolicitudRepetida([previa], { ...nueva, email: "otro@example.com", telefono: "612 345 678" }, AHORA_R)?.id).toBe("r-1");
+  });
+
+  it("otra hora, otros comensales u otro contacto: no es repetida", () => {
+    expect(buscarSolicitudRepetida([previa], { ...nueva, hora: "21:00" }, AHORA_R)).toBeNull();
+    expect(buscarSolicitudRepetida([previa], { ...nueva, comensales: 3 }, AHORA_R)).toBeNull();
+    expect(buscarSolicitudRepetida([previa], { ...nueva, email: "otro@example.com", telefono: "+34699999999" }, AHORA_R)).toBeNull();
+  });
+
+  it("sin email ni teléfono en la nueva no se compara nada", () => {
+    expect(buscarSolicitudRepetida([previa], { ...nueva, email: null, telefono: null }, AHORA_R)).toBeNull();
+  });
+
+  it(`pasados ${MINUTOS_SOLICITUD_REPETIDA} minutos ya no cuenta (puede ser otra reserva de verdad)`, () => {
+    const vieja = { ...previa, created_at: new Date(AHORA_R.getTime() - (MINUTOS_SOLICITUD_REPETIDA + 1) * 60_000).toISOString() };
+    expect(buscarSolicitudRepetida([vieja], nueva, AHORA_R)).toBeNull();
+    const justo = { ...previa, created_at: new Date(AHORA_R.getTime() - (MINUTOS_SOLICITUD_REPETIDA - 1) * 60_000).toISOString() };
+    expect(buscarSolicitudRepetida([justo], nueva, AHORA_R)?.id).toBe("r-1");
+  });
+
+  it("una reserva cancelada o rechazada no cuenta; una verificada o confirmada sí", () => {
+    expect(buscarSolicitudRepetida([{ ...previa, estado: "cancelada" }], nueva, AHORA_R)).toBeNull();
+    expect(buscarSolicitudRepetida([{ ...previa, estado: "rechazada" }], nueva, AHORA_R)).toBeNull();
+    expect(buscarSolicitudRepetida([{ ...previa, estado: "verificada" }], nueva, AHORA_R)?.id).toBe("r-1");
+    expect(buscarSolicitudRepetida([{ ...previa, estado: "confirmada" }], nueva, AHORA_R)?.id).toBe("r-1");
+  });
+
+  it("sin fecha de creación no se da por repetida; con varias, la más reciente", () => {
+    expect(buscarSolicitudRepetida([{ ...previa, created_at: null }], nueva, AHORA_R)).toBeNull();
+    const otra = { ...previa, id: "r-2", created_at: "2026-11-18T21:07:00.000Z" };
+    expect(buscarSolicitudRepetida([previa, otra], nueva, AHORA_R)?.id).toBe("r-2");
   });
 });

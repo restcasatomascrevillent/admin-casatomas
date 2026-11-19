@@ -120,7 +120,8 @@ SIEMPRE a Drive (carpeta del proveedor → «2026-03 Marzo») y se guarda
 
 - `pendientes/{uid}/{trabajo}/…`: piezas del OCR por trabajos. Se borran al
   terminar o fallar el trabajo (los «duplicado» las guardan hasta decidir).
-- `temporal/{factura}-{nombre}`: el original cuando Drive falla al guardar. La
+- `temporal/{factura}-{nombre}`: el original de una factura recién guardada
+  (desde el 18/11/2026 guardar no espera a Drive) o cuando Drive falla. La
   factura queda «pendiente de Drive» (`archivo_path` sin `drive_url`; el botón del
   original lo dice) y la Edge Function `facturas-originales-drive` (pg_cron
   `facturas-originales-drive`, cada 10 min, solo si hay algo que hacer) la sube y

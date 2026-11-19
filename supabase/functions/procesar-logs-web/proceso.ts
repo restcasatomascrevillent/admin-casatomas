@@ -16,8 +16,9 @@
 //       una vez por incidencia (explicar.ts). Comparte el tope diario de IA
 //       con los análisis de los tickets y usa como mucho la mitad.
 //    5. Purga diaria y estado final.
-//  Origen (20261130100000): solo los «Fallo de la web» (y los «Servicio
-//  externo» con linear_tickets_externos) crean, reabren, comentan o migran
+//  Origen (20261130100000): solo los fallos nuestros (origen «web»: «Fallo de
+//  la web» y «Fallo del admin», ver ambito.ts) y los «Servicio externo» con
+//  linear_tickets_externos crean, reabren, comentan o migran
 //  tickets; el SQL ya no los pide para el resto, y esto es la segunda barrera.
 //  Los tickets que ya existen de lo que no depende de la web no se tocan (solo
 //  se sincroniza su estado); los pedidos a mano («Pedido a mano…») sí siguen.

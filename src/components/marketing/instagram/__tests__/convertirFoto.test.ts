@@ -2,7 +2,7 @@
  * Conversión de la foto en el navegador (createImageBitmap + OffscreenCanvas
  * simulados: jsdom no decodifica ni pinta) y aptitud para post/story.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import {
   CALIDAD_JPEG,
   MENSAJE_FORMATO_ILEGIBLE,
@@ -18,7 +18,7 @@ interface Lienzo {
   alto: number;
   ctx: { fillRect: ReturnType<typeof vi.fn>; drawImage: ReturnType<typeof vi.fn>; fillStyle?: string; imageSmoothingQuality?: string };
   opciones: unknown;
-  convertToBlob: ReturnType<typeof vi.fn>;
+  convertToBlob: Mock<(o: { type: string; quality: number }) => Promise<Blob>>;
 }
 
 let lienzos: Lienzo[];

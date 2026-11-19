@@ -86,6 +86,38 @@ describe("embeddings por nombre", () => {
     expect(upserts).toEqual([LOTE_ESCRITURA, LOTE_ESCRITURA, 3]);
   });
 
+  it("lotes de 10 (antes 50: con la base cargada pasaban de los 8 s)", () => {
+    expect(LOTE_ESCRITURA).toBe(10);
+  });
+
+  it("al guardar una factura no se reintenta: un corte por tiempo queda para el cron", async () => {
+    const { supabase } = supaFalso({});
+    const upsert = vi.fn(async () => ({ error: { code: "57014", message: "canceling statement due to statement timeout" } }));
+    const q = supabase.from("productos_nombre_embedding") as unknown as Record<string, unknown>;
+    const supaCorte = { from: () => ({ ...q, upsert }) };
+    const embed = vi.fn(async (t: string | string[]) => (t as string[]).map(() => [0.1]));
+    const r = await asegurarVectoresNombres({ supabase: supaCorte, openai: { embed } }, ["Merluza"]);
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(r.error).toContain("statement timeout");
+  });
+
+  it("el cron reintenta un lote cortado por tiempo y sigue con el resto", async () => {
+    const { supabase, tabla } = supaFalso({ A: null, B: null });
+    const q = supabase.from("productos_nombre_embedding") as unknown as Record<string, unknown> & { upsert: (f: unknown[]) => Promise<unknown> };
+    let cortes = 1;
+    const upsert = vi.fn(async (filas: { nombre: string; embedding: string }[]) => {
+      if (cortes-- > 0) return { error: { code: "57014", message: "canceling statement due to statement timeout" } };
+      return q.upsert(filas);
+    });
+    const supaCorte = { from: () => ({ ...supabase.from("productos_nombre_embedding"), upsert }) };
+    const embed = vi.fn(async (t: string[]) => t.map(() => [0.3]));
+    const dormir = vi.fn(async () => {});
+    expect(await rellenarPendientes({ supabase: supaCorte, embed, dormir, esperasReintentoMs: [4] })).toEqual({ pendientes: 2, guardados: 2 });
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(dormir).toHaveBeenCalledWith(4);
+    expect(tabla.get("A")).toBe("[0.3]");
+  });
+
   it("rellenarPendientes: una llamada con todos los pendientes; sin pendientes, ninguna", async () => {
     const { supabase, tabla } = supaFalso({ A: null, B: "[1]", C: null });
     const embed = vi.fn(async (t: string[]) => t.map(() => [0.1]));

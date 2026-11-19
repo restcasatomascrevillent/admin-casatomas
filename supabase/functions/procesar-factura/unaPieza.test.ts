@@ -248,20 +248,21 @@ async function caminoTrabajo(e: (typeof ESCENARIOS)[string]) {
   return { fin: fin!.args, cierre: a, inicio, oaUnico, oaPiezas, sb, ruta };
 }
 
-// UPDATE de facturas con el coste de leer el documento (migración 20261010120000).
-const esCosteLectura = (c: Escrito) =>
-  c.tabla === "facturas" &&
-  c.ops.some((o) => o.m === "update" && !!o.a[0] && typeof o.a[0] === "object" && "coste_lectura_usd" in (o.a[0] as object));
+// Columnas del coste de leer el documento (migración 20261010120000). Desde el 18/11/2026 van
+// en la MISMA escritura que las alertas y el original.
+const COLUMNAS_COSTE = ["coste_lectura_usd", "lectura_llamadas", "lectura_modelo"] as const;
+const datosUpdate = (c: Escrito) => c.ops.find((o) => o.m === "update")?.a[0] as Record<string, unknown> | undefined;
+const updatesFacturas = (sb: ReturnType<typeof supabaseFalso>) =>
+  sb.consultas.filter((c) => c.tabla === "facturas" && !!datosUpdate(c));
 const costeGuardado = (sb: ReturnType<typeof supabaseFalso>) =>
-  sb.consultas.filter(esCosteLectura).map((c) => ({
-    ...(c.ops.find((o) => o.m === "update")!.a[0] as Record<string, unknown>),
+  updatesFacturas(sb).filter((c) => "coste_lectura_usd" in datosUpdate(c)!).map((c) => ({
+    ...Object.fromEntries(COLUMNAS_COSTE.map((k) => [k, datosUpdate(c)![k]])),
     factura: c.ops.find((o) => o.m === "eq")?.a[1],
   }));
 
 // Lo que se escribe en la BD, sin la hora ni el id del trabajo (ni el coste de lectura, que se prueba aparte).
 const escrituras = (sb: ReturnType<typeof supabaseFalso>) =>
   sb.consultas
-    .filter((c) => !esCosteLectura(c))
     .filter((c) => ["facturas", "productos_factura"].includes(c.tabla) && c.ops.some((o) => o.m === "insert" || o.m === "update"))
     .map((c) => ({
       tabla: c.tabla,
@@ -270,6 +271,7 @@ const escrituras = (sb: ReturnType<typeof supabaseFalso>) =>
         a: o.a.map((x) => {
           if (x && typeof x === "object" && !Array.isArray(x)) {
             const { procesado_en: _h, ocr_trabajo_id: _t, ...resto } = x as Record<string, unknown>;
+            for (const k of COLUMNAS_COSTE) delete resto[k];
             return resto;
           }
           return x;
@@ -306,8 +308,18 @@ describe("una página: camino síncrono ≡ trabajo de una pieza", () => {
       // 2) MISMAS comprobaciones y escrituras (cabecera, líneas, alertas, archivo).
       expect(rpcsGuardado(t.sb)).toEqual(rpcsGuardado(s.sb));
       expect(escrituras(t.sb)).toEqual(escrituras(s.sb));
-      // (cabecera + líneas + alertas + archivo_path; nada si es duplicado)
-      expect(escrituras(s.sb)).toHaveLength(e.existente ? 0 : 4);
+      // (cabecera + líneas + UNA escritura con alertas, archivo_path y coste; nada si es duplicado)
+      expect(escrituras(s.sb)).toHaveLength(e.existente ? 0 : 3);
+      if (!e.existente) {
+        // 18/11/2026: un solo UPDATE de la factura tras insertarla (antes, alertas, original y coste por separado).
+        for (const sb of [s.sb, t.sb]) {
+          const ups = updatesFacturas(sb);
+          expect(ups).toHaveLength(1);
+          expect(Object.keys(datosUpdate(ups[0])!).sort()).toEqual(
+            ["alertas_validacion", "archivo_path", "coste_lectura_usd", "lectura_llamadas", "lectura_modelo"],
+          );
+        }
+      }
 
       if (e.existente) {
         // 3a) Duplicado: mismo documento pendiente y mismo resumen para decidir.
@@ -330,12 +342,12 @@ describe("una página: camino síncrono ≡ trabajo de una pieza", () => {
         expect(t.fin.p_estado).toBe("completado");
         expect(t.fin.p_factura_id).toBe(101);
         expect(sinComun(t.fin.p_resultado as Record<string, unknown>)).toEqual(sinComun(JSON.parse(JSON.stringify(s.respuesta))));
-        // Coste de lectura por documento. Síncrono: visión (e.llamadas × 0,00044 $) + 2 llamadas de
-        // embeddings (cabecera y líneas) sin tokens simulados; llamadas = visión + 2.
+        // Coste de lectura por documento. Síncrono: visión (e.llamadas × 0,00044 $) + 1 llamada de
+        // embeddings (la cabecera; los nombres los pone el cron) sin tokens simulados; llamadas = visión + 1.
         const costeVision = Math.round(e.llamadas * 0.00044 * 1e6) / 1e6;
         expect(s.respuesta.coste_usd).toBeCloseTo(costeVision, 6);
         expect(costeGuardado(s.sb)).toEqual([
-          { coste_lectura_usd: s.respuesta.coste_usd, lectura_llamadas: e.llamadas + 2, lectura_modelo: "gpt-5.6-luna", factura: 101 },
+          { coste_lectura_usd: s.respuesta.coste_usd, lectura_llamadas: e.llamadas + 1, lectura_modelo: "gpt-5.6-luna", factura: 101 },
         ]);
         // Trabajo: lo que sumaron las piezas (0,0123 simulado en ocr_trabajos) + embeddings; sin `llamadas`
         // en el simulacro del trabajo → null. El panel recibe el mismo total que se guarda.
@@ -350,6 +362,12 @@ describe("una página: camino síncrono ≡ trabajo de una pieza", () => {
         // La copia de pendientes/ se borra una vez archivado el original.
         expect(t.sb.borrados).toEqual([[t.ruta]]);
       }
+      // 18/11/2026: guardar NO calcula ni guarda el vector de los nombres de las líneas (lo
+      // completa el cron embeddings-nombres): ni una consulta a productos_nombre_embedding y,
+      // de embeddings, solo la cabecera (texto suelto; nada si es duplicado).
+      for (const sb of [s.sb, t.sb]) expect(sb.consultas.filter((c) => c.tabla === "productos_nombre_embedding")).toEqual([]);
+      const embeddingsS = s.oa.cuerpos.filter((c) => c.url.endsWith("/embeddings")).map((c) => typeof c.body.input);
+      expect(embeddingsS).toEqual(e.existente ? [] : ["string"]);
       // La factura del trabajo lleva su id (idempotencia ante reintentos).
       const insT = t.sb.consultas.find((c) => c.tabla === "facturas" && c.ops[0].m === "insert")?.ops[0].a[0] as Record<string, unknown> | undefined;
       if (!e.existente) expect(insT).toMatchObject({ ocr_trabajo_id: TID, paginas: 1 });

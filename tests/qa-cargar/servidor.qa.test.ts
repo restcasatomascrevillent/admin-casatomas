@@ -144,7 +144,7 @@ describe("QA Cargar · servidor (arreglado)", () => {
   beforeEach(() => _olvidarTokenDrive());
   afterEach(() => vi.unstubAllGlobals());
 
-  it("S-1: reintento de consolidación con la factura ya creada SIN original → se archiva en Drive (no se pierde)", async () => {
+  it("S-1: reintento de consolidación con la factura ya creada SIN original → copia temporal apuntada (no se pierde)", async () => {
     const ficheros = new Map([[RUTA, new Uint8Array([1, 2, 3])]]);
     const { f, factura } = escenarioReintento(ficheros);
     const llamadas = driveFalso();
@@ -155,24 +155,41 @@ describe("QA Cargar · servidor (arreglado)", () => {
     const terminar = f.rpcs.find((r) => r.nombre === "ocr_terminar_trabajo")!;
     expect(terminar.args.p_estado).toBe("completado");
     expect((terminar.args.p_resultado as Record<string, unknown>).archivo_guardado).toBe(true);
-    expect((terminar.args.p_resultado as Record<string, unknown>).archivo_estado).toBe("drive");
-    expect(llamadas.some((l) => l.endsWith("?multipart"))).toBe(true); // de verdad se subió a Drive
-    expect(factura.drive_url).toBe(URL_DRIVE); // y la factura apunta a él
+    // 18/11/2026: guardar no espera a Drive; lo sube el cron facturas-originales-drive.
+    expect((terminar.args.p_resultado as Record<string, unknown>).archivo_estado).toBe("en_cola");
+    expect(llamadas).toEqual([]);
+    expect(factura.archivo_path).toBe("temporal/101-foto.jpg");
+    expect(ficheros.get("temporal/101-foto.jpg")).toEqual(new Uint8Array([1, 2, 3]));
+    // Un fallo de Drive no se apunta (no lo hubo).
+    expect(f.rpcs.map((r) => r.nombre)).not.toContain("facturas_original_drive_fallo");
   });
 
-  it("S-1: con Drive caído, el original queda apuntado y NO se borra de pendientes/", async () => {
+  it("S-1: si Storage no admite la copia temporal, se sube a Drive en el momento; y si tampoco, se apunta la de pendientes/", async () => {
     const ficheros = new Map([[RUTA, new Uint8Array([1, 2, 3])]]);
     const { f, factura } = escenarioReintento(ficheros);
-    driveFalso(503);
+    const upload = vi.fn(async () => ({ data: null, error: { message: "Storage caído" } }));
+    const storage = f.supabase.storage.from();
+    f.supabase.storage.from = () => ({ ...storage, upload });
+    const llamadas = driveFalso();
     await procesarConsolidacion(
       { supabase: f.supabase, openai: openaiFalso() as never, drive: DRIVE_ON },
       { id: TID, num_paginas: 1, nombre_original: "foto.jpg", original_path: RUTA, original_mime: "image/jpeg" },
     );
-    // Copia temporal (pendiente de Drive) o, como poco, la de pendientes/ apuntada.
-    expect(factura.archivo_path).toBeTruthy();
-    expect(ficheros.has(factura.archivo_path!) || f.subidas.includes(factura.archivo_path!)).toBe(true);
-    const terminar = f.rpcs.find((r) => r.nombre === "ocr_terminar_trabajo")!;
-    expect((terminar.args.p_resultado as Record<string, unknown>).archivo_estado).toBe("temporal");
+    expect(llamadas.some((l) => l.endsWith("?multipart"))).toBe(true);
+    expect(factura.drive_url).toBe(URL_DRIVE);
+    expect((f.rpcs.find((r) => r.nombre === "ocr_terminar_trabajo")!.args.p_resultado as Record<string, unknown>).archivo_estado).toBe("drive");
+
+    // Storage y Drive caídos: la factura apunta a la copia de pendientes/ (limpiarPendientesTrabajo respeta
+    // lo que una factura usa como archivo_path; este simulacro no lo modela).
+    const otro = escenarioReintento(new Map([[RUTA, new Uint8Array([1, 2, 3])]]));
+    const st2 = otro.f.supabase.storage.from();
+    otro.f.supabase.storage.from = () => ({ ...st2, upload });
+    driveFalso(503);
+    await procesarConsolidacion(
+      { supabase: otro.f.supabase, openai: openaiFalso() as never, drive: DRIVE_ON },
+      { id: TID, num_paginas: 1, nombre_original: "foto.jpg", original_path: RUTA, original_mime: "image/jpeg" },
+    );
+    expect(otro.factura.archivo_path).toBe(RUTA);
   });
 
   it("S-2: reintento tras morir entre cabecera y líneas → se insertan las líneas que faltan", async () => {
@@ -203,9 +220,10 @@ describe("QA Cargar · servidor (arreglado)", () => {
         ? { data: null, error: { message: "canceling statement due to statement timeout" } }
         : { data: null, error: null }
     );
+    // Un corte por tiempo se reintenta a los 3 s y a los 8 s (escribirFactura, 18/11/2026): aquí sin esperar.
     const r = await apuntarOriginal(f.supabase, 101, {
       drive_url: URL_DRIVE, archivo_path: null, error: null, drive_error: null,
-    }, { esperaMs: 0 });
+    }, { esperaMs: 0, reintento: { dormir: async () => {} } });
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/statement timeout/);
     expect(r.error).toContain(URL_DRIVE); // el enlace no se pierde: queda en el error/log

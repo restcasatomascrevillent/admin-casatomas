@@ -15,10 +15,14 @@
 //       RPC productos_aplicar_clasificacion_ia, que crea los productos (origen
 //       'ia'), los alias y asigna SOLO las líneas sin producto. Un alias que ya
 //       exista manda: nunca pisa una corrección hecha a mano.
+//       Desde el 18/11/2026 va en tandas de TANDA_RPC productos y, si la base
+//       corta una tanda por tiempo (8 s de PostgREST), se reintenta (CAS-7:
+//       con la base cargada, mandar los 120 de golpe se cortaba).
 //  Lo que la IA no conteste se queda sin clasificar y sale en «Sin
 //  clasificar» de Facturas › Productos.
 // ============================================================================
 
+import { conReintentoPorTiempo, ESPERAS_REINTENTO_MS } from "../_shared/reintento-bd.ts";
 import {
   abreviaturasActivas,
   type AbreviaturaFila,
@@ -33,6 +37,12 @@ export const MODELO_POR_DEFECTO = "gpt-5.6-luna";
 /** Líneas pendientes que se leen por tanda y textos distintos que se mandan al modelo. */
 export const MAX_LINEAS = 300;
 export const MAX_TEXTOS = 120;
+/**
+ * Productos por llamada a productos_aplicar_clasificacion_ia. Cada llamada es
+ * una transacción con el límite de 8 s de PostgREST: con 120 de golpe tardaba
+ * de media 3,4 s y hasta 7,5 s (sin carga), y con la base cargada se cortaba.
+ */
+export const TANDA_RPC = 30;
 
 // deno-lint-ignore no-explicit-any
 type Supa = any;
@@ -408,13 +418,73 @@ export interface DependenciasClasificar {
   supabase: Supa;
   /** Llama al modelo y devuelve el JSON ya parseado. */
   llamarModelo: (mensajes: { role: string; content: string }[], esquema: typeof ESQUEMA_CLASIFICACION) => Promise<unknown>;
+  /** Esperas antes de reintentar una tanda cortada por tiempo (por defecto 3 s y 8 s). */
+  esperasReintentoMs?: readonly number[];
+  /** Para los tests. */
+  dormir?: (ms: number) => Promise<void>;
+}
+
+/** Lo que devuelve productos_aplicar_clasificacion_ia (sumado entre tandas). */
+export interface Aplicado {
+  productos_creados: number;
+  alias_creados: number;
+  lineas_asignadas: number;
+  /** Quedan líneas de estos textos por asignar: las asigna el cron (cada 5 min). */
+  lineas_pendientes: boolean;
+}
+
+/** Trocea una lista en tandas de `tam` elementos. */
+export function trocear<T>(lista: T[], tam: number): T[][] {
+  const t = Math.max(1, Math.floor(tam));
+  const res: T[][] = [];
+  for (let i = 0; i < lista.length; i += t) res.push(lista.slice(i, i + t));
+  return res;
+}
+
+/**
+ * Manda los elementos a productos_aplicar_clasificacion_ia en tandas de
+ * TANDA_RPC. Cada tanda es independiente (lo de las anteriores ya queda
+ * guardado) y se puede repetir sin duplicar nada, así que si la base la corta
+ * por tiempo se reintenta tras una espera. Si aun así no entra, lanza con el
+ * mensaje de Postgres (el monitor lo reconoce como «la base iba cargada»): lo
+ * que no se aplicó vuelve a la siguiente pasada del cron.
+ */
+export async function aplicarPorTandas(
+  supabase: Supa,
+  items: ElementoClasificacion[],
+  opts: { tam?: number; esperasMs?: readonly number[]; dormir?: (ms: number) => Promise<void> } = {},
+): Promise<Aplicado> {
+  const total: Aplicado = { productos_creados: 0, alias_creados: 0, lineas_asignadas: 0, lineas_pendientes: false };
+  const tandas = trocear(items, opts.tam ?? TANDA_RPC);
+  for (let i = 0; i < tandas.length; i++) {
+    const { data, error } = await conReintentoPorTiempo(
+      () => supabase.rpc("productos_aplicar_clasificacion_ia", { p_items: tandas[i] }),
+      {
+        esperasMs: opts.esperasMs ?? ESPERAS_REINTENTO_MS,
+        dormir: opts.dormir,
+        alReintentar: (n, ms, e) =>
+          console.warn(`[${FUNCION}] tanda ${i + 1}/${tandas.length} cortada por tiempo (${e.message}); reintento ${n} en ${ms / 1000} s`),
+      },
+    );
+    if (error) {
+      // El mensaje queda igual que antes (agrupa con la misma incidencia en el monitor); el detalle, en el registro.
+      console.error(`[${FUNCION}] tanda ${i + 1}/${tandas.length} sin aplicar; ${i} ya guardadas: ${JSON.stringify(total)}`);
+      throw new Error(`productos_aplicar_clasificacion_ia: ${error.message}`);
+    }
+    const d = (data ?? {}) as Partial<Aplicado>;
+    total.productos_creados += Number(d.productos_creados ?? 0);
+    total.alias_creados += Number(d.alias_creados ?? 0);
+    total.lineas_asignadas += Number(d.lineas_asignadas ?? 0);
+    total.lineas_pendientes = total.lineas_pendientes || d.lineas_pendientes === true;
+  }
+  return total;
 }
 
 export interface ResultadoClasificar {
   pendientes: number;
   textos: number;
   propuestas: number;
-  aplicado: { productos_creados?: number; alias_creados?: number; lineas_asignadas?: number } | null;
+  aplicado: Aplicado | null;
   /** Avisos de abreviatura nueva creados (pantalla de subida y campana). */
   avisos_abreviaturas?: number;
 }
@@ -455,8 +525,7 @@ export async function clasificarPendientes(deps: DependenciasClasificar): Promis
   const items = validarAsignaciones(respuesta, textos, catalogo, categorias, extras.abreviaturas);
   if (items.length === 0) return { pendientes: lineas.length, textos: textos.length, propuestas: 0, aplicado: null };
 
-  const { data: aplicado, error: e4 } = await supabase.rpc("productos_aplicar_clasificacion_ia", { p_items: items });
-  if (e4) throw new Error(`productos_aplicar_clasificacion_ia: ${e4.message}`);
+  const aplicado = await aplicarPorTandas(supabase, items, { esperasMs: deps.esperasReintentoMs, dormir: deps.dormir });
   // Abreviaturas nuevas: aviso para confirmarlas. Es una ayuda: si falla no se pierde la clasificación.
   let avisos = 0;
   const nuevas = extraerAbreviaturasNuevas(respuesta, textos, extras.abreviaturas);
@@ -470,7 +539,7 @@ export async function clasificarPendientes(deps: DependenciasClasificar): Promis
     }
   }
   return {
-    pendientes: lineas.length, textos: textos.length, propuestas: items.length, aplicado: aplicado ?? null,
+    pendientes: lineas.length, textos: textos.length, propuestas: items.length, aplicado,
     ...(avisos > 0 ? { avisos_abreviaturas: avisos } : {}),
   };
 }

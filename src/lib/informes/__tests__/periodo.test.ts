@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mesAnteriorA, mesesPorDefecto, periodoEnUrl, periodoInicial, rangoPorDefecto, sufijoArchivo, textoPeriodo, validarRango } from "../periodo";
+import { mesAnteriorA, mesDeLaPagina, mesesPorDefecto, periodoEnUrl, rangoDeMes, periodoInicial, rangoPorDefecto, sufijoArchivo, textoPeriodo, validarRango } from "../periodo";
 
 describe("periodo de los informes", () => {
   it("meses: el que va en curso (si ya pasó el día 1) y los 12 anteriores", () => {
@@ -39,5 +39,20 @@ describe("periodo de los informes", () => {
     expect(sufijoArchivo({ tipo: "rango", desde: "2026-01-01", hasta: "2026-03-31" })).toBe("2026-01-01-a-2026-03-31");
     expect(periodoEnUrl({ tipo: "mes", mes: "2026-10" })).toEqual({ mes: "2026-10" });
     expect(periodoEnUrl({ tipo: "rango", desde: "2026-01-01", hasta: "2026-01-31" })).toEqual({ desde: "2026-01-01", hasta: "2026-01-31" });
+  });
+
+  it("el mes de la página: URL, luego el guardado, luego el último cerrado", () => {
+    const hoy = "2026-11-18";
+    expect(mesDeLaPagina(hoy, "2026-09", "2026-07")).toBe("2026-09");
+    expect(mesDeLaPagina(hoy, null, "2026-07")).toBe("2026-07");
+    expect(mesDeLaPagina(hoy, "1999-01", "basura")).toBe("2026-10");
+    expect(mesDeLaPagina(hoy, "2026-11", null)).toBe("2026-11"); // el que va en curso también se puede elegir
+    expect(mesDeLaPagina("2026-11-01", "2026-11", null)).toBe("2026-10"); // el día 1 aún no está en la lista
+  });
+
+  it("el mes entero como rango (también febrero y años bisiestos)", () => {
+    expect(rangoDeMes("2026-02")).toEqual({ desde: "2026-02-01", hasta: "2026-02-28" });
+    expect(rangoDeMes("2028-02")).toEqual({ desde: "2028-02-01", hasta: "2028-02-29" });
+    expect(rangoDeMes("2026-10")).toEqual({ desde: "2026-10-01", hasta: "2026-10-31" });
   });
 });

@@ -14,7 +14,8 @@
 //  mismo prompt, modelo OCR_MODELO, relectura por cuadre, verificador de pie,
 //  contador, citas, deducción y normalización) y para guardar
 //  (guardarLecturaUnica → guardarDocumento: duplicado, embeddings, cabecera,
-//  líneas, validación de cordura y archivo en Drive o Storage). Lo único que
+//  líneas, validación de cordura y original a la copia temporal de Storage,
+//  que el cron facturas-originales-drive sube a Drive). Lo único que
 //  cambia es de dónde salen los bytes (base64 del panel o Storage) y que el
 //  trabajo deja `ocr_trabajo_id` en la factura (idempotencia de reintentos).
 //  Sin Deno.env: todo llega por parámetro (vitest y el banco local lo usan).
@@ -25,6 +26,7 @@ import { type DocumentoListo, type FicheroUnico, leerDocumentoUnico } from "./ex
 import {
   type ContextoGuardado,
   type DocumentoPendiente,
+  type EntradaGuardado,
   guardarDocumento,
   guardarOriginalPendiente,
   ofertasDuplicado,
@@ -36,21 +38,24 @@ import {
 type Supa = any;
 
 /**
- * Pasos 4-9 para un documento de una página: el original va en base64 (Drive
- * si está configurado, Storage si no), una página, y en el camino de trabajos
- * el id del trabajo para que un reintento no cree otra factura.
+ * Pasos 4-9 para un documento de una página: el original va en base64 (a la
+ * copia temporal de Storage; Drive, después), una página, y en el camino de trabajos
+ * el id del trabajo para que un reintento no cree otra factura. `costeLectura`:
+ * el coste de leerlo, que se guarda en la misma escritura que las alertas.
  */
 export function guardarLecturaUnica(
   ctx: ContextoGuardado,
   listo: DocumentoListo,
   f: FicheroUnico,
   ocrTrabajoId: string | null,
+  costeLectura?: EntradaGuardado["costeLectura"],
 ): Promise<ResultadoGuardado> {
   return guardarDocumento(ctx, {
     ...listo,
     original: { tipo: "base64", b64: f.b64, mime: f.mime, nombre: f.nombre },
     paginas: 1,
     ...(ocrTrabajoId ? { ocrTrabajoId } : {}),
+    ...(costeLectura ? { costeLectura } : {}),
   });
 }
 
@@ -155,10 +160,11 @@ export async function procesarSincrono(
   generarId: () => string = () => crypto.randomUUID(),
 ): Promise<Record<string, unknown>> {
   const listo = await leerDocumentoUnico(ctx.openai, f);
-  // 4) → 9) Duplicado, embeddings, cabecera, líneas, validación, archivo.
-  const g = await guardarLecturaUnica(ctx, listo, f, null);
   // Todo lo que costó leer este documento: visión, relecturas, pie, contador y embeddings.
-  const lectura = costeDeCliente(ctx.openai.uso, ctx.openai.config.modelo);
+  const costeLectura = () => costeDeCliente(ctx.openai.uso, ctx.openai.config.modelo);
+  // 4) → 9) Duplicado, embeddings, cabecera, líneas, validación, archivo (y el coste, en la misma escritura).
+  const g = await guardarLecturaUnica(ctx, listo, f, null, costeLectura);
+  const lectura = g.estado === "guardado" && g.coste ? g.coste : costeLectura();
 
   if (g.estado === "duplicado" && g.existente) {
     // Se guarda lo leído (sin volver a pagar el OCR) para «Sustituir la existente».
@@ -193,6 +199,7 @@ export async function procesarSincrono(
       coste_usd: lectura.usd,
     };
   }
-  if (g.estado === "guardado") await guardarCosteLectura(ctx.supabase, g.facturaId, lectura);
+  // El coste ya va en la escritura final del guardado; solo si no llegó a mandarse, aparte.
+  if (g.estado === "guardado" && !g.coste) await guardarCosteLectura(ctx.supabase, g.facturaId, lectura);
   return { ...g.respuesta, coste_usd: lectura.usd } as unknown as Record<string, unknown>;
 }

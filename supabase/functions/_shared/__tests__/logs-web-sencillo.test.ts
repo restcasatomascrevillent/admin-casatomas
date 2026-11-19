@@ -34,6 +34,7 @@ describe("causas conocidas en sencillo", () => {
     const ejemplos: Record<string, Parameters<typeof causaConocida>[0]> = {
       chunk_caducado: { tipo: "error_js", mensaje: "ChunkLoadError: Loading chunk 3 failed." },
       cron_plataforma: { tipo: "error_integracion", mensaje: "job startup timeout", objetivo: "cron:sync-trafico-web" },
+      bd_tiempo_agotado: { tipo: "error_servidor", mensaje: "clasificar-productos: productos_aplicar_clasificacion_ia: canceling statement due to statement timeout" },
       react_hidratacion: { tipo: "error_react", mensaje: "Minified React error #418" },
       peticion_sin_respuesta: { tipo: "error_peticion", mensaje: "sin respuesta", propiedades: { status: 0 } },
       dns_host_inexistente: { tipo: "error_servidor", mensaje: "dns error: failed to lookup address" },
@@ -48,6 +49,9 @@ describe("causas conocidas en sencillo", () => {
       expect(c!.sencillo.quePasa.length, id).toBeGreaterThan(20);
       expect(c!.sencillo.queHacer.length, id).toBeGreaterThan(5);
       expect(`${c!.sencillo.quePasa} ${c!.sencillo.queHacer}`, id).not.toMatch(JERGA);
+      // Título en llano para la cabecera del detalle y del ticket (18/11/2026), también sin jerga.
+      expect(c!.sencillo.titulo, id).toMatch(/^[A-ZÁÉÍÓÚ0-9].+\.$/);
+      expect(`${c!.sencillo.titulo} ${c!.sencillo.seArregla ?? ""}`, id).not.toMatch(JERGA);
     }
   });
 });

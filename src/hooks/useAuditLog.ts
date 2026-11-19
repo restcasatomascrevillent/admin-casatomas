@@ -52,7 +52,10 @@ export interface AuditLogFiltros {
 }
 
 const PAGE_SIZE = 25;
-const GRUPOS_ACCION: Record<string, { columna: string; valores: string[] }> = {
+const GRUPOS_ACCION: Record<
+  string,
+  { columna: "accion" | "tipo_evento"; valores: string[] }
+> = {
   grupo_cambios: {
     columna: "accion",
     valores: ["crear", "actualizar", "eliminar"],
@@ -125,7 +128,7 @@ export function useAuditLog(filtros: AuditLogFiltros, pagina: number) {
       const desde = pagina * PAGE_SIZE;
       const consultar = (columnaActor: "actor_label" | "actor_email") => {
         let query = supabase
-          .from("audit_log_visible" as "audit_log")
+          .from("audit_log_visible")
           .select("*", { count: "exact" });
         if (filtros.actor?.trim()) {
           const actor = filtros.actor.trim();
@@ -310,7 +313,7 @@ export function useAuditLogAgrupado(
     }
 
     const consultar = (columnaActor: "actor_label" | "actor_email") => {
-      let query = supabase.from("audit_log_visible" as "audit_log").select("*");
+      let query = supabase.from("audit_log_visible").select("*");
       if (filtros.actor?.trim()) {
         const actor = filtros.actor.trim();
         query = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(actor)
