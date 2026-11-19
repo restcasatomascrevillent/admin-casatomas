@@ -144,6 +144,9 @@ import {
   rechazoMenuDelDia,
   leerMenuDelDia,
   motivoHoraNoOfrecidaWeb,
+  buscarSolicitudRepetida,
+  ESTADOS_SOLICITUD_REPETIDA,
+  type ReservaCandidataRepetida,
   type TurnoWeb,
   type ConsentimientosReserva,
   type EstadoDobleOptin,
@@ -1530,6 +1533,36 @@ async function handleCrear(req: Request): Promise<Response> {
   // cliente es genérico, para no confirmarle que está en la lista.
   if (await verificarBlacklist(telefono, email)) {
     return await avisar("no_disponible", "Blacklist.", "No ha sido posible formalizar la solicitud.", 403, false);
+  }
+
+  // Solicitud repetida (CAS-13): si este cliente ya tiene una reserva web viva
+  // igual (día, hora, comensales) hecha hace menos de media hora, no se crea
+  // otra: se le devuelve la suya con el mismo 201. Va antes de los límites y
+  // del aforo: su primera reserva ya ocupa sitio y cuenta para el límite por
+  // teléfono, y el reintento acabaría rechazado o con un correo de rechazo.
+  // Si la consulta falla se sigue como siempre (nunca bloquea una reserva).
+  if (telefono || email) {
+    try {
+      const { data: candidatas, error: errorRepetida } = await supabase
+        .from("reservas")
+        .select("id, estado, hora, numero_comensales, telefono, email, created_at")
+        .eq("fecha", fecha)
+        .eq("canal", "web")
+        .eq("marca", marcaTemprana)
+        .in("estado", ESTADOS_SOLICITUD_REPETIDA as string[]);
+      if (errorRepetida) throw new Error(errorRepetida.message);
+      const repetida = buscarSolicitudRepetida(
+        candidatas as ReservaCandidataRepetida[] | null,
+        { hora, comensales: partySize, telefono, email },
+        new Date(),
+      );
+      if (repetida) {
+        console.log(`[CREAR] Solicitud repetida: ya existe la reserva ${repetida.id} (${repetida.created_at}); no se crea otra.`);
+        return json({ ok: true, reserva_id: repetida.id, estado: repetida.estado, repetida: true }, 201);
+      }
+    } catch (err) {
+      console.error("[CREAR] No se pudo comprobar si la solicitud es repetida:", (err as Error)?.message || err);
+    }
   }
 
   // Comensales fuera de rango
