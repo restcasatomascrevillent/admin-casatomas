@@ -577,6 +577,7 @@ function FilaResumen({
     // arriba; «Categoría · Proveedor · N compras · kg · últ. €» truncado debajo.
     const detalle = [
       ruta ?? "Sin categoría",
+      p.es_descuento ? "descuento general, no se compra" : null,
       nombresProv.length > 0 ? nombresProv.join(", ") : null,
       plural(p.compras, "compra", "compras"),
       formatCantidades(p.cantidades),
@@ -655,6 +656,7 @@ function FilaResumen({
         </span>
         <span className="block truncate text-xs text-muted-foreground">
           {ruta ?? "Sin categoría"}
+          {p.es_descuento && " · descuento general, no se compra"}
           {nombresProv.length > 0 && ` · ${nombresProv.join(", ")}`}
         </span>
       </button>
