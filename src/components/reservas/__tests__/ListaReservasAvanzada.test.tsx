@@ -886,6 +886,45 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
     expect(notificaciones()[0].body).toEqual({ id: "res-confirmada", estado: "cancelada" });
   });
 
+  it("con email, «Cancelar sin enviar correo» cancela igual pero NO avisa al cliente, y el aviso lo dice (19/11/2026)", async () => {
+    supa.filas = [{ ...reserva("res-confirmada", "confirmada", "Carlos Confirmado"), email: "carlos@ejemplo.com" }];
+    const { tabla } = await montar();
+
+    fireEvent.click(opcionMas(filaDe(tabla, "Carlos Confirmado"), "Cancelar"));
+    const dialogo = await screen.findByRole("alertdialog");
+    expect(within(dialogo).getByRole("button", { name: "Sí, cancelar y avisar al cliente" })).toBeInTheDocument();
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar sin enviar correo" }));
+
+    await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "cancelada" }));
+    expect(supa.eq).toHaveBeenCalledWith("id", "res-confirmada");
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("Estado actualizado correctamente", {
+        description: "Sin correo: no se ha avisado al cliente.",
+      }),
+    );
+    expect(notificaciones()).toEqual([]);
+  });
+
+  it("con email, «Sí, cancelar y avisar al cliente» sigue mandando el aviso", async () => {
+    supa.filas = [{ ...reserva("res-confirmada", "confirmada", "Carlos Confirmado"), email: "carlos@ejemplo.com" }];
+    const { tabla } = await montar();
+
+    fireEvent.click(opcionMas(filaDe(tabla, "Carlos Confirmado"), "Cancelar"));
+    const dialogo = await screen.findByRole("alertdialog");
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Sí, cancelar y avisar al cliente" }));
+
+    await waitFor(() => expect(notificaciones()).toHaveLength(1));
+    expect(notificaciones()[0].body).toEqual({ id: "res-confirmada", estado: "cancelada" });
+  });
+
+  it("sin email el diálogo no ofrece «Cancelar sin enviar correo»", async () => {
+    const { tabla } = await montar();
+    fireEvent.click(opcionMas(filaDe(tabla, "Carlos Confirmado"), "Cancelar"));
+    const dialogo = await screen.findByRole("alertdialog");
+    expect(within(dialogo).queryByRole("button", { name: "Cancelar sin enviar correo" })).toBeNull();
+    expect(within(dialogo).getByRole("button", { name: "Sí, cancelar la reserva" })).toBeInTheDocument();
+  });
+
   it("CORREGIDO (decisión del dueño): una reserva «Llegó» o «No vino» ya no se puede cancelar: «Más» no lo ofrece", async () => {
     // Antes solo quedaba deshabilitado el de una cancelada; podía cancelarse una «Llegó» o una «No vino».
     supa.filas = [

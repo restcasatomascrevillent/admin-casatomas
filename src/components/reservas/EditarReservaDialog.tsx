@@ -330,13 +330,23 @@ function AccionesEstado({ reserva, onHecho }: { reserva: ReservaEditable; onHech
           <AlertDialogHeader>
             <AlertDialogTitle>¿Cancelar la reserva?</AlertDialogTitle>
             <AlertDialogDescription>
-              {reserva.nombre || "Sin nombre"}: pasa a «Cancelada»{reserva.email ? " y se le avisa por correo" : ""}.
+              {reserva.nombre || "Sin nombre"}: pasa a «Cancelada»
+              {reserva.email?.trim() ? ". Puedes avisarle por correo o cancelarla sin enviarle nada." : " (no tiene email: no se le envía nada)."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {/* «Cancelar sin enviar correo» (19/11/2026, petición del dueño): solo si tiene email. */}
           <AlertDialogFooter>
             <AlertDialogCancel>No, dejarla</AlertDialogCancel>
+            {reserva.email?.trim() ? (
+              <AlertDialogAction
+                className="border border-red-600 bg-background text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950"
+                onClick={() => void hacer(() => cancelar(fila, { sinCorreo: true }))}
+              >
+                Cancelar sin enviar correo
+              </AlertDialogAction>
+            ) : null}
             <AlertDialogAction className="bg-red-600 text-white hover:bg-red-700" onClick={() => void hacer(() => cancelar(fila))}>
-              Sí, cancelar
+              {reserva.email?.trim() ? "Sí, cancelar y avisar" : "Sí, cancelar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

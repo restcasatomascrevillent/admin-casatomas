@@ -23,7 +23,10 @@ vi.mock("@/hooks/useAccionesServicioReserva", () => ({
   useAccionesServicioReserva: () => ({
     marcarLlegada: anota("marcarLlegada"),
     marcarNoShow: anota("marcarNoShow"),
-    cancelar: anota("cancelar"),
+    cancelar: async (_reserva: unknown, opciones?: { sinCorreo?: boolean }) => {
+      h.escrituras.push(opciones?.sinCorreo ? "cancelar sin correo" : "cancelar");
+      return true;
+    },
     deshacerLlegadaONoShow: anota("deshacer"),
     moverEspacio: anota("moverEspacio"),
   }),
@@ -68,10 +71,10 @@ const reserva = (estado: string, extra: Record<string, unknown> = {}) =>
     ...extra,
   }) as never;
 
-const panelReserva = (estado: string, nombresMesa: string[] = []) =>
+const panelReserva = (estado: string, nombresMesa: string[] = [], extra: Record<string, unknown> = {}) =>
   enHoja(
     <PanelReservaMovil
-      reserva={reserva(estado)}
+      reserva={reserva(estado, extra)}
       fecha="2026-11-06"
       salas={[{ id: "s1", nombre: "Comedor" }]}
       mesas={[{ id: "m3", nombre: "3", espacio_id: "s1", capacidad: 4, activa: true } as never]}
@@ -116,6 +119,20 @@ describe("Ficha de una reserva (móvil)", () => {
     expect(h.escrituras).toEqual([]);
     fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Sí, anular" }));
     await waitFor(() => expect(h.escrituras).toEqual(["cancelar"]));
+  });
+
+  it("«Anular sin enviar correo» (19/11/2026): con email, la confirmación ofrece anular sin avisar al cliente", async () => {
+    panelReserva("confirmada", [], { email: "ana@ejemplo.com" });
+    fireEvent.click(screen.getByTestId("ficha-anular-mesa"));
+    expect(screen.getByRole("alert")).toHaveTextContent("y se le avisa por correo");
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Anular sin enviar correo" }));
+    await waitFor(() => expect(h.escrituras).toEqual(["cancelar sin correo"]));
+  });
+
+  it("sin email no hay «Anular sin enviar correo» (no se le manda nada de todas formas)", () => {
+    panelReserva("confirmada", []);
+    fireEvent.click(screen.getByTestId("ficha-anular-mesa"));
+    expect(within(screen.getByRole("alert")).queryByRole("button", { name: "Anular sin enviar correo" })).toBeNull();
   });
 
   it("anulada (13/11/2026): «Anulada» en la ficha y ningún botón que escriba", () => {
