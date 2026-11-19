@@ -2,6 +2,21 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.49.0] - 2026-11-19
+
+Objetivo: IA de Facturas: dictado por voz, espera más clara y tarifas de proveedor que contestan lo que se pregunta (precio por botella con y sin IVA)
+
+### Añadido
+- Facturas: dictado por voz en el chat de Facturas ([#265](https://github.com/restcasatomascrevillent/admin-casatomas/pull/265))
+- Facturas: calidad percibida del chat (espera, errores, pistas, copiar) ([#296](https://github.com/restcasatomascrevillent/admin-casatomas/pull/296))
+- Chat-facturas: investigación de adjuntos — los seguimientos de una tarifa contestan lo que se pregunta y «Parar» en el botón de enviar ([#317](https://github.com/restcasatomascrevillent/admin-casatomas/pull/317))
+
+### Cambiado
+- Presupuestos: revisión en producción (envases, precio de referencia, IA, velocidad, tabla corta) ([#297](https://github.com/restcasatomascrevillent/admin-casatomas/pull/297))
+- Chat-facturas: decisiones del dueño (r109, r114, n25, n55) y tickets automáticos de documentos ([#298](https://github.com/restcasatomascrevillent/admin-casatomas/pull/298))
+- Chat-facturas: hallazgos F1-F7 de la revisión independiente + trampa de --simular ([#299](https://github.com/restcasatomascrevillent/admin-casatomas/pull/299))
+- Chat-facturas: las preguntas sobre una tarifa reutilizan la comparación ya hecha ([#319](https://github.com/restcasatomascrevillent/admin-casatomas/pull/319))
+
 ## [1.48.0] - 2026-11-19
 
 Objetivo: Reservas web sin duplicados por reintento (CAS-13) y cancelar sin enviar correo al cliente
