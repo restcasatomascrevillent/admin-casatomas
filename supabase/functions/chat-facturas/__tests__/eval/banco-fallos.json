@@ -78,12 +78,12 @@
       "origen": "unidades (apartado 3.3 y 4.1)",
       "mensaje": "A cuánto compro el pan de cristal",
       "fallo_original": "Mezclaba la caja (29,40 €) con la unidad (1,40 €) y salía una «subida» del 2.000 %.",
-      "correcto": "Panadería García: la caja a 29,40 € (albarán del 13/11/2026); las pulgas de Nicolás y Valero van por unidad. Nunca una media de caja y unidad.",
+      "correcto": "El último precio de Panadería García en su unidad, sin mezclar caja y unidad (se calcula en vivo con el SQL de esperado: el 13/11/2026 era la caja a 29,40 € y el 18/11/2026 entró un albarán a 32,55 €/ud). Nunca una media de caja y unidad.",
       "herramienta": { "nombre": "compras_producto", "argumentos": { "producto": "pan de cristal" } },
       "rpc": { "debe": ["ultima_factura", "unidades_mezcladas|por_variante"], "max_ms": 3000 },
       "esperado": [
-        { "ruta": "ultima_factura.precio_unitario", "tipo": "num", "tol": 0.01, "valor": 29.4, "sql": "select coalesce((to_jsonb(pf)->>'importe_neto')::numeric / nullif(pf.cantidad, 0), pf.precio_unitario) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pan de cristal' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" },
-        { "ruta": "ultima_factura.unidad", "tipo": "txt", "valor": "caja", "sql": "select pf.unidad from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pan de cristal' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" }
+        { "ruta": "ultima_factura.precio_unitario", "tipo": "num", "tol": 0.01, "valor": 32.55, "sql": "select coalesce((to_jsonb(pf)->>'importe_neto')::numeric / nullif(pf.cantidad, 0), pf.precio_unitario) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pan de cristal' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" },
+        { "ruta": "ultima_factura.unidad", "tipo": "txt", "valor": "ud", "sql": "select pf.unidad from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pan de cristal' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" }
       ],
       "ia": { "prod": { "debe": ["29,40"], "no_debe": ["2\\.000 ?%"] } },
       "sql": "select pf.nombre, pf.cantidad, pf.unidad, pf.precio_unitario, f.fecha, f.proveedor from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ilike '%pan%cristal%' order by f.fecha desc limit 6"
