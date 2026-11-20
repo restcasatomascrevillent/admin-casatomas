@@ -133,5 +133,11 @@
   { "nombre": "en una página pero no en la línea 1 (donde sí hay scripts nuestros): fallo de la web", "origen": "web", "proveedor": null,
     "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "SyntaxError: JSON Parse error", "pila": "global code@https://restaurantecasatomascrevillente.es/carta:15:40" } },
   { "nombre": "sin pila ni marca: fallo de la web", "origen": "web", "proveedor": null,
-    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "TypeError: undefined is not an object (evaluating 'a.b')" } }
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "TypeError: undefined is not an object (evaluating 'a.b')" } },
+  { "nombre": "CAS-6: iPhone en /carta/carnes con la página cambiada por el navegador (dom_ajeno)", "origen": "navegador", "proveedor": null,
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "Error: Minified React error #425; visit https://reactjs.org/docs/error-decoder.html for the full message or use the non-minified dev environment for full errors and additional helpful warnings.", "pila": "ts@https://restaurantecasatomascrevillente.es/assets/app-TFlv6IO6.js:39:73", "accion": "dom_ajeno", "propiedades": { "componente": "cambio ajeno: texto «Carnes» → «Meats»" } } },
+  { "nombre": "hidratación con la página intacta (fallo nuestro): web", "origen": "web", "proveedor": null,
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "Error: Minified React error #418; visit https://reactjs.org/docs/error-decoder.html", "pila": "ts@https://restaurantecasatomascrevillente.es/assets/app-TFlv6IO6.js:39:73", "propiedades": { "componente": "página intacta antes de hidratar" } } },
+  { "nombre": "la marca dom_ajeno en un error que no es de hidratación: web", "origen": "web", "proveedor": null,
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "TypeError: undefined is not an object (evaluating 'plato.precio')", "accion": "dom_ajeno" } }
 ]

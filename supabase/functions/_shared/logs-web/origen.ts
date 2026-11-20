@@ -15,8 +15,8 @@
 //    3. Navegador: extensiones (chrome-extension://…), scripts que inyectan
 //       los navegadores de las apps, «ResizeObserver loop», «Script error.» de
 //       otro dominio sin datos, rastreadores bloqueados, errores de React al
-//       hidratar con la página traducida por el navegador (la web lo dice con
-//       `accion` «pagina_traducida», CAS-18/19/20) y scripts que el navegador
+//       hidratar con la página cambiada por el navegador (la web lo dice con
+//       `accion` «pagina_traducida» o «dom_ajeno», CAS-6/18/19/20) y scripts que el navegador
 //       mete en la página (`__firefox__`, `window.ethereum` o una pila solo con
 //       la línea 1 de la página, CAS-21/22/23/26/27/28) → navegador.
 //    4. Navegador: petición sin respuesta (estado 0, «Sin respuesta de…»),
@@ -103,6 +103,10 @@ export const PATRON_HIDRATACION =
 
 /** `accion` de la web para un error de hidratación con la página traducida por el navegador. */
 export const ACCION_PAGINA_TRADUCIDA = "pagina_traducida";
+/** `accion` de la web cuando algo de fuera cambió la página antes de hidratar, sin rastro de traductor (web-casatomas lib/dom-ajeno.ts). */
+export const ACCION_DOM_AJENO = "dom_ajeno";
+/** Las dos marcas de «la página la cambió el navegador antes de que React la hidratara». */
+export const ACCIONES_DOM_DEL_NAVEGADOR = [ACCION_PAGINA_TRADUCIDA, ACCION_DOM_AJENO];
 /** `accion` de la web para una imagen que no cargó y sí al volver a pedirla (corte momentáneo de la conexión). */
 export const ACCION_RECUPERADA_AL_REINTENTAR = "recuperada_al_reintentar";
 
@@ -206,7 +210,7 @@ export function origenDeError(d: DatosOrigen): Origen {
 
   if (navegador) {
     // 3. El navegador o una extensión.
-    if (TIPOS_JS.includes(d.tipo) && d.accion === ACCION_PAGINA_TRADUCIDA && PATRON_HIDRATACION.test(mensaje)) return "navegador";
+    if (TIPOS_JS.includes(d.tipo) && ACCIONES_DOM_DEL_NAVEGADOR.includes(d.accion ?? "") && PATRON_HIDRATACION.test(mensaje)) return "navegador";
     if (TIPOS_JS.includes(d.tipo) && pilaSoloDeLaPagina(d.pila)) return "navegador";
     if (PATRON_EXTENSION.test(`${texto}\n${d.objetivo ?? ""}`) || PATRON_NAVEGADOR.test(texto) || PATRON_SCRIPT_ERROR.test(mensaje.trim())) return "navegador";
     if (d.tipo === "error_recurso" && PATRON_BLOQUEADORES.test(d.objetivo ?? "")) return "navegador";

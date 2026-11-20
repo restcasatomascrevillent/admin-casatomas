@@ -325,6 +325,7 @@ export const TEXTO_ACCION_RECARGA: Record<string, string> = {
   sin_conexion: "sin conexión: no se recargó",
   recuperada_al_reintentar: "cargó al volver a pedirla (corte momentáneo de la conexión)",
   pagina_traducida: "página traducida por el navegador",
+  dom_ajeno: "página cambiada por el navegador mientras cargaba",
 };
 
 /**

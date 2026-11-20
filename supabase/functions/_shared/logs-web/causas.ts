@@ -13,7 +13,7 @@
 // ============================================================================
 
 import { PATRON_CHUNK_CADUCADO, PATRON_CRON_PLATAFORMA } from "./huella.ts";
-import { ACCION_PAGINA_TRADUCIDA, ACCION_RECUPERADA_AL_REINTENTAR, PATRON_HIDRATACION } from "./origen.ts";
+import { ACCION_DOM_AJENO, ACCION_PAGINA_TRADUCIDA, ACCION_RECUPERADA_AL_REINTENTAR, PATRON_HIDRATACION } from "./origen.ts";
 import { conMayuscula, listaTareas, tareasDe, type TareaSencilla } from "./sencillo.ts";
 import { funcionDeError, funcionSencilla } from "./funciones.ts";
 
@@ -55,7 +55,7 @@ export interface DatosCausa {
    * aviso_version_nueva, sin_version_nueva o sin_conexion (recarga-por-version.ts).
    * En una imagen de la web, recuperada_al_reintentar o sin_conexion
    * (actividad/imagen-fallida.ts); en un error de hidratación, pagina_traducida
-   * (pagina-traducida.ts).
+   * (pagina-traducida.ts) o dom_ajeno (dom-ajeno.ts).
    */
   accion?: string | null;
 }
@@ -121,6 +121,21 @@ const REGLAS: Regla[] = [
       seArregla: "Sí: la página se vuelve a dibujar sola, ya traducida.",
     }),
     coincide: (d) => d.accion === ACCION_PAGINA_TRADUCIDA && PATRON_HIDRATACION.test(txt(d)),
+  },
+  {
+    id: "hidratacion_dom_ajeno",
+    titulo: "Algo del navegador cambió la página antes de que React la hidratara",
+    explicacion:
+      "Mientras cargaba, algo que no es la web (un traductor sin rastro conocido como el de Safari, una extensión o el propio navegador) cambió el HTML que React aún no había reclamado; la web lo ve con un vigilante en los primeros segundos y dice qué cambió en `componente`. React lo recupera solo volviendo a pintar esa parte. No es un fallo de la web.",
+    acciones: ["Nada: lo provoca el navegador del visitante. Si `componente` muestra un texto nuestro cambiado por otro idioma, era un traductor."],
+    ruidoSiAislado: true,
+    sencillo: () => ({
+      quePasa: "El navegador del visitante cambió la página mientras cargaba (un traductor o una extensión) y la página se volvió a dibujar. No es un fallo de la web: se ve y funciona bien.",
+      queHacer: "Nada: lo provoca el navegador del visitante.",
+      titulo: "El navegador del visitante cambió la página mientras cargaba.",
+      seArregla: "Sí: la página se vuelve a dibujar sola.",
+    }),
+    coincide: (d) => d.accion === ACCION_DOM_AJENO && PATRON_HIDRATACION.test(txt(d)),
   },
   {
     id: "imagen_recuperada_al_reintentar",

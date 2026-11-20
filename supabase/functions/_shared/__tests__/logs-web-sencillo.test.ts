@@ -42,6 +42,7 @@ describe("causas conocidas en sencillo", () => {
       carga_sin_conexion: { tipo: "error_promesa", mensaje: "TypeError: Failed to fetch dynamically imported module", accion: "sin_conexion" },
       carga_sin_version_nueva: { tipo: "error_promesa", mensaje: "TypeError: Load failed", accion: "sin_version_nueva" },
       hidratacion_pagina_traducida: { tipo: "error_js", mensaje: "Uncaught Error: Minified React error #425; visit https://reactjs.org/docs/error-decoder.html", accion: "pagina_traducida" },
+      hidratacion_dom_ajeno: { tipo: "error_js", mensaje: "Error: Minified React error #425; visit https://reactjs.org/docs/error-decoder.html", accion: "dom_ajeno" },
       imagen_recuperada_al_reintentar: { tipo: "error_recurso", objetivo: "https://restaurantecasatomascrevillente.es/assets/lampara-1400w-nk0RtDsA.avif", accion: "recuperada_al_reintentar" },
     };
     expect(Object.keys(ejemplos).sort()).toEqual([...IDS_CAUSAS].sort());
@@ -130,7 +131,7 @@ describe("versión antigua tras publicar", () => {
     expect(TEXTO_TRAS_PUBLICAR.repetido).toBe("no se arregló al recargar · revisar");
     expect(TEXTO_ACCION_RECARGA.recuperado_tras_recarga).toBe("se recargó sola con la versión nueva");
     expect(Object.keys(TEXTO_ACCION_RECARGA).sort()).toEqual([
-      "aviso_version_nueva", "pagina_traducida", "recarga_sin_efecto", "recuperada_al_reintentar", "recuperado_tras_recarga", "sin_conexion", "sin_version_nueva",
+      "aviso_version_nueva", "dom_ajeno", "pagina_traducida", "recarga_sin_efecto", "recuperada_al_reintentar", "recuperado_tras_recarga", "sin_conexion", "sin_version_nueva",
     ]);
   });
   it("¿afecta?: no, salvo que recargar no lo arregle; y lo que no era versión antigua cuenta aparte", () => {

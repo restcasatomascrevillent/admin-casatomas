@@ -14,9 +14,11 @@
 --
 --  1. web_logs_origen_error(): dos reglas nuevas, con la marca que manda la
 --     web (web-casatomas) en `accion`:
---       · «pagina_traducida» en un error de React al hidratar (#418/#421/#422/
---         #423/#425): el traductor del navegador cambió los textos antes de
---         que React hidratara (Chrome en Android, 19/11/2026) → navegador.
+--       · «pagina_traducida» o «dom_ajeno» en un error de React al hidratar
+--         (#418/#421/#422/#423/#425): el traductor del navegador (Chrome en
+--         Android, 19/11/2026) u otra cosa de fuera (Safari, una extensión:
+--         la web lo ve con un MutationObserver) cambió la página antes de que
+--         React la hidratara → navegador.
 --         Sin esa marca, un error de hidratación sigue siendo de la web.
 --       · «recuperada_al_reintentar» en una imagen que no cargó y sí al volver
 --         a pedirla (la lámpara de la carta, 18 y 19/11/2026) → conexion.
@@ -76,10 +78,11 @@ as $$
              ~* 'falta_secreto|falta (el |la )?(secreto|clave|configur|firma)|not_configured|no_configurado|no está configurad|missing (secret|api key|env)|dns error|failed to lookup address|enotfound|name or service not known'
       then 'web'
     -- 3. El navegador o una extensión.
-    -- Error de React al hidratar con la página traducida por el navegador (web-casatomas, CAS-18/19/20).
+    -- Error de React al hidratar con la página cambiada por el navegador: traducida (rastro de Chrome/Edge)
+    -- o cualquier cambio ajeno antes de hidratar (web-casatomas lib/dom-ajeno.ts). CAS-6/18/19/20.
     -- Hacen falta las dos cosas: sin la marca de la web, un desajuste es un fallo nuestro.
     when coalesce(p_fuente, 'navegador') = 'navegador' and p_tipo in ('error_js', 'error_promesa', 'error_react')
-         and p_accion = 'pagina_traducida'
+         and p_accion in ('pagina_traducida', 'dom_ajeno')
          and coalesce(p_mensaje, '') ~* 'minified react error #(418|421|422|423|425)([^0-9]|$)|hydration failed because|there was an error while hydrating|text content does not match server-rendered html|did not match\. server:'
       then 'navegador'
     when coalesce(p_fuente, 'navegador') = 'navegador'
