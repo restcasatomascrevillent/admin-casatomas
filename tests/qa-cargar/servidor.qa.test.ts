@@ -207,11 +207,13 @@ describe("QA Cargar · servidor (arreglado)", () => {
       },
     );
     expect(r.estado).toBe("guardado");
-    const insert = f.consultas.find((c) => c.tabla === "productos_factura" && c.ops.some((o) => o.m === "insert"));
-    expect(insert).toBeTruthy();
-    const filas = insert!.ops.find((o) => o.m === "insert")!.a[0] as { factura_id: number; nombre: string }[];
+    // Las líneas van por la RPC transaccional e idempotente (20261213010000).
+    const rpc = f.rpcs.find((x) => x.nombre === "facturas_insertar_lineas");
+    expect(rpc).toBeTruthy();
+    expect(rpc!.args.p_factura_id).toBe(101);
+    const filas = rpc!.args.p_lineas as { nombre: string }[];
     expect(filas).toHaveLength(1);
-    expect(filas[0]).toMatchObject({ factura_id: 101, nombre: "Merluza" });
+    expect(filas[0]).toMatchObject({ nombre: "Merluza" });
   });
 
   it("S-7: si el UPDATE de la factura falla, apuntarOriginal lo reintenta y, si no puede, devuelve el error", async () => {
