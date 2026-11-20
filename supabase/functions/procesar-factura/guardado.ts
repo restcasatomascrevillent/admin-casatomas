@@ -37,6 +37,23 @@ export interface ContextoGuardado {
   supabase: Supa;
   openai: ClienteOpenAI;
   drive: ConfigDrive;
+  /** Esperas entre reintentos de los INSERT cortados por tiempo (por defecto 3 s y 8 s; los tests lo acortan). */
+  reintento?: OpcionesReintento;
+}
+
+/**
+ * Reintento de una escritura que la base cortó por tiempo (57014/55P03). Postgres
+ * deshace la sentencia entera, así que repetirla es seguro (el INSERT de la
+ * cabecera y el de las líneas son una sentencia cada uno: todo o nada). Antes un
+ * corte hacía fallar el intento entero de consolidación (el vector de la factura,
+ * la cabecera y la compensación otra vez) y, a la tercera, el trabajo quedaba
+ * «fallido» hasta que alguien pulsaba «Reintentar» (19/11/2026: 31 minutos).
+ */
+function reintentoEscritura(ctx: ContextoGuardado, que: string): OpcionesReintento {
+  return {
+    alReintentar: (n, ms, e) => console.warn(`[guardado] ${que}: cortado por tiempo (${e.message}); reintento ${n} en ${ms / 1000} s`),
+    ...ctx.reintento,
+  };
 }
 
 export type OriginalDocumento =
@@ -293,6 +310,11 @@ export function valorSinDescuento(p: unknown): Record<string, number | boolean> 
       ? { importe_bruto: l.importe_bruto as number, importe_bruto_estimado: l.importe_bruto_estimado === true }
       : {}),
   };
+}
+
+/** ¿El error es que la RPC `facturas_insertar_lineas` no existe (migración 20261213010000 sin aplicar)? */
+export function faltaRpcLineas(e: { code?: string | null; message?: string | null }): boolean {
+  return e.code === "PGRST202" || e.code === "42883" || /facturas_insertar_lineas/i.test(e.message ?? "") && /could not find|does not exist/i.test(e.message ?? "");
 }
 
 /** ¿El error es que falta la columna `bultos` (migración 20261005150000 sin aplicar)? */
@@ -618,13 +640,20 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   const extra04b = { paginas: Math.min(20, Math.max(1, e.paginas ?? 1)), ...(e.ocrTrabajoId ? { ocr_trabajo_id: e.ocrTrabajoId } : {}) };
   let conColumnas04b = true;
   const extra = e.cabeceraExtra ?? {};
-  let ins = await supabase.from("facturas").insert({ ...cabecera, ...extra04b, ...extra }).select("id").single();
+  const reintCabecera = reintentoEscritura(ctx, "insert factura");
+  let ins = await conReintentoPorTiempo(
+    () => supabase.from("facturas").insert({ ...cabecera, ...extra04b, ...extra }).select("id").single(),
+    reintCabecera,
+  );
   if (ins.error && esColumnaNueva(ins.error.message) && !e.ocrTrabajoId) {
     // Migración 20261005120000 sin aplicar: el camino de una página sigue
     // funcionando como en v101 (sin pagina/orden).
     console.warn("[procesar-factura] columnas 04b ausentes; se guarda sin ellas:", ins.error.message);
     conColumnas04b = false;
-    ins = await supabase.from("facturas").insert({ ...cabecera, ...extra }).select("id").single();
+    ins = await conReintentoPorTiempo(
+      () => supabase.from("facturas").insert({ ...cabecera, ...extra }).select("id").single(),
+      reintCabecera,
+    );
   }
   if (ins.error) throw new Error(`insert factura: ${ins.error.message}`);
   const facturaId: number = ins.data.id;
@@ -663,25 +692,41 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
 }
 
 /**
- * Paso 7: líneas. Un solo INSERT (todas o ninguna). El vector de los nombres
+ * Paso 7: líneas. Una RPC (`facturas_insertar_lineas`, 20261213010000) que en UNA
+ * transacción toma un bloqueo por factura, mira si ya hay líneas y, solo si no
+ * hay ninguna, inserta todas (todas o ninguna). Así dos procesos sobre el mismo
+ * trabajo (el lease de 180 s caduca mientras el primero sigue, sobre todo con
+ * los reintentos por tiempo) no pueden duplicar las líneas: el segundo espera y
+ * encuentra las del primero (devuelve 0). El vector de los nombres
  * nuevos NO se calcula aquí (18/11/2026): el trigger deja su fila de
  * productos_nombre_embedding pendiente (embedding NULL) y la completa el cron
  * embeddings-nombres (cada 10 min). Antes iba en serie al guardar: ~6 s con la
  * base cargada (upsert en un índice HNSW) y se cortaba por los 8 s de PostgREST.
+ * Si la RPC aún no existe (código desplegado antes que la migración) se usa el
+ * INSERT directo de antes.
  */
 async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: DatosNormalizados, conColumnas04b: boolean): Promise<void> {
   if (d.productos.length === 0) return;
   const { supabase } = ctx;
-  const insertar = (conBultos: boolean, conIvaPct: boolean) =>
-    supabase.from("productos_factura")
-      .insert(
-        filasProductos(d, conColumnas04b, conBultos, conIvaPct).map((f) => ({ factura_id: facturaId, ...f })),
-      );
+  let conRpc = true;
+  const insertar = (conBultos: boolean, conIvaPct: boolean) => {
+    const filas = filasProductos(d, conColumnas04b, conBultos, conIvaPct);
+    return conRpc
+      ? supabase.rpc("facturas_insertar_lineas", { p_factura_id: facturaId, p_lineas: filas })
+      : supabase.from("productos_factura").insert(filas.map((f) => ({ factura_id: facturaId, ...f })));
+  };
   // Columnas opcionales que puede faltar por migrar: se quita la que falte
   // y se reintenta (a lo sumo una vez por columna).
   let conBultos = true;
   let conIvaPct = true;
-  let { error } = await insertar(conBultos, conIvaPct);
+  const reint = reintentoEscritura(ctx, "insert productos");
+  const insertarConReintento = (b: boolean, i: boolean) => conReintentoPorTiempo(() => insertar(b, i), reint);
+  let { error } = await insertarConReintento(conBultos, conIvaPct);
+  if (error && conRpc && faltaRpcLineas(error)) {
+    console.warn("[procesar-factura] falta facturas_insertar_lineas (¿migración sin aplicar?); INSERT directo:", error.message);
+    conRpc = false;
+    ({ error } = await insertarConReintento(conBultos, conIvaPct));
+  }
   for (let i = 0; i < 2 && error; i++) {
     if (conBultos && faltaColumnaBultos(error.message)) {
       console.warn("[procesar-factura] columna bultos ausente; se guardan las líneas sin ella:", error.message);
@@ -690,7 +735,7 @@ async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: Datos
       console.warn("[procesar-factura] columna iva_pct ausente; se guardan las líneas sin ella:", error.message);
       conIvaPct = false;
     } else break;
-    ({ error } = await insertar(conBultos, conIvaPct));
+    ({ error } = await insertarConReintento(conBultos, conIvaPct));
   }
   if (error) throw new Error(`insert productos: ${error.message}`);
 }

@@ -261,8 +261,8 @@ const costeGuardado = (sb: ReturnType<typeof supabaseFalso>) =>
   }));
 
 // Lo que se escribe en la BD, sin la hora ni el id del trabajo (ni el coste de lectura, que se prueba aparte).
-const escrituras = (sb: ReturnType<typeof supabaseFalso>) =>
-  sb.consultas
+const escrituras = (sb: ReturnType<typeof supabaseFalso>) => [
+  ...sb.consultas
     .filter((c) => ["facturas", "productos_factura"].includes(c.tabla) && c.ops.some((o) => o.m === "insert" || o.m === "update"))
     .map((c) => ({
       tabla: c.tabla,
@@ -277,7 +277,12 @@ const escrituras = (sb: ReturnType<typeof supabaseFalso>) =>
           return x;
         }),
       })),
-    }));
+    })),
+  // Las líneas van por la RPC transaccional e idempotente (20261213010000).
+  ...sb.rpcs
+    .filter((r) => r.nombre === "facturas_insertar_lineas")
+    .map((r) => ({ tabla: "productos_factura", ops: [{ m: "rpc", a: [r.args] }] })),
+];
 const rpcsGuardado = (sb: ReturnType<typeof supabaseFalso>) =>
   sb.rpcs.filter((r) => ["ocr_factura_existente", "validar_cordura_factura"].includes(r.nombre));
 const sinComun = (r: Record<string, unknown>) => {
