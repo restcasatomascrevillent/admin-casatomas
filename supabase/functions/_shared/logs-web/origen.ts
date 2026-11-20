@@ -14,9 +14,11 @@
 //       dirección que ya no existe → web (es configuración nuestra).
 //    3. Navegador: extensiones (chrome-extension://…), scripts que inyectan
 //       los navegadores de las apps, «ResizeObserver loop», «Script error.» de
-//       otro dominio sin datos, rastreadores bloqueados y errores de React al
+//       otro dominio sin datos, rastreadores bloqueados, errores de React al
 //       hidratar con la página traducida por el navegador (la web lo dice con
-//       `accion` «pagina_traducida», CAS-18/19/20) → navegador.
+//       `accion` «pagina_traducida», CAS-18/19/20) y scripts que el navegador
+//       mete en la página (`__firefox__`, `window.ethereum` o una pila solo con
+//       la línea 1 de la página, CAS-21/22/23/26/27/28) → navegador.
 //    4. Navegador: petición sin respuesta (estado 0, «Sin respuesta de…»),
 //       «Failed to fetch», «Load failed», «NetworkError», cancelada, e imagen
 //       que cargó al volver a pedirla (`accion` «recuperada_al_reintentar»,
@@ -72,7 +74,23 @@ export const PATRON_EXTENSION = /(chrome|moz|safari|safari-web|ms-browser|edge)-
 
 /** Avisos del propio navegador y scripts que inyectan los navegadores de las apps (Facebook, Instagram, Bing…). */
 export const PATRON_NAVEGADOR =
-  /resizeobserver loop|_autofillcallbackhandler|instantsearchsdkjsbridge|__gcrweb|weixinjsbridge|webkit\.messagehandlers|java object is gone|zalojsv2|getreadmode(config|render|extract)|symbrowser_|cefsharp|non-error promise rejection captured|can.t find variable: (gmo|zalo|_autofill)/i;
+  /resizeobserver loop|_autofillcallbackhandler|instantsearchsdkjsbridge|__gcrweb|weixinjsbridge|webkit\.messagehandlers|java object is gone|zalojsv2|getreadmode(config|render|extract)|symbrowser_|cefsharp|non-error promise rejection captured|can.t find variable: (gmo|zalo|_autofill)|__firefox__|window\.ethereum/i;
+
+/**
+ * Pila en la que TODOS los marcos están en la línea 1 de una página (no de un
+ * fichero .js): es un script que el navegador mete en la página (Brave en
+ * iPhone con su cartera, 20/11/2026: «window.__firefox__…» y
+ * «window.ethereum.selectedAddress…» en «global code@https://…/carta:1:12»).
+ * La web no tiene código propio en la línea 1 de su HTML (solo la cabecera;
+ * sus dos scripts en línea van al final del cuerpo, y la web lo comprueba al
+ * construir: web-casatomas scripts/verificar-html.mjs). Sin pila no cuenta.
+ */
+export const PATRON_PILA_SOLO_PAGINA = /^(\s*(global code@|at |@)?https?:\/\/[^\s]+:1:[0-9]+\s*)+$/i;
+const PATRON_JS = /\.m?js([?#:\s]|$)/i;
+export function pilaSoloDeLaPagina(pila: string | null | undefined): boolean {
+  const p = (pila ?? "").trim();
+  return p !== "" && PATRON_PILA_SOLO_PAGINA.test(p) && !PATRON_JS.test(p);
+}
 
 /**
  * Errores de React al hidratar (#418/#421/#422/#423/#425 minificados y sus
@@ -189,6 +207,7 @@ export function origenDeError(d: DatosOrigen): Origen {
   if (navegador) {
     // 3. El navegador o una extensión.
     if (TIPOS_JS.includes(d.tipo) && d.accion === ACCION_PAGINA_TRADUCIDA && PATRON_HIDRATACION.test(mensaje)) return "navegador";
+    if (TIPOS_JS.includes(d.tipo) && pilaSoloDeLaPagina(d.pila)) return "navegador";
     if (PATRON_EXTENSION.test(`${texto}\n${d.objetivo ?? ""}`) || PATRON_NAVEGADOR.test(texto) || PATRON_SCRIPT_ERROR.test(mensaje.trim())) return "navegador";
     if (d.tipo === "error_recurso" && PATRON_BLOQUEADORES.test(d.objetivo ?? "")) return "navegador";
     // 4. La conexión del visitante.

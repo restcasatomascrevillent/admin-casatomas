@@ -21,6 +21,10 @@
 --       · «recuperada_al_reintentar» en una imagen que no cargó y sí al volver
 --         a pedirla (la lámpara de la carta, 18 y 19/11/2026) → conexion.
 --         «sin_conexion» ya era conexion.
+--       · Scripts que el navegador mete en la página (Brave en iPhone, 20/11/2026:
+--         `window.__firefox__…`, `window.ethereum.selectedAddress…`): por esas
+--         marcas o por una pila con todos los marcos en la línea 1 de una página
+--         y ningún .js → navegador. La web no tiene código propio ahí.
 --  2. web_logs_agrupar_errores(): igual que en 20261130100000 salvo la
 --     reaparición. Antes, CUALQUIER ocurrencia nueva reabría una incidencia
 --     resuelta y, si la incidencia era «de la web» (por ocurrencias antiguas),
@@ -82,10 +86,17 @@ as $$
          and ((coalesce(p_mensaje, '') || E'\n' || coalesce(p_pila, '') || E'\n' || coalesce(p_objetivo, ''))
                 ~* '(chrome|moz|safari|safari-web|ms-browser|edge)-extension://|webkit-masked-url://'
               or (coalesce(p_mensaje, '') || E'\n' || coalesce(p_pila, ''))
-                ~* 'resizeobserver loop|_autofillcallbackhandler|instantsearchsdkjsbridge|__gcrweb|weixinjsbridge|webkit\.messagehandlers|java object is gone|zalojsv2|getreadmode(config|render|extract)|symbrowser_|cefsharp|non-error promise rejection captured|can.t find variable: (gmo|zalo|_autofill)'
+                ~* 'resizeobserver loop|_autofillcallbackhandler|instantsearchsdkjsbridge|__gcrweb|weixinjsbridge|webkit\.messagehandlers|java object is gone|zalojsv2|getreadmode(config|render|extract)|symbrowser_|cefsharp|non-error promise rejection captured|can.t find variable: (gmo|zalo|_autofill)|__firefox__|window\.ethereum'
               or btrim(coalesce(p_mensaje, ''), E' \t\n\r') ~* '^(uncaught )?script error\.?$'
               or (p_tipo = 'error_recurso' and coalesce(p_objetivo, '')
                 ~* 'googletagmanager\.com|google-analytics\.com|doubleclick\.net|googlesyndication\.com|clarity\.ms|hotjar\.com|cloudflareinsights\.com|fbevents\.js'))
+      then 'navegador'
+    -- Script que el navegador mete en la página: todos los marcos en la línea 1 de una página, ningún .js
+    -- (Brave en iPhone, CAS-21/22/23/26/27/28). La web no tiene código propio en la línea 1 de su HTML.
+    when coalesce(p_fuente, 'navegador') = 'navegador' and p_tipo in ('error_js', 'error_promesa', 'error_react')
+         and btrim(coalesce(p_pila, ''), E' \t\n\r') <> ''
+         and btrim(p_pila, E' \t\n\r') ~* '^(\s*(global code@|at |@)?https?://[^\s]+:1:[0-9]+\s*)+$'
+         and p_pila !~* '\.m?js([?#:\s]|$)'
       then 'navegador'
     -- 4. La conexión del visitante.
     when coalesce(p_fuente, 'navegador') = 'navegador' and p_tipo = 'error_peticion'

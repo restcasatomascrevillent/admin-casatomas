@@ -119,5 +119,19 @@
   { "nombre": "CAS-17: la lámpara tampoco cargó y el servidor no contestaba", "origen": "conexion", "proveedor": null,
     "datos": { "tipo": "error_recurso", "fuente": "navegador", "objetivo": "https://restaurantecasatomascrevillente.es/assets/lampara-1400w-nk0RtDsA.avif", "propiedades": { "etiqueta": "img" }, "accion": "sin_conexion" } },
   { "nombre": "imagen de la web que falla sin marca (fichero que falta o roto): fallo de la web", "origen": "web", "proveedor": null,
-    "datos": { "tipo": "error_recurso", "fuente": "navegador", "objetivo": "https://restaurantecasatomascrevillente.es/assets/lampara-1400w-nk0RtDsA.avif", "propiedades": { "etiqueta": "img" } } }
+    "datos": { "tipo": "error_recurso", "fuente": "navegador", "objetivo": "https://restaurantecasatomascrevillente.es/assets/lampara-1400w-nk0RtDsA.avif", "propiedades": { "etiqueta": "img" } } },
+  { "nombre": "CAS-27: Brave en iPhone, «Can't find variable: __firefox__» en la línea 1 de /carta", "origen": "navegador", "proveedor": null,
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "ReferenceError: Can't find variable: __firefox__", "pila": "global code@https://restaurantecasatomascrevillente.es/carta:1:12" } },
+  { "nombre": "CAS-23: «window.__firefox__.[token]» en la línea 1 de /carta/novedades-del-dia", "origen": "navegador", "proveedor": null,
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "TypeError: undefined is not an object (evaluating 'window.__firefox__.[token]')", "pila": "global code@https://restaurantecasatomascrevillente.es/carta/novedades-del-dia:1:19" } },
+  { "nombre": "CAS-21: la cartera de Brave, «window.ethereum.selectedAddress = undefined»", "origen": "navegador", "proveedor": null,
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "TypeError: undefined is not an object (evaluating 'window.ethereum.selectedAddress = undefined')", "pila": "global code@https://restaurantecasatomascrevillente.es/carta:1:16" } },
+  { "nombre": "script desconocido metido por el navegador: toda la pila en la línea 1 de la página", "origen": "navegador", "proveedor": null,
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "TypeError: null is not an object (evaluating 'document.querySelector(\"#x\").value')", "pila": "global code@https://restaurantecasatomascrevillente.es/carta/carnes:1:44\nglobal code@https://restaurantecasatomascrevillente.es/carta/carnes:1:120" } },
+  { "nombre": "en la línea 1 de la página pero con un marco de nuestro .js: fallo de la web", "origen": "web", "proveedor": null,
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "TypeError: x is undefined", "pila": "global code@https://restaurantecasatomascrevillente.es/carta:1:12\nts@https://restaurantecasatomascrevillente.es/assets/app-TFlv6IO6.js:39:73" } },
+  { "nombre": "en una página pero no en la línea 1 (donde sí hay scripts nuestros): fallo de la web", "origen": "web", "proveedor": null,
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "SyntaxError: JSON Parse error", "pila": "global code@https://restaurantecasatomascrevillente.es/carta:15:40" } },
+  { "nombre": "sin pila ni marca: fallo de la web", "origen": "web", "proveedor": null,
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "TypeError: undefined is not an object (evaluating 'a.b')" } }
 ]
