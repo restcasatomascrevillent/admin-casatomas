@@ -119,6 +119,9 @@ jobs:
       - name: Alertas de un documento al añadir o borrar líneas (PGlite)
         if: env.COMPLETA == 'true'
         run: npm run test:alertas-lineas:db
+      - name: Recálculo de alertas del minuto acotado (PGlite)
+        if: env.COMPLETA == 'true'
+        run: npm run test:alertas-recalculo:db
       - name: clasificar-productos por tandas, sin cortes por tiempo (PGlite)
         if: env.COMPLETA == 'true'
         run: npm run test:clasificar-productos:db
