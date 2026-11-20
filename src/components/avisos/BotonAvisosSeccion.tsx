@@ -104,8 +104,8 @@ export function BotonAvisosSeccion({ seccion, className, compacto = false }: { s
 
 /**
  * Color de cada fila en los avisos de Reservas (CAS-9, 17/11/2026, petición del dueño: «diferentes tipos de colores
- * de filas»): azul la reserva nueva (hay que verificarla), rojo la cancelada (solo revisar) y, desde el 18/11/2026,
- * verde la que ha confirmado el cliente con el enlace del correo (solo revisar). Revisada, más clara.
+ * de filas»): azul la reserva nueva (hay que verificarla) y rojo la cancelada (solo revisar). Revisada, más clara.
+ * El verde de «Confirmada por el cliente» (18/11/2026) se quitó el 20/11/2026 (CAS-24): ya no hay ese aviso.
  */
 const TONO_AVISO_RESERVA: Record<string, { borde: string; fondo: string; fondoRevisado: string; icono: string }> = {
   reserva_nueva: {
@@ -113,12 +113,6 @@ const TONO_AVISO_RESERVA: Record<string, { borde: string; fondo: string; fondoRe
     fondo: "bg-sky-50 dark:bg-sky-950/40",
     fondoRevisado: "bg-sky-50/40 dark:bg-sky-950/15",
     icono: "text-sky-700 dark:text-sky-300",
-  },
-  reserva_confirmada: {
-    borde: "border-l-emerald-500",
-    fondo: "bg-emerald-50 dark:bg-emerald-950/40",
-    fondoRevisado: "bg-emerald-50/40 dark:bg-emerald-950/15",
-    icono: "text-emerald-700 dark:text-emerald-300",
   },
   reserva_cancelada: {
     borde: "border-l-red-500",
@@ -222,7 +216,6 @@ function ModalAvisos({
           {esReservas && (
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" data-testid="leyenda-avisos-reservas">
               <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border-l-4 border-l-sky-500 bg-sky-100 dark:bg-sky-900/60" aria-hidden="true" />Nueva: verificar</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border-l-4 border-l-emerald-500 bg-emerald-100 dark:bg-emerald-900/60" aria-hidden="true" />Confirmada por el cliente: revisar</span>
               <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm border-l-4 border-l-red-500 bg-red-100 dark:bg-red-900/60" aria-hidden="true" />Cancelada: revisar</span>
             </p>
           )}

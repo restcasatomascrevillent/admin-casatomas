@@ -47,7 +47,8 @@ export const TIPO_MARGEN_BAJO = "facturas_margen_bajo";
 export type FiltroAvisos = "todos" | "sin_leer" | "reservas" | "facturas" | "otros";
 
 export const TIPOS_POR_FILTRO: Record<"reservas" | "facturas", string[]> = {
-  reservas: ["solicitud_pendiente", "reserva_nueva", "reserva_confirmada", "reserva_cancelada", "reserva_sin_asignar"],
+  // 20/11/2026 (CAS-24): sin «Confirmada por el cliente»; en Reservas solo lo que hay que verificar y las canceladas.
+  reservas: ["solicitud_pendiente", "reserva_nueva", "reserva_cancelada", "reserva_sin_asignar"],
   facturas: ["facturas_subida", "facturas_abreviatura", "subida_precio", "original_sin_drive", ...TIPOS_ALERTA_FACTURAS.map((t) => t.tipo), TIPO_MARGEN_BAJO],
 };
 
@@ -149,7 +150,6 @@ export const SECCIONES_AVISOS: Record<SeccionAvisos, { titulo: string; tipos: { 
       // (azul) y las que confirme luego el cliente (verdes)». Una «Reserva nueva» se da por revisada sola en
       // cuanto la reserva deja de estar pendiente (20261212720000).
       { tipo: "reserva_nueva", etiqueta: "Reservas nuevas" },
-      { tipo: "reserva_confirmada", etiqueta: "Confirmadas por el cliente" },
       { tipo: "reserva_cancelada", etiqueta: "Canceladas" },
     ],
   },
