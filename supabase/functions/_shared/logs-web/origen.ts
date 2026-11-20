@@ -14,9 +14,13 @@
 //       dirección que ya no existe → web (es configuración nuestra).
 //    3. Navegador: extensiones (chrome-extension://…), scripts que inyectan
 //       los navegadores de las apps, «ResizeObserver loop», «Script error.» de
-//       otro dominio sin datos y rastreadores bloqueados → navegador.
+//       otro dominio sin datos, rastreadores bloqueados y errores de React al
+//       hidratar con la página traducida por el navegador (la web lo dice con
+//       `accion` «pagina_traducida», CAS-18/19/20) → navegador.
 //    4. Navegador: petición sin respuesta (estado 0, «Sin respuesta de…»),
-//       «Failed to fetch», «Load failed», «NetworkError», cancelada → conexion.
+//       «Failed to fetch», «Load failed», «NetworkError», cancelada, e imagen
+//       que cargó al volver a pedirla (`accion` «recuperada_al_reintentar»,
+//       CAS-17) → conexion.
 //    5. Servicio de fuera (Google Maps, Instagram/Meta, Stripe, OpenAI…, o un
 //       recurso de otro dominio) → externo, con el nombre del proveedor.
 //    6. Todo lo demás → web (JS de nuestro código, React, 404 de nuestras
@@ -69,6 +73,20 @@ export const PATRON_EXTENSION = /(chrome|moz|safari|safari-web|ms-browser|edge)-
 /** Avisos del propio navegador y scripts que inyectan los navegadores de las apps (Facebook, Instagram, Bing…). */
 export const PATRON_NAVEGADOR =
   /resizeobserver loop|_autofillcallbackhandler|instantsearchsdkjsbridge|__gcrweb|weixinjsbridge|webkit\.messagehandlers|java object is gone|zalojsv2|getreadmode(config|render|extract)|symbrowser_|cefsharp|non-error promise rejection captured|can.t find variable: (gmo|zalo|_autofill)/i;
+
+/**
+ * Errores de React al hidratar (#418/#421/#422/#423/#425 minificados y sus
+ * mensajes de desarrollo). Solo cuentan como «navegador» si además la web dice
+ * que la página estaba traducida (`accion` «pagina_traducida», web-casatomas
+ * src/lib/pagina-traducida.ts): sin traductor, un desajuste es un fallo nuestro.
+ */
+export const PATRON_HIDRATACION =
+  /minified react error #(418|421|422|423|425)([^0-9]|$)|hydration failed because|there was an error while hydrating|text content does not match server-rendered html|did not match\. server:/i;
+
+/** `accion` de la web para un error de hidratación con la página traducida por el navegador. */
+export const ACCION_PAGINA_TRADUCIDA = "pagina_traducida";
+/** `accion` de la web para una imagen que no cargó y sí al volver a pedirla (corte momentáneo de la conexión). */
+export const ACCION_RECUPERADA_AL_REINTENTAR = "recuperada_al_reintentar";
 
 /** «Script error.»: un script de otro dominio falló y el navegador no deja ver nada más. Mensaje entero. */
 export const PATRON_SCRIPT_ERROR = /^(uncaught )?script error\.?$/i;
@@ -161,6 +179,7 @@ export function origenDeError(d: DatosOrigen): Origen {
     if (d.accion === "sin_conexion") return "conexion";
     if (d.accion === "recuperado_tras_recarga") return "version_antigua";
   }
+  if (d.tipo === "error_recurso" && d.accion === ACCION_RECUPERADA_AL_REINTENTAR) return "conexion";
   if (esVersionAntigua(d)) return "version_antigua";
 
   // 2. Nuestro aunque lo parezca de fuera.
@@ -169,6 +188,7 @@ export function origenDeError(d: DatosOrigen): Origen {
 
   if (navegador) {
     // 3. El navegador o una extensión.
+    if (TIPOS_JS.includes(d.tipo) && d.accion === ACCION_PAGINA_TRADUCIDA && PATRON_HIDRATACION.test(mensaje)) return "navegador";
     if (PATRON_EXTENSION.test(`${texto}\n${d.objetivo ?? ""}`) || PATRON_NAVEGADOR.test(texto) || PATRON_SCRIPT_ERROR.test(mensaje.trim())) return "navegador";
     if (d.tipo === "error_recurso" && PATRON_BLOQUEADORES.test(d.objetivo ?? "")) return "navegador";
     // 4. La conexión del visitante.

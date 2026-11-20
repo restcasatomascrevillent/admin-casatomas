@@ -13,6 +13,7 @@
 // ============================================================================
 
 import { PATRON_CHUNK_CADUCADO, PATRON_CRON_PLATAFORMA } from "./huella.ts";
+import { ACCION_PAGINA_TRADUCIDA, ACCION_RECUPERADA_AL_REINTENTAR, PATRON_HIDRATACION } from "./origen.ts";
 import { conMayuscula, listaTareas, tareasDe, type TareaSencilla } from "./sencillo.ts";
 import { funcionDeError, funcionSencilla } from "./funciones.ts";
 
@@ -52,6 +53,9 @@ export interface DatosCausa {
    * `accion` de UNA ocurrencia (solo al mirar eventos sueltos). En los errores de
    * carga, la web dice qué decidió: recuperado_tras_recarga, recarga_sin_efecto,
    * aviso_version_nueva, sin_version_nueva o sin_conexion (recarga-por-version.ts).
+   * En una imagen de la web, recuperada_al_reintentar o sin_conexion
+   * (actividad/imagen-fallida.ts); en un error de hidratación, pagina_traducida
+   * (pagina-traducida.ts).
    */
   accion?: string | null;
 }
@@ -103,6 +107,36 @@ const txt = (d: DatosCausa) => `${d.mensaje ?? ""}\n${d.pila ?? ""}`;
 const esAssetDeDespliegue = (url: string) => /\/assets\/[^/?#]+-[A-Za-z0-9_-]{8}\.(?:m?js|css)(?:$|[?#])/.test(url);
 
 const REGLAS: Regla[] = [
+  {
+    id: "hidratacion_pagina_traducida",
+    titulo: "El traductor del navegador cambió la página antes de que React la hidratara",
+    explicacion:
+      "La página estaba traducida por el navegador (Chrome, Edge): el traductor cambia cada texto por <font>…</font> y, si lo hace antes de que React hidrate una sección (las de abajo se hidratan cuando el navegador está ocioso), el HTML ya no es el que React esperaba (#425, #418, #422). React lo recupera solo volviendo a pintar esa sección y el traductor la vuelve a traducir. No es un fallo de la web ni tiene arreglo en React (facebook/react#11538).",
+    acciones: ["Nada: lo provoca el traductor del navegador del visitante."],
+    ruidoSiAislado: true,
+    sencillo: () => ({
+      quePasa: "El visitante tenía la página traducida por su navegador y la página se volvió a dibujar al cargar. No es un fallo de la web: se ve y funciona bien.",
+      queHacer: "Nada: lo provoca el traductor del navegador del visitante.",
+      titulo: "El traductor del navegador hizo que la página se dibujara dos veces.",
+      seArregla: "Sí: la página se vuelve a dibujar sola, ya traducida.",
+    }),
+    coincide: (d) => d.accion === ACCION_PAGINA_TRADUCIDA && PATRON_HIDRATACION.test(txt(d)),
+  },
+  {
+    id: "imagen_recuperada_al_reintentar",
+    titulo: "Una imagen no cargó a la primera y sí al volver a pedirla",
+    explicacion:
+      "La imagen está en la web, pero la primera petición falló (normalmente, la conexión del visitante se cortó un momento). La web la vuelve a pedir una vez y, al cargar, la repinta: el visitante la ve. No es un fallo de la web.",
+    acciones: ["Nada si son casos sueltos. Si fueran muchas sesiones a la vez, mirar el estado de Vercel."],
+    ruidoSiAislado: true,
+    sencillo: () => ({
+      quePasa: "Una imagen no cargó a la primera porque la conexión del visitante falló un momento; la web la volvió a pedir y se vio bien.",
+      queHacer: "Nada: es la conexión del visitante.",
+      titulo: "Una imagen tardó en cargar por la conexión del visitante.",
+      seArregla: "Sí: la web la vuelve a pedir sola.",
+    }),
+    coincide: (d) => d.tipo === "error_recurso" && d.accion === ACCION_RECUPERADA_AL_REINTENTAR,
+  },
   {
     id: "carga_sin_conexion",
     titulo: "El visitante se quedó sin conexión mientras cargaba la página",
@@ -203,8 +237,9 @@ const REGLAS: Regla[] = [
     id: "react_hidratacion",
     titulo: "React no pudo «hidratar» el HTML pre-renderizado (errores #418/#423/#425)",
     explicacion:
-      "El HTML que se sirve ya pintado no coincide con lo que React pinta en el navegador (fechas u horas, textos que dependen del idioma o de datos que llegan después). React lo vuelve a pintar entero: la página funciona, pero tarda más.",
+      "El HTML que se sirve ya pintado no coincide con lo que React pinta en el navegador (fechas u horas, textos que dependen del idioma o de datos que llegan después, o algo que cambió la página antes de hidratar: un traductor o el navegador convirtiendo cifras en teléfonos). React lo vuelve a pintar entero: la página funciona, pero tarda más.",
     acciones: [
+      "Mirar el origen de las ocurrencias: las que vienen con la página traducida por el navegador (`pagina_traducida`) son «Navegador o extensión» y no hay que hacer nada con ellas.",
       "Reproducir con la versión sin minificar (`npm run dev`) para ver el aviso completo y el componente.",
       "Mover a un useEffect lo que dependa del navegador (fecha actual, localStorage, idioma) o renderizarlo solo en cliente.",
     ],

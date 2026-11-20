@@ -41,6 +41,8 @@ describe("causas conocidas en sencillo", () => {
       falta_secreto: { tipo: "error_servidor", mensaje: "falta_secreto" },
       carga_sin_conexion: { tipo: "error_promesa", mensaje: "TypeError: Failed to fetch dynamically imported module", accion: "sin_conexion" },
       carga_sin_version_nueva: { tipo: "error_promesa", mensaje: "TypeError: Load failed", accion: "sin_version_nueva" },
+      hidratacion_pagina_traducida: { tipo: "error_js", mensaje: "Uncaught Error: Minified React error #425; visit https://reactjs.org/docs/error-decoder.html", accion: "pagina_traducida" },
+      imagen_recuperada_al_reintentar: { tipo: "error_recurso", objetivo: "https://restaurantecasatomascrevillente.es/assets/lampara-1400w-nk0RtDsA.avif", accion: "recuperada_al_reintentar" },
     };
     expect(Object.keys(ejemplos).sort()).toEqual([...IDS_CAUSAS].sort());
     for (const [id, d] of Object.entries(ejemplos)) {
@@ -53,6 +55,25 @@ describe("causas conocidas en sencillo", () => {
       expect(c!.sencillo.titulo, id).toMatch(/^[A-ZÁÉÍÓÚ0-9].+\.$/);
       expect(`${c!.sencillo.titulo} ${c!.sencillo.seArregla ?? ""}`, id).not.toMatch(JERGA);
     }
+  });
+});
+
+describe("lo que no depende de la web, por la marca de la web (CAS-17, CAS-18/19/20)", () => {
+  const HIDRATACION = "Uncaught Error: Minified React error #418; visit https://reactjs.org/docs/error-decoder.html for the full message";
+  it("hidratación con la página traducida: causa propia; sin la marca, la de siempre (fallo de la web)", () => {
+    expect(causaConocida({ tipo: "error_js", mensaje: HIDRATACION, accion: "pagina_traducida" })?.id).toBe("hidratacion_pagina_traducida");
+    expect(causaConocida({ tipo: "error_js", mensaje: HIDRATACION })?.id).toBe("react_hidratacion");
+    // La marca sola no basta: un error que no es de hidratación no se atribuye al traductor.
+    expect(causaConocida({ tipo: "error_js", mensaje: "TypeError: vino.precio is null", accion: "pagina_traducida" })).toBeNull();
+  });
+  it("la causa de la hidratación de siempre recuerda mirar el origen de las ocurrencias", () => {
+    expect(causaConocida({ tipo: "error_js", mensaje: HIDRATACION })?.acciones[0]).toMatch(/pagina_traducida/);
+  });
+  it("imagen recuperada al reintentar: conexión del visitante; sin conexión, la de siempre; sin marca, ninguna", () => {
+    const lampara = { tipo: "error_recurso", objetivo: "https://restaurantecasatomascrevillente.es/assets/lampara-1400w-nk0RtDsA.avif" };
+    expect(causaConocida({ ...lampara, accion: "recuperada_al_reintentar" })?.sencillo.seArregla).toMatch(/^Sí/);
+    expect(causaConocida({ ...lampara, accion: "sin_conexion" })?.id).toBe("carga_sin_conexion");
+    expect(causaConocida(lampara)).toBeNull();
   });
 });
 
@@ -108,7 +129,9 @@ describe("versión antigua tras publicar", () => {
     expect(TEXTO_TRAS_PUBLICAR.sin_impacto).toBe("esperado tras publicar · sin impacto");
     expect(TEXTO_TRAS_PUBLICAR.repetido).toBe("no se arregló al recargar · revisar");
     expect(TEXTO_ACCION_RECARGA.recuperado_tras_recarga).toBe("se recargó sola con la versión nueva");
-    expect(Object.keys(TEXTO_ACCION_RECARGA).sort()).toEqual(["aviso_version_nueva", "recarga_sin_efecto", "recuperado_tras_recarga", "sin_conexion", "sin_version_nueva"]);
+    expect(Object.keys(TEXTO_ACCION_RECARGA).sort()).toEqual([
+      "aviso_version_nueva", "pagina_traducida", "recarga_sin_efecto", "recuperada_al_reintentar", "recuperado_tras_recarga", "sin_conexion", "sin_version_nueva",
+    ]);
   });
   it("¿afecta?: no, salvo que recargar no lo arregle; y lo que no era versión antigua cuenta aparte", () => {
     expect(afectaTrasPublicar(3, 0)).toBe("No: las 3 veces fueron páginas antiguas abiertas durante una publicación y se recargó sola.");
