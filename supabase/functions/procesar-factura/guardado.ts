@@ -37,6 +37,23 @@ export interface ContextoGuardado {
   supabase: Supa;
   openai: ClienteOpenAI;
   drive: ConfigDrive;
+  /** Esperas entre reintentos de los INSERT cortados por tiempo (por defecto 3 s y 8 s; los tests lo acortan). */
+  reintento?: OpcionesReintento;
+}
+
+/**
+ * Reintento de una escritura que la base cortó por tiempo (57014/55P03). Postgres
+ * deshace la sentencia entera, así que repetirla es seguro (el INSERT de la
+ * cabecera y el de las líneas son una sentencia cada uno: todo o nada). Antes un
+ * corte hacía fallar el intento entero de consolidación (el vector de la factura,
+ * la cabecera y la compensación otra vez) y, a la tercera, el trabajo quedaba
+ * «fallido» hasta que alguien pulsaba «Reintentar» (19/11/2026: 31 minutos).
+ */
+function reintentoEscritura(ctx: ContextoGuardado, que: string): OpcionesReintento {
+  return {
+    alReintentar: (n, ms, e) => console.warn(`[guardado] ${que}: cortado por tiempo (${e.message}); reintento ${n} en ${ms / 1000} s`),
+    ...ctx.reintento,
+  };
 }
 
 export type OriginalDocumento =
@@ -618,13 +635,20 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   const extra04b = { paginas: Math.min(20, Math.max(1, e.paginas ?? 1)), ...(e.ocrTrabajoId ? { ocr_trabajo_id: e.ocrTrabajoId } : {}) };
   let conColumnas04b = true;
   const extra = e.cabeceraExtra ?? {};
-  let ins = await supabase.from("facturas").insert({ ...cabecera, ...extra04b, ...extra }).select("id").single();
+  const reintCabecera = reintentoEscritura(ctx, "insert factura");
+  let ins = await conReintentoPorTiempo(
+    () => supabase.from("facturas").insert({ ...cabecera, ...extra04b, ...extra }).select("id").single(),
+    reintCabecera,
+  );
   if (ins.error && esColumnaNueva(ins.error.message) && !e.ocrTrabajoId) {
     // Migración 20261005120000 sin aplicar: el camino de una página sigue
     // funcionando como en v101 (sin pagina/orden).
     console.warn("[procesar-factura] columnas 04b ausentes; se guarda sin ellas:", ins.error.message);
     conColumnas04b = false;
-    ins = await supabase.from("facturas").insert({ ...cabecera, ...extra }).select("id").single();
+    ins = await conReintentoPorTiempo(
+      () => supabase.from("facturas").insert({ ...cabecera, ...extra }).select("id").single(),
+      reintCabecera,
+    );
   }
   if (ins.error) throw new Error(`insert factura: ${ins.error.message}`);
   const facturaId: number = ins.data.id;
@@ -681,7 +705,9 @@ async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: Datos
   // y se reintenta (a lo sumo una vez por columna).
   let conBultos = true;
   let conIvaPct = true;
-  let { error } = await insertar(conBultos, conIvaPct);
+  const reint = reintentoEscritura(ctx, "insert productos");
+  const insertarConReintento = (b: boolean, i: boolean) => conReintentoPorTiempo(() => insertar(b, i), reint);
+  let { error } = await insertarConReintento(conBultos, conIvaPct);
   for (let i = 0; i < 2 && error; i++) {
     if (conBultos && faltaColumnaBultos(error.message)) {
       console.warn("[procesar-factura] columna bultos ausente; se guardan las líneas sin ella:", error.message);
@@ -690,7 +716,7 @@ async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: Datos
       console.warn("[procesar-factura] columna iva_pct ausente; se guardan las líneas sin ella:", error.message);
       conIvaPct = false;
     } else break;
-    ({ error } = await insertar(conBultos, conIvaPct));
+    ({ error } = await insertarConReintento(conBultos, conIvaPct));
   }
   if (error) throw new Error(`insert productos: ${error.message}`);
 }
