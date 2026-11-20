@@ -7,7 +7,7 @@
 --  (haqmmdfdzzatdnrrcgez) solo tras aceptar el PR de la release y con el «sí»
 --  del dueño. Requiere 20261130100000_logs_web_origen.sql. Idempotente. Tiene
 --  que terminar en «logs_web_navegador_reaperturas: aplicada».
---  Deshacer: supabase/rollbacks/20261213000000_logs_web_navegador_reaperturas_ROLLBACK.sql
+--  Deshacer: supabase/rollbacks/20261213040000_logs_web_navegador_reaperturas_ROLLBACK.sql
 --  Pruebas: npm run test:logs-web:db (PGlite) y
 --  supabase/functions/_shared/__tests__/logs-web-origen.test.ts (vitest): los
 --  MISMOS casos (logs-web-origen-casos.json) pasan por el SQL y por origen.ts.
@@ -304,7 +304,7 @@ begin
 
   -- Reaparición de una resuelta: nueva ocurrencia posterior a la resolución.
   --   Si la incidencia puede tener ticket (de la web, o externa con el interruptor), solo cuenta una
-  --   ocurrencia nueva que también podría abrirlo (20261213000000): una del visitante sin cobertura o
+  --   ocurrencia nueva que también podría abrirlo (20261213040000): una del visitante sin cobertura o
   --   del traductor del navegador no reabre un fallo de la web ya arreglado. Las que no dependen de
   --   la web se reabren con cualquiera (solo en el panel: su ticket no se toca), como antes.
   --   reabrir      → estado «reabierta» y, si había ticket, se reabre/comenta el mismo.

@@ -1,4 +1,4 @@
--- ROLLBACK de 20261213000000_logs_web_navegador_reaperturas.sql (Super Admin › Logs).
+-- ROLLBACK de 20261213040000_logs_web_navegador_reaperturas.sql (Super Admin › Logs).
 -- Aplicar a mano SOLO si hay que deshacerlo. Vuelve a web_logs_origen_error() y
 -- web_logs_agrupar_errores() de 20261130100000_logs_web_origen.sql (copia
 -- literal): los errores de hidratación con la página traducida vuelven a ser

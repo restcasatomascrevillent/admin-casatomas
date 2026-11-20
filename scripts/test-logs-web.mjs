@@ -2,7 +2,7 @@
 // agrupación, estadísticas, retención), 20261118100100 (operaciones de la BD),
 // 20261129143000 (errores «tras publicar» y explicación en sencillo) y
 // 20261130100000 (origen de cada error: fallo de la web, servicio externo o no
-// depende de la web) y 20261213000000 (página traducida, imagen recuperada al
+// depende de la web) y 20261213040000 (página traducida, imagen recuperada al
 // reintentar y reapariciones solo por lo que podría abrir ticket) contra un
 // Postgres en memoria (PGlite). Nunca toca Supabase.
 //
@@ -37,8 +37,8 @@ const LEGIBLES = await readFile("supabase/migrations/20261129143000_logs_web_leg
 const ROLLBACK_LEGIBLES = await readFile("supabase/rollbacks/20261129143000_logs_web_legibles_ROLLBACK.sql", "utf8");
 const ORIGEN = await readFile("supabase/migrations/20261130100000_logs_web_origen.sql", "utf8");
 const ROLLBACK_ORIGEN = await readFile("supabase/rollbacks/20261130100000_logs_web_origen_ROLLBACK.sql", "utf8");
-const NAVEGADOR = await readFile("supabase/migrations/20261213000000_logs_web_navegador_reaperturas.sql", "utf8");
-const ROLLBACK_NAVEGADOR = await readFile("supabase/rollbacks/20261213000000_logs_web_navegador_reaperturas_ROLLBACK.sql", "utf8");
+const NAVEGADOR = await readFile("supabase/migrations/20261213040000_logs_web_navegador_reaperturas.sql", "utf8");
+const ROLLBACK_NAVEGADOR = await readFile("supabase/rollbacks/20261213040000_logs_web_navegador_reaperturas_ROLLBACK.sql", "utf8");
 // Los mismos casos que el vitest de origen.ts: el SQL tiene que clasificar igual.
 const CASOS_ORIGEN = JSON.parse(await readFile("supabase/functions/_shared/__tests__/logs-web-origen-casos.json", "utf8"));
 // El patrón de «versión antigua» del SQL tiene que ser el mismo que el de huella.ts.
