@@ -1,5 +1,5 @@
 -- Deshace 20261213010000_guardado_facturas_rapido: vuelve a los horarios, a
--- reanudar_trabajos_ocr de antes (cuerpos de
+-- reanudar_trabajos_ocr de antes y quita las funciones y el trigger nuevos (cuerpos de
 -- producción del 20/11/2026). No borra la columna reintentos_auto (inofensiva).
 
 do $cron$
@@ -73,3 +73,7 @@ $function$;
 
 drop function if exists public.ocr_reanudar_fallidos_transitorios();
 drop function if exists public.ocr_reanudar_fallido_interno(uuid);
+drop function if exists public.ocr_trabajo_ficheros_presentes(uuid);
+drop trigger if exists trg_ocr_trabajos_cerrar_ticket_fallo on public.ocr_trabajos;
+drop function if exists public.ocr_trabajos_cerrar_ticket_fallo();
+drop function if exists public.facturas_insertar_lineas(bigint, jsonb);

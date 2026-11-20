@@ -312,6 +312,11 @@ export function valorSinDescuento(p: unknown): Record<string, number | boolean> 
   };
 }
 
+/** ¿El error es que la RPC `facturas_insertar_lineas` no existe (migración 20261213010000 sin aplicar)? */
+export function faltaRpcLineas(e: { code?: string | null; message?: string | null }): boolean {
+  return e.code === "PGRST202" || e.code === "42883" || /facturas_insertar_lineas/i.test(e.message ?? "") && /could not find|does not exist/i.test(e.message ?? "");
+}
+
 /** ¿El error es que falta la columna `bultos` (migración 20261005150000 sin aplicar)? */
 export function faltaColumnaBultos(msg: string | undefined | null): boolean {
   return !!msg && /bultos/i.test(msg) && /column|columna|schema cache/i.test(msg);
@@ -687,20 +692,29 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
 }
 
 /**
- * Paso 7: líneas. Un solo INSERT (todas o ninguna). El vector de los nombres
+ * Paso 7: líneas. Una RPC (`facturas_insertar_lineas`, 20261213010000) que en UNA
+ * transacción toma un bloqueo por factura, mira si ya hay líneas y, solo si no
+ * hay ninguna, inserta todas (todas o ninguna). Así dos procesos sobre el mismo
+ * trabajo (el lease de 180 s caduca mientras el primero sigue, sobre todo con
+ * los reintentos por tiempo) no pueden duplicar las líneas: el segundo espera y
+ * encuentra las del primero (devuelve 0). El vector de los nombres
  * nuevos NO se calcula aquí (18/11/2026): el trigger deja su fila de
  * productos_nombre_embedding pendiente (embedding NULL) y la completa el cron
  * embeddings-nombres (cada 10 min). Antes iba en serie al guardar: ~6 s con la
  * base cargada (upsert en un índice HNSW) y se cortaba por los 8 s de PostgREST.
+ * Si la RPC aún no existe (código desplegado antes que la migración) se usa el
+ * INSERT directo de antes.
  */
 async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: DatosNormalizados, conColumnas04b: boolean): Promise<void> {
   if (d.productos.length === 0) return;
   const { supabase } = ctx;
-  const insertar = (conBultos: boolean, conIvaPct: boolean) =>
-    supabase.from("productos_factura")
-      .insert(
-        filasProductos(d, conColumnas04b, conBultos, conIvaPct).map((f) => ({ factura_id: facturaId, ...f })),
-      );
+  let conRpc = true;
+  const insertar = (conBultos: boolean, conIvaPct: boolean) => {
+    const filas = filasProductos(d, conColumnas04b, conBultos, conIvaPct);
+    return conRpc
+      ? supabase.rpc("facturas_insertar_lineas", { p_factura_id: facturaId, p_lineas: filas })
+      : supabase.from("productos_factura").insert(filas.map((f) => ({ factura_id: facturaId, ...f })));
+  };
   // Columnas opcionales que puede faltar por migrar: se quita la que falte
   // y se reintenta (a lo sumo una vez por columna).
   let conBultos = true;
@@ -708,6 +722,11 @@ async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: Datos
   const reint = reintentoEscritura(ctx, "insert productos");
   const insertarConReintento = (b: boolean, i: boolean) => conReintentoPorTiempo(() => insertar(b, i), reint);
   let { error } = await insertarConReintento(conBultos, conIvaPct);
+  if (error && conRpc && faltaRpcLineas(error)) {
+    console.warn("[procesar-factura] falta facturas_insertar_lineas (¿migración sin aplicar?); INSERT directo:", error.message);
+    conRpc = false;
+    ({ error } = await insertarConReintento(conBultos, conIvaPct));
+  }
   for (let i = 0; i < 2 && error; i++) {
     if (conBultos && faltaColumnaBultos(error.message)) {
       console.warn("[procesar-factura] columna bultos ausente; se guardan las líneas sin ella:", error.message);

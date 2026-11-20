@@ -39,7 +39,13 @@ function supaFalso(inserts: { facturas?: Respuesta[]; productos_factura?: Respue
     });
   const supabase = {
     from: (t: string) => cadena(t),
-    rpc: async () => ({ data: null, error: null }),
+    // Las líneas van por la RPC `facturas_insertar_lineas`: cuenta como un INSERT de productos_factura.
+    rpc: async (nombre: string, args?: { p_lineas?: unknown }) => {
+      if (nombre !== "facturas_insertar_lineas") return { data: null, error: null };
+      hechos.push({ tabla: "productos_factura", filas: args?.p_lineas });
+      const n = (contador.productos_factura = (contador.productos_factura ?? 0) + 1);
+      return (inserts.productos_factura?.[n - 1] ?? { data: 2, error: null }) as { data?: unknown; error: unknown };
+    },
     storage: { from: () => ({ upload: async (path: string) => ({ data: { path }, error: null }) }) },
   };
   return { supabase, hechos, intentos: (t: string) => hechos.filter((h) => h.tabla === t).length };
@@ -92,6 +98,18 @@ describe("guardarDocumento: INSERT cortados por tiempo", () => {
     expect(dormir.mock.calls.map((c) => c[0])).toEqual([3000, 8000]);
     // Nada se compensó: no hubo DELETE de la factura.
     expect(sb.hechos.every((h) => h.tabla !== "historial_precios")).toBe(true);
+  });
+
+  it("las líneas van por la RPC transaccional (un solo envío con todas) y, si la RPC aún no existe, por el INSERT de antes", async () => {
+    const mudos = callar();
+    const sb = supaFalso({ productos_factura: [{ error: { code: "PGRST202", message: "Could not find the function public.facturas_insertar_lineas(p_factura_id, p_lineas) in the schema cache" } }] });
+    const g = await guardarDocumento(ctx(sb), entrada());
+    mudos.forEach((m) => m.mockRestore());
+    expect(g).toMatchObject({ estado: "guardado", facturaId: 101 });
+    const envios = sb.hechos.filter((h) => h.tabla === "productos_factura");
+    expect(envios).toHaveLength(2); // RPC (no existe) + INSERT directo
+    expect((envios[0].filas as unknown[]).length).toBe(2);
+    expect((envios[1].filas as { factura_id: number }[]).map((f) => f.factura_id)).toEqual([101, 101]);
   });
 
   it("un error que no es de tiempo no se repite: falla a la primera y se compensa la cabecera", async () => {
