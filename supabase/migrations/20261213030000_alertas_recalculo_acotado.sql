@@ -68,7 +68,10 @@ begin
        and a.backend_type = 'client backend'
        and a.state = 'active'
        and a.xact_start < clock_timestamp() - interval '1 second'
-       and a.query ~* '(insert\s+into|update|delete\s+from)\s+("?public"?\.)?"?(facturas|productos_factura)"?(\s|\()';
+       and (a.query ~* '(insert\s+into|update|delete\s+from)\s+("?public"?\.)?"?(facturas|productos_factura)"?(\s|\()'
+            -- Líneas por la RPC del PR #326 (20261213010000): PostgREST la llama como
+            -- SELECT "public"."facturas_insertar_lineas"(…), que la regla de arriba no ve.
+            or a.query ~* '"?facturas_insertar_lineas"?\s*\(');
   exception when others then
     v_n := 0;
   end;
