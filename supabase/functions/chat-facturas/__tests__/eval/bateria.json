@@ -1003,14 +1003,14 @@
    "esperado": [
     {
      "ruta": "ultima_factura.precio_unitario",
-     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'Q[.]OVEJA CURADO TRUFADO' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "sql": "select pf.precio_unitario from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'Q[.] ?OVEJA CURADO TRUFADO' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tol": 0.01,
      "valor": 25.01,
      "tipo": "num"
     },
     {
      "ruta": "ultima_factura.fecha",
-     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'Q[.]OVEJA CURADO TRUFADO' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
+     "sql": "select f.fecha::text from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'Q[.] ?OVEJA CURADO TRUFADO' and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1",
      "tipo": "txt",
      "valor": "2026-07-29"
     }
@@ -3233,7 +3233,7 @@
     },
     {
      "ruta": "[i=2].producto_catalogo",
-     "sql": "select p.nombre from productos_catalogo p join productos_factura pf on pf.producto_id = p.id where pf.nombre ~* 'Q[.]OVEJA CURADO TRUFADO' limit 1",
+     "sql": "select p.nombre from productos_catalogo p join productos_factura pf on pf.producto_id = p.id where pf.nombre ~* 'Q[.] ?OVEJA CURADO TRUFADO' limit 1",
      "tipo": "txt",
      "valor": "Queso de oveja curado trufado Campollano"
     }
