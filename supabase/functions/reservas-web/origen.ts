@@ -45,6 +45,7 @@ const CAMPOS_FORMULARIO = new Set([
   "menu_del_dia",
   "acepta_condiciones",
   "consentimiento_newsletter",
+  "canal_avisos",
 ]);
 
 export interface OrigenCliente {

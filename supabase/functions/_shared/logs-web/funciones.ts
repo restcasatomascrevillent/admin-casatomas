@@ -75,6 +75,8 @@ export const FUNCIONES: Readonly<Record<string, FuncionServidor>> = {
     "puede que alguno no reciba un correo de su reserva o que no le funcione un enlace del correo", "los correos que no salieron se reintentan solos cada 15 minutos"),
   "notify-reservation-change": web("Web › Reservas", "el aviso al cliente de un cambio en su reserva", "pide que se mande al cliente el correo cuando se cambia su reserva desde el panel",
     "puede que alguno no reciba el correo con el cambio de su reserva", null),
+  "whatsapp-reservas": web("Web › Reservas", "los avisos de reserva por WhatsApp", "manda por WhatsApp los avisos de reserva a quien lo eligió al reservar y atiende sus botones",
+    "puede que alguno no reciba el WhatsApp de su reserva (le llega el correo) o que no le funcione un botón", "Meta vuelve a mandar las pulsaciones durante un tiempo"),
   "newsletter-baja": web("Web › Newsletter", "la baja de la newsletter", "da de baja a quien pulsa «darse de baja» en un correo de la newsletter",
     "puede que alguien que quería darse de baja siga apuntado", null, CLIENTE),
   "registrar-actividad-web": {

@@ -66,6 +66,14 @@ verify_jwt = false
 [functions.emails-reserva]
 verify_jwt = false
 
+# Avisos de reserva por WhatsApp (prueba de concepto, 21/11/2026). Meta llama
+# al webhook sin JWT de Supabase: su autenticación es la firma
+# X-Hub-Signature-256 (HMAC con WHATSAPP_APP_SECRET). Las rutas internas
+# (/enviar, /plantillas…) exigen x-webhook-secret == WHATSAPP_RESERVAS_SECRET y
+# fallan cerradas. Ver supabase/functions/whatsapp-reservas/index.ts.
+[functions.whatsapp-reservas]
+verify_jwt = false
+
 # La llama pg_cron (net.http_post, 03:30 UTC) sin usuario ni JWT: con
 # verify_jwt = true la pasarela la cortaría con 401. La autenticación real es
 # la cabecera x-webhook-secret == TRAFICO_WEB_CRON_SECRET (comparación en
