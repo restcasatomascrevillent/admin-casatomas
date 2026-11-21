@@ -257,7 +257,11 @@ const WHATSAPP_ENVIAR_URL = `${SUPABASE_URL}/functions/v1/whatsapp-reservas/envi
 const WHATSAPP_TIMEOUT_MS = 10000;
 
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-const resend = new Resend(RESEND_API_KEY);
+// Sin RESEND_API_KEY (la demo no manda correos) `new Resend("")` lanza al
+// ARRANCAR y la función entera da WORKER_ERROR (también las rutas que no mandan
+// correo: /enlace/*, el desvío a WhatsApp…). Se crea solo si hay clave, igual
+// que en reservas-web; los envíos reales van por fetch y ya comprueban la clave.
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1586,7 +1590,7 @@ async function handleEnviarPrueba(req: Request): Promise<Response> {
   // la única función que construye el HTML, aquí y en enviarCorreoParaReserva.
   const { asunto, html: cuerpoHtml } = renderPlantilla(plantilla, datos);
 
-  if (!RESEND_API_KEY) {
+  if (!RESEND_API_KEY || !resend) {
     return json({ ok: false, error: "resend_no_configurado" }, 200);
   }
 
