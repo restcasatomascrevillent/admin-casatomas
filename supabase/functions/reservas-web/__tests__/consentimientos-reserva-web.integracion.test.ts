@@ -650,3 +650,18 @@ describe("GET /confirmar (enlaces antiguos): el clic del cliente verifica el ema
     expect(db.tabla("reservas")[0]).not.toHaveProperty("email_verificado_at");
   });
 });
+
+// ============================================================================
+// WhatsApp apagado (sin WHATSAPP_RESERVAS_ACTIVO, como producción hoy): nada
+// cambia. Con la variable puesta, ver canal-avisos-whatsapp.integracion.test.ts.
+// ============================================================================
+describe("WhatsApp apagado", () => {
+  it("/disponibilidad no anuncia avisos_whatsapp y /crear ignora canal_avisos", async () => {
+    const d = await disponibilidad({ fecha: FECHA, numero_comensales: 4 });
+    expect(d.cuerpo[0]).not.toHaveProperty("avisos_whatsapp");
+
+    const r = await crear(reserva({ canal_avisos: "whatsapp", telefono: "" }));
+    expect(r.status).toBe(201);
+    expect(db.tabla("reservas")[0]).not.toHaveProperty("canal_avisos");
+  });
+});

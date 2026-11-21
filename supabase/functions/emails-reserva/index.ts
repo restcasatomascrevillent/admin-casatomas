@@ -146,7 +146,10 @@ import {
   estadoPropuesta,
   estadoTrasAceptarPropuesta,
   estadoErrorConfirmarContraoferta,
+  estadoGestion,
+  ESTADOS_CANCELABLES_POR_CLIENTE,
   tokenDelCuerpo,
+  viaDelCuerpo,
   type AccionWeb,
   type EstadoEnlace,
   type DetallesEnlace,
@@ -241,6 +244,17 @@ const PAUSA_LOTE_MS = leerEnteroEnv(Deno.env.get("EMAILS_RESERVA_LOTE_PAUSA_MS")
 // 3: 50 reservas ese día) — de sobra para drenar cualquier atasco real en
 // una sola pasada, y el cron vuelve a pasar cada 15 minutos si algo queda.
 const MAX_FILAS_REINTENTO = leerEnteroEnv(Deno.env.get("EMAILS_RESERVA_REINTENTO_MAX_FILAS"), 50);
+
+// AVISOS POR WHATSAPP (prueba de concepto, 21/11/2026 — ver
+// docs/funcionalidades/whatsapp-reservas.md): si el cliente eligió WhatsApp al
+// reservar (`reservas.canal_avisos`), el aviso se pide a whatsapp-reservas y,
+// si no sale, se manda el correo de siempre. Apagado salvo que
+// WHATSAPP_RESERVAS_ACTIVO='true' (hoy solo en la demo): sin la variable, esta
+// función se comporta exactamente igual que antes y ni siquiera lee la columna.
+const WHATSAPP_ACTIVO = Deno.env.get("WHATSAPP_RESERVAS_ACTIVO") === "true";
+const WHATSAPP_SECRETO = Deno.env.get("WHATSAPP_RESERVAS_SECRET") ?? "";
+const WHATSAPP_ENVIAR_URL = `${SUPABASE_URL}/functions/v1/whatsapp-reservas/enviar`;
+const WHATSAPP_TIMEOUT_MS = 10000;
 
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 const resend = new Resend(RESEND_API_KEY);
@@ -800,6 +814,46 @@ interface ResultadoEnvio {
 }
 
 /**
+ * ¿Ha salido el aviso por WhatsApp? `false` = mandar el correo como siempre:
+ * el cliente no eligió WhatsApp, la columna `canal_avisos` aún no existe
+ * (migración 20261215100000 sin aplicar), o whatsapp-reservas no pudo enviarlo
+ * (sin teléfono válido, plantilla sin aprobar, Meta caído…). Nunca lanza.
+ * Sin idempotencia propia en esta prueba: dos /notificar seguidos del mismo
+ * estado mandarían dos WhatsApp (el panel llama una vez por cambio).
+ */
+async function avisarPorWhatsAppSiLoEligio(reservaId: string): Promise<boolean> {
+  const { data, error } = await supabase.from("reservas").select("canal_avisos").eq("id", reservaId).maybeSingle();
+  if (error) {
+    console.warn(`[emails-reserva] No se pudo leer canal_avisos (¿migración 20261215100000 sin aplicar?): ${error.message}`);
+    return false;
+  }
+  if ((data as { canal_avisos?: string } | null)?.canal_avisos !== "whatsapp") return false;
+  if (!WHATSAPP_SECRETO) {
+    console.error("[emails-reserva] WHATSAPP_RESERVAS_SECRET sin configurar: el aviso va por correo");
+    return false;
+  }
+  const controlador = new AbortController();
+  const temporizador = setTimeout(() => controlador.abort(), WHATSAPP_TIMEOUT_MS);
+  try {
+    const res = await fetch(WHATSAPP_ENVIAR_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-webhook-secret": WHATSAPP_SECRETO },
+      body: JSON.stringify({ reserva_id: reservaId }),
+      signal: controlador.signal,
+    });
+    const cuerpo = (await res.json().catch(() => null)) as { enviado?: boolean; motivo?: string } | null;
+    if (res.ok && cuerpo?.enviado) return true;
+    console.warn(`[emails-reserva] WhatsApp no enviado para ${reservaId} (${res.status} ${cuerpo?.motivo ?? "sin_motivo"}): va por correo`);
+    return false;
+  } catch (err) {
+    console.warn(`[emails-reserva] Error pidiendo el WhatsApp de ${reservaId}: va por correo`, (err as Error)?.message);
+    return false;
+  } finally {
+    clearTimeout(temporizador);
+  }
+}
+
+/**
  * `tipoForzado` — BUG PRE-EXISTENTE ENCONTRADO Y CORREGIDO AQUÍ (no estaba
  * en el encargo original, pero está dentro de mi territorio y socava
  * directamente la robustez del recordatorio, que el propio informe de
@@ -825,6 +879,11 @@ interface ResultadoEnvio {
 async function enviarCorreoParaReserva(reservaId: string, tipoForzado?: TipoPlantilla): Promise<ResultadoEnvio> {
   const reserva = await fetchReserva(reservaId);
   if (!reserva) return { enviado: false, motivo: "reserva_no_encontrada" };
+  // WhatsApp primero si el cliente lo eligió (ver WHATSAPP_ACTIVO). El
+  // recordatorio (tipoForzado) aún no tiene plantilla de WhatsApp: por correo.
+  if (WHATSAPP_ACTIVO && !tipoForzado && (await avisarPorWhatsAppSiLoEligio(reserva.id))) {
+    return { enviado: true, motivo: "whatsapp" };
+  }
   if (!reserva.email) return { enviado: false, motivo: "reserva_sin_email" };
 
   const tipo = tipoForzado ?? tipoEmailParaEstado(reserva.estado, reserva.canal);
@@ -1741,13 +1800,17 @@ async function detallesDeReserva(r: ReservaRow): Promise<DetallesEnlace> {
 /** Contexto común de un token ya verificado: la fila, su marca y su flujo. */
 type ContextoEnlace =
   | { tipo: "contraoferta"; accion: AccionWeb; carga: CargaToken; reserva: ReservaRow; marca: Marca }
+  | { tipo: "gestion"; accion: AccionWeb; carga: CargaToken; reserva: ReservaRow; marca: Marca }
   | { tipo: "propuesta"; accion: AccionWeb; carga: CargaToken; solicitud: SolicitudParaPropuesta; marca: Marca };
+
+/** Por dónde llega el clic (ver viaDelCuerpo en enlaces-web.ts). */
+type ViaEnlace = "whatsapp" | "web";
 
 async function cargarContextoEnlace(token: string): Promise<ContextoEnlace | null> {
   const carga = await verificarTokenCualquierAccion(TOKEN_SECRET, token);
   if (!carga) return null;
   const { tipo, accion } = describirAccion(carga.accion);
-  if (tipo === "contraoferta") {
+  if (tipo === "contraoferta" || tipo === "gestion") {
     const reserva = await fetchReserva(carga.id);
     if (!reserva) return null;
     return { tipo, accion, carga, reserva, marca: marcaSegura(reserva.marca) };
@@ -1761,9 +1824,10 @@ function respuestaEnlace(
   ctx: ContextoEnlace,
   estado: EstadoEnlace,
   detalles: DetallesEnlace | null,
+  estadoReservaTrasEnlace?: string,
 ): RespuestaEnlace {
   const ok = estado === "pendiente" || estado === "hecho" || estado === "recibida" || estado === "ya_hecho";
-  return {
+  const respuesta: RespuestaEnlace = {
     ok,
     estado,
     tipo: ctx.tipo,
@@ -1772,6 +1836,9 @@ function respuestaEnlace(
     // Un enlace inválido no enseña datos de nadie.
     detalles: estado === "invalido" ? null : detalles,
   };
+  // «Gestionar mi reserva»: la página dice en qué punto está la reserva.
+  if (ctx.tipo === "gestion") respuesta.estadoReserva = estadoReservaTrasEnlace ?? ctx.reserva.estado;
+  return respuesta;
 }
 
 async function consultarEnlace(token: string): Promise<RespuestaEnlace> {
@@ -1781,12 +1848,15 @@ async function consultarEnlace(token: string): Promise<RespuestaEnlace> {
     const estado = estadoContraoferta(ctx.accion, ctx.reserva, ctx.carga.fp);
     return respuestaEnlace(ctx, estado, await detallesDeReserva(ctx.reserva));
   }
+  if (ctx.tipo === "gestion") {
+    return respuestaEnlace(ctx, estadoGestion(ctx.reserva, hoyEnMadridIso()), await detallesDeReserva(ctx.reserva));
+  }
   const estado = estadoPropuesta(ctx.accion, ctx.solicitud.propuesta_estado, propuestaVigente(ctx.solicitud, ctx.carga.fp));
   return respuestaEnlace(ctx, estado, await detallesDeSolicitud(ctx.solicitud, ctx.marca));
 }
 
 /** Contraoferta: aceptar = verificada -> confirmada; rechazar = verificada -> cancelada. */
-async function ejecutarContraoferta(ctx: Extract<ContextoEnlace, { tipo: "contraoferta" }>): Promise<RespuestaEnlace> {
+async function ejecutarContraoferta(ctx: Extract<ContextoEnlace, { tipo: "contraoferta" }>, via: ViaEnlace): Promise<RespuestaEnlace> {
   const { reserva, accion } = ctx;
   const detalles = await detallesDeReserva(reserva);
   const previo = estadoContraoferta(accion, reserva, ctx.carga.fp);
@@ -1812,6 +1882,10 @@ async function ejecutarContraoferta(ctx: Extract<ContextoEnlace, { tipo: "contra
     const estado = actual ? estadoContraoferta(accion, actual, ctx.carga.fp) : "invalido";
     return respuestaEnlace(ctx, estado === "pendiente" ? "error" : estado, detalles);
   }
+
+  // Pulsado en WhatsApp: ni demuestra que controla el correo ni hace falta el
+  // aviso de después (whatsapp-reservas le contesta en el mismo chat).
+  if (via === "whatsapp") return respuestaEnlace(ctx, "hecho", detalles);
 
   // Doble opt-in del newsletter: «Confirmo» desde el correo demuestra que el
   // cliente controla ese buzón (rechazar no: puede ser alguien diciendo «no
@@ -1844,7 +1918,7 @@ async function avisoPanelReservaBestEffort(reserva: ReservaRow, accion: AccionWe
 }
 
 /** Propuesta de una solicitud del bot: aceptar crea la reserva; rechazar la marca rechazada. */
-async function ejecutarPropuesta(ctx: Extract<ContextoEnlace, { tipo: "propuesta" }>): Promise<RespuestaEnlace> {
+async function ejecutarPropuesta(ctx: Extract<ContextoEnlace, { tipo: "propuesta" }>, via: ViaEnlace): Promise<RespuestaEnlace> {
   const { solicitud: s, accion } = ctx;
   const detalles = await detallesDeSolicitud(s, ctx.marca);
   const previo = estadoPropuesta(accion, s.propuesta_estado, propuestaVigente(s, ctx.carga.fp));
@@ -1879,7 +1953,9 @@ async function ejecutarPropuesta(ctx: Extract<ContextoEnlace, { tipo: "propuesta
     // Aceptar desde el correo = email verificado (doble opt-in). La reserva
     // hereda la casilla del newsletter de la solicitud en la BD (trigger
     // reservas_proteger_consentimiento_newsletter); esto dispara el alta.
-    await registrarEmailVerificado(supabase as unknown as ClienteVerificacion, res.reserva_id, new Date().toISOString(), "emails-reserva");
+    if (via === "web") {
+      await registrarEmailVerificado(supabase as unknown as ClienteVerificacion, res.reserva_id, new Date().toISOString(), "emails-reserva");
+    }
     try {
       await enviarCorreoParaReserva(res.reserva_id);
     } catch (err) {
@@ -1896,10 +1972,55 @@ async function ejecutarPropuesta(ctx: Extract<ContextoEnlace, { tipo: "propuesta
   return respuestaEnlace(ctx, estado, detalles);
 }
 
-async function ejecutarEnlace(token: string): Promise<RespuestaEnlace> {
+/**
+ * «Gestionar mi reserva» -> cancelar. Solo desde pendiente/verificada/
+ * confirmada y si el día no ha pasado (estadoGestion). Sin aviso automático
+ * al cliente (la página o el chat ya le dicen que está cancelada); sí aviso en
+ * el panel, para que el personal sepa que se libera la mesa.
+ */
+async function ejecutarCancelacionCliente(ctx: Extract<ContextoEnlace, { tipo: "gestion" }>, via: ViaEnlace): Promise<RespuestaEnlace> {
+  const { reserva } = ctx;
+  const detalles = await detallesDeReserva(reserva);
+  const previo = estadoGestion(reserva, hoyEnMadridIso());
+  if (previo !== "pendiente") return respuestaEnlace(ctx, previo, detalles);
+
+  const { data: actualizada, error } = await supabase
+    .from("reservas")
+    .update({ estado: "cancelada" })
+    .eq("id", reserva.id)
+    .in("estado", [...ESTADOS_CANCELABLES_POR_CLIENTE])
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error(`[emails-reserva] No se pudo cancelar la reserva ${reserva.id} desde «Gestionar mi reserva»:`, error.code, error.message);
+    return respuestaEnlace(ctx, "error", detalles);
+  }
+  if (!actualizada) {
+    // Carrera: alguien la cambió entre medias.
+    const actual = await fetchReserva(reserva.id);
+    const estado = actual ? estadoGestion(actual, hoyEnMadridIso()) : "invalido";
+    return respuestaEnlace(ctx, estado === "pendiente" ? "error" : estado, detalles, actual?.estado);
+  }
+
+  const { error: errorAviso } = await supabase.from("notificaciones_dashboard").insert({
+    tipo: "reserva_cancelada_cliente",
+    titulo: "Un cliente ha cancelado su reserva",
+    mensaje: `${reserva.nombre || "Cliente"} (${reserva.telefono || "sin teléfono"}), ${reserva.fecha} ${(reserva.hora || "").slice(0, 5)}, ` +
+      `${reserva.numero_comensales} personas. La ha cancelado desde ${via === "whatsapp" ? "WhatsApp" : "«Gestionar mi reserva»"}.`,
+    referencia_id: reserva.id,
+    referencia_tipo: "reserva",
+    prioridad: "alta",
+  });
+  if (errorAviso) console.error("[emails-reserva] No se pudo crear el aviso de cancelación en el panel:", errorAviso.message);
+  return respuestaEnlace(ctx, "hecho", detalles, "cancelada");
+}
+
+async function ejecutarEnlace(token: string, via: ViaEnlace = "web"): Promise<RespuestaEnlace> {
   const ctx = await cargarContextoEnlace(token);
   if (!ctx) return respuestaInvalida(BASES_WEB);
-  return ctx.tipo === "contraoferta" ? await ejecutarContraoferta(ctx) : await ejecutarPropuesta(ctx);
+  if (ctx.tipo === "contraoferta") return await ejecutarContraoferta(ctx, via);
+  if (ctx.tipo === "gestion") return await ejecutarCancelacionCliente(ctx, via);
+  return await ejecutarPropuesta(ctx, via);
 }
 
 function jsonEnlace(req: Request, body: unknown, status = 200): Response {
@@ -1922,7 +2043,7 @@ async function handleEnlace(req: Request, modo: "consultar" | "ejecutar"): Promi
   }
   const token = tokenDelCuerpo(body);
   if (!token) return jsonEnlace(req, respuestaInvalida(BASES_WEB));
-  const respuesta = modo === "consultar" ? await consultarEnlace(token) : await ejecutarEnlace(token);
+  const respuesta = modo === "consultar" ? await consultarEnlace(token) : await ejecutarEnlace(token, viaDelCuerpo(body));
   return jsonEnlace(req, respuesta);
 }
 
