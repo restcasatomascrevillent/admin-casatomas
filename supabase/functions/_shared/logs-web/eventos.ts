@@ -55,14 +55,16 @@ export const CATALOGO_NAVEGADOR: Record<string, DefinicionTipo> = {
   cheque_checkout: { categoria: "actividad", consentimiento: true, props: ["importe", "plantilla"] },
   cheque_pagado: { categoria: "operacion", consentimiento: true, props: ["importe"], acciones: ["ok"] },
   carga_pagina: { categoria: "tecnico", consentimiento: true, props: ["ttfb", "dom", "carga", "lcp", "cls", "navegacion"] },
-  peticion: { categoria: "tecnico", consentimiento: true, props: ["endpoint", "metodo", "status"] },
+  // causa/en_linea/cancelada: lo que la web decidió de una petición sin respuesta (web-casatomas,
+  // actividad/clasificar.ts causaSinRespuesta: cancelada, sin_red o error_red). Antes se descartaban.
+  peticion: { categoria: "tecnico", consentimiento: true, props: ["endpoint", "metodo", "status", "causa", "en_linea", "cancelada"] },
   // recargado/origen/despliegue_anterior/build_anterior: el error de «versión antigua» que la web
   // manda DESPUÉS de recargarse sola (web-casatomas, src/lib/recarga-por-version.ts). La decisión
   // (recuperado_tras_recarga, recarga_sin_efecto, aviso_version_nueva…) llega en `accion`.
   error_js: { categoria: "error", consentimiento: false, props: ["componente", ...PROPS_RECARGA] },
   error_promesa: { categoria: "error", consentimiento: false, props: [...PROPS_RECARGA] },
   error_recurso: { categoria: "error", consentimiento: false, props: ["etiqueta"] },
-  error_peticion: { categoria: "error", consentimiento: false, props: ["endpoint", "metodo", "status"] },
+  error_peticion: { categoria: "error", consentimiento: false, props: ["endpoint", "metodo", "status", "causa", "en_linea"] },
   error_react: { categoria: "error", consentimiento: false, props: ["componente", ...PROPS_RECARGA] },
   error_404: { categoria: "error", consentimiento: false, props: ["referente_interno"] },
 };
