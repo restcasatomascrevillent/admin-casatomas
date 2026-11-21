@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.51.0] - 2026-11-21
+
+Objetivo: Las comidas de los jueves se pueden reservar por la web (las cenas, igual)
+
+### Añadido
+- Reservas: las comidas de los jueves se pueden reservar por la web (las cenas, igual) ([#332](https://github.com/restcasatomascrevillent/admin-casatomas/pull/332))
+
 ## [1.50.1] - 2026-11-21
 
 Objetivo: Menos falsos errores en Logs (traductor, conexión del visitante, scripts del navegador) sin reabrir tickets arreglados, y avisos de Reservas solo de lo que hay que mirar
