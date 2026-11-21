@@ -72,6 +72,7 @@
     "test:sentar-fuera:db": "node scripts/test-reservas-sentar-fuera.mjs",
     "test:cancelada-por:db": "node scripts/test-reservas-cancelada-por.mjs",
     "test:avisos-confirmada:db": "node scripts/test-avisos-reserva-confirmada.mjs",
+    "test:avisos-sin-confirmada:db": "node scripts/test-avisos-sin-confirmada.mjs",
     "test:sala-evento:db": "node scripts/test-sala-entera-evento.mjs",
     "test:servicios-bloqueados:db": "node scripts/test-servicios-bloqueados.mjs",
     "test:jueves-abiertos:db": "node scripts/test-jueves-abiertos.mjs",

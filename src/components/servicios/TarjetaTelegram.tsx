@@ -23,12 +23,8 @@ const SELECT_CLASE =
 const HORAS = Array.from({ length: 24 }, (_, h) => h);
 const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 
-/**
- * Tipos que se pueden mandar al momento: los de Reservas y Facturas de la página Avisos. «Confirmada por el cliente»
- * (18/11/2026) todavía no: la Edge Function `avisos-telegram` no lo conoce.
- */
-const TIPOS_FUERA_DE_TELEGRAM = new Set(["reserva_confirmada"]);
-const TIPOS = [...SECCIONES_AVISOS.reservas.tipos, ...SECCIONES_AVISOS.facturas.tipos].filter((t) => !TIPOS_FUERA_DE_TELEGRAM.has(t.tipo));
+/** Tipos que se pueden mandar al momento: los de Reservas y Facturas de la página Avisos. */
+const TIPOS = [...SECCIONES_AVISOS.reservas.tipos, ...SECCIONES_AVISOS.facturas.tipos];
 
 type Formulario = Omit<ConfigAvisosTelegram, "resumen_ultimo_dia">;
 
