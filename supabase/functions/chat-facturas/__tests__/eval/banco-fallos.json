@@ -29,10 +29,10 @@
       "origen": "#79-82 (11/11/2026, cuatro veces)",
       "mensaje": "Suma las bases imponibles de las facturas de Acciona de 2026",
       "fallo_original": "Cuatro respuestas distintas y ninguna buena: el listado traía 10 de 11 facturas y el modelo sumó las filas que veía.",
-      "correcto": "Producción: 11 facturas, base 26.858,89 €, total 32.499,26 €. Demo: 12 facturas, base 31.994,05 €.",
+      "correcto": "Se calcula en vivo (--en-vivo, con el SQL del campo esperado): las cifras fijas caducaban con cada factura nueva. 18/11/2026 en producción: 12 facturas, base 30.050,20 €, total 36.360,75 €.",
       "herramienta": { "nombre": "filtrar_documentos", "argumentos": { "filtro": "todos", "texto": "acciona", "tipo": null, "desde": "2026-01-01", "hasta": "2026-12-31", "orden": null, "limite": null } },
-      "rpc": { "debe": ["como_leer", "por_mes"], "prod": { "debe": ["\"base\": ?26858\\.89", "\"total\": ?32499\\.26"] }, "demo": { "debe": ["\"base\": ?31994\\.05"] }, "max_ms": 3000 },
-      "ia": { "prod": { "debe": ["26\\.858,89"] }, "demo": { "debe": ["31\\.994,05"] } },
+      "rpc": { "debe": ["como_leer", "por_mes"], "max_ms": 3000 },
+      "esperado": [{"ruta": "sumas.base", "tipo": "num", "tol": 0.01, "valor": 30050.2, "sql": "select round(sum(subtotal), 2) from facturas where proveedor ilike '%acciona%' and fecha between '2026-01-01' and '2026-12-31'"}, {"ruta": "sumas.facturas.total", "tipo": "num", "tol": 0.01, "valor": 36360.75, "sql": "select round(sum(total), 2) from facturas where proveedor ilike '%acciona%' and fecha between '2026-01-01' and '2026-12-31'"}, {"ruta": "sumas.facturas.n", "tipo": "num", "tol": 0, "valor": 12, "sql": "select count(*) from facturas where proveedor ilike '%acciona%' and fecha between '2026-01-01' and '2026-12-31'"}],
       "sql": "select count(*), sum(subtotal), sum(total) from facturas where proveedor ilike '%acciona%' and fecha between '2026-01-01' and '2026-12-31'"
     },
     {
@@ -51,9 +51,10 @@
       "origen": "#60, 62, 63, 64 (10/11/2026, cuatro veces)",
       "mensaje": "cuantos litros de cerveza hemos comprado este año",
       "fallo_original": "79.459 litros: leía «1/3 L» como 3 litros.",
-      "correcto": "Producción: 21.022,3 l en 466 líneas (2026, familia Cervezas). Demo: 20.520,9 l el 07/11.",
+      "correcto": "Se calcula en vivo (--en-vivo, con el SQL del campo esperado): litros de cerveza de 2026; crece con cada factura. 17/11/2026 en producción: 21.022,3 l.",
       "herramienta": { "nombre": "volumen_comprado", "argumentos": { "categoria": "cerveza", "producto": null, "desde": "2026-01-01", "hasta": "2026-12-31", "unidad": null, "orden": null, "denominacion": null } },
-      "rpc": { "prod": { "debe": ["2102[0-9]\\.[0-9]"] }, "demo": { "debe": ["205[0-9][0-9]\\.[0-9]"] }, "no_debe": ["79459"], "max_ms": 5000 },
+      "rpc": { "debe": ["\"total\""], "no_debe": ["79459"], "max_ms": 5000 },
+      "esperado": [{"ruta": "total", "tipo": "num", "tol": 0.5, "valor": 21022.3, "sql": "select round(sum(cantidad_base), 1) from volumen_lineas where categoria = 'Cervezas' and medida = 'l' and fecha between '2026-01-01' and '2026-12-31'"}],
       "ia": { "prod": { "debe": ["21\\.02[0-9]"] }, "demo": { "debe": ["20\\.5[0-9][0-9]"] } },
       "sql": "select sum(cantidad_base) from volumen_lineas where categoria = 'Cervezas' and medida = 'l' and fecha between '2026-01-01' and '2026-12-31'"
     },
@@ -77,12 +78,12 @@
       "origen": "unidades (apartado 3.3 y 4.1)",
       "mensaje": "A cuánto compro el pan de cristal",
       "fallo_original": "Mezclaba la caja (29,40 €) con la unidad (1,40 €) y salía una «subida» del 2.000 %.",
-      "correcto": "Panadería García: la caja a 29,40 € (albarán del 13/11/2026); las pulgas de Nicolás y Valero van por unidad. Nunca una media de caja y unidad.",
+      "correcto": "El último precio de Panadería García en su unidad, sin mezclar caja y unidad (se calcula en vivo con el SQL de esperado: el 13/11/2026 era la caja a 29,40 € y el 18/11/2026 entró un albarán a 32,55 €/ud). Nunca una media de caja y unidad.",
       "herramienta": { "nombre": "compras_producto", "argumentos": { "producto": "pan de cristal" } },
       "rpc": { "debe": ["ultima_factura", "unidades_mezcladas|por_variante"], "max_ms": 3000 },
       "esperado": [
-        { "ruta": "ultima_factura.precio_unitario", "tipo": "num", "tol": 0.01, "valor": 29.4, "sql": "select coalesce((to_jsonb(pf)->>'importe_neto')::numeric / nullif(pf.cantidad, 0), pf.precio_unitario) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pan de cristal' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" },
-        { "ruta": "ultima_factura.unidad", "tipo": "txt", "valor": "caja", "sql": "select pf.unidad from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pan de cristal' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" }
+        { "ruta": "ultima_factura.precio_unitario", "tipo": "num", "tol": 0.01, "valor": 32.55, "sql": "select coalesce((to_jsonb(pf)->>'importe_neto')::numeric / nullif(pf.cantidad, 0), pf.precio_unitario) from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pan de cristal' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" },
+        { "ruta": "ultima_factura.unidad", "tipo": "txt", "valor": "ud", "sql": "select pf.unidad from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ~* 'pan de cristal' and f.proveedor_id is not null and pf.precio_unitario > 0 and not (f.tipo = 'albaran' and f.facturado_en_id is not null) order by f.fecha desc, f.id desc, pf.id desc limit 1" }
       ],
       "ia": { "prod": { "debe": ["29,40"], "no_debe": ["2\\.000 ?%"] } },
       "sql": "select pf.nombre, pf.cantidad, pf.unidad, pf.precio_unitario, f.fecha, f.proveedor from productos_factura pf join facturas f on f.id = pf.factura_id where pf.nombre ilike '%pan%cristal%' order by f.fecha desc limit 6"

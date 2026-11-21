@@ -4008,6 +4008,7 @@ export type Database = {
           id: number
           importe_bruto: number | null
           importe_bruto_estimado: boolean
+          importe_neto: number | null
           iva_pct: number | null
           nombre: string
           nombre_normalizado: string | null
@@ -4032,6 +4033,7 @@ export type Database = {
           id?: number
           importe_bruto?: number | null
           importe_bruto_estimado?: boolean
+          importe_neto?: number | null
           iva_pct?: number | null
           nombre: string
           nombre_normalizado?: string | null
@@ -4056,6 +4058,7 @@ export type Database = {
           id?: number
           importe_bruto?: number | null
           importe_bruto_estimado?: boolean
+          importe_neto?: number | null
           iva_pct?: number | null
           nombre?: string
           nombre_normalizado?: string | null
@@ -5370,6 +5373,30 @@ export type Database = {
       }
     }
     Views: {
+      audit_log_visible: {
+        Row: {
+          accion: string | null
+          actor_email: string | null
+          actor_label: string | null
+          actor_origin: string | null
+          actor_user_id: string | null
+          created_at: string | null
+          detalles: Json | null
+          device_id: string | null
+          id: string | null
+          ip_address: string | null
+          registro_id: string | null
+          request_id: string | null
+          resultado: string | null
+          session_id: string | null
+          tabla: string | null
+          texto_busqueda: string | null
+          tipo_evento: string | null
+          user_agent: string | null
+          visible_por_defecto: boolean | null
+        }
+        Relationships: []
+      }
       chat_facturas_conversaciones: {
         Row: {
           created_at: string | null
@@ -6343,7 +6370,9 @@ export type Database = {
           categoria_id: number | null
           compras: number
           documentos: number
+          es_descuento: boolean
           gasto: number
+          gasto_impreso: number
           lineas_sin_importe: number
           nombre: string
           origen: string
@@ -6351,6 +6380,7 @@ export type Database = {
           proveedores: string[]
           ultima_fecha: string | null
           ultimo_precio: number | null
+          ultimo_precio_impreso: number | null
           unidad_habitual: string | null
         }[]
       }

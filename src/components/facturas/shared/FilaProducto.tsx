@@ -5,7 +5,7 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
 import { Pencil, AlertCircle, Check, X } from "lucide-react";
-import { formatCantidadLinea, formatImporte, formatNumero, precioAnomalo, valorSinDescuento } from "./formatters";
+import { desgloseNeto, formatCantidadLinea, formatImporte, formatNumero, precioAnomalo, valorSinDescuento } from "./formatters";
 import { normalizarUnidadFactura } from "./unidad";
 import { esLineaRegalo } from "@/lib/facturas/resumenCompras";
 
@@ -15,6 +15,51 @@ const InsigniaRegalo = () => (
     Regalo
   </span>
 );
+
+/**
+ * Explicación del desglose de una línea con descuento («X € impreso · Y € de descuento», «Regalo / 100 % de
+ * descuento»…). Null si la línea no tiene nada que desglosar.
+ */
+const notaDesglose = (p: ProductoFactura): ReactNode => {
+  const d = desgloseNeto(p);
+  if (!d) return null;
+  if (d.tipo === "repartido") return "descuento repartido en sus productos";
+  if (d.tipo === "regalo") return "Regalo / 100 % de descuento";
+  return (
+    <>
+      <span className="line-through">{formatImporte(p.precio)}</span> impreso · {formatImporte(d.descuento)} de descuento
+    </>
+  );
+};
+
+/**
+ * Importe de la línea con su coste real. Sin `importe_neto` (o igual al impreso)
+ * es la cifra de siempre; con descuento, el neto es la cifra principal y lo
+ * impreso queda en gris y tachado con el descuento al lado.
+ *
+ * `notaAparte`: la nota del desglose no va debajo del importe, sino que la pinta quien llama (en móvil, en una
+ * segunda línea bajo el nombre: junto al importe llegaba a quitarle al nombre casi todo el ancho de la fila,
+ * 68 px a 360 px). Solo se ve el importe; con el contenedor ancho la nota vuelve aquí.
+ */
+const ImporteLinea = ({ p, notaAparte = false }: { p: ProductoFactura; notaAparte?: boolean }) => {
+  const d = desgloseNeto(p);
+  if (!d) return <>{formatImporte(p.precio)}</>;
+  const nota = `${notaAparte ? "hidden [@container(min-width:30rem)]:block" : "block"} whitespace-normal text-right text-xs font-normal text-muted-foreground`;
+  const principal =
+    d.tipo === "repartido" ? (
+      <span className="font-normal text-muted-foreground">{formatImporte(p.precio)}</span>
+    ) : d.tipo === "regalo" ? (
+      <span className="font-normal text-muted-foreground line-through">{formatImporte(p.precio)}</span>
+    ) : (
+      <span>Neto {formatImporte(d.neto)}</span>
+    );
+  return (
+    <span className="inline-flex max-w-[12rem] flex-col items-end">
+      {principal}
+      <span className={nota}>{notaDesglose(p)}</span>
+    </span>
+  );
+};
 
 /** «Valor sin descuento …» a la vista y su explicación en un popover táctil (no en `title`). */
 const ValorSinDescuento = ({ v, className = "" }: { v: { texto: string; titulo: string }; className?: string }) => (
@@ -201,13 +246,15 @@ export const FilaProducto = ({
               <ValorSinDescuento v={sinDescuento} />
             </p>
           )}
+          {/* Con la fila estrecha el desglose va aquí, bajo el nombre: junto al importe le quitaba el ancho al nombre. */}
+          {notaDesglose(p) && <p className="text-muted-foreground [@container(min-width:30rem)]:hidden">{notaDesglose(p)}</p>}
         </div>
         <span className={`hidden text-right text-sm tabular-nums text-muted-foreground [@container(min-width:30rem)]:block`}>{formatCantidadLinea(p)}</span>
         <span className={`hidden text-right text-sm tabular-nums text-muted-foreground [@container(min-width:30rem)]:block`}>{formatImporte(p.precio_unitario ?? null)}</span>
         <span className="flex items-center justify-end gap-1.5 whitespace-nowrap text-sm font-semibold tabular-nums text-foreground">
           {regalo && <InsigniaRegalo />}
           {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-600" aria-hidden="true" />}>Más del doble de lo que suele cobrar este proveedor (media {formatImporte(avgPrice ?? null)})</AyudaPopover>}
-          {formatImporte(p.precio)}
+          <ImporteLinea p={p} notaAparte />
         </span>
         {editable ? (
           <Button
@@ -311,7 +358,7 @@ export const FilaProducto = ({
       <TableCell className="py-2.5 text-right font-semibold tabular-nums whitespace-nowrap text-foreground">
         <span className="inline-flex items-center justify-end gap-1.5">
           {regalo && <InsigniaRegalo />}
-          {formatImporte(p.precio)}
+          <ImporteLinea p={p} />
         </span>
         {sinDescuento && (
           <span className="block whitespace-normal text-xs font-normal text-muted-foreground">

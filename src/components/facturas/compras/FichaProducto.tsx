@@ -3,7 +3,7 @@ import { Pencil, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { GraficoSeriePrecio } from "@/components/facturas/GraficoSeriePrecio";
-import { formatDateCorta, formatImporte, formatNumero, plural } from "@/components/facturas/shared/formatters";
+import { difiereNeto, formatDateCorta, formatImporte, formatNumero, plural, textoNetoImpreso } from "@/components/facturas/shared/formatters";
 import { DetalleProductoDialog } from "@/components/facturas/productos/DetalleProductoDialog";
 import { ContenidoProducto } from "./ContenidoProducto";
 import { EstadoError, FOCO, Hueso, Marca, TITULO_SECCION, filaEstado } from "./estilo";
@@ -161,10 +161,16 @@ export function FichaProducto({
           <div className="min-w-0 px-3 py-2">
             <dt className="text-xs font-medium text-muted-foreground">Último precio</dt>{" "}
             <dd className="text-base font-medium leading-7 tabular-nums">{producto.ultimo_precio === null ? "—" : formatImporte(producto.ultimo_precio)}</dd>
+            {producto.ultimo_precio !== null && difiereNeto(producto.ultimo_precio, producto.ultimo_precio_impreso) && (
+              <dd className="text-xs text-muted-foreground">{textoNetoImpreso(producto.ultimo_precio, producto.ultimo_precio_impreso as number)}</dd>
+            )}
           </div>
           <div className="min-w-0 bg-muted/25 px-3 py-2">
             <dt className="text-xs font-medium text-muted-foreground">Gasto sin IVA</dt>{" "}
             <dd className="text-lg font-semibold leading-7 tabular-nums">{formatImporte(producto.gasto)}</dd>
+            {difiereNeto(producto.gasto, producto.gasto_impreso) && (
+              <dd className="text-xs text-muted-foreground">{textoNetoImpreso(producto.gasto, producto.gasto_impreso)}</dd>
+            )}
           </div>
         </dl>
 

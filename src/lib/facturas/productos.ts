@@ -28,10 +28,20 @@ export interface ResumenProducto {
   documentos: number;
   /** Suma de cantidades por unidad: {"kg": 48, "ud": 12}. "" = sin unidad. */
   cantidades: Record<string, number>;
-  /** Suma de importes de línea (base, sin IVA). */
+  /** Coste real: suma de importes netos de línea (base, sin IVA, con los descuentos repartidos). */
   gasto: number;
+  /** Lo impreso en las facturas (suma de totales de línea). Igual que `gasto` si no hay descuentos. */
+  gasto_impreso?: number;
   lineas_sin_importe: number;
+  /** Último precio unitario NETO. */
   ultimo_precio: number | null;
+  /** Último precio unitario tal como se imprimió. */
+  ultimo_precio_impreso?: number | null;
+  /**
+   * Es una línea de descuento convertida en «producto» (Descuento comercial, Descuento Heineken…): no se compra.
+   * Su gasto suma en los totales, pero no tiene precio unitario (`ultimo_precio` llega a null).
+   */
+  es_descuento?: boolean;
   ultima_fecha: string | null;
   proveedores: string[];
 }
@@ -409,6 +419,7 @@ export function destinoFusionSugerido(seleccion: Pick<ResumenProducto, "producto
 
 /** Normaliza una fila cruda de la RPC (numeric llega como string o número). */
 export function aResumen(f: Record<string, unknown>): ResumenProducto {
+  const esDescuento = f.es_descuento === true;
   const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
   const nn = (v: unknown) => (v === null || v === undefined ? null : Number(v));
   const cant: Record<string, number> = {};
@@ -424,8 +435,13 @@ export function aResumen(f: Record<string, unknown>): ResumenProducto {
     documentos: n(f.documentos),
     cantidades: cant,
     gasto: n(f.gasto),
+    // RPC antigua sin la columna: se toma el neto como impreso (no hay nada que desglosar).
+    gasto_impreso: f.gasto_impreso === null || f.gasto_impreso === undefined ? n(f.gasto) : n(f.gasto_impreso),
     lineas_sin_importe: n(f.lineas_sin_importe),
-    ultimo_precio: nn(f.ultimo_precio),
+    // Un descuento no es un artículo: su «último precio» (la última línea positiva, 32,93 € en Descuento comercial) no es un precio.
+    ultimo_precio: esDescuento ? null : nn(f.ultimo_precio),
+    ultimo_precio_impreso: esDescuento ? null : f.ultimo_precio_impreso === undefined ? nn(f.ultimo_precio) : nn(f.ultimo_precio_impreso),
+    es_descuento: esDescuento,
     ultima_fecha: (f.ultima_fecha as string | null) ?? null,
     proveedores: Array.isArray(f.proveedores) ? (f.proveedores as string[]) : [],
   };

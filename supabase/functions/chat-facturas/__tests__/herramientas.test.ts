@@ -14,6 +14,9 @@ import {
   AGRUPAR_FLEX,
   anotarRuta,
   construirConsultaFlexible,
+  conAnada,
+  excluirPorFormato,
+  pideBotellaNormal,
   esErrorCorregible,
   familiaDeBebida,
   FILTROS_FLEX,
@@ -182,7 +185,7 @@ describe("systemPrompt", () => {
   });
 
   it("conteos: solo numeros, sin importes ni avisos (prueba 3: q04, q12, q13)", () => {
-    expect(p).toMatch(/Pregunta de cuantos o de UN documento \(la ultima factura\): solo lo pedido; sin avisos de parcial/);
+    expect(p).toMatch(/Pregunta de cuantos o de UN documento: solo lo pedido; sin avisos de parcial/);
     const filtrar = TOOLS.find((t) => t.function.name === "filtrar_documentos")!.function;
     expect(filtrar.description).toMatch(/los demas filtros solo cuentan/);
   });
@@ -695,7 +698,8 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
 
   it("unidades distintas: no comparar, cada proveedor en su unidad", () => {
     expect(p).toMatch(/lista TODOS los proveedores, cada uno con su precio en SU unidad/);
-    expect(p).toMatch(/Osborne la caja a 519,40 €; Luga el kilo a 20,50 €/);
+    // Los ejemplos (Osborne la caja / Luga el kilo, cebo vs bellota) se quitaron por el tope del prompt; la obligacion sigue.
+    expect(p).toMatch(/sin ganador si avisos\.unidades_mezcladas o productos_coincidentes > 1 salvo con precio_comparable/);
   });
 
   it("unidad y categoria solo se mandan si vienen (compatibles con las RPC de antes)", () => {
@@ -1040,6 +1044,16 @@ describe("precio tal como se compra (11/11/2026)", () => {
     expect(p).toMatch(/€\/l o €\/kg solo si lo piden o va a granel/);
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT);
   });
+
+  it("con descuento: el precio real y, entre paréntesis, el de factura; sin descuento, ni neto ni impreso (19/11/2026)", () => {
+    const p = systemPrompt("2026-11-19");
+    expect(p).toMatch(
+      /Con precio_impreso \(descuento\): el real y, entre parentesis, el de factura \(«18,25 € \(en factura 20,05 €, con 9 % de descuento\)»\); si no, nada de neto ni impreso\./,
+    );
+    // Los campos que activan la regla los pone la base (20261212910000); el prompt los nombra tal cual.
+    expect(p).toMatch(/precio_impreso/);
+    expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT);
+  });
 });
 
 describe("precio de referencia = la ULTIMA factura (dueño, 13/11/2026)", () => {
@@ -1061,5 +1075,43 @@ describe("precio de referencia = la ULTIMA factura (dueño, 13/11/2026)", () => 
       rpc: "variacion_precios_agente",
       params: { p_producto: "percebe", p_comparar: "anterior" },
     });
+  });
+});
+
+describe("compras_producto: formato y añada de la pregunta (batería t34, 18/11/2026)", () => {
+  it("pideBotellaNormal: 75 cl y «no magnum» sí; magnum, 1,5 l o 3 l no; sin formato no", () => {
+    expect(pideBotellaNormal("Precio del PSI 2023 75 cl")).toBe(true);
+    expect(pideBotellaNormal("Precio del Lagar de Cervera 75 cl (no magnum)")).toBe(true);
+    expect(pideBotellaNormal("la botella de 0,75 l de Viña Arana")).toBe(true);
+    expect(pideBotellaNormal("el magnum de PSI 2023")).toBe(false);
+    expect(pideBotellaNormal("PSI 2023 1,5 l")).toBe(false);
+    expect(pideBotellaNormal("PSI 2023 de 3 L")).toBe(false);
+    expect(pideBotellaNormal("Precio del PSI 2023")).toBe(false);
+    expect(pideBotellaNormal(undefined)).toBe(false);
+  });
+
+  it("excluirPorFormato: suma magnum/jeroboam a lo que ya excluya el modelo; si el producto ya es magnum, nada", () => {
+    expect(excluirPorFormato(null, "psi 2023", "Precio del PSI 2023 75 cl")).toBe("magnum mgn jeroboam jerobo");
+    expect(excluirPorFormato("caja", "psi 2023", "psi 2023 75 cl")).toBe("caja magnum mgn jeroboam jerobo");
+    expect(excluirPorFormato(null, "psi magnum 2023", "psi magnum 2023 75 cl")).toBeNull();
+    expect(excluirPorFormato("caja", "psi 2023", "Precio del PSI 2023")).toBe("caja");
+  });
+
+  it("conAnada: la añada pegada al producto en la pregunta pasa a la búsqueda; un periodo no", () => {
+    expect(conAnada("psi", "Precio del PSI 2023", false)).toBe("psi 2023");
+    expect(conAnada("psi", "Precio del PSI del 2023 75 cl", false)).toBe("psi 2023");
+    expect(conAnada("psi 2023", "Precio del PSI 2023", false)).toBe("psi 2023");
+    expect(conAnada("psi", "Precio del PSI 2023", true)).toBe("psi");
+    expect(conAnada("psi", "Cuánto compré de PSI en 2023", false)).toBe("psi");
+    expect(conAnada("psi", undefined, false)).toBe("psi");
+  });
+
+  it("prepararLlamada: la pregunta de la botella normal excluye el magnum y conserva la añada", () => {
+    const ll = prepararLlamada("compras_producto", { producto: "psi 2023" }, "Precio del PSI 2023 75 cl");
+    expect(ll).toMatchObject({ rpc: "compras_producto_agente", params: { p_texto: "psi 2023", p_excluir: "magnum mgn jeroboam jerobo" } });
+    const sin = prepararLlamada("compras_producto", { producto: "psi 2023" }, "Precio del PSI 2023");
+    expect(sin).toMatchObject({ params: { p_texto: "psi 2023", p_excluir: null } });
+    const ana = prepararLlamada("compras_producto", { producto: "psi" }, "Precio del PSI 2023 75 cl");
+    expect(ana).toMatchObject({ params: { p_texto: "psi 2023" } });
   });
 });
