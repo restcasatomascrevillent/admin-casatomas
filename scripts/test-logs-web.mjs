@@ -2,7 +2,9 @@
 // agrupación, estadísticas, retención), 20261118100100 (operaciones de la BD),
 // 20261129143000 (errores «tras publicar» y explicación en sencillo) y
 // 20261130100000 (origen de cada error: fallo de la web, servicio externo o no
-// depende de la web) contra un Postgres en memoria (PGlite). Nunca toca Supabase.
+// depende de la web) y 20261213040000 (página traducida, imagen recuperada al
+// reintentar y reapariciones solo por lo que podría abrir ticket) contra un
+// Postgres en memoria (PGlite). Nunca toca Supabase.
 //
 //   npm run test:logs-web:db
 //
@@ -19,7 +21,9 @@
 // atrás de las incidencias pendientes; el origen de cada error (mismos casos
 // que origen.ts), que solo los fallos de la web (y externos si se activa)
 // abren o reabren tickets, «Pedir ticket» a mano, errores por sesión y la
-// clasificación de lo ya guardado; y los rollbacks.
+// clasificación de lo ya guardado; que lo que no depende de la web (visitante
+// sin cobertura, página traducida) no reabre un fallo de la web ya resuelto
+// y lo que sí depende, sí; y los rollbacks.
 import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -33,6 +37,8 @@ const LEGIBLES = await readFile("supabase/migrations/20261129143000_logs_web_leg
 const ROLLBACK_LEGIBLES = await readFile("supabase/rollbacks/20261129143000_logs_web_legibles_ROLLBACK.sql", "utf8");
 const ORIGEN = await readFile("supabase/migrations/20261130100000_logs_web_origen.sql", "utf8");
 const ROLLBACK_ORIGEN = await readFile("supabase/rollbacks/20261130100000_logs_web_origen_ROLLBACK.sql", "utf8");
+const NAVEGADOR = await readFile("supabase/migrations/20261213040000_logs_web_navegador_reaperturas.sql", "utf8");
+const ROLLBACK_NAVEGADOR = await readFile("supabase/rollbacks/20261213040000_logs_web_navegador_reaperturas_ROLLBACK.sql", "utf8");
 // Los mismos casos que el vitest de origen.ts: el SQL tiene que clasificar igual.
 const CASOS_ORIGEN = JSON.parse(await readFile("supabase/functions/_shared/__tests__/logs-web-origen-casos.json", "utf8"));
 // El patrón de «versión antigua» del SQL tiene que ser el mismo que el de huella.ts.
@@ -524,6 +530,8 @@ ok((await q("select count(*)::int n from public.web_eventos where sesion_id = $1
 {
   await db.exec(ORIGEN);
   await db.exec(ORIGEN); // idempotente
+  await db.exec(NAVEGADOR);
+  await db.exec(NAVEGADOR); // idempotente
   comprobaciones++;
 
   // Mismos casos que origen.ts (vitest): el SQL clasifica igual.
@@ -641,9 +649,87 @@ ok((await q("select count(*)::int n from public.web_eventos where sesion_id = $1
   igual([qq.origen, qq.linear_estado], ["web", "pendiente"], "el fallo de la web sigue pendiente");
   igual((await q("select count(*)::int n from public.web_eventos where categoria = 'error' and origen is null")).rows[0].n, 0, "todos los errores guardados tienen origen");
   ok((await q("select errores_web from public.web_sesiones where sesion_id = $1", [S])).rows[0].errores_web === 1, "y las sesiones, sus errores de la web");
+  await db.exec(NAVEGADOR);
+}
+
+// ─── 9 quater. Lo que no depende de la web no reabre un fallo de la web (CAS-17, CAS-18/19/20) ─
+{
+  await q("update public.web_logs_config set reapertura = 'reabrir', umbral_ocurrencias = 3, umbral_sesiones = 2, linear_tickets_externos = false, excluir_pruebas_tickets = true");
+  const LAMPARA = "https://restaurantecasatomascrevillente.es/assets/lampara-1400w-nk0RtDsA.avif";
+  const HIDRATACION = "Uncaught Error: Minified React error #418; visit https://reactjs.org/docs/error-decoder.html for the full message";
+  const H = { img: "4a".repeat(16), hid: "4b".repeat(16), con: "4c".repeat(16) };
+  const err = (o) => ev({ categoria: "error", gravedad: "error", consentimiento: false, sesion_id: randomUUID(), secuencia: 1, ocurrido_en: iso(1_500), ...o });
+  const img = (o = {}) => err({ tipo: "error_recurso", gravedad: "aviso", huella: H.img, objetivo: LAMPARA, propiedades: { etiqueta: "img" }, ...o });
+  const hid = (o = {}) => err({ tipo: "error_js", huella: H.hid, mensaje: HIDRATACION, ruta: "/", ...o });
+  const inc = async (h) => (await q("select * from public.web_incidencias where huella = $1", [h])).rows[0];
+  const origenes = async (h) => (await q("select origen from public.web_eventos where huella = $1 order by ocurrido_en, id", [h])).rows.map((x) => x.origen);
+  // Resuelta (con ticket) en el instante `cuando`: después de las ocurrencias de antes, antes de las nuevas.
+  const resolverConTicket = async (h, cuando) => {
+    await q("update public.web_incidencias set estado = 'resuelta', linear_estado = 'creado', linear_issue_id = 'X', linear_destino = 'prueba', linear_pendiente_reapertura = false where huella = $1", [h]);
+    await q("update public.web_incidencias set resuelta_en = $2 where huella = $1", [h, cuando]); // el trigger pone now() al resolver
+  };
+
+  // Como en producción: la lámpara (2 sin marca, de antes del arreglo) y la tanda de hidratación del 19/11 (3 sin marca).
+  await ingerir([img({ ocurrido_en: iso(3_000) }), img({ ocurrido_en: iso(2_900) }),
+                 hid({ ocurrido_en: iso(3_000) }), hid({ ocurrido_en: iso(2_999) }), hid({ ocurrido_en: iso(2_998) })]);
+  await agrupar();
+  igual([(await inc(H.img)).origen, (await inc(H.hid)).origen], ["web", "web"], "sin la marca de la web, las dos son fallos de la web (como CAS-17 y CAS-18)");
+  await resolverConTicket(H.img, iso(2_000));
+  await resolverConTicket(H.hid, iso(2_000));
+
+  // Tras el arreglo: la web las manda con su marca.
+  await ingerir([img({ accion: "recuperada_al_reintentar", ocurrido_en: iso(900) }), img({ accion: "sin_conexion", ocurrido_en: iso(899) }),
+                 hid({ accion: "pagina_traducida", ocurrido_en: iso(900) })]);
+  await agrupar();
+  igual(await origenes(H.img), ["web", "web", "conexion", "conexion"], "imagen recuperada al reintentar o sin conexión: conexión del visitante");
+  igual(await origenes(H.hid), ["web", "web", "web", "navegador"], "hidratación con la página traducida: navegador");
+  let [i1, h1] = [await inc(H.img), await inc(H.hid)];
+  igual([i1.estado, i1.reabierta_veces, i1.linear_pendiente_reapertura, i1.linear_estado], ["resuelta", 0, false, "creado"],
+        "un visitante sin cobertura no reabre la lámpara ya arreglada (ni su ticket)");
+  igual([h1.estado, h1.reabierta_veces, h1.linear_pendiente_reapertura], ["resuelta", 0, false], "la página traducida tampoco reabre la hidratación");
+  igual([i1.origen, i1.ocurrencias, i1.ocurrencias_24h], ["web", 4, 4], "la incidencia sigue siendo de la web y cuenta todas las ocurrencias");
+
+  // Tampoco una de la web hecha por una prueba o por el personal (no cuentan para los tickets).
+  await ingerir([img({ es_interno: true, ocurrido_en: iso(800) })]);
+  await agrupar();
+  igual((await inc(H.img)).estado, "resuelta", "una de tráfico interno no la reabre (como en los umbrales)");
+
+  // Si el fichero de verdad vuelve a fallar (sin marca: el servidor contestó), sí: se reabre y se avisa en su ticket.
+  await ingerir([img({ ocurrido_en: iso(700) })]);
+  await agrupar();
+  i1 = await inc(H.img);
+  igual([i1.estado, i1.reabierta_veces, i1.linear_pendiente_reapertura], ["reabierta", 1, true], "un fallo de la web nuevo sí reabre la incidencia y su ticket");
+  // Y un error de hidratación sin traductor, igual.
+  await ingerir([hid({ ocurrido_en: iso(700) })]);
+  await agrupar();
+  h1 = await inc(H.hid);
+  igual([h1.estado, h1.linear_pendiente_reapertura], ["reabierta", true], "hidratación sin traductor tras resolverse: se reabre");
+
+  // Las que no dependen de la web se reabren con cualquiera, solo en el panel, como antes.
+  await ingerir([err({ tipo: "error_peticion", huella: H.con, objetivo: "rest:novedades", mensaje: "Sin respuesta de rest:novedades", propiedades: { status: 0 }, ocurrido_en: iso(600) })]);
+  await agrupar();
+  await resolverConTicket(H.con, iso(550));
+  await ingerir([err({ tipo: "error_peticion", huella: H.con, objetivo: "rest:novedades", mensaje: "Sin respuesta de rest:novedades", propiedades: { status: 0 }, ocurrido_en: iso(500) })]);
+  await agrupar();
+  const c1 = await inc(H.con);
+  igual([c1.origen, c1.estado, c1.linear_pendiente_reapertura], ["conexion", "reabierta", false], "conexión: se reabre aquí, su ticket no se toca (sin cambios)");
+
+  // Rollback: vuelven las reglas de 20261130100000 (la marca no cuenta y cualquiera reabre).
+  await db.exec(ROLLBACK_NAVEGADOR);
+  const o = async (d) => (await q("select public.web_logs_origen_error($1, 'navegador', $2, null, $3, '{}'::jsonb, $4, null) o", [d.tipo, d.mensaje ?? null, d.objetivo ?? null, d.accion])).rows[0].o;
+  igual([await o({ tipo: "error_js", mensaje: HIDRATACION, accion: "pagina_traducida" }), await o({ tipo: "error_recurso", objetivo: LAMPARA, accion: "recuperada_al_reintentar" })],
+        ["web", "web"], "tras el rollback, las dos marcas ya no cuentan");
+  await q("update public.web_incidencias set estado = 'resuelta', linear_pendiente_reapertura = false where huella = $1", [H.img]);
+  await q("update public.web_incidencias set resuelta_en = $2 where huella = $1", [H.img, iso(450)]);
+  await ingerir([img({ accion: "sin_conexion", ocurrido_en: iso(400) })]);
+  await agrupar();
+  igual([(await inc(H.img)).estado, (await inc(H.img)).linear_pendiente_reapertura], ["reabierta", true], "y cualquier ocurrencia vuelve a reabrir (como antes)");
+  await db.exec(NAVEGADOR);
+  igual(await o({ tipo: "error_js", mensaje: HIDRATACION, accion: "pagina_traducida" }), "navegador", "se puede volver a aplicar");
 }
 
 // ─── 10. Rollbacks ──────────────────────────────────────────────────────────
+await db.exec(ROLLBACK_NAVEGADOR);
 await db.exec(ROLLBACK_ORIGEN);
 await db.exec(ROLLBACK_LEGIBLES);
 await db.exec(ROLLBACK_OP);
@@ -654,6 +740,7 @@ await db.exec(MIGRACION);
 await db.exec(OPERACIONES);
 await db.exec(LEGIBLES);
 await db.exec(ORIGEN);
+await db.exec(NAVEGADOR);
 ok((await q("select count(*)::int n from public.web_logs_config")).rows[0].n === 1, "se puede volver a aplicar tras el rollback");
 
 console.log(`✓ Logs web: ${comprobaciones} comprobaciones`);

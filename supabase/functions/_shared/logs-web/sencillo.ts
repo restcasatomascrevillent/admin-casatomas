@@ -312,13 +312,20 @@ export const TEXTO_TRAS_PUBLICAR: Record<ClaseTrasPublicar, string> = {
   repetido: "no se arregló al recargar · revisar",
 };
 
-/** Qué decidió la web ante un error de carga (`accion`, web-casatomas recarga-por-version.ts), en llano. */
+/**
+ * Qué decidió la web ante un error (`accion`), en llano: los de carga
+ * (web-casatomas recarga-por-version.ts), una imagen que no cargó
+ * (actividad/imagen-fallida.ts) y la hidratación con la página traducida (pagina-traducida.ts).
+ */
 export const TEXTO_ACCION_RECARGA: Record<string, string> = {
   recuperado_tras_recarga: "se recargó sola con la versión nueva",
   recarga_sin_efecto: "se recargó pero siguió con la misma versión",
   aviso_version_nueva: "se le pidió tocar «Actualizar»",
   sin_version_nueva: "no había versión nueva (red o fichero que falta)",
   sin_conexion: "sin conexión: no se recargó",
+  recuperada_al_reintentar: "cargó al volver a pedirla (corte momentáneo de la conexión)",
+  pagina_traducida: "página traducida por el navegador",
+  dom_ajeno: "página cambiada por el navegador mientras cargaba",
 };
 
 /**

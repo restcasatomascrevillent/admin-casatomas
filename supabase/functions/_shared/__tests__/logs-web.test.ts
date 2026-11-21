@@ -184,6 +184,17 @@ describe("normalizarLote", () => {
     expect(normalizarEndpoint("rest:configuracion_tienda")).toBe("rest:configuracion_tienda");
     expect(normalizarEndpoint("https://evil/../x y")).toBeNull();
   });
+  it("una petición sin respuesta guarda lo que decidió la web: causa y si había red (antes se descartaban)", async () => {
+    const r = await normalizarLote({
+      contexto: { consentimiento: true },
+      eventos: [
+        { id: id(), tipo: "error_peticion", props: { endpoint: "rest:novedades", metodo: "GET", status: 0, causa: "sin_red", en_linea: false, otra: "x" } },
+        { id: id(), tipo: "peticion", props: { endpoint: "rest:tapas", metodo: "GET", status: 0, causa: "cancelada", en_linea: true, cancelada: true } },
+      ],
+    }, ctx);
+    expect(r.eventos[0].propiedades).toEqual({ endpoint: "rest:novedades", metodo: "GET", status: 0, causa: "sin_red", en_linea: false });
+    expect(r.eventos[1].propiedades).toEqual({ endpoint: "rest:tapas", metodo: "GET", status: 0, causa: "cancelada", en_linea: true, cancelada: true });
+  });
   it("los identificadores técnicos (vista_id, id de plato/vino) llegan intactos; un id raro no", async () => {
     const vista = id();
     const r = await normalizarLote({ contexto: { consentimiento: true }, eventos: [
