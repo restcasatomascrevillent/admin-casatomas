@@ -47,7 +47,16 @@ const TOKEN_TTL_SEGUNDOS = 60 * 60 * 24 * 14; // 14 días, igual que reservas-we
 //                          solicitudes_pendientes.id, ver propuesta-solicitud.ts).
 // Acciones distintas a propósito: verificarToken exige la acción esperada,
 // así que un token de un flujo nunca se acepta en las rutas del otro.
-export type AccionToken = "aceptar" | "rechazar" | "aceptar_solicitud" | "rechazar_solicitud";
+// 'gestionar'           -> «Gestionar mi reserva» (botón del WhatsApp de
+//                          reserva recibida, ver whatsapp-reservas): ver la
+//                          reserva y cancelarla. Huella fija (HUELLA_GESTION):
+//                          vale en cualquier estado, la página dice qué se
+//                          puede hacer en cada uno. Caduca el día después de
+//                          la reserva (firmarTokenGestion), no a los 14 días.
+export type AccionToken = "aceptar" | "rechazar" | "aceptar_solicitud" | "rechazar_solicitud" | "gestionar";
+
+/** Huella de los tokens de «Gestionar mi reserva». */
+export const HUELLA_GESTION = "g1";
 
 export interface CargaToken {
   id: string;
@@ -111,12 +120,43 @@ export async function firmarToken(
   huella: string,
   ahoraEpochSegundos: number = Math.floor(Date.now() / 1000),
 ): Promise<string> {
-  const carga: CargaToken = {
+  return firmarCarga(secreto, {
     id: reservaId,
     accion,
     exp: ahoraEpochSegundos + TOKEN_TTL_SEGUNDOS,
     fp: huella,
-  };
+  });
+}
+
+/**
+ * Caducidad de «Gestionar mi reserva»: el día siguiente a la reserva (00:00
+ * UTC del día +2, holgura de sobra para el huso de Madrid), y nunca antes de
+ * los 14 días de siempre. Una reserva para dentro de dos meses tiene que
+ * poder gestionarse hasta ese día.
+ */
+export function caducidadGestion(fechaIso: string, ahoraEpochSegundos: number = Math.floor(Date.now() / 1000)): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(fechaIso || "");
+  const minimo = ahoraEpochSegundos + TOKEN_TTL_SEGUNDOS;
+  if (!m) return minimo;
+  const finDia = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 2) / 1000;
+  return Math.max(minimo, finDia);
+}
+
+export async function firmarTokenGestion(
+  secreto: string,
+  reservaId: string,
+  fechaReservaIso: string,
+  ahoraEpochSegundos: number = Math.floor(Date.now() / 1000),
+): Promise<string> {
+  return firmarCarga(secreto, {
+    id: reservaId,
+    accion: "gestionar",
+    exp: caducidadGestion(fechaReservaIso, ahoraEpochSegundos),
+    fp: HUELLA_GESTION,
+  });
+}
+
+async function firmarCarga(secreto: string, carga: CargaToken): Promise<string> {
   const cargaB64 = base64UrlEncode(new TextEncoder().encode(JSON.stringify(carga)));
   const clave = await claveHmac(secreto);
   const firma = await crypto.subtle.sign("HMAC", clave, new TextEncoder().encode(cargaB64));

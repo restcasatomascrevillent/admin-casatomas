@@ -89,6 +89,9 @@ export const ADMITE_INTEGRACION: ReadonlySet<string> = new Set([
   "registrar-actividad-web", "procesar-logs-web",
   // Embeddings por nombre (20261203100000): pg_cron con x-ocr-secret o un usuario de facturas.
   "embeddings-nombres",
+  // Avisos de reserva por WhatsApp (21/11/2026): webhook de Meta con su firma
+  // X-Hub-Signature-256; rutas internas con x-webhook-secret (falla cerrado).
+  "whatsapp-reservas",
 ]);
 
 /** La autenticación y autorización de negocio siguen en cada handler. */

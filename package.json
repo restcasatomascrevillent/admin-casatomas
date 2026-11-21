@@ -80,6 +80,7 @@
     "test:jueves-abiertos:db": "node scripts/test-jueves-abiertos.mjs",
     "test:jueves-turnos:db": "node scripts/test-jueves-turnos.mjs",
     "test:jueves-comida-web:db": "node scripts/test-jueves-comida-web.mjs",
+    "test:canal-avisos:db": "node scripts/test-canal-avisos.mjs",
     "test:logs-web:db": "node scripts/test-logs-web.mjs",
     "test:peticiones:db": "node scripts/test-peticiones.mjs",
     "test:tickets-documentos:db": "node scripts/test-tickets-documentos.mjs",

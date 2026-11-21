@@ -106,9 +106,9 @@ export function cabecerasCorsEnlace(origen: string | null, permitidos: readonly 
 // Token -> qué flujo es
 // ----------------------------------------------------------------------------
 
-const ACCIONES: readonly AccionToken[] = ["aceptar", "rechazar", "aceptar_solicitud", "rechazar_solicitud"];
+const ACCIONES: readonly AccionToken[] = ["aceptar", "rechazar", "aceptar_solicitud", "rechazar_solicitud", "gestionar"];
 
-/** Verifica el token contra las 4 acciones y devuelve la que casa (o null). */
+/** Verifica el token contra las 5 acciones y devuelve la que casa (o null). */
 export async function verificarTokenCualquierAccion(
   secreto: string,
   token: string,
@@ -122,12 +122,14 @@ export async function verificarTokenCualquierAccion(
   return null;
 }
 
-/** 'contraoferta' = sobre una reserva ya existente; 'propuesta' = sobre una solicitud del bot. */
-export type TipoEnlace = "contraoferta" | "propuesta";
+/** 'contraoferta' = sobre una reserva ya existente; 'propuesta' = sobre una
+ * solicitud del bot; 'gestion' = «Gestionar mi reserva» (ver y cancelar). */
+export type TipoEnlace = "contraoferta" | "propuesta" | "gestion";
 /** Lo que el cliente va a hacer, visto desde la web. */
-export type AccionWeb = "aceptar" | "rechazar";
+export type AccionWeb = "aceptar" | "rechazar" | "cancelar";
 
 export function describirAccion(accion: AccionToken): { tipo: TipoEnlace; accion: AccionWeb } {
+  if (accion === "gestionar") return { tipo: "gestion", accion: "cancelar" };
   return {
     tipo: accion === "aceptar" || accion === "rechazar" ? "contraoferta" : "propuesta",
     accion: accion === "aceptar" || accion === "aceptar_solicitud" ? "aceptar" : "rechazar",
@@ -184,6 +186,10 @@ export interface RespuestaEnlace {
   accion: AccionWeb | null;
   negocio: NegocioEnlace;
   detalles: DetallesEnlace | null;
+  /** Solo en tipo 'gestion': estado actual de la reserva ('pendiente',
+   * 'verificada', 'confirmada', 'cancelada'…), para que la página diga en qué
+   * punto está. */
+  estadoReserva?: string | null;
 }
 
 export function negocioEnlace(marca: unknown, bases: Record<Marca, string>): NegocioEnlace {
@@ -224,6 +230,26 @@ export function estadoContraoferta(accion: AccionWeb, reserva: ReservaParaEnlace
   return reserva.estado === "verificada" && huellaReservaCoincide(huellaToken, reserva.estado, reserva.hora)
     ? "pendiente"
     : "invalido";
+}
+
+// ----------------------------------------------------------------------------
+// Estado de un enlace de GESTIÓN («Gestionar mi reserva»)
+// ----------------------------------------------------------------------------
+
+/** Estados en los que el cliente puede cancelar su reserva desde el enlace. */
+export const ESTADOS_CANCELABLES_POR_CLIENTE: readonly string[] = ["pendiente", "verificada", "confirmada"];
+
+/**
+ * - cancelada                         -> ya_hecho
+ * - completada / no_show / otros      -> invalido (ya no hay nada que gestionar)
+ * - día ya pasado                     -> fecha_pasada
+ * - pendiente / verificada / confirmada -> pendiente (se puede cancelar)
+ */
+export function estadoGestion(reserva: { estado: string; fecha: string | null }, hoyIso: string): EstadoEnlace {
+  if (reserva.estado === "cancelada") return "ya_hecho";
+  if (!ESTADOS_CANCELABLES_POR_CLIENTE.includes(reserva.estado)) return "invalido";
+  if ((reserva.fecha ?? "").slice(0, 10) < hoyIso) return "fecha_pasada";
+  return "pendiente";
 }
 
 // ----------------------------------------------------------------------------
@@ -268,6 +294,14 @@ export function estadoTrasAceptarPropuesta(
 export function estadoErrorConfirmarContraoferta(codigo: string | null | undefined, mensaje?: string | null): EstadoEnlace {
   if (codigo === "23514" || /aforo/i.test(mensaje ?? "")) return "sin_aforo";
   return "error";
+}
+
+/** Por dónde llega el clic: 'whatsapp' si lo reenvía whatsapp-reservas tras
+ * pulsar un botón del chat; 'web' en cualquier otro caso (la página de la web).
+ * Solo sirve para NO hacer cosas (verificar el email, mandar el aviso de
+ * después): un tercero que lo falsee no gana nada. */
+export function viaDelCuerpo(body: unknown): "whatsapp" | "web" {
+  return (body as { via?: unknown } | null)?.via === "whatsapp" ? "whatsapp" : "web";
 }
 
 /** Lee `{ token }` de un body JSON desconocido. */
