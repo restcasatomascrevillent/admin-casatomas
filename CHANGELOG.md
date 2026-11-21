@@ -2,6 +2,17 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.50.1] - 2026-11-21
+
+Objetivo: Menos falsos errores en Logs (traductor, conexión del visitante, scripts del navegador) sin reabrir tickets arreglados, y avisos de Reservas solo de lo que hay que mirar
+
+### Cambiado
+- Reservas: en los avisos de Reservas ya no llegan las confirmadas por el cliente, solo las de verificar y las canceladas (CAS-24) ([#330](https://github.com/restcasatomascrevillent/admin-casatomas/pull/330))
+- Logs: la página traducida, la conexión del visitante y los scripts del navegador ya no cuentan como fallo de la web ni reabren tickets arreglados (CAS-17..23, CAS-26..29) ([#329](https://github.com/restcasatomascrevillent/admin-casatomas/pull/329))
+
+### Otros
+- Logs: `sin_version_nueva` llega solo si la página falla también tras el reintento de la web ([#234](https://github.com/restcasatomascrevillent/admin-casatomas/pull/234))
+
 ## [1.50.0] - 2026-11-20
 
 Objetivo: Facturas: el mismo coste real (neto de descuentos) en Productos, Análisis y el chat, y subidas sin cortes por tiempo (el guardado reintenta y se reanuda solo, recálculo de alertas acotado y tareas escalonadas)
