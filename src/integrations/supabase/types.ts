@@ -4359,6 +4359,8 @@ export type Database = {
       reservas: {
         Row: {
           canal: string | null
+          /** Solo existe si 20261215100000_reservas_canal_avisos.sql está aplicada ('email' | 'whatsapp'). */
+          canal_avisos?: string
           /** «Quién canceló» (20261205100200_reservas_cancelada_por): los escribe el trigger de la BD, el panel solo los lee. Ver src/lib/reservas/cancelacion.ts. */
           cancelada_at: string | null
           cancelada_por: string | null
@@ -4400,6 +4402,7 @@ export type Database = {
         }
         Insert: {
           canal?: string | null
+          canal_avisos?: string
           cancelada_at?: string | null
           cancelada_por?: string | null
           condiciones_aceptadas_at?: string | null
@@ -4431,6 +4434,7 @@ export type Database = {
         }
         Update: {
           canal?: string | null
+          canal_avisos?: string
           cancelada_at?: string | null
           cancelada_por?: string | null
           condiciones_aceptadas_at?: string | null

@@ -94,6 +94,7 @@ import {
 import { aplicarCambioReserva, mensajeErrorServicio, type ReservaServicio } from "@/lib/reservas/servicioSala";
 import type { CambiosVerificacion, ReservaParaVerificar } from "@/lib/reservas/verificacion";
 import { marcarAvisosDeReserva } from "@/lib/avisosRevisados";
+import { leerCanalAvisos } from "@/lib/reservas/canalAvisos";
 import { avisarReservaAtendida } from "@/hooks/useAvisosSeccion";
 
 // Antes se declaraban aquí; siguen saliendo de este módulo para quien ya las importaba.
@@ -338,6 +339,9 @@ export function useAccionesServicioReserva() {
         ahora: new Date(),
         estadoPrevio: estadoPrevioDe(reserva.id),
       });
+      // Por dónde se le avisa (correo o WhatsApp), para que el aviso al personal diga la verdad.
+      // A la vez que la escritura, para no retrasar nada; si falla, `null` (= correo).
+      const canalAvisos = def.avisaCliente && !sinCorreo && !enBloque ? leerCanalAvisos(reserva.id) : Promise.resolve(null);
       const escrito = await escribir(reserva.id, cambios, {
         verbo: def.verbo(reserva),
         desdeEstados: desdeEstadosDeLaEscritura(id, reserva),
@@ -355,7 +359,12 @@ export function useAccionesServicioReserva() {
       // 5. Lo que queda apuntado para el «Deshacer» del chip, el aviso y el correo. Si hubo que reintentar desde
       // otro estado vivo, la reserva «de verdad» es la que tenía ESE estado: es el que se recuerda y el que
       // restaura el «Deshacer» del aviso.
-      const vista = escrito.estadoReal ? { ...reserva, estado: escrito.estadoReal } : reserva;
+      const canal = await canalAvisos;
+      const vista = {
+        ...reserva,
+        ...(escrito.estadoReal ? { estado: escrito.estadoReal } : {}),
+        ...(canal ? { canal_avisos: canal } : {}),
+      };
       if (def.recuerdaEstadoPrevio) recordarEstadoPrevio(reserva.id, vista.estado);
       if (def.olvidaEstadoPrevio) olvidarEstadoPrevio(reserva.id);
       // Sin correo: el aviso lo dice, para que nadie dé por hecho que el cliente ya lo sabe.
