@@ -752,11 +752,9 @@ async function enSegundoPlano(tarea: Promise<unknown>, etiqueta: string): Promis
 // Devuelve SIEMPRE un resultado (nunca lanza): quien lo llama decide si
 // avisar con `debeAvisarDeEmailsReserva` (pura, en plantillas.ts).
 //
-// SIN LLAMADORES desde el 2026-09-28 (el correo de "solicitud recibida" se
-// quito del canal web — ver el bloque del final de `handleCrear`). Se
-// mantiene a proposito: es el contrato de
-// delegacion ya escrito y probado, y el sitio exacto donde volver a
-// engancharse si el dueño cambia de idea.
+// Desde el 2026-09-28 (el correo de "solicitud recibida" se quito del canal
+// web — ver el bloque del final de `handleCrear`) solo la llaman las reservas
+// con avisos por WhatsApp (22/11/2026): ese primer aviso sí lo quiere el dueño.
 async function notificarViaEmailsReserva(reservaId: string): Promise<ResultadoNotificarEmailsReserva> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -1937,6 +1935,19 @@ async function handleCrear(req: Request): Promise<Response> {
   // Los correos de RECHAZO (`avisar(...)`, mas arriba) no cambian: esos se
   // siguen mandando desde aqui porque en ese punto todavia no hay fila en
   // `reservas` sobre la que `emails-reserva` pudiera trabajar.
+  //
+  // EXCEPCION: quien eligio avisos por WHATSAPP (prueba de concepto,
+  // 22/11/2026). El primer WhatsApp («hemos recibido tu solicitud», con
+  // «Gestionar mi reserva» y «Ver la carta») lo pidio el dueño. Se vuelve a
+  // llamar a `emails-reserva/notificar` SOLO para esas reservas:
+  // emails-reserva se lo pide a whatsapp-reservas antes de mirar el canal y,
+  // si el WhatsApp no sale, la regla de `CANALES_SIN_SOLICITUD_RECIBIDA` sigue
+  // impidiendo el correo. En segundo plano: no retrasa el 201. Sin la columna
+  // (migración 20261215100000 sin aplicar) `canal_avisos` ya no está en la
+  // fila y no se llama.
+  if (filaReserva.canal_avisos === "whatsapp") {
+    await enSegundoPlano(notificarViaEmailsReserva(inserted.id), "aviso por WhatsApp de la reserva recibida");
+  }
 
   return json({ ok: true, reserva_id: inserted.id, estado: "pendiente" }, 201);
 }
