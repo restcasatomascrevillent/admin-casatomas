@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-// Sin tipos generados: las tablas son de 20261126001000 y la tarjeta tiene que decir
-// «falta la migración» en vez de romper si aún no está.
+// Sin tipos generados: las tablas son de 20261126001000 (y los chats por canal de 20261216100000); la
+// tarjeta tiene que decir «falta la migración» en vez de romper si aún no está.
 const sb = supabase as unknown as SupabaseClient;
 
 /** chat_id válido: número (grupos: -100…) o @canal. Igual que el CHECK de la tabla. */
@@ -11,9 +11,26 @@ export const chatIdValido = (v: string): boolean => /^(-?[0-9]{1,20}|@[A-Za-z0-9
 
 export const CLAVE_AVISOS_TELEGRAM = ["super-admin", "avisos-telegram"] as const;
 
+/** Los chats por canal (20261216100000). Vacíos: Reservas, Facturas y Resúmenes usan chat_id; Fallos no se envía. */
+export const CHATS_CANAL = [
+  { campo: "chat_reservas", etiqueta: "Reservas", ayuda: "Reservas nuevas y canceladas de hoy y mañana. Vacío: el chat general." },
+  { campo: "chat_facturas", etiqueta: "Facturas y márgenes", ayuda: "Precios, márgenes, albaranes y el resto de avisos al momento. Vacío: el chat general." },
+  { campo: "chat_resumenes", etiqueta: "Resúmenes", ayuda: "Resumen diario y semanal. Vacío: el chat general." },
+  { campo: "chat_fallos", etiqueta: "Fallos técnicos", ayuda: "Solo para desarrolladores (llevan emails y preguntas del chatbot). Vacío: no se envían." },
+] as const;
+export type CampoChat = "chat_id" | (typeof CHATS_CANAL)[number]["campo"];
+
+export const MIGRACION_BASE = "20261126001000_avisos_telegram";
+export const MIGRACION_CANALES = "20261216100000_telegram_canales";
+
 export interface ConfigAvisosTelegram {
   activo: boolean;
+  /** Chat general: el de Reservas, Facturas y Resúmenes si no tienen el suyo. */
   chat_id: string | null;
+  chat_reservas: string | null;
+  chat_facturas: string | null;
+  chat_resumenes: string | null;
+  chat_fallos: string | null;
   hora_resumen: number;
   tipos_al_momento: string[];
   silencio_activo: boolean;
@@ -30,15 +47,19 @@ export interface EnvioTelegram {
 }
 
 export type EstadoAvisosTelegram =
-  | { disponible: false }
+  | { disponible: false; migracion: string }
   | { disponible: true; config: ConfigAvisosTelegram; ultimoEnvio: EnvioTelegram | null; ultimoError: EnvioTelegram | null };
 
 export type CambiosAvisosTelegram = Partial<Omit<ConfigAvisosTelegram, "resumen_ultimo_dia">>;
 
-function sinMigracion(e: { code?: string; message?: string } | null): boolean {
-  if (!e) return false;
-  if (e.code === "42P01" || e.code === "PGRST205") return true;
-  return /avisos_telegram/.test(e.message ?? "") && /does not exist|could not find|schema cache/i.test(e.message ?? "");
+/** Qué migración falta según el error de la lectura (null si el error es otro). */
+function migracionQueFalta(e: { code?: string; message?: string } | null): string | null {
+  if (!e) return null;
+  const m = e.message ?? "";
+  if (e.code === "42P01" || e.code === "PGRST205") return MIGRACION_BASE;
+  if (e.code === "42703" || /chat_(reservas|facturas|resumenes|fallos)/.test(m)) return MIGRACION_CANALES;
+  if (/avisos_telegram/.test(m) && /does not exist|could not find|schema cache/i.test(m)) return MIGRACION_BASE;
+  return null;
 }
 
 export function useAvisosTelegram() {
@@ -47,11 +68,12 @@ export function useAvisosTelegram() {
     queryFn: async (): Promise<EstadoAvisosTelegram> => {
       const { data, error } = await sb
         .from("avisos_telegram_config")
-        .select("activo, chat_id, hora_resumen, tipos_al_momento, silencio_activo, silencio_desde, silencio_hasta, resumen_ultimo_dia")
+        .select("activo, chat_id, chat_reservas, chat_facturas, chat_resumenes, chat_fallos, hora_resumen, tipos_al_momento, silencio_activo, silencio_desde, silencio_hasta, resumen_ultimo_dia")
         .eq("id", true)
         .maybeSingle();
       if (error) {
-        if (sinMigracion(error)) return { disponible: false };
+        const migracion = migracionQueFalta(error);
+        if (migracion) return { disponible: false, migracion };
         throw new Error(error.message || "No se pudo leer la configuración de Telegram.");
       }
       if (!data) throw new Error("Solo un super admin puede ver la configuración de Telegram.");
@@ -76,7 +98,7 @@ export function useGuardarAvisosTelegram() {
     mutationFn: async (cambios: CambiosAvisosTelegram) => {
       const { data, error } = await sb.from("avisos_telegram_config").update(cambios).eq("id", true).select("id");
       if (error) {
-        if (/chat_id/.test(error.message)) throw new Error("El chat_id no es válido: un número (los grupos empiezan por -100) o @nombre_del_canal.");
+        if (/chat_/.test(error.message)) throw new Error("Algún chat no es válido: un número (los grupos empiezan por -100) o @nombre_del_canal.");
         throw new Error(error.message);
       }
       if (!data || data.length === 0) throw new Error("No se ha guardado: solo un super admin puede cambiar Telegram.");
@@ -103,6 +125,8 @@ export interface ResultadoPruebaTelegram {
   ok: boolean;
   error?: string;
   sin_configurar?: boolean;
+  /** Una prueba por chat distinto, con los canales que recibe (20261216100000). */
+  resultados?: { canales: string[]; ok: boolean; error?: string }[];
 }
 
 export function useProbarTelegram() {

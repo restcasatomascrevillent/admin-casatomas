@@ -4,9 +4,9 @@ import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-cl
 import { exigirSuperAdmin } from "../_shared/autorizacion.ts";
 import { compararTiempoConstante } from "../_shared/tiempo-constante.ts";
 import {
-  type Accion, agruparEnMensajes, aplicarTopesPorGrupo, type Aviso, type ConfigTelegram, construirResumen, construirSemanal, cuerpoSendMessage, type DatosSemanales,
-  diaMadrid, type Envio, errorSaneado, esAccion, evaluarPendientes, mensajeAviso, notaTope, type ReservaInfo, SIN_CONFIGURAR, silencioAhora,
-  type Sugerencia, TEXTO_PRUEBA, TIPOS_RESERVA, TOPE_DIA, TOPE_HORA, TOPE_RESERVAS_DIA, TOPE_RESERVAS_HORA,
+  type Accion, agruparEnMensajes, aplicarTopes, type Aviso, type CanalAviso, canalDeTipo, chatDe, type ConfigTelegram, construirResumen, construirSemanal,
+  cuerpoSendMessage, type DatosSemanales, destinos, diaMadrid, type Envio, errorSaneado, esAccion, evaluarPendientes, mensajeAviso, NOMBRE_CANAL, notaTope,
+  type ReservaInfo, SIN_CONFIGURAR, silencioAhora, type Sugerencia, textoPrueba, tipoRegistro, TIPOS_RESERVA, topesDeCanal,
 } from "./logica.ts";
 import { type Contexto, type Fallo, idAlbaran, mensajeFallo } from "./fallos.ts";
 const createClient = clienteConAuditoria(createClientBase, "avisos-telegram");
@@ -14,34 +14,31 @@ const createClient = clienteConAuditoria(createClientBase, "avisos-telegram");
 // ============================================================================
 //  avisos-telegram · Avisos del panel por Telegram (11-nov-2026)
 // ----------------------------------------------------------------------------
-//  POST { accion: "pendientes" }  manda al momento los avisos nuevos de los tipos
-//       marcados (avisos_telegram_config.tipos_al_momento) sin enviar, fuera del
-//       silencio nocturno. Varios a la vez van juntos en mensajes de ≤ 4.096.
-//  POST { accion: "resumen" }     un mensaje con los avisos de las últimas 24 h
-//       agrupados por tipo; guarda resumen_ultimo_dia (uno al día).
-//  POST { accion: "fallos" }      fallos internos para desarrolladores (fallos.ts): un mensaje
-//       por fila pendiente de fallos_internos, sin silencio nocturno.
-//  POST { accion: "semanal" }     resumen semanal del dueño (lunes por la mañana, configurable): vinos y
-//       tienda bajo el mínimo de margen, facturas por verificar y albaranes sin factura (RPC
-//       avisos_telegram_datos_semanal). Sin nada que contar, no manda nada.
-//  POST { accion: "probar" }      «Prueba de avisos de Casa Tomás» al chat
-//       configurado (aunque esté desactivado: sirve para montarlo).
-//  Todo queda en avisos_telegram_envios (ok o error).
+//  22/11/2026 (dueño: «diferentes subchats para que no se pete uno» y «mensajes más concisos»): cuatro
+//  chats, uno por canal (migración 20261216100000):
+//    Reservas             reservas nuevas y canceladas de hoy y mañana         chat_reservas  (o chat_id)
+//    Facturas y márgenes  los demás avisos al momento (precio, margen…)        chat_facturas  (o chat_id)
+//    Resúmenes            resumen diario y semanal                              chat_resumenes (o chat_id)
+//    Fallos técnicos      fallos internos para desarrolladores                  chat_fallos (sin él, no se envían)
+//  Cada aviso es UNA línea con emoji (y el enlace debajo si sirve para actuar). El resumen diario no repite lo
+//  que ya llegó al momento. Cada canal tiene su tope; si Telegram pide esperar (429), no cuenta como fallo.
 //
-//  Secretos: TELEGRAM_BOT_TOKEN (sin él no envía nada, responde y registra
-//  «Telegram sin configurar»); PANEL_URL opcional (enlace al panel en cada aviso).
-//  18/11/2026 (revisión de producción): el resumen no cuela avisos con campana=false ni unidades dudosas ni
-//  repite «Por revisar» cada día, y no se manda vacío; sin nombres de clientes (RGPD); las reservas nuevas y
-//  canceladas de hoy y mañana van al momento (no las pendientes de verificar ni las canceladas desde el
-//  panel); tope de avisos al momento por hora y día («…y N más»).
-//  14/11/2026: mensajes de 2-4 líneas (título, qué ha pasado, qué hacer, enlace). En
-//  «Margen bajo» con precio sugerido (RPC avisos_precio_sugerido), el enlace abre
-//  /aplicar-precio/<aviso> en el panel: sesión + permiso de carta + confirmación.
-//  La llaman: pg_cron (avisos-telegram-pendientes cada 5 min y
-//  avisos-telegram-resumen cada hora, x-ocr-secret = Vault «ocr_trabajos_secret»)
-//  y un SUPER ADMIN con su JWT desde Super Admin › Servicios › Configurar.
-//  verify_jwt = false (pg_net no lleva JWT): la autenticación es el secreto o el
-//  super admin. Texto plano (sin parse_mode): no hay HTML que escapar.
+//  POST { accion: "pendientes" }  manda al momento los avisos nuevos (tipos marcados en tipos_al_momento y,
+//       salvo que se apague, las reservas de hoy y mañana) fuera del silencio nocturno, cada uno a su canal.
+//  POST { accion: "resumen" }     un mensaje con los avisos de las últimas 24 h que no salieron al momento;
+//       guarda resumen_ultimo_dia (uno al día).
+//  POST { accion: "fallos" }      fallos internos (fallos.ts): un mensaje por fila pendiente de fallos_internos,
+//       sin silencio nocturno.
+//  POST { accion: "semanal" }     resumen semanal del dueño (lunes por la mañana, configurable).
+//  POST { accion: "probar" }      una prueba a cada chat configurado, diciendo qué llegará ahí (aunque esté
+//       desactivado: sirve para montarlo).
+//  Todo queda en avisos_telegram_envios (ok o error, con el chat).
+//
+//  Secretos: TELEGRAM_BOT_TOKEN (sin él no envía nada, responde y registra «Telegram sin configurar»);
+//  PANEL_URL opcional (enlaces al panel). La llaman pg_cron (avisos_telegram_disparar, x-ocr-secret = Vault
+//  «ocr_trabajos_secret») y un SUPER ADMIN con su JWT desde Super Admin › Servicios › Configurar.
+//  verify_jwt = false (pg_net no lleva JWT): la autenticación es el secreto o el super admin. Texto plano
+//  (sin parse_mode): no hay HTML que escapar. Sin nombres de clientes (RGPD).
 // ============================================================================
 
 const SECRETO = Deno.env.get("OCR_TRABAJOS_SECRET");
@@ -49,7 +46,8 @@ const URL_SB = Deno.env.get("SUPABASE_URL")!;
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const TOKEN = (Deno.env.get("TELEGRAM_BOT_TOKEN") ?? "").trim();
 const PANEL_URL = Deno.env.get("PANEL_URL") ?? null;
-const NOTA_TOPE = "nota tope";
+/** Registro de la nota «➕ N avisos más» de cada canal (como mucho una por hora si no hay nada más que mandar). */
+const notaTopeDe = (canal: CanalAviso) => `nota tope · ${canal}`;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -61,7 +59,8 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
-type Resultado = { ok: true; mensaje_id: number | null } | { ok: false; error: string };
+/** Resultado de un envío. `esperar`: Telegram pidió parar (429); no es un fallo del aviso, se reintenta luego. */
+type Resultado = { ok: true; mensaje_id: number | null } | { ok: false; error: string; esperar?: boolean };
 
 async function enviarTelegram(chatId: string, texto: string): Promise<Resultado> {
   const control = new AbortController();
@@ -74,7 +73,9 @@ async function enviarTelegram(chatId: string, texto: string): Promise<Resultado>
       signal: control.signal,
     });
     const cuerpo = await res.json().catch(() => null) as { ok?: boolean; description?: string; result?: { message_id?: number } } | null;
-    if (!res.ok || !cuerpo?.ok) return { ok: false, error: errorSaneado(`Telegram ${res.status}: ${cuerpo?.description ?? "sin respuesta"}`) };
+    if (!res.ok || !cuerpo?.ok) {
+      return { ok: false, error: errorSaneado(`Telegram ${res.status}: ${cuerpo?.description ?? "sin respuesta"}`), esperar: res.status === 429 };
+    }
     return { ok: true, mensaje_id: cuerpo.result?.message_id ?? null };
   } catch (e) {
     return { ok: false, error: errorSaneado(`Telegram no responde: ${(e as Error)?.name ?? "error"}`) };
@@ -93,11 +94,7 @@ async function cargarReservas(sb: Cliente, avisos: Aviso[]): Promise<Map<string,
   const ids = [...new Set(avisos.filter((a) => TIPOS_RESERVA.includes(a.tipo) && a.referencia_id).map((a) => a.referencia_id as string))];
   const mapa = new Map<string, ReservaInfo>();
   if (ids.length === 0) return mapa;
-  let { data, error } = await sb.from("reservas").select("id, fecha, hora, numero_comensales, canal, estado, cancelada_por").in("id", ids);
-  if (error) {
-    // Sin la columna cancelada_por (migración 20261205100200 sin aplicar).
-    ({ data, error } = await sb.from("reservas").select("id, fecha, hora, numero_comensales, canal, estado").in("id", ids));
-  }
+  const { data, error } = await sb.from("reservas").select("id, fecha, hora, numero_comensales, canal, estado, cancelada_por").in("id", ids);
   if (error) {
     console.warn("[avisos-telegram] reservas:", error.message);
     return null;
@@ -136,43 +133,56 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
     const falta = /does not exist|schema cache/i.test(eCfg.message ?? "");
     return json({ ok: false, error: falta ? "Falta la migración 20261126001000_avisos_telegram" : eCfg.message }, 500);
   }
-  const cfg = cfgFila as ConfigTelegram | null;
-  const chatId = cfg?.chat_id?.trim() ?? "";
+  const cfg = (cfgFila ?? { chat_id: null }) as ConfigTelegram;
+  if (cfgFila && !("chat_fallos" in cfgFila)) return json({ ok: false, error: "Falta la migración 20261216100000_telegram_canales" }, 500);
 
-  const registrar = async (filas: { tipo: string; aviso_id?: string | null; fallo_id?: number | null; ok: boolean; error?: string | null; mensaje_id?: number | null }[]) => {
+  type Fila = { tipo: string; chat: string | null; aviso_id?: string | null; fallo_id?: number | null; ok: boolean; error?: string | null; mensaje_id?: number | null };
+  const registrar = async (filas: Fila[]) => {
     if (filas.length === 0) return;
-    const { error } = await sb.from("avisos_telegram_envios").insert(filas.map((f) => ({ chat_id: chatId || null, ...f })));
+    const { error } = await sb.from("avisos_telegram_envios").insert(filas.map(({ chat, ...f }) => ({ chat_id: chat, ...f })));
     if (error) console.error("[avisos-telegram] registro:", error.message);
   };
+  const resultadoFila = (r: Resultado) => ({ ok: r.ok, error: r.ok ? null : r.error, mensaje_id: r.ok ? r.mensaje_id : null });
 
   // Sin token: no se envía nada. Se registra (como mucho una vez por hora y acción) y se responde sin fallar.
   if (!TOKEN) {
+    const tipo = tipoRegistro(accion);
     const { data: reciente } = await sb.from("avisos_telegram_envios").select("id")
-      .eq("tipo", accion === "pendientes" ? "pendientes" : accion === "resumen" ? "resumen" : "prueba")
-      .eq("error", SIN_CONFIGURAR).gte("enviado_en", new Date(Date.now() - 3600_000).toISOString()).limit(1);
-    if (accion === "probar" || !reciente?.length) {
-      await registrar([{ tipo: accion === "probar" ? "prueba" : accion, ok: false, error: SIN_CONFIGURAR }]);
-    }
+      .eq("tipo", tipo).eq("error", SIN_CONFIGURAR).gte("enviado_en", new Date(Date.now() - 3600_000).toISOString()).limit(1);
+    if (accion === "probar" || !reciente?.length) await registrar([{ tipo, chat: null, ok: false, error: SIN_CONFIGURAR }]);
     console.warn(`[avisos-telegram] ${quien} · ${accion}: ${SIN_CONFIGURAR} (falta TELEGRAM_BOT_TOKEN)`);
     return json({ ok: false, sin_configurar: true, error: SIN_CONFIGURAR });
   }
-  if (!chatId) return json({ ok: false, error: "Falta el chat_id de Telegram en la configuración" });
 
   if (accion === "probar") {
-    const r = await enviarTelegram(chatId, TEXTO_PRUEBA);
-    await registrar([{ tipo: "prueba", ok: r.ok, error: r.ok ? null : r.error, mensaje_id: r.ok ? r.mensaje_id : null }]);
-    console.log(`[avisos-telegram] ${quien} · probar · ${r.ok ? "ok" : r.error}`);
-    return json(r.ok ? { ok: true } : { ok: false, error: r.error });
+    const lista = destinos(cfg);
+    if (lista.length === 0) return json({ ok: false, error: "Falta el chat de Telegram en la configuración" });
+    const resultados: { chat: string; canales: string[]; ok: boolean; error?: string }[] = [];
+    for (const [i, d] of lista.entries()) {
+      if (i > 0) await pausa();
+      const r = await enviarTelegram(d.chat, textoPrueba(d.canales));
+      await registrar([{ tipo: "prueba", chat: d.chat, ...resultadoFila(r) }]);
+      resultados.push({ chat: d.chat, canales: d.canales.map((c) => NOMBRE_CANAL[c]), ok: r.ok, ...(r.ok ? {} : { error: r.error }) });
+    }
+    const fallidos = resultados.filter((r) => !r.ok);
+    console.log(`[avisos-telegram] ${quien} · probar · ${resultados.length - fallidos.length}/${resultados.length}${fallidos.length ? ` · ${fallidos[0].error}` : ""}`);
+    return json({
+      ok: fallidos.length === 0,
+      resultados,
+      ...(fallidos.length ? { error: fallidos.map((f) => `${f.canales.join(", ")}: ${f.error}`).join(" · ") } : {}),
+    });
   }
 
-  if (!cfg?.activo) return json({ ok: true, enviados: 0, motivo: "inactivo" });
+  if (!cfg.activo) return json({ ok: true, enviados: 0, motivo: "inactivo" });
   const ahora = new Date();
 
   if (accion === "fallos") {
-    // Fallos internos (tabla fallos_internos): un mensaje por fallo, sin silencio nocturno.
+    // Fallos internos (tabla fallos_internos): un mensaje por fallo, sin silencio nocturno, solo a su chat.
+    const chat = chatDe(cfg, "fallos");
+    if (!chat) return json({ ok: true, enviados: 0, motivo: "sin chat de Fallos técnicos" });
     const { data: filas, error: eRec } = await sb.rpc("fallos_internos_reclamar", { p_limite: 20 });
     if (eRec) return json({ ok: false, error: eRec.message }, 500);
-    const fallos = (filas ?? []) as Fallo[];
+    const fallos = (filas ?? []) as (Fallo & { intentos?: number })[];
     let enviados = 0;
     const errores: string[] = [];
     for (const [i, f] of fallos.entries()) {
@@ -183,8 +193,16 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
         const { data: alb } = await sb.from("facturas").select("id, proveedor, fecha").eq("id", idAlb).maybeSingle();
         if (alb) ctx.albaran = alb as Contexto["albaran"];
       }
-      const r = await enviarTelegram(chatId, mensajeFallo(f, ctx));
-      await registrar([{ tipo: "fallo", fallo_id: f.id, ok: r.ok, error: r.ok ? null : r.error, mensaje_id: r.ok ? r.mensaje_id : null }]);
+      const r = await enviarTelegram(chat, mensajeFallo(f, ctx));
+      await registrar([{ tipo: "fallo", chat, fallo_id: f.id, ...resultadoFila(r) }]);
+      if (!r.ok && r.esperar) {
+        // Telegram pide esperar: este y los que quedan se devuelven a la cola sin gastar un intento.
+        for (const g of fallos.slice(i)) {
+          await sb.from("fallos_internos").update({ intentos: Math.max(0, (g.intentos ?? 1) - 1), reclamado_en: null, ultimo_error: r.error }).eq("id", g.id);
+        }
+        errores.push(r.error);
+        break;
+      }
       await sb.from("fallos_internos").update(r.ok ? { enviado_en: new Date().toISOString(), ultimo_error: null } : { ultimo_error: r.error }).eq("id", f.id);
       if (r.ok) enviados++;
       else errores.push(r.error);
@@ -195,10 +213,12 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
 
   if (accion === "semanal") {
     if (cfg.semanal_activo === false) return json({ ok: true, enviados: 0, motivo: "semanal apagada" });
+    const chat = chatDe(cfg, "resumenes");
+    if (!chat) return json({ ok: true, enviados: 0, motivo: "sin chat de Resúmenes" });
     const { data, error: eSem } = await sb.rpc("avisos_telegram_datos_semanal");
     if (eSem) return json({ ok: false, error: eSem.message }, 500);
     const datosSem = (data ?? {}) as DatosSemanales;
-    // Total de albaranes sin factura (el aviso solo cuenta los de más de 35 días); si falla, se omite esa línea.
+    // Total de albaranes sin factura (el aviso solo cuenta los de más de 35 días); si falla, se omite esa parte.
     const { data: tot, error: eTot } = await sb.rpc("avisos_telegram_albaranes_total");
     if (eTot) console.warn("[avisos-telegram] albaranes total:", eTot.message);
     else if (datosSem.albaranes) datosSem.albaranes = { ...datosSem.albaranes, ...(tot as object) };
@@ -211,8 +231,8 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
       await marcar(); // nada que contar: no se manda y no se vuelve a mirar hoy
       return json({ ok: true, secciones: 0, omitido: true });
     }
-    const r = await enviarTelegram(chatId, semanal.texto);
-    await registrar([{ tipo: "semanal", ok: r.ok, error: r.ok ? null : r.error, mensaje_id: r.ok ? r.mensaje_id : null }]);
+    const r = await enviarTelegram(chat, semanal.texto);
+    await registrar([{ tipo: "semanal", chat, ...resultadoFila(r) }]);
     if (r.ok) await marcar();
     console.log(`[avisos-telegram] ${quien} · semanal · ${semanal.secciones} secciones · ${r.ok ? "ok" : r.error}`);
     return json(r.ok ? { ok: true, secciones: semanal.secciones } : { ok: false, error: r.error });
@@ -220,6 +240,9 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
 
   if (accion === "pendientes") {
     if (silencioAhora(cfg, ahora)) return json({ ok: true, enviados: 0, motivo: "silencio" });
+    const chats: Record<CanalAviso, string | null> = { reservas: chatDe(cfg, "reservas"), facturas: chatDe(cfg, "facturas") };
+    const canales = new Set((Object.keys(chats) as CanalAviso[]).filter((c) => chats[c]));
+    if (canales.size === 0) return json({ ok: true, enviados: 0, motivo: "sin chat" });
     const desde = new Date(ahora.getTime() - 24 * 3600_000).toISOString();
     // Los tipos marcados y, salvo que se apague, las reservas nuevas/canceladas (solo valen las de hoy y mañana).
     const tipos = [...cfg.tipos_al_momento, ...(cfg.reservas_al_momento === false ? [] : TIPOS_RESERVA)];
@@ -237,81 +260,102 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
       envios = (data ?? []) as Envio[];
     }
     const reservas = await cargarReservas(sb, lista);
-    const ev = evaluarPendientes(lista, envios, cfg, ahora, { reservas });
+    const ev = evaluarPendientes(lista, envios, cfg, ahora, { reservas, canales });
     // Lo que no se va a mandar nunca (unidades dudosas, reserva cancelada desde el panel…) se da por consumido.
-    await registrar(ev.descartar.map((d) => ({ tipo: "aviso", aviso_id: d.aviso.id, ok: true, error: d.motivo })));
+    await registrar(ev.descartar.map((d) => ({ tipo: "aviso", chat: null, aviso_id: d.aviso.id, ok: true, error: d.motivo })));
 
-    // Topes contra la inundación: por hora y por día (solo cuentan los envíos correctos de avisos). Las reservas
-    // tienen el suyo y se cuentan aparte, para que los avisos de precio no las dejen sin avisar.
+    // Lo ya mandado en las últimas 24 h, por canal (solo los envíos correctos de avisos): para los topes.
     const desdeHora = new Date(ahora.getTime() - 3600_000).toISOString();
     const { data: envsOk } = await sb.from("avisos_telegram_envios").select("aviso_id, enviado_en")
       .eq("tipo", "aviso").eq("ok", true).is("error", null).gte("enviado_en", desde).limit(2000);
     const idsEnv = [...new Set((envsOk ?? []).map((e: { aviso_id: string | null }) => e.aviso_id).filter(Boolean))] as string[];
-    const idsReserva = new Set<string>();
+    const canalDe = new Map<string, CanalAviso>();
     if (idsEnv.length) {
-      const { data: tr } = await sb.from("notificaciones_dashboard").select("id").in("id", idsEnv).in("tipo", TIPOS_RESERVA);
-      for (const x of tr ?? []) idsReserva.add((x as { id: string }).id);
+      const { data: tt } = await sb.from("notificaciones_dashboard").select("id, tipo").in("id", idsEnv);
+      for (const x of (tt ?? []) as { id: string; tipo: string }[]) canalDe.set(x.id, canalDeTipo(x.tipo));
     }
-    const usados = { hora: 0, dia: 0, reservasHora: 0, reservasDia: 0 };
+    const usados: Record<CanalAviso, { hora: number; dia: number }> = { reservas: { hora: 0, dia: 0 }, facturas: { hora: 0, dia: 0 } };
     for (const e of (envsOk ?? []) as { aviso_id: string | null; enviado_en: string }[]) {
-      const res = !!e.aviso_id && idsReserva.has(e.aviso_id);
-      const reciente = e.enviado_en >= desdeHora;
-      if (res) { usados.reservasDia++; if (reciente) usados.reservasHora++; } else { usados.dia++; if (reciente) usados.hora++; }
+      const c = (e.aviso_id && canalDe.get(e.aviso_id)) || "facturas";
+      usados[c].dia++;
+      if (e.enviado_en >= desdeHora) usados[c].hora++;
     }
-    const topes = { hora: cfg.tope_hora ?? TOPE_HORA, dia: cfg.tope_dia ?? TOPE_DIA, reservasHora: TOPE_RESERVAS_HORA, reservasDia: TOPE_RESERVAS_DIA };
-    const { enviar, resto } = aplicarTopesPorGrupo(ev.enviar, (a) => TIPOS_RESERVA.includes(a.tipo), usados, topes);
-    const pendientes = enviar.slice(0, 50);
-    // El resto va en una nota («…y N más»); si no hay nada que mandar, la nota sale como mucho una vez por hora.
-    let nota: string | null = null;
-    if (resto.length > 0) {
-      const { data: previa } = await sb.from("avisos_telegram_envios").select("id").eq("tipo", "pendientes").eq("ok", true).eq("error", NOTA_TOPE)
-        .gte("enviado_en", new Date(ahora.getTime() - 3600_000).toISOString()).limit(1);
-      if (pendientes.length > 0 || !previa?.length) nota = notaTope(resto.length, PANEL_URL);
-    }
-    // Margen bajo: el precio sugerido (20261130160000) para «Qué hacer» y el enlace «Aplicar el precio».
-    const sugerencias = new Map<string, Sugerencia | null>();
-    for (const a of pendientes.filter((x) => x.tipo === "facturas_margen_bajo")) {
-      const { data, error } = await sb.rpc("avisos_precio_sugerido", { p_aviso: a.id });
-      if (error) console.warn("[avisos-telegram] precio sugerido:", error.message);
-      sugerencias.set(a.id, (data as Sugerencia | null) ?? null);
-    }
-    const textos = pendientes.map((a) => mensajeAviso(a, PANEL_URL, sugerencias.get(a.id), { ahora, reservas }));
-    if (nota && textos.length > 0) textos[textos.length - 1] += `\n\n${nota}`;
-    const mensajes = agruparEnMensajes(textos);
-    if (nota && textos.length === 0) mensajes.push({ texto: nota, indices: [] });
+
     let enviados = 0;
-    let notaEnviada = false;
+    let total = 0;
+    let topados = 0;
     const errores: string[] = [];
-    for (const [i, m] of mensajes.entries()) {
-      if (i > 0) await pausa();
-      const r = await enviarTelegram(chatId, m.texto);
-      await registrar(m.indices.map((k) => ({
-        tipo: "aviso", aviso_id: pendientes[k].id, ok: r.ok, error: r.ok ? null : r.error, mensaje_id: r.ok ? r.mensaje_id : null,
-      })));
-      if (r.ok) {
-        enviados += m.indices.length;
-        if (nota && (m.indices.includes(textos.length - 1) || textos.length === 0)) notaEnviada = true;
-      } else errores.push(r.error);
+    let primero = true;
+    for (const canal of canales) {
+      const chat = chats[canal] as string;
+      const delCanal = ev.enviar.filter((a) => canalDeTipo(a.tipo) === canal);
+      if (delCanal.length === 0) continue;
+      const { enviar, resto } = aplicarTopes(delCanal, usados[canal], topesDeCanal(canal, cfg));
+      const pendientes = enviar.slice(0, 50);
+      total += pendientes.length;
+      // El resto va en una nota («➕ N avisos más»); si no hay nada más que mandar, como mucho una vez por hora.
+      let nota: string | null = null;
+      if (resto.length > 0) {
+        const { data: previa } = await sb.from("avisos_telegram_envios").select("id").eq("tipo", "pendientes").eq("ok", true).eq("error", notaTopeDe(canal))
+          .gte("enviado_en", desdeHora).limit(1);
+        if (pendientes.length > 0 || !previa?.length) nota = notaTope(resto.length, PANEL_URL);
+      }
+      // Margen bajo: el precio sugerido (20261130160000) para «→ súbelo a …» y el enlace «Aplicar el precio».
+      const sugerencias = new Map<string, Sugerencia | null>();
+      for (const a of pendientes.filter((x) => x.tipo === "facturas_margen_bajo")) {
+        const { data, error } = await sb.rpc("avisos_precio_sugerido", { p_aviso: a.id });
+        if (error) console.warn("[avisos-telegram] precio sugerido:", error.message);
+        sugerencias.set(a.id, (data as Sugerencia | null) ?? null);
+      }
+      const textos = pendientes.map((a) => mensajeAviso(a, PANEL_URL, sugerencias.get(a.id), { ahora, reservas }));
+      const mensajes = agruparEnMensajes(nota ? [...textos, nota] : textos);
+      const iNota = nota ? textos.length : -1;
+      let notaEnviada = false;
+      for (const m of mensajes) {
+        if (!primero) await pausa();
+        primero = false;
+        const r = await enviarTelegram(chat, m.texto);
+        const deAvisos = m.indices.filter((k) => k !== iNota);
+        if (!r.ok && r.esperar) {
+          // Telegram pide esperar: no se registra como fallo (se reintenta en la próxima vuelta) y se deja este chat.
+          errores.push(`${NOMBRE_CANAL[canal]}: ${r.error}`);
+          break;
+        }
+        await registrar(deAvisos.map((k) => ({ tipo: "aviso", chat, aviso_id: pendientes[k].id, ...resultadoFila(r) })));
+        if (r.ok) {
+          enviados += deAvisos.length;
+          if (m.indices.includes(iNota)) notaEnviada = true;
+        } else errores.push(`${NOMBRE_CANAL[canal]}: ${r.error}`);
+      }
+      if (nota && notaEnviada) {
+        topados += resto.length;
+        await registrar([
+          ...resto.map((a) => ({ tipo: "aviso", chat, aviso_id: a.id, ok: true, error: `tope: agrupado en «${resto.length} avisos más»` })),
+          { tipo: "pendientes", chat, ok: true, error: notaTopeDe(canal) },
+        ]);
+      }
     }
-    if (nota && notaEnviada) {
-      await registrar([
-        ...resto.map((a) => ({ tipo: "aviso", aviso_id: a.id, ok: true, error: `tope: agrupado en «…y ${resto.length} más»` })),
-        { tipo: "pendientes", ok: true, error: NOTA_TOPE },
-      ]);
-    }
-    console.log(`[avisos-telegram] ${quien} · pendientes · ${enviados}/${pendientes.length}${resto.length ? ` · tope: ${resto.length} más` : ""}${errores.length ? ` · ${errores[0]}` : ""}`);
-    return json({ ok: errores.length === 0, enviados, pendientes: pendientes.length, tope: resto.length, error: errores[0] });
+    console.log(`[avisos-telegram] ${quien} · pendientes · ${enviados}/${total}${topados ? ` · tope: ${topados} más` : ""}${errores.length ? ` · ${errores[0]}` : ""}`);
+    return json({ ok: errores.length === 0, enviados, pendientes: total, tope: topados, error: errores[0] });
   }
 
   // resumen
+  const chat = chatDe(cfg, "resumenes");
+  if (!chat) return json({ ok: true, enviados: 0, motivo: "sin chat de Resúmenes" });
   const desde = new Date(ahora.getTime() - 24 * 3600_000).toISOString();
   const { data: avisos, error: eAv } = await sb.from("notificaciones_dashboard")
     .select("id, tipo, titulo, mensaje, referencia_tipo, referencia_id, created_at, caduca_en, datos")
     .gt("created_at", desde).order("created_at", { ascending: false }).limit(500);
   if (eAv) return json({ ok: false, error: eAv.message }, 500);
   const lista = (avisos ?? []) as Aviso[];
+  // Lo que ya llegó al momento no se repite (envío correcto y sin «error»: no los descartados ni los del tope).
+  const { data: yaEnviados, error: eEnv } = await sb.from("avisos_telegram_envios").select("aviso_id")
+    .eq("tipo", "aviso").eq("ok", true).is("error", null)
+    .gte("enviado_en", new Date(ahora.getTime() - 48 * 3600_000).toISOString()).limit(5000);
+  if (eEnv) return json({ ok: false, error: eEnv.message }, 500);
+  const enviados = new Set(((yaEnviados ?? []) as { aviso_id: string | null }[]).map((e) => e.aviso_id).filter(Boolean) as string[]);
   const reservas = await cargarReservas(sb, lista);
-  const resumen = construirResumen(lista, ahora, PANEL_URL, { reservas, revision: cfg.resumen_revision ?? {} });
+  const resumen = construirResumen(lista, ahora, PANEL_URL, { reservas, revision: cfg.resumen_revision ?? {}, enviados });
   if (resumen.total === 0 || !resumen.texto) {
     // Nada que contar: no se manda «sin avisos», y hoy no se vuelve a mirar.
     const { error } = await sb.from("avisos_telegram_config").update({ resumen_ultimo_dia: diaMadrid(ahora) }).eq("id", true);
@@ -319,8 +363,8 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
     console.log(`[avisos-telegram] ${quien} · resumen · sin avisos que contar: no se envía`);
     return json({ ok: true, total: 0, omitido: true });
   }
-  const r = await enviarTelegram(chatId, resumen.texto);
-  await registrar([{ tipo: "resumen", ok: r.ok, error: r.ok ? null : r.error, mensaje_id: r.ok ? r.mensaje_id : null }]);
+  const r = await enviarTelegram(chat, resumen.texto);
+  await registrar([{ tipo: "resumen", chat, ...resultadoFila(r) }]);
   if (r.ok) {
     const { error } = await sb.from("avisos_telegram_config").update({ resumen_ultimo_dia: diaMadrid(ahora), resumen_revision: resumen.revision }).eq("id", true);
     if (error) console.error("[avisos-telegram] resumen_ultimo_dia:", error.message);
