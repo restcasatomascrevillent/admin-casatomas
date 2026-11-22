@@ -124,7 +124,12 @@ export function espacioAlAceptar(
  * tiene a dónde enviarlo), así que decirlo aquí evita el fallo de creer que
  * al cliente ya se le ha avisado.
  */
-export function avisoAlCliente(reserva: Pick<ReservaParaVerificar, "email">): string {
+export function avisoAlCliente(reserva: Pick<ReservaParaVerificar, "email"> & { canal_avisos?: string | null }): string {
   const email = (reserva.email ?? "").trim();
+  // Eligió WhatsApp al reservar (canalAvisos.ts): emails-reserva se lo manda por ahí y,
+  // si no sale, por correo.
+  if (reserva.canal_avisos === "whatsapp") {
+    return email ? `Se le avisa por WhatsApp (si no le llega, por correo a ${email})` : "Se le avisa por WhatsApp";
+  }
   return email ? `Se le manda el correo a ${email}` : "No tiene correo: hay que avisarle por teléfono";
 }

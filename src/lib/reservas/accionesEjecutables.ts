@@ -90,6 +90,8 @@ export interface ReservaEjecutable {
   espacio_id?: string | null;
   hora_solicitada?: string | null;
   espacio_solicitado_id?: string | null;
+  /** 'email' | 'whatsapp': lo rellena el hook al ejecutar (canalAvisos.ts), no las listas. */
+  canal_avisos?: string | null;
 }
 
 /** Lo que hace falta además de la reserva, según la acción. `undefined`: nada. */
@@ -189,7 +191,7 @@ const traducirErrorMigracion = (error: unknown): string | null =>
  */
 const avisoVerificada = (reserva: ReservaEjecutable, cambios: CambiosReserva): AvisoPersonal => ({
   titulo: `Reserva verificada para las ${horaCorta(cambios.hora ?? reserva.hora)}`,
-  descripcion: avisoAlCliente({ email: reserva.email ?? null }),
+  descripcion: avisoAlCliente({ email: reserva.email ?? null, canal_avisos: reserva.canal_avisos }),
 });
 
 /**
@@ -198,7 +200,9 @@ const avisoVerificada = (reserva: ReservaEjecutable, cambios: CambiosReserva): A
  * ya lo sabe.
  */
 const avisoEstadoActualizado = (reserva: ReservaEjecutable): AvisoPersonal =>
-  (reserva.email ?? "").trim()
+  reserva.canal_avisos === "whatsapp"
+    ? { titulo: "Estado actualizado correctamente", descripcion: avisoAlCliente({ email: reserva.email ?? null, canal_avisos: "whatsapp" }) }
+    : (reserva.email ?? "").trim()
     ? { titulo: "Estado actualizado correctamente" }
     : { titulo: "Estado actualizado correctamente", descripcion: "Sin email: no se envía ningún correo al cliente." };
 
@@ -261,7 +265,7 @@ export const ACCIONES_EJECUTABLES: { readonly [K in IdAccionEjecutable]: Definic
     verbo: () => "rechazar la solicitud",
     cambios: () => ({ estado: ESTADO_CANCELADA }),
     avisaCliente: true,
-    aviso: (reserva) => ({ titulo: "Solicitud rechazada", descripcion: avisoAlCliente({ email: reserva.email ?? null }) }),
+    aviso: (reserva) => ({ titulo: "Solicitud rechazada", descripcion: avisoAlCliente({ email: reserva.email ?? null, canal_avisos: reserva.canal_avisos }) }),
     traducirError: traducirErrorMigracion,
     motivoRechazo: soloDesde("rechazar", "pendiente"),
   },

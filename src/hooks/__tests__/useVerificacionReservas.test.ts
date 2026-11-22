@@ -142,4 +142,12 @@ describe("avisoAlCliente", () => {
     expect(avisoAlCliente(reserva({ email: null }))).toBe("No tiene correo: hay que avisarle por teléfono");
     expect(avisoAlCliente(reserva({ email: "   " }))).toBe("No tiene correo: hay que avisarle por teléfono");
   });
+
+  it("si eligió WhatsApp al reservar, dice WhatsApp (y el correo solo como respaldo)", () => {
+    expect(avisoAlCliente({ ...reserva({ email: "ana@ejemplo.com" }), canal_avisos: "whatsapp" })).toBe(
+      "Se le avisa por WhatsApp (si no le llega, por correo a ana@ejemplo.com)",
+    );
+    expect(avisoAlCliente({ ...reserva({ email: null }), canal_avisos: "whatsapp" })).toBe("Se le avisa por WhatsApp");
+    expect(avisoAlCliente({ ...reserva({ email: "ana@ejemplo.com" }), canal_avisos: "email" })).toBe("Se le manda el correo a ana@ejemplo.com");
+  });
 });
