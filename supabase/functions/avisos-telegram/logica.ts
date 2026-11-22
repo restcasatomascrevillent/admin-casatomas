@@ -1,18 +1,22 @@
 // ============================================================================
 //  avisos-telegram · lógica pura (sin Deno ni red), probada con vitest en
-//  supabase/functions/avisos-telegram/__tests__/logica.test.ts
+//  supabase/functions/avisos-telegram/__tests__/
+// ----------------------------------------------------------------------------
+//  22/11/2026 (petición del dueño): cuatro chats, uno por canal, para que uno no se llene con lo de otro
+//  (canalDeTipo, chatDe), y mensajes de UNA línea con emoji (lineaAviso). El resumen diario es una línea por
+//  tipo con el número y los dos casos principales, sin repetir lo que ya llegó al momento.
 // ============================================================================
 
 /** Límite de Telegram para el texto de sendMessage. */
 export const LIMITE_TELEGRAM = 4096;
 /** Tras estos fallos, un aviso ya no se reintenta al momento (sale igual en el resumen). */
 export const MAX_FALLOS = 3;
-/** Frases por tipo en el resumen. */
-export const FRASES_POR_TIPO = 4;
+/** Casos que se nombran por tipo en el resumen diario («Chuletón 41 %, Entrecot 38 % y 3 más»). */
+export const CASOS_POR_TIPO = 2;
 /** Tope de avisos «al momento» por hora y por día (configurable: tope_hora y tope_dia). El resto, en el panel. */
 export const TOPE_HORA = 10;
 export const TOPE_DIA = 30;
-/** Tope propio de las reservas (nuevas/canceladas de hoy y mañana): no compiten con los avisos de precio o margen. */
+/** Tope propio del canal de reservas: no compite con los avisos de precio o margen. */
 export const TOPE_RESERVAS_HORA = 20;
 export const TOPE_RESERVAS_DIA = 60;
 /** «Por revisar»: solo entra en el resumen si cambia en CAMBIO_REVISION documentos o han pasado DIAS_REVISION días. */
@@ -20,15 +24,23 @@ export const CAMBIO_REVISION = 5;
 export const DIAS_REVISION = 7;
 /** Si un precio es ≥ RATIO_UNIDADES veces el otro (o al revés), casi seguro se comparan unidades distintas o hay una lectura mala. */
 export const RATIO_UNIDADES = 10;
-/** Avisos de reservas (sin nombres de clientes en Telegram; ver fraseReserva). */
+/** Avisos de reservas (sin nombres de clientes en Telegram; ver lineaReserva). */
 export const TIPOS_RESERVA = ["reserva_nueva", "reserva_cancelada"];
-export const TEXTO_PRUEBA = "Prueba de avisos de Casa Tomás";
 export const SIN_CONFIGURAR = "Telegram sin configurar";
 export const ZONA = "Europe/Madrid";
+/** Largo máximo de la línea de un aviso. */
+export const MAX_LINEA = 180;
 
 export interface ConfigTelegram {
   activo: boolean;
+  /** Chat general: el de Reservas, Facturas y Resúmenes cuando no tienen el suyo. */
   chat_id: string | null;
+  /** 22/11/2026 (20261216100000): un chat por canal. */
+  chat_reservas?: string | null;
+  chat_facturas?: string | null;
+  chat_resumenes?: string | null;
+  /** Fallos técnicos (desarrolladores). Sin él, no se envían: nunca van al general. */
+  chat_fallos?: string | null;
   hora_resumen: number;
   tipos_al_momento: string[];
   silencio_activo: boolean;
@@ -46,6 +58,49 @@ export interface ConfigTelegram {
   semanal_dia?: number;
   semanal_hora?: number;
   semanal_ultimo_dia?: string | null;
+}
+
+// ─── Canales (22/11/2026) ───────────────────────────────────────────────────
+
+/** Los cuatro chats. Reservas y Facturas reciben los avisos al momento; Resúmenes, el diario y el semanal. */
+export type Canal = "reservas" | "facturas" | "resumenes" | "fallos";
+export type CanalAviso = "reservas" | "facturas";
+export const CANALES: Canal[] = ["reservas", "facturas", "resumenes", "fallos"];
+export const NOMBRE_CANAL: Record<Canal, string> = {
+  reservas: "Reservas",
+  facturas: "Facturas y márgenes",
+  resumenes: "Resúmenes",
+  fallos: "Fallos técnicos",
+};
+
+/** Canal de un tipo de aviso. Misma regla que avisos_telegram_canal (SQL, 20261216100000). */
+export const canalDeTipo = (tipo: string): CanalAviso =>
+  tipo.startsWith("reserva_") || tipo === "solicitud_pendiente" ? "reservas" : "facturas";
+
+const chatLimpio = (v: string | null | undefined): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
+
+/** Chat de un canal: el suyo o, salvo Fallos técnicos, el general. null si no hay a dónde mandarlo. */
+export function chatDe(cfg: Pick<ConfigTelegram, "chat_id" | "chat_reservas" | "chat_facturas" | "chat_resumenes" | "chat_fallos">, canal: Canal): string | null {
+  if (canal === "fallos") return chatLimpio(cfg.chat_fallos);
+  const propio = canal === "reservas" ? cfg.chat_reservas : canal === "facturas" ? cfg.chat_facturas : cfg.chat_resumenes;
+  return chatLimpio(propio) ?? chatLimpio(cfg.chat_id);
+}
+
+/** Los chats distintos a los que se manda algo, con los canales que recibe cada uno (para la prueba). */
+export function destinos(cfg: Parameters<typeof chatDe>[0]): { chat: string; canales: Canal[] }[] {
+  const porChat = new Map<string, Canal[]>();
+  for (const c of CANALES) {
+    const chat = chatDe(cfg, c);
+    if (chat) porChat.set(chat, [...(porChat.get(chat) ?? []), c]);
+  }
+  return [...porChat.entries()].map(([chat, canales]) => ({ chat, canales }));
+}
+
+/** Texto de la prueba de un chat: qué canales llegarán ahí. */
+export function textoPrueba(canales: Canal[]): string {
+  const nombres = canales.map((c) => NOMBRE_CANAL[c]);
+  const lista = nombres.length > 1 ? `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}` : nombres[0] ?? "";
+  return `✅ Prueba de avisos de Casa Tomás. Aquí llegará: ${lista}.`;
 }
 
 export interface EstadoRevision {
@@ -70,6 +125,10 @@ export interface ContextoAvisos {
   reservas?: Map<string, ReservaInfo> | null;
   /** «Por revisar» ya mandado (config.resumen_revision). */
   revision?: Record<string, EstadoRevision> | null;
+  /** Canales con chat: los avisos de un canal sin chat no se consideran (ni se dan por consumidos). */
+  canales?: ReadonlySet<CanalAviso> | null;
+  /** Avisos ya enviados al momento (no se repiten en el resumen). */
+  enviados?: ReadonlySet<string> | null;
 }
 
 export interface Aviso {
@@ -107,6 +166,7 @@ export const ETIQUETA_TIPO: Record<string, string> = {
   facturas_precio_baja: "Bajan de precio",
   facturas_precio_proveedor: "Un proveedor sube varias cosas",
   facturas_precio_pactado: "Precio pactado roto",
+  facturas_abreviatura: "Abreviaturas por confirmar",
   peticion_urgente: "Peticiones urgentes",
   reserva_modificada: "Reservas modificadas",
   facturas_margen_bajo: "Margen bajo",
@@ -115,6 +175,33 @@ export const ETIQUETA_TIPO: Record<string, string> = {
 };
 
 export const etiquetaTipo = (tipo: string): string => ETIQUETA_TIPO[tipo] ?? tipo.replace(/_/g, " ");
+
+/** Emoji de cada tipo: abre la línea del aviso y la del resumen. */
+export const EMOJI_TIPO: Record<string, string> = {
+  reserva_nueva: "🟢",
+  reserva_cancelada: "🔴",
+  reserva_modificada: "🟠",
+  solicitud_pendiente: "🟡",
+  facturas_margen_bajo: "⚠️",
+  facturas_precio_sube: "📈",
+  subida_precio: "📈",
+  facturas_precio_proveedor: "📈",
+  facturas_precio_baja: "📉",
+  facturas_precio_mejor: "💡",
+  facturas_precio_pactado: "📌",
+  facturas_familia_gasto: "💸",
+  facturas_albaran_sin_factura: "🧾",
+  facturas_proveedor_nuevo: "🆕",
+  facturas_importe_inusual: "❗",
+  facturas_revision: "📋",
+  facturas_subida: "📤",
+  original_sin_drive: "📁",
+  facturas_abreviatura: "🔤",
+  peticion_urgente: "🚨",
+  instagram_encargo: "📸",
+  sistema: "ℹ️",
+};
+export const emojiTipo = (tipo: string): string => EMOJI_TIPO[tipo] ?? "🔔";
 
 /** Tipos que nunca van a Telegram: retirados y los técnicos de super admin (modelos de IA). */
 export const tipoExcluido = (tipo: string): boolean => tipo === "reserva_sin_asignar" || tipo.startsWith("ia_modelo");
@@ -210,9 +297,9 @@ export interface Evaluacion {
 }
 
 /**
- * Avisos que hay que mandar al momento: tipo marcado (o reserva de hoy/mañana), de las últimas 24 h y
- * posteriores a la activación, sin caducar, no excluidos, con campana, sin envío correcto y con menos de
- * MAX_FALLOS fallos. Orden: más antiguo primero. Misma regla que avisos_telegram_hay_pendientes (SQL),
+ * Avisos que hay que mandar al momento: tipo marcado (o reserva de hoy/mañana), cuyo canal tiene chat, de las
+ * últimas 24 h y posteriores a la activación, sin caducar, no excluidos, con campana, sin envío correcto y con
+ * menos de MAX_FALLOS fallos. Orden: más antiguo primero. Misma regla que avisos_telegram_hay_pendientes (SQL),
  * salvo `descartar` (unidades dudosas, reservas que no valen), que solo conoce esta función.
  */
 export function evaluarPendientes(
@@ -227,6 +314,7 @@ export function evaluarPendientes(
     else fallos.set(e.aviso_id, (fallos.get(e.aviso_id) ?? 0) + 1);
   }
   const candidatos = avisos
+    .filter((a) => !ctx.canales || ctx.canales.has(canalDeTipo(a.tipo)))
     .filter((a) => alMomento(a, cfg, ahora, ctx.reservas))
     .filter((a) => Date.parse(a.created_at) > desde)
     .filter((a) => !a.caduca_en || Date.parse(a.caduca_en) > ahora.getTime())
@@ -264,26 +352,15 @@ export function aplicarTopes<T>(lista: T[], usados: { hora: number; dia: number 
   return { enviar: lista.slice(0, libres), resto: lista.slice(libres) };
 }
 
-/**
- * Topes separados: las reservas tienen el suyo (y se cuentan aparte), el resto de avisos comparten hora y día.
- * Así un día con muchos avisos de precio no deja sin avisar de una reserva, ni al revés. Conserva el orden.
- */
-export function aplicarTopesPorGrupo<T>(
-  lista: T[], esReserva: (x: T) => boolean,
-  usados: { hora: number; dia: number; reservasHora: number; reservasDia: number },
-  topes: { hora: number; dia: number; reservasHora: number; reservasDia: number },
-): { enviar: T[]; resto: T[] } {
-  const res = aplicarTopes(lista.filter(esReserva), { hora: usados.reservasHora, dia: usados.reservasDia }, { hora: topes.reservasHora, dia: topes.reservasDia });
-  const otros = aplicarTopes(lista.filter((x) => !esReserva(x)), { hora: usados.hora, dia: usados.dia }, topes);
-  const ok = new Set<T>([...res.enviar, ...otros.enviar]);
-  return { enviar: lista.filter((x) => ok.has(x)), resto: lista.filter((x) => !ok.has(x)) };
+/** Topes de cada canal de avisos: Reservas tiene los suyos; Facturas, los configurables (tope_hora y tope_dia). */
+export function topesDeCanal(canal: CanalAviso, cfg: Pick<ConfigTelegram, "tope_hora" | "tope_dia">): { hora: number; dia: number } {
+  return canal === "reservas" ? { hora: TOPE_RESERVAS_HORA, dia: TOPE_RESERVAS_DIA } : { hora: cfg.tope_hora ?? TOPE_HORA, dia: cfg.tope_dia ?? TOPE_DIA };
 }
 
 /** Línea para los avisos que no caben por el tope. */
 export function notaTope(restantes: number, panelUrl?: string | null): string {
   const url = enlacePanel(panelUrl, "/avisos");
-  return `…y ${restantes} ${restantes === 1 ? "aviso más" : "avisos más"} (hay demasiados seguidos: el resto, en el panel).${url ? `
-Ver: ${url}` : ""}`;
+  return `➕ ${restantes} ${restantes === 1 ? "aviso más" : "avisos más"} (demasiados seguidos), en el panel${url ? `\n${url}` : "."}`;
 }
 
 /** Recorta a `max` caracteres (contando como Telegram, en UTF-16) con «…» al final. */
@@ -292,30 +369,41 @@ export function recortar(texto: string, max: number): string {
   return texto.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
 }
 
-const NL = "\n";
 const limpio = (s: unknown): string => (typeof s === "string" ? s.replace(/\s+/g, " ").trim() : "");
 
-// ─── Plantillas cortas (14/11/2026) ─────────────────────────────────────────
-//  Dueño: «todos los avisos deben ser concisos y claros: 2-4 líneas, qué ha pasado con
-//  números, y qué hacer». Cada aviso suelto sale así:
-//    1. Título (qué es)                         «Margen bajo: Chuletón»
-//    2. Qué ha pasado, con números (una frase)  «Los ingredientes ya son el 41 % de lo que cobras (máximo 35 %).»
-//    3. Qué hacer                               «Qué hacer: sube la carta de 22,00 € a 24,50 € (con IVA).»
-//    4. Enlace                                  «Aplicar el precio: https://…/aplicar-precio/<id>»
-//  El resumen diario usa solo la línea 2 de cada aviso.
-
-/** Largo máximo de la línea «qué ha pasado». */
-export const MAX_FRASE = 220;
-
 const n2 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const n1 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const n0 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
+/** Hasta 2 decimales, sin ceros de sobra: 1,92 · 2 · 2,3. */
+const nCorto = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 const numero = (v: unknown): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const x = Number(v);
   return Number.isFinite(x) ? x : null;
 };
 const eur = (v: number) => `${n2.format(v)} €`;
+/** Euros sin decimales con miles («3.945 €»): para el resumen. */
+const milesEnteros = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0, useGrouping: "always" as unknown as boolean });
+const eur0 = (v: number) => `${milesEnteros.format(v)} €`;
+/** «+10 %» / «−16 %» (signo menos tipográfico). */
+const pctConSigno = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${n0.format(Math.abs(v))} %`;
+
+/** «BERBERECHO» → «Berberecho» (los nombres de las facturas vienen a menudo en mayúsculas). */
+function frase(s: string): string {
+  return /[a-záéíóúñ]/.test(s) ? s : s.charAt(0) + s.slice(1).toLowerCase();
+}
+/** Recorta por palabras completas («Distribuciones Gastronómicas…»); si la primera ya no cabe, como recortar. */
+function recortarPalabras(texto: string, max: number): string {
+  if (texto.length <= max) return texto;
+  const corte = texto.slice(0, max).lastIndexOf(" ");
+  return corte > 0 ? `${texto.slice(0, corte).replace(/[\s,;:·-]+$/, "")}…` : recortar(texto, max);
+}
+/** Nombre de proveedor corto: sin «S.L.», «S.A.U.»…, con mayúsculas solo al principio de cada palabra si venía en MAYÚSCULAS. */
+export function proveedorCorto(s: unknown, max = 30): string {
+  let p = limpio(s).replace(/[,\s]+(s\.?\s?[alrc]\.?\s?[lu]?\.?\s?u?\.?|sau|slu|c\.?\s?b\.?)$/i, "").trim();
+  if (p && !/[a-záéíóúñ]/.test(p)) p = p.toLowerCase().replace(/(^|[\s(-])(\p{L})/gu, (_m, a: string, b: string) => a + b.toUpperCase());
+  return recortarPalabras(p, max);
+}
+const producto = (s: unknown, max = 40) => recortarPalabras(frase(limpio(s)), max);
 
 /** Precio sugerido para un aviso «Margen bajo» (RPC avisos_precio_sugerido, 20261130160000). */
 export interface Sugerencia {
@@ -325,57 +413,18 @@ export interface Sugerencia {
 }
 
 /** Primera frase de un texto (hasta el primer «. » seguido de mayúscula), recortada a `max`. */
-export function primeraFrase(texto: string, max = MAX_FRASE): string {
+export function primeraFrase(texto: string, max = MAX_LINEA): string {
   const t = limpio(texto);
   // Corta en «. » + Mayúscula que no abre una palabra en MAYÚSCULAS: no ante un nombre en MAYÚSCULAS («… 32,00 €/kg. CASIMIRO PEREZ …»).
   const m = t.match(/^(.+?[.!?])\s+(?=[A-ZÁÉÍÓÚÑ¿¡«](?![A-ZÁÉÍÓÚÑ]{2}))/);
   return recortar(m ? m[1] : t, max);
 }
 
-/** «Qué ha pasado» de un aviso «Margen bajo», con los números de datos. null si faltan datos. */
-function fraseMargenBajo(d: Record<string, unknown>, conNombre = false): string | null {
-  const canal = d.canal;
-  const valor = numero(d.valor);
-  const limite = numero(d.limite);
-  if (valor === null || limite === null) return null;
-  const nombre = limpio(d.nombre);
-  // En el resumen no hay título encima: la frase dice de qué artículo habla.
-  const quien = conNombre && nombre ? `${recortar(nombre, 50)}: ` : "";
-  if (canal === "plato") {
-    const antes = numero(d.eur_antes);
-    const ahora = numero(d.eur);
-    const prod = limpio(d.producto);
-    const sube = prod && antes !== null && ahora !== null && ahora > antes ? ` Sube ${prod}: de ${eur(antes)} a ${eur(ahora)}.` : "";
-    return `${quien}${quien ? "l" : "L"}os ingredientes ya son el ${n0.format(valor)} % de lo que cobras (máximo ${n0.format(limite)} %).${sube}`;
-  }
-  if (canal === "vino" || canal === "tienda" || canal === "peso") {
-    const coste = numero(d.coste);
-    const antes = numero(d.coste_antes);
-    const que = canal === "peso" ? "el kilo" : "la botella";
-    const cuesta = coste !== null ? ` ${que[0].toUpperCase()}${que.slice(1)} te cuesta ${eur(coste)}${antes !== null ? ` (antes ${eur(antes)})` : ""}.` : "";
-    return `${quien}${quien ? "c" : "C"}obras ${n1.format(valor)} veces lo que pagas (mínimo ${n1.format(limite)})${canal === "tienda" ? " en la tienda" : ""}.${cuesta}`;
-  }
-  return null;
-}
+/** ¿Hay un precio sugerido que se pueda aplicar (y no se ha aplicado ya)? */
+export const sugerenciaAplicable = (s: Sugerencia | null | undefined): s is Sugerencia & { precio_sugerido: number } =>
+  !!s && typeof s.precio_sugerido === "number" && s.precio_sugerido > 0 && !s.aplicado;
 
-const MEDIDAS: Record<string, string> = { kg: "kg", l: "l", ud: "ud", caja: "caja" };
-
-/** «Más barato en otro proveedor»: el dato clave (quién lo vende más barato y a cuánto) va entero. null si faltan datos. */
-function frasePrecioMejor(d: Record<string, unknown>): string | null {
-  const producto = limpio(d.producto);
-  const otro = limpio(d.proveedor_otro);
-  const precio = numero(d.precio);
-  const precioOtro = numero(d.precio_otro);
-  if (!producto || !otro || precio === null || precioOtro === null) return null;
-  const medida = typeof d.medida === "string" && MEDIDAS[d.medida] ? `/${MEDIDAS[d.medida]}` : "";
-  const habitual = limpio(d.proveedor);
-  const pct = numero(d.diferencia_pct);
-  const ahorro = numero(d.ahorro);
-  return `${producto}: ${otro} lo vendió a ${eur(precioOtro)}${medida}; ${habitual ? `${habitual} te lo cobró` : "tú pagaste"} a ${eur(precio)}${medida}`
-    + `${pct !== null ? ` (${n0.format(pct)} % menos)` : ""}${ahorro !== null && ahorro > 0 ? `, unos ${n0.format(ahorro)} € de ahorro en 90 días` : ""}.`;
-}
-
-const CANALES: Record<string, string> = { web: "web", telefono: "teléfono", manual: "manual", presencial: "en el local" };
+const CANALES_RESERVA: Record<string, string> = { web: "web", telefono: "teléfono", manual: "manual", presencial: "en el local" };
 
 /** «hoy», «mañana» o «jue 20/11» (Madrid). */
 function cuandoReserva(fecha: string, ahora: Date): string {
@@ -388,83 +437,156 @@ function cuandoReserva(fecha: string, ahora: Date): string {
 }
 
 /**
- * Frase de una reserva SIN nombre ni teléfono del cliente (los avisos del panel los llevan; a Telegram no).
- * «Reserva de 4 pax a las 21:00 · hoy, web». Sin los datos de la reserva, se quita el nombre del texto del aviso
- * («Nombre · 12/11 15:00 · 8 pers. · web» → «12/11 15:00 · 8 pers. · web»).
+ * Línea de una reserva SIN nombre ni teléfono del cliente (los avisos del panel los llevan; a Telegram no).
+ *   nueva:     «Reserva hoy 21:00 · 4 pax · web»
+ *   cancelada: «Cancelada mañana 14:00 · 2 pax · la canceló el cliente»
+ * Sin los datos de la reserva, se quita el nombre del texto del aviso («Nombre · 12/11 15:00 · 8 pers. · web»).
  */
-export function fraseReserva(a: Aviso, r: ReservaInfo | null | undefined, ahora: Date): string {
+export function lineaReserva(a: Aviso, r: ReservaInfo | null | undefined, ahora: Date): string {
   const cancelada = a.tipo === "reserva_cancelada";
+  const base = cancelada ? "Cancelada" : "Reserva";
   if (r) {
     const hora = (r.hora ?? "").slice(0, 5);
-    const cuando = [cuandoReserva(r.fecha, ahora), CANALES[r.canal ?? ""]].filter(Boolean).join(", ");
-    const quien = cancelada && r.cancelada_por === "cliente" ? " · la canceló el cliente" : "";
-    return `Reserva${cancelada ? " cancelada" : ""} de ${r.numero_comensales ?? "?"} pax${hora ? ` a las ${hora}` : ""} · ${cuando}${quien}`;
+    const partes = [
+      `${base} ${cuandoReserva(r.fecha, ahora)}${hora ? ` ${hora}` : ""}`,
+      `${r.numero_comensales ?? "?"} pax`,
+      ...(cancelada ? (r.cancelada_por === "cliente" ? ["la canceló el cliente"] : []) : [CANALES_RESERVA[r.canal ?? ""]].filter(Boolean)),
+    ];
+    return partes.join(" · ");
   }
   const partes = limpio(a.mensaje).split(" · ").slice(1).filter((x) => !/^la cancel/.test(x));
-  const base = cancelada ? "Reserva cancelada" : "Reserva nueva";
   return partes.length ? `${base}: ${partes.join(" · ")}` : base;
 }
 
-/** Opciones de las frases: ahora (para «hoy»/«mañana»), reservas conocidas y si va con el nombre del artículo (resumen). */
-export interface OpcionesFrase extends ContextoAvisos {
+/** Opciones de las líneas: ahora (para «hoy»/«mañana») y las reservas conocidas. */
+export interface OpcionesLinea extends ContextoAvisos {
   ahora?: Date;
-  nombre?: boolean;
 }
 
-/** Línea 2: qué ha pasado, con números (una frase corta). También es la frase del resumen. */
-export function fraseAviso(a: Aviso, op: OpcionesFrase = {}): string {
-  // Datos personales: nunca el texto del aviso (lleva nombre y teléfono del cliente).
-  if (esReserva(a)) return recortar(fraseReserva(a, a.referencia_id ? op.reservas?.get(a.referencia_id) : null, op.ahora ?? new Date()), MAX_FRASE);
-  if (a.tipo === "solicitud_pendiente") return recortar(limpio(a.titulo) || etiquetaTipo(a.tipo), MAX_FRASE);
-  if (a.tipo === "facturas_margen_bajo" && a.datos) {
-    const f = fraseMargenBajo(a.datos, op.nombre);
-    if (f) return recortar(f, MAX_FRASE);
+/** «Margen bajo» en una línea: el artículo, la cifra frente al límite y, si hay, el precio que lo arregla. */
+function lineaMargen(d: Record<string, unknown>, sug: Sugerencia | null | undefined): string | null {
+  const valor = numero(d.valor);
+  const limite = numero(d.limite);
+  const nombre = recortar(limpio(d.nombre), 50);
+  if (valor === null || limite === null || !nombre) return null;
+  const arreglo = sugerenciaAplicable(sug) ? ` → súbelo a ${eur(sug.precio_sugerido)}` : "";
+  if (d.canal === "plato") {
+    const antes = numero(d.eur_antes);
+    const ahora = numero(d.eur);
+    const prod = producto(d.producto, 30);
+    const sube = !arreglo && prod && antes !== null && ahora !== null && ahora > antes ? ` · sube ${prod} (${n2.format(antes)} → ${eur(ahora)})` : "";
+    return `${nombre}: coste ${n0.format(valor)} % (máx. ${n0.format(limite)} %)${arreglo}${sube}`;
   }
-  if (a.tipo === "facturas_precio_mejor" && a.datos) {
-    const f = frasePrecioMejor(a.datos);
-    if (f) return recortar(f, MAX_FRASE);
+  if (d.canal === "vino" || d.canal === "tienda" || d.canal === "peso") {
+    const coste = numero(d.coste);
+    const antes = numero(d.coste_antes);
+    const cuesta = !arreglo && coste !== null
+      ? ` · coste ${eur(coste)}${d.canal === "peso" ? "/kg" : ""}${antes !== null ? ` (antes ${n2.format(antes)})` : ""}`
+      : "";
+    return `${nombre}: cobras ×${nCorto.format(valor)} (mín. ×${nCorto.format(limite)})${d.canal === "tienda" ? " en tienda" : ""}${arreglo}${cuesta}`;
   }
-  const tg = limpio(a.datos?.texto_telegram);
-  if (tg) return primeraFrase(tg);
+  return null;
+}
+
+const medidaDe = (d: Record<string, unknown>): string => (typeof d.medida === "string" && /^(kg|l|ud|caja)$/.test(d.medida) ? `/${d.medida}` : "");
+
+/** Variación en % de un aviso de precio (la guardada o, si no, la calculada). */
+function variacion(d: Record<string, unknown>): number | null {
+  const v = numero(d.variacion_pct);
+  if (v !== null) return v;
+  const p = numero(d.precio);
+  const r = numero(d.precio_ref);
+  return p !== null && r !== null && r > 0 ? ((p - r) / r) * 100 : null;
+}
+
+/** Línea propia de los avisos de Facturas con datos conocidos; null → la genérica (título). */
+function lineaFacturas(a: Aviso, d: Record<string, unknown>, sug: Sugerencia | null | undefined): string | null {
+  switch (a.tipo) {
+    case "facturas_margen_bajo":
+      return lineaMargen(d, sug);
+    case "facturas_precio_sube":
+    case "facturas_precio_baja": {
+      const prod = producto(d.producto);
+      const precio = numero(d.precio);
+      const ref = numero(d.precio_ref);
+      const pct = variacion(d);
+      if (!prod || precio === null || ref === null || pct === null) return null;
+      const prov = proveedorCorto(d.proveedor);
+      return `${prod}: ${pctConSigno(pct)} (${n2.format(ref)} → ${eur(precio)}${medidaDe(d)})${prov ? ` · ${prov}` : ""}`;
+    }
+    case "facturas_precio_mejor": {
+      const prod = producto(d.producto);
+      const otro = proveedorCorto(d.proveedor_otro);
+      const precio = numero(d.precio);
+      const precioOtro = numero(d.precio_otro);
+      if (!prod || !otro || precio === null || precioOtro === null) return null;
+      const pct = numero(d.diferencia_pct);
+      return `${prod}: ${otro} a ${eur(precioOtro)}${medidaDe(d)} (tú ${n2.format(precio)}${pct !== null ? `, −${n0.format(pct)} %` : ""})`;
+    }
+    case "facturas_precio_proveedor": {
+      const prov = proveedorCorto(d.proveedor);
+      const n = numero(d.productos);
+      if (!prov || n === null) return null;
+      const pct = numero(d.variacion_pct);
+      const impacto = numero(d.impacto_mes);
+      const extras = [pct !== null ? `${pctConSigno(pct)} de media` : null, impacto !== null && impacto > 0 ? `~${eur0(impacto)}/mes` : null].filter(Boolean);
+      return `${prov} sube ${n} productos${extras.length ? ` (${extras.join(", ")})` : ""}`;
+    }
+    case "facturas_familia_gasto": {
+      const fam = limpio(d.familia);
+      const pct = numero(d.variacion_pct);
+      if (!fam || pct === null) return null;
+      const valor = numero(d.valor);
+      const media = numero(d.media);
+      return `${fam}: ${pctConSigno(pct)} este mes${valor !== null && media !== null ? ` (~${eur0(valor)}, media ${eur0(media)})` : ""}`;
+    }
+    case "facturas_albaran_sin_factura": {
+      const prov = proveedorCorto(d.proveedor, 34);
+      const n = numero(d.albaranes);
+      if (!prov || n === null) return null;
+      const imp = numero(d.importe);
+      return `${prov}: ${n} ${n === 1 ? "albarán" : "albaranes"} sin factura${imp !== null ? ` (${eur(imp)})` : ""}`;
+    }
+    case "facturas_proveedor_nuevo": {
+      const prov = proveedorCorto(d.proveedor, 34);
+      if (!prov) return null;
+      const imp = numero(d.importe);
+      return `Proveedor nuevo: ${prov}${imp !== null ? ` (${eur(imp)})` : ""}`;
+    }
+    case "facturas_importe_inusual": {
+      const prov = proveedorCorto(d.proveedor);
+      const imp = numero(d.importe);
+      if (!prov || imp === null) return null;
+      const veces = numero(d.veces);
+      return `${prov}: factura de ${eur(imp)}${veces !== null ? ` (×${nCorto.format(veces)} su media)` : ""}`;
+    }
+    case "facturas_revision": {
+      const n = numero(d.cuantos);
+      if (n === null) return null;
+      return `${milesEnteros.format(n)} documentos ${d.resumen === "duplicados" ? "posiblemente duplicados" : "por revisar"}`;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * Un aviso en UNA línea (sin el emoji): qué ha pasado, con la cifra que importa y, si se sabe, qué hacer.
+ *   «Chuletón: coste 41 % (máx. 35 %) → súbelo a 24,50 €»
+ *   «Berberecho: +10 % (29,00 → 32,00 €/ud) · Casimiro Perez Rodriguez»
+ *   «Reserva hoy 21:00 · 4 pax · web»
+ * Sin datos para una línea propia, el título del aviso (o la primera frase de su texto).
+ */
+export function lineaAviso(a: Aviso, op: OpcionesLinea & { sug?: Sugerencia | null } = {}): string {
+  // Datos personales: nunca el texto del aviso de una reserva o solicitud (lleva nombre y teléfono del cliente).
+  if (esReserva(a)) return recortar(lineaReserva(a, a.referencia_id ? op.reservas?.get(a.referencia_id) : null, op.ahora ?? new Date()), MAX_LINEA);
+  if (a.tipo === "solicitud_pendiente") return recortar(limpio(a.titulo) || etiquetaTipo(a.tipo), MAX_LINEA);
+  const propia = a.datos ? lineaFacturas(a, a.datos, op.sug) : null;
+  if (propia) return recortar(propia, MAX_LINEA);
   const titulo = limpio(a.titulo);
-  const mensaje = limpio(a.mensaje);
-  if (mensaje && mensaje !== titulo) return primeraFrase(mensaje);
-  return recortar(titulo || etiquetaTipo(a.tipo), MAX_FRASE);
-}
-
-/** Línea 3: qué hacer, por tipo (null si no hay nada que hacer, p. ej. una reserva nueva). */
-const QUE_HACER: Record<string, string> = {
-  reserva_cancelada: "la mesa queda libre; no hace falta hacer nada.",
-  solicitud_pendiente: "llama al cliente y resuélvela en Reservas.",
-  facturas_subida: "revisa lo subido en Facturas.",
-  subida_precio: "mira si toca subir la carta o buscar otro proveedor.",
-  original_sin_drive: "vuelve a subir el original en Facturas.",
-  facturas_precio_sube: "mira si toca subir la carta o pedir otro precio.",
-  facturas_precio_mejor: "pide precio a ese proveedor (comprueba que es la misma calidad).",
-  facturas_familia_gasto: "revisa las compras de ese mes.",
-  facturas_albaran_sin_factura: "pide la factura al proveedor o vincúlala si ya la tienes.",
-  facturas_proveedor_nuevo: "comprueba que no sea un proveedor repetido.",
-  facturas_importe_inusual: "comprueba que el importe esté bien leído.",
-  facturas_revision: "revísalos y márcalos como verificados.",
-  facturas_precio_baja: "buen momento para comprar más.",
-  facturas_precio_proveedor: "habla con el proveedor o busca otro.",
-  facturas_precio_pactado: "reclama el precio pactado al proveedor.",
-  facturas_margen_bajo: "revisa el precio en Facturas › Márgenes.",
-  instagram_encargo: "míralo en RRSS › Encargos.",
-  peticion_urgente: "míralo en Peticiones.",
-};
-
-/** ¿Hay un precio sugerido que se pueda aplicar (y no se ha aplicado ya)? */
-export const sugerenciaAplicable = (s: Sugerencia | null | undefined): s is Sugerencia & { precio_sugerido: number } =>
-  !!s && typeof s.precio_sugerido === "number" && s.precio_sugerido > 0 && !s.aplicado;
-
-export function queHacer(a: Aviso, sug?: Sugerencia | null): string | null {
-  if (a.tipo === "facturas_margen_bajo" && sugerenciaAplicable(sug)) {
-    return sug.precio_actual !== null && sug.precio_actual > 0
-      ? `sube la carta de ${eur(sug.precio_actual)} a ${eur(sug.precio_sugerido)} (con IVA).`
-      : `pon en la carta ${eur(sug.precio_sugerido)} (con IVA).`;
-  }
-  return QUE_HACER[a.tipo] ?? null;
+  if (titulo) return recortar(titulo, MAX_LINEA);
+  const texto = limpio(a.datos?.texto_telegram) || limpio(a.mensaje);
+  return texto ? primeraFrase(texto) : etiquetaTipo(a.tipo);
 }
 
 /** Ruta del panel para aplicar el precio sugerido de un aviso (pide sesión y permiso de carta). */
@@ -474,6 +596,7 @@ export const rutaAplicarPrecio = (avisoId: string) => `/aplicar-precio/${encodeU
 export function rutaPanel(a: Pick<Aviso, "tipo" | "referencia_tipo" | "datos">): string {
   const enlace = typeof a.datos?.enlace === "string" ? a.datos.enlace : null;
   if (enlace && enlace.startsWith("?") && (a.tipo.startsWith("facturas_") || a.referencia_tipo === "facturas_alerta")) return `/facturas${enlace}`;
+  if (enlace && enlace.startsWith("/facturas")) return enlace;
   if (a.tipo === "reserva_nueva" || a.tipo === "reserva_cancelada") return "/reservas?tab=reservas";
   if (a.tipo === "solicitud_pendiente") return "/reservas?tab=reservas&status=solicitudes";
   return "/avisos";
@@ -486,27 +609,16 @@ export function enlacePanel(base: string | null | undefined, ruta: string): stri
   return `${b}${ruta.startsWith("/") ? ruta : `/${ruta}`}`;
 }
 
-/** Línea 1: el título del aviso (corto); en «Margen bajo», «Margen bajo: <nombre>». */
-export function tituloAviso(a: Aviso): string {
-  const nombre = limpio(a.datos?.nombre);
-  if (a.tipo === "facturas_margen_bajo" && nombre) return recortar(`Margen bajo: ${nombre}`, 90);
-  return recortar(limpio(a.titulo) || etiquetaTipo(a.tipo), 90);
-}
-
 /**
- * Texto de un aviso suelto (al momento): 2-4 líneas (título, qué ha pasado, qué hacer y enlace).
- * Con un precio sugerido aplicable, el enlace es el de «Aplicar el precio» (pantalla del panel
- * que pide sesión, permiso de carta y confirmación).
+ * Texto de un aviso suelto (al momento): una línea con emoji y, debajo, el enlace solo si sirve para actuar
+ * (los de Facturas; con un precio sugerido aplicable, el de «Aplicar el precio»). Las reservas, sin enlace.
  */
-export function mensajeAviso(a: Aviso, panelUrl?: string | null, sug?: Sugerencia | null, op: OpcionesFrase = {}): string {
+export function mensajeAviso(a: Aviso, panelUrl?: string | null, sug?: Sugerencia | null, op: OpcionesLinea = {}): string {
+  const linea = `${emojiTipo(a.tipo)} ${lineaAviso(a, { ...op, sug })}`;
+  if (canalDeTipo(a.tipo) === "reservas") return linea;
   const aplicar = a.tipo === "facturas_margen_bajo" && sugerenciaAplicable(sug) ? enlacePanel(panelUrl, rutaAplicarPrecio(a.id)) : null;
   const url = aplicar ?? enlacePanel(panelUrl, rutaPanel(a));
-  const pie = url ? `\n${aplicar ? "Aplicar el precio" : "Ver"}: ${url}` : "";
-  const titulo = tituloAviso(a);
-  const frase = fraseAviso(a, op);
-  const hacer = queHacer(a, sug);
-  const lineas = [titulo, ...(frase && frase !== titulo ? [frase] : []), ...(hacer ? [`Qué hacer: ${hacer}`] : [])];
-  return recortar(lineas.join("\n"), LIMITE_TELEGRAM - pie.length) + pie;
+  return url ? `${linea}\n${url}` : linea;
 }
 
 /**
@@ -528,10 +640,13 @@ export function agruparEnMensajes(textos: string[], max = LIMITE_TELEGRAM): { te
   return salida;
 }
 
-/** Fecha corta «martes 11/11» en Madrid. */
-function fechaCorta(fecha: Date): string {
-  return new Intl.DateTimeFormat("es-ES", { timeZone: ZONA, weekday: "long", day: "2-digit", month: "2-digit" }).format(fecha).replace(",", "");
+/** «23/11» en Madrid. */
+function diaMes(fecha: Date): string {
+  const d = diaMadrid(fecha);
+  return `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 }
+
+// ─── Resumen diario ─────────────────────────────────────────────────────────
 
 export interface Resumen {
   /** Vacío si no hay nada que contar: entonces no se manda mensaje. */
@@ -554,11 +669,73 @@ export function incluirRevision(cuantos: number | null, previo: EstadoRevision |
   return cuantos !== null && Math.abs(cuantos - previo.n) >= CAMBIO_REVISION;
 }
 
+/** Un caso en pocas palabras para la línea de su tipo en el resumen («Chuletón 41 %», «Makro 340 €»). */
+export function casoCorto(a: Aviso, op: OpcionesLinea = {}): string {
+  const d = a.datos ?? {};
+  if (esReserva(a)) {
+    const r = a.referencia_id ? op.reservas?.get(a.referencia_id) : null;
+    if (r) return `${cuandoReserva(r.fecha, op.ahora ?? new Date())}${r.hora ? ` ${r.hora.slice(0, 5)}` : ""} (${r.numero_comensales ?? "?"} pax)`;
+    return recortar(lineaReserva(a, null, op.ahora ?? new Date()).replace(/^(Reserva|Cancelada):?\s*/, ""), 30) || "sin datos";
+  }
+  const pct = variacion(d);
+  const imp = numero(d.importe);
+  switch (a.tipo) {
+    case "facturas_margen_bajo": {
+      const v = numero(d.valor);
+      const nombre = recortar(limpio(d.nombre), 30);
+      if (nombre && v !== null) return d.canal === "plato" ? `${nombre} ${n0.format(v)} %` : `${nombre} ×${nCorto.format(v)}`;
+      break;
+    }
+    case "facturas_precio_sube":
+    case "facturas_precio_baja":
+      if (limpio(d.producto) && pct !== null) return `${producto(d.producto, 30)} ${pctConSigno(pct)}`;
+      break;
+    case "facturas_precio_mejor":
+      if (limpio(d.producto) && numero(d.diferencia_pct) !== null) return `${producto(d.producto, 30)} −${n0.format(numero(d.diferencia_pct) as number)} %`;
+      break;
+    case "facturas_precio_proveedor":
+      if (limpio(d.proveedor)) return `${proveedorCorto(d.proveedor, 24)}${numero(d.productos) !== null ? ` (${numero(d.productos)})` : ""}`;
+      break;
+    case "facturas_familia_gasto":
+      if (limpio(d.familia) && pct !== null) return `${recortar(limpio(d.familia), 30)} ${pctConSigno(pct)}`;
+      break;
+    case "facturas_albaran_sin_factura":
+    case "facturas_importe_inusual":
+    case "facturas_proveedor_nuevo":
+      if (limpio(d.proveedor)) return `${proveedorCorto(d.proveedor, 24)}${imp !== null ? ` ${eur0(imp)}` : ""}`;
+      break;
+  }
+  return recortar(limpio(a.titulo) || limpio(a.mensaje) || etiquetaTipo(a.tipo), 40);
+}
+
+/** Cuánto importa un aviso para elegir los casos del resumen (mayor = antes). */
+function peso(a: Aviso): number {
+  const d = a.datos ?? {};
+  const v = numero(d.valor);
+  const l = numero(d.limite);
+  switch (a.tipo) {
+    case "facturas_margen_bajo":
+      if (v && l) return d.canal === "plato" ? v / l : l / v;
+      return 0;
+    case "facturas_precio_sube":
+    case "facturas_precio_baja":
+    case "facturas_precio_proveedor":
+      return numero(d.impacto_mes) ?? Math.abs(variacion(d) ?? 0);
+    case "facturas_precio_mejor":
+      return numero(d.ahorro) ?? numero(d.diferencia_pct) ?? 0;
+    case "facturas_familia_gasto":
+      return numero(d.variacion_pct) ?? 0;
+    default:
+      return numero(d.importe) ?? 0;
+  }
+}
+
 /**
- * Resumen diario: avisos de las últimas 24 h (sin los excluidos, caducados, con la campana apagada, de
- * unidades dudosas ni reservas que no valen), agrupados por tipo (más numeroso primero), con el número y hasta
- * FRASES_POR_TIPO frases (las más recientes). Nunca pasa de LIMITE_TELEGRAM: si no cabe, corta por grupos y lo dice.
- * Sin nada que contar, `texto` va vacío (no se manda «sin avisos»).
+ * Resumen diario: los avisos de las últimas 24 h que NO llegaron ya al momento (sin los excluidos, caducados, con
+ * la campana apagada, de unidades dudosas ni reservas que no valen). Una línea por tipo, el más numeroso primero:
+ *   «⚠️ Margen bajo (2): Chuletón 41 %, Entrecot 38 %»
+ * con los CASOS_POR_TIPO más importantes y «y N más». «Por revisar» va en su línea con la diferencia
+ * («📋 Por revisar: 190 docs (+12)»). Sin nada que contar, `texto` va vacío (no se manda «sin avisos»).
  */
 export function construirResumen(avisos: Aviso[], ahora: Date, panelUrl?: string | null, ctx: ContextoAvisos = {}): Resumen {
   const desde = ahora.getTime() - 24 * 3600_000;
@@ -569,11 +746,13 @@ export function construirResumen(avisos: Aviso[], ahora: Date, panelUrl?: string
     .filter((a) => Date.parse(a.created_at) > desde && Date.parse(a.created_at) <= ahora.getTime())
     .filter((a) => !tipoExcluido(a.tipo) && !campanaApagada(a))
     .filter((a) => !a.caduca_en || Date.parse(a.caduca_en) > ahora.getTime())
+    .filter((a) => !ctx.enviados?.has(a.id))
     .filter((a) => !motivoSospechoso(a))
     .filter((a) => visibilidadReserva(a, ctx.reservas) === "si")
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   // «Por revisar»: solo el más reciente de cada clase, y solo si cambia o toca la semanal.
   const vistos = new Set<string>();
+  const lineasRevision: string[] = [];
   const validos = base.filter((a) => {
     if (a.tipo !== "facturas_revision") return true;
     const clase = claseRevision(a);
@@ -581,40 +760,50 @@ export function construirResumen(avisos: Aviso[], ahora: Date, panelUrl?: string
     vistos.add(clase);
     const cuantos = numero(a.datos?.cuantos);
     if (!incluirRevision(cuantos, previa[clase], hoy)) return false;
-    if (cuantos !== null) revision[clase] = { n: cuantos, dia: hoy };
+    if (cuantos !== null) {
+      revision[clase] = { n: cuantos, dia: hoy };
+      const p = previa[clase];
+      const dif = p ? cuantos - p.n : 0;
+      const que = clase === "duplicados" ? "Posibles duplicados" : "Por revisar";
+      lineasRevision.push(`${emojiTipo(a.tipo)} ${que}: ${milesEnteros.format(cuantos)} docs${dif ? ` (${dif > 0 ? "+" : "−"}${milesEnteros.format(Math.abs(dif))})` : ""}`);
+    } else {
+      lineasRevision.push(`${emojiTipo(a.tipo)} ${recortar(limpio(a.titulo) || "Documentos por revisar", 60)}`);
+    }
     return true;
   });
-  const url = enlacePanel(panelUrl, "/avisos");
-  const pie = url ? `\n\nVer todo: ${url}` : "";
   if (validos.length === 0) return { texto: "", total: 0, revision: previa };
-  const cabecera = `Avisos de Casa Tomás · ${fechaCorta(ahora)}`;
-  const op: OpcionesFrase = { ahora, reservas: ctx.reservas, nombre: true };
-  const frase = (a: Aviso): string => {
-    const f = fraseAviso(a, op);
-    const p = a.tipo === "facturas_revision" ? previa[claseRevision(a)] : undefined;
-    return p ? `${f} (el ${p.dia.slice(8, 10)}/${p.dia.slice(5, 7)} eran ${p.n})` : f;
-  };
-  const grupos = new Map<string, Aviso[]>();
-  for (const a of validos) grupos.set(a.tipo, [...(grupos.get(a.tipo) ?? []), a]);
-  const ordenados = [...grupos.entries()].sort((x, y) => y[1].length - x[1].length || etiquetaTipo(x[0]).localeCompare(etiquetaTipo(y[0]), "es"));
 
-  let cuerpo = `${cabecera}\nÚltimas 24 h: ${validos.length} ${validos.length === 1 ? "aviso" : "avisos"}.`;
-  const avisoCorte = "\n\n(No cabe todo: el resto, en el panel.)";
-  for (let g = 0; g < ordenados.length; g++) {
-    const [tipo, lista] = ordenados[g];
-    const frases = lista.slice(0, FRASES_POR_TIPO).map((a) => `• ${frase(a)}`);
-    const resto = lista.length - frases.length;
-    const bloque = `\n\n${etiquetaTipo(tipo)} (${lista.length})\n${frases.join("\n")}${resto > 0 ? `\n…y ${resto} más.` : ""}`;
-    const reserva = (g < ordenados.length - 1 ? avisoCorte.length : 0) + pie.length;
-    if (cuerpo.length + bloque.length + reserva > LIMITE_TELEGRAM) {
-      // Si ni el primer grupo cabe entero, va recortado; si no, se corta aquí.
-      if (g === 0) cuerpo = recortar(cuerpo + bloque, LIMITE_TELEGRAM - avisoCorte.length - pie.length);
-      cuerpo += avisoCorte;
+  const op: OpcionesLinea = { ahora, reservas: ctx.reservas };
+  const grupos = new Map<string, Aviso[]>();
+  for (const a of validos) if (a.tipo !== "facturas_revision") grupos.set(a.tipo, [...(grupos.get(a.tipo) ?? []), a]);
+  const ordenados = [...grupos.entries()].sort((x, y) => y[1].length - x[1].length || etiquetaTipo(x[0]).localeCompare(etiquetaTipo(y[0]), "es"));
+  const lineas = ordenados.map(([tipo, lista]) => {
+    const principales = [...lista].sort((x, y) => peso(y) - peso(x) || Date.parse(y.created_at) - Date.parse(x.created_at)).slice(0, CASOS_POR_TIPO);
+    const resto = lista.length - principales.length;
+    const casos = principales.map((a) => casoCorto(a, op)).join(", ");
+    return `${emojiTipo(tipo)} ${etiquetaTipo(tipo)} (${lista.length}): ${casos}${resto > 0 ? ` y ${resto} más` : ""}`;
+  });
+  const url = enlacePanel(panelUrl, "/avisos");
+  const cabecera = `Resumen ${diaMes(ahora)} · ${validos.length} ${validos.length === 1 ? "aviso" : "avisos"}`;
+  return { texto: componer(cabecera, [...lineas, ...lineasRevision], url ? [url] : []), total: validos.length, revision };
+}
+
+/** Cabecera, líneas y pie en ≤ LIMITE_TELEGRAM: si no caben todas las líneas, corta y lo dice («…y N tipos más»). */
+function componer(cabecera: string, lineas: string[], pie: string[]): string {
+  const finales = pie.join("\n");
+  let cuerpo = cabecera;
+  for (let i = 0; i < lineas.length; i++) {
+    const quedan = lineas.length - i - 1;
+    const corte = `\n…y ${lineas.length - i} más, en el panel`;
+    const reserva = (quedan > 0 ? corte.length : 0) + (finales ? finales.length + 1 : 0);
+    const l = `\n${recortar(lineas[i], 400)}`;
+    if (cuerpo.length + l.length + reserva > LIMITE_TELEGRAM) {
+      cuerpo += corte;
       break;
     }
-    cuerpo += bloque;
+    cuerpo += l;
   }
-  return { texto: recortar(cuerpo + pie, LIMITE_TELEGRAM), total: validos.length, revision };
+  return recortar(finales ? `${cuerpo}\n${finales}` : cuerpo, LIMITE_TELEGRAM);
 }
 
 // ─── Resumen semanal para el dueño (lunes por la mañana) ────────────────────
@@ -627,57 +816,49 @@ export interface DatosSemanales {
   albaranes?: { total_n?: number; total_proveedores?: number; total_importe?: number; n?: number; proveedores?: number; importe?: number; mayores?: { proveedor: string | null; importe: number; n: number }[] };
 }
 
-const miles = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" as unknown as boolean });
-const milesEnteros = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0, useGrouping: "always" as unknown as boolean });
-const eurM = (v: number) => `${miles.format(v)} €`;
-
-const fechaCortaDia = (iso: string | null | undefined): string => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : "");
+/** «peores: Vino A ×1,2, Vino B ×1,5» (los 2 primeros). */
+const peores = (l: { nombre: string; multiplicador: number }[] | undefined): string => {
+  const x = (l ?? []).slice(0, 2).map((p) => `${recortar(limpio(p.nombre), 28)} ×${nCorto.format(p.multiplicador)}`);
+  return x.length ? ` · peores: ${x.join(", ")}` : "";
+};
 
 /**
- * Resumen semanal: vinos de la carta bajo el mínimo, tienda bajo el mínimo, facturas por verificar y albaranes sin
- * factura. Corto: cifras y los 3 mayores de cada cosa, más el enlace al panel. Vacío si no hay nada que decir.
+ * Resumen semanal, una línea por cosa: vinos de la carta y tienda bajo el mínimo (con los 2 peores), facturas por
+ * verificar y albaranes sin factura de más de 35 días (con el total de todos si hay más), y los enlaces al panel.
+ * Vacío si no hay nada que decir.
  */
 export function construirSemanal(d: DatosSemanales, ahora: Date, panelUrl?: string | null): { texto: string; secciones: number } {
-  const bloques: string[] = [];
+  const lineas: string[] = [];
+  let margenes = false;
+  let docs = false;
   const v = d.vinos;
   if (v && (v.bajo ?? 0) > 0) {
-    bloques.push([
-      `Vinos de la carta por debajo de ×${n1.format(v.limite ?? 2.3)}: ${v.bajo}${v.total ? ` de ${v.total}` : ""}`,
-      ...(v.peor ?? []).slice(0, 3).map((x) => `• ${recortar(limpio(x.nombre), 50)} · ×${n2.format(x.multiplicador)}`),
-    ].join("\n"));
+    margenes = true;
+    lineas.push(`🍷 Vinos bajo ×${nCorto.format(v.limite ?? 2.3)}: ${v.bajo}${v.total ? ` de ${v.total}` : ""}${peores(v.peor)}`);
   }
   const t = d.tienda;
   if (t && t.activa !== false && (t.bajo ?? 0) > 0) {
-    bloques.push([
-      `Tienda por debajo de ×${n1.format(t.limite ?? 1.5)}: ${t.bajo}${t.total ? ` de ${t.total}` : ""}${(t.bajo_coste ?? 0) > 0 ? ` (${t.bajo_coste} se venden por debajo del coste)` : ""}`,
-      ...(t.peor ?? []).slice(0, 3).map((x) => `• ${recortar(limpio(x.nombre), 50)} · ×${n2.format(x.multiplicador)}`),
-    ].join("\n"));
+    margenes = true;
+    lineas.push(`🛒 Tienda bajo ×${nCorto.format(t.limite ?? 1.5)}: ${t.bajo}${t.total ? ` de ${t.total}` : ""}${(t.bajo_coste ?? 0) > 0 ? ` (${t.bajo_coste} bajo coste)` : ""}${peores(t.peor)}`);
   }
   const f = d.facturas;
   if (f && (f.documentos ?? 0) > 0) {
-    bloques.push([
-      `Facturas por verificar: ${milesEnteros.format(f.documentos ?? 0)} documentos (${eurM(f.importe ?? 0)})`,
-      ...(f.mayores ?? []).slice(0, 3).map((x) => `• ${recortar(limpio(x.proveedor) || "Sin proveedor", 40)} · ${eurM(x.total)}${fechaCortaDia(x.fecha) ? ` · ${fechaCortaDia(x.fecha)}` : ""}`),
-    ].join("\n"));
+    docs = true;
+    const mayor = f.mayores?.[0];
+    lineas.push(`📋 Facturas por verificar: ${milesEnteros.format(f.documentos ?? 0)} (${eur0(f.importe ?? 0)})${mayor ? ` · mayor: ${proveedorCorto(mayor.proveedor) || "sin proveedor"} ${eur0(mayor.total)}` : ""}`);
   }
   const al = d.albaranes;
   if (al && (al.n ?? 0) > 0) {
-    bloques.push([
-      `Albaranes sin factura desde hace más de 35 días: ${eurM(al.importe ?? 0)} en ${al.proveedores ?? "?"} ${al.proveedores === 1 ? "proveedor" : "proveedores"}`,
-      ...(al.mayores ?? []).slice(0, 3).map((x) => `• ${recortar(limpio(x.proveedor) || "Sin proveedor", 40)} · ${eurM(x.importe)} (${x.n} ${x.n === 1 ? "albarán" : "albaranes"})`),
-      ...((al.total_n ?? 0) > (al.n ?? 0)
-        ? [`En total, con los más recientes: ${al.total_n} albaranes de ${al.total_proveedores ?? "?"} proveedores (${eurM(al.total_importe ?? 0)})`]
-        : []),
-    ].join("\n"));
+    docs = true;
+    const total = (al.total_n ?? 0) > (al.n ?? 0) ? ` · en total ${al.total_n} (${eur0(al.total_importe ?? 0)})` : "";
+    const provs = al.proveedores ?? "?";
+    lineas.push(`🧾 Albaranes sin factura +35 días: ${eur0(al.importe ?? 0)} en ${provs} ${provs === 1 ? "proveedor" : "proveedores"}${total}`);
   }
-  if (bloques.length === 0) return { texto: "", secciones: 0 };
-  const hayMargenes = bloques.some((b) => b.startsWith("Vinos") || b.startsWith("Tienda"));
-  const hayDocs = bloques.some((b) => b.startsWith("Facturas") || b.startsWith("Albaranes"));
-  const margenes = hayMargenes ? enlacePanel(panelUrl, "/facturas?tab=margenes") : null;
-  const docs = hayDocs ? enlacePanel(panelUrl, "/facturas?tab=compras&modo=documentos") : null;
-  const pie = [margenes && `Márgenes: ${margenes}`, docs && `Facturas: ${docs}`].filter(Boolean).join(NL);
-  const cabecera = `Casa Tomás · resumen de la semana (${fechaCorta(ahora)})`;
-  return { texto: recortar([cabecera, ...bloques, ...(pie ? [pie] : [])].join("\n\n"), LIMITE_TELEGRAM), secciones: bloques.length };
+  if (lineas.length === 0) return { texto: "", secciones: 0 };
+  const urlMargenes = margenes ? enlacePanel(panelUrl, "/facturas?tab=margenes") : null;
+  const urlDocs = docs ? enlacePanel(panelUrl, "/facturas?tab=compras&modo=documentos") : null;
+  const pie = [urlMargenes && `Márgenes: ${urlMargenes}`, urlDocs && `Facturas: ${urlDocs}`].filter(Boolean) as string[];
+  return { texto: componer(`📅 Semana ${diaMes(ahora)}`, lineas, pie), secciones: lineas.length };
 }
 
 /** Quita el token de cualquier texto de error (la URL de la API lo lleva). */
@@ -692,3 +873,6 @@ export function cuerpoSendMessage(chatId: string, texto: string): Record<string,
 
 export type Accion = "pendientes" | "resumen" | "probar" | "fallos" | "semanal";
 export const esAccion = (v: unknown): v is Accion => v === "pendientes" || v === "resumen" || v === "probar" || v === "fallos" || v === "semanal";
+
+/** Tipo de la fila de avisos_telegram_envios de cada acción (el CHECK admite 'fallo', no 'fallos'). */
+export const tipoRegistro = (accion: Accion): string => (accion === "probar" ? "prueba" : accion === "fallos" ? "fallo" : accion);
