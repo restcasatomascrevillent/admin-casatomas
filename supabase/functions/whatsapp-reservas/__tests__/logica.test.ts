@@ -13,6 +13,8 @@ import {
   limpiarVariable,
   variablesParaTipo,
   mensajePlantilla,
+  mensajeSinPlantilla,
+  rellenarCuerpo,
   consultaMapa,
   firmarPayloadBoton,
   leerPayloadBoton,
@@ -146,6 +148,53 @@ describe("datos de la reserva", () => {
   it("«Cómo llegar» busca el restaurante de la reserva", () => {
     expect(decodeURIComponent(consultaMapa("casa_tomas"))).toBe("Casa Tomás, C/ Santa María de la Cabeza, 2, Crevillente");
     expect(decodeURIComponent(consultaMapa("touza"))).toContain("Touza");
+  });
+});
+
+describe("aviso SIN plantilla (ventana de 24 h, mientras Meta revisa las plantillas)", () => {
+  it("rellena el texto de la plantilla con sus variables", () => {
+    const texto = rellenarCuerpo(P.rechazada, variablesParaTipo("rechazada", RESERVA));
+    expect(texto).toContain("Hola Ana López, lamentamos decirte");
+    expect(texto).toContain("en Casa Tomás para el sábado 12 de diciembre a las 21:30 h");
+    expect(texto).toContain("llámanos al 966 10 78 87");
+    expect(texto).not.toMatch(/\{\{/);
+  });
+
+  it("confirma tu asistencia: botones de respuesta con el MISMO payload firmado y «Cómo llegar» como enlace en el texto", () => {
+    const m = mensajeSinPlantilla({
+      para: "34612345678",
+      def: P.propuesta,
+      variables: variablesParaTipo("propuesta", RESERVA),
+      botones: { payloads: { aceptar: "PA", rechazar: "PR" }, mapa: consultaMapa("casa_tomas") },
+      datosOpacos: datosOpacos(RESERVA.id, "propuesta"),
+    }) as { type: string; interactive: { type: string; body: { text: string }; action: { buttons: unknown[] } }; biz_opaque_callback_data: string };
+    expect(m.type).toBe("interactive");
+    expect(m.interactive.type).toBe("button");
+    expect(m.interactive.action.buttons).toEqual([
+      { type: "reply", reply: { id: "PA", title: "Sí, confirmo" } },
+      { type: "reply", reply: { id: "PR", title: "No puedo, cancelar" } },
+    ]);
+    expect(m.interactive.body.text).toContain("¿Confirmas tu asistencia?");
+    expect(m.interactive.body.text).toContain(`Cómo llegar: https://www.google.com/maps/search/?api=1&query=${consultaMapa("casa_tomas")}`);
+    expect(leerDatosOpacos(m.biz_opaque_callback_data)).toEqual({ reservaId: RESERVA.id, tipo: "propuesta" });
+  });
+
+  it("reserva recibida: texto con «Gestionar mi reserva» (token en la URL) y «Ver la carta»", () => {
+    const m = mensajeSinPlantilla({
+      para: "34612345678",
+      def: P.solicitud_recibida,
+      variables: variablesParaTipo("solicitud_recibida", RESERVA),
+      botones: { tokenGestion: "abc.d+f" },
+    }) as { type: string; text: { body: string } };
+    expect(m.type).toBe("text");
+    expect(m.text.body).toContain(`Gestionar mi reserva: ${WEB}/reserva/respuesta?token=abc.d%2Bf`);
+    expect(m.text.body).toContain(`Ver la carta: ${WEB}/carta`);
+  });
+
+  it("los títulos de los botones caben en los 20 caracteres de Meta", () => {
+    for (const def of Object.values(P)) {
+      for (const b of def.botones) if (b.tipo === "respuesta") expect(b.texto.length, b.texto).toBeLessThanOrEqual(20);
+    }
   });
 });
 
