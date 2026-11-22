@@ -53,6 +53,9 @@ const ENV: Record<string, string | undefined> = {
 };
 
 const URL_FUNCION = "https://proyecto.supabase.co/functions/v1/reservas-web";
+const URL_EMAILS_RESERVA = "https://proyecto.supabase.co/functions/v1/emails-reserva/notificar";
+/** Cuerpos de las llamadas a emails-reserva/notificar (el aviso de la reserva recibida). */
+const llamadasEmailsReserva: unknown[] = [];
 // «Ahora» fijo: jueves 1-10-2026, 10:00 en Madrid (08:00 UTC, horario de verano).
 const AHORA = new Date("2026-10-01T08:00:00.000Z");
 const FECHA = "2026-10-15";
@@ -123,7 +126,11 @@ async function crear(body: Fila) {
 
 beforeAll(async () => {
   vi.stubGlobal("Deno", { env: { get: (k: string) => ENV[k] } });
-  vi.stubGlobal("fetch", async (url: unknown) => {
+  vi.stubGlobal("fetch", async (url: unknown, init?: RequestInit) => {
+    if (String(url) === URL_EMAILS_RESERVA) {
+      llamadasEmailsReserva.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ ok: true, motivo: "whatsapp" }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
     throw new Error(`fetch inesperado en un test: ${String(url)}`);
   });
   sembrar();
@@ -171,12 +178,22 @@ describe("avisos por WhatsApp activos", () => {
     expect(r.cuerpo[0]).toMatchObject({ kind: "meta", avisos_whatsapp: true });
   });
 
-  it("eligió WhatsApp: se guarda en la reserva", async () => {
+  it("eligió WhatsApp: se guarda en la reserva y se pide el aviso de reserva recibida", async () => {
+    llamadasEmailsReserva.length = 0;
     const r = await crear(reserva({ canal_avisos: "whatsapp" }));
 
     expect(r.status).toBe(201);
     expect(db.tabla("reservas")).toHaveLength(1);
     expect(db.tabla("reservas")[0]).toMatchObject({ canal_avisos: "whatsapp", telefono: "+34611222333" });
+    expect(llamadasEmailsReserva).toEqual([{ reserva_id: db.tabla("reservas")[0].id }]);
+  });
+
+  it("eligió correo: NO se pide ningún aviso (el correo de la web sigue silenciado)", async () => {
+    llamadasEmailsReserva.length = 0;
+    const r = await crear(reserva());
+
+    expect(r.status).toBe(201);
+    expect(llamadasEmailsReserva).toEqual([]);
   });
 
   it("WhatsApp sin teléfono: 400 telefono_requerido_whatsapp y no se guarda nada", async () => {
@@ -195,6 +212,7 @@ describe("avisos por WhatsApp activos", () => {
   });
 
   it("migración 20261215100000 sin aplicar: la reserva se guarda igual, sin la columna, y queda rastro", async () => {
+    llamadasEmailsReserva.length = 0;
     db.columnasInexistentes = { reservas: ["canal_avisos"] };
 
     const r = await crear(reserva({ canal_avisos: "whatsapp" }));
@@ -203,5 +221,7 @@ describe("avisos por WhatsApp activos", () => {
     expect(db.tabla("reservas")).toHaveLength(1);
     expect(db.tabla("reservas")[0]).not.toHaveProperty("canal_avisos");
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining("20261215100000"));
+    // Sin la columna no se sabe que eligió WhatsApp: no se pide el aviso.
+    expect(llamadasEmailsReserva).toEqual([]);
   });
 });
