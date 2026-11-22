@@ -47,6 +47,10 @@ begin
   insert into avisos_telegram_envios (tipo, aviso_id, ok)
   select 'aviso', n.id, true from notificaciones_dashboard n where n.created_at > now() - interval '25 hours' on conflict do nothing;
   update avisos_telegram_config set activo = true, chat_id = '-1001234567890', silencio_activo = false where id;
+  -- 20261216100000: los fallos técnicos solo van a su chat (chat_fallos); con esa migración, se pone el mismo.
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'avisos_telegram_config' and column_name = 'chat_fallos') then
+    execute 'update avisos_telegram_config set chat_fallos = chat_id where id';
+  end if;
   -- (los triggers de reservas ya han creado avisos «reserva_nueva»; se marcan como enviados salvo los de prueba)
   delete from avisos_telegram_envios where aviso_id in (select id from notificaciones_dashboard where referencia_id in (v_r1, v_r2, v_r3, v_r4));
   update notificaciones_dashboard set created_at = now() + interval '1 second' where referencia_id in (v_r1, v_r2, v_r3, v_r4);

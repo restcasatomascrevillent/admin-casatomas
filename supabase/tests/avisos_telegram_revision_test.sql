@@ -16,6 +16,10 @@ begin
   delete from fallos_internos;   -- (se deshace con el rollback) para partir de cero
   update avisos_telegram_config set activo = false where id;
   update avisos_telegram_config set activo = true, chat_id = '-100123456' where id;   -- activo_desde := now()
+  -- 20261216100000: los fallos técnicos solo van a su chat (chat_fallos); con esa migración, se pone el mismo.
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'avisos_telegram_config' and column_name = 'chat_fallos') then
+    execute 'update avisos_telegram_config set chat_fallos = chat_id where id';
+  end if;
   -- Atraso anterior a la activación (hace 1 h, 1 día y 5 días).
   insert into fallos_internos (tipo, datos, created_at) values ('prueba_revision', '{"k":"viejo1h"}', now() - interval '1 hour'),
     ('prueba_revision', '{"k":"viejo1d"}', now() - interval '1 day'), ('prueba_revision', '{"k":"viejo5d"}', now() - interval '5 days');
@@ -33,6 +37,9 @@ begin
 
   -- T2 ─────────────────────────────────────────────────────────────────────
   update avisos_telegram_config set activo_desde = now() - interval '30 days' where id;
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'avisos_telegram_config' and column_name = 'fallos_desde') then
+    execute 'update avisos_telegram_config set fallos_desde = now() - interval ''30 days'' where id';
+  end if;
   update fallos_internos set reclamado_en = null, intentos = 0 where tipo = 'prueba_revision';
   perform 1 from fallos_internos_reclamar(50);
   select count(*) into v_n from fallos_internos where tipo = 'prueba_revision' and reclamado_en is not null and datos ->> 'k' = 'viejo5d';
