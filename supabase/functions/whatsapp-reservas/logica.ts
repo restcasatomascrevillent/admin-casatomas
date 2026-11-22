@@ -303,6 +303,73 @@ export function mensajePlantilla(opciones: {
   return mensaje;
 }
 
+// ----------------------------------------------------------------------------
+// Mensaje SIN plantilla (ventana de 24 h)
+// ----------------------------------------------------------------------------
+// Si Meta no deja usar la plantilla (aún sin aprobar, pausada…), el aviso se
+// manda igual como mensaje normal: Meta lo admite dentro de las 24 h
+// siguientes a que el cliente escriba al número, y lo rechaza fuera (error
+// 131047), así que fuera de esa ventana no cambia nada. Mismo texto que la
+// plantilla; las respuestas rápidas pasan a botones de respuesta (mismo
+// payload firmado, ver leerWebhook: llegan como `interactive.button_reply`) y
+// los botones de enlace, a líneas con la URL. Prueba de concepto: sirve para
+// probar los botones mientras Meta revisa las plantillas.
+
+/** Texto de la plantilla con sus variables puestas. */
+export function rellenarCuerpo(def: DefinicionPlantilla, variables: string[]): string {
+  return def.cuerpo.replace(/\{\{(\d+)\}\}/g, (_m, n) => variables[Number(n) - 1] ?? "");
+}
+
+/** URL final de un botón de enlace (con el final que se rellena al enviar). */
+export function urlBoton(b: Extract<BotonPlantilla, { tipo: "url" }>, valores: ValoresBotones): string | null {
+  if (!b.url.includes("{{1}}")) return b.url;
+  const valor = b.sufijo === "gestionar" ? (valores.tokenGestion ? encodeURIComponent(valores.tokenGestion) : null) : valores.mapa;
+  return valor ? b.url.replace("{{1}}", valor) : null;
+}
+
+/** Cuerpo de POST /{phone-number-id}/messages con el aviso SIN plantilla. */
+export function mensajeSinPlantilla(opciones: {
+  para: string;
+  def: DefinicionPlantilla;
+  variables: string[];
+  botones?: ValoresBotones;
+  datosOpacos?: string;
+}): Record<string, unknown> {
+  const { para, def, variables, botones = {}, datosOpacos } = opciones;
+  const enlaces = def.botones
+    .filter((b): b is Extract<BotonPlantilla, { tipo: "url" }> => b.tipo === "url")
+    .map((b) => {
+      const url = urlBoton(b, botones);
+      return url ? `${b.texto}: ${url}` : null;
+    })
+    .filter((x): x is string => !!x);
+  const texto = [rellenarCuerpo(def, variables), ...(enlaces.length ? [enlaces.join("\n")] : [])].join("\n\n");
+  const respuestas = def.botones.filter((b): b is Extract<BotonPlantilla, { tipo: "respuesta" }> => b.tipo === "respuesta");
+
+  const mensaje: Record<string, unknown> = respuestas.length
+    ? {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: para,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: { text: texto.slice(0, 1024) },
+          action: {
+            buttons: respuestas.slice(0, 3).map((b) => {
+              const payload = botones.payloads?.[b.accion];
+              if (!payload) throw new Error(`falta_payload_${b.accion}`);
+              // Título de un botón de respuesta: máximo 20 caracteres.
+              return { type: "reply", reply: { id: payload, title: b.texto.slice(0, 20) } };
+            }),
+          },
+        },
+      }
+    : { messaging_product: "whatsapp", recipient_type: "individual", to: para, type: "text", text: { body: texto, preview_url: false } };
+  if (datosOpacos) mensaje.biz_opaque_callback_data = datosOpacos.slice(0, 512);
+  return mensaje;
+}
+
 /** Mensaje de texto libre (solo vale en las 24 h siguientes a que el cliente escriba o pulse un botón). */
 export function mensajeTexto(para: string, texto: string, respondeA?: string): Record<string, unknown> {
   const mensaje: Record<string, unknown> = {

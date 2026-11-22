@@ -27,6 +27,8 @@ El recordatorio de dos días antes y el aviso de «reserva modificada» siguen y
 
 Los botones de respuesta llevan un dato oculto corto y firmado (no el token del correo, que es demasiado largo para Meta). Si el restaurante cambia la hora después de mandar el WhatsApp, el botón viejo deja de valer, igual que el enlace del correo.
 
+Si Meta no deja usar una plantilla (aún sin aprobar, pausada…), `whatsapp-reservas` manda el mismo aviso **sin plantilla**: los botones de respuesta como botones normales y los de enlace como líneas con la URL. Meta solo lo admite dentro de las 24 h siguientes a que el cliente escriba al número; fuera de esa ventana falla y va el correo.
+
 Si Meta acepta el mensaje pero luego no llega (por ejemplo, el número no tiene WhatsApp), sale un aviso en el panel («No le ha llegado el WhatsApp…, llámale»).
 
 ## Cómo se activa (variables de las funciones de Supabase)

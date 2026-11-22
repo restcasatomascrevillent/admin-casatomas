@@ -21,6 +21,11 @@
 //   POST /suscribir             -> suscribe la app a la cuenta de WhatsApp
 //                                  (para recibir el webhook)
 //   POST /prueba {telefono, tipo?} -> manda una plantilla con datos de ejemplo
+//
+// Si Meta no deja usar la plantilla (aún sin aprobar, pausada…), /enviar lo
+// reintenta SIN plantilla (logica.ts, mensajeSinPlantilla): Meta lo admite
+// dentro de las 24 h siguientes a que el cliente escriba, con los mismos
+// botones de respuesta. Fuera de esa ventana falla igual y va el correo.
 //   Las rutas POST que no son /webhook exigen `x-webhook-secret` ==
 //   WHATSAPP_RESERVAS_SECRET (compararTiempoConstante, FALLA CERRADO).
 //
@@ -54,6 +59,7 @@ import {
   esTipoAvisoWhatsApp,
   variablesParaTipo,
   mensajePlantilla,
+  mensajeSinPlantilla,
   mensajeTexto,
   telefonoParaWhatsApp,
   consultaMapa,
@@ -180,7 +186,9 @@ async function valoresBotones(def: DefinicionPlantilla, r: ReservaParaWhatsApp):
   return valores;
 }
 
-async function enviarAvisoReserva(reservaId: string): Promise<{ enviado: boolean; motivo?: string; tipo?: TipoAvisoWhatsApp; id?: string }> {
+async function enviarAvisoReserva(
+  reservaId: string,
+): Promise<{ enviado: boolean; motivo?: string; tipo?: TipoAvisoWhatsApp; id?: string; sinPlantilla?: boolean }> {
   if (!configurado()) return { enviado: false, motivo: "whatsapp_no_configurado" };
   const reserva = await leerReserva(reservaId);
   if (!reserva) return { enviado: false, motivo: "reserva_no_encontrada" };
@@ -193,20 +201,27 @@ async function enviarAvisoReserva(reservaId: string): Promise<{ enviado: boolean
   if (!para) return { enviado: false, motivo: "telefono_no_valido", tipo };
 
   const def = PLANTILLAS[tipo];
-  const mensaje = mensajePlantilla({
+  const contenido = {
     para,
     def,
     variables: variablesParaTipo(tipo, reserva),
     botones: await valoresBotones(def, reserva),
     datosOpacos: datosOpacos(reserva.id, tipo),
-  });
-  const { id, error } = await enviarMensaje(mensaje);
-  if (error) {
-    console.error(`[${FUENTE}] Meta rechazó el aviso '${tipo}' de la reserva ${reserva.id}: ${error}`);
-    return { enviado: false, motivo: `meta: ${error}`, tipo };
+  };
+  const { id, error } = await enviarMensaje(mensajePlantilla(contenido));
+  if (!error) {
+    console.log(`[${FUENTE}] Aviso '${tipo}' de la reserva ${reserva.id} enviado (${id})`);
+    return { enviado: true, tipo, id: id ?? undefined };
   }
-  console.log(`[${FUENTE}] Aviso '${tipo}' de la reserva ${reserva.id} enviado (${id})`);
-  return { enviado: true, tipo, id: id ?? undefined };
+  console.error(`[${FUENTE}] Meta rechazó la plantilla del aviso '${tipo}' de la reserva ${reserva.id}: ${error}. Se intenta sin plantilla.`);
+  // Sin plantilla: solo sale si el cliente ha escrito en las últimas 24 h.
+  const sinPlantilla = await enviarMensaje(mensajeSinPlantilla(contenido));
+  if (sinPlantilla.error) {
+    console.error(`[${FUENTE}] Tampoco sin plantilla (¿fuera de la ventana de 24 h?): ${sinPlantilla.error}`);
+    return { enviado: false, motivo: `meta: ${error} | sin plantilla: ${sinPlantilla.error}`, tipo };
+  }
+  console.log(`[${FUENTE}] Aviso '${tipo}' de la reserva ${reserva.id} enviado SIN plantilla (${sinPlantilla.id})`);
+  return { enviado: true, tipo, id: sinPlantilla.id ?? undefined, sinPlantilla: true };
 }
 
 // ----------------------------------------------------------------------------
