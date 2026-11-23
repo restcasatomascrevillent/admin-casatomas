@@ -61,7 +61,7 @@ describe("Dashboard › Avisos: cada aviso solo a quien ve su sección", () => {
     expect(avisosParaDashboard(lista, camarero, AHORA).map((a) => a.id).sort()).toEqual(["email", "reserva"]);
   });
 
-  it("fuera caducados y los que no van a la campana; sin leer primero y, dentro, del más nuevo al más viejo", () => {
+  it("fuera los revisados, los caducados y los que no van a la campana; del más nuevo al más viejo", () => {
     const lista = [
       n("leida-nueva", "reserva_nueva", { leida: true, created_at: "2026-11-10T11:00:00Z" }),
       n("vieja", "reserva_nueva", { created_at: "2026-11-09T08:00:00Z" }),
@@ -71,7 +71,7 @@ describe("Dashboard › Avisos: cada aviso solo a quien ve su sección", () => {
       n("sin-permiso", "instagram_encargo"),
     ];
     const ids = avisosParaDashboard(lista, { ...TODO, rrss: false }, AHORA).map((a) => a.id);
-    expect(ids).toEqual(["nueva", "vieja", "leida-nueva"]);
+    expect(ids).toEqual(["nueva", "vieja"]);
   });
 
   it("sin leer por sección, en el orden del menú", () => {
