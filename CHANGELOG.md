@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.53.1] - 2026-11-23
+
+Objetivo: El copiloto de Facturas encuentra los productos y proveedores que sí están (búsqueda por partes) y responde más rápido
+
+### Cambiado
+- Chat-facturas: la búsqueda de productos y proveedores encuentra lo que sí está ([#347](https://github.com/restcasatomascrevillent/admin-casatomas/pull/347))
+
 ## [1.53.0] - 2026-11-23
 
 Objetivo: Fallos a Linear en una tanda diaria a las 7:00 (sin los de Facturas) y avisos de reserva por WhatsApp, apagados en producción
