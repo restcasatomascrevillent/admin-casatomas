@@ -75,6 +75,15 @@ Fuente única: `src/components/trafico-web/comportamiento/definiciones.ts`. El c
 
 ## Incidencias y Linear
 
+> **Tanda diaria (20261218100000, 23/11/2026, petición del dueño: «a las 7:00 pasa todos los nuevos fallos a Linear, todos
+> los que no tengan que ver con facturas»).** Con `web_logs_config.linear_tanda_hora` (7 por defecto), los fallos de la web
+> y del admin (rojos) **solo abren ticket al momento si son críticos** (lo que impide reservar o pagar un cheque). Los demás
+> los marca `procesar-logs-web` en su primera pasada desde esa hora (Madrid): todos los que no tienen ticket y tienen alguna
+> ocurrencia real en la ventana, **sin umbrales de ocurrencias ni de sesiones**, salvo los de la zona **Facturas**
+> (`linear_tanda_sin_facturas`; se pueden pedir a mano). Una vez al día (`web_logs_estado.linear_tanda_ultimo_dia`); los
+> tickets se crean después como siempre, con el tope diario. Los externos (con su interruptor) siguen con sus umbrales. Con
+> `linear_tanda_hora = null` (Configuración › Incidencias y avisos › «Al momento, si superan los umbrales»), todo como antes.
+
 - **Huella estable**: no cambia con los números, los ids, el hash de los ficheros de Vite ni la línea. Sí cambia con el tipo, el mensaje normalizado o la función donde salta; en los 404, con la ruta.
 - **Umbrales** (configurables):
   - por defecto, 3 ocurrencias y 2 sesiones distintas en 24 h;
