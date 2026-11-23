@@ -25,8 +25,11 @@ const SELECT_CLASE =
 const HORAS = Array.from({ length: 24 }, (_, h) => h);
 const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 
-/** Tipos que se pueden mandar al momento: los de Reservas y Facturas de la página Avisos. */
-const TIPOS = [...SECCIONES_AVISOS.reservas.tipos, ...SECCIONES_AVISOS.facturas.tipos];
+/**
+ * Tipos de Facturas que se pueden mandar al momento. Las reservas no se marcan: desde el 23/11/2026 su grupo recibe
+ * siempre cada paso (petición por aceptar, aceptada, confirmada por el cliente y cancelada).
+ */
+const TIPOS = SECCIONES_AVISOS.facturas.tipos;
 
 /** Todos los campos de chat y los que reciben avisos del negocio (Fallos técnicos no cuenta para activar). */
 const CAMPOS_CHAT: CampoChat[] = ["chat_id", ...CHATS_CANAL.map((c) => c.campo)];
@@ -183,7 +186,10 @@ export function TarjetaTelegram() {
         </div>
 
         <fieldset className="flex min-w-0 flex-col gap-2">
-          <legend className="mb-1 text-sm font-medium text-foreground">Al momento (el resto, solo en el resumen)</legend>
+          <legend className="mb-1 text-sm font-medium text-foreground">Facturas al momento (el resto, solo en el resumen)</legend>
+          <p className="-mt-1 text-xs text-muted-foreground">
+            Reservas: siempre al momento, en su chat, con cada paso (petición por aceptar, aceptada, confirmada por el cliente o cancelada).
+          </p>
           <div className="grid min-w-0 gap-x-4 gap-y-2 sm:grid-cols-2">
             {TIPOS.map((t) => (
               <label key={t.tipo} className="flex min-w-0 items-center gap-2 text-sm">

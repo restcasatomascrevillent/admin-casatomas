@@ -105,10 +105,10 @@ describe("avisos-telegram · pendientes (no reenviar)", () => {
 });
 
 describe("avisos-telegram · avisos de una línea", () => {
-  it("una línea con emoji y, debajo, el enlace al panel si hay PANEL_URL", () => {
+  it("una línea con emoji y, al final, el enlace con texto corto si hay PANEL_URL", () => {
     const a = aviso({ tipo: "facturas_precio_sube", titulo: "Sube el aceite", datos: { producto: "ACEITE OLIVA 5L", proveedor: "MAKRO, S.A.", precio: 36.8, precio_ref: 31.2, variacion_pct: 17.9, enlace: "?tab=compras&factura=12" } });
     expect(rutaPanel(a)).toBe("/facturas?tab=compras&factura=12");
-    expect(mensajeAviso(a, "https://panel.example/")).toBe("📈 Aceite oliva 5l: +18 % (31,20 → 36,80 €) · Makro\nhttps://panel.example/facturas?tab=compras&factura=12");
+    expect(mensajeAviso(a, "https://panel.example/")).toBe('📈 Aceite oliva 5l: +18 % (31,20 → 36,80 €) · Makro · <a href="https://panel.example/facturas?tab=compras&amp;factura=12">Abrir</a>');
     expect(mensajeAviso(a, null)).toBe("📈 Aceite oliva 5l: +18 % (31,20 → 36,80 €) · Makro");
     expect(enlacePanel("javascript:alert(1)", "/x")).toBeNull();
   });
@@ -118,10 +118,10 @@ describe("avisos-telegram · avisos de una línea", () => {
       datos: { canal: "plato", nombre: "Chuletón", valor: 41, limite: 35, producto: "Ternera", eur_antes: 18, eur: 21.5, enlace: "?tab=margenes&articulo=plato:1" },
     });
     const sug = { precio_actual: 22, precio_sugerido: 24.5 };
-    expect(mensajeAviso(a, "https://panel.example", sug)).toBe("⚠️ Chuletón: coste 41 % (máx. 35 %) → súbelo a 24,50 €\nhttps://panel.example/aplicar-precio/0000-aa");
+    expect(mensajeAviso(a, "https://panel.example", sug)).toBe('⚠️ Chuletón: coste 41 % (máx. 35 %) → súbelo a 24,50 € · <a href="https://panel.example/aplicar-precio/0000-aa">Aplicar precio</a>');
     // Ya aplicado o sin sugerencia: qué ha subido y enlace normal a Márgenes.
     const sin = mensajeAviso(a, "https://panel.example", null);
-    expect(sin).toBe("⚠️ Chuletón: coste 41 % (máx. 35 %) · sube Ternera (18,00 → 21,50 €)\nhttps://panel.example/facturas?tab=margenes&articulo=plato:1");
+    expect(sin).toBe('⚠️ Chuletón: coste 41 % (máx. 35 %) · sube Ternera (18,00 → 21,50 €) · <a href="https://panel.example/facturas?tab=margenes&amp;articulo=plato:1">Abrir</a>');
     expect(mensajeAviso(a, "https://panel.example", { ...sug, aplicado: { precio: 24.5 } })).not.toContain("aplicar-precio");
   });
   it("margen bajo de un vino o al peso: veces que cobras lo que pagas", () => {
@@ -152,15 +152,14 @@ describe("avisos-telegram · avisos de una línea", () => {
     expect(l("facturas_abreviatura", { abreviatura: "mc" }, "«MC» parece Metro Chef. ¿Confirmar?")).toBe("«MC» parece Metro Chef. ¿Confirmar?");
     expect(l("facturas_precio_sube", {}, "Berberecho sube un 10 % en CASIMIRO")).toBe("Berberecho sube un 10 % en CASIMIRO");
   });
-  it("todos los avisos sueltos son una línea (más el enlace, si lo hay) y nunca pasan de MAX_LINEA", () => {
+  it("todos los avisos sueltos son UNA línea y el texto nunca pasa de MAX_LINEA; el HTML va escapado", () => {
     const tipos = ["reserva_nueva", "reserva_cancelada", "solicitud_pendiente", "facturas_precio_sube", "facturas_revision", "sistema", "facturas_margen_bajo", "peticion_urgente"];
     for (const tipo of tipos) {
       const m = mensajeAviso(aviso({ tipo, titulo: "Algo ha pasado con 3 cosas ".repeat(20), mensaje: "Una frase larga. Y una segunda." }), "https://panel.example");
-      const [linea, ...resto] = m.split("\n");
-      expect(resto.length).toBeLessThanOrEqual(1);
-      expect(linea.length).toBeLessThanOrEqual(MAX_LINEA + 3); // + emoji y espacio
-      if (resto.length) expect(resto[0]).toMatch(/^https:\/\/panel\.example\//);
+      expect(m).not.toContain("\n");
+      expect(m.replace(/ · <a .*$/, "").length).toBeLessThanOrEqual(MAX_LINEA + 3); // + emoji y espacio
     }
+    expect(mensajeAviso(aviso({ tipo: "sistema", titulo: "Gin & Tonic <b>gratis</b>" }), null)).toBe("ℹ️ Gin &amp; Tonic &lt;b&gt;gratis&lt;/b&gt;");
   });
   it("las reservas van sin enlace", () => {
     expect(mensajeAviso(aviso({ tipo: "reserva_nueva", titulo: "Reserva nueva", mensaje: null }), "https://panel.example")).toBe("🟢 Reserva");
@@ -192,48 +191,47 @@ describe("avisos-telegram · avisos de una línea", () => {
 });
 
 describe("avisos-telegram · resumen diario", () => {
-  it("una línea por tipo con el número y los casos, el más numeroso primero", () => {
+  const CAB = "<b>📊 Resumen · miércoles 11/11</b>";
+  it("una sección por tipo con el número y los casos en lista; los avisos de reservas del panel no salen (van por sus pasos)", () => {
     const avisos = [
       aviso({ tipo: "reserva_nueva", titulo: "Reserva nueva", mensaje: "Ana Pérez · 12/11 21:00 · 4 pers. · web", created_at: "2026-11-11T08:00:00Z" }),
-      aviso({ tipo: "reserva_nueva", titulo: "Reserva nueva", mensaje: "Luis Gil · 13/11 14:00 · 2 pers. · web", created_at: "2026-11-11T09:00:00Z" }),
       aviso({ datos: { canal: "vino", nombre: "Ribera X", valor: 2.1, limite: 2.3 } }),
       aviso({ tipo: "reserva_sin_asignar", titulo: "No sale" }),
       aviso({ tipo: "ia_modelo_nuevo", titulo: "Tampoco" }),
       aviso({ titulo: "Viejo", created_at: "2026-11-09T09:00:00Z" }),
     ];
     const { texto, total } = construirResumen(avisos, AHORA, "https://panel.example");
-    expect(total).toBe(3);
-    expect(texto).toBe(
-      "Resumen 11/11 · 3 avisos\n" +
-        "🟢 Reservas nuevas (2): 13/11 14:00 · 2 pers. · web, 12/11 21:00 · 4 pers. · web\n" +
-        "⚠️ Margen bajo (1): Ribera X ×2,1\n" +
-        "https://panel.example/avisos",
-    );
-    expect(texto).not.toMatch(/Ana|Luis|No sale|Tampoco|Viejo/);
+    expect(total).toBe(1);
+    expect(texto).toBe(`${CAB}\n\n<b>⚠️ Margen bajo: 1</b>\n• Ribera X ×2,1\n\n<a href="https://panel.example/avisos">Ver avisos</a>`);
+    expect(texto).not.toMatch(/Ana|No sale|Tampoco|Viejo/);
   });
   it("los 2 casos más importantes y «y N más»", () => {
     const avisos = [5, 40, 12, 3, 25].map((impacto, i) =>
       aviso({ tipo: "facturas_precio_sube", datos: { producto: `Producto ${i}`, precio: 11, precio_ref: 10, variacion_pct: 10, impacto_mes: impacto } }));
-    const { texto } = construirResumen(avisos, AHORA);
-    expect(texto).toContain("📈 Suben de precio (5): Producto 1 +10 %, Producto 4 +10 % y 3 más");
+    expect(construirResumen(avisos, AHORA).texto).toContain("<b>📈 Suben de precio: 5</b>\n• Producto 1 +10 %\n• Producto 4 +10 %\n• y 3 más");
   });
   it("no repite lo que ya llegó al momento", () => {
     const ya = aviso();
     const no = aviso({ tipo: "facturas_albaran_sin_factura", datos: { proveedor: "Makro", albaranes: 2, importe: 340 } });
     const r = construirResumen([ya, no], AHORA, null, { enviados: new Set([ya.id]) });
     expect(r.total).toBe(1);
-    expect(r.texto).toBe("Resumen 11/11 · 1 aviso\n🧾 Albaranes sin factura (1): Makro 340 €");
+    expect(r.texto).toBe(`${CAB}\n\n<b>🧾 Albaranes sin factura: 1</b>\n• Makro 340 €`);
     expect(construirResumen([ya], AHORA, null, { enviados: new Set([ya.id]) }).texto).toBe("");
   });
-  it("sin avisos no manda nada (texto vacío)", () => {
-    expect(construirResumen([], AHORA)).toMatchObject({ texto: "", total: 0 });
+  it("sin avisos ni reservas no manda nada (texto vacío)", () => {
+    expect(construirResumen([], AHORA)).toMatchObject({ texto: "", total: 0, conSemanal: false });
+  });
+  it("sin nombres repetidos: «• No imprime…» bajo «Peticiones urgentes», no «Petición urgente: No imprime…»", () => {
+    const t2 = construirResumen([aviso({ tipo: "peticion_urgente", titulo: "Petición urgente: No imprime la comanda de cocina" })], AHORA).texto;
+    expect(t2).toContain("<b>🚨 Peticiones urgentes: 1</b>\n• No imprime la comanda de cocina");
   });
   it("nunca pasa de 4.096 aunque haya muchos tipos y títulos largos", () => {
     const tipos = Array.from({ length: 60 }, (_, i) => `tipo_raro_${i}`);
-    const avisos = tipos.flatMap((t) => Array.from({ length: 3 }, () => aviso({ tipo: t, titulo: "z".repeat(390) })));
+    const avisos = tipos.flatMap((t) => Array.from({ length: 3 }, () => aviso({ tipo: t, titulo: "z ".repeat(200) })));
     const { texto } = construirResumen(avisos, AHORA, "https://panel.example");
     expect(texto.length).toBeLessThanOrEqual(LIMITE_TELEGRAM);
-    expect(texto).toMatch(/…y \d+ más, en el panel/);
-    expect(texto.endsWith("https://panel.example/avisos")).toBe(true);
+    expect(texto).toContain("\n…y más en el panel\n\n");
+    expect(texto.match(/<b>🔔 tipo raro/g)!.length).toBeGreaterThan(10); // mete las líneas que caben, no tira el bloque
+    expect(texto.endsWith('<a href="https://panel.example/avisos">Ver avisos</a>')).toBe(true);
   });
 });

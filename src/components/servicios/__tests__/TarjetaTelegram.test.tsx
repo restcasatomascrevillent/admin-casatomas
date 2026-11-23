@@ -45,7 +45,8 @@ describe("TarjetaTelegram", () => {
     expect(screen.getByText("Desactivado")).toBeInTheDocument();
     expect(screen.getByLabelText(/Resumen diario/)).toHaveValue("9");
     expect(screen.getByLabelText("Margen bajo al momento")).toBeChecked();
-    expect(screen.getByLabelText("Reservas nuevas al momento")).not.toBeChecked();
+    expect(screen.queryByLabelText("Reservas nuevas al momento")).not.toBeInTheDocument();
+    expect(screen.getByText(/Reservas: siempre al momento/)).toBeInTheDocument();
     expect(screen.getByLabelText("Silencio nocturno de")).toBeChecked();
     expect(screen.getByTestId("tg-estado")).toHaveTextContent("Último envío:ninguno");
     expect(screen.getByText(/@BotFather/)).toBeInTheDocument();
@@ -66,7 +67,7 @@ describe("TarjetaTelegram", () => {
 
     fireEvent.change(screen.getByLabelText("Chat general"), { target: { value: " -1001234567890 " } });
     fireEvent.change(screen.getByLabelText(/Resumen diario/), { target: { value: "20" } });
-    fireEvent.click(screen.getByLabelText("Reservas nuevas al momento"));
+    fireEvent.click(screen.getByLabelText("Bajan de precio al momento"));
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(h.guardar).toHaveBeenCalledTimes(1));
     expect(h.guardar.mock.calls[0][0]).toMatchObject({
@@ -75,7 +76,7 @@ describe("TarjetaTelegram", () => {
       chat_reservas: null,
       chat_fallos: null,
       hora_resumen: 20,
-      tipos_al_momento: ["facturas_margen_bajo", "facturas_precio_sube", "reserva_nueva"],
+      tipos_al_momento: ["facturas_margen_bajo", "facturas_precio_sube", "facturas_precio_baja"],
     });
   });
 
