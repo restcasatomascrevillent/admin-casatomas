@@ -103,14 +103,16 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
           ) : q.isLoading ? (
             <div className="space-y-2">{Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-12" />)}</div>
           ) : q.data?.filas.length ? (
-            <Table data-testid="tabla-incidencias">
+            // 23/11/2026 (dueño: «que no haya que hacer scroll lateral»): columnas de ancho fijo y la de la incidencia con el
+            // resto; los textos largos sin espacios (URL, rutas de traducción, mensajes técnicos) se parten donde haga falta.
+            <Table data-testid="tabla-incidencias" className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Incidencia</TableHead>
-                  <TableHead className="text-right">Ocurrencias</TableHead>
-                  <TableHead className="hidden text-right sm:table-cell">Sesiones</TableHead>
-                  <TableHead className="hidden md:table-cell">Última vez</TableHead>
-                  <TableHead>Seguimiento</TableHead>
+                  <TableHead className="pl-3 sm:pl-4">Incidencia</TableHead>
+                  <TableHead className="w-24 px-2 text-right sm:w-28 sm:px-4">Ocurrencias</TableHead>
+                  <TableHead className="hidden w-24 text-right sm:table-cell">Sesiones</TableHead>
+                  <TableHead className="hidden w-40 md:table-cell">Última vez</TableHead>
+                  <TableHead className="w-24 px-2 sm:w-32 sm:px-4">Seguimiento</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -123,7 +125,7 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
                   return (
                   <TableRow key={i.id} className={cn("cursor-pointer", noDepende && "text-muted-foreground")} tabIndex={0} onClick={() => onAbrirIncidencia(i.id)}
                     onKeyDown={(e) => e.key === "Enter" && onAbrirIncidencia(i.id)} data-testid="fila-incidencia" data-origen={o}>
-                    <TableCell className={cn("border-l-4", o === "web" ? "border-l-destructive" : o === "externo" ? "border-l-amber-500" : "border-l-slate-300 dark:border-l-slate-600")}>
+                    <TableCell className={cn("border-l-4 pl-3 [overflow-wrap:anywhere] sm:pl-4", o === "web" ? "border-l-destructive" : o === "externo" ? "border-l-amber-500" : "border-l-slate-300 dark:border-l-slate-600")}>
                       <span className="flex flex-wrap items-center gap-2">
                         <BadgeOrigen origen={o} proveedor={o === "externo" ? proveedorDeFila(i) : null} ambito={ficha.ambito} />
                         {i.gravedad === "critico" && o === "web" && <Badge variant="destructive" className="shrink-0">{NOMBRE_GRAVEDAD.critico}</Badge>}
@@ -144,10 +146,10 @@ export function PestanaIncidencias({ desde, hasta, entorno, autoRefresco, onAbri
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{i.ocurrencias}<span className="block text-xs text-muted-foreground">{i.ocurrencias_24h} en 24 h</span></TableCell>
+                    <TableCell className="px-2 text-right tabular-nums sm:px-4">{i.ocurrencias}<span className="block text-xs text-muted-foreground">{i.ocurrencias_24h} en 24 h</span></TableCell>
                     <TableCell className="hidden text-right tabular-nums sm:table-cell">{i.sesiones_afectadas}</TableCell>
                     <TableCell className="hidden whitespace-nowrap text-xs md:table-cell">{fmtFechaHora(i.ultima_vez)}</TableCell>
-                    <TableCell className="space-y-1 text-xs">
+                    <TableCell className="space-y-1 px-2 text-xs [overflow-wrap:anywhere] sm:px-4">
                       <Badge variant="outline">{NOMBRE_ESTADO[i.estado]}</Badge>
                       <span className="block text-muted-foreground">
                         {i.linear_identificador ? `${i.linear_identificador}${i.linear_destino === "prueba" ? " (pruebas)" : ""}` : NOMBRE_LINEAR[i.linear_estado]}
