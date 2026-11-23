@@ -2,6 +2,22 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.53.0] - 2026-11-23
+
+Objetivo: Fallos a Linear en una tanda diaria a las 7:00 (sin los de Facturas) y avisos de reserva por WhatsApp, apagados en producción
+
+### Añadido
+- feature/whatsapp-reservas ([#335](https://github.com/restcasatomascrevillent/admin-casatomas/pull/335))
+- Whatsapp-reservas: mandar el aviso sin plantilla si Meta no deja usarla ([#336](https://github.com/restcasatomascrevillent/admin-casatomas/pull/336))
+
+### Cambiado
+- Reservas: el aviso del panel dice WhatsApp si el cliente lo eligió ([#337](https://github.com/restcasatomascrevillent/admin-casatomas/pull/337))
+- Reservas-web: pedir el aviso de reserva recibida a quien eligió WhatsApp ([#339](https://github.com/restcasatomascrevillent/admin-casatomas/pull/339))
+
+### Otros
+- Chat-facturas: referencia del caso r050 (queso trufado) ([#334](https://github.com/restcasatomascrevillent/admin-casatomas/pull/334))
+- Los fallos pasan a Linear en una tanda diaria a las 7:00, sin los de Facturas ([#345](https://github.com/restcasatomascrevillent/admin-casatomas/pull/345))
+
 ## [1.52.1] - 2026-11-23
 
 Objetivo: Telegram: reservas con su estado y resúmenes claros; Dashboard sin avisos revisados; Logs sin scroll lateral
