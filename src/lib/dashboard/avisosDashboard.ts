@@ -60,9 +60,10 @@ export function puedeVerAviso(n: Pick<NotificacionDashboard, "tipo" | "referenci
 }
 
 /**
- * Lo que enseña el módulo: los avisos que puede ver, sin los caducados ni los
- * que no van a la campana (subidas pequeñas: `datos.campana = false`), sin
- * leer primero y, dentro, del más nuevo al más viejo.
+ * Lo que enseña el módulo: los avisos SIN REVISAR que puede ver, sin los caducados ni los
+ * que no van a la campana (subidas pequeñas: `datos.campana = false`), del más nuevo al más viejo.
+ * 23/11/2026 (dueño: «si ya están revisados que no aparezcan»): los revisados ya no salen aquí; siguen
+ * en la página Avisos («Ver todos»).
  */
 export function avisosParaDashboard(
   lista: NotificacionDashboard[],
@@ -70,8 +71,8 @@ export function avisosParaDashboard(
   ahora: number = Date.now(),
 ): NotificacionDashboard[] {
   return lista
-    .filter((n) => n.datos?.campana !== false && !avisoCaducado(n, ahora) && puedeVerAviso(n, permisos))
-    .sort((a, b) => Number(a.leida) - Number(b.leida) || Date.parse(b.created_at) - Date.parse(a.created_at));
+    .filter((n) => !n.leida && n.datos?.campana !== false && !avisoCaducado(n, ahora) && puedeVerAviso(n, permisos))
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
 }
 
 /** Sin leer por sección (las fichas de arriba), en el orden del menú. */
