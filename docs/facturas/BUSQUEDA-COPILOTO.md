@@ -1,6 +1,6 @@
 # Cómo busca el copiloto de Facturas un producto o un proveedor
 
-Estado tras la migración `20261217100000_chat_facturas_busqueda_por_partes` (23/11/2026). Todo vive en SQL
+Estado tras la migración `20261217100100_chat_facturas_busqueda_por_partes` (23/11/2026). Todo vive en SQL
 (`supabase/migrations`); el bucle (`supabase/functions/chat-facturas`) solo decide qué herramienta llamar.
 
 ## Productos
