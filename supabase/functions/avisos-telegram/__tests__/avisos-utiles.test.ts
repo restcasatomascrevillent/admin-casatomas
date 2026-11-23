@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aplicarTopes, type Aviso, casoCorto, construirResumen, construirSemanal, evaluarPendientes, incluirRevision, lineaAviso, lineaReserva, mensajeAviso,
-  motivoSospechoso, notaTope, pendientesDeEnvio, type ReservaInfo, TOPE_RESERVAS_DIA, TOPE_RESERVAS_HORA, topesDeCanal, visibilidadReserva,
+  motivoSospechoso, notaTope, pendientesDeEnvio, type ReservaInfo, TOPE_RESERVAS_DIA, TOPE_RESERVAS_HORA, topesDeCanal,
 } from "../logica";
 
 // Casos reales de la revisión de producción del 17/11/2026 (con nombres y cifras inventados).
@@ -41,7 +41,7 @@ describe("avisos-telegram · resumen útil", () => {
     const b = aviso({ datos: { canal: "plato", nombre: "Entrecot", valor: 38, limite: 35 } });
     const c = aviso({ datos: { canal: "plato", nombre: "Lubina", valor: 36, limite: 35 } });
     expect(casoCorto(a)).toBe("Chuletón 41 %");
-    expect(construirResumen([c, b, a], AHORA).texto).toContain("⚠️ Margen bajo (3): Chuletón 41 %, Entrecot 38 % y 1 más");
+    expect(construirResumen([c, b, a], AHORA).texto).toContain("<b>⚠️ Margen bajo: 3</b>\n• Chuletón 41 %\n• Entrecot 38 %\n• y 1 más");
   });
 
   it("«Por revisar»: su línea con la diferencia; no se repite cada día; sí si cambia o pasa una semana", () => {
@@ -52,10 +52,10 @@ describe("avisos-telegram · resumen útil", () => {
     const av = aviso({ tipo: "facturas_revision", titulo: "202 documentos con avisos sin revisar", datos: { cuantos: 202, resumen: "avisos" } });
     expect(construirResumen([av], AHORA, null, { revision: { avisos: { n: 200, dia: "2026-11-10" } } }).total).toBe(0);
     const r = construirResumen([av], AHORA, null, { revision: { avisos: { n: 190, dia: "2026-11-10" } } });
-    expect(r.texto).toBe("Resumen 11/11 · 1 aviso\n📋 Por revisar: 202 docs (+12)");
+    expect(r.texto).toBe("<b>📊 Resumen · miércoles 11/11</b>\n\n<b>📋 Documentos con avisos sin revisar: 202</b> (+12 desde el 10/11)");
     expect(r.revision.avisos).toEqual({ n: 202, dia: "2026-11-11" });
     const dup = aviso({ tipo: "facturas_revision", titulo: "Duplicados", datos: { cuantos: 3, resumen: "duplicados" } });
-    expect(construirResumen([dup], AHORA).texto).toContain("📋 Posibles duplicados: 3 docs");
+    expect(construirResumen([dup], AHORA).texto).toContain("<b>📋 Posibles duplicados: 3</b>");
   });
 
   it("no manda nada si no queda nada que contar", () => {
@@ -103,32 +103,13 @@ describe("avisos-telegram · reservas sin datos personales", () => {
     expect(casoCorto(a, { ahora: AHORA, reservas })).toBe("vie 20/11 13:30 (6 pax)");
   });
 
-  it("no avisa de cancelaciones del restaurante ni de reservas pendientes de verificar", () => {
-    const nueva = aviso({ tipo: "reserva_nueva", referencia_id: "r1" });
-    const canc = aviso({ tipo: "reserva_cancelada", referencia_id: "r1" });
-    expect(visibilidadReserva(nueva, mapa(reserva({ estado: "pendiente" })))).toBe("espera");
-    expect(visibilidadReserva(nueva, mapa(reserva({ estado: "verificada" })))).toBe("si");
-    expect(visibilidadReserva(nueva, mapa(reserva({ estado: "cancelada" })))).toBe("no");
-    expect(visibilidadReserva(canc, mapa(reserva({ cancelada_por: "restaurante" })))).toBe("no");
-    expect(visibilidadReserva(canc, mapa(reserva({ cancelada_por: "cliente" })))).toBe("si");
-    const r = construirResumen([nueva, canc], AHORA, null, { reservas: mapa(reserva({ estado: "pendiente" })) });
-    expect(r.total).toBe(1); // solo la cancelación (no consta quién)
-  });
-
-  it("al momento: hoy y mañana sí; otro día no; pendientes esperan; manuales se descartan", () => {
-    const hoy = aviso({ id: "h", tipo: "reserva_nueva", referencia_id: "r1" });
-    const manana = aviso({ id: "m", tipo: "reserva_nueva", referencia_id: "r2" });
-    const lejos = aviso({ id: "l", tipo: "reserva_nueva", referencia_id: "r3" });
-    const pend = aviso({ id: "p", tipo: "reserva_nueva", referencia_id: "r4" });
-    const manual = aviso({ id: "x", tipo: "reserva_cancelada", referencia_id: "r5" });
-    const reservas = mapa(
-      reserva({ id: "r1" }), reserva({ id: "r2", fecha: "2026-11-12" }), reserva({ id: "r3", fecha: "2026-11-20" }),
-      reserva({ id: "r4", estado: "pendiente" }), reserva({ id: "r5", cancelada_por: "restaurante" }),
-    );
-    const ev = evaluarPendientes([hoy, manana, lejos, pend, manual], [], CFG, AHORA, { reservas });
-    expect(ev.enviar.map((a) => a.id)).toEqual(["h", "m"]);
-    expect(ev.descartar.map((d) => d.aviso.id)).toEqual(["x"]);
-    expect(pendientesDeEnvio([hoy], [], { ...CFG, reservas_al_momento: false }, AHORA, { reservas })).toEqual([]);
+  it("los avisos de reservas del panel ya no van ni al momento ni al resumen (van por sus pasos)", () => {
+    const nueva = aviso({ id: "n", tipo: "reserva_nueva", referencia_id: "r1" });
+    const canc = aviso({ id: "c", tipo: "reserva_cancelada", referencia_id: "r1" });
+    const cfg = { ...CFG, tipos_al_momento: ["reserva_nueva", "reserva_cancelada", "facturas_margen_bajo"] };
+    expect(evaluarPendientes([nueva, canc], [], cfg, AHORA, { reservas: mapa(reserva()) })).toEqual({ enviar: [], descartar: [] });
+    expect(pendientesDeEnvio([nueva, canc, aviso({ id: "m" })], [], cfg, AHORA).map((a) => a.id)).toEqual(["m"]);
+    expect(construirResumen([nueva, canc], AHORA).texto).toBe("");
   });
 });
 
@@ -140,7 +121,7 @@ describe("avisos-telegram · topes por canal y resumen semanal", () => {
     expect(aplicarTopes(l, { hora: 0, dia: 29 }, { hora: 10, dia: 30 }).enviar).toEqual([0]);
     expect(aplicarTopes(l, { hora: 10, dia: 10 }, { hora: 10, dia: 30 }).enviar).toEqual([]);
     expect(aplicarTopes(l, { hora: 0, dia: 0 }, { hora: 10, dia: 30 }).resto).toHaveLength(5);
-    expect(notaTope(5, "https://p.example")).toBe("➕ 5 avisos más (demasiados seguidos), en el panel\nhttps://p.example/avisos");
+    expect(notaTope(5, "https://p.example")).toBe('➕ 5 avisos más (demasiados seguidos), en el panel · <a href="https://p.example/avisos">Ver</a>');
     expect(notaTope(1)).toBe("➕ 1 aviso más (demasiados seguidos), en el panel.");
   });
 
@@ -150,30 +131,29 @@ describe("avisos-telegram · topes por canal y resumen semanal", () => {
     expect(topesDeCanal("facturas", {})).toEqual({ hora: 10, dia: 30 });
   });
 
-  it("semanal: una línea por cosa, con los 2 peores y el total de albaranes si hay más", () => {
+  it("semanal: una sección por cosa, con los 2 peores (sin cortar el nombre) y el total de albaranes si hay más", () => {
     const lunes = new Date("2026-11-16T08:00:00Z");
     const { texto, secciones } = construirSemanal({
-      vinos: { limite: 2.3, bajo: 69, total: 85, peor: [{ nombre: "Vino A", multiplicador: 1.2 }, { nombre: "Vino B", multiplicador: 1.5 }, { nombre: "Vino C", multiplicador: 1.6 }] },
+      vinos: { limite: 2.3, bajo: 69, total: 85, peor: [{ nombre: "Léon Beyer Gewurztraminer 2021", multiplicador: 1.37 }, { nombre: "Vino B", multiplicador: 1.5 }, { nombre: "Vino C", multiplicador: 1.6 }] },
       tienda: { activa: true, limite: 1.5, bajo: 72, total: 90, bajo_coste: 10, peor: [{ nombre: "Vino D", multiplicador: 0.83 }] },
       facturas: { documentos: 1276, importe: 1440000, mayores: [{ proveedor: "PROVEEDOR X S.L.", total: 12345.6, fecha: "2026-11-03" }] },
       albaranes: { n: 22, proveedores: 14, importe: 9304.88, total_n: 113, total_proveedores: 42, total_importe: 46734.15 },
     }, lunes, "https://panel.example");
     expect(secciones).toBe(4);
     expect(texto).toBe(
-      "📅 Semana 16/11\n" +
-        "🍷 Vinos bajo ×2,3: 69 de 85 · peores: Vino A ×1,2, Vino B ×1,5\n" +
-        "🛒 Tienda bajo ×1,5: 72 de 90 (10 bajo coste) · peores: Vino D ×0,83\n" +
-        "📋 Facturas por verificar: 1.276 (1.440.000 €) · mayor: Proveedor X 12.346 €\n" +
-        "🧾 Albaranes sin factura +35 días: 9.305 € en 14 proveedores · en total 113 (46.734 €)\n" +
-        "Márgenes: https://panel.example/facturas?tab=margenes\n" +
-        "Facturas: https://panel.example/facturas?tab=compras&modo=documentos",
+      "<b>📅 Resumen de la semana · 16/11</b>\n\n" +
+        "<b>🍷 Vinos con margen bajo: 69 de 85</b> (mín. ×2,3)\n• Léon Beyer Gewurztraminer 2021 ×1,37\n• Vino B ×1,50\n\n" +
+        "<b>🛒 Tienda con margen bajo: 72 de 90</b> (mín. ×1,5)\n• 10 por debajo del coste\n• Vino D ×0,83\n\n" +
+        "<b>📋 Facturas por verificar: 1.276</b>\n• 1.440.000 € en total\n• la mayor: Proveedor X, 12.346 €\n\n" +
+        "<b>🧾 Albaranes sin factura (+35 días): 9.305 €</b>\n• de 14 proveedores\n• 113 en total contando los recientes (46.734 €)\n\n" +
+        '<a href="https://panel.example/facturas?tab=margenes">Márgenes</a> · <a href="https://panel.example/facturas?tab=compras&amp;modo=documentos">Facturas</a>',
     );
   });
 
-  it("semanal: sin totales no se inventa la parte «en total»; vacío si no hay nada", () => {
+  it("semanal: sin totales no se inventa la línea «en total»; vacío si no hay nada", () => {
     const lunes = new Date("2026-11-16T08:00:00Z");
     expect(construirSemanal({ albaranes: { n: 1, proveedores: 1, importe: 300 } }, lunes, null).texto)
-      .toBe("📅 Semana 16/11\n🧾 Albaranes sin factura +35 días: 300 € en 1 proveedor");
+      .toBe("<b>📅 Resumen de la semana · 16/11</b>\n\n<b>🧾 Albaranes sin factura (+35 días): 300 €</b>\n• de 1 proveedor");
     expect(construirSemanal({ vinos: { bajo: 0 }, albaranes: { n: 0 } }, lunes, null)).toEqual({ texto: "", secciones: 0 });
   });
 });

@@ -157,10 +157,10 @@ describe("Avisos", () => {
     expect(h.marcarLeida).not.toHaveBeenCalled();
   });
 
-  it("sin nada que pueda ver: «No hay avisos», y siempre el enlace a la página Avisos", () => {
+  it("sin nada que pueda ver: «No hay avisos sin revisar», y siempre el enlace a la página Avisos", () => {
     h.facturas = false;
     pintar(<AvisosDashboard />);
-    expect(screen.getByText("No hay avisos.")).toBeInTheDocument();
+    expect(screen.getByText("No hay avisos sin revisar.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Ver todos/ })).toHaveAttribute("href", "/avisos");
   });
 });

@@ -13,6 +13,9 @@
 // 17/11/2026 (CAS-9, dueño: «que sigan habiendo avisos en el dashboard pero que te redirijan al apartado avisos de
 // reservas»): los avisos de reservas (nuevas y canceladas) llevan a Reservas › Avisos con el modal abierto, donde se
 // verifican o se revisan. Tocarlos aquí ya no los da por revisados (ni hay «✓»): eso se hace allí, con un botón.
+//
+// 23/11/2026 (dueño: «en avisos si ya están revisados que no aparezcan»): solo los avisos sin revisar; al revisar
+// uno desaparece de aquí. Los revisados siguen en la página Avisos («Ver todos»).
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Bell, Check, CheckCheck, Info } from "lucide-react";
@@ -112,7 +115,7 @@ export function AvisosDashboard() {
         {loading || cargando ? (
           <p className="m-auto text-sm text-muted-foreground" role="status">Cargando avisos…</p>
         ) : avisos.length === 0 ? (
-          <p className="m-auto text-sm text-muted-foreground">No hay avisos.</p>
+          <p className="m-auto text-sm text-muted-foreground">No hay avisos sin revisar.</p>
         ) : (
           <>
             {porSeccion.length > 0 && (
@@ -152,7 +155,6 @@ export function AvisosDashboard() {
                       {n.mensaje ? <span className="block truncate text-xs text-foreground/80">{n.mensaje}</span> : null}
                       <span className="block truncate text-xs text-muted-foreground">
                         {ETIQUETA_SECCION_AVISO[seccionDeAviso(n)]} · {cuando(n.created_at)}
-                        {n.leida ? " · Revisado" : ""}
                       </span>
                     </span>
                   </>
@@ -185,7 +187,7 @@ export function AvisosDashboard() {
                   </li>
                 );
               })}
-              {visibles.length === 0 && <li className="py-3 text-center text-sm text-muted-foreground">No hay avisos de esta sección.</li>}
+              {visibles.length === 0 && <li className="py-3 text-center text-sm text-muted-foreground">No hay avisos sin revisar de esta sección.</li>}
             </ul>
           </>
         )}
