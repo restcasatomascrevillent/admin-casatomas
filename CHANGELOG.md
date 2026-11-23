@@ -2,6 +2,15 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.52.1] - 2026-11-23
+
+Objetivo: Telegram: reservas con su estado y resúmenes claros; Dashboard sin avisos revisados; Logs sin scroll lateral
+
+### Cambiado
+- Dashboard: en Avisos no salen los ya revisados ([#341](https://github.com/restcasatomascrevillent/admin-casatomas/pull/341))
+- Telegram: reservas con su estado y resúmenes más claros ([#342](https://github.com/restcasatomascrevillent/admin-casatomas/pull/342))
+- Logs: las tablas de Logs caben en la pantalla, sin scroll lateral ([#343](https://github.com/restcasatomascrevillent/admin-casatomas/pull/343))
+
 ## [1.52.0] - 2026-11-23
 
 Objetivo: Telegram en cuatro chats (uno por canal) y avisos de una línea
