@@ -204,6 +204,10 @@ export interface ConfigLogsWeb {
   ia_max_analisis_dia: number;
   /** Los «Servicio externo» pueden abrir ticket (migración 20261130100000). */
   linear_tickets_externos?: boolean;
+  /** Hora (Madrid) de la tanda diaria de fallos a Linear; null = al momento por umbrales (migración 20261218100000). */
+  linear_tanda_hora?: number | null;
+  /** La tanda diaria no pasa sola los fallos de Facturas (migración 20261218100000). */
+  linear_tanda_sin_facturas?: boolean;
   entorno_bd: Entorno;
   actualizado_en: string;
 }

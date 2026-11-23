@@ -39,6 +39,8 @@ const ORIGEN = await readFile("supabase/migrations/20261130100000_logs_web_orige
 const ROLLBACK_ORIGEN = await readFile("supabase/rollbacks/20261130100000_logs_web_origen_ROLLBACK.sql", "utf8");
 const NAVEGADOR = await readFile("supabase/migrations/20261213040000_logs_web_navegador_reaperturas.sql", "utf8");
 const ROLLBACK_NAVEGADOR = await readFile("supabase/rollbacks/20261213040000_logs_web_navegador_reaperturas_ROLLBACK.sql", "utf8");
+const TANDA = await readFile("supabase/migrations/20261218100000_logs_linear_tanda_diaria.sql", "utf8");
+const ROLLBACK_TANDA = await readFile("supabase/rollbacks/20261218100000_logs_linear_tanda_diaria_ROLLBACK.sql", "utf8");
 // Los mismos casos que el vitest de origen.ts: el SQL tiene que clasificar igual.
 const CASOS_ORIGEN = JSON.parse(await readFile("supabase/functions/_shared/__tests__/logs-web-origen-casos.json", "utf8"));
 // El patrón de «versión antigua» del SQL tiene que ser el mismo que el de huella.ts.
@@ -742,5 +744,44 @@ await db.exec(LEGIBLES);
 await db.exec(ORIGEN);
 await db.exec(NAVEGADOR);
 ok((await q("select count(*)::int n from public.web_logs_config")).rows[0].n === 1, "se puede volver a aplicar tras el rollback");
+
+// ─── 11. Tanda diaria de fallos a Linear (20261218100000, 23/11/2026) ───────
+// Con tanda, un fallo de la web o del admin solo pasa a «pendiente» al momento si es crítico: los demás los marca
+// procesar-logs-web en la tanda de cada mañana (proceso.test.ts). Sin tanda (null), los umbrales de siempre.
+{
+  await db.exec(TANDA);
+  await db.exec(TANDA); // idempotente
+  igual((await q("select linear_tanda_hora, linear_tanda_sin_facturas from public.web_logs_config")).rows[0],
+        { linear_tanda_hora: 7, linear_tanda_sin_facturas: true }, "tanda a las 7:00 y sin Facturas, por defecto");
+  igual((await q("select linear_tanda_ultimo_dia from public.web_logs_estado")).rows[0].linear_tanda_ultimo_dia, null, "aún sin tanda hecha");
+  igual((await q("select has_column_privilege('authenticated', 'public.web_logs_config', 'linear_tanda_hora', 'UPDATE') p")).rows[0].p, true,
+        "el super admin puede cambiar la hora desde el panel");
+  await q("update public.web_logs_config set umbral_ocurrencias = 3, umbral_sesiones = 2, tickets_404 = false");
+  const HT = "7".repeat(32);
+  const HC = "8".repeat(32);
+  const HU = "9".repeat(32);
+  const fallo = (h, n, extra = {}) => Array.from({ length: n }, (_, i) => ev({ tipo: "error_js", categoria: "error", gravedad: "error", huella: h,
+    ruta: "/carta", mensaje: `TypeError: fallo ${h.slice(0, 1)}`, sesion_id: randomUUID(), secuencia: 300 + i, version: "0.40", ...extra }));
+  await ingerir([...fallo(HT, 4), ev({ tipo: "error_servidor", categoria: "error", fuente: "servidor", proyecto: "servidor", gravedad: "critico",
+                                       huella: HC, mensaje: "reservas-web 500", consentimiento: false })]);
+  await agrupar();
+  const est = async (h) => (await q("select linear_estado, motivo_ticket from public.web_incidencias where huella = $1 and entorno = 'produccion'", [h])).rows[0];
+  igual((await est(HT)).linear_estado, "sin_ticket", "con tanda: un fallo por encima de los umbrales espera a la tanda");
+  igual((await est(HC)).linear_estado, "pendiente", "con tanda: un crítico sigue abriendo ticket al momento");
+  await q("update public.web_logs_config set linear_tanda_hora = null");
+  await ingerir(fallo(HU, 4));
+  await agrupar();
+  igual((await est(HU)).linear_estado, "pendiente", "sin tanda: los umbrales de siempre");
+  await q("update public.web_logs_config set linear_tanda_hora = 7");
+  await db.exec(ROLLBACK_TANDA);
+  await db.exec(ROLLBACK_TANDA); // idempotente
+  igual((await q("select count(*)::int n from information_schema.columns where table_name = 'web_logs_config' and column_name like 'linear_tanda%'")).rows[0].n, 0,
+        "el rollback quita las columnas");
+  await ingerir(fallo(HT, 1));
+  await agrupar();
+  igual((await est(HT)).linear_estado, "pendiente", "tras el rollback, vuelven los umbrales (5 ocurrencias en 5 sesiones)");
+  await db.exec(TANDA);
+  igual((await q("select linear_tanda_hora from public.web_logs_config")).rows[0].linear_tanda_hora, 7, "se puede volver a aplicar");
+}
 
 console.log(`✓ Logs web: ${comprobaciones} comprobaciones`);

@@ -144,6 +144,20 @@ function crearRepo(sb: any): RepoProceso {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return d.sort((a: any, b: any) => a.ocurrido_en.localeCompare(b.ocurrido_en) || (a.secuencia ?? 0) - (b.secuencia ?? 0) || a.id - b.id);
     },
+    async tandaUltimoDia() {
+      const d = comprobar(await sb.from("web_logs_estado").select("linear_tanda_ultimo_dia").eq("id", true).maybeSingle(), "leer la tanda diaria");
+      return (d as { linear_tanda_ultimo_dia?: string | null } | null)?.linear_tanda_ultimo_dia ?? null;
+    },
+    async guardarTanda(dia) {
+      comprobar(await sb.from("web_logs_estado").update({ linear_tanda_ultimo_dia: dia }).eq("id", true), "guardar la tanda diaria");
+    },
+    async candidatosTanda(entornos, limite) {
+      // Fallos de la web y del admin sin ticket con alguna ocurrencia real en la ventana (la de los umbrales).
+      return comprobar(await sb.from("web_incidencias").select("*")
+        .eq("linear_estado", "sin_ticket").eq("origen", "web").in("estado", ["nueva", "abierta", "reabierta"])
+        .in("entorno", entornos).gt("ocurrencias_ventana", 0)
+        .order("ultima_vez", { ascending: false }).limit(limite), "leer candidatas de la tanda") ?? [];
+    },
     async ticketsCreadosDesde(desde, destino) {
       const r = await sb.from("web_incidencias").select("id", { count: "exact", head: true })
         .gte("linear_creado_en", desde.toISOString()).eq("linear_destino", destino);
