@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  agruparEnMensajes, type Aviso, construirResumen, cuerpoSendMessage, diaMadrid, enlacePanel, enSilencio, errorSaneado, esAccion, fraseAviso, horaMadrid,
-  LIMITE_TELEGRAM, MAX_FALLOS, mensajeAviso, pendientesDeEnvio, recortar, rutaPanel, silencioAhora,
+  agruparEnMensajes, type Aviso, canalDeTipo, chatDe, construirResumen, cuerpoSendMessage, destinos, diaMadrid, enlacePanel, enSilencio, errorSaneado, esAccion,
+  horaMadrid, LIMITE_TELEGRAM, lineaAviso, MAX_FALLOS, MAX_LINEA, mensajeAviso, pendientesDeEnvio, proveedorCorto, recortar, rutaPanel, silencioAhora,
+  textoPrueba, tipoRegistro,
 } from "../logica";
 
 const AHORA = new Date("2026-11-11T10:00:00Z"); // 11:00 en Madrid
@@ -41,6 +42,32 @@ describe("avisos-telegram · silencio nocturno", () => {
   });
 });
 
+describe("avisos-telegram · un chat por canal", () => {
+  it("reservas y solicitudes van a Reservas; todo lo demás, a Facturas y márgenes (igual que el SQL)", () => {
+    expect(["reserva_nueva", "reserva_cancelada", "reserva_modificada", "solicitud_pendiente"].map(canalDeTipo)).toEqual(["reservas", "reservas", "reservas", "reservas"]);
+    expect(["facturas_margen_bajo", "facturas_precio_sube", "peticion_urgente", "reservas_raras"].map(canalDeTipo)).toEqual(["facturas", "facturas", "facturas", "facturas"]);
+  });
+  it("cada canal usa su chat o, si no tiene, el general; los fallos técnicos NUNCA van al general", () => {
+    const cfg = { chat_id: "-100", chat_reservas: " -200 ", chat_facturas: "", chat_resumenes: null, chat_fallos: null };
+    expect(chatDe(cfg, "reservas")).toBe("-200");
+    expect(chatDe(cfg, "facturas")).toBe("-100");
+    expect(chatDe(cfg, "resumenes")).toBe("-100");
+    expect(chatDe(cfg, "fallos")).toBeNull();
+    expect(chatDe({ ...cfg, chat_fallos: "-900" }, "fallos")).toBe("-900");
+    expect(chatDe({ chat_id: null }, "reservas")).toBeNull();
+  });
+  it("la prueba va una vez a cada chat distinto y dice qué llegará ahí", () => {
+    const d = destinos({ chat_id: "-100", chat_reservas: "-200", chat_fallos: "-900" });
+    expect(d).toEqual([
+      { chat: "-200", canales: ["reservas"] },
+      { chat: "-100", canales: ["facturas", "resumenes"] },
+      { chat: "-900", canales: ["fallos"] },
+    ]);
+    expect(textoPrueba(["facturas", "resumenes"])).toBe("✅ Prueba de avisos de Casa Tomás. Aquí llegará: Facturas y márgenes y Resúmenes.");
+    expect(destinos({ chat_id: null })).toEqual([]);
+  });
+});
+
 describe("avisos-telegram · pendientes (no reenviar)", () => {
   it("solo tipos marcados, recientes, posteriores a la activación, con campana y sin excluir", () => {
     const bueno = aviso();
@@ -70,60 +97,81 @@ describe("avisos-telegram · pendientes (no reenviar)", () => {
     const viejo = aviso({ created_at: "2026-11-11T09:00:00Z" });
     expect(pendientesDeEnvio([nuevo, viejo], [], CFG, AHORA).map((x) => x.id)).toEqual([viejo.id, nuevo.id]);
   });
+  it("un canal sin chat no recibe nada (y sus avisos esperan, no se descartan)", () => {
+    const margen = aviso();
+    expect(pendientesDeEnvio([margen], [], CFG, AHORA, { canales: new Set(["reservas"]) })).toEqual([]);
+    expect(pendientesDeEnvio([margen], [], CFG, AHORA, { canales: new Set(["facturas"]) }).map((a) => a.id)).toEqual([margen.id]);
+  });
 });
 
-describe("avisos-telegram · mensajes", () => {
-  it("frase corta: la primera frase de texto_telegram o del mensaje", () => {
-    expect(fraseAviso(aviso({ datos: { texto_telegram: "  El vino ha bajado.\n Revisa. " } }))).toBe("El vino ha bajado.");
-    expect(fraseAviso(aviso({ datos: null }))).toBe("El vino ha bajado a 2,1×");
-    expect(fraseAviso(aviso({ mensaje: null, datos: null }))).toBe("Margen bajo en Ribera X");
-    expect(fraseAviso(aviso({ tipo: "facturas_precio_sube", mensaje: "Bogavante ha subido un 12 %: de 25,00 a 28,00 €/kg. Con lo que compras, son unos 20 € más al mes." })))
-      .toBe("Bogavante ha subido un 12 %: de 25,00 a 28,00 €/kg.");
-  });
-  it("enlace al panel solo con PANEL_URL válida", () => {
-    const a = aviso({ tipo: "facturas_precio_sube", titulo: "Sube el aceite", datos: { texto_telegram: "Sube.", enlace: "?tab=compras&factura=12" } });
+describe("avisos-telegram · avisos de una línea", () => {
+  it("una línea con emoji y, debajo, el enlace al panel si hay PANEL_URL", () => {
+    const a = aviso({ tipo: "facturas_precio_sube", titulo: "Sube el aceite", datos: { producto: "ACEITE OLIVA 5L", proveedor: "MAKRO, S.A.", precio: 36.8, precio_ref: 31.2, variacion_pct: 17.9, enlace: "?tab=compras&factura=12" } });
     expect(rutaPanel(a)).toBe("/facturas?tab=compras&factura=12");
-    expect(rutaPanel(aviso({ tipo: "reserva_nueva", referencia_tipo: "reserva" }))).toBe("/reservas?tab=reservas");
-    expect(mensajeAviso(a, "https://panel.example/")).toBe(
-      "Sube el aceite\nSube.\nQué hacer: mira si toca subir la carta o pedir otro precio.\nVer: https://panel.example/facturas?tab=compras&factura=12",
-    );
-    expect(mensajeAviso(a, null)).toBe("Sube el aceite\nSube.\nQué hacer: mira si toca subir la carta o pedir otro precio.");
+    expect(mensajeAviso(a, "https://panel.example/")).toBe("📈 Aceite oliva 5l: +18 % (31,20 → 36,80 €) · Makro\nhttps://panel.example/facturas?tab=compras&factura=12");
+    expect(mensajeAviso(a, null)).toBe("📈 Aceite oliva 5l: +18 % (31,20 → 36,80 €) · Makro");
     expect(enlacePanel("javascript:alert(1)", "/x")).toBeNull();
   });
-  it("margen bajo de un plato: 4 líneas con números, precio sugerido y enlace para aplicarlo", () => {
+  it("margen bajo de un plato: la cifra frente al límite y el precio que lo arregla, con «Aplicar el precio»", () => {
     const a = aviso({
       id: "0000-aa",
       datos: { canal: "plato", nombre: "Chuletón", valor: 41, limite: 35, producto: "Ternera", eur_antes: 18, eur: 21.5, enlace: "?tab=margenes&articulo=plato:1" },
     });
     const sug = { precio_actual: 22, precio_sugerido: 24.5 };
-    const m = mensajeAviso(a, "https://panel.example", sug);
-    expect(m).toBe(
-      "Margen bajo: Chuletón\n" +
-        "Los ingredientes ya son el 41 % de lo que cobras (máximo 35 %). Sube Ternera: de 18,00 € a 21,50 €.\n" +
-        "Qué hacer: sube la carta de 22,00 € a 24,50 € (con IVA).\n" +
-        "Aplicar el precio: https://panel.example/aplicar-precio/0000-aa",
-    );
-    expect(m.split("\n").length).toBeLessThanOrEqual(4);
-    // Ya aplicado o sin sugerencia: enlace normal a Márgenes.
-    expect(mensajeAviso(a, "https://panel.example", { ...sug, aplicado: { precio: 24.5 } })).toContain("Ver: https://panel.example/facturas?tab=margenes");
-    expect(mensajeAviso(a, "https://panel.example", null)).toContain("Qué hacer: revisa el precio en Facturas › Márgenes.");
+    expect(mensajeAviso(a, "https://panel.example", sug)).toBe("⚠️ Chuletón: coste 41 % (máx. 35 %) → súbelo a 24,50 €\nhttps://panel.example/aplicar-precio/0000-aa");
+    // Ya aplicado o sin sugerencia: qué ha subido y enlace normal a Márgenes.
+    const sin = mensajeAviso(a, "https://panel.example", null);
+    expect(sin).toBe("⚠️ Chuletón: coste 41 % (máx. 35 %) · sube Ternera (18,00 → 21,50 €)\nhttps://panel.example/facturas?tab=margenes&articulo=plato:1");
+    expect(mensajeAviso(a, "https://panel.example", { ...sug, aplicado: { precio: 24.5 } })).not.toContain("aplicar-precio");
   });
-  it("margen bajo de un vino: veces que cobras lo que pagas", () => {
-    const a = aviso({ datos: { canal: "vino", nombre: "Ribera X", valor: 2.1, limite: 2.3, coste: 12, coste_antes: 10 } });
-    expect(fraseAviso(a)).toBe("Cobras 2,1 veces lo que pagas (mínimo 2,3). La botella te cuesta 12,00 € (antes 10,00 €).");
+  it("margen bajo de un vino o al peso: veces que cobras lo que pagas", () => {
+    expect(lineaAviso(aviso({ datos: { canal: "vino", nombre: "Ribera X", valor: 2.1, limite: 2.3, coste: 12, coste_antes: 10 } })))
+      .toBe("Ribera X: cobras ×2,1 (mín. ×2,3) · coste 12,00 € (antes 10,00)");
+    expect(lineaAviso(aviso({ datos: { canal: "peso", nombre: "Atún ijada", valor: 1.92, limite: 2, coste: 52, coste_antes: 48 } })))
+      .toBe("Atún ijada: cobras ×1,92 (mín. ×2) · coste 52,00 €/kg (antes 48,00)");
+    expect(lineaAviso(aviso({ datos: { canal: "tienda", nombre: "Rioja Y", valor: 1.2, limite: 1.5 } }), { sug: { precio_actual: 10, precio_sugerido: 12.5 } }))
+      .toBe("Rioja Y: cobras ×1,2 (mín. ×1,5) en tienda → súbelo a 12,50 €");
   });
-  it("todos los avisos sueltos tienen entre 2 y 4 líneas", () => {
-    const tipos = ["reserva_nueva", "reserva_cancelada", "solicitud_pendiente", "facturas_precio_sube", "facturas_revision", "sistema", "facturas_margen_bajo"];
+  it("cada aviso de Facturas en una línea con sus cifras (casos de producción)", () => {
+    const l = (tipo: string, datos: Record<string, unknown>, titulo = "Título") => lineaAviso(aviso({ tipo, titulo, datos }));
+    expect(l("facturas_precio_baja", { producto: "MICROMEZCLUM SUAVE 60G", proveedor: "Makro distribuidor mayorista S.A.", precio: 68.1667, precio_ref: 80.8333, variacion_pct: -15.7, medida: "kg" }))
+      .toBe("Micromezclum suave 60g: −16 % (80,83 → 68,17 €/kg) · Makro distribuidor mayorista");
+    expect(l("facturas_precio_mejor", { producto: "Nécora gallega hembra M", proveedor: "CETAREA ANGELMAR S.L.", proveedor_otro: "CASIMIRO PEREZ RODRIGUEZ", precio: 48.5, precio_otro: 30, medida: "kg", diferencia_pct: 38.1 }))
+      .toBe("Nécora gallega hembra M: Casimiro Perez Rodriguez a 30,00 €/kg (tú 48,50, −38 %)");
+    expect(l("facturas_familia_gasto", { familia: "Lácteos y huevos", variacion_pct: 45.8, valor: 3945.12, media: 2705.56 }))
+      .toBe("Lácteos y huevos: +46 % este mes (~3.945 €, media 2.706 €)");
+    expect(l("facturas_albaran_sin_factura", { proveedor: "Once de Enero Artesanos del Mar", albaranes: 1, importe: 294.25 }))
+      .toBe("Once de Enero Artesanos del Mar: 1 albarán sin factura (294,25 €)");
+    expect(l("facturas_proveedor_nuevo", { proveedor: "CASH ELCHE", importe: 324.03 })).toBe("Proveedor nuevo: Cash Elche (324,03 €)");
+    expect(l("facturas_importe_inusual", { proveedor: "HERMANOS FERNANDEZ LOPEZ, SAU", importe: 985.92, veces: 4.7 }))
+      .toBe("Hermanos Fernandez Lopez: factura de 985,92 € (×4,7 su media)");
+    expect(l("facturas_precio_proveedor", { proveedor: "Frutas Pepe", productos: 4, variacion_pct: 12.4, impacto_mes: 38.2 }))
+      .toBe("Frutas Pepe sube 4 productos (+12 % de media, ~38 €/mes)");
+    expect(l("facturas_revision", { cuantos: 213, resumen: "avisos" })).toBe("213 documentos por revisar");
+    // Sin datos para una línea propia: el título.
+    expect(l("facturas_abreviatura", { abreviatura: "mc" }, "«MC» parece Metro Chef. ¿Confirmar?")).toBe("«MC» parece Metro Chef. ¿Confirmar?");
+    expect(l("facturas_precio_sube", {}, "Berberecho sube un 10 % en CASIMIRO")).toBe("Berberecho sube un 10 % en CASIMIRO");
+  });
+  it("todos los avisos sueltos son una línea (más el enlace, si lo hay) y nunca pasan de MAX_LINEA", () => {
+    const tipos = ["reserva_nueva", "reserva_cancelada", "solicitud_pendiente", "facturas_precio_sube", "facturas_revision", "sistema", "facturas_margen_bajo", "peticion_urgente"];
     for (const tipo of tipos) {
-      const l = mensajeAviso(aviso({ tipo, mensaje: "Algo ha pasado con 3 cosas. Y una segunda frase larga que no debe salir." }), "https://panel.example").split("\n");
-      expect(l.length).toBeGreaterThanOrEqual(2);
-      expect(l.length).toBeLessThanOrEqual(4);
-      expect(l.join("\n")).not.toContain("segunda frase");
+      const m = mensajeAviso(aviso({ tipo, titulo: "Algo ha pasado con 3 cosas ".repeat(20), mensaje: "Una frase larga. Y una segunda." }), "https://panel.example");
+      const [linea, ...resto] = m.split("\n");
+      expect(resto.length).toBeLessThanOrEqual(1);
+      expect(linea.length).toBeLessThanOrEqual(MAX_LINEA + 3); // + emoji y espacio
+      if (resto.length) expect(resto[0]).toMatch(/^https:\/\/panel\.example\//);
     }
   });
+  it("las reservas van sin enlace", () => {
+    expect(mensajeAviso(aviso({ tipo: "reserva_nueva", titulo: "Reserva nueva", mensaje: null }), "https://panel.example")).toBe("🟢 Reserva");
+  });
+  it("proveedor corto: sin forma jurídica y sin gritar", () => {
+    expect(proveedorCorto("Distribuciones Gastronómicas Nicolás y Valero, S.R.L.")).toBe("Distribuciones Gastronómicas…");
+    expect(proveedorCorto("CASIMIRO PEREZ RODRIGUEZ")).toBe("Casimiro Perez Rodriguez");
+    expect(proveedorCorto("Makro distribuidor mayorista S.A.")).toBe("Makro distribuidor mayorista");
+    expect(proveedorCorto("Vinos Lisa")).toBe("Vinos Lisa");
+  });
   it("respeta el límite de 4.096 caracteres", () => {
-    const largo = aviso({ datos: { texto_telegram: "x".repeat(10_000) } });
-    expect(mensajeAviso(largo, "https://panel.example").length).toBeLessThanOrEqual(LIMITE_TELEGRAM);
     expect(recortar("abcdef", 4)).toBe("abc…");
     expect((cuerpoSendMessage("-100", "y".repeat(5000)).text as string).length).toBe(LIMITE_TELEGRAM);
   });
@@ -136,52 +184,56 @@ describe("avisos-telegram · mensajes", () => {
   it("el error nunca lleva el token", () => {
     expect(errorSaneado("fallo en https://api.telegram.org/bot123456:ABC-def_g/sendMessage")).not.toContain("123456:ABC");
   });
-  it("acciones válidas", () => {
-    expect(["pendientes", "resumen", "probar"].every(esAccion)).toBe(true);
+  it("acciones válidas y su tipo en el registro (el de fallos es «fallo»)", () => {
+    expect(["pendientes", "resumen", "probar", "fallos", "semanal"].every(esAccion)).toBe(true);
     expect(esAccion("borrar")).toBe(false);
+    expect(["pendientes", "resumen", "probar", "fallos", "semanal"].map((a) => tipoRegistro(a as never))).toEqual(["pendientes", "resumen", "prueba", "fallo", "semanal"]);
   });
 });
 
 describe("avisos-telegram · resumen diario", () => {
-  it("agrupa por tipo con número y frases, el más numeroso primero", () => {
+  it("una línea por tipo con el número y los casos, el más numeroso primero", () => {
     const avisos = [
       aviso({ tipo: "reserva_nueva", titulo: "Reserva nueva", mensaje: "Ana Pérez · 12/11 21:00 · 4 pers. · web", created_at: "2026-11-11T08:00:00Z" }),
-      aviso({ tipo: "reserva_nueva", titulo: "Reserva nueva", mensaje: null, created_at: "2026-11-11T09:00:00Z" }),
-      aviso({ datos: { texto_telegram: "El vino X ha bajado a 2,1×." } }),
+      aviso({ tipo: "reserva_nueva", titulo: "Reserva nueva", mensaje: "Luis Gil · 13/11 14:00 · 2 pers. · web", created_at: "2026-11-11T09:00:00Z" }),
+      aviso({ datos: { canal: "vino", nombre: "Ribera X", valor: 2.1, limite: 2.3 } }),
       aviso({ tipo: "reserva_sin_asignar", titulo: "No sale" }),
       aviso({ tipo: "ia_modelo_nuevo", titulo: "Tampoco" }),
       aviso({ titulo: "Viejo", created_at: "2026-11-09T09:00:00Z" }),
     ];
     const { texto, total } = construirResumen(avisos, AHORA, "https://panel.example");
     expect(total).toBe(3);
-    expect(texto).toContain("Últimas 24 h: 3 avisos.");
-    expect(texto.indexOf("Reservas nuevas (2)")).toBeLessThan(texto.indexOf("Margen bajo (1)"));
-    expect(texto).toContain("• Reserva nueva\n");
-    expect(texto).toContain("• Reserva nueva: 12/11 21:00 · 4 pers. · web");
-    expect(texto).not.toContain("Ana");
-    expect(texto).toContain("• El vino X ha bajado a 2,1×.");
-    expect(texto).not.toContain("No sale");
-    expect(texto).not.toContain("Tampoco");
-    expect(texto).not.toContain("Viejo");
-    expect(texto).toContain("https://panel.example/avisos");
+    expect(texto).toBe(
+      "Resumen 11/11 · 3 avisos\n" +
+        "🟢 Reservas nuevas (2): 13/11 14:00 · 2 pers. · web, 12/11 21:00 · 4 pers. · web\n" +
+        "⚠️ Margen bajo (1): Ribera X ×2,1\n" +
+        "https://panel.example/avisos",
+    );
+    expect(texto).not.toMatch(/Ana|Luis|No sale|Tampoco|Viejo/);
   });
-  it("como mucho 4 frases por tipo y «…y N más»", () => {
-    const avisos = Array.from({ length: 7 }, (_, i) => aviso({ tipo: "facturas_precio_sube", datos: { texto_telegram: `Sube ${i}` } }));
+  it("los 2 casos más importantes y «y N más»", () => {
+    const avisos = [5, 40, 12, 3, 25].map((impacto, i) =>
+      aviso({ tipo: "facturas_precio_sube", datos: { producto: `Producto ${i}`, precio: 11, precio_ref: 10, variacion_pct: 10, impacto_mes: impacto } }));
     const { texto } = construirResumen(avisos, AHORA);
-    expect(texto.match(/^• /gm)?.length).toBe(4);
-    expect(texto).toContain("…y 3 más.");
+    expect(texto).toContain("📈 Suben de precio (5): Producto 1 +10 %, Producto 4 +10 % y 3 más");
+  });
+  it("no repite lo que ya llegó al momento", () => {
+    const ya = aviso();
+    const no = aviso({ tipo: "facturas_albaran_sin_factura", datos: { proveedor: "Makro", albaranes: 2, importe: 340 } });
+    const r = construirResumen([ya, no], AHORA, null, { enviados: new Set([ya.id]) });
+    expect(r.total).toBe(1);
+    expect(r.texto).toBe("Resumen 11/11 · 1 aviso\n🧾 Albaranes sin factura (1): Makro 340 €");
+    expect(construirResumen([ya], AHORA, null, { enviados: new Set([ya.id]) }).texto).toBe("");
   });
   it("sin avisos no manda nada (texto vacío)", () => {
     expect(construirResumen([], AHORA)).toMatchObject({ texto: "", total: 0 });
   });
-  it("nunca pasa de 4.096 aunque haya muchos tipos y textos largos", () => {
-    const tipos = ["facturas_precio_sube", "facturas_margen_bajo", "reserva_nueva", "facturas_revision", "facturas_proveedor_nuevo", "facturas_importe_inusual", "facturas_precio_baja", "facturas_precio_mejor", "reserva_cancelada", "subida_precio", "facturas_familia_gasto", "facturas_precio_pactado"];
-    const avisos = tipos.flatMap((t) => Array.from({ length: 5 }, () => aviso({ tipo: t, datos: { texto_telegram: "z".repeat(390) } })));
+  it("nunca pasa de 4.096 aunque haya muchos tipos y títulos largos", () => {
+    const tipos = Array.from({ length: 60 }, (_, i) => `tipo_raro_${i}`);
+    const avisos = tipos.flatMap((t) => Array.from({ length: 3 }, () => aviso({ tipo: t, titulo: "z".repeat(390) })));
     const { texto } = construirResumen(avisos, AHORA, "https://panel.example");
     expect(texto.length).toBeLessThanOrEqual(LIMITE_TELEGRAM);
-    expect(texto).toContain("No cabe todo");
-    expect(texto).toContain("https://panel.example/avisos");
-    const enorme = construirResumen([aviso({ datos: { texto_telegram: "w".repeat(9000) } })], AHORA);
-    expect(enorme.texto.length).toBeLessThanOrEqual(LIMITE_TELEGRAM);
+    expect(texto).toMatch(/…y \d+ más, en el panel/);
+    expect(texto.endsWith("https://panel.example/avisos")).toBe(true);
   });
 });

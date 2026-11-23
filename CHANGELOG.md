@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.52.0] - 2026-11-23
+
+Objetivo: Telegram en cuatro chats (uno por canal) y avisos de una línea
+
+### Añadido
+- Telegram: un chat por canal y avisos de una línea ([#338](https://github.com/restcasatomascrevillent/admin-casatomas/pull/338))
+
 ## [1.51.0] - 2026-11-21
 
 Objetivo: Las comidas de los jueves se pueden reservar por la web (las cenas, igual)
