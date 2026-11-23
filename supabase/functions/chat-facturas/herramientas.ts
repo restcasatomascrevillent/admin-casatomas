@@ -1316,6 +1316,37 @@ export function sinCompras(nombre: string, data: any): boolean {
   return false;
 }
 
+// ─── Producto que es un proveedor, y al revés (23/11/2026) ──────────────────
+//  Conversación real: «Detállame el gasto de suministros altamira» → el modelo
+//  la buscó como producto y contestó «no encuentro». Ahora la búsqueda de
+//  productos dice si lo pedido es un proveedor (`es_proveedor`, migración
+//  20261217100000) y la de proveedores si es un producto (`es_producto`): se
+//  consulta lo que toca en la misma ronda, sin otra vuelta del modelo.
+
+/** compras_producto (o historial/gráfica caídos a ella): lo pedido es un proveedor → su nombre; si no, null. */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function proveedorPedido(data: any): string | null {
+  if (!data || typeof data !== "object" || Array.isArray(data) || data.error !== undefined) return null;
+  if (data.sin_datos !== true || typeof data.es_proveedor !== "string") return null;
+  return data.es_proveedor.trim() || null;
+}
+
+/** ficha_proveedor sin proveedor (ni parecidos por los que preguntar), pero lo pedido es un producto. */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function productoPedido(nombre: string, data: any): boolean {
+  if (nombre !== "ficha_proveedor" || !data || typeof data !== "object" || Array.isArray(data) || data.error !== undefined) return false;
+  return data.sin_datos === true && data.es_producto === true && !Array.isArray(data.proveedores_parecidos);
+}
+
+export const notaDesvioProveedor = (buscado: string, proveedor: string): string =>
+  `«${buscado}» no es un producto: es el proveedor ${proveedor}. Esto es su ficha (gasto con IVA, sus productos y su ultimo precio): ` +
+  "contesta con ella y di que es el proveedor.";
+
+export const notaDesvioProducto = (buscado: string): string =>
+  `«${buscado}» no es un proveedor: es un producto. Esto son sus compras (a quien y a que precio): contesta con ellas.`;
+
 // ─── Vinos de la carta: coste efectivo por botella (17/11/2026) ─────────────
 //  27 de las últimas 39 preguntas eran «precio de la botella de X». La respuesta
 //  buena no es la línea de la factura (por caja, o sin contar las botellas sin
