@@ -3,7 +3,10 @@
  * con un repositorio en memoria y destinos simulados.
  */
 import { describe, expect, it, vi } from "vitest";
-import { accionPara, inicioDiaMadrid, ordenPrioridad, procesar, siguienteIntento, ticketPermitido, type ConfigLogs, type IncidenciaFila, type RepoProceso } from "../proceso";
+import {
+  accionPara, esDeFacturas, horaYDiaMadrid, inicioDiaMadrid, ordenPrioridad, procesar, siguienteIntento, tandaDiaria, ticketPermitido, type ConfigLogs, type IncidenciaFila,
+  type RepoProceso,
+} from "../proceso";
 import { construirTicket, enLinea, pasosDesdeRecorrido, resumenSencillo, type EntradaTicket, type EventoTicket } from "../ticket";
 import { interpretarAnalisis, mensajesIncidencia, quitarArchivosInventados } from "../ia";
 import { ErrorLinear, type DestinoTickets } from "../linear";
@@ -62,6 +65,9 @@ function repoMemoria(incs: IncidenciaFila[], over: Partial<RepoProceso> = {}) {
     incidenciasSinExplicar: async () => [],
     ultimaPurga: async () => AHORA.toISOString(),
     purgar: async () => ({}),
+    tandaUltimoDia: async () => (estado.tanda as string | undefined) ?? null,
+    guardarTanda: async (dia) => { estado.tanda = dia; },
+    candidatosTanda: async () => incs.filter((i) => i.linear_estado === "sin_ticket"),
     ...over,
   };
   return { repo, cambios, ingeridos, estado, config };
@@ -542,5 +548,65 @@ describe("recolector de pg_cron: caída de la base de datos = una incidencia", (
     expect(ev[0].huella).toBe(ev[1].huella);
     expect(ev[2].objetivo).toBe("cron:instagram-programador");
     expect(ev[2].huella).not.toBe(ev[1].huella);
+  });
+});
+
+describe("procesar-logs-web · tanda diaria de fallos a Linear (20261218100000)", () => {
+  // Dueño, 23/11/2026: «a las 7:00 pasa todos los nuevos fallos a Linear, todos los que no tengan que ver con facturas».
+  const rojo = incidencia({ id: 2, linear_estado: "sin_ticket", origen: "web", motivo_ticket: null });
+  const facturas = incidencia({
+    id: 3, linear_estado: "sin_ticket", origen: "web", tipo: "error_servidor", fuente: "servidor", proyecto: "servidor", rutas: [], pila: null,
+    titulo: "clasificar-productos: tiempo agotado", mensaje: "clasificar-productos: tiempo agotado", motivo_ticket: null,
+  });
+  const externo = incidencia({ id: 4, linear_estado: "sin_ticket", origen: "externo", motivo_ticket: null });
+  const conTanda = (r: ReturnType<typeof repoMemoria>) => Object.assign(r.config, { linear_tanda_hora: 7, linear_tanda_sin_facturas: true });
+
+  it("hora y día en Madrid", () => {
+    expect(horaYDiaMadrid(new Date("2026-11-23T05:59:00Z"))).toEqual({ hora: 6, dia: "2026-11-23" });
+    expect(horaYDiaMadrid(new Date("2026-11-23T06:00:00Z"))).toEqual({ hora: 7, dia: "2026-11-23" });
+    expect(horaYDiaMadrid(new Date("2026-07-01T05:00:00Z"))).toEqual({ hora: 7, dia: "2026-07-01" }); // verano, UTC+2
+  });
+
+  it("qué es de Facturas: por la zona o, si no, por la función del mensaje", () => {
+    expect(esDeFacturas("Panel › Facturas", null)).toBe(true);
+    expect(esDeFacturas("Web › Reservas", "reservas-web: 500")).toBe(false);
+    expect(esDeFacturas(null, "procesar-factura: tiempo agotado")).toBe(true);
+    expect(esDeFacturas(null, "ocr-trabajo/pagina: error")).toBe(true);
+    expect(esDeFacturas(null, "TypeError: vino.precio is null")).toBe(false);
+  });
+
+  it("antes de la hora no hace nada; a la hora marca los rojos (sin umbrales), salta Facturas y externos; una vez al día", async () => {
+    const r = repoMemoria([{ ...rojo }, { ...facturas }, { ...externo }]);
+    conTanda(r);
+    expect(await tandaDiaria(r.repo, r.config, new Date("2026-11-23T05:30:00Z"))).toBeNull(); // 6:30 en Madrid
+    expect(r.cambios).toEqual([]);
+    expect(await tandaDiaria(r.repo, r.config, new Date("2026-11-23T06:05:00Z"))).toEqual({ marcadas: 1, facturas: 1 });
+    const porId = Object.fromEntries(r.cambios.map(([id, c]) => [id, c]));
+    expect(porId[2]).toMatchObject({ linear_estado: "pendiente", requiere_ticket: true, motivo_ticket: expect.stringMatching(/^Tanda diaria de las 07:00/) });
+    expect(porId[3]).toEqual({ motivo_ticket: expect.stringMatching(/^Zona Facturas/) });
+    expect(porId[4]).toBeUndefined();
+    expect(r.estado.tanda).toBe("2026-11-23");
+    expect(await tandaDiaria(r.repo, r.config, new Date("2026-11-23T09:00:00Z"))).toBeNull(); // ya hecha hoy
+  });
+
+  it("sin tanda (null o sin la migración), apagado Linear o con Facturas permitido", async () => {
+    const r = repoMemoria([{ ...rojo }, { ...facturas }]);
+    expect(await tandaDiaria(r.repo, r.config, AHORA)).toBeNull(); // sin la columna
+    Object.assign(r.config, { linear_tanda_hora: null });
+    expect(await tandaDiaria(r.repo, r.config, AHORA)).toBeNull();
+    Object.assign(r.config, { linear_tanda_hora: 7, linear_modo: "desactivado" });
+    expect(await tandaDiaria(r.repo, r.config, AHORA)).toBeNull();
+    Object.assign(r.config, { linear_modo: "prueba", linear_tanda_sin_facturas: false });
+    expect(await tandaDiaria(r.repo, r.config, AHORA)).toEqual({ marcadas: 2, facturas: 0 });
+  });
+
+  it("dentro del proceso: la tanda marca y en la misma pasada se crea el ticket", async () => {
+    const r = repoMemoria([{ ...rojo }]);
+    conTanda(r);
+    const { d: destino } = destinoSimulado();
+    const res = await procesar({ repo: r.repo, destino: () => destino, ia: null, despliegues: null, urlPanel: "https://panel.example", ahora: () => AHORA });
+    expect(res.tanda).toEqual({ marcadas: 1, facturas: 0 });
+    expect(res.tickets).toMatchObject({ creados: 1 });
+    expect(destino.crear).toHaveBeenCalledTimes(1);
   });
 });

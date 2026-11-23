@@ -173,10 +173,34 @@ export function PestanaConfiguracion({ estado, sub, onSub, onCambiosSinGuardar }
               <p className="text-xs text-muted-foreground">Falta aplicar en Supabase la migración del origen (20261130100000_logs_web_origen) para elegir si los servicios externos abren ticket.</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Los fallos de la web pueden abrir ticket siempre (si superan los umbrales). Lo que no depende de la web (conexión del visitante, navegador o extensiones,
+              Los fallos de la web pueden abrir ticket siempre (en la tanda diaria o, sin ella, si superan los umbrales). Lo que no depende de la web (conexión del visitante, navegador o extensiones,
               versión antigua que se arregló sola, bots y pruebas) nunca abre ticket. Los tickets que ya existían no se cierran. «Pedir ticket» a mano vale para cualquiera.
             </p>
           </Seccion>
+          {"linear_tanda_hora" in b && (
+            // 23/11/2026 (dueño: «a las 7:00 pasa todos los nuevos fallos a Linear, menos los de facturas»).
+            <Seccion titulo="Paso de fallos a Linear">
+              <div className="space-y-1">
+                <Label className="text-xs" htmlFor="u-tanda">Fallos de la web y del admin</Label>
+                <Select value={b.linear_tanda_hora == null ? "umbrales" : String(b.linear_tanda_hora)}
+                  onValueChange={(v) => set("linear_tanda_hora", v === "umbrales" ? null : Number(v))}>
+                  <SelectTrigger id="u-tanda" className="h-11 w-full sm:w-96" data-testid="tanda-hora"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 24 }, (_, h) => (
+                      <SelectItem key={h} value={String(h)}>Todos los nuevos, cada día a las {String(h).padStart(2, "0")}:00</SelectItem>
+                    ))}
+                    <SelectItem value="umbrales">Al momento, si superan los umbrales (como antes)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Interruptor id="u-tanda-facturas" etiqueta="No pasar solos los de Facturas (se pueden pedir a mano)"
+                valor={b.linear_tanda_sin_facturas !== false} onCambio={(v) => set("linear_tanda_sin_facturas", v)} />
+              <p className="text-xs text-muted-foreground">
+                Los críticos (lo que impide reservar o pagar un cheque) abren ticket al momento siempre. Con la tanda diaria, los umbrales de abajo solo se
+                usan para los servicios externos. Se respeta el tope de tickets nuevos al día (Linear).
+              </p>
+            </Seccion>
+          )}
           <Seccion titulo="Umbrales de ticket">
             <div className="flex flex-wrap gap-6">
               <Numero id="u-oc" etiqueta="Ocurrencias" valor={b.umbral_ocurrencias} min={1} max={100000} onCambio={(n) => set("umbral_ocurrencias", n)} />

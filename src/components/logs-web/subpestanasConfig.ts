@@ -24,7 +24,7 @@ export const CAMPOS_SUBPESTANA: Record<SubpestanaConfig, Array<keyof ConfigLogsW
   recogida: ["recoger_actividad", "recoger_errores_navegador", "recoger_peticiones", "recoger_errores_servidor", "recoger_integraciones", "recoger_hosting",
     "entornos_aceptados", "rutas_excluidas", "mensajes_ignorados"],
   incidencias: ["umbral_ocurrencias", "umbral_sesiones", "umbral_ventana_horas", "umbral_404_diario", "tickets_404", "excluir_pruebas_tickets", "reapertura",
-    "entornos_ticket", "linear_tickets_externos"],
+    "entornos_ticket", "linear_tickets_externos", "linear_tanda_hora", "linear_tanda_sin_facturas"],
   linear: ["linear_modo", "linear_equipo_id", "linear_proyecto_id", "linear_etiquetas", "linear_estado_reabrir_id", "linear_max_tickets_dia"],
   ia: ["ia_activada", "ia_max_analisis_dia"],
   retencion: ["retencion_actividad_dias", "retencion_errores_dias", "limite_eventos_dia", "limite_eventos_sesion", "limite_eventos_ip_minuto"],

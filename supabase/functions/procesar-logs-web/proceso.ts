@@ -29,7 +29,7 @@
 // ============================================================================
 
 import { ErrorLinear, prioridadLinear, type DestinoTickets } from "./linear.ts";
-import { construirActualizacion, construirReapertura, construirTicket, type AnalisisIa, type EventoTicket, type IncidenciaTicket } from "./ticket.ts";
+import { construirActualizacion, construirReapertura, construirTicket, fichaDeIncidencia, type AnalisisIa, type EventoTicket, type IncidenciaTicket } from "./ticket.ts";
 import { interpretarAnalisis, mensajesIncidencia, type MensajeChat } from "./ia.ts";
 import { interpretarExplicacion, mensajesExplicacion, necesitaExplicacion, type ExplicacionIa } from "./explicar.ts";
 import { eventosDeCron, eventosDeDespliegues, eventosDeSyncTrafico, type DespliegueVercel, type EstadoSyncTrafico, type FalloCron } from "./recolectores.ts";
@@ -52,6 +52,12 @@ export interface ConfigLogs {
   entornos_aceptados: string[];
   /** Los «Servicio externo» pueden abrir ticket (20261130100000; sin la migración, undefined = no). */
   linear_tickets_externos?: boolean;
+  /** Entornos que abren tickets (por defecto, solo producción). */
+  entornos_ticket?: string[];
+  /** Hora (Madrid) de la tanda diaria de fallos a Linear (20261218100000). null = sin tanda; undefined = sin la migración. */
+  linear_tanda_hora?: number | null;
+  /** La tanda diaria no pasa sola los fallos de la zona Facturas (20261218100000). */
+  linear_tanda_sin_facturas?: boolean;
 }
 
 export interface IncidenciaFila extends IncidenciaTicket {
@@ -99,6 +105,11 @@ export interface RepoProceso {
   incidenciasSinExplicar(limite: number): Promise<IncidenciaFila[]>;
   ultimaPurga(): Promise<string | null>;
   purgar(): Promise<Record<string, unknown>>;
+  /** Día (Madrid, AAAA-MM-DD) de la última tanda diaria de fallos a Linear; null si nunca (20261218100000). */
+  tandaUltimoDia(): Promise<string | null>;
+  guardarTanda(dia: string): Promise<void>;
+  /** Fallos de la web y del admin sin ticket con alguna ocurrencia real en la ventana, los más recientes primero. */
+  candidatosTanda(entornos: string[], limite: number): Promise<IncidenciaFila[]>;
 }
 
 export interface DependenciasProceso {
@@ -127,6 +138,55 @@ const SEIS_HORAS = 6 * 3_600_000;
 export function siguienteIntento(intentos: number, ahora: Date): Date {
   const ms = Math.min(5 * 60_000 * 2 ** Math.max(intentos - 1, 0), SEIS_HORAS);
   return new Date(ahora.getTime() + ms);
+}
+
+/** Hora (0–23) y día (AAAA-MM-DD) en Madrid. */
+export function horaYDiaMadrid(ahora: Date): { hora: number; dia: string } {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
+  }).formatToParts(ahora).map((x) => [x.type, x.value]));
+  return { hora: Number(p.hour) % 24, dia: `${p.year}-${p.month}-${p.day}` };
+}
+
+/**
+ * ¿Es de Facturas? Por la zona de la ficha («Panel › Facturas») o, si no la hay, por el nombre de la función del mensaje
+ * («procesar-factura: …», «ocr-trabajo/…: …»). La tanda diaria no pasa estos fallos solos a Linear (dueño, 23/11/2026).
+ */
+export function esDeFacturas(zona: string | null | undefined, mensaje: string | null | undefined): boolean {
+  if (zona && /\bFacturas\b/.test(zona)) return true;
+  const funcion = /^([a-z0-9-]+)(?:\/[^\s:]*)?:/.exec((mensaje ?? "").trim())?.[1] ?? "";
+  return /factur|^ocr|clasificar-productos|embeddings-nombres/.test(funcion);
+}
+
+/**
+ * Tanda diaria (20261218100000; dueño, 23/11/2026: «a las 7:00 pasa todos los nuevos fallos a Linear, todos los que no
+ * tengan que ver con facturas»). La primera pasada desde linear_tanda_hora (Madrid) marca para Linear todos los fallos
+ * de la web y del admin («rojos») sin ticket con alguna ocurrencia real en la ventana, sin umbrales de ocurrencias ni de
+ * sesiones; los de Facturas no (se pueden pedir a mano). Una vez al día. Los críticos ya se abren al momento (SQL) y los
+ * tickets se crean después como siempre (tope diario incluido).
+ */
+export async function tandaDiaria(repo: RepoProceso, config: ConfigLogs, ahora: Date): Promise<{ marcadas: number; facturas: number } | null> {
+  if (config.linear_modo === "desactivado" || config.linear_tanda_hora == null) return null;
+  const { hora, dia } = horaYDiaMadrid(ahora);
+  if (hora < config.linear_tanda_hora || (await repo.tandaUltimoDia()) === dia) return null;
+  let marcadas = 0;
+  let facturas = 0;
+  for (const inc of await repo.candidatosTanda(config.entornos_ticket ?? ["produccion"], 300)) {
+    if (inc.linear_estado !== "sin_ticket" || inc.origen !== "web" || !["nueva", "abierta", "reabierta"].includes(inc.estado)) continue;
+    const ficha = fichaDeIncidencia(inc, await repo.muestras(inc.id));
+    if (config.linear_tanda_sin_facturas !== false && esDeFacturas(ficha.zona, inc.mensaje)) {
+      facturas++;
+      await repo.actualizar(inc.id, { motivo_ticket: "Zona Facturas: la tanda diaria no la pasa sola a Linear (se puede pedir a mano)" });
+      continue;
+    }
+    marcadas++;
+    await repo.actualizar(inc.id, {
+      linear_estado: "pendiente", requiere_ticket: true, linear_proximo_intento: ahora.toISOString(),
+      motivo_ticket: `Tanda diaria de las ${String(config.linear_tanda_hora).padStart(2, "0")}:00: fallo nuevo de la web o del admin`,
+    });
+  }
+  await repo.guardarTanda(dia);
+  return { marcadas, facturas };
 }
 
 /** Medianoche de hoy en Madrid (el tope diario de tickets y análisis va por día natural). */
@@ -265,6 +325,14 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
 
     // ─── 3. Agrupar ─────────────────────────────────────────────────────────
     resumen.agrupacion = await repo.agrupar();
+
+    // ─── 3b. Tanda diaria de fallos a Linear (20261218100000) ───────────────
+    try {
+      const tanda = await tandaDiaria(repo, config, ahora);
+      if (tanda) resumen.tanda = tanda;
+    } catch (e) {
+      errores.push(`tanda: ${mensajeError(e)}`);
+    }
 
     // ─── 4. Tickets ─────────────────────────────────────────────────────────
     const tickets = { creados: 0, reabiertos: 0, actualizados: 0, sincronizados: 0, migrados: 0, fallidos: 0, aplazados: 0 };
