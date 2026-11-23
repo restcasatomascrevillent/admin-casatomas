@@ -23,10 +23,9 @@ const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   "/reservas": "reservas",
   // "/trabajadores" ya no requiere permiso: la ruta solo redirige a "/".
   "/marketing": "marketing",
-  // RRSS (antes Instagram): mismo permiso que Newsletter. La agencia
-  // (Oficiosos, «instagram_agencia») entra solo a Instagram › Encargos.
-  "/rrss": ["marketing", "instagram_agencia"],
-  "/instagram": ["marketing", "instagram_agencia"],
+  // Redes (23/11/2026): rrss embebido, permiso propio. /rrss e /instagram (sección antigua)
+  // solo redirigen aquí.
+  "/redes": "redes",
   "/tienda": "tienda",
   // «Facturas · Subida» (06/11/2026) entra también, solo a la pestaña Cargar.
   "/facturas": ["facturas", "facturas_subida"],

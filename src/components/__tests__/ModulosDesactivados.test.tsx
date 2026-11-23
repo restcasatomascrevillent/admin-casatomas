@@ -62,8 +62,7 @@ function abrir(entrada: string | { pathname: string; state: unknown }) {
         <Route path="/dashboard" element={<ProtectedRoute><p>Dashboard</p></ProtectedRoute>} />
         <Route path="/reservas" element={<ProtectedRoute><p>Página de Reservas</p></ProtectedRoute>} />
         <Route path="/marketing" element={<ProtectedRoute><p>Página de Newsletter</p></ProtectedRoute>} />
-        <Route path="/rrss" element={<ProtectedRoute><p>Página de RRSS</p></ProtectedRoute>} />
-        <Route path="/instagram/rapido" element={<ProtectedRoute requiredSection="marketing"><p>Instagram rápido</p></ProtectedRoute>} />
+        <Route path="/redes" element={<ProtectedRoute><p>Página de Redes</p></ProtectedRoute>} />
         <Route path="/facturas" element={<ProtectedRoute><p>Página de Facturas</p></ProtectedRoute>} />
         <Route path="/albaranes" element={<ProtectedRoute requiredSection="facturas_albaranes"><p>Subir albaranes</p></ProtectedRoute>} />
         <Route path="/peticiones" element={<ProtectedRoute><p>Página de Peticiones</p></ProtectedRoute>} />
@@ -75,7 +74,7 @@ function abrir(entrada: string | { pathname: string; state: unknown }) {
 
 beforeEach(() => {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
-  h.permisos = ver("dashboard", "reservas", "marketing", "facturas");
+  h.permisos = ver("dashboard", "reservas", "marketing", "redes", "facturas");
   h.superAdmin = false;
   h.apagados = [];
   h.cargandoToggles = false;
@@ -86,22 +85,22 @@ beforeEach(() => {
 
 describe("menú del equipo", () => {
   it("todo activado: lo de siempre según sus permisos", () => {
-    expect(menu()).toEqual(["/dashboard", "/reservas", "/marketing", "/rrss", "/facturas", "/peticiones", "/ayuda"]);
+    expect(menu()).toEqual(["/dashboard", "/reservas", "/marketing", "/redes", "/facturas", "/peticiones", "/ayuda"]);
   });
 
-  it("RRSS apagado ya no se lleva Newsletter (antes compartían interruptor), y al revés", () => {
+  it("Redes apagado no se lleva Newsletter, y al revés", () => {
     h.apagados = ["rrss"];
     expect(menu()).toEqual(["/dashboard", "/reservas", "/marketing", "/facturas", "/peticiones", "/ayuda"]);
   });
 
-  it("Newsletter apagado deja RRSS", () => {
+  it("Newsletter apagado deja Redes", () => {
     h.apagados = ["marketing"];
-    expect(menu()).toEqual(["/dashboard", "/reservas", "/rrss", "/facturas", "/peticiones", "/ayuda"]);
+    expect(menu()).toEqual(["/dashboard", "/reservas", "/redes", "/facturas", "/peticiones", "/ayuda"]);
   });
 
   it("Nueva petición (sin permisos) también se puede apagar; Dashboard y Ayuda no", () => {
     h.apagados = ["peticiones", "dashboard", "ayuda"];
-    expect(menu()).toEqual(["/dashboard", "/reservas", "/marketing", "/rrss", "/facturas", "/ayuda"]);
+    expect(menu()).toEqual(["/dashboard", "/reservas", "/marketing", "/redes", "/facturas", "/ayuda"]);
   });
 
   it("Subir albaranes apagado no se lleva Facturas", () => {
@@ -132,10 +131,10 @@ describe("menú del super admin", () => {
   it("ve los módulos apagados, marcados «Desactivado para el equipo»; los demás, sin marca", () => {
     h.apagados = ["rrss", "peticiones"];
     expect(menu()).toEqual([
-      "/dashboard", "/reservas", "/gestion-web", "/marketing", "/rrss", "/cheques", "/tienda", "/facturas",
+      "/dashboard", "/reservas", "/gestion-web", "/marketing", "/redes", "/cheques", "/tienda", "/facturas",
       "/usuarios", "/peticiones", "/ayuda",
     ]);
-    const rrss = screen.getByRole("link", { name: "RRSS (desactivado para el equipo)" });
+    const rrss = screen.getByRole("link", { name: "Redes (desactivado para el equipo)" });
     expect(rrss).toHaveAttribute("data-desactivado", "true");
     expect(within(rrss).getByText("Desactivado")).toHaveAttribute("title", "Desactivado para el equipo");
     expect(screen.getByRole("link", { name: "Nueva petición (desactivado para el equipo)" })).toBeInTheDocument();
@@ -148,21 +147,14 @@ describe("menú del super admin", () => {
 describe("rutas de un módulo apagado", () => {
   it("el equipo va al Dashboard con un aviso, y la página no llega a pintarse", async () => {
     h.apagados = ["rrss"];
-    abrir("/rrss");
+    abrir("/redes");
     expect(await screen.findByText("Dashboard")).toBeInTheDocument();
     expect(screen.getByTestId("donde")).toHaveTextContent("/dashboard");
-    expect(screen.queryByText("Página de RRSS")).toBeNull();
+    expect(screen.queryByText("Página de Redes")).toBeNull();
     expect(h.aviso).toHaveBeenCalledTimes(1);
-    expect(h.aviso).toHaveBeenCalledWith("«RRSS» está desactivado", expect.objectContaining({ description: expect.any(String) }));
+    expect(h.aviso).toHaveBeenCalledWith("«Redes» está desactivado", expect.objectContaining({ description: expect.any(String) }));
     // No es un acceso denegado por permisos: no se apunta en la auditoría.
     expect(h.auditar).not.toHaveBeenCalled();
-  });
-
-  it("también sus otras rutas (Instagram rápido es de RRSS)", async () => {
-    h.apagados = ["rrss"];
-    abrir("/instagram/rapido");
-    expect(await screen.findByText("Dashboard")).toBeInTheDocument();
-    expect(screen.queryByText("Instagram rápido")).toBeNull();
   });
 
   it("los módulos sin permisos (Nueva petición) también se bloquean", async () => {
@@ -182,8 +174,8 @@ describe("rutas de un módulo apagado", () => {
   it("sin Dashboard, a la primera sección que pueda ver y esté activada", async () => {
     h.permisos = ver("reservas", "facturas");
     h.apagados = ["reservas", "rrss"];
-    abrir("/rrss");
-    // Sin permiso de RRSS manda el permiso de siempre (a una sección activada); con permiso, el interruptor.
+    abrir("/redes");
+    // Sin permiso de Redes manda el permiso de siempre (a una sección activada); con permiso, el interruptor.
     expect(await screen.findByText("Página de Facturas")).toBeInTheDocument();
   });
 
@@ -198,25 +190,25 @@ describe("rutas de un módulo apagado", () => {
   it("el super admin entra igual (sin aviso)", async () => {
     h.superAdmin = true;
     h.apagados = ["rrss", "peticiones"];
-    abrir("/rrss");
-    expect(await screen.findByText("Página de RRSS")).toBeInTheDocument();
-    expect(screen.getByTestId("donde")).toHaveTextContent("/rrss");
+    abrir("/redes");
+    expect(await screen.findByText("Página de Redes")).toBeInTheDocument();
+    expect(screen.getByTestId("donde")).toHaveTextContent("/redes");
     expect(h.aviso).not.toHaveBeenCalled();
   });
 
   it("mientras no se saben los interruptores se deja pasar (como con los permisos recordados)", async () => {
     h.apagados = ["rrss"];
     h.cargandoToggles = true;
-    abrir("/rrss");
-    expect(await screen.findByText("Página de RRSS")).toBeInTheDocument();
+    abrir("/redes");
+    expect(await screen.findByText("Página de Redes")).toBeInTheDocument();
     expect(h.aviso).not.toHaveBeenCalled();
   });
 
-  it("el permiso sigue mandando por debajo: sin permiso de RRSS no entra aunque esté activado", async () => {
+  it("el permiso sigue mandando por debajo: sin permiso de Redes no entra aunque esté activado", async () => {
     h.permisos = ver("dashboard");
-    abrir("/rrss");
+    abrir("/redes");
     expect(await screen.findByText("Dashboard")).toBeInTheDocument();
-    expect(h.auditar).toHaveBeenCalledWith("/rrss");
+    expect(h.auditar).toHaveBeenCalledWith("/redes");
     expect(h.aviso).not.toHaveBeenCalled();
   });
 

@@ -82,7 +82,7 @@ describe("Control del Panel", () => {
     expect(within(peticiones).getByText("Activado · lo ve el equipo")).toBeInTheDocument();
     expect(within(peticiones).getByText(/Reportar errores, pedir mejoras/)).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Nueva petición" })).toBeChecked();
-    expect(screen.getByRole("switch", { name: "RRSS" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "Redes" })).toBeChecked();
 
     const facturas = screen.getByTestId("funcionalidad-facturas");
     expect(facturas).toHaveAttribute("data-activa", "false");
@@ -119,9 +119,9 @@ describe("Control del Panel", () => {
     await waitFor(() => expect(h.setEnabled).toHaveBeenCalledWith("facturas", "Facturas", true));
     fireEvent.click(screen.getByText("Reservas", { selector: "label" }));
     await waitFor(() => expect(h.setEnabled).toHaveBeenCalledWith("reservas", "Reservas", false));
-    // RRSS y Nueva petición no tienen fila: se guardan con su clave nueva.
-    fireEvent.click(screen.getByRole("switch", { name: "RRSS" }));
-    await waitFor(() => expect(h.setEnabled).toHaveBeenCalledWith("rrss", "RRSS", false));
+    // Redes (clave «rrss») y Nueva petición no tienen fila: se guardan con su clave nueva.
+    fireEvent.click(screen.getByRole("switch", { name: "Redes" }));
+    await waitFor(() => expect(h.setEnabled).toHaveBeenCalledWith("rrss", "Redes", false));
     fireEvent.click(screen.getByRole("switch", { name: "Nueva petición" }));
     await waitFor(() => expect(h.setEnabled).toHaveBeenCalledWith("peticiones", "Nueva petición", false));
   });

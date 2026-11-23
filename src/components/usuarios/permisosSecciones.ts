@@ -54,6 +54,8 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
     "sin efecto: en Novedades, Menús diarios y Tapas basta con «Ver» para cambiarlo todo (decisión del dueño, 06/11/2026).",
   marketing:
     "en Instagram: crear y cambiar piezas, subir fotos, usar la IA, publicar, programar, pedir encargos y generar vídeos. En el newsletter: crear y enviar newsletters (también la prueba) y actualizar la lista de envío. Con solo «Ver» se consultan los suscriptores, el historial de envíos y las estadísticas.",
+  redes:
+    "en rrss (Redes): subir fotos y vídeos, crear piezas y publicarlas o programarlas, según lo que tenga configurado rrss para «editar». Con solo «Ver» entra y consulta lo que hay.",
   instagram_agencia: "aceptar, entregar y comentar los encargos de Instagram como la agencia (Oficiosos). Con solo «Ver», los consulta.",
   instagram_render:
     "obligatorio para el usuario del equipo de vídeo: reclamar, generar y subir los vídeos de los reels. No le des Marketing.",
@@ -149,6 +151,8 @@ export function sinEdicion(permisos: PermisoSeccion[]): PermisoSeccion[] {
  */
 const SECCIONES_FUERA_DEL_ROL = new Set([
   "dashboard", "instagram_agencia", "instagram_render", "facturas_subida", "usuarios",
+  // Redes (23/11/2026): rrss embebido; su nivel no cambia el rol de quien ya lo tenía.
+  "redes",
   // Tipos de usuario «Reservas» y «Albaranes» (10/11/2026): un solo interruptor cada una.
   "reservas_crear", "facturas_albaranes",
 ]);

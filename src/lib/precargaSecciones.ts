@@ -8,8 +8,8 @@ export const CARGADORES_SECCION = {
   "/reservas": () => import("@/pages/Reservas"),
   "/gestion-web": () => import("@/pages/GestorWeb"),
   "/marketing": () => import("@/pages/Marketing"),
-  // RRSS (08/11/2026): antes «/instagram», que ahora redirige aquí.
-  "/rrss": () => import("@/pages/RRSS"),
+  // Redes (23/11/2026): rrss embebido. Sustituye a RRSS (/rrss) y a Instagram, que redirigen aquí.
+  "/redes": () => import("@/pages/Redes"),
   "/cheques": () => import("@/pages/Cheques"),
   "/tienda": () => import("@/pages/Tienda"),
   "/facturas": () => import("@/pages/Facturas"),

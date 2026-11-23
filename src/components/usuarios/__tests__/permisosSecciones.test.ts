@@ -35,7 +35,7 @@ describe("SECCIONES_CONFIGURABLES", () => {
   it("son todas las secciones del panel, «usuarios» incluida (configurable desde el 06/11/2026)", () => {
     const claves = SECCIONES_CONFIGURABLES.map((s) => s.key);
     expect(claves).toEqual([
-      "dashboard", "reservas", "reservas_configuracion", "reservas_crear", "gestor_carta", "gestion_web", "marketing", "instagram_agencia", "instagram_render", "cheques", "tienda", "facturas", "facturas_subida", "facturas_albaranes", "usuarios",
+      "dashboard", "reservas", "reservas_configuracion", "reservas_crear", "gestor_carta", "gestion_web", "marketing", "redes", "instagram_agencia", "instagram_render", "cheques", "tienda", "facturas", "facturas_subida", "facturas_albaranes", "usuarios",
     ]);
   });
 
