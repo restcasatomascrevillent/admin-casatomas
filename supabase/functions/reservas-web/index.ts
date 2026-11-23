@@ -56,6 +56,16 @@
 //                             opt-in (20261003184500): el alta en el newsletter
 //                             llega cuando el cliente pulsa «Confirmo» en el
 //                             correo (reservas.email_verificado_at), no aquí
+//
+// Avisos por WhatsApp (prueba de concepto, 21/11/2026, ver
+// docs/funcionalidades/whatsapp-reservas.md). Solo con
+// WHATSAPP_RESERVAS_ACTIVO='true' (hoy, solo la demo); sin ella nada cambia:
+//   · POST /disponibilidad: la fila `meta` lleva `avisos_whatsapp: true` y la
+//     web enseña el selector «¿Cómo quieres recibir los avisos?».
+//   · POST /crear: `canal_avisos: "whatsapp"` (opcional) obliga a dar teléfono
+//     (400 `telefono_requerido_whatsapp`) y se guarda en
+//     `reservas.canal_avisos` (migración 20261215100000). Cualquier otro valor,
+//     o la variable apagada: lo de siempre, correo.
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
@@ -175,6 +185,8 @@ const TOKEN_SECRET = Deno.env.get("RESERVAS_WEB_TOKEN_SECRET") ?? "";
 const SHARED_SECRET = Deno.env.get("RESERVAS_WEB_SHARED_SECRET") ?? "";
 const ALLOWED_ORIGIN = Deno.env.get("RESERVAS_WEB_ALLOWED_ORIGIN") || "*";
 const PUBLIC_BASE_URL = Deno.env.get("RESERVAS_WEB_PUBLIC_URL") || `${SUPABASE_URL}/functions/v1/reservas-web`;
+// Avisos por WhatsApp (ver cabecera): la web solo ofrece elegirlo si está activo.
+const WHATSAPP_ACTIVO = Deno.env.get("WHATSAPP_RESERVAS_ACTIVO") === "true";
 // Sal del HMAC de la IP para el limitador de /crear (CT-REM-FN-07). Si falta
 // RESERVAS_WEB_IP_SALT se usa la service role key (secreta y estable entre
 // isolates, que es lo que importa para contar por IP), como chat-web.
@@ -740,11 +752,9 @@ async function enSegundoPlano(tarea: Promise<unknown>, etiqueta: string): Promis
 // Devuelve SIEMPRE un resultado (nunca lanza): quien lo llama decide si
 // avisar con `debeAvisarDeEmailsReserva` (pura, en plantillas.ts).
 //
-// SIN LLAMADORES desde el 2026-09-28 (el correo de "solicitud recibida" se
-// quito del canal web — ver el bloque del final de `handleCrear`). Se
-// mantiene a proposito: es el contrato de
-// delegacion ya escrito y probado, y el sitio exacto donde volver a
-// engancharse si el dueño cambia de idea.
+// Desde el 2026-09-28 (el correo de "solicitud recibida" se quito del canal
+// web — ver el bloque del final de `handleCrear`) solo la llaman las reservas
+// con avisos por WhatsApp (22/11/2026): ese primer aviso sí lo quiere el dueño.
 async function notificarViaEmailsReserva(reservaId: string): Promise<ResultadoNotificarEmailsReserva> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -1279,6 +1289,9 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
     // Configuración incoherente detectada (umbrales en desorden, periodos
     // que cruzan medianoche, franja 16:00-17:00…). El panel puede pintarlo.
     avisos: resultado.avisos,
+    // Avisos por WhatsApp: la web enseña el selector solo si viene a true.
+    // Sin la variable no se manda (la respuesta queda como siempre).
+    ...(WHATSAPP_ACTIVO ? { avisos_whatsapp: true } : {}),
   };
 
   return json([meta, ...periodosOut, ...ocupacionOut, ...huecosOut, ...descartadosOut]);
@@ -1428,6 +1441,9 @@ async function handleCrear(req: Request): Promise<Response> {
 
   if (config.telefono_obligatorio && !telefono) return json({ ok: false, error: "telefono_requerido" }, 400);
   if (config.email_obligatorio && !email) return json({ ok: false, error: "email_requerido" }, 400);
+  // Avisos por WhatsApp (ver cabecera): sin teléfono no hay a dónde mandarlos.
+  const avisosPorWhatsApp = WHATSAPP_ACTIVO && body?.canal_avisos === "whatsapp";
+  if (avisosPorWhatsApp && !telefono) return json({ ok: false, error: "telefono_requerido_whatsapp" }, 400);
 
   const datosSolicitud = { nombre, telefono, email, fecha, hora, comensales: partySize, notas, marca: marcaTemprana, consentimientos };
   // B-3: antes esto devolvía SIEMPRE HTTP 200. El frontend solo mira
@@ -1810,6 +1826,8 @@ async function handleCrear(req: Request): Promise<Response> {
   // reserva normal no se cae si la función sale antes que la migración
   // 20261122100000.
   if (menuDelDia) filaReserva.menu_del_dia = true;
+  // Solo si eligió WhatsApp: si no, el DEFAULT de la columna ('email').
+  if (avisosPorWhatsApp) filaReserva.canal_avisos = "whatsapp";
   // «Cómo se hizo la reserva» (columna `origen`, migración 2026112212…): lo
   // que manda la web (opcional y validado en origen.ts) más lo que ve la
   // función. Nunca hace fallar la reserva: si algo va mal, sin `origen`.
@@ -1850,6 +1868,18 @@ async function handleCrear(req: Request): Promise<Response> {
   if (insertError && esColumnaInexistente(insertError, "origen")) {
     console.error("[CREAR] Falta la columna reservas.origen (¿migración 2026112212 sin aplicar?). Se guarda la reserva sin ella.");
     delete filaReserva.origen;
+    ({ data: inserted, error: insertError } = await supabase
+      .from("reservas")
+      .insert(filaReserva)
+      .select("id")
+      .single());
+  }
+
+  // Y para `canal_avisos` (migración 20261215100000): sin la columna, la
+  // reserva se guarda igual y sus avisos van por correo.
+  if (insertError && esColumnaInexistente(insertError, "canal_avisos")) {
+    console.error("[CREAR] Falta la columna reservas.canal_avisos (¿migración 20261215100000 sin aplicar?). Se guarda la reserva sin ella: avisos por correo.");
+    delete filaReserva.canal_avisos;
     ({ data: inserted, error: insertError } = await supabase
       .from("reservas")
       .insert(filaReserva)
@@ -1905,6 +1935,19 @@ async function handleCrear(req: Request): Promise<Response> {
   // Los correos de RECHAZO (`avisar(...)`, mas arriba) no cambian: esos se
   // siguen mandando desde aqui porque en ese punto todavia no hay fila en
   // `reservas` sobre la que `emails-reserva` pudiera trabajar.
+  //
+  // EXCEPCION: quien eligio avisos por WHATSAPP (prueba de concepto,
+  // 22/11/2026). El primer WhatsApp («hemos recibido tu solicitud», con
+  // «Gestionar mi reserva» y «Ver la carta») lo pidio el dueño. Se vuelve a
+  // llamar a `emails-reserva/notificar` SOLO para esas reservas:
+  // emails-reserva se lo pide a whatsapp-reservas antes de mirar el canal y,
+  // si el WhatsApp no sale, la regla de `CANALES_SIN_SOLICITUD_RECIBIDA` sigue
+  // impidiendo el correo. En segundo plano: no retrasa el 201. Sin la columna
+  // (migración 20261215100000 sin aplicar) `canal_avisos` ya no está en la
+  // fila y no se llama.
+  if (filaReserva.canal_avisos === "whatsapp") {
+    await enSegundoPlano(notificarViaEmailsReserva(inserted.id), "aviso por WhatsApp de la reserva recibida");
+  }
 
   return json({ ok: true, reserva_id: inserted.id, estado: "pendiente" }, 201);
 }

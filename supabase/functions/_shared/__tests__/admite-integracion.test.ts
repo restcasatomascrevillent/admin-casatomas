@@ -32,6 +32,7 @@ const AUTENTICACION_PROPIA: Record<string, { mecanismo: string; patrones: RegExp
   "avisos-telegram": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed (pg_cron o SQL con el secreto de Vault) o JWT de super admin", patrones: [/x-ocr-secret/, /compararTiempoConstante/, /exigirSuperAdmin/] },
   "registrar-actividad-web": { mecanismo: "pública (navegador de la web): origen permitido, tope de tamaño, límite por IP con HMAC y cupo diario en la RPC", patrones: [/entornoDeOrigen/, /hmacHex/, /MAX_BYTES_LOTE/, /web_logs_ingerir/] },
   "procesar-logs-web": { mecanismo: "x-webhook-secret del cron en tiempo constante (falla cerrado) o JWT de super admin", patrones: [/x-webhook-secret/, /compararTiempoConstante/, /exigirSuperAdmin/] },
+  "whatsapp-reservas": { mecanismo: "webhook de Meta con firma X-Hub-Signature-256 (HMAC con la clave de la app) en tiempo constante; rutas internas con x-webhook-secret, fail-closed", patrones: [/x-hub-signature-256/, /firmaMetaValida/, /x-webhook-secret/, /compararTiempoConstante/] },
   "instagram-metricas": { mecanismo: "x-webhook-secret del cron en tiempo constante (falla cerrado) o usuario de marketing (leer con «Ver», capturar con «Editar»)", patrones: [/x-webhook-secret/, /compararTiempoConstante/, /can_read_section/, /can_edit_section/] },
 };
 

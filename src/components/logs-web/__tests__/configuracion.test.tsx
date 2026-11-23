@@ -115,6 +115,10 @@ describe("Configuración en subpestañas", () => {
     fireEvent.click(screen.getByRole("button", { name: /Guardar configuración/ }));
     expect(guardar.mock.calls[0][0]).toMatchObject({ linear_tickets_externos: true });
   });
+  it("«Paso de fallos a Linear»: la tanda diaria se marca como cambio de «Incidencias» y solo sale con la migración", () => {
+    expect(subpestanasConCambios(base({ linear_tanda_hora: 7 }), base({ linear_tanda_hora: null }))).toEqual(["incidencias"]);
+    expect(subpestanasConCambios(base({ linear_tanda_sin_facturas: true }), base({ linear_tanda_sin_facturas: false }))).toEqual(["incidencias"]);
+  });
   it("sin la migración del origen, lo dice en vez del interruptor", () => {
     const { linear_tickets_externos: _x, ...sin } = base();
     config = sin as ConfigLogsWeb;

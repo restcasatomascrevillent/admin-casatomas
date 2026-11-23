@@ -143,6 +143,7 @@ describe("catálogo de funciones del servidor en llano", () => {
   it("las de la web: las que llama la web pública (web-casatomas/src) y las que llegan al cliente", () => {
     expect([...FUNCIONES_WEB].sort()).toEqual([
       "chat-web", "cheques-regalo-web", "emails-reserva", "newsletter-baja", "notify-reservation-change", "registrar-actividad-web", "reservas-web", "stripe-webhook-cheques-regalo",
+      "whatsapp-reservas",
     ]);
     for (const f of ["clasificar-productos", "embeddings-nombres", "procesar-factura", "ocr-trabajo", "instagram-publicar", "instagram-programador", "avisos-telegram"]) {
       expect(FUNCIONES[f].ambito, f).toBe("admin");
