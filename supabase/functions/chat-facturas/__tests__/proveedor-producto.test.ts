@@ -1,7 +1,7 @@
 // Producto que es un proveedor, y al revés (23/11/2026).
 // Conversación real de producción (20/11/2026): «Detállame el gasto de suministros altamira» → el modelo
 // la buscó como producto y la respuesta fue «No encuentro "suministros altamira"». Con la migración
-// 20261217100000 la búsqueda de productos devuelve `es_proveedor` y la ficha de proveedor `es_producto`;
+// 20261217100100 la búsqueda de productos devuelve `es_proveedor` y la ficha de proveedor `es_producto`;
 // el bucle consulta entonces lo que toca en la misma ronda.
 import { describe, expect, it } from "vitest";
 import { ejecutarConversacion, type EstadoUso, type Traza } from "../bucle.ts";

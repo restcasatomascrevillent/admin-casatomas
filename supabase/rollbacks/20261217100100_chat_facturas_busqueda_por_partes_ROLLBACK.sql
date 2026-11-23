@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- 20261217100000_chat_facturas_busqueda_por_partes · ROLLBACK: vuelve a la búsqueda que exige todas las palabras, al proveedor por nombre seguido
+-- 20261217100100_chat_facturas_busqueda_por_partes (aplicada como 20261217100000) · ROLLBACK: vuelve a la búsqueda que exige todas las palabras, al proveedor por nombre seguido
 -- y a «copas» = familia Licores. Los índices se quitan (no molestan si se dejan).
 set lock_timeout = '5s';
 

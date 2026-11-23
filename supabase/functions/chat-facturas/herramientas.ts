@@ -1320,7 +1320,7 @@ export function sinCompras(nombre: string, data: any): boolean {
 //  Conversación real: «Detállame el gasto de suministros altamira» → el modelo
 //  la buscó como producto y contestó «no encuentro». Ahora la búsqueda de
 //  productos dice si lo pedido es un proveedor (`es_proveedor`, migración
-//  20261217100000) y la de proveedores si es un producto (`es_producto`): se
+//  20261217100100) y la de proveedores si es un producto (`es_producto`): se
 //  consulta lo que toca en la misma ronda, sin otra vuelta del modelo.
 
 /** compras_producto (o historial/gráfica caídos a ella): lo pedido es un proveedor → su nombre; si no, null. */
