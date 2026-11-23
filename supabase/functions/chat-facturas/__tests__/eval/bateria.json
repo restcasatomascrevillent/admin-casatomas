@@ -1,5 +1,5 @@
 {
- "descripcion": "Batería ampliada del copiloto de Facturas: las 121 preguntas reales distintas de producción (chat_facturas_mensajes, rol user, hasta el 17/11/2026), casos nuevos por tema y casos de trampa. Cada caso lleva categoría, herramienta esperada y «esperado»: ruta en el resultado + valor + tolerancia, calculados con SQL propio contra producción (campo sql: se recalcula con --en-vivo). Sin datos personales de clientes. Se lanza con scripts/eval-chat-fallos.mjs --bateria.",
+ "descripcion": "Batería ampliada del copiloto de Facturas: las 121 preguntas reales distintas de producción (chat_facturas_mensajes, rol user, hasta el 17/11/2026), casos nuevos por tema y casos de trampa. Cada caso lleva categoría, herramienta esperada y «esperado»: ruta en el resultado + valor + tolerancia, calculados con SQL propio contra producción (campo sql: se recalcula con --en-vivo). Sin datos personales de clientes. Se lanza con scripts/eval-chat-fallos.mjs --bateria. Categoría busqueda_por_partes (23/11/2026): conversaciones reales del 12 al 23/11/2026 en las que la búsqueda de productos o de proveedores no encontraba lo que sí había (migración 20261217100000).",
  "fecha_referencia": "2026-11-17",
  "casos": [
   {
@@ -5624,6 +5624,615 @@
     "max_ms": 8000
    },
    "nota": "sin descuento: la línea no trae precio_impreso ni descuento_pct (las claves ni aparecen)"
+  },
+  {
+   "id": "bp01",
+   "categoria": "busqueda_por_partes",
+   "origen": "real (prod, 20/11/2026 16:41): «No hay compras registradas de Leon Beyer ni de productos similares»",
+   "mensaje": "Precio leon beyer",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "leon beyer"
+    },
+    "asociacion": null
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select round(pf.total / pf.cantidad, 2) from productos_factura pf where pf.nombre ilike 'L.Beyer Gewurztraminer%' order by pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 16.25,
+     "tipo": "num"
+    },
+    {
+     "ruta": "sin_datos",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "Beyer"
+    ],
+    "prod": {
+     "debe": [
+      "L\\.Beyer Gewurztraminer",
+      "por_partes",
+      "\"coincidencia\": \"aproximada\""
+     ]
+    },
+    "max_ms": 8000
+   },
+   "nota": "la línea es «L.Beyer Gewurztraminer 2021»: «leon» = la inicial con punto. Antes: sin_datos. En la demo el catálogo ya lo llama «Gewürztraminer Léon Beyer» y casa por nombre"
+  },
+  {
+   "id": "bp02",
+   "categoria": "busqueda_por_partes",
+   "origen": "real (prod, 20/11/2026 16:42)",
+   "mensaje": "Leon beyern vino 2021",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "Leon beyern vino 2021"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "ultima_factura.precio_unitario",
+     "sql": "select round(pf.total / pf.cantidad, 2) from productos_factura pf where pf.nombre ilike 'L.Beyer Gewurztraminer%' order by pf.id desc limit 1",
+     "tol": 0.01,
+     "valor": 16.25,
+     "tipo": "num"
+    },
+    {
+     "ruta": "sin_datos",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    },
+    {
+     "ruta": "por_partes.palabras_sin_casar",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "Beyer"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "errata (beyern), palabra de familia que no está en el nombre (vino) y añada que sí está (2021)"
+  },
+  {
+   "id": "bp03",
+   "categoria": "busqueda_por_partes",
+   "origen": "real (prod, 19/11/2026 17:48): «No encuentro L.P.ROSE con ese nombre exacto»",
+   "mensaje": "PRECIO L.P.ROSE",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "L.P.ROSE"
+    },
+    "asociacion": null
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "LP ROSE|ROSE LP"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "las siglas con puntos se unen: «l.p.» = «lp». Antes «l» se tomaba por litro y no casaba nada"
+  },
+  {
+   "id": "bp04",
+   "categoria": "busqueda_por_partes",
+   "origen": "real (prod, 20/11/2026 11:43): «No encuentro aceite Palo… parecido: aceite Beneoliva»",
+   "mensaje": "ACEITE PALO PRECIO",
+   "herramienta": {
+    "nombre": "historial_precios",
+    "argumentos": {
+     "producto": "aceite palo"
+    },
+    "asociacion": null
+   },
+   "esperado": [
+    {
+     "ruta": "compras_encontradas",
+     "op": ">=",
+     "valor": 1,
+     "tol": 0,
+     "tipo": "num"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "HACIENDA EL PALO"
+    ],
+    "no_debe": [
+     "PALO CORTADO",
+     "PALO ALUMINIO",
+     "RECOGEDOR"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "«aceite» no está en la línea («HACIENDA EL PALO PREMIUM 500ML») sino en el proveedor que la factura; el palo cortado (vino) y el palo de aluminio no entran"
+  },
+  {
+   "id": "bp05",
+   "categoria": "busqueda_por_partes",
+   "origen": "real (prod, 20/11/2026 16:59): «No encuentro suministros altamira… posible coincidencia 80/20 ALTAMIRA DORADO»",
+   "mensaje": "Detállame el gasto de suministros altamira",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "suministros altamira",
+     "orden": "importe"
+    },
+    "asociacion": null
+   },
+   "esperado": [
+    {
+     "ruta": "es_proveedor",
+     "sql": "select p.nombre from proveedores p where p.nombre ilike 'suministros hosteleros altamira%' order by p.id limit 1",
+     "valor": "SUMINISTROS HOSTELEROS ALTAMIRA, S. L.",
+     "tipo": "txt"
+    },
+    {
+     "ruta": "coincidencia",
+     "valor": "proveedor",
+     "tipo": "txt"
+    },
+    {
+     "ruta": "sugerencias",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "no_debe": [
+     "ALTAMIRA DORADO"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "el modelo lo buscó como producto: la búsqueda dice que es un proveedor y el bucle consulta su ficha (proveedor-producto.test.ts)"
+  },
+  {
+   "id": "bp06",
+   "categoria": "busqueda_por_partes",
+   "origen": "real (prod, 20/11/2026 16:59), por la herramienta buena",
+   "mensaje": "Detállame el gasto de suministros altamira",
+   "herramienta": {
+    "nombre": "ficha_proveedor",
+    "argumentos": {
+     "proveedor": "suministros altamira"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "proveedor",
+     "sql": "select p.nombre from proveedores p where p.nombre ilike 'suministros hosteleros altamira%' order by p.id limit 1",
+     "valor": "SUMINISTROS HOSTELEROS ALTAMIRA, S. L.",
+     "tipo": "txt"
+    },
+    {
+     "ruta": "gasto",
+     "sql": "select round(sum(f.total), 2) from facturas f where f.proveedor_id = (select p.id from proveedores p where p.nombre ilike 'suministros hosteleros altamira%' order by p.id limit 1) and not (f.tipo = 'albaran' and f.id in (select albaran_id from albaranes_facturados_agente()))",
+     "tol": 0.05,
+     "valor": 50423.88,
+     "tipo": "num"
+    },
+    {
+     "ruta": "sin_datos",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "el nombre a medias (falta «hosteleros»): método «palabras»"
+  },
+  {
+   "id": "bp07",
+   "categoria": "busqueda_por_partes",
+   "origen": "nuevo (23/11/2026): el mismo proveedor con dos letras bailadas, por la herramienta de productos",
+   "mensaje": "gasto de suminsitros altamira",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "suminsitros altamira"
+    },
+    "asociacion": null
+   },
+   "esperado": [
+    {
+     "ruta": "es_proveedor",
+     "sql": "select p.nombre from proveedores p where p.nombre ilike 'suministros hosteleros altamira%' order by p.id limit 1",
+     "valor": "SUMINISTROS HOSTELEROS ALTAMIRA, S. L.",
+     "tipo": "txt"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "errata de teclado en el nombre del proveedor"
+  },
+  {
+   "id": "bp08",
+   "categoria": "busqueda_por_partes",
+   "origen": "nuevo (23/11/2026): proveedor sin tilde, sin «de» y sin las palabras de en medio",
+   "mensaje": "Ficha de marques riscal",
+   "herramienta": {
+    "nombre": "ficha_proveedor",
+    "argumentos": {
+     "proveedor": "marques riscal"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "proveedor",
+     "sql": "select p.nombre from proveedores p where p.nombre ilike '%herederos del marqu_s de riscal%' order by p.id limit 1",
+     "valor": "BODEGAS DE LOS HEREDEROS DEL MARQUÉS DE RISCAL, S.L.U.",
+     "tipo": "txt"
+    },
+    {
+     "ruta": "sin_datos",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   }
+  },
+  {
+   "id": "bp09",
+   "categoria": "busqueda_por_partes",
+   "origen": "real (prod, 20/11/2026 17:00): «No hay compras registradas de quitagrasa ni de productos similares»",
+   "mensaje": "Que proveedor me trae el quita grasa",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "quita grasa"
+    },
+    "asociacion": null
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "valor": true,
+     "tipo": "bool"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "DESENGRASANTE"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "no hay nada llamado así, pero «grasa» está dentro de «desengrasante»: se sugiere (botones), no se suma"
+  },
+  {
+   "id": "bp10",
+   "categoria": "busqueda_por_partes",
+   "origen": "real (prod, 20/11/2026 17:22): «No encuentro compras registradas de copas Riedel»",
+   "mensaje": "Dime copas riedel el gasto",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "copas riedel",
+     "orden": "importe"
+    },
+    "asociacion": null
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "valor": true,
+     "tipo": "bool"
+    },
+    {
+     "ruta": "total",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "\"sugerencias\": \\[\"COPA"
+    ],
+    "no_debe": [
+     "Johnnie",
+     "Tanqueray"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "no hay Riedel: se sugieren las copas que sí se compran (de cristal), nunca los licores"
+  },
+  {
+   "id": "bp11",
+   "categoria": "busqueda_por_partes",
+   "origen": "real (prod, 20/11/2026 17:21): «En copas ruedes me puedes decir el costo» (en la demo contestó con el gasto en licores)",
+   "mensaje": "En copas me puedes decir el costo",
+   "rpc_directo": {
+    "rpc": "asociar_termino_agente",
+    "params": {
+     "p_texto": "copas"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "tipo",
+     "valor": "producto",
+     "tipo": "txt"
+    }
+   ],
+   "rpc": {
+    "no_debe": [
+     "Licores"
+    ],
+    "max_ms": 3000
+   },
+   "nota": "«copas» ya no es la familia Licores y destilados: son las copas de cristal del catálogo"
+  },
+  {
+   "id": "bp12",
+   "categoria": "busqueda_por_partes",
+   "origen": "nuevo (23/11/2026): palabra de familia delante de la marca (46 % de acierto en el banco de 3.348 consultas)",
+   "mensaje": "precio vino aalto",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "vino aalto"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    },
+    {
+     "ruta": "coincidencia",
+     "valor": "aproximada",
+     "tipo": "txt"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "Aalto"
+    ],
+    "no_debe": [
+     "GIRASOL",
+     "OLEICO"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "«vino» no está en el nombre: vale porque las líneas son de la familia Vinos; el aceite «alto oleico» no entra"
+  },
+  {
+   "id": "bp13",
+   "categoria": "busqueda_por_partes",
+   "origen": "nuevo (23/11/2026): añada que no figura en el nombre (8 % de acierto en el banco)",
+   "mensaje": "precio aalto 2021",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "aalto 2021"
+    },
+    "asociacion": {
+     "categoria": "Vinos",
+     "familia": "Bebidas",
+     "tipo": "producto"
+    }
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    },
+    {
+     "ruta": "por_partes.palabras_sin_casar[0]",
+     "valor": "2021",
+     "tipo": "txt"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "Aalto"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "se da Aalto y se avisa de que la añada 2021 no figura"
+  },
+  {
+   "id": "bp14",
+   "categoria": "busqueda_por_partes",
+   "origen": "real (prod, 14/11/2026 15:26): «Hormiga magnitud botella» (dictado: magnum)",
+   "mensaje": "Hormiga magnitud botella",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "hormiga magnitud",
+     "orden": "precio"
+    },
+    "asociacion": null
+   },
+   "esperado": [],
+   "rpc": {
+    "debe": [
+     "HORMIGA"
+    ],
+    "prod": {
+     "debe": [
+      "\"sin_datos\": true",
+      "MAGNUM"
+     ]
+    },
+    "max_ms": 8000
+   },
+   "nota": "en producción hay dos Hormigas (75 cl y magnum): no se elige, se sugieren las dos. En la demo solo hay una y se da esa, avisando de la palabra que no figura"
+  },
+  {
+   "id": "bp15",
+   "categoria": "busqueda_por_partes",
+   "subcategoria": "trampa",
+   "origen": "real (prod, 12/11/2026 18:21): no existe y no hay nada parecido",
+   "mensaje": "Precio botella la faraona",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "la faraona",
+     "orden": "precio"
+    },
+    "asociacion": null
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "valor": true,
+     "tipo": "bool"
+    },
+    {
+     "ruta": "sugerencias",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    },
+    {
+     "ruta": "es_proveedor",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    },
+    {
+     "ruta": "total",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "max_ms": 8000
+   },
+   "nota": "trampa: la búsqueda por partes no debe inventar parecidos"
+  },
+  {
+   "id": "bp16",
+   "categoria": "busqueda_por_partes",
+   "subcategoria": "trampa",
+   "origen": "nuevo (23/11/2026): la línea escribe letras con puntos («BITTER KAS N.R. * 24»)",
+   "mensaje": "precio BITTER KAS N.R.",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "BITTER KAS N.R."
+    },
+    "asociacion": null
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    },
+    {
+     "ruta": "por_partes",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "BITTER KAS"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "trampa: unir las siglas de la pregunta no debe romper las líneas que las escriben con puntos"
+  },
+  {
+   "id": "bp17",
+   "categoria": "busqueda_por_partes",
+   "subcategoria": "trampa",
+   "origen": "nuevo (23/11/2026): un producto con nombre de proveedor",
+   "mensaje": "precio altamira dorado",
+   "herramienta": {
+    "nombre": "compras_producto",
+    "argumentos": {
+     "producto": "altamira dorado"
+    },
+    "asociacion": null
+   },
+   "esperado": [
+    {
+     "ruta": "sin_datos",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    },
+    {
+     "ruta": "es_proveedor",
+     "sql": "select null",
+     "tol": 0,
+     "valor": null,
+     "tipo": "nulo"
+    }
+   ],
+   "rpc": {
+    "debe": [
+     "ALTAMIRA DORADO"
+    ],
+    "max_ms": 8000
+   },
+   "nota": "trampa: «altamira dorado» es un producto, no el proveedor Altamira",
+   "solo_en": "prod"
   }
  ]
 }
