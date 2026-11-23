@@ -42,6 +42,10 @@ import {
   resumenVinoCarta,
   resultadoVacio,
   sinCompras,
+  notaDesvioProducto,
+  notaDesvioProveedor,
+  productoPedido,
+  proveedorPedido,
   prepararLlamada,
   recortar,
   separarAdjunto,
@@ -641,6 +645,30 @@ async function ejecutarTool(nombre: string, args: any, supabase: Cliente, ctx: C
         if (alt.tipo === "rpc" && alt.rpc === "compras_producto_agente") {
           const ra = await supabase.rpc(alt.rpc, alt.params);
           if (!ra.error && ra.data) { data = ra.data; ll = alt; }
+        }
+      }
+      // Lo pedido como producto es un proveedor («gasto de suministros altamira»): su ficha,
+      // en esta misma ronda. Si la ficha falla o viene vacía, se queda el aviso de la búsqueda.
+      const prov = ll.rpc === "compras_producto_agente" ? proveedorPedido(data) : null;
+      if (prov) {
+        const rf = await supabase.rpc("ficha_proveedor_agente", { p_texto: prov });
+        if (!rf.error && rf.data && typeof rf.data === "object" && !Array.isArray(rf.data) && rf.data.sin_datos !== true && rf.data.error === undefined) {
+          data = rf.data;
+          ll = {
+            tipo: "rpc", rpc: "ficha_proveedor_agente", params: { p_texto: prov }, limite: null,
+            nota: notaDesvioProveedor(String(args?.producto ?? ""), prov),
+          };
+        }
+      }
+      // Y al revés: lo pedido como proveedor es un producto («ficha de leon beyer»): sus compras.
+      if (productoPedido(nombre, data)) {
+        const alt = prepararLlamada("compras_producto", { producto: args?.proveedor }, ctx.pregunta, null, ctx.presupuestoId);
+        if (alt.tipo === "rpc" && alt.rpc === "compras_producto_agente") {
+          const ra = await supabase.rpc(alt.rpc, alt.params);
+          if (!ra.error && ra.data && typeof ra.data === "object" && ra.data.sin_datos !== true && ra.data.error === undefined) {
+            data = ra.data;
+            ll = { ...alt, nota: notaDesvioProducto(String(args?.proveedor ?? "")) };
+          }
         }
       }
       // compras_producto: si el texto no casa con nada, UNA segunda llamada
