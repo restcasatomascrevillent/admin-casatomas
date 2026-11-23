@@ -1,5 +1,5 @@
 // Búsqueda de productos y proveedores del copiloto de Facturas (migración
-// 20261217100000_chat_facturas_busqueda_por_partes), contra un Postgres en memoria
+// 20261217100100_chat_facturas_busqueda_por_partes), contra un Postgres en memoria
 // (PGlite) con pg_trgm y unaccent. Nunca toca Supabase.
 //
 //   npm run test:chat-busqueda:db
@@ -21,7 +21,7 @@ import { unaccent } from "@electric-sql/pglite/contrib/unaccent";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 
-const MIG = await readFile("supabase/migrations/20261217100000_chat_facturas_busqueda_por_partes.sql", "utf8");
+const MIG = await readFile("supabase/migrations/20261217100100_chat_facturas_busqueda_por_partes.sql", "utf8");
 
 /** Una función de la migración (las nuevas van con `as $$ … $$;`). */
 function funcion(nombre) {

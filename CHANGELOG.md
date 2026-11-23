@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.53.2] - 2026-11-23
+
+Objetivo: CI en verde: la migración de la búsqueda del copiloto deja de repetir versión (sin cambios de comportamiento)
+
+### Cambiado
+- Migraciones: la migración de la búsqueda del copiloto deja de repetir versión ([#349](https://github.com/restcasatomascrevillent/admin-casatomas/pull/349))
+
 ## [1.53.1] - 2026-11-23
 
 Objetivo: El copiloto de Facturas encuentra los productos y proveedores que sí están (búsqueda por partes) y responde más rápido

@@ -1,6 +1,9 @@
 set client_encoding = 'UTF8';
 -- ============================================================================
--- 20261217100000_chat_facturas_busqueda_por_partes · Facturas (23/11/2026)
+-- 20261217100100_chat_facturas_busqueda_por_partes · Facturas (23/11/2026)
+-- Aplicada en demo y producción el 23/11/2026 con la versión 20261217100000; el fichero se renombró a 20261217100100 porque
+-- 20261217100000 ya era de telegram_reservas_estado (versión repetida). Dentro, los comentarios y avisos conservan el número
+-- con el que se aplicó: el texto de las funciones es exactamente el que está en las bases de datos.
 -- El copiloto de Facturas contestaba «no hay compras» de productos y proveedores que sí están. Conversaciones reales de
 -- producción (19-23/11/2026) y un banco de 5.500 consultas generadas de los productos y proveedores reales:
 --   · «Precio leon beyer» → nada (la línea es «L.Beyer Gewurztraminer 2021»): la búsqueda exigía TODAS las palabras en la
@@ -29,7 +32,7 @@ set client_encoding = 'UTF8';
 --   8. terminos_agente: «copas» deja de ser la familia Licores (se busca por nombre: las copas de cristal).
 -- Las funciones enteras parten de la definición VIVA (idéntica en demo y producción el 23/11/2026); compras_producto_agente
 -- y ficha_proveedor_agente se parchean con sustituciones de texto (aborta sin cambiar nada si no es la esperada).
--- Requiere 20261212530000. Sin begin/commit propios. Rollback: supabase/rollbacks/20261217100000_chat_facturas_busqueda_por_partes_ROLLBACK.sql
+-- Requiere 20261212530000. Sin begin/commit propios. Rollback: supabase/rollbacks/20261217100100_chat_facturas_busqueda_por_partes_ROLLBACK.sql
 -- ============================================================================
 set lock_timeout = '5s';
 
