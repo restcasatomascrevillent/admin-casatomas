@@ -282,7 +282,7 @@ export function PestanaConfiguracion({ estado, sub, onSub, onCambiosSinGuardar }
               los errores, de todos. No se graban pantallas ni pulsaciones: solo eventos estructurados. Touza y el panel no envían actividad.
             </p>
             <div className="overflow-x-auto">
-              <Table data-testid="tabla-cobertura">
+              <Table data-testid="tabla-cobertura" className="[overflow-wrap:anywhere]">
                 <TableHeader>
                   <TableRow><TableHead>Evento</TableHead><TableHead>Categoría</TableHead><TableHead>Fuente</TableHead><TableHead>Consentimiento</TableHead><TableHead>Datos desde</TableHead><TableHead className="hidden lg:table-cell">Qué significa</TableHead></TableRow>
                 </TableHeader>

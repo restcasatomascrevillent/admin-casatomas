@@ -121,34 +121,37 @@ export function PestanaActividad({ desde, hasta, entorno, autoRefresco, onAbrirS
         <div className="space-y-2">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-10" />)}</div>
       ) : vista === "sesiones" ? (
         sesiones.data?.filas.length ? (
-          <Table data-testid="tabla-sesiones">
+          // 23/11/2026: sin scroll lateral (columnas de ancho fijo; la entrada y la procedencia se parten o se cortan).
+          <Table data-testid="tabla-sesiones" className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead>Inicio</TableHead>
-                <TableHead>Entrada y procedencia</TableHead>
-                <TableHead className="hidden md:table-cell">Dispositivo</TableHead>
-                <TableHead className="text-right">Páginas</TableHead>
-                <TableHead className="hidden text-right sm:table-cell">Activo</TableHead>
-                <TableHead>Resultado</TableHead>
+                <TableHead className="w-24 px-2 sm:w-36 sm:px-4">Inicio</TableHead>
+                <TableHead className="px-2 sm:px-4">Entrada y procedencia</TableHead>
+                <TableHead className="hidden w-40 md:table-cell">Dispositivo</TableHead>
+                <TableHead className="w-16 px-2 text-right sm:w-20 sm:px-4">Páginas</TableHead>
+                <TableHead className="hidden w-20 text-right sm:table-cell">Activo</TableHead>
+                <TableHead className="w-28 px-2 sm:w-40 sm:px-4">Resultado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sesiones.data.filas.map((s) => (
                 <TableRow key={s.sesion_id} className="cursor-pointer" onClick={() => onAbrirSesion(s.sesion_id)} tabIndex={0}
                   onKeyDown={(e) => e.key === "Enter" && onAbrirSesion(s.sesion_id)} data-testid="fila-sesion">
-                  <TableCell className="whitespace-nowrap tabular-nums">{fmtFechaHora(s.inicio)}</TableCell>
-                  <TableCell>
-                    <span className="block max-w-[16rem] truncate">{s.pagina_entrada ?? "—"}</span>
+                  <TableCell className="px-2 text-xs tabular-nums sm:whitespace-nowrap sm:px-4">{fmtFechaHora(s.inicio)}</TableCell>
+                  <TableCell className="px-2 [overflow-wrap:anywhere] sm:px-4">
+                    <span className="block truncate" title={s.pagina_entrada ?? undefined}>{s.pagina_entrada ?? "—"}</span>
                     <span className="text-xs text-muted-foreground">{NOMBRE_ORIGEN[s.origen_tipo ?? "desconocido"] ?? s.origen_tipo}{s.campana ? ` · ${s.campana}` : s.origen_detalle ? ` · ${s.origen_detalle}` : ""}</span>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-xs">{NOMBRE_DISPOSITIVO[s.dispositivo ?? "desconocido"] ?? s.dispositivo} · {s.navegador ?? "?"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{s.paginas_vistas}</TableCell>
+                  <TableCell className="hidden text-xs [overflow-wrap:anywhere] md:table-cell">{NOMBRE_DISPOSITIVO[s.dispositivo ?? "desconocido"] ?? s.dispositivo} · {s.navegador ?? "?"}</TableCell>
+                  <TableCell className="px-2 text-right tabular-nums sm:px-4">{s.paginas_vistas}</TableCell>
                   <TableCell className="hidden text-right tabular-nums sm:table-cell">{fmtDuracion(s.tiempo_activo_ms)}</TableCell>
-                  <TableCell className="space-x-1">
+                  <TableCell className="px-2 sm:px-4">
+                    <span className="flex flex-wrap gap-1">
                     {s.conversiones > 0 && <Badge className="gap-1 bg-emerald-600"><CheckCircle2 className="h-3 w-3" />{s.conversiones}</Badge>}
                     {s.inicio_operacion && s.conversiones === 0 && <Badge variant="outline">empezó y no terminó</Badge>}
                     <ErroresSesion s={s} />
                     {(s.es_interno || s.es_prueba || s.es_bot) && <Badge variant="outline">{s.es_bot ? "bot" : s.es_prueba ? "prueba" : "interno"}</Badge>}
+                    </span>
                   </TableCell>
                 </TableRow>
               ))}
@@ -158,14 +161,15 @@ export function PestanaActividad({ desde, hasta, entorno, autoRefresco, onAbrirS
           <p className="py-8 text-center text-sm text-muted-foreground" data-testid="sin-sesiones">No hay sesiones con estos filtros en el periodo.</p>
         )
       ) : eventos.data?.filas.length ? (
-        <Table data-testid="tabla-eventos">
+        // 23/11/2026: sin scroll lateral (columnas de ancho fijo; «Qué pasó» con el resto y los textos largos se parten).
+        <Table data-testid="tabla-eventos" className="table-fixed">
           <TableHeader>
             <TableRow>
-              <TableHead>Hora</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Qué pasó</TableHead>
-              <TableHead className="hidden lg:table-cell">Página</TableHead>
-              <TableHead className="hidden md:table-cell">Origen del dato</TableHead>
+              <TableHead className="w-24 px-2 sm:w-36 sm:px-4">Hora</TableHead>
+              <TableHead className="w-28 px-2 sm:w-40 sm:px-4">Tipo</TableHead>
+              <TableHead className="px-2 sm:px-4">Qué pasó</TableHead>
+              <TableHead className="hidden w-48 lg:table-cell">Página</TableHead>
+              <TableHead className="hidden w-32 md:table-cell">Origen del dato</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -173,20 +177,20 @@ export function PestanaActividad({ desde, hasta, entorno, autoRefresco, onAbrirS
               const origen = e.categoria === "error" ? origenDeEvento(e) : null;
               return (
               <TableRow key={e.id} data-testid="fila-evento" data-origen={origen ?? undefined} className={origen ? estiloDe(origen).fila : undefined}>
-                <TableCell className="whitespace-nowrap tabular-nums text-xs">{fmtFechaHora(e.ocurrido_en)}</TableCell>
-                <TableCell className="space-y-1 text-xs">
-                  <Badge variant="outline" className={cn("whitespace-nowrap", origen && estiloDe(origen).insignia)}>{NOMBRE_TIPO[e.tipo] ?? e.tipo}</Badge>
+                <TableCell className="px-2 tabular-nums text-xs sm:whitespace-nowrap sm:px-4">{fmtFechaHora(e.ocurrido_en)}</TableCell>
+                <TableCell className="space-y-1 px-2 text-xs sm:px-4">
+                  <Badge variant="outline" className={cn("text-left", origen && estiloDe(origen).insignia)}>{NOMBRE_TIPO[e.tipo] ?? e.tipo}</Badge>
                   {origen && <BadgeOrigen origen={origen} ambito={ambitoDeEvento(e)} className="flex w-fit px-1.5 py-0 text-[10px]" />}
                 </TableCell>
-                <TableCell className="max-w-[28rem] text-sm">
-                  <span className="break-words">{describirEvento(e)}</span>
+                <TableCell className="px-2 text-sm [overflow-wrap:anywhere] sm:px-4">
+                  <span>{describirEvento(e)}</span>
                   <span className="ml-2 space-x-2 text-xs">
                     {e.sesion_id && <button type="button" className="text-primary underline underline-offset-2" onClick={() => onAbrirSesion(e.sesion_id!)}>sesión</button>}
                     {e.incidencia_id && <button type="button" className="text-primary underline underline-offset-2" onClick={() => onAbrirIncidencia(e.incidencia_id!)}>incidencia #{e.incidencia_id}</button>}
                   </span>
                 </TableCell>
-                <TableCell className="hidden lg:table-cell text-xs">{e.ruta ?? "—"}</TableCell>
-                <TableCell className="hidden md:table-cell text-xs text-muted-foreground">{e.fuente}{e.entorno !== "produccion" ? ` · ${e.entorno}` : ""}</TableCell>
+                <TableCell className="hidden text-xs [overflow-wrap:anywhere] lg:table-cell">{e.ruta ?? "—"}</TableCell>
+                <TableCell className="hidden text-xs text-muted-foreground [overflow-wrap:anywhere] md:table-cell">{e.fuente}{e.entorno !== "produccion" ? ` · ${e.entorno}` : ""}</TableCell>
               </TableRow>
               );
             })}
