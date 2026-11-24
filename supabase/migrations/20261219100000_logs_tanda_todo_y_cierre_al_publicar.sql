@@ -5,9 +5,9 @@
 -- Dueño, 24/11/2026: «Todo lo que haya de fallos en la sección de incidencias de
 -- logs se tiene que pasar a ticket de Linear a las 7 de la mañana y cuando se
 -- solucione se tiene que marcar como done en Linear y que desaparezca en
--- incidencias del panel». Eligió: lo de la vista por defecto de Incidencias (web,
--- admin y servicios externos), sin Facturas; y «solucionado» = al publicarse el
--- arreglo.
+-- incidencias del panel». Los de la web y del admin, sin Facturas; los de
+-- servicios externos no («los tickets de servicios externos no tienen que
+-- pasar»). «Solucionado» = al publicarse el arreglo.
 --
 -- 1. La tanda (20261218100000) solo cogía fallos con ocurrencias en las últimas
 --    24 h: el 24/11 se dejó dos del domingo. Ahora procesar-logs-web pide las
@@ -15,10 +15,11 @@
 --    principio del día de la tanda anterior (7 días si no la hubo): sin ticket,
 --    abiertas, no 404, de la web/admin o externas (con el interruptor), con alguna
 --    ocurrencia real desde p_desde (mismo criterio que los umbrales).
--- 2. Servicios externos: se enciende linear_tickets_externos (Logs ›
---    Configuración › «Tickets de servicios externos») y, con tanda, también
---    esperan a la tanda (al momento, solo los críticos): web_logs_agrupar_errores
---    igual que en 20261218100000 salvo esa regla.
+-- 2. Servicios externos: siguen sin pasar solos (linear_tickets_externos no se
+--    toca; en producción está apagado). Si algún día se enciende, con tanda
+--    también esperan a la tanda (al momento, solo los críticos), y los 404
+--    siguen su regla: web_logs_agrupar_errores igual que en 20261218100000 salvo
+--    esa regla.
 -- 3. La tanda de hoy se repite (linear_tanda_ultimo_dia = null): la próxima pasada
 --    mira 7 días atrás y coge lo que la primera se dejó.
 -- 4. Cierre al publicar: web_logs_resolver_por_release(identificadores, versión)
@@ -33,9 +34,6 @@
 -- ===========================================================================
 begin;
 set local lock_timeout = '5s';
-
--- ─── 2. Servicios externos en la tanda ─────────────────────────────────────
-update public.web_logs_config set linear_tickets_externos = true where id and not linear_tickets_externos;
 
 create or replace function public.web_logs_agrupar_errores(p_limite integer default 5000)
 returns jsonb
