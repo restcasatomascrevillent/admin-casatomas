@@ -18,7 +18,9 @@
 //       hidratar con la página cambiada por el navegador (la web lo dice con
 //       `accion` «pagina_traducida» o «dom_ajeno», CAS-6/18/19/20) y scripts que el navegador
 //       mete en la página (`__firefox__`, `window.ethereum` o una pila solo con
-//       la línea 1 de la página, CAS-21/22/23/26/27/28) → navegador.
+//       la línea 1 de la página, CAS-21/22/23/26/27/28; o una pila solo con
+//       líneas de la página de la 100 en adelante, que el HTML de la web no
+//       tiene, CAS-33/34) → navegador.
 //    4. Navegador: petición sin respuesta (estado 0, «Sin respuesta de…»),
 //       «Failed to fetch», «Load failed», «NetworkError», cancelada, e imagen
 //       que cargó al volver a pedirla (`accion` «recuperada_al_reintentar»,
@@ -90,6 +92,21 @@ const PATRON_JS = /\.m?js([?#:\s]|$)/i;
 export function pilaSoloDeLaPagina(pila: string | null | undefined): boolean {
   const p = (pila ?? "").trim();
   return p !== "" && PATRON_PILA_SOLO_PAGINA.test(p) && !PATRON_JS.test(p);
+}
+
+/**
+ * Pila en la que TODOS los marcos están en una página (no en un fichero .js) y
+ * en la línea 100 o posterior: el HTML de la web no tiene tantas líneas (18 el
+ * 24/11/2026; web-casatomas scripts/verificar-html.mjs para el build si alguna
+ * página pasa de 99), así que ese código no es nuestro: lo metió el navegador
+ * (Chrome en iPhone, 22/11/2026: «Maximum call stack size exceeded» con
+ * «Fk@https://…/carta:236:392», CAS-33/34). Nuestros scripts en línea están
+ * en las últimas líneas del HTML y siguen contando como fallo de la web.
+ */
+export const PATRON_PILA_FUERA_DEL_HTML = /^(\s*([^\s@]*@|at )?https?:\/\/[^\s]+:[1-9][0-9][0-9]+:[0-9]+\s*)+$/i;
+export function pilaFueraDelHtml(pila: string | null | undefined): boolean {
+  const p = (pila ?? "").trim();
+  return p !== "" && PATRON_PILA_FUERA_DEL_HTML.test(p) && !PATRON_JS.test(p);
 }
 
 /**
@@ -211,7 +228,7 @@ export function origenDeError(d: DatosOrigen): Origen {
   if (navegador) {
     // 3. El navegador o una extensión.
     if (TIPOS_JS.includes(d.tipo) && ACCIONES_DOM_DEL_NAVEGADOR.includes(d.accion ?? "") && PATRON_HIDRATACION.test(mensaje)) return "navegador";
-    if (TIPOS_JS.includes(d.tipo) && pilaSoloDeLaPagina(d.pila)) return "navegador";
+    if (TIPOS_JS.includes(d.tipo) && (pilaSoloDeLaPagina(d.pila) || pilaFueraDelHtml(d.pila))) return "navegador";
     if (PATRON_EXTENSION.test(`${texto}\n${d.objetivo ?? ""}`) || PATRON_NAVEGADOR.test(texto) || PATRON_SCRIPT_ERROR.test(mensaje.trim())) return "navegador";
     if (d.tipo === "error_recurso" && PATRON_BLOQUEADORES.test(d.objetivo ?? "")) return "navegador";
     // 4. La conexión del visitante.

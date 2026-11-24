@@ -39,6 +39,8 @@ const ORIGEN = await readFile("supabase/migrations/20261130100000_logs_web_orige
 const ROLLBACK_ORIGEN = await readFile("supabase/rollbacks/20261130100000_logs_web_origen_ROLLBACK.sql", "utf8");
 const NAVEGADOR = await readFile("supabase/migrations/20261213040000_logs_web_navegador_reaperturas.sql", "utf8");
 const ROLLBACK_NAVEGADOR = await readFile("supabase/rollbacks/20261213040000_logs_web_navegador_reaperturas_ROLLBACK.sql", "utf8");
+const PILA = await readFile("supabase/migrations/20261220100000_logs_web_pila_fuera_del_html.sql", "utf8");
+const ROLLBACK_PILA = await readFile("supabase/rollbacks/20261220100000_logs_web_pila_fuera_del_html_ROLLBACK.sql", "utf8");
 const TANDA = await readFile("supabase/migrations/20261218100000_logs_linear_tanda_diaria.sql", "utf8");
 const ROLLBACK_TANDA = await readFile("supabase/rollbacks/20261218100000_logs_linear_tanda_diaria_ROLLBACK.sql", "utf8");
 const TODO = await readFile("supabase/migrations/20261219100000_logs_tanda_todo_y_cierre_al_publicar.sql", "utf8");
@@ -537,6 +539,18 @@ ok((await q("select count(*)::int n from public.web_eventos where sesion_id = $1
   await db.exec(NAVEGADOR);
   await db.exec(NAVEGADOR); // idempotente
   comprobaciones++;
+
+  // Antes de 20261220100000, una pila en líneas de la página que el HTML no tiene era «de la web» (CAS-33/34).
+  const origenDe = async (d) => (await q("select public.web_logs_origen_error($1, $2, $3, $4, $5, $6::jsonb, $7, $8) o",
+    [d.tipo, d.fuente ?? null, d.mensaje ?? null, d.pila ?? null, d.objetivo ?? null, JSON.stringify(d.propiedades ?? {}), d.accion ?? null, d.tras_publicar ?? null])).rows[0].o;
+  const CAS33 = CASOS_ORIGEN.find((c) => c.nombre.startsWith("CAS-33")).datos;
+  igual(await origenDe(CAS33), "web", "sin la migración, CAS-33 cuenta como fallo de la web");
+  await db.exec(PILA);
+  await db.exec(PILA); // idempotente
+  await db.exec(ROLLBACK_PILA);
+  igual(await origenDe(CAS33), "web", "el rollback de 20261220100000 vuelve a la regla anterior");
+  await db.exec(PILA);
+  igual(await origenDe(CAS33), "navegador", "con la migración, CAS-33 es del navegador");
 
   // Mismos casos que origen.ts (vitest): el SQL clasifica igual.
   for (const c of CASOS_ORIGEN) {

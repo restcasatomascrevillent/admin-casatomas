@@ -139,5 +139,15 @@
   { "nombre": "hidratación con la página intacta (fallo nuestro): web", "origen": "web", "proveedor": null,
     "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "Error: Minified React error #418; visit https://reactjs.org/docs/error-decoder.html", "pila": "ts@https://restaurantecasatomascrevillente.es/assets/app-TFlv6IO6.js:39:73", "propiedades": { "componente": "página intacta antes de hidratar" } } },
   { "nombre": "la marca dom_ajeno en un error que no es de hidratación: web", "origen": "web", "proveedor": null,
-    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "TypeError: undefined is not an object (evaluating 'plato.precio')", "accion": "dom_ajeno" } }
+    "datos": { "tipo": "error_js", "fuente": "navegador", "mensaje": "TypeError: undefined is not an object (evaluating 'plato.precio')", "accion": "dom_ajeno" } },
+  { "nombre": "CAS-33: Chrome en iPhone, desbordamiento de pila en líneas 195-236 de la página (el HTML tiene 18)", "origen": "navegador", "proveedor": null,
+    "datos": {"tipo": "error_js", "fuente": "navegador", "mensaje": "RangeError: Maximum call stack size exceeded.", "pila": "@https://restaurantecasatomascrevillente.es/carta/carnes:198:68\n@https://restaurantecasatomascrevillente.es/carta/carnes:195:249\n@https://restaurantecasatomascrevillente.es/carta/carnes:205:358\nFk@https://restaurantecasatomascrevillente.es/carta:236:392\nDk@https://restaurantecasatomascrevillente.es/carta:236:70\nFk@https://restaurantecasatomascrevillente.es/carta:236:418\nDk@https://restaurantecasatomascrevillente.es/carta:236:70"} },
+  { "nombre": "CAS-34: el mismo script, con marcos de dos páginas de la carta", "origen": "navegador", "proveedor": null,
+    "datos": {"tipo": "error_js", "fuente": "navegador", "mensaje": "RangeError: Maximum call stack size exceeded.", "pila": "@https://restaurantecasatomascrevillente.es/carta/entrantes-calientes:195:249\n@https://restaurantecasatomascrevillente.es/carta/entrantes-calientes:198:39\nFk@https://restaurantecasatomascrevillente.es/carta/carnes:236:392\nDk@https://restaurantecasatomascrevillente.es/carta/carnes:236:70"} },
+  { "nombre": "desbordamiento de pila con un marco de nuestro .js: fallo de la web", "origen": "web", "proveedor": null,
+    "datos": {"tipo": "error_js", "fuente": "navegador", "mensaje": "RangeError: Maximum call stack size exceeded.", "pila": "Fk@https://restaurantecasatomascrevillente.es/carta:236:392\nDk@https://restaurantecasatomascrevillente.es/assets/app-TFlv6IO6.js:236:70"} },
+  { "nombre": "pila en la página con un marco en la línea 99 (cabe en el HTML): fallo de la web", "origen": "web", "proveedor": null,
+    "datos": {"tipo": "error_js", "fuente": "navegador", "mensaje": "RangeError: Maximum call stack size exceeded.", "pila": "Fk@https://restaurantecasatomascrevillente.es/carta:236:392\nDk@https://restaurantecasatomascrevillente.es/carta:99:70"} },
+  { "nombre": "desbordamiento de pila sin pila: fallo de la web", "origen": "web", "proveedor": null,
+    "datos": {"tipo": "error_js", "fuente": "navegador", "mensaje": "RangeError: Maximum call stack size exceeded."} }
 ]
