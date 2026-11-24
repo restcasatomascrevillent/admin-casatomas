@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
-  accionPara, esDeFacturas, horaYDiaMadrid, inicioDiaMadrid, ordenPrioridad, procesar, siguienteIntento, tandaDiaria, ticketPermitido, type ConfigLogs, type IncidenciaFila,
+  accionPara, construirCierre, desdeTanda, esDeFacturas, horaYDiaMadrid, inicioDiaMadrid, ordenPrioridad, procesar, siguienteIntento, tandaDiaria, ticketPermitido, type ConfigLogs, type IncidenciaFila,
   type RepoProceso,
 } from "../proceso";
 import { construirTicket, enLinea, pasosDesdeRecorrido, resumenSencillo, type EntradaTicket, type EventoTicket } from "../ticket";
@@ -67,7 +67,8 @@ function repoMemoria(incs: IncidenciaFila[], over: Partial<RepoProceso> = {}) {
     purgar: async () => ({}),
     tandaUltimoDia: async () => (estado.tanda as string | undefined) ?? null,
     guardarTanda: async (dia) => { estado.tanda = dia; },
-    candidatosTanda: async () => incs.filter((i) => i.linear_estado === "sin_ticket"),
+    // El filtro por fecha lo hace SQL (web_logs_candidatos_tanda, prueba PGlite); aquí se guarda desde cuándo se pidió.
+    candidatosTanda: async (_entornos, _limite, desde) => { estado.desdeTanda = desde.toISOString(); return incs.filter((i) => i.linear_estado === "sin_ticket"); },
     ...over,
   };
   return { repo, cambios, ingeridos, estado, config };
@@ -82,6 +83,7 @@ function destinoSimulado(over: Partial<DestinoTickets> = {}) {
     comentar: vi.fn(async (_id, c) => { comentarios.push(c); }),
     consultar: vi.fn(async () => ({ id: "x", identificador: "CT-1", url: null, estadoTipo: "completed", estadoNombre: "Done" })),
     reabrir: vi.fn(async () => {}),
+    cerrar: vi.fn(async () => "Done"),
     ...over,
   };
   return { d, creados, comentarios };
@@ -600,6 +602,38 @@ describe("procesar-logs-web · tanda diaria de fallos a Linear (20261218100000)"
     expect(await tandaDiaria(r.repo, r.config, AHORA)).toEqual({ marcadas: 2, facturas: 0 });
   });
 
+  // 24/11/2026: la primera tanda solo miraba las últimas 24 h y se dejó dos fallos de la web del domingo 22/11.
+  it("mira desde el principio del día de la tanda anterior (Madrid); sin tanda anterior, 7 días; como mucho 30", () => {
+    const ahora = new Date("2026-11-24T06:05:00Z");
+    expect(desdeTanda(null, ahora).toISOString()).toBe("2026-11-17T06:05:00.000Z");
+    expect(desdeTanda("2026-11-23", ahora).toISOString()).toBe("2026-11-22T23:00:00.000Z"); // 00:00 del 23 en Madrid
+    expect(desdeTanda("2026-07-01", new Date("2026-07-02T05:05:00Z")).toISOString()).toBe("2026-06-30T22:00:00.000Z"); // verano
+    expect(desdeTanda("2026-09-01", ahora).toISOString()).toBe("2026-10-25T06:05:00.000Z"); // tope de 30 días
+    expect(desdeTanda("basura", ahora).toISOString()).toBe("2026-11-17T06:05:00.000Z");
+  });
+
+  it("pide las candidatas desde la tanda anterior y no pasa los 404 (tienen su propia regla)", async () => {
+    const r = repoMemoria([{ ...rojo }, incidencia({ id: 5, linear_estado: "sin_ticket", origen: "web", tipo: "error_404", motivo_ticket: null })]);
+    conTanda(r);
+    expect(await tandaDiaria(r.repo, r.config, new Date("2026-11-24T06:05:00Z"))).toEqual({ marcadas: 1, facturas: 0 });
+    expect(r.estado.desdeTanda).toBe("2026-11-17T06:05:00.000Z"); // primera tanda: 7 días
+    expect(r.cambios.map(([id]) => id)).toEqual([2]);
+    const r2 = repoMemoria([{ ...rojo }]);
+    conTanda(r2);
+    r2.estado.tanda = "2026-11-23";
+    await tandaDiaria(r2.repo, r2.config, new Date("2026-11-24T06:05:00Z"));
+    expect(r2.estado.desdeTanda).toBe("2026-11-22T23:00:00.000Z");
+  });
+
+  it("con «Tickets de servicios externos», la tanda también pasa los externos (lo de la vista de Incidencias)", async () => {
+    const r = repoMemoria([{ ...rojo }, { ...externo }, { ...facturas }]);
+    conTanda(r);
+    Object.assign(r.config, { linear_tickets_externos: true });
+    expect(await tandaDiaria(r.repo, r.config, new Date("2026-11-24T06:05:00Z"))).toEqual({ marcadas: 2, facturas: 1 });
+    const porId = Object.fromEntries(r.cambios.map(([id, c]) => [id, c]));
+    expect(porId[4]).toMatchObject({ linear_estado: "pendiente", motivo_ticket: expect.stringMatching(/servicio externo$/) });
+  });
+
   it("dentro del proceso: la tanda marca y en la misma pasada se crea el ticket", async () => {
     const r = repoMemoria([{ ...rojo }]);
     conTanda(r);
@@ -608,5 +642,41 @@ describe("procesar-logs-web · tanda diaria de fallos a Linear (20261218100000)"
     expect(res.tanda).toEqual({ marcadas: 1, facturas: 0 });
     expect(res.tickets).toMatchObject({ creados: 1 });
     expect(destino.crear).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("procesar-logs-web · ticket a Done al publicarse el arreglo (20261219100000)", () => {
+  // Dueño, 24/11/2026: «cuando se solucione se tiene que marcar como done en Linear y que desaparezca en incidencias».
+  const arreglada = (o: Partial<IncidenciaFila> = {}) => incidencia({
+    id: 9, estado: "resuelta", linear_estado: "creado", linear_issue_id: "iss-9", linear_identificador: "CAS-33", linear_destino: "prueba",
+    linear_cerrar_pendiente: true, linear_cerrar_motivo: "Arreglado en la versión 1.53.3, publicada el 24/11/2026 a las 09:10.", ...o,
+  });
+
+  it("si está pendiente de cerrar, eso va antes que nada", () => {
+    expect(accionPara(arreglada(), AHORA, "prueba")).toBe("cerrar");
+    expect(accionPara(arreglada({ linear_cerrar_pendiente: false }), AHORA, "prueba")).not.toBe("cerrar");
+    expect(accionPara(arreglada({ linear_estado: "pendiente" }), AHORA, "prueba")).toBeNull(); // sin ticket no hay nada que cerrar
+  });
+
+  it("pasa el ticket a Done, comenta la versión y quita la marca", async () => {
+    const r = repoMemoria([arreglada()]);
+    const { d: destino, comentarios } = destinoSimulado();
+    const res = await procesar({ repo: r.repo, destino: () => destino, ia: null, despliegues: null, urlPanel: "https://panel.example", ahora: () => AHORA });
+    expect(destino.cerrar).toHaveBeenCalledWith("iss-9", 9);
+    expect(comentarios[0]).toBe("✅ Arreglado en la versión 1.53.3, publicada el 24/11/2026 a las 09:10. El ticket pasa a «Done». Si el fallo vuelve a pasar, la incidencia se reabre sola y se avisa en este ticket.");
+    expect(res.tickets).toMatchObject({ cerrados: 1 });
+    expect(Object.fromEntries(r.cambios.map(([id, c]) => [id, c]))[9]).toMatchObject({ linear_cerrar_pendiente: false, linear_estado_remoto: "Done" });
+  });
+
+  it("si el fallo volvió antes de cerrarlo (ya no está resuelta), no lo cierra: solo quita la marca", async () => {
+    const r = repoMemoria([arreglada({ estado: "reabierta" })]);
+    const { d: destino } = destinoSimulado();
+    await procesar({ repo: r.repo, destino: () => destino, ia: null, despliegues: null, urlPanel: "https://panel.example", ahora: () => AHORA });
+    expect(destino.cerrar).not.toHaveBeenCalled();
+    expect(Object.fromEntries(r.cambios.map(([id, c]) => [id, c]))[9]).toMatchObject({ linear_cerrar_pendiente: false });
+  });
+
+  it("comentario de cierre sin motivo guardado", () => {
+    expect(construirCierre({ linear_cerrar_motivo: null }, null)).toBe("✅ Arreglo publicado en producción. Si el fallo vuelve a pasar, la incidencia se reabre sola y se avisa en este ticket.");
   });
 });

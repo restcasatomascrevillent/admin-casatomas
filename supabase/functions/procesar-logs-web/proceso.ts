@@ -71,6 +71,9 @@ export interface IncidenciaFila extends IncidenciaTicket {
   linear_proximo_intento: string | null;
   linear_ultima_sync: string | null;
   linear_pendiente_reapertura: boolean;
+  /** Arreglo publicado: pasar el ticket a Done en Linear (20261219100000; undefined sin la migración). */
+  linear_cerrar_pendiente?: boolean;
+  linear_cerrar_motivo?: string | null;
   ocurrencias_en_ticket: number;
   analisis_ia: AnalisisIa | null;
   analisis_ia_en: string | null;
@@ -108,8 +111,11 @@ export interface RepoProceso {
   /** Día (Madrid, AAAA-MM-DD) de la última tanda diaria de fallos a Linear; null si nunca (20261218100000). */
   tandaUltimoDia(): Promise<string | null>;
   guardarTanda(dia: string): Promise<void>;
-  /** Fallos de la web y del admin sin ticket con alguna ocurrencia real en la ventana, los más recientes primero. */
-  candidatosTanda(entornos: string[], limite: number): Promise<IncidenciaFila[]>;
+  /**
+   * Fallos de la web y del admin sin ticket, abiertos y no 404, con alguna ocurrencia real desde `desde`, los más
+   * recientes primero (20261219100000; sin esa migración, los que tienen ocurrencias en la ventana).
+   */
+  candidatosTanda(entornos: string[], limite: number, desde: Date): Promise<IncidenciaFila[]>;
 }
 
 export interface DependenciasProceso {
@@ -159,20 +165,36 @@ export function esDeFacturas(zona: string | null | undefined, mensaje: string | 
 }
 
 /**
+ * Desde cuándo mira la tanda: el principio (Madrid) del día de la tanda anterior, para no perder nada aunque un día no
+ * pasara o cambiara la hora; como mucho 30 días atrás. Sin tanda anterior, 7 días (20261219100000; el 24/11/2026 la
+ * primera tanda, que solo miraba las últimas 24 h, se dejó dos fallos del domingo).
+ */
+export function desdeTanda(ultimoDia: string | null, ahora: Date): Date {
+  const tope = new Date(ahora.getTime() - 30 * 86_400_000);
+  if (!ultimoDia || !/^\d{4}-\d{2}-\d{2}$/.test(ultimoDia)) return new Date(ahora.getTime() - 7 * 86_400_000);
+  const inicio = inicioDiaMadrid(new Date(`${ultimoDia}T12:00:00Z`));
+  return inicio < tope ? tope : inicio;
+}
+
+/**
  * Tanda diaria (20261218100000; dueño, 23/11/2026: «a las 7:00 pasa todos los nuevos fallos a Linear, todos los que no
  * tengan que ver con facturas»). La primera pasada desde linear_tanda_hora (Madrid) marca para Linear todos los fallos
- * de la web y del admin («rojos») sin ticket con alguna ocurrencia real en la ventana, sin umbrales de ocurrencias ni de
- * sesiones; los de Facturas no (se pueden pedir a mano). Una vez al día. Los críticos ya se abren al momento (SQL) y los
- * tickets se crean después como siempre (tope diario incluido).
+ * de la web y del admin («rojos») sin ticket con alguna ocurrencia real desde la tanda anterior (desdeTanda), sin
+ * umbrales de ocurrencias ni de sesiones; los de Facturas no (se pueden pedir a mano) y los 404 tampoco (tienen su
+ * regla). Una vez al día. Los críticos ya se abren al momento (SQL) y los tickets se crean después como siempre (tope
+ * diario incluido).
  */
 export async function tandaDiaria(repo: RepoProceso, config: ConfigLogs, ahora: Date): Promise<{ marcadas: number; facturas: number } | null> {
   if (config.linear_modo === "desactivado" || config.linear_tanda_hora == null) return null;
   const { hora, dia } = horaYDiaMadrid(ahora);
-  if (hora < config.linear_tanda_hora || (await repo.tandaUltimoDia()) === dia) return null;
+  if (hora < config.linear_tanda_hora) return null;
+  const ultimoDia = await repo.tandaUltimoDia();
+  if (ultimoDia === dia) return null;
   let marcadas = 0;
   let facturas = 0;
-  for (const inc of await repo.candidatosTanda(config.entornos_ticket ?? ["produccion"], 300)) {
-    if (inc.linear_estado !== "sin_ticket" || inc.origen !== "web" || !["nueva", "abierta", "reabierta"].includes(inc.estado)) continue;
+  for (const inc of await repo.candidatosTanda(config.entornos_ticket ?? ["produccion"], 300, desdeTanda(ultimoDia, ahora))) {
+    const externo = inc.origen === "externo" && config.linear_tickets_externos === true;
+    if (inc.linear_estado !== "sin_ticket" || (inc.origen !== "web" && !externo) || inc.tipo === "error_404" || !["nueva", "abierta", "reabierta"].includes(inc.estado)) continue;
     const ficha = fichaDeIncidencia(inc, await repo.muestras(inc.id));
     if (config.linear_tanda_sin_facturas !== false && esDeFacturas(ficha.zona, inc.mensaje)) {
       facturas++;
@@ -182,7 +204,7 @@ export async function tandaDiaria(repo: RepoProceso, config: ConfigLogs, ahora: 
     marcadas++;
     await repo.actualizar(inc.id, {
       linear_estado: "pendiente", requiere_ticket: true, linear_proximo_intento: ahora.toISOString(),
-      motivo_ticket: `Tanda diaria de las ${String(config.linear_tanda_hora).padStart(2, "0")}:00: fallo nuevo de la web o del admin`,
+      motivo_ticket: `Tanda diaria de las ${String(config.linear_tanda_hora).padStart(2, "0")}:00: fallo nuevo ${externo ? "de un servicio externo" : "de la web o del admin"}`,
     });
   }
   await repo.guardarTanda(dia);
@@ -200,7 +222,7 @@ export function inicioDiaMadrid(ahora: Date): Date {
   return new Date(Date.UTC(+p.year, +p.month - 1, +p.day) - desfase);
 }
 
-export type Accion = "crear" | "reabrir" | "actualizar" | "sincronizar" | "migrar" | null;
+export type Accion = "crear" | "reabrir" | "actualizar" | "sincronizar" | "migrar" | "cerrar" | null;
 
 /**
  * Qué hay que hacer con el ticket de una incidencia ahora mismo.
@@ -231,6 +253,8 @@ export function accionPara(i: IncidenciaFila, ahora: Date, destino?: DestinoTick
     return !i.linear_proximo_intento || Date.parse(i.linear_proximo_intento) <= ahora.getTime() ? "crear" : null;
   }
   if (i.linear_estado !== "creado" || !i.linear_issue_id) return null;
+  // Arreglo publicado (web_logs_resolver_por_release, 20261219100000): el ticket pasa a Done antes que nada.
+  if (i.linear_cerrar_pendiente) return "cerrar";
   if (destino && i.linear_destino && i.linear_destino !== destino) {
     const sigueViva = i.linear_pendiente_reapertura || (i.estado !== "resuelta" && i.ocurrencias > i.ocurrencias_en_ticket);
     return sigueViva && permitido ? "migrar" : null;
@@ -243,6 +267,12 @@ export function accionPara(i: IncidenciaFila, ahora: Date, destino?: DestinoTick
   if (permitido && nuevas > 0 && (ahora.getTime() - ultima >= SEIS_HORAS || i.ocurrencias >= 2 * Math.max(i.ocurrencias_en_ticket, 1))) return "actualizar";
   if (ahora.getTime() - ultima >= SEIS_HORAS && i.estado !== "resuelta") return "sincronizar";
   return null;
+}
+
+/** Comentario al pasar el ticket a Done porque se publicó el arreglo (20261219100000). */
+export function construirCierre(i: Pick<IncidenciaFila, "linear_cerrar_motivo">, estadoNuevo: string | null): string {
+  const motivo = (i.linear_cerrar_motivo ?? "").trim() || "Arreglo publicado en producción.";
+  return `✅ ${motivo}${estadoNuevo ? ` El ticket pasa a «${estadoNuevo}».` : ""} Si el fallo vuelve a pasar, la incidencia se reabre sola y se avisa en este ticket.`;
 }
 
 const mensajeError = (e: unknown) => sanearTexto(e instanceof Error ? e.message : String(e), 400) ?? "error";
@@ -335,7 +365,7 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
     }
 
     // ─── 4. Tickets ─────────────────────────────────────────────────────────
-    const tickets = { creados: 0, reabiertos: 0, actualizados: 0, sincronizados: 0, migrados: 0, fallidos: 0, aplazados: 0 };
+    const tickets = { creados: 0, reabiertos: 0, actualizados: 0, sincronizados: 0, migrados: 0, cerrados: 0, fallidos: 0, aplazados: 0 };
     resumen.tickets = tickets;
     if (config.linear_modo !== "desactivado") {
       const destino = deps.destino(config.linear_modo, config);
@@ -356,7 +386,7 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
             tickets.aplazados++;
             continue;
           }
-          if (accion === "actualizar" || accion === "reabrir" || accion === "migrar") {
+          if (accion === "actualizar" || accion === "reabrir" || accion === "migrar" || accion === "cerrar") {
             if (cupos.actualizar <= 0) continue;
           }
           if (accion === "sincronizar" && cupos.sincronizar <= 0) continue;
@@ -390,6 +420,19 @@ export async function procesar(deps: DependenciasProceso): Promise<Record<string
                 linear_ultimo_error: null, linear_bloqueo_hasta: null, ...(estadoNuevo ? { linear_estado_remoto: estadoNuevo } : {}),
               });
               tickets.reabiertos++;
+            } else if (accion === "cerrar") {
+              cupos.actualizar--;
+              // Solo si sigue resuelta (si el fallo volvió antes de cerrarlo, manda la reapertura) y en su destino.
+              let estadoNuevo: string | null = null;
+              if (inc.estado === "resuelta" && (!inc.linear_destino || inc.linear_destino === destino.tipo)) {
+                estadoNuevo = await destino.cerrar(inc.linear_issue_id!, inc.id);
+                await destino.comentar(inc.linear_issue_id!, construirCierre(inc, estadoNuevo), inc.id);
+                tickets.cerrados++;
+              }
+              await repo.actualizar(inc.id, {
+                linear_cerrar_pendiente: false, ocurrencias_en_ticket: inc.ocurrencias, linear_ultima_sync: ahora.toISOString(),
+                linear_ultimo_error: null, linear_bloqueo_hasta: null, ...(estadoNuevo ? { linear_estado_remoto: estadoNuevo } : {}),
+              });
             } else if (accion === "actualizar") {
               cupos.actualizar--;
               await destino.comentar(inc.linear_issue_id!, construirActualizacion(inc, inc.ocurrencias_en_ticket), inc.id);

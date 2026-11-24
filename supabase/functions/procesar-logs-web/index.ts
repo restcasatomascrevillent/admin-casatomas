@@ -35,7 +35,7 @@ import { crearLlamadaIa } from "../_shared/logs-web/openai.ts";
 import { entornoDeSupabase } from "../_shared/logs-web/clasificacion.ts";
 import { crearDestinoLinear, crearDestinoPrueba, MENSAJES_LINEAR, probarConexion } from "./linear.ts";
 import { leerDesplieguesVercel } from "./recolectores.ts";
-import { procesar, type RepoProceso } from "./proceso.ts";
+import { procesar, type IncidenciaFila, type RepoProceso } from "./proceso.ts";
 
 const createClient = clienteConAuditoria(createClientBase, "procesar-logs-web");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -54,6 +54,8 @@ const cors = {
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
 const SIN_COLUMNA = /explicacion_ia\w* does not exist|column .*explicacion_ia|Could not find .*explicacion_ia/i;
+// Sin la migración 20261219100000 (web_logs_candidatos_tanda) la tanda usa la consulta de antes.
+const SIN_FUNCION = /Could not find the function public\.web_logs_candidatos_tanda|function public\.web_logs_candidatos_tanda\(.*\) does not exist/i;
 
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -116,7 +118,12 @@ function crearRepo(sb: any): RepoProceso {
         .eq("linear_estado", "creado").neq("estado", "ignorada")
         .order("linear_pendiente_reapertura", { ascending: false })
         .order("linear_ultima_sync", { ascending: true, nullsFirst: true }).order("id").limit(limite - mitad), "leer incidencias con ticket") ?? [];
-      return [...porCrear, ...conTicket];
+      // · por cerrar (arreglo publicado, 20261219100000): primero; sin la migración no hay columna y no hay ninguna.
+      const rc = await sb.from("web_incidencias").select("*").eq("linear_cerrar_pendiente", true).eq("linear_estado", "creado").order("id").limit(20);
+      if (rc.error && !/linear_cerrar_pendiente/.test(rc.error.message ?? "")) comprobar(rc, "leer incidencias por cerrar");
+      const porCerrar = (rc.error ? [] : rc.data ?? []) as typeof conTicket;
+      const vistos = new Set<number>();
+      return [...porCerrar, ...porCrear, ...conTicket].filter((x) => !vistos.has(x.id) && (vistos.add(x.id), true));
     },
     async reclamar(id, ahora, hasta) {
       const r = await sb.from("web_incidencias").update({ linear_bloqueo_hasta: hasta.toISOString() })
@@ -151,10 +158,16 @@ function crearRepo(sb: any): RepoProceso {
     async guardarTanda(dia) {
       comprobar(await sb.from("web_logs_estado").update({ linear_tanda_ultimo_dia: dia }).eq("id", true), "guardar la tanda diaria");
     },
-    async candidatosTanda(entornos, limite) {
-      // Fallos de la web y del admin sin ticket con alguna ocurrencia real en la ventana (la de los umbrales).
+    async candidatosTanda(entornos, limite, desde) {
+      // Fallos de la web y del admin sin ticket con alguna ocurrencia real desde la tanda anterior (20261219100000).
+      const r = await sb.rpc("web_logs_candidatos_tanda", { p_desde: desde.toISOString(), p_entornos: entornos, p_limite: limite });
+      if (!r.error) return (r.data as IncidenciaFila[] | null) ?? [];
+      if (!SIN_FUNCION.test(r.error.message ?? "") && r.error.code !== "PGRST202" && r.error.code !== "42883") {
+        comprobar(r, "leer candidatas de la tanda");
+      }
+      // Sin la migración: los que tienen ocurrencias reales en la ventana de los umbrales (como en 20261218100000).
       return comprobar(await sb.from("web_incidencias").select("*")
-        .eq("linear_estado", "sin_ticket").eq("origen", "web").in("estado", ["nueva", "abierta", "reabierta"])
+        .eq("linear_estado", "sin_ticket").eq("origen", "web").neq("tipo", "error_404").in("estado", ["nueva", "abierta", "reabierta"])
         .in("entorno", entornos).gt("ocurrencias_ventana", 0)
         .order("ultima_vez", { ascending: false }).limit(limite), "leer candidatas de la tanda") ?? [];
     },

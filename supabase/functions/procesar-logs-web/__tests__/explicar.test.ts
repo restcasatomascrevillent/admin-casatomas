@@ -129,7 +129,7 @@ describe("paso de explicaciones en el proceso", () => {
     const { repo: r, config } = repo([], { incidenciasConTicket: async () => [i], explicacionesDesde: async () => 20 });
     config.linear_modo = "prueba";
     const crear = vi.fn(async (x: { id: string; descripcion: string }) => ({ id: x.id, identificador: "PRUEBA-1", url: null, estadoTipo: "triage", estadoNombre: "x" }));
-    await procesar({ repo: r, destino: () => ({ tipo: "prueba", crear, comentar: vi.fn(), consultar: vi.fn(), reabrir: vi.fn() }), ia, despliegues: null, urlPanel: "https://p", ahora: () => AHORA });
+    await procesar({ repo: r, destino: () => ({ tipo: "prueba", crear, comentar: vi.fn(), consultar: vi.fn(), reabrir: vi.fn(), cerrar: vi.fn() }), ia, despliegues: null, urlPanel: "https://p", ahora: () => AHORA });
     expect(ia).not.toHaveBeenCalled();
     expect(crear.mock.calls[0][0].descripcion).toMatch(/tope diario de análisis de IA/);
   });

@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
-  clasificarErrorLinear, crearDestinoLinear, crearDestinoPrueba, ErrorLinear, estadoParaReabrir, MENSAJES_LINEAR, prioridadLinear, probarConexion, QUERIES_CONEXION,
+  clasificarErrorLinear, crearDestinoLinear, crearDestinoPrueba, ErrorLinear, estadoParaCerrar, estadoParaReabrir, MENSAJES_LINEAR, prioridadLinear, probarConexion, QUERIES_CONEXION,
   type DatosCrear, type RepoPrueba,
 } from "../linear";
 
@@ -189,6 +189,27 @@ describe("destino Linear real", () => {
     const destino = crearDestinoLinear({ apiKey: "lin_api_prueba", fetchFn: l.fetchFn, esperar: sinEspera });
     expect(await destino.consultar("no-existe")).toBeNull();
     await expect(destino.reabrir("no-existe", null, 7)).rejects.toMatchObject({ codigo: "no_encontrado" });
+  });
+});
+
+describe("Linear · pasar a Done al publicarse el arreglo (20261219100000)", () => {
+  it("lo pasa al primer estado «completado» del equipo; si ya está hecho, no lo mueve", async () => {
+    const l = linearSimulado();
+    const destino = crearDestinoLinear({ apiKey: "lin_api_prueba", fetchFn: l.fetchFn, esperar: sinEspera });
+    const t = await destino.crear(datos());
+    l.issues.get(t.id)!.state = { name: "En revisión", type: "started" };
+    expect(await destino.cerrar(t.id, 7)).toBe("Done");
+    expect(l.issues.get(t.id)?.state).toEqual({ name: "Done", type: "completed" });
+    const actualizaciones = l.llamadas.filter((x) => x.query.includes("issueUpdate")).length;
+    expect(await destino.cerrar(t.id, 7)).toBe("Done");
+    expect(l.llamadas.filter((x) => x.query.includes("issueUpdate")).length).toBe(actualizaciones);
+  });
+  it("ticket borrado: error «no encontrado»; equipo sin estado completado: error de datos", async () => {
+    const l = linearSimulado();
+    const destino = crearDestinoLinear({ apiKey: "lin_api_prueba", fetchFn: l.fetchFn, esperar: sinEspera });
+    await expect(destino.cerrar("no-existe", 7)).rejects.toMatchObject({ codigo: "no_encontrado" });
+    expect(estadoParaCerrar(ESTADOS)).toEqual({ id: "st-hecho", name: "Done" });
+    expect(estadoParaCerrar(ESTADOS.filter((e) => e.type !== "completed"))).toBeNull();
   });
 });
 
