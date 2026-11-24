@@ -58,6 +58,11 @@ export interface DestinoTickets {
    * a «Por hacer»). Devuelve el nombre del estado al que lo pasa, o null.
    */
   reabrir(issueId: string, estadoId: string | null, incidenciaId: number): Promise<string | null>;
+  /**
+   * Pasa el ticket al primer estado «completado» de su equipo (Done) porque se publicó el arreglo (20261219100000).
+   * Si ya está completado no lo mueve. Devuelve el nombre del estado en que queda.
+   */
+  cerrar(issueId: string, incidenciaId: number): Promise<string | null>;
 }
 
 /** Qué ha fallado, para decidir qué hacer (el texto para la persona va en `message`). */
@@ -192,6 +197,12 @@ export function estadoParaReabrir(estados: Array<{ id: string; name: string; typ
   return null;
 }
 
+/** Estado al que pasa un ticket arreglado: el primero «completado» del equipo (Done). */
+export function estadoParaCerrar(estados: Array<{ id: string; name: string; type: string; position?: number }>): { id: string; name: string } | null {
+  const candidato = estados.filter((e) => e.type === "completed").sort((a, b) => (a.position ?? 0) - (b.position ?? 0))[0];
+  return candidato ? { id: candidato.id, name: candidato.name } : null;
+}
+
 const CERRADO = new Set(["completed", "canceled", "duplicate"]);
 
 export function crearDestinoLinear(opts: OpcionesCliente): DestinoTickets {
@@ -261,6 +272,23 @@ export function crearDestinoLinear(opts: OpcionesCliente): DestinoTickets {
         { id: issueId, input: { stateId: destino.id } },
       );
       if (!r?.issueUpdate?.success) throw new ErrorLinear("Linear no confirmó la reapertura. Se reintenta solo.", true, null, "caido");
+      return destino.name;
+    },
+    async cerrar(issueId) {
+      const d = await gql<{ issue?: { state?: { type?: string; name?: string } | null; team?: { states?: { nodes?: Array<{ id: string; name: string; type: string; position?: number }> } } | null } | null }>(
+        `query($id: String!) { issue(id: $id) { state { type name } team { states(first: 50) { nodes { id name type position } } } } }`,
+        { id: issueId },
+      );
+      const issue = d?.issue;
+      if (!issue) throw new ErrorLinear("El ticket ya no existe en Linear (borrado o sin acceso): no se puede cerrar.", false, null, "no_encontrado");
+      if (issue.state?.type === "completed") return issue.state.name ?? null; // ya está hecho
+      const destino = estadoParaCerrar(issue.team?.states?.nodes ?? []);
+      if (!destino) throw new ErrorLinear("El equipo de Linear no tiene ningún estado «completado» (Done) al que pasar el ticket.", false, null, "datos");
+      const r = await gql<{ issueUpdate?: { success?: boolean } }>(
+        `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`,
+        { id: issueId, input: { stateId: destino.id } },
+      );
+      if (!r?.issueUpdate?.success) throw new ErrorLinear("Linear no confirmó el cierre del ticket. Se reintenta solo.", true, null, "caido");
       return destino.name;
     },
   };
@@ -376,7 +404,7 @@ export interface RepoPrueba {
   buscarCreado(linearUuid: string): Promise<{ id: number } | null>;
   insertar(fila: {
     incidencia_id: number;
-    operacion: "crear" | "comentar" | "reabrir" | "consultar";
+    operacion: "crear" | "comentar" | "reabrir" | "consultar" | "cerrar";
     linear_uuid: string | null;
     titulo: string | null;
     cuerpo: string | null;
@@ -407,6 +435,10 @@ export function crearDestinoPrueba(repo: RepoPrueba, urlPanel: string): DestinoT
     async reabrir(issueId, _estado, incidenciaId) {
       await repo.insertar({ incidencia_id: incidenciaId, operacion: "reabrir", linear_uuid: issueId, titulo: null, cuerpo: null, prioridad: null, etiquetas: [] });
       return "Destino de pruebas";
+    },
+    async cerrar(issueId, incidenciaId) {
+      await repo.insertar({ incidencia_id: incidenciaId, operacion: "cerrar", linear_uuid: issueId, titulo: null, cuerpo: null, prioridad: null, etiquetas: [] });
+      return "Destino de pruebas · hecho";
     },
   };
 }
