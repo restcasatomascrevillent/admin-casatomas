@@ -795,7 +795,9 @@ ok((await q("select count(*)::int n from public.web_logs_config")).rows[0].n ===
   await q("update public.web_logs_config set linear_tickets_externos = false, tickets_404 = false, umbral_ocurrencias = 3, umbral_sesiones = 2");
   await db.exec(TODO);
   await db.exec(TODO); // idempotente
-  igual((await q("select linear_tickets_externos from public.web_logs_config")).rows[0].linear_tickets_externos, true, "enciende los tickets de servicios externos");
+  igual((await q("select linear_tickets_externos from public.web_logs_config")).rows[0].linear_tickets_externos, false,
+        "no enciende los tickets de servicios externos (dueño, 24/11: «los de servicios externos no tienen que pasar»)");
+  await q("update public.web_logs_config set linear_tickets_externos = true"); // para probar la regla si algún día se encienden
   igual((await q("select linear_tanda_ultimo_dia from public.web_logs_estado")).rows[0].linear_tanda_ultimo_dia, null, "la tanda de hoy se repite con la regla nueva");
 
   const H = { viejo: "b1".repeat(16), hoy: "b2".repeat(16), ticket: "b3".repeat(16), n404: "b4".repeat(16), interno: "b5".repeat(16),
@@ -874,7 +876,6 @@ ok((await q("select count(*)::int n from public.web_logs_config")).rows[0].n ===
   igual((await q("select count(*)::int n from pg_proc where proname in ('web_logs_candidatos_tanda', 'web_logs_resolver_por_release')")).rows[0].n, 0, "el rollback quita las funciones");
   igual((await q("select count(*)::int n from information_schema.columns where table_name = 'web_incidencias' and column_name like 'linear_cerrar%'")).rows[0].n, 0,
         "y las columnas de cierre");
-  igual((await q("select linear_tickets_externos from public.web_logs_config")).rows[0].linear_tickets_externos, false, "y apaga otra vez los externos");
   const HX = "bc".repeat(16);
   await q("update public.web_logs_config set linear_tickets_externos = true");
   await ingerir([0, 1, 2].map(() => mapa(HX)));
