@@ -75,14 +75,26 @@ Fuente única: `src/components/trafico-web/comportamiento/definiciones.ts`. El c
 
 ## Incidencias y Linear
 
-> **Tanda diaria (20261218100000, 23/11/2026, petición del dueño: «a las 7:00 pasa todos los nuevos fallos a Linear, todos
-> los que no tengan que ver con facturas»).** Con `web_logs_config.linear_tanda_hora` (7 por defecto), los fallos de la web
-> y del admin (rojos) **solo abren ticket al momento si son críticos** (lo que impide reservar o pagar un cheque). Los demás
-> los marca `procesar-logs-web` en su primera pasada desde esa hora (Madrid): todos los que no tienen ticket y tienen alguna
-> ocurrencia real en la ventana, **sin umbrales de ocurrencias ni de sesiones**, salvo los de la zona **Facturas**
-> (`linear_tanda_sin_facturas`; se pueden pedir a mano). Una vez al día (`web_logs_estado.linear_tanda_ultimo_dia`); los
-> tickets se crean después como siempre, con el tope diario. Los externos (con su interruptor) siguen con sus umbrales. Con
-> `linear_tanda_hora = null` (Configuración › Incidencias y avisos › «Al momento, si superan los umbrales»), todo como antes.
+> **Tanda diaria (20261218100000 y 20261219100000; dueño, 23 y 24/11/2026: «a las 7:00 pasa todos los fallos de
+> Incidencias a Linear, salvo los de Facturas y los de servicios externos; cuando se solucione, Done en Linear y que
+> desaparezca de Incidencias»).**
+> - Con `web_logs_config.linear_tanda_hora` (7 por defecto), los fallos de la web y del admin **solo abren ticket al
+>   momento si son críticos** (lo que impide reservar o pagar un cheque). Los de servicios externos no pasan (interruptor
+>   «Tickets de servicios externos» apagado; si se enciende, también esperan a la tanda). Los 404 siguen su regla
+>   (`tickets_404` y umbral diario).
+> - Los demás los marca `procesar-logs-web` en su primera pasada desde esa hora (Madrid), una vez al día
+>   (`web_logs_estado.linear_tanda_ultimo_dia`): todos los que no tienen ticket y tienen alguna ocurrencia real **desde
+>   el principio del día de la tanda anterior** (7 días si no la hubo, 30 como mucho; `web_logs_candidatos_tanda`),
+>   **sin umbrales**, salvo los de la zona **Facturas** (`linear_tanda_sin_facturas`; se pueden pedir a mano). La primera
+>   tanda, el 24/11, solo miraba 24 h y se dejó dos fallos del domingo. Los tickets se crean después como siempre, con el
+>   tope diario.
+> - **Al publicarse el arreglo**: la tarea programada «Aplicar en producción las releases aceptadas» lee la línea
+>   «Tickets que arregla: CAS-…» de la release aceptada y llama a `web_logs_resolver_por_release(tickets, versión)`
+>   (solo `service_role`). La incidencia pasa a «resuelta» (sale de Incidencias › Activas) y `procesar-logs-web` pasa
+>   el ticket al primer estado «completado» del equipo (Done) con el comentario «✅ Arreglado en la versión X…». Si el
+>   fallo vuelve a pasar, se reabre sola y se avisa en el mismo ticket.
+> - Con `linear_tanda_hora = null` (Configuración › Incidencias y avisos › «Al momento, si superan los umbrales»),
+>   todo como antes.
 
 - **Huella estable**: no cambia con los números, los ids, el hash de los ficheros de Vite ni la línea. Sí cambia con el tipo, el mensaje normalizado o la función donde salta; en los 404, con la ruta.
 - **Umbrales** (configurables):

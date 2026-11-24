@@ -174,14 +174,15 @@ export function PestanaConfiguracion({ estado, sub, onSub, onCambiosSinGuardar }
             )}
             <p className="text-xs text-muted-foreground">
               Los fallos de la web pueden abrir ticket siempre (en la tanda diaria o, sin ella, si superan los umbrales). Lo que no depende de la web (conexión del visitante, navegador o extensiones,
-              versión antigua que se arregló sola, bots y pruebas) nunca abre ticket. Los tickets que ya existían no se cierran. «Pedir ticket» a mano vale para cualquiera.
+              versión antigua que se arregló sola, bots y pruebas) nunca abre ticket. «Pedir ticket» a mano vale para cualquiera. Cuando se publica la versión que arregla un fallo,
+              su ticket pasa a «Done» en Linear y la incidencia, a resuelta; si vuelve a pasar, se reabre sola.
             </p>
           </Seccion>
           {"linear_tanda_hora" in b && (
-            // 23/11/2026 (dueño: «a las 7:00 pasa todos los nuevos fallos a Linear, menos los de facturas»).
+            // 23 y 24/11/2026 (dueño: «a las 7:00 pasa a Linear todos los fallos de Incidencias, menos los de facturas»; los de servicios externos no).
             <Seccion titulo="Paso de fallos a Linear">
               <div className="space-y-1">
-                <Label className="text-xs" htmlFor="u-tanda">Fallos de la web y del admin</Label>
+                <Label className="text-xs" htmlFor="u-tanda">Fallos de la web y del admin (y de servicios externos, si están activados arriba)</Label>
                 <Select value={b.linear_tanda_hora == null ? "umbrales" : String(b.linear_tanda_hora)}
                   onValueChange={(v) => set("linear_tanda_hora", v === "umbrales" ? null : Number(v))}>
                   <SelectTrigger id="u-tanda" className="h-11 w-full sm:w-96" data-testid="tanda-hora"><SelectValue /></SelectTrigger>
@@ -196,8 +197,8 @@ export function PestanaConfiguracion({ estado, sub, onSub, onCambiosSinGuardar }
               <Interruptor id="u-tanda-facturas" etiqueta="No pasar solos los de Facturas (se pueden pedir a mano)"
                 valor={b.linear_tanda_sin_facturas !== false} onCambio={(v) => set("linear_tanda_sin_facturas", v)} />
               <p className="text-xs text-muted-foreground">
-                Los críticos (lo que impide reservar o pagar un cheque) abren ticket al momento siempre. Con la tanda diaria, los umbrales de abajo solo se
-                usan para los servicios externos. Se respeta el tope de tickets nuevos al día (Linear).
+                Los críticos (lo que impide reservar o pagar un cheque) abren ticket al momento siempre. La tanda coge todo lo que no tiene ticket y ha pasado
+                desde la tanda anterior, sin umbrales; los 404 siguen su propia regla. Se respeta el tope de tickets nuevos al día (Linear).
               </p>
             </Seccion>
           )}
