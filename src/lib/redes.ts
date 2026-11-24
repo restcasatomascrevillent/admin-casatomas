@@ -18,7 +18,12 @@ export function origenRrss(valor: unknown = import.meta.env.VITE_RRSS_URL): stri
   }
 }
 
-/** Entrada embebida de rrss con el pase en el fragmento (no se envía al servidor ni sale en el Referer). */
-export function urlEmbebida(origen: string, pase: string): string {
-  return `${origen}/embed#pass=${encodeURIComponent(pase)}`;
+/** Entrada embebida de rrss. El pase NO va en la dirección: se entrega por postMessage. */
+export function urlEmbebida(origen: string): string {
+  return `${origen}/embed`;
+}
+
+/** Huella SHA-256 en base64url (43 caracteres) que manda el iframe de rrss. */
+export function esHuella(valor: unknown): valor is string {
+  return typeof valor === "string" && /^[A-Za-z0-9_-]{43}$/.test(valor);
 }

@@ -4,15 +4,21 @@
  * docs/integracion-casatomas.md.
  *
  *   POST `${SUPABASE_URL}/functions/v1/rrss-embed-pass`   Authorization: Bearer <JWT del panel>
- *     → 200 { pase, caducaEn }      el panel abre `${VITE_RRSS_URL}/embed#pass=<pase>`
- *     → 401 sin sesión · 403 sin «Ver» en Redes · 503 sin configurar o sin poder comprobar
+ *     { cnf }  huella (SHA-256, base64url) del secreto que generó el iframe de rrss
+ *     → 200 { pase, caducaEn }      el panel se lo pasa al iframe por postMessage
+ *     → 400 sin huella · 401 sin sesión · 403 sin «Ver» en Redes · 503 sin configurar
+ *
+ * Prueba de posesión: el pase lleva `cnf` y rrss solo lo acepta junto al secreto,
+ * que nunca sale del iframe. El pase no viaja en la dirección. Mientras Redes está
+ * abierta, rrss pide uno nuevo cada 10 minutos: si aquí ya no se da (le han quitado
+ * «Redes»), rrss corta el acceso como mucho unos 20 minutos después.
  *
  * El pase es un JWT ES256 firmado con la clave PRIVADA de este servidor
  * (secreto RRSS_EMBED_PRIVATE_JWK). rrss solo tiene la pública. Lleva:
  *   iss  RRSS_EMBED_ISSUER          aud   RRSS_EMBED_AUDIENCE (por defecto «rrss»)
  *   sub  id del usuario del panel   brand RRSS_EMBED_BRAND_ID (la marca de rrss)
  *   role nivel en Redes: «superadmin», «editar» (Ver + Puede editar) o «ver»
- *   name correo del usuario (para reconocerlo en rrss)
+ *   name nombre visible del usuario (nunca su correo)
  *   iat, exp (60 s), jti (aleatorio: rrss solo lo acepta una vez)
  * Qué puede hacer cada nivel en rrss lo decide rrss (su configuración de la
  * integración), no este panel.
@@ -113,6 +119,24 @@ export function cabecerasCors(req: Request, env: (n: string) => string | undefin
   };
 }
 
+const HUELLA = /^[A-Za-z0-9_-]{43}$/;
+
+/** Nombre visible del usuario del panel (`display_name`), sin correo. */
+async function nombreVisible(userId: string, deps: DependenciasPase): Promise<string | null> {
+  const env = deps.env ?? envDeDeno;
+  try {
+    const servicio = deps.crearCliente(env("SUPABASE_URL") ?? "", env("SUPABASE_SERVICE_ROLE_KEY") ?? "", {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data } = await servicio.auth.admin.getUserById(userId);
+    const meta = (data?.user?.user_metadata ?? {}) as Record<string, unknown>;
+    const nombre = [meta.display_name, meta.full_name].find((v) => typeof v === "string" && v.trim());
+    return typeof nombre === "string" && !nombre.includes("@") ? nombre.trim().slice(0, 120) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Nivel del usuario en Redes, con la clave de servicio (has_section_permission ya cuenta a los super admins). */
 async function nivelRedes(userId: string, deps: DependenciasPase): Promise<NivelRedes | null> {
   const env = deps.env ?? envDeDeno;
@@ -147,6 +171,11 @@ export async function manejarPase(req: Request, deps: DependenciasPase): Promise
   }
   const usuario = await exigirPermiso(req, SECCION_REDES, "view", { ...deps, corsHeaders: cors });
   if (!usuario.ok) return usuario.response;
+  const cuerpo = (await req.json().catch(() => null)) as { cnf?: unknown } | null;
+  const cnf = cuerpo?.cnf;
+  if (typeof cnf !== "string" || !HUELLA.test(cnf)) {
+    return respuestaJson({ success: false, error: "Falta la huella del iframe de Redes." }, 400, cors);
+  }
 
   let nivel: NivelRedes | null;
   try {
@@ -157,16 +186,18 @@ export async function manejarPase(req: Request, deps: DependenciasPase): Promise
   if (!nivel) return respuestaJson({ success: false, error: "No tienes permiso para Redes." }, 403, cors);
 
   const ahora = (deps.ahora ?? (() => Math.floor(Date.now() / 1000)))();
+  const nombre = await nombreVisible(usuario.userId, deps);
   const pase = await firmarPase(config, {
     iss: config.issuer,
     aud: config.audience,
     sub: usuario.userId,
     brand: config.brandId,
     role: nivel,
-    ...(usuario.email ? { name: usuario.email.slice(0, 120) } : {}),
+    ...(nombre ? { name: nombre } : {}),
     iat: ahora,
     exp: ahora + VIDA_PASE_SEGUNDOS,
     jti: (deps.nuevoId ?? (() => crypto.randomUUID()))(),
+    cnf,
   });
   console.log("[rrss-embed-pass] pase emitido", JSON.stringify({ nivel }));
   return new Response(JSON.stringify({ success: true, pase, caducaEn: VIDA_PASE_SEGUNDOS }), {

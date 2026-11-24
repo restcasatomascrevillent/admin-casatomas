@@ -6,16 +6,23 @@ rrss: `docs/integracion-casatomas.md` (rama `f66/integracion-casatomas`).
 ## Qué es
 
 La sección **Redes** (`/redes`) abre rrss, la herramienta de redes sociales, en un iframe. El personal
-entra con su usuario del panel: el panel pide a su servidor un **pase firmado** (ES256, 60 s, de un
-solo uso) y rrss lo cambia por una sesión limitada a la marca del restaurante. Sin otra cuenta ni
-contraseña, sin cookies.
+entra con su usuario del panel, sin otra cuenta ni contraseña y sin cookies:
+
+1. El iframe (`rrss/embed`, sin nada en la dirección) genera un secreto y manda su huella al panel.
+2. El panel pide a su servidor un **pase firmado** (ES256, 60 s, de un solo uso) ligado a esa huella y
+   se lo da **solo** a ese iframe (comprueba `event.source` y el origen de rrss).
+3. rrss lo cambia por una sesión limitada a la marca del restaurante.
+4. Cada 10 minutos se repite. Si a alguien le quitan «Redes» o lo borran del panel, el panel deja de
+   dar pases y rrss le corta el acceso como mucho ~20 minutos después.
 
 Sustituye a la sección antigua **RRSS/Instagram** (`/rrss`, `/instagram`, `/instagram/rapido`), que
-ahora redirige a `/redes`. Su código, tablas, funciones y cron **no se han borrado**: siguen en el repo
+ahora redirige a `/redes`. Su código, tablas y funciones **no se han borrado**: siguen en el repo
 y archivados en la rama local `archivo/instagram-estudio` (desde `origin/staging` en `903446d7`). El
-borrado será otro PR cuando el dueño lo confirme. Ojo: los cron `instagram-programador`,
-`instagram-metricas-diarias` e `instagram-limpieza-bucket` siguen funcionando donde estén creados
-(publicarían lo que ya estuviera programado); apagarlos es una decisión aparte.
+borrado será otro PR cuando el dueño lo confirme. Sus tres cron (`instagram-programador`,
+`instagram-metricas-diarias` e `instagram-limpieza-bucket`) publicarían lo que ya estuviera programado
+sin pantalla que lo enseñe: este PR los quita con la migración
+`20261219100000_instagram_antiguo_sin_cron.sql` (vuelta atrás en `supabase/rollbacks/`; prueba
+`npm run test:instagram-sin-cron:db`). Lo programado queda guardado, sin publicarse.
 
 ## Quién entra
 
@@ -26,6 +33,8 @@ Permiso nuevo **«Redes»** (`redes`) en Usuarios › Permisos. No cuenta para e
 | Super admin | `superadmin` | Editor: sube, crea y publica |
 | Redes: Ver + Puede editar | `editar` | Editor |
 | Redes: solo Ver | `ver` | Solo lectura |
+
+El pase lleva el nombre visible (`display_name`) del usuario, nunca su correo.
 | Sin Redes | — | No ve la sección (403 en la función) |
 
 El interruptor del módulo en Control del Panel sigue siendo la clave `rrss` (ahora se llama «Redes»).
@@ -54,4 +63,4 @@ Secretos de la función en el Supabase **demo** (`sfonaclosuafvlhutkon`):
 
 Variable de Vercel (Preview): `VITE_RRSS_URL=https://rrss-omega.vercel.app`.
 
-No hay migración: los permisos por sección son filas de `user_permissions`.
+La única migración es la de los cron (arriba); los permisos por sección son filas de `user_permissions`.

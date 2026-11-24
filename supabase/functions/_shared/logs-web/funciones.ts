@@ -145,6 +145,8 @@ export const FUNCIONES: Readonly<Record<string, FuncionServidor>> = {
     "el panel puede no saber si Instagram está conectado"),
   "rrss-ia": panel("Redes sociales", "el editor con IA de fotos y vídeos para redes", "propone con IA cómo editar fotos y vídeos para las redes",
     "no salen las propuestas de la IA para editar"),
+  "rrss-embed-pass": panel("Redes", "el acceso del panel a Redes (rrss)", "da al iframe de Redes el pase para entrar en rrss sin otra cuenta",
+    "la sección Redes no se abre o se cierra sola"),
   "enviar-newsletter": panel("Newsletter", "el envío de la newsletter", "manda la newsletter a los suscriptores",
     "la newsletter puede no haber salido, o solo a una parte de los suscriptores", null, "hay que revisarla en Newsletter y volver a enviarla"),
   "newsletter-ia": panel("Newsletter", "la redacción de la newsletter con IA", "propone con IA el texto y el diseño de la newsletter",

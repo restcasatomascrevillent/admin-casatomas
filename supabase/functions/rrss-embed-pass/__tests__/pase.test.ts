@@ -10,9 +10,9 @@ import { leerConfig, manejarPase, VIDA_PASE_SEGUNDOS, type DependenciasPase } fr
 
 const BRAND = "b141a5b7-65c1-4d79-acc8-a18ac6a5c84b";
 const PANEL = "https://admin-casatomas-git-staging-casa-tomas.vercel.app";
-const USUARIOS: Record<string, { id: string; email: string; super?: boolean; redes?: "view" | "edit" }> = {
+const USUARIOS: Record<string, { id: string; email: string; nombre?: string; super?: boolean; redes?: "view" | "edit" }> = {
   "jwt-super": { id: "11111111-1111-4111-8111-111111111111", email: "dueno@ct.test", super: true },
-  "jwt-editar": { id: "22222222-2222-4222-8222-222222222222", email: "sala@ct.test", redes: "edit" },
+  "jwt-editar": { id: "22222222-2222-4222-8222-222222222222", email: "sala@ct.test", nombre: "Sala", redes: "edit" },
   "jwt-ver": { id: "33333333-3333-4333-8333-333333333333", email: "camarero@ct.test", redes: "view" },
   "jwt-nada": { id: "44444444-4444-4444-8444-444444444444", email: "cocina@ct.test" },
 };
@@ -26,6 +26,12 @@ const crearCliente = () => ({
     getUser: async (token?: string) => {
       const u = token ? USUARIOS[token] : undefined;
       return u ? { data: { user: { id: u.id, email: u.email } }, error: null } : { data: { user: null }, error: { message: "x" } };
+    },
+    admin: {
+      getUserById: async (id: string) => {
+        const u = Object.values(USUARIOS).find((x) => x.id === id);
+        return { data: { user: u ? { id: u.id, user_metadata: u.nombre ? { display_name: u.nombre } : {} } : null }, error: null };
+      },
     },
   },
   rpc: async (fn: string, args: Record<string, unknown>) => {
@@ -44,10 +50,13 @@ function deps(extra: Partial<DependenciasPase> = {}): DependenciasPase {
   return { crearCliente, env: (n) => env[n], ahora: () => 1_800_000_000, ...extra };
 }
 
-const pedir = (token?: string, origen = PANEL) =>
+/** Huella (SHA-256 en base64url) del secreto del iframe. */
+const CNF = "a".repeat(43);
+const pedir = (token?: string, origen = PANEL, cuerpo: unknown = { cnf: CNF }) =>
   new Request("https://x.supabase.co/functions/v1/rrss-embed-pass", {
     method: "POST",
-    headers: { Origin: origen, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { Origin: origen, "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(cuerpo),
   });
 
 function leer(pase: string) {
@@ -88,10 +97,13 @@ describe("rrss-embed-pass", () => {
       sub: USUARIOS["jwt-editar"]!.id,
       brand: BRAND,
       role: "editar",
-      name: "sala@ct.test",
+      // El nombre visible, nunca el correo.
+      name: "Sala",
       iat: 1_800_000_000,
       exp: 1_800_000_060,
       jti: "jti-0123456789abcdef",
+      // Ligado al iframe que lo pidió (prueba de posesión).
+      cnf: CNF,
     });
     const valida = await crypto.subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
@@ -114,6 +126,17 @@ describe("rrss-embed-pass", () => {
     const a = leer((await (await manejarPase(pedir("jwt-ver"), deps())).json()).pase).claims.jti;
     const b = leer((await (await manejarPase(pedir("jwt-ver"), deps())).json()).pase).claims.jti;
     expect(a).not.toBe(b);
+  });
+
+  it("sin la huella del iframe no hay pase (no se puede sacar uno para usarlo fuera)", async () => {
+    expect((await manejarPase(pedir("jwt-editar", PANEL, {}), deps())).status).toBe(400);
+    expect((await manejarPase(pedir("jwt-editar", PANEL, { cnf: "corta" }), deps())).status).toBe(400);
+  });
+
+  it("sin nombre visible no se manda nada en su lugar (tampoco el correo)", async () => {
+    const { claims } = leer((await (await manejarPase(pedir("jwt-ver"), deps())).json()).pase);
+    expect(claims.name).toBeUndefined();
+    expect(JSON.stringify(claims)).not.toContain("@");
   });
 
   it("sin sesión 401, sin permiso de Redes 403", async () => {

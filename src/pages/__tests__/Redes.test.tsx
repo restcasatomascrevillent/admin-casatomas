@@ -1,12 +1,16 @@
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { origenRrss, urlEmbebida } from "@/lib/redes";
+import { esHuella, origenRrss, urlEmbebida } from "@/lib/redes";
 
-// Redes (23/11/2026): pide el pase al servidor, abre rrss en un iframe aislado con el pase en el
-// fragmento y vuelve a pedirlo solo cuando rrss (y nadie más) avisa de que la sesión se perdió.
+// Redes (23/11/2026): abre rrss en un iframe aislado SIN pase en la dirección; solo cuando el
+// propio iframe (y desde el origen de rrss) manda la huella de su secreto, el panel pide el pase
+// al servidor y se lo entrega a él y a nadie más.
 
-const h = vi.hoisted(() => ({ invocaciones: 0, error: null as null | { context: Response } }));
+const h = vi.hoisted(() => ({
+  pedidos: [] as unknown[],
+  error: null as null | { context: Response },
+}));
 
 vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <main>{children}</main>,
@@ -14,61 +18,88 @@ vi.mock("@/components/DashboardLayout", () => ({
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     functions: {
-      invoke: async () => {
-        h.invocaciones++;
-        return h.error ? { data: null, error: h.error } : { data: { pase: `pase.${h.invocaciones}.firma` }, error: null };
+      invoke: async (_nombre: string, opciones: { body: unknown }) => {
+        h.pedidos.push(opciones.body);
+        return h.error ? { data: null, error: h.error } : { data: { pase: `pase.${h.pedidos.length}.firma` }, error: null };
       },
     },
   },
 }));
 
 const RRSS = "https://rrss.ejemplo.test";
+const CNF = "b".repeat(43);
 
 beforeEach(() => {
-  h.invocaciones = 0;
+  h.pedidos = [];
   h.error = null;
   vi.stubEnv("VITE_RRSS_URL", RRSS);
 });
 
+/** El iframe de rrss «manda» un mensaje (en jsdom, simulando su ventana y su origen). */
+function desdeIframe(iframe: HTMLIFrameElement, data: unknown, origin = RRSS) {
+  const ventana = iframe.contentWindow!;
+  const enviados: Array<{ data: unknown; origen: string }> = [];
+  ventana.postMessage = ((d: unknown, o: string) => enviados.push({ data: d, origen: o })) as typeof ventana.postMessage;
+  act(() => {
+    window.dispatchEvent(new MessageEvent("message", { data, origin, source: ventana }));
+  });
+  return enviados;
+}
+
 describe("Redes", () => {
-  it("abre rrss con el pase en el fragmento, sin dejarle mover el panel", async () => {
+  it("abre rrss sin nada en la dirección y sin dejarle mover el panel", async () => {
     const { default: Redes } = await import("../Redes");
     render(<Redes />);
-    const iframe = await screen.findByTestId("redes-iframe");
-    expect(iframe.getAttribute("src")).toBe(`${RRSS}/embed#pass=pase.1.firma`);
+    const iframe = (await screen.findByTestId("redes-iframe")) as HTMLIFrameElement;
+    expect(iframe.getAttribute("src")).toBe(`${RRSS}/embed`);
     const sandbox = iframe.getAttribute("sandbox") ?? "";
     expect(sandbox).toContain("allow-scripts");
     expect(sandbox).not.toContain("allow-top-navigation");
+    expect(h.pedidos).toEqual([]);
   });
 
-  it("si rrss avisa de que la sesión se perdió, pide otro pase; un aviso de otro origen no hace nada", async () => {
+  it("al pedirlo el iframe con su huella, pide el pase ligado a ella y se lo da solo a él", async () => {
     const { default: Redes } = await import("../Redes");
     render(<Redes />);
-    await screen.findByTestId("redes-iframe");
-    act(() => {
-      window.dispatchEvent(new MessageEvent("message", { origin: "https://malo.test", data: { type: "rrss:expired" } }));
-    });
-    expect(h.invocaciones).toBe(1);
-    act(() => {
-      window.dispatchEvent(new MessageEvent("message", { origin: RRSS, data: { type: "rrss:expired" } }));
-    });
-    await waitFor(() => expect(screen.getByTestId("redes-iframe").getAttribute("src")).toContain("pase.2.firma"));
+    const iframe = (await screen.findByTestId("redes-iframe")) as HTMLIFrameElement;
+    const enviados = desdeIframe(iframe, { type: "rrss:hello", cnf: CNF });
+    await waitFor(() => expect(enviados).toHaveLength(1));
+    expect(h.pedidos).toEqual([{ cnf: CNF }]);
+    expect(enviados[0]).toEqual({ data: { type: "rrss:pass", pass: "pase.1.firma", cnf: CNF }, origen: RRSS });
   });
 
-  it("sin permiso: enseña el motivo y no abre nada", async () => {
+  it("no atiende mensajes de otro origen ni de otra ventana (B5), ni huellas mal formadas", async () => {
+    const { default: Redes } = await import("../Redes");
+    render(<Redes />);
+    const iframe = (await screen.findByTestId("redes-iframe")) as HTMLIFrameElement;
+    desdeIframe(iframe, { type: "rrss:hello", cnf: CNF }, "https://malo.test");
+    desdeIframe(iframe, { type: "rrss:hello", cnf: "corta" });
+    act(() => {
+      // Otra ventana del mismo origen (otra pestaña de rrss): no es el iframe.
+      window.dispatchEvent(new MessageEvent("message", { data: { type: "rrss:hello", cnf: CNF }, origin: RRSS, source: window }));
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(h.pedidos).toEqual([]);
+  });
+
+  it("si el servidor no da pase (sin permiso), se cierra rrss y se dice el motivo", async () => {
     h.error = { context: new Response(JSON.stringify({ error: "No tienes permiso para Redes." }), { status: 403 }) };
     const { default: Redes } = await import("../Redes");
     render(<Redes />);
+    const iframe = (await screen.findByTestId("redes-iframe")) as HTMLIFrameElement;
+    desdeIframe(iframe, { type: "rrss:hello", cnf: CNF });
     expect(await screen.findByRole("alert")).toHaveTextContent("No tienes permiso para Redes.");
     expect(screen.queryByTestId("redes-iframe")).toBeNull();
   });
 
-  it("solo acepta una dirección https (o local) para rrss", () => {
+  it("solo acepta una dirección https (o local) para rrss y huellas de 43 caracteres", () => {
     expect(origenRrss("https://rrss-omega.vercel.app/algo")).toBe("https://rrss-omega.vercel.app");
     expect(origenRrss("http://localhost:5173")).toBe("http://localhost:5173");
     expect(origenRrss("http://rrss.ejemplo.test")).toBeNull();
     expect(origenRrss("javascript:alert(1)")).toBeNull();
     expect(origenRrss("")).toBeNull();
-    expect(urlEmbebida(RRSS, "a.b.c")).toBe(`${RRSS}/embed#pass=a.b.c`);
+    expect(urlEmbebida(RRSS)).toBe(`${RRSS}/embed`);
+    expect(esHuella(CNF)).toBe(true);
+    expect(esHuella("x")).toBe(false);
   });
 });
