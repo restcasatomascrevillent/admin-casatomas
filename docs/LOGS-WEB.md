@@ -76,10 +76,12 @@ Fuente única: `src/components/trafico-web/comportamiento/definiciones.ts`. El c
 ## Incidencias y Linear
 
 > **Tanda diaria (20261218100000 y 20261219100000; dueño, 23 y 24/11/2026: «a las 7:00 pasa todos los fallos de
-> Incidencias a Linear, salvo los de Facturas; cuando se solucione, Done en Linear y que desaparezca de Incidencias»).**
-> - Con `web_logs_config.linear_tanda_hora` (7 por defecto), los fallos de la web, del admin y de servicios externos
->   (con «Tickets de servicios externos», encendido desde 20261219100000) **solo abren ticket al momento si son
->   críticos** (lo que impide reservar o pagar un cheque). Los 404 siguen su regla (`tickets_404` y umbral diario).
+> Incidencias a Linear, salvo los de Facturas y los de servicios externos; cuando se solucione, Done en Linear y que
+> desaparezca de Incidencias»).**
+> - Con `web_logs_config.linear_tanda_hora` (7 por defecto), los fallos de la web y del admin **solo abren ticket al
+>   momento si son críticos** (lo que impide reservar o pagar un cheque). Los de servicios externos no pasan (interruptor
+>   «Tickets de servicios externos» apagado; si se enciende, también esperan a la tanda). Los 404 siguen su regla
+>   (`tickets_404` y umbral diario).
 > - Los demás los marca `procesar-logs-web` en su primera pasada desde esa hora (Madrid), una vez al día
 >   (`web_logs_estado.linear_tanda_ultimo_dia`): todos los que no tienen ticket y tienen alguna ocurrencia real **desde
 >   el principio del día de la tanda anterior** (7 días si no la hubo, 30 como mucho; `web_logs_candidatos_tanda`),

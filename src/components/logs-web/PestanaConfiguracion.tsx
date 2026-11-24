@@ -179,10 +179,10 @@ export function PestanaConfiguracion({ estado, sub, onSub, onCambiosSinGuardar }
             </p>
           </Seccion>
           {"linear_tanda_hora" in b && (
-            // 23 y 24/11/2026 (dueño: «a las 7:00 pasa a Linear todos los fallos de Incidencias, menos los de facturas»).
+            // 23 y 24/11/2026 (dueño: «a las 7:00 pasa a Linear todos los fallos de Incidencias, menos los de facturas»; los de servicios externos no).
             <Seccion titulo="Paso de fallos a Linear">
               <div className="space-y-1">
-                <Label className="text-xs" htmlFor="u-tanda">Fallos de la web, del admin y de servicios externos (con su interruptor)</Label>
+                <Label className="text-xs" htmlFor="u-tanda">Fallos de la web y del admin (y de servicios externos, si están activados arriba)</Label>
                 <Select value={b.linear_tanda_hora == null ? "umbrales" : String(b.linear_tanda_hora)}
                   onValueChange={(v) => set("linear_tanda_hora", v === "umbrales" ? null : Number(v))}>
                   <SelectTrigger id="u-tanda" className="h-11 w-full sm:w-96" data-testid="tanda-hora"><SelectValue /></SelectTrigger>

@@ -1,6 +1,6 @@
 -- Vuelta atrás de 20261219100000_logs_tanda_todo_y_cierre_al_publicar.sql
--- Deja web_logs_agrupar_errores como en 20261218100000, quita las dos funciones y las columnas de cierre, y apaga
--- otra vez los tickets de servicios externos (en producción estaban apagados antes). procesar-logs-web vuelve sola a la
+-- Deja web_logs_agrupar_errores como en 20261218100000 y quita las dos funciones y las columnas de cierre (no toca
+-- linear_tickets_externos: la migración tampoco). procesar-logs-web vuelve sola a la
 -- consulta anterior de la tanda (ocurrencias_ventana > 0) y deja de cerrar tickets. Las incidencias ya resueltas y los
 -- tickets ya cerrados en Linear se quedan como están.
 begin;
@@ -294,7 +294,5 @@ alter table public.web_linear_prueba
 
 alter table public.web_incidencias drop constraint if exists web_incidencias_linear_cerrar_motivo_check;
 alter table public.web_incidencias drop column if exists linear_cerrar_motivo, drop column if exists linear_cerrar_pendiente;
-
-update public.web_logs_config set linear_tickets_externos = false where id and linear_tickets_externos;
 
 commit;
