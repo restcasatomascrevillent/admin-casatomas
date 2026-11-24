@@ -6,7 +6,7 @@ import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useHistorialAvisos } from "@/hooks/useHistorialAvisos";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { useAbrirAviso } from "@/hooks/useAbrirAviso";
-import { agruparPorDia, FILTROS_AVISOS, horaAviso, rutaDeAviso, TIPO_ICON, type FiltroAvisos } from "@/lib/avisos";
+import { abrirAvisoLoRevisa, agruparPorDia, FILTROS_AVISOS, horaAviso, rutaDeAviso, TIPO_ICON, type FiltroAvisos } from "@/lib/avisos";
 import { cn } from "@/lib/utils";
 import { EstadoReservaAviso, useEstadosReservasAvisos } from "@/hooks/useEstadosReservasAvisos";
 
@@ -24,7 +24,8 @@ export default function Avisos() {
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_AVISOS);
 
   const abrir = (n: NotificacionDashboard) => {
-    void marcarLeida(n.id);
+    // Ver una «Reserva nueva» no la da por revisada: sigue esperando respuesta (`abrirAvisoLoRevisa`).
+    if (abrirAvisoLoRevisa(n)) void marcarLeida(n.id);
     abrirAviso(n);
   };
 
