@@ -3,7 +3,7 @@
  *
  * El panel abre rrss en un iframe (`/embed`, sin nada en la dirección). rrss genera
  * un secreto y manda su huella al panel (`rrss:hello`); el panel pide a su servidor
- * (Edge Function `rrss-embed-pass`) un pase firmado de un solo uso y 60 s ligado a
+ * (Edge Function `rrss-embed-pass`) un pase firmado de un solo uso y 30 s ligado a
  * esa huella y se lo pasa al iframe (`rrss:pass`). rrss lo cambia por una sesión
  * limitada a la marca del restaurante: sin otra cuenta ni contraseña. Mientras la
  * sección está abierta, rrss pide un pase nuevo cada 10 minutos; si al usuario le

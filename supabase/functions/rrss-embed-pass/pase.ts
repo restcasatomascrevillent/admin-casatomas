@@ -19,7 +19,7 @@
  *   sub  id del usuario del panel   brand RRSS_EMBED_BRAND_ID (la marca de rrss)
  *   role nivel en Redes: «superadmin», «editar» (Ver + Puede editar) o «ver»
  *   name nombre visible del usuario (nunca su correo)
- *   iat, exp (60 s), jti (aleatorio: rrss solo lo acepta una vez)
+ *   iat, exp (30 s), jti (aleatorio: rrss solo lo acepta una vez)
  * Qué puede hacer cada nivel en rrss lo decide rrss (su configuración de la
  * integración), no este panel.
  */
@@ -27,7 +27,7 @@ import { exigirPermiso, respuestaJson, type DependenciasAutorizacion } from "../
 
 export const SECCION_REDES = "redes";
 /** Vida del pase: lo justo para cargar el iframe. */
-export const VIDA_PASE_SEGUNDOS = 60;
+export const VIDA_PASE_SEGUNDOS = 30;
 
 export type NivelRedes = "superadmin" | "editar" | "ver";
 

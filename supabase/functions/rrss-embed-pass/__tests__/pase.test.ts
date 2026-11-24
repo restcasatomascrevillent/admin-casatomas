@@ -2,7 +2,7 @@
 /**
  * Edge Function rrss-embed-pass sin red: Auth y RPC de permisos simulados. El
  * pase sale firmado con ES256 (se comprueba con la clave pública, como hará
- * rrss), con el nivel de Redes de cada usuario, 60 s de vida y un jti único;
+ * rrss), con el nivel de Redes de cada usuario, 30 s de vida y un jti único;
  * sin sesión, sin permiso o sin configuración no sale nada.
  */
 import { beforeAll, describe, expect, it } from "vitest";
@@ -82,7 +82,7 @@ beforeAll(async () => {
 });
 
 describe("rrss-embed-pass", () => {
-  it("emite un pase ES256 verificable con la clave pública, para la marca y con 60 s de vida", async () => {
+  it("emite un pase ES256 verificable con la clave pública, para la marca y con 30 s de vida", async () => {
     const res = await manejarPase(pedir("jwt-editar"), deps({ nuevoId: () => "jti-0123456789abcdef" }));
     expect(res.status).toBe(200);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(PANEL);
@@ -100,7 +100,7 @@ describe("rrss-embed-pass", () => {
       // El nombre visible, nunca el correo.
       name: "Sala",
       iat: 1_800_000_000,
-      exp: 1_800_000_060,
+      exp: 1_800_000_030,
       jti: "jti-0123456789abcdef",
       // Ligado al iframe que lo pidió (prueba de posesión).
       cnf: CNF,

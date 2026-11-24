@@ -33,6 +33,7 @@
     "test:clasificar-productos:db": "node scripts/test-clasificar-productos.mjs",
     "test:abreviaturas:db": "node scripts/test-abreviaturas.mjs",
     "test:instagram-sin-cron:db": "node scripts/test-instagram-sin-cron.mjs",
+    "test:redes-aviso:db": "node scripts/test-redes-aviso-revocar.mjs",
     "test:abreviaturas-avisos:db": "node scripts/test-abreviaturas-avisos.mjs",
     "test:abreviaturas-endurecer:db": "node scripts/test-abreviaturas-endurecer.mjs",
     "test:proveedores-notas-ia:db": "node scripts/test-proveedores-notas-ia.mjs",
