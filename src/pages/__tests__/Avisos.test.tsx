@@ -84,6 +84,7 @@ beforeEach(() => {
   h.llamadas = [];
   h.rango = [];
   h.filas = [];
+  permiso.editaReservas = false;
 });
 
 describe("Avisos", () => {
@@ -140,5 +141,34 @@ describe("Avisos", () => {
     montar();
     fireEvent.click(await screen.findByRole("button", { name: "Aviso 1 (abrir)" }));
     expect(await screen.findByTestId("ruta")).toHaveTextContent("/facturas?tab=cargar");
+    // Ir al origen lo da por revisado, como siempre.
+    expect(h.llamadas).toContainEqual({ op: "rpc", args: ["marcar_avisos_revisados", { p_ids: ["n1"], p_tipos: null }] });
+  });
+
+  // 24/11/2026: la reserva de Sergio Zambrana (27/11) desapareció de «Sin revisar» solo por abrirla.
+  it("ver una «Reserva nueva» no la da por revisada: sigue en la lista hasta responderla o pulsar «Leído»", async () => {
+    permiso.editaReservas = true;
+    h.filas = [aviso(1, { tipo: "reserva_nueva", referencia_tipo: "reserva", referencia_id: "res-r1" })];
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: "Aviso 1 (abrir)" }));
+    expect(await screen.findByTestId("ficha-reserva")).toHaveTextContent("res-r1");
+    expect(h.llamadas.filter((l) => l.op === "rpc")).toEqual([]);
+    expect(screen.getByRole("button", { name: "Marcar como leído: Aviso 1" })).toBeInTheDocument();
+
+    // «Leído» sigue cerrándolo a mano.
+    fireEvent.click(screen.getByRole("button", { name: "Marcar como leído: Aviso 1" }));
+    await waitFor(() =>
+      expect(h.llamadas).toContainEqual({ op: "rpc", args: ["marcar_avisos_revisados", { p_ids: ["n1"], p_tipos: null }] }),
+    );
+  });
+
+  it("ver una reserva cancelada sí la da por revisada (no hay nada que responder)", async () => {
+    permiso.editaReservas = true;
+    h.filas = [aviso(1, { tipo: "reserva_cancelada", referencia_tipo: "reserva", referencia_id: "res-r1" })];
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: "Aviso 1 (abrir)" }));
+    await waitFor(() =>
+      expect(h.llamadas).toContainEqual({ op: "rpc", args: ["marcar_avisos_revisados", { p_ids: ["n1"], p_tipos: null }] }),
+    );
   });
 });
