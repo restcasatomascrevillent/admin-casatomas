@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.53.3] - 2026-11-24
+
+Objetivo: Ver una reserva nueva desde Avisos o la campana ya no quita su aviso mientras siga pendiente
+
+### Cambiado
+- Avisos: ver una «Reserva nueva» ya no la da por revisada ([#352](https://github.com/restcasatomascrevillent/admin-casatomas/pull/352))
+
 ## [1.53.2] - 2026-11-23
 
 Objetivo: CI en verde: la migración de la búsqueda del copiloto deja de repetir versión (sin cambios de comportamiento)
