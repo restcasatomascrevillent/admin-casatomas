@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.53.6] - 2026-11-24
+
+Objetivo: Revisión diaria de Linear 24/11: CAS-33 y CAS-34
+
+### Cambiado
+- Logs: un script que el navegador mete en la página ya no abre ticket aunque no esté en la línea 1 (CAS-33, CAS-34) ([#358](https://github.com/restcasatomascrevillent/admin-casatomas/pull/358))
+
 ## [1.53.5] - 2026-11-24
 
 Objetivo: Fallos de la web y del admin a Linear a las 7:00 desde la tanda anterior (sin Facturas ni externos) y tickets a Done al publicarse el arreglo
