@@ -25,7 +25,7 @@ set client_encoding = 'UTF8';
 -- Después de aplicarla: select public.facturas_generar_alertas(); (el aviso de 389 caduca y
 -- sale el de 97). No borra ni cambia ningún documento: solo deja de contar los antiguos.
 -- Rollback: supabase/rollbacks/20261221100000_avisos_sin_carga_historica_ROLLBACK.sql
--- Test: npm run test:avisos-historicos:db
+-- Test: node scripts/test-avisos-historicos.mjs
 -- ============================================================================
 begin;
 

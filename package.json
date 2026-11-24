@@ -96,8 +96,7 @@
     "lint:cambios": "node scripts/lint-cambios.mjs",
     "test:precios-netos-reservas:db": "node scripts/test-precios-netos-reservas.mjs",
     "test:guardado-facturas-rapido:db": "node scripts/test-guardado-facturas-rapido.mjs",
-    "test:chat-busqueda:db": "node scripts/test-chat-busqueda-por-partes.mjs",
-    "test:avisos-historicos:db": "node scripts/test-avisos-historicos.mjs"
+    "test:chat-busqueda:db": "node scripts/test-chat-busqueda-por-partes.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",

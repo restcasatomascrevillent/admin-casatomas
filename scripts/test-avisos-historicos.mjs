@@ -1,7 +1,7 @@
 // «N documentos con avisos sin revisar» sin la carga histórica (migración 20261221100000),
 // contra un Postgres en memoria (PGlite). Nunca toca Supabase.
 //
-//   npm run test:avisos-historicos:db
+//   node scripts/test-avisos-historicos.mjs
 //
 // facturas_alertas_candidatas, facturas_alertas_tras_verificar y avisos_telegram_datos_semanal
 // reales son enormes y necesitan medio esquema: aquí se sustituyen por funciones mínimas que
