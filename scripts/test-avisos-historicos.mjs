@@ -66,6 +66,7 @@ end $f$;`;
 
 async function nuevaBase({ semanal = true, crlf = false } = {}) {
   const db = new PGlite();
+  await db.exec("create role anon; create role authenticated; create role service_role;"); // roles que nombra el revoke de la migración
   const nl = crlf ? "\r\n" : "\n";
   await db.exec(`
     create table public.facturas (

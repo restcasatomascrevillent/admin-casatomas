@@ -48,6 +48,8 @@ as $$
   select p_fecha is null or p_fecha >= p_hoy - p_dias
 $$;
 
+revoke all on function public.facturas_aviso_accionable(text, date, date, int) from public, anon, authenticated;
+
 comment on function public.facturas_aviso_accionable(text, date, date, int) is
   '¿Cuenta este documento en «N documentos con avisos sin revisar»? Solo si su fecha es de los últimos p_dias días (o no tiene fecha), venga de la bandeja, de una subida a mano o de una importación. 20261221100000.';
 

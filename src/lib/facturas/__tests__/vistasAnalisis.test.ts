@@ -172,7 +172,7 @@ describe("gráfica de precio", () => {
     expect(g.max).toBeGreaterThan(130);
     // sin precio de aviso, la serie queda igual
     expect(serieConPrecioDeAlerta(serie, "2026-11", null)).toBe(serie);
-    // un mes sin compras no se inventa
+    // el mes de la compra que avisa lleva su precio aunque la consulta por meses no lo trajera
     expect(serieConPrecioDeAlerta(serie, "2026-10", 130)[4].precio).toBe(130);
   });
 

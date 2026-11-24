@@ -488,11 +488,15 @@ function DetallePrecio({
     const porMes = new Map((q.data?.puntos ?? []).map((p) => [p.clave.slice(0, 7), p.valor]));
     serie = meses.map((m) => ({ mes: m, precio: porMes.get(m) ?? null }));
     // El mes de la compra que avisa enseña el precio de ESA compra (no la mediana del mes), como los textos.
-    if (a.tipo !== "facturas_precio_proveedor") serie = serieConPrecioDeAlerta(serie, fin.slice(0, 7), a.datos.precioUd ?? a.datos.precio);
+    // Solo con fecha de la compra: sin ella el mes de `fin` sería el del periodo, no el de la compra.
+    if (a.tipo !== "facturas_precio_proveedor" && a.datos.fecha) serie = serieConPrecioDeAlerta(serie, a.datos.fecha.slice(0, 7), a.datos.precioUd ?? a.datos.precio);
     referencia = a.datos.precioRefUd ?? a.datos.precioRef;
     textoRef = textoReferenciaAlerta(a.tipo, a.datos.fechaRef);
     ultimaCompra = a.tipo !== "facturas_precio_proveedor" && a.datos.fecha ? { fecha: a.datos.fecha, precio: a.datos.precioUd ?? a.datos.precio } : null;
-    normal90 = a.tipo === "facturas_precio_sube" || a.tipo === "facturas_precio_baja" ? a.datos.precioContexto : null;
+    // precio_contexto va en la MEDIDA (€/kg); la gráfica, en la unidad facturada (€/caja). Si no
+    // coinciden no se enseña: mezclar las dos bases en la misma línea confunde más que ayuda.
+    const mismaBase = a.datos.precioUd === null || a.datos.precioUd === undefined || !a.datos.medida || (a.datos.unidad ?? "").toLowerCase() === a.datos.medida.toLowerCase();
+    normal90 = (a.tipo === "facturas_precio_sube" || a.tipo === "facturas_precio_baja") && mismaBase ? a.datos.precioContexto : null;
     subtitulo = `${a.datos.proveedor ? `${a.datos.proveedor} · ` : ""}${resumenCortoAlerta(a)}`;
   }
   const g = geometriaPrecio(serie, referencia);
@@ -530,7 +534,7 @@ function DetallePrecio({
           <GraficaPrecioMeses
             g={g}
             unidad={unidad}
-            etiquetaRef={textoRef === "precio pactado" ? "pactado" : "antes"}
+            etiquetaRef={textoRef === "precio pactado" ? "pactado" : textoRef.startsWith("precio de la compra anterior") ? "anterior" : "antes"}
             ariaLabel={`Precio de ${titulo} por mes: ${g.puntos.map((p) => `${mesCorto(p.mes)} ${precio2(p.precio)} €`).join(", ")}${g.referencia !== null ? `. Raya: ${textoRef}, ${precio2(g.referencia)} €` : ""}`}
             comprasDe={
               comprasQ.data
@@ -550,12 +554,12 @@ function DetallePrecio({
           )}
           {ultimaCompra && ultimaCompra.precio !== null && (
             <span data-testid="leyenda-ultima-compra">
-              {" "}· Última compra ({ultimaCompra.fecha.slice(8, 10)}/{ultimaCompra.fecha.slice(5, 7)}): <span className="font-medium tabular-nums text-foreground">{precio2(ultimaCompra.precio)} €</span>
+              {" "}· Última compra ({ultimaCompra.fecha.slice(8, 10)}/{ultimaCompra.fecha.slice(5, 7)}): <span className="font-medium tabular-nums text-foreground">{precio2(ultimaCompra.precio)} €/{unidad}</span>
             </span>
           )}
           {normal90 !== null && normal90 > 0 && (
             <span data-testid="leyenda-normal-90">
-              {" "}· Lo normal en 90 días: <span className="tabular-nums">{precio2(normal90)} €</span>
+              {" "}· Lo normal en 90 días: <span className="tabular-nums">{precio2(normal90)} €/{unidad}</span>
             </span>
           )}
         </p>
