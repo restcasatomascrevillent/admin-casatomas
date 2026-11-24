@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { reservaDeAviso, rutaDeAviso, TIPO_ICON } from "@/lib/avisos";
+import { abrirAvisoLoRevisa, reservaDeAviso, rutaDeAviso, TIPO_ICON } from "@/lib/avisos";
 import { useAbrirAviso } from "@/hooks/useAbrirAviso";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,7 +58,8 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
   // «Ver» en una reserva abre su ficha en un modal (11/11/2026); lo demás, su origen. La campana se cierra antes.
   const { abrirAviso, dialogoAviso } = useAbrirAviso();
   const handleClick = (notif: (typeof notificaciones)[0]) => {
-    marcarLeida(notif.id);
+    // Ver una «Reserva nueva» no la da por revisada: sigue esperando respuesta (`abrirAvisoLoRevisa`).
+    if (abrirAvisoLoRevisa(notif)) marcarLeida(notif.id);
     if (rutaDeAviso(notif) || reservaDeAviso(notif)) setAbierto(false);
     abrirAviso(notif);
   };

@@ -184,6 +184,15 @@ export const rutaAvisosReservas = () => `/reservas?${PARAM_ABRIR_AVISOS}=reserva
 export const esAvisoDeReservas = (n: { tipo: string; referencia_tipo?: string | null }) =>
   n.referencia_tipo === "reserva" && tiposDeSeccion("reservas").includes(n.tipo);
 
+/**
+ * ¿Abrir un aviso («Ver») lo da por revisado? Todos menos «Reserva nueva» (24/11/2026, dueño: «¿por qué la
+ * reserva se ha quitado de avisos si aún sigue pendiente?»): mirar la reserva no es responderla. Ese aviso se
+ * cierra al verificarla o rechazarla (CAS-9, y solo en la base de datos desde 20261212720000) o con «Leído».
+ * Es la regla que ya seguía Reservas › Avisos; la página «Avisos» y la campana lo marcaban al abrirlo.
+ */
+export const abrirAvisoLoRevisa = (n: { tipo: string; referencia_tipo?: string | null }): boolean =>
+  !(n.tipo === "reserva_nueva" && n.referencia_tipo === "reserva");
+
 /** Evento para abrir el modal «Avisos» de una sección desde otro sitio («Ver todas» de Análisis). */
 export const EVENTO_ABRIR_AVISOS = "abrir-avisos-seccion";
 export function abrirAvisosSeccion(seccion: SeccionAvisos) {
