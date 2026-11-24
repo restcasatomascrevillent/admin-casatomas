@@ -2,6 +2,14 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.53.5] - 2026-11-24
+
+Objetivo: Fallos de la web y del admin a Linear a las 7:00 desde la tanda anterior (sin Facturas ni externos) y tickets a Done al publicarse el arreglo
+
+### Otros
+- Todo lo de Incidencias a Linear a las 7:00 y tickets a Done al publicarse el arreglo ([#354](https://github.com/restcasatomascrevillent/admin-casatomas/pull/354))
+- Los fallos de servicios externos no pasan solos a Linear ([#356](https://github.com/restcasatomascrevillent/admin-casatomas/pull/356))
+
 ## [1.53.3] - 2026-11-24
 
 Objetivo: Ver una reserva nueva desde Avisos o la campana ya no quita su aviso mientras siga pendiente
