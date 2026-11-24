@@ -81,7 +81,7 @@ async function nuevaBase({ semanal = true, crlf = false } = {}) {
       (1, current_date - 3,   false, now() - interval '10 days', null,    ${av}),   -- a mano, reciente: cuenta
       (2, current_date - 200, false, now() - interval '10 days', 'zip:2', ${av}),   -- carga histórica antigua: NO
       (3, current_date - 30,  false, now() - interval '10 days', 'zip:3', ${av}),   -- importada reciente: cuenta
-      (4, current_date - 300, false, now() - interval '10 days', null,    ${av}),   -- a mano, antigua: cuenta
+      (4, current_date - 300, false, now() - interval '10 days', null,    ${av}),   -- a mano, antigua (p. ej. facturas de 2025 subidas hoy): NO
       (5, current_date - 3,   true,  now() - interval '10 days', null,    ${av}),   -- verificada: NO
       (6, current_date - 3,   false, now() - interval '3 days',  null,    ${av}),   -- de hace 3 días: NO en el resumen (7 días), SÍ en el semanal
       (7, current_date - 3,   false, now() - interval '10 days', null,    ${hist}), -- solo nota histórica: NO
@@ -101,21 +101,23 @@ const hayFuncion = async (db, nombre) => (await db.query(`select 1 from pg_proc 
   igual(await verificar(db), 5005, "antes: tras_verificar cuenta 5 y lista 5");
   igual(await semanal(db), 6, "antes: el semanal cuenta 1, 2, 3, 4, 6 y 8");
   await db.exec(MIGRACION);
-  igual(await resumen(db), 3, "después: 1, 3 y 4 (la histórica antigua, 2 y 8, ya no)");
-  igual(await verificar(db), 3003, "después: tras_verificar, igual");
-  igual(await semanal(db), 4, "después: el semanal, 1, 3, 4 y 6");
+  igual(await resumen(db), 2, "después: 1 y 3 (las de fecha antigua, 2, 4 y 8, ya no)");
+  igual(await verificar(db), 2002, "después: tras_verificar, igual");
+  igual(await semanal(db), 3, "después: el semanal, 1, 3 y 6");
   ok((await definicion(db, "public.facturas_alertas_candidatas(date)")).includes("facturas_aviso_accionable"), "candidatas parcheada");
   // Idempotente: otra vez no duplica la condición.
   await db.exec(MIGRACION);
   const d = await definicion(db, "public.facturas_alertas_candidatas(date)");
   igual(d.split("facturas_aviso_accionable").length - 1, 1, "aplicada dos veces: una sola condición");
-  igual(await resumen(db), 3, "sigue igual");
+  igual(await resumen(db), 2, "sigue igual");
   // La regla en sí.
   const r = (await db.query(`select public.facturas_aviso_accionable(null, current_date - 500, current_date) a,
                                     public.facturas_aviso_accionable('zip', current_date - 91, current_date) b,
                                     public.facturas_aviso_accionable('zip', current_date - 90, current_date) c,
                                     public.facturas_aviso_accionable('zip', current_date, current_date) d`)).rows[0];
-  igual(r, { a: true, b: false, c: true, d: true }, "regla: a mano siempre; importado solo ≤ 90 días");
+  igual(r, { a: false, b: false, c: true, d: true }, "regla: por fecha del documento (≤ 90 días), venga de donde venga");
+  const sinFecha = (await db.query(`select public.facturas_aviso_accionable(null, null, current_date) s`)).rows[0].s;
+  igual(sinFecha, true, "regla: sin fecha sí cuenta");
   // Rollback.
   await db.exec(ROLLBACK);
   igual(await resumen(db), 5, "rollback: vuelve a contar todo");
@@ -124,7 +126,7 @@ const hayFuncion = async (db, nombre) => (await db.query(`select 1 from pg_proc 
   igual(await hayFuncion(db, "facturas_aviso_accionable"), 0, "rollback: sin la función de la regla");
   await db.exec(ROLLBACK); // el rollback también es repetible
   await db.exec(MIGRACION); // y se puede volver a aplicar
-  igual(await resumen(db), 3, "otra vez aplicada");
+  igual(await resumen(db), 2, "otra vez aplicada");
   await db.close();
 }
 
@@ -132,7 +134,7 @@ const hayFuncion = async (db, nombre) => (await db.query(`select 1 from pg_proc 
 {
   const db = await nuevaBase({ semanal: false });
   await db.exec(MIGRACION);
-  igual(await resumen(db), 3, "sin semanal: el resumen se arregla igual");
+  igual(await resumen(db), 2, "sin semanal: el resumen se arregla igual");
   igual(await hayFuncion(db, "avisos_telegram_datos_semanal"), 0, "no inventa la función semanal");
   await db.close();
 }
@@ -141,8 +143,8 @@ const hayFuncion = async (db, nombre) => (await db.query(`select 1 from pg_proc 
 {
   const db = await nuevaBase({ crlf: true });
   await db.exec(MIGRACION);
-  igual(await resumen(db), 3, "CRLF: resumen");
-  igual(await semanal(db), 4, "CRLF: semanal");
+  igual(await resumen(db), 2, "CRLF: resumen");
+  igual(await semanal(db), 3, "CRLF: semanal");
   await db.exec(ROLLBACK);
   igual(await semanal(db), 6, "CRLF: rollback");
   await db.close();

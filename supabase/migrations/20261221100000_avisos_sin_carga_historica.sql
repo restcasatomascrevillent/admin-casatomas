@@ -9,10 +9,11 @@ set client_encoding = 'UTF8';
 -- días. El resumen cuenta todo documento sin verificar con algún aviso de lectura cuyo
 -- created_at tenga más de 7 días: según cada tanda de la carga cumplía los 7 días, la cifra
 -- subía sola (190 → 210 → 213 → 274 → 389 del 17 al 24/11) sin que nadie subiera nada.
--- Regla nueva: se cuenta lo ACCIONABLE = lo subido a mano o por la bandeja (import_clave nulo)
--- y lo importado de los últimos 90 días (por fecha del documento). La carga histórica antigua
--- ya no cuenta. En producción quedan 97 (74 subidos a mano o por la bandeja + 23 importados
--- recientes) en lugar de 389.
+-- Regla nueva: se cuenta lo ACCIONABLE = documentos con fecha de los últimos 90 días (o sin
+-- fecha), vengan de donde vengan. Primera versión (mismo día): «a mano siempre cuenta»; se
+-- cambió al saber que el dueño había subido a mano todas las facturas de 2025, que con esa
+-- regla habrían vuelto a disparar la cifra a la semana. Con los datos de antes de esa subida
+-- quedaban 97 en lugar de 389 (cifra exacta pendiente de recalcular en producción).
 -- Qué cambia:
 --   1. facturas_aviso_accionable(import_clave, fecha, hoy, dias): la regla, en un sitio.
 --   2. facturas_alertas_candidatas (CTE «avisos») y facturas_alertas_tras_verificar (cuenta y
@@ -40,11 +41,15 @@ immutable
 parallel safe
 set search_path = public, pg_temp
 as $$
-  select p_import_clave is null or p_fecha >= p_hoy - p_dias
+  -- 24/11/2026: por la FECHA del documento, venga de donde venga. El dueño subió a mano todas
+  -- las facturas de 2025: contarlas por ser «a mano» volvería a disparar la cifra. p_import_clave
+  -- se queda en la firma (la llaman así las funciones parcheadas) aunque ya no decide.
+  -- Sin fecha (no se pudo leer) sí cuenta: eso hay que mirarlo.
+  select p_fecha is null or p_fecha >= p_hoy - p_dias
 $$;
 
 comment on function public.facturas_aviso_accionable(text, date, date, int) is
-  '¿Cuenta este documento en «N documentos con avisos sin revisar»? Lo subido a mano o por la bandeja (sin import_clave) y lo importado de los últimos p_dias días; la carga histórica antigua no. 20261221100000.';
+  '¿Cuenta este documento en «N documentos con avisos sin revisar»? Solo si su fecha es de los últimos p_dias días (o no tiene fecha), venga de la bandeja, de una subida a mano o de una importación. 20261221100000.';
 
 do $mig$
 declare
