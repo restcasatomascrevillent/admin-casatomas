@@ -15,7 +15,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDateCorta, formatNumero } from "@/components/facturas/shared/formatters";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
-import { nombreMes, ticksPrecio, type GeometriaPrecio } from "@/lib/facturas/vistasAnalisis";
+import { ladoEtiquetaReferencia, nombreMes, ticksPrecio, type GeometriaPrecio } from "@/lib/facturas/vistasAnalisis";
 import { ETIQUETA_TIPO } from "@/lib/facturas/documentosCifra";
 import type { CompraProducto } from "@/lib/facturas/comprasProducto";
 
@@ -94,6 +94,7 @@ export function GraficaPrecioMeses({
   const caja = useRef<HTMLDivElement>(null);
   const idTooltip = useId();
   const ticks = ticksPrecio(g);
+  const etiqueta = ladoEtiquetaReferencia(g, ANCHO, ALTO);
 
   // Tocar fuera cierra el cuadro fijado.
   useEffect(() => {
@@ -152,7 +153,11 @@ export function GraficaPrecioMeses({
           </svg>
           {g.referencia !== null && g.yReferencia !== null && (
             <span
-              className="pointer-events-none absolute right-0 -translate-y-full whitespace-nowrap rounded bg-background/90 px-1 text-[0.6875rem] font-medium tabular-nums text-foreground/80"
+              className={cn(
+                "pointer-events-none absolute whitespace-nowrap rounded bg-background/90 px-1 text-[0.6875rem] font-medium tabular-nums text-foreground/80",
+                etiqueta.lado === "derecha" ? "right-0" : "left-0",
+                etiqueta.debajo ? "translate-y-0.5" : "-translate-y-full",
+              )}
               style={{ top: pctY(g.yReferencia) }}
               data-testid="etiqueta-referencia"
             >
