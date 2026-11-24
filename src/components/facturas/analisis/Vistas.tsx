@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatEntero, plural } from "@/components/facturas/shared/formatters";
 import { resumenCortoAlerta, tituloCortoAlerta } from "@/lib/facturas/alertas";
 import { textoPctCorto, type CambioPrecio, type DecisionFacturas, type ProductoTop } from "@/lib/facturas/decision";
-import { decisionesDeHoy, explicarAhorro, geometriaPrecio, nombreMes, notasComparar, partesFraseAhorro, mesesHasta, textoDecision, type MargenDecision, type PuntoPrecio, type TextoDecision } from "@/lib/facturas/vistasAnalisis";
+import { decisionesDeHoy, explicarAhorro, geometriaPrecio, nombreMes, notasComparar, partesFraseAhorro, mesesHasta, serieConPrecioDeAlerta, textoDecision, textoReferenciaAlerta, type MargenDecision, type PuntoPrecio, type TextoDecision } from "@/lib/facturas/vistasAnalisis";
 import { FILTROS_VACIOS, parametrosExplorar, type LocalRpc } from "@/lib/facturas/explorador";
 import { mesCorto } from "@/lib/facturas/resumenCompras";
 import { useExplorarCompras } from "@/hooks/useExplorarCompras";
@@ -470,6 +470,8 @@ function DetallePrecio({
   let serie: PuntoPrecio[] = [];
   let referencia: number | null = null;
   let textoRef = "";
+  let ultimaCompra: { fecha: string; precio: number | null } | null = null;
+  let normal90: number | null = null;
   let unidad = "ud";
   if (e.top) {
     const p = e.top;
@@ -485,8 +487,12 @@ function DetallePrecio({
     unidad = a.datos.unidad ?? a.datos.medida ?? "ud";
     const porMes = new Map((q.data?.puntos ?? []).map((p) => [p.clave.slice(0, 7), p.valor]));
     serie = meses.map((m) => ({ mes: m, precio: porMes.get(m) ?? null }));
+    // El mes de la compra que avisa enseña el precio de ESA compra (no la mediana del mes), como los textos.
+    if (a.tipo !== "facturas_precio_proveedor") serie = serieConPrecioDeAlerta(serie, fin.slice(0, 7), a.datos.precioUd ?? a.datos.precio);
     referencia = a.datos.precioRefUd ?? a.datos.precioRef;
-    textoRef = a.tipo === "facturas_precio_pactado" ? "precio pactado" : "precio de antes (mediana de 90 días)";
+    textoRef = textoReferenciaAlerta(a.tipo, a.datos.fechaRef);
+    ultimaCompra = a.tipo !== "facturas_precio_proveedor" && a.datos.fecha ? { fecha: a.datos.fecha, precio: a.datos.precioUd ?? a.datos.precio } : null;
+    normal90 = a.tipo === "facturas_precio_sube" || a.tipo === "facturas_precio_baja" ? a.datos.precioContexto : null;
     subtitulo = `${a.datos.proveedor ? `${a.datos.proveedor} · ` : ""}${resumenCortoAlerta(a)}`;
   }
   const g = geometriaPrecio(serie, referencia);
@@ -541,6 +547,16 @@ function DetallePrecio({
             <>
               {" "}· <span className="inline-block h-0 w-3 border-t border-dashed border-foreground/60 align-middle" aria-hidden /> {textoRef}: {precio2(g.referencia)} €
             </>
+          )}
+          {ultimaCompra && ultimaCompra.precio !== null && (
+            <span data-testid="leyenda-ultima-compra">
+              {" "}· Última compra ({ultimaCompra.fecha.slice(8, 10)}/{ultimaCompra.fecha.slice(5, 7)}): <span className="font-medium tabular-nums text-foreground">{precio2(ultimaCompra.precio)} €</span>
+            </span>
+          )}
+          {normal90 !== null && normal90 > 0 && (
+            <span data-testid="leyenda-normal-90">
+              {" "}· Lo normal en 90 días: <span className="tabular-nums">{precio2(normal90)} €</span>
+            </span>
           )}
         </p>
       )}

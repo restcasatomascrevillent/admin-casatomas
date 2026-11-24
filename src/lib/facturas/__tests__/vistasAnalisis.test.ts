@@ -7,6 +7,9 @@ import {
   explicarAhorro,
   fraseAhorro,
   geometriaPrecio,
+  ladoEtiquetaReferencia,
+  serieConPrecioDeAlerta,
+  textoReferenciaAlerta,
   mesesHasta,
   nombreMes,
   notasComparar,
@@ -152,6 +155,42 @@ describe("gráfica de precio", () => {
     expect(g!.yReferencia!).toBeGreaterThan(g!.puntos[1].y); // 11 queda por debajo de 14
     expect(g?.meses).toHaveLength(3);
     expect(geometriaPrecio([{ mes: "2026-08", precio: null }], 5)).toBeNull();
+  });
+
+  // Caso real (percebe de Casimiro, 24/11/2026): noviembre tenía tres compras (50, 90 y 130 €/kg);
+  // la mediana del mes (90) tapaba los 130 del aviso y la raya «antes 90» caía encima del punto.
+  it("el mes de la compra que avisa enseña el precio de esa compra, no la mediana del mes", () => {
+    const serie = [
+      { mes: "2026-06", precio: 95 }, { mes: "2026-07", precio: 95 }, { mes: "2026-08", precio: 100 },
+      { mes: "2026-09", precio: 120 }, { mes: "2026-10", precio: null }, { mes: "2026-11", precio: 90 },
+    ];
+    const nueva = serieConPrecioDeAlerta(serie, "2026-11", 130);
+    expect(nueva.map((p) => p.precio)).toEqual([95, 95, 100, 120, null, 130]);
+    expect(serie[5].precio).toBe(90); // no muta
+    const g = geometriaPrecio(nueva, 90)!;
+    expect(g.puntos[g.puntos.length - 1].precio).toBe(130);
+    expect(g.max).toBeGreaterThan(130);
+    // sin precio de aviso, la serie queda igual
+    expect(serieConPrecioDeAlerta(serie, "2026-11", null)).toBe(serie);
+    // un mes sin compras no se inventa
+    expect(serieConPrecioDeAlerta(serie, "2026-10", 130)[4].precio).toBe(130);
+  });
+
+  it("el rótulo de la raya dice lo mismo que «Qué decidir hoy»", () => {
+    expect(textoReferenciaAlerta("facturas_precio_sube", "2026-11-03")).toBe("precio de la compra anterior (03/11)");
+    expect(textoReferenciaAlerta("facturas_precio_baja", null)).toBe("precio de antes (mediana de 90 días)");
+    expect(textoReferenciaAlerta("facturas_precio_pactado", "2026-11-03")).toBe("precio pactado");
+  });
+
+  it("el rótulo de la raya se aparta de los puntos", () => {
+    // Antes: referencia 90 y último punto en 90, los dos a la derecha: el rótulo tapaba el punto.
+    const tapado = geometriaPrecio([{ mes: "2026-09", precio: 120 }, { mes: "2026-10", precio: 100 }, { mes: "2026-11", precio: 90 }], 90)!;
+    const l = ladoEtiquetaReferencia(tapado);
+    expect(l).not.toEqual({ lado: "derecha", debajo: false });
+    // Sin choque, a la derecha y encima como siempre.
+    const libre = geometriaPrecio([{ mes: "2026-09", precio: 120 }, { mes: "2026-10", precio: 125 }, { mes: "2026-11", precio: 130 }], 90)!;
+    expect(ladoEtiquetaReferencia(libre)).toEqual({ lado: "derecha", debajo: false });
+    expect(ladoEtiquetaReferencia({ puntos: [], yReferencia: null })).toEqual({ lado: "derecha", debajo: false });
   });
 
   it("los 6 meses hasta una fecha y el nombre del mes", () => {
