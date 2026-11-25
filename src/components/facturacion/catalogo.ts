@@ -80,6 +80,15 @@ export interface GastoServicio {
   /** De dónde sale el importe: metido a mano, estimado (cuota + uso leído) o falta meterlo. */
   origen: "manual" | "estimado" | "falta" | "gratis";
 }
+/**
+ * Servicios que salen en Servicios › Costes pero no se cobran en el recibo mensual. Stripe lo
+ * paga el restaurante (son las comisiones de sus cheques regalo), no nosotros (dueño, 25/11/2026:
+ * «en recibos mensuales quita Stripe, eso no se paga desde nosotros»).
+ */
+export const PROVEEDORES_FUERA_DEL_RECIBO: ReadonlySet<string> = new Set(["stripe"]);
+/** ¿Este gasto de Servicios se cobra en el recibo mensual? */
+export const entraEnRecibo = (proveedor: string | null | undefined): boolean =>
+  !PROVEEDORES_FUERA_DEL_RECIBO.has((proveedor ?? "").trim().toLowerCase());
 const esLineaVacia = (l: LineaFactura) => !l.concepto.trim() && l.precio === 0;
 /** El concepto del recibo de un gasto de Servicios («OpenAI · Inteligencia artificial», su importe y su descuento). */
 export function lineaDeGasto(g: GastoServicio, descuento = 0): LineaFactura {
@@ -88,7 +97,7 @@ export function lineaDeGasto(g: GastoServicio, descuento = 0): LineaFactura {
 }
 /** Añade al recibo UN gasto de Servicios (al final, con los demás). No hace nada si ya está o cuesta 0 €. */
 export function anadirGastoServicio(f: Factura, g: GastoServicio): Factura {
-  if (g.importe <= 0 || f.lineas.some(l => l.proveedor === g.proveedor)) return f;
+  if (g.importe <= 0 || !entraEnRecibo(g.proveedor) || f.lineas.some(l => l.proveedor === g.proveedor)) return f;
   const lineas = [...f.lineas.filter(l => !esLineaVacia(l)), lineaDeGasto(g)];
   if (lineas.length > 100) throw new Error("Un recibo admite hasta 100 conceptos.");
   return { ...f, lineas };
@@ -116,11 +125,12 @@ export function quitarConcepto(f: Factura, id: string): Factura {
 /**
  * Pone en el recibo los gastos del mes: sustituye las líneas que ya venían de Servicios
  * (se reconocen por `proveedor`) y deja intactas las demás (cuota y conceptos a mano).
- * Lo que cuesta 0 € no se añade. Los descuentos puestos a un servicio se conservan.
+ * Lo que cuesta 0 € no se añade, ni lo que no pagamos nosotros (Stripe). Los descuentos puestos
+ * a un servicio se conservan.
  */
 export function aplicarGastosServicios(f: Factura, gastos: GastoServicio[]): Factura {
   const previas = new Map(f.lineas.filter(l => l.proveedor).map(l => [l.proveedor!, l]));
-  const nuevas: LineaFactura[] = gastos.filter(g => g.importe > 0).map(g => lineaDeGasto(g, previas.get(g.proveedor)?.descuento ?? 0));
+  const nuevas: LineaFactura[] = gastos.filter(g => g.importe > 0 && entraEnRecibo(g.proveedor)).map(g => lineaDeGasto(g, previas.get(g.proveedor)?.descuento ?? 0));
   const resto = f.lineas.filter(l => !l.proveedor && !esLineaVacia(l));
   const lineas = [...resto, ...nuevas];
   if (lineas.length > 100) throw new Error("Un recibo admite hasta 100 conceptos.");
