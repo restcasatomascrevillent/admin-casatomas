@@ -14,6 +14,14 @@
 //     dentro del mismo mensaje (sin repetir «por revisar»).
 //   · Formato HTML de Telegram: negritas y enlaces con texto corto (la URL no se ve). Si Telegram no acepta el
 //     HTML, la función lo reenvía en texto plano (aTextoPlano).
+//  25/11/2026 (dueño: «cuando se suba … si ha subido el precio … enviar a Telegram … con el enlace al Drive de esa
+//  factura», «si es marisco o vino … el precio sugerido con el mismo margen» y «al final del día un resumen de las
+//  facturas subidas»):
+//   · Los avisos de una misma factura van en UN mensaje (mensajeFactura): proveedor, nº y fecha, qué ha pasado
+//     (precio anterior → nuevo y %) y los enlaces al original en Drive y al panel.
+//   · Subidas de marisco o vino con su vino o plato en la carta: el precio con el mismo margen (sugerenciasCarta).
+//   · Las subidas de precio van aunque no suenen en la campana (AVISA_SIEMPRE).
+//   · Cierre del día (construirCierre): facturas subidas hoy y avisos del día, en el chat de Resúmenes.
 // ============================================================================
 
 /** Límite de Telegram para el texto de sendMessage. */
@@ -67,6 +75,10 @@ export interface ConfigTelegram {
   semanal_dia?: number;
   semanal_hora?: number;
   semanal_ultimo_dia?: string | null;
+  /** 25/11/2026 (20261222100000): cierre del día con las facturas subidas, a cierre_hora (Madrid). */
+  cierre_activo?: boolean;
+  cierre_hora?: number;
+  cierre_ultimo_dia?: string | null;
 }
 
 // ─── Canales (22/11/2026) ───────────────────────────────────────────────────
@@ -242,6 +254,13 @@ export function silencioAhora(cfg: Pick<ConfigTelegram, "silencio_activo" | "sil
 }
 
 const campanaApagada = (a: Aviso): boolean => a.datos?.campana === false;
+/**
+ * 25/11/2026 (dueño: «cuando se suba … si ha subido el precio … se tiene que enviar»): las subidas de precio van a
+ * Telegram aunque no suenen en la campana (impacto pequeño o agrupadas por proveedor). Misma regla que
+ * avisos_telegram_hay_pendientes (SQL, 20261222100000).
+ */
+export const AVISA_SIEMPRE = ["facturas_precio_sube"];
+const campanaApagadaTelegram = (a: Aviso): boolean => campanaApagada(a) && !AVISA_SIEMPRE.includes(a.tipo);
 const esReserva = (a: Aviso): boolean => TIPOS_RESERVA.includes(a.tipo);
 
 /** Día siguiente (AAAA-MM-DD) de un día AAAA-MM-DD. */
@@ -307,7 +326,7 @@ export function evaluarPendientes(
     .filter((a) => !esAvisoDeReserva(a.tipo) && cfg.tipos_al_momento.includes(a.tipo))
     .filter((a) => Date.parse(a.created_at) > desde)
     .filter((a) => !a.caduca_en || Date.parse(a.caduca_en) > ahora.getTime())
-    .filter((a) => !tipoExcluido(a.tipo) && !campanaApagada(a))
+    .filter((a) => !tipoExcluido(a.tipo) && !campanaApagadaTelegram(a))
     .filter((a) => !enviados.has(a.id) && (fallos.get(a.id) ?? 0) < MAX_FALLOS)
     .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
   const enviar: Aviso[] = [];
@@ -1023,8 +1042,388 @@ export function cuerpoSendMessage(chatId: string, texto: string, html = true): R
   return { chat_id: chatId, text: recortar(texto, LIMITE_TELEGRAM), ...(html ? { parse_mode: "HTML" } : {}), link_preview_options: { is_disabled: true } };
 }
 
-export type Accion = "pendientes" | "resumen" | "probar" | "fallos" | "semanal";
-export const esAccion = (v: unknown): v is Accion => v === "pendientes" || v === "resumen" || v === "probar" || v === "fallos" || v === "semanal";
+export type Accion = "pendientes" | "resumen" | "probar" | "fallos" | "semanal" | "cierre";
+export const esAccion = (v: unknown): v is Accion =>
+  v === "pendientes" || v === "resumen" || v === "probar" || v === "fallos" || v === "semanal" || v === "cierre";
 
 /** Tipo de la fila de avisos_telegram_envios de cada acción (el CHECK admite 'fallo', no 'fallos'). */
 export const tipoRegistro = (accion: Accion): string => (accion === "probar" ? "prueba" : accion === "fallos" ? "fallo" : accion);
+
+// ─── Facturas: un mensaje por factura y cierre del día (25/11/2026) ─────────
+// Petición del dueño: «cuando se suba un aviso, si ha subido el precio, si hay algo que destacar de esa factura, se
+// tiene que enviar automáticamente a Telegram con lo que ha pasado de forma explícita y el enlace al Drive de esa
+// factura; además, si se trata de marisco o vino (carta a 20 € con IVA, lo compraba a 10 y me lo suben a 15), que me
+// diga el precio sugerido con el mismo margen … y que al final del día mande un aviso con el resumen de facturas que
+// se han subido ese día. Sencillo, breve, conciso y bien explicado».
+
+/** Tipos de aviso que hablan de UNA factura (datos.factura_id): van juntos en el mensaje de esa factura. */
+export const TIPOS_DE_FACTURA = [
+  "facturas_precio_sube", "facturas_precio_baja", "facturas_precio_pactado", "facturas_precio_mejor", "facturas_precio_proveedor",
+  "facturas_importe_inusual", "facturas_proveedor_nuevo", "facturas_margen_bajo",
+];
+/** Como mucho estos avisos por mensaje de factura (el resto, «➕ N más en el panel»). */
+export const MAX_AVISOS_FACTURA = 12;
+/** Como mucho estos platos o vinos con precio sugerido por subida. */
+export const MAX_SUGERENCIAS = 3;
+/** Minutos que se espera al enlace de Drive de una factura recién subida antes de mandarla sin él. */
+export const ESPERA_DRIVE_MIN = 20;
+/** Importes con separador de miles también en 4 cifras («1.234,50 €»). */
+const nMiles = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always" as unknown as boolean });
+const eurMiles = (v: number) => `${nMiles.format(v)} €`;
+/** Redondeo del precio sugerido: hacia arriba, a 0,50 € (como avisos_precio_sugerido). */
+export const PASO_PRECIO = 0.5;
+/** Facturas nombradas en el cierre del día (el resto, «y N más»). */
+export const MAX_FACTURAS_CIERRE = 8;
+/** Casos por tipo de aviso en el cierre del día. */
+export const CASOS_CIERRE = 3;
+
+/** Lo que hace falta de una factura (tabla facturas) para su mensaje y para el cierre del día. */
+export interface FacturaInfo {
+  id: number;
+  tipo?: string | null;
+  proveedor?: string | null;
+  numero_documento?: string | null;
+  fecha?: string | null;
+  total?: number | string | null;
+  drive_url?: string | null;
+  /** timestamp sin zona (UTC). */
+  created_at?: string | null;
+  local?: string | null;
+}
+
+const enteroPositivo = (v: unknown): number | null => {
+  const x = numero(v);
+  return x !== null && Number.isInteger(x) && x > 0 ? x : null;
+};
+
+/** Instante de un timestamp de la base; los «timestamp» sin zona son UTC. null si no se entiende. */
+export function instanteUtc(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const t = Date.parse(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s.replace(" ", "T")}Z`);
+  return Number.isFinite(t) ? t : null;
+}
+
+/** Enlace de Drive del original, o null si no lo hay (o no es de Google Drive). */
+export const urlDrive = (v: unknown): string | null =>
+  typeof v === "string" && /^https:\/\/(drive|docs)\.google\.com\/\S+$/.test(v.trim()) ? v.trim() : null;
+
+/** Factura de un aviso (datos.factura_id), solo en los tipos que hablan de una factura. */
+export const facturaDeAviso = (a: Aviso): number | null => (TIPOS_DE_FACTURA.includes(a.tipo) ? enteroPositivo(a.datos?.factura_id) : null);
+
+/** Un mensaje: los avisos de una factura juntos, o un aviso suelto (factura_id null). */
+export interface GrupoAvisos {
+  factura_id: number | null;
+  avisos: Aviso[];
+}
+
+/** Agrupa los avisos por factura, en el orden en que llega el primero de cada una; los que no son de una factura, sueltos. */
+export function agruparPorFactura(avisos: Aviso[]): GrupoAvisos[] {
+  const salida: GrupoAvisos[] = [];
+  const porFactura = new Map<number, GrupoAvisos>();
+  for (const a of avisos) {
+    const f = facturaDeAviso(a);
+    if (f === null) {
+      salida.push({ factura_id: null, avisos: [a] });
+      continue;
+    }
+    const g = porFactura.get(f);
+    if (g) g.avisos.push(a);
+    else {
+      const nuevo = { factura_id: f, avisos: [a] };
+      porFactura.set(f, nuevo);
+      salida.push(nuevo);
+    }
+  }
+  return salida;
+}
+
+/** ¿Se espera al enlace de Drive? Solo si la factura aún no lo tiene y se subió hace menos de ESPERA_DRIVE_MIN. */
+export function esperarDrive(f: FacturaInfo | null | undefined, ahora: Date): boolean {
+  if (!f || urlDrive(f.drive_url)) return false;
+  const t = instanteUtc(f.created_at);
+  return t !== null && ahora.getTime() - t < ESPERA_DRIVE_MIN * 60_000;
+}
+
+// ─── Precio sugerido con el mismo margen (marisco y vino) ───────────────────
+
+/**
+ * Precio de carta que mantiene el MISMO margen multiplicativo cuando sube el coste: PVP × coste nuevo / coste anterior,
+ * redondeado hacia arriba a `paso`. El PVP de la carta lleva IVA y el coste de la factura no, pero el IVA multiplica
+ * igual antes y después, así que el multiplicador sin IVA (venta ÷ coste) queda igual.
+ * Ej.: carta 20 € con IVA, lo comprabas a 10 y ahora a 15 → 30 €. null si no sube o los datos no sirven.
+ */
+export function precioMismoMargen(pvp: number, costeAntes: number, costeAhora: number, paso = PASO_PRECIO): number | null {
+  if (!(pvp > 0) || !(costeAntes > 0) || !(costeAhora > costeAntes)) return null;
+  const ratio = costeAhora / costeAntes;
+  if (ratio >= RATIO_UNIDADES) return null; // casi seguro, unidades distintas
+  return Math.round(Math.ceil((pvp * ratio) / paso - 1e-9) * paso * 100) / 100;
+}
+
+/** Un vino o plato de la carta (restaurante) que se vende tal cual a partir de un producto de factura. */
+export interface ArticuloCarta {
+  tipo: "vino" | "plato";
+  id: string;
+  nombre: string;
+  /** PVP con IVA (precio_eur). */
+  precio: number;
+  /** Vinos: PVP de la copa (precio_copa_eur), si se vende por copas. */
+  copa?: number | null;
+}
+
+/** La carta de un producto: si es marisco, y los vinos y platos que lo venden tal cual. */
+export interface CartaDeProducto {
+  marisco: boolean;
+  articulos: ArticuloCarta[];
+}
+
+/** Filas que lee la función para saber qué vinos y platos venden cada producto. */
+export interface FilasCarta {
+  productos: { id: number; categoria_id: number | null }[];
+  categorias: { id: number; nombre: string }[];
+  vinoProducto: { vino_id: string; producto_id: number }[];
+  vinos: { id: string; nombre: string; precio_eur: number | string | null; precio_copa_eur?: number | string | null; activado?: boolean | null; restaurante?: boolean | null }[];
+  /** Escandallos de los platos que usan alguno de los productos (TODAS sus líneas, para saber si llevan algo más). */
+  escandallo: { plato_id: string; producto_id: number | null }[];
+  platos: { id: string; nombre: string; precio_eur: number | string | null; activado?: boolean | null; restaurante?: boolean | null }[];
+}
+
+/** «Marisco» o «Pescado y marisco» (la familia del propio producto; «Pescado» no). */
+export const esFamiliaMarisco = (nombre: string | null | undefined): boolean => /marisco/i.test(nombre ?? "");
+
+/**
+ * La carta de cada producto: los vinos enlazados (vino_producto) y los platos cuyo escandallo es SOLO ese producto
+ * (marisco al peso o por unidad: «Gamba roja», «Ostras»). Un plato con más ingredientes no: su coste no sube en la
+ * misma proporción. Solo lo activo en la carta del restaurante y con precio.
+ */
+export function cartaPorProducto(f: FilasCarta): Map<number, CartaDeProducto> {
+  const categoria = new Map(f.categorias.map((c) => [c.id, c.nombre]));
+  const vinos = new Map(f.vinos.filter((v) => v.activado !== false && v.restaurante !== false).map((v) => [v.id, v]));
+  const platos = new Map(f.platos.filter((p) => p.activado !== false && p.restaurante !== false).map((p) => [p.id, p]));
+  const ingredientes = new Map<string, Set<number>>();
+  for (const e of f.escandallo) {
+    if (e.producto_id === null) continue;
+    ingredientes.set(e.plato_id, (ingredientes.get(e.plato_id) ?? new Set()).add(e.producto_id));
+  }
+  const salida = new Map<number, CartaDeProducto>();
+  for (const p of f.productos) {
+    const articulos: ArticuloCarta[] = [];
+    for (const vp of f.vinoProducto.filter((x) => x.producto_id === p.id)) {
+      const v = vinos.get(vp.vino_id);
+      const precio = numero(v?.precio_eur);
+      if (v && precio !== null && precio > 0) articulos.push({ tipo: "vino", id: v.id, nombre: limpio(v.nombre), precio, copa: numero(v.precio_copa_eur) });
+    }
+    for (const [platoId, prods] of ingredientes) {
+      if (prods.size !== 1 || !prods.has(p.id)) continue;
+      const pl = platos.get(platoId);
+      const precio = numero(pl?.precio_eur);
+      if (pl && precio !== null && precio > 0) articulos.push({ tipo: "plato", id: pl.id, nombre: limpio(pl.nombre), precio });
+    }
+    salida.set(p.id, { marisco: esFamiliaMarisco(p.categoria_id !== null ? categoria.get(p.categoria_id) : null), articulos });
+  }
+  return salida;
+}
+
+/** Precio sugerido de un vino o plato tras una subida. */
+export interface SugerenciaCarta {
+  tipo: "vino" | "plato";
+  nombre: string;
+  antes: number;
+  sugerido: number;
+  copa?: { antes: number; sugerido: number } | null;
+}
+
+/**
+ * Precios sugeridos (mismo margen) de una subida de precio de MARISCO o VINO: los vinos enlazados al producto y, si
+ * el producto es marisco, los platos que lo venden tal cual. Vacío en el resto de casos.
+ */
+export function sugerenciasCarta(a: Aviso, carta: CartaDeProducto | null | undefined): SugerenciaCarta[] {
+  if (a.tipo !== "facturas_precio_sube" || !carta || motivoSospechoso(a)) return [];
+  const precio = numero(a.datos?.precio);
+  const ref = numero(a.datos?.precio_ref);
+  if (precio === null || ref === null) return [];
+  const salida: SugerenciaCarta[] = [];
+  for (const art of carta.articulos) {
+    if (art.tipo === "plato" && !carta.marisco) continue;
+    const sugerido = precioMismoMargen(art.precio, ref, precio);
+    if (sugerido === null) continue;
+    const copa = art.copa && art.copa > 0 ? precioMismoMargen(art.copa, ref, precio) : null;
+    salida.push({ tipo: art.tipo, nombre: art.nombre, antes: art.precio, sugerido, copa: copa !== null && art.copa ? { antes: art.copa, sugerido: copa } : null });
+  }
+  return salida.slice(0, MAX_SUGERENCIAS);
+}
+
+/** «↳ Gamba roja: carta 28,00 → 36,50 € (mismo margen)» (HTML; vinos con copa: «botella …, copa …»). */
+export function lineaSugerencia(s: SugerenciaCarta): string {
+  const nombre = esc(recortarPalabras(s.nombre, 40));
+  const botella = `${s.copa ? "botella" : "carta"} ${n2.format(s.antes)} → <b>${esc(eur(s.sugerido))}</b>`;
+  const copa = s.copa ? `, copa ${n2.format(s.copa.antes)} → <b>${esc(eur(s.copa.sugerido))}</b>` : "";
+  return `   ↳ ${nombre}: ${botella}${copa} (mismo margen)`;
+}
+
+// ─── Mensaje de una factura ─────────────────────────────────────────────────
+
+const ETIQUETA_DOC: Record<string, string> = { factura: "Factura", albaran: "Albarán", ticket: "Ticket", abono: "Abono" };
+
+/** «dd/mm» de un AAAA-MM-DD. */
+const ddmm = (f: unknown): string => (typeof f === "string" && /^\d{4}-\d{2}-\d{2}/.test(f) ? `${f.slice(8, 10)}/${f.slice(5, 7)}` : "");
+
+/** Cabecera (HTML) de la factura: «🧾 Nicolás y Valero · Factura F-123 del 09/10 · 1.234,56 €». */
+export function cabeceraFactura(f: FacturaInfo | null | undefined, avisos: Aviso[] = []): string {
+  const d = avisos[0]?.datos ?? {};
+  const prov = proveedorCorto(f?.proveedor ?? d.proveedor, 48) || "Proveedor sin nombre";
+  const doc = ETIQUETA_DOC[limpio(f?.tipo).toLowerCase()] ?? "Factura";
+  const num = limpio(f?.numero_documento);
+  const fecha = ddmm(f?.fecha ?? d.fecha);
+  const total = numero(f?.total);
+  const partes = [`${doc}${num ? ` ${recortar(num, 30)}` : ""}${fecha ? ` del ${fecha}` : ""}`, ...(total !== null ? [eurMiles(total)] : [])];
+  return `🧾 <b>${esc(prov)}</b> · ${esc(partes.join(" · "))}`;
+}
+
+/**
+ * Lo que ha pasado, sin el proveedor (ya va en la cabecera):
+ *   «Gamba roja N1 de Alicante: 136,00 → 178,00 €/kg (+31 %)»
+ *   «Aceite de oliva: 4,90 €/l, pactado 4,50 € (+9 %)»
+ *   «Importe inusual: 1.234,00 € (×3 su media)»
+ * El resto, como el aviso suelto (lineaAviso).
+ */
+export function lineaEnFactura(a: Aviso, sug?: Sugerencia | null): string {
+  const d = a.datos ?? {};
+  // El nombre del catálogo («Gamba roja N1 de Alicante») va en el título de la subida («… sube un 31 % en …»).
+  const delTitulo = a.tipo === "facturas_precio_sube" ? /^(.+?) sube un /.exec(limpio(a.titulo))?.[1] : null;
+  const prod = delTitulo ? recortarPalabras(delTitulo, 40) : producto(d.producto);
+  const precio = numero(d.precio);
+  const ref = numero(d.precio_ref);
+  const pct = variacion(d);
+  switch (a.tipo) {
+    case "facturas_precio_sube":
+    case "facturas_precio_baja":
+      if (prod && precio !== null && ref !== null && pct !== null) {
+        return recortar(`${prod}: ${n2.format(ref)} → ${eur(precio)}${medidaDe(d)} (${pctConSigno(pct)})`, MAX_LINEA);
+      }
+      break;
+    case "facturas_precio_pactado":
+      if (prod && precio !== null && ref !== null && pct !== null) {
+        return recortar(`${prod}: ${eur(precio)}${medidaDe(d)}, pactado ${eur(ref)} (${pctConSigno(pct)})`, MAX_LINEA);
+      }
+      break;
+    case "facturas_importe_inusual": {
+      const imp = numero(d.importe);
+      const veces = numero(d.veces);
+      if (imp !== null) return `Importe inusual: ${eurMiles(imp)}${veces !== null ? ` (×${nCorto.format(veces)} su media)` : ""}`;
+      break;
+    }
+    case "facturas_proveedor_nuevo":
+      return "Proveedor nuevo: primera factura suya";
+  }
+  return lineaAviso(a, { sug });
+}
+
+/** Lo que más importa primero: subidas (la mayor antes), margen bajo y el resto en su orden. */
+function ordenEnFactura(a: Aviso): number {
+  return a.tipo === "facturas_precio_sube" ? 0 : a.tipo === "facturas_margen_bajo" ? 1 : a.tipo === "facturas_precio_pactado" ? 2 : 3;
+}
+
+export interface OpcionesFactura {
+  panelUrl?: string | null;
+  /** Precio sugerido de los avisos «Margen bajo» (RPC avisos_precio_sugerido), por id de aviso. */
+  sugerencias?: Map<string, Sugerencia | null> | null;
+  /** La carta de cada producto (para el precio con el mismo margen). */
+  carta?: Map<number, CartaDeProducto> | null;
+}
+
+/**
+ * Mensaje (HTML) de UNA factura con todo lo que hay que destacar de ella:
+ *   🧾 Nicolás y Valero · Factura F-123 del 09/10 · 1.234,56 €
+ *   📈 Gamba roja N1 de Alicante: 136,00 → 178,00 €/kg (+31 %)
+ *      ↳ Gamba roja: carta 28,00 → 36,50 € (mismo margen)
+ *   ⚠️ Chuletón: coste 41 % (máx. 35 %) → súbelo a 24,50 € · Aplicar precio
+ *   📄 Original en Drive · Abrir en el panel
+ */
+export function mensajeFactura(f: FacturaInfo | null | undefined, avisos: Aviso[], op: OpcionesFactura = {}): string {
+  const lista = [...avisos].sort((x, y) => ordenEnFactura(x) - ordenEnFactura(y) || (variacion(y.datos ?? {}) ?? 0) - (variacion(x.datos ?? {}) ?? 0));
+  const lineas: string[] = [cabeceraFactura(f, lista)];
+  for (const a of lista.slice(0, MAX_AVISOS_FACTURA)) {
+    const sug = op.sugerencias?.get(a.id) ?? null;
+    const aplicar = a.tipo === "facturas_margen_bajo" && sugerenciaAplicable(sug) ? enlacePanel(op.panelUrl, rutaAplicarPrecio(a.id)) : null;
+    lineas.push(`${emojiTipo(a.tipo)} ${esc(lineaEnFactura(a, sug))}${aplicar ? ` · ${enlaceHtml(aplicar, "Aplicar precio")}` : ""}`);
+    const prod = enteroPositivo(a.datos?.producto_id);
+    for (const s of sugerenciasCarta(a, prod !== null ? op.carta?.get(prod) : null)) lineas.push(lineaSugerencia(s));
+  }
+  const resto = lista.length - MAX_AVISOS_FACTURA;
+  if (resto > 0) lineas.push(`➕ ${resto} ${resto === 1 ? "aviso más" : "avisos más"} de esta factura, en el panel`);
+  const id = f?.id ?? facturaDeAviso(lista[0]);
+  const drive = urlDrive(f?.drive_url);
+  const panel = id !== null && id !== undefined ? enlacePanel(op.panelUrl, `/facturas?tab=compras&modo=documentos&doc=${id}`) : null;
+  const enlaces = [drive ? enlaceHtml(drive, "Original en Drive") : "Original aún sin Drive", panel ? enlaceHtml(panel, "Abrir en el panel") : null];
+  lineas.push(`📄 ${enlaces.filter(Boolean).join(" · ")}`);
+  return lineas.join("\n");
+}
+
+// ─── Cierre del día ─────────────────────────────────────────────────────────
+
+/** Cuántos mensajes de Telegram distintos hay en unos envíos (los avisos de una factura comparten mensaje_id). */
+export function mensajesDistintos(envios: { mensaje_id?: number | null }[]): number {
+  const ids = new Set<number>();
+  let sueltos = 0;
+  for (const e of envios) {
+    if (typeof e.mensaje_id === "number") ids.add(e.mensaje_id);
+    else sueltos++;
+  }
+  return ids.size + sueltos;
+}
+
+/** ¿Es este aviso de hoy (Madrid) y cuenta en el cierre? Facturas y márgenes, sin «por revisar» ni lo dudoso. */
+function avisoDelCierre(a: Aviso, hoy: string, ahora: Date): boolean {
+  return diaMadrid(new Date(a.created_at)) === hoy && Date.parse(a.created_at) <= ahora.getTime()
+    && canalDeTipo(a.tipo) === "facturas" && a.tipo !== "facturas_revision"
+    && !tipoExcluido(a.tipo) && !campanaApagadaTelegram(a) && !motivoSospechoso(a)
+    && (!a.caduca_en || Date.parse(a.caduca_en) > ahora.getTime());
+}
+
+/**
+ * Cierre del día (HTML), en el chat de Resúmenes a la hora configurada (cierre_hora, por defecto 22:00 de Madrid):
+ *   🌙 Cierre del día · martes 25/11
+ *   🧾 Facturas subidas hoy: 3 · 1.530,40 €
+ *   • Nicolás y Valero · 912,00 €
+ *   …
+ *   📈 Suben de precio: 2
+ *   • Gamba roja N1 de Alicante +31 %
+ *   …
+ *   Facturas · Avisos
+ * Las facturas subidas hoy (de la mayor a la menor) y los avisos de Facturas y márgenes de hoy, por tipo. Vacío si no
+ * hay nada (no se manda).
+ */
+export function construirCierre(facturas: FacturaInfo[], avisos: Aviso[], ahora: Date, panelUrl?: string | null): { texto: string; facturas: number; avisos: number } {
+  const hoy = diaMadrid(ahora);
+  const deHoy = facturas.filter((f) => {
+    const t = instanteUtc(f.created_at);
+    return t !== null && t <= ahora.getTime() && diaMadrid(new Date(t)) === hoy;
+  }).sort((a, b) => (numero(b.total) ?? 0) - (numero(a.total) ?? 0));
+  const validos = avisos.filter((a) => avisoDelCierre(a, hoy, ahora));
+  if (deHoy.length === 0 && validos.length === 0) return { texto: "", facturas: 0, avisos: 0 };
+
+  const bloques: string[] = [];
+  const suma = deHoy.reduce((s, f) => s + (numero(f.total) ?? 0), 0);
+  const items = deHoy.slice(0, MAX_FACTURAS_CIERRE).map((f) => {
+    const doc = limpio(f.tipo).toLowerCase();
+    const total = numero(f.total);
+    return esc([proveedorCorto(f.proveedor, 34) || "Sin proveedor", ...(doc && doc !== "factura" ? [(ETIQUETA_DOC[doc] ?? doc).toLowerCase()] : []), ...(total !== null ? [eurMiles(total)] : [])].join(" · "));
+  });
+  if (deHoy.length > MAX_FACTURAS_CIERRE) items.push(`y ${deHoy.length - MAX_FACTURAS_CIERRE} más`);
+  bloques.push(seccion(deHoy.length ? `🧾 Facturas subidas hoy: ${deHoy.length} · ${esc(eurMiles(suma))}` : "🧾 Facturas subidas hoy: ninguna", items));
+
+  const grupos = new Map<string, Aviso[]>();
+  for (const a of validos) grupos.set(a.tipo, [...(grupos.get(a.tipo) ?? []), a]);
+  const ordenados = [...grupos.entries()].sort((x, y) => y[1].length - x[1].length || etiquetaTipo(x[0]).localeCompare(etiquetaTipo(y[0]), "es"));
+  for (const [tipo, lista] of ordenados) {
+    const principales = [...lista].sort((x, y) => peso(y) - peso(x) || Date.parse(y.created_at) - Date.parse(x.created_at)).slice(0, CASOS_CIERRE);
+    const resto = lista.length - principales.length;
+    bloques.push(seccion(`${emojiTipo(tipo)} ${esc(etiquetaTipo(tipo))}: ${lista.length}`, [...principales.map((a) => esc(casoCorto(a))), ...(resto > 0 ? [`y ${resto} más`] : [])]));
+  }
+  if (validos.length === 0) bloques.push("Sin avisos de precios ni márgenes hoy.");
+
+  const urlFacturas = deHoy.length ? enlacePanel(panelUrl, "/facturas?tab=compras&modo=documentos") : null;
+  const urlAvisos = validos.length ? enlacePanel(panelUrl, "/avisos") : null;
+  const pie = [urlFacturas && enlaceHtml(urlFacturas, "Facturas"), urlAvisos && enlaceHtml(urlAvisos, "Avisos")].filter(Boolean).join(" · ");
+  return { texto: componer(`<b>🌙 Cierre del día · ${fechaLarga(ahora)}</b>`, bloques, pie), facturas: deHoy.length, avisos: validos.length };
+}
