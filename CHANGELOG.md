@@ -2,6 +2,28 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.53.6] - 2026-11-24
+
+Objetivo: Revisión diaria de Linear 24/11: CAS-33 y CAS-34
+
+### Cambiado
+- Logs: un script que el navegador mete en la página ya no abre ticket aunque no esté en la línea 1 (CAS-33, CAS-34) ([#358](https://github.com/restcasatomascrevillent/admin-casatomas/pull/358))
+
+## [1.53.5] - 2026-11-24
+
+Objetivo: Fallos de la web y del admin a Linear a las 7:00 desde la tanda anterior (sin Facturas ni externos) y tickets a Done al publicarse el arreglo
+
+### Otros
+- Todo lo de Incidencias a Linear a las 7:00 y tickets a Done al publicarse el arreglo ([#354](https://github.com/restcasatomascrevillent/admin-casatomas/pull/354))
+- Los fallos de servicios externos no pasan solos a Linear ([#356](https://github.com/restcasatomascrevillent/admin-casatomas/pull/356))
+
+## [1.53.3] - 2026-11-24
+
+Objetivo: Ver una reserva nueva desde Avisos o la campana ya no quita su aviso mientras siga pendiente
+
+### Cambiado
+- Avisos: ver una «Reserva nueva» ya no la da por revisada ([#352](https://github.com/restcasatomascrevillent/admin-casatomas/pull/352))
+
 ## [1.53.2] - 2026-11-23
 
 Objetivo: CI en verde: la migración de la búsqueda del copiloto deja de repetir versión (sin cambios de comportamiento)

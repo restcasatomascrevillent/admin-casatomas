@@ -75,14 +75,26 @@ Fuente única: `src/components/trafico-web/comportamiento/definiciones.ts`. El c
 
 ## Incidencias y Linear
 
-> **Tanda diaria (20261218100000, 23/11/2026, petición del dueño: «a las 7:00 pasa todos los nuevos fallos a Linear, todos
-> los que no tengan que ver con facturas»).** Con `web_logs_config.linear_tanda_hora` (7 por defecto), los fallos de la web
-> y del admin (rojos) **solo abren ticket al momento si son críticos** (lo que impide reservar o pagar un cheque). Los demás
-> los marca `procesar-logs-web` en su primera pasada desde esa hora (Madrid): todos los que no tienen ticket y tienen alguna
-> ocurrencia real en la ventana, **sin umbrales de ocurrencias ni de sesiones**, salvo los de la zona **Facturas**
-> (`linear_tanda_sin_facturas`; se pueden pedir a mano). Una vez al día (`web_logs_estado.linear_tanda_ultimo_dia`); los
-> tickets se crean después como siempre, con el tope diario. Los externos (con su interruptor) siguen con sus umbrales. Con
-> `linear_tanda_hora = null` (Configuración › Incidencias y avisos › «Al momento, si superan los umbrales»), todo como antes.
+> **Tanda diaria (20261218100000 y 20261219100000; dueño, 23 y 24/11/2026: «a las 7:00 pasa todos los fallos de
+> Incidencias a Linear, salvo los de Facturas y los de servicios externos; cuando se solucione, Done en Linear y que
+> desaparezca de Incidencias»).**
+> - Con `web_logs_config.linear_tanda_hora` (7 por defecto), los fallos de la web y del admin **solo abren ticket al
+>   momento si son críticos** (lo que impide reservar o pagar un cheque). Los de servicios externos no pasan (interruptor
+>   «Tickets de servicios externos» apagado; si se enciende, también esperan a la tanda). Los 404 siguen su regla
+>   (`tickets_404` y umbral diario).
+> - Los demás los marca `procesar-logs-web` en su primera pasada desde esa hora (Madrid), una vez al día
+>   (`web_logs_estado.linear_tanda_ultimo_dia`): todos los que no tienen ticket y tienen alguna ocurrencia real **desde
+>   el principio del día de la tanda anterior** (7 días si no la hubo, 30 como mucho; `web_logs_candidatos_tanda`),
+>   **sin umbrales**, salvo los de la zona **Facturas** (`linear_tanda_sin_facturas`; se pueden pedir a mano). La primera
+>   tanda, el 24/11, solo miraba 24 h y se dejó dos fallos del domingo. Los tickets se crean después como siempre, con el
+>   tope diario.
+> - **Al publicarse el arreglo**: la tarea programada «Aplicar en producción las releases aceptadas» lee la línea
+>   «Tickets que arregla: CAS-…» de la release aceptada y llama a `web_logs_resolver_por_release(tickets, versión)`
+>   (solo `service_role`). La incidencia pasa a «resuelta» (sale de Incidencias › Activas) y `procesar-logs-web` pasa
+>   el ticket al primer estado «completado» del equipo (Done) con el comentario «✅ Arreglado en la versión X…». Si el
+>   fallo vuelve a pasar, se reabre sola y se avisa en el mismo ticket.
+> - Con `linear_tanda_hora = null` (Configuración › Incidencias y avisos › «Al momento, si superan los umbrales»),
+>   todo como antes.
 
 - **Huella estable**: no cambia con los números, los ids, el hash de los ficheros de Vite ni la línea. Sí cambia con el tipo, el mensaje normalizado o la función donde salta; en los 404, con la ruta.
 - **Umbrales** (configurables):
@@ -151,7 +163,7 @@ Cada error (`web_eventos.origen`) y cada incidencia (`web_incidencias.origen`, `
 | **Rojo** | Fallo de la web | JS de nuestro código, React, promesas que no son de red, 404 de nuestras páginas o ficheros, 5xx de nuestras funciones, despliegue fallido, falta una clave nuestra, versión antigua que **no** se arregló al recargar o sin versión nueva | Sí (umbrales). Cuenta en el número rojo de la pestaña |
 | **Ámbar** | Servicio externo | Google Maps, Mapbox, Instagram/Meta, Stripe, OpenAI, Google (IA, Drive, reseñas), Resend, Vercel, Telegram, Vapi, Google Fonts, YouTube, Supabase saturado (pg_cron) o un recurso de otro dominio | Solo si se activa «Los servicios externos también pueden abrir ticket» (Configuración › Incidencias y avisos). Se cuentan aparte («Externos: N») |
 | **Gris** | Conexión del visitante | Petición sin respuesta (estado 0, «Sin respuesta de…»), «Failed to fetch», «Load failed», «NetworkError», cancelada, sin conexión; imagen de la web que no cargó y sí al volver a pedirla (`accion` «recuperada_al_reintentar») o que tampoco cargó y el servidor no contestaba (`accion` «sin_conexion»): la web la reintenta una vez y la repinta (CAS-17, migración 20261213040000) | Nunca |
-| **Gris** | Navegador o extensión | `chrome-extension://`, `moz-extension://`, `safari-web-extension://`…, scripts de los navegadores de las apps, «ResizeObserver loop», «Script error.», rastreadores bloqueados; errores de React al hidratar (#418/#421/#422/#423/#425) con la página cambiada por el navegador antes de hidratar (`accion` «pagina_traducida»: rastro del traductor de Chrome o Edge; o «dom_ajeno»: la web vio con un vigilante que algo de fuera cambió el HTML, p. ej. la traducción de Safari o una extensión; CAS-6/18/19/20, migración 20261213040000). Sin esa marca, un error de hidratación sigue siendo de la web; scripts que mete el navegador en la página (`__firefox__`, `window.ethereum` o una pila con todos los marcos en la línea 1 de una página y ningún .js: Brave en iPhone, CAS-21..28). La web no tiene código propio en la línea 1 y su build lo comprueba (web-casatomas#92) | Nunca |
+| **Gris** | Navegador o extensión | `chrome-extension://`, `moz-extension://`, `safari-web-extension://`…, scripts de los navegadores de las apps, «ResizeObserver loop», «Script error.», rastreadores bloqueados; errores de React al hidratar (#418/#421/#422/#423/#425) con la página cambiada por el navegador antes de hidratar (`accion` «pagina_traducida»: rastro del traductor de Chrome o Edge; o «dom_ajeno»: la web vio con un vigilante que algo de fuera cambió el HTML, p. ej. la traducción de Safari o una extensión; CAS-6/18/19/20, migración 20261213040000). Sin esa marca, un error de hidratación sigue siendo de la web; scripts que mete el navegador en la página (`__firefox__`, `window.ethereum` o una pila con todos los marcos en la línea 1 de una página y ningún .js: Brave en iPhone, CAS-21..28). La web no tiene código propio en la línea 1 y su build lo comprueba (web-casatomas#92); o una pila con todos los marcos en líneas de la página de la 100 en adelante y ningún .js (Chrome en iPhone, «Maximum call stack size exceeded», CAS-33/34, migración 20261220100000): el HTML de la web no llega a esas líneas y su build lo comprueba (web-casatomas scripts/verificar-html.mjs) | Nunca |
 | **Gris** | Versión antigua (se arregló sola) | `tras_publicar` sin impacto o sin datos de después | Nunca |
 | **Gris** | Bots y pruebas | Solo ocurrencias de bots, pruebas automáticas o tráfico interno (si «No contar pruebas…» está activado) | Nunca |
 

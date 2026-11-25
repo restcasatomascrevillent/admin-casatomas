@@ -26,7 +26,16 @@ describe("unidades canónicas de platos", () => {
         "ración",
         "RACIONES",
       ]),
-    ).toEqual(["Unidad", "kg", "gramos", "Ración"]);
+    ).toEqual(["Unidad", "Ración", "kg", "gramos"]);
+  });
+  it("ofrece «Ración» aunque ningún plato la use todavía", () => {
+    expect(opcionesUnidadPlato()).toEqual(["Unidad", "Ración", "kg", "gramos"]);
+    expect(opcionesUnidadPlato(["Unidad", "kg"])).toContain("Ración");
+  });
+  it("guarda la ración con su forma canónica", () => {
+    expect(guardarUnidadPlato("Ración")).toBe("Ración");
+    expect(normalizarUnidadPlato("racion")).toBe("Ración");
+    expect(descomponerUnidad("Ración")).toEqual({ unidad: "Ración", gramos: 100 });
   });
   it("conserva el peso y transforma las formas históricas", () => {
     expect(normalizarUnidadPlato("150gramos")).toBe("150 g");

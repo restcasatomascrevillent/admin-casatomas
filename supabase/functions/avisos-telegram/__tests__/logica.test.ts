@@ -184,7 +184,7 @@ describe("avisos-telegram · avisos de una línea", () => {
     expect(errorSaneado("fallo en https://api.telegram.org/bot123456:ABC-def_g/sendMessage")).not.toContain("123456:ABC");
   });
   it("acciones válidas y su tipo en el registro (el de fallos es «fallo»)", () => {
-    expect(["pendientes", "resumen", "probar", "fallos", "semanal"].every(esAccion)).toBe(true);
+    expect(["pendientes", "resumen", "probar", "fallos", "semanal", "informes"].every(esAccion)).toBe(true);
     expect(esAccion("borrar")).toBe(false);
     expect(["pendientes", "resumen", "probar", "fallos", "semanal"].map((a) => tipoRegistro(a as never))).toEqual(["pendientes", "resumen", "prueba", "fallo", "semanal"]);
   });

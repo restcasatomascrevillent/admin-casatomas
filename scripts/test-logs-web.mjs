@@ -39,8 +39,12 @@ const ORIGEN = await readFile("supabase/migrations/20261130100000_logs_web_orige
 const ROLLBACK_ORIGEN = await readFile("supabase/rollbacks/20261130100000_logs_web_origen_ROLLBACK.sql", "utf8");
 const NAVEGADOR = await readFile("supabase/migrations/20261213040000_logs_web_navegador_reaperturas.sql", "utf8");
 const ROLLBACK_NAVEGADOR = await readFile("supabase/rollbacks/20261213040000_logs_web_navegador_reaperturas_ROLLBACK.sql", "utf8");
+const PILA = await readFile("supabase/migrations/20261220100000_logs_web_pila_fuera_del_html.sql", "utf8");
+const ROLLBACK_PILA = await readFile("supabase/rollbacks/20261220100000_logs_web_pila_fuera_del_html_ROLLBACK.sql", "utf8");
 const TANDA = await readFile("supabase/migrations/20261218100000_logs_linear_tanda_diaria.sql", "utf8");
 const ROLLBACK_TANDA = await readFile("supabase/rollbacks/20261218100000_logs_linear_tanda_diaria_ROLLBACK.sql", "utf8");
+const TODO = await readFile("supabase/migrations/20261219100000_logs_tanda_todo_y_cierre_al_publicar.sql", "utf8");
+const ROLLBACK_TODO = await readFile("supabase/rollbacks/20261219100000_logs_tanda_todo_y_cierre_al_publicar_ROLLBACK.sql", "utf8");
 // Los mismos casos que el vitest de origen.ts: el SQL tiene que clasificar igual.
 const CASOS_ORIGEN = JSON.parse(await readFile("supabase/functions/_shared/__tests__/logs-web-origen-casos.json", "utf8"));
 // El patrón de «versión antigua» del SQL tiene que ser el mismo que el de huella.ts.
@@ -536,6 +540,18 @@ ok((await q("select count(*)::int n from public.web_eventos where sesion_id = $1
   await db.exec(NAVEGADOR); // idempotente
   comprobaciones++;
 
+  // Antes de 20261220100000, una pila en líneas de la página que el HTML no tiene era «de la web» (CAS-33/34).
+  const origenDe = async (d) => (await q("select public.web_logs_origen_error($1, $2, $3, $4, $5, $6::jsonb, $7, $8) o",
+    [d.tipo, d.fuente ?? null, d.mensaje ?? null, d.pila ?? null, d.objetivo ?? null, JSON.stringify(d.propiedades ?? {}), d.accion ?? null, d.tras_publicar ?? null])).rows[0].o;
+  const CAS33 = CASOS_ORIGEN.find((c) => c.nombre.startsWith("CAS-33")).datos;
+  igual(await origenDe(CAS33), "web", "sin la migración, CAS-33 cuenta como fallo de la web");
+  await db.exec(PILA);
+  await db.exec(PILA); // idempotente
+  await db.exec(ROLLBACK_PILA);
+  igual(await origenDe(CAS33), "web", "el rollback de 20261220100000 vuelve a la regla anterior");
+  await db.exec(PILA);
+  igual(await origenDe(CAS33), "navegador", "con la migración, CAS-33 es del navegador");
+
   // Mismos casos que origen.ts (vitest): el SQL clasifica igual.
   for (const c of CASOS_ORIGEN) {
     const d = c.datos;
@@ -782,6 +798,106 @@ ok((await q("select count(*)::int n from public.web_logs_config")).rows[0].n ===
   igual((await est(HT)).linear_estado, "pendiente", "tras el rollback, vuelven los umbrales (5 ocurrencias en 5 sesiones)");
   await db.exec(TANDA);
   igual((await q("select linear_tanda_hora from public.web_logs_config")).rows[0].linear_tanda_hora, 7, "se puede volver a aplicar");
+}
+
+// ─── 12. Todo lo de Incidencias a Linear a las 7:00 y Done al publicar (20261219100000, 24/11/2026) ──
+// El 24/11 la primera tanda se dejó dos fallos de la web del domingo (solo miraba 24 h). El dueño pidió además que
+// pase todo lo de la vista de Incidencias (web, admin y externos; sin Facturas) y que, al publicarse el arreglo, el
+// ticket pase a Done y la incidencia desaparezca de Incidencias.
+{
+  await q("update public.web_logs_estado set linear_tanda_ultimo_dia = current_date");
+  await q("update public.web_logs_config set linear_tickets_externos = false, tickets_404 = false, umbral_ocurrencias = 3, umbral_sesiones = 2");
+  await db.exec(TODO);
+  await db.exec(TODO); // idempotente
+  igual((await q("select linear_tickets_externos from public.web_logs_config")).rows[0].linear_tickets_externos, false,
+        "no enciende los tickets de servicios externos (dueño, 24/11: «los de servicios externos no tienen que pasar»)");
+  await q("update public.web_logs_config set linear_tickets_externos = true"); // para probar la regla si algún día se encienden
+  igual((await q("select linear_tanda_ultimo_dia from public.web_logs_estado")).rows[0].linear_tanda_ultimo_dia, null, "la tanda de hoy se repite con la regla nueva");
+
+  const H = { viejo: "b1".repeat(16), hoy: "b2".repeat(16), ticket: "b3".repeat(16), n404: "b4".repeat(16), interno: "b5".repeat(16),
+              bot: "b6".repeat(16), mes: "b7".repeat(16), demo: "b8".repeat(16), ext: "b9".repeat(16), extCrit: "ba".repeat(16), web3: "bb".repeat(16) };
+  const uno = (h, extra = {}) => ev({ tipo: "error_js", categoria: "error", gravedad: "error", huella: h, ruta: "/carta/carnes",
+    mensaje: `RangeError: Maximum call stack size exceeded ${h.slice(0, 2)}`, sesion_id: randomUUID(), secuencia: 900, version: "1.14.0", ...extra });
+  const mapa = (h, extra = {}) => uno(h, { mensaje: "Google Maps JavaScript API error: RefererNotAllowedMapError", ...extra });
+  const pid = async (h, entorno = "produccion") => (await q("select id from public.web_incidencias where huella = $1 and entorno = $2", [h, entorno])).rows[0].id;
+  const est = async (h) => (await q("select estado, linear_estado, origen from public.web_incidencias where huella = $1 and entorno = 'produccion'", [h])).rows[0];
+  await ingerir([uno(H.viejo), uno(H.hoy), uno(H.ticket), uno(H.interno, { es_interno: true }), uno(H.bot, { es_bot: true }), uno(H.mes),
+                 ...[0, 1, 2].map(() => mapa(H.ext)), mapa(H.extCrit, { gravedad: "critico" }), ...[0, 1, 2].map(() => uno(H.web3)),
+                 ...[0, 1, 2, 3].map(() => ev({ tipo: "error_404", categoria: "error", gravedad: "aviso", huella: H.n404, ruta: "/carta/nada", sesion_id: randomUUID() }))]);
+  await ingerir([uno(H.demo)], { entorno: "demo" });
+  await agrupar();
+  igual((await est(H.ext)).origen, "externo", "Google Maps es un servicio externo");
+  igual((await est(H.ext)).linear_estado, "sin_ticket", "con tanda, un externo por encima de los umbrales espera a la tanda");
+  igual((await est(H.web3)).linear_estado, "sin_ticket", "igual que uno de la web");
+  igual((await est(H.extCrit)).linear_estado, "pendiente", "un externo crítico abre ticket al momento");
+  await q("update public.web_logs_config set tickets_404 = true, umbral_404_diario = 3");
+  await ingerir([ev({ tipo: "error_404", categoria: "error", gravedad: "aviso", huella: H.n404, ruta: "/carta/nada", sesion_id: randomUUID() })]);
+  await agrupar();
+  igual((await est(H.n404)).linear_estado, "pendiente", "los 404 siguen su regla (tickets_404 y umbral diario), con o sin tanda");
+  await q("update public.web_logs_config set tickets_404 = false");
+  await q("update public.web_incidencias set linear_estado = 'sin_ticket', requiere_ticket = false where huella in ($1, $2)", [H.n404, H.extCrit]);
+
+  // El fallo «viejo» pasó hace 40 h (como los del domingo) y el «mes», hace 20 días.
+  await q("update public.web_eventos e set ocurrido_en = now() - interval '40 hours' from public.web_incidencias i where e.incidencia_id = i.id and i.huella = $1", [H.viejo]);
+  await q("update public.web_eventos e set ocurrido_en = now() - interval '20 days' from public.web_incidencias i where e.incidencia_id = i.id and i.huella = $1", [H.mes]);
+  await q("update public.web_incidencias set linear_estado = 'creado', linear_destino = 'prueba', linear_issue_id = 'iss-b3', linear_identificador = 'CAS-90' where huella = $1", [H.ticket]);
+  await agrupar();
+  igual((await q("select ocurrencias_ventana from public.web_incidencias where huella = $1 and entorno = 'produccion'", [H.viejo])).rows[0].ocurrencias_ventana, 0,
+        "el fallo de hace 40 h ya no tiene ocurrencias en la ventana (por eso la tanda de antes no lo cogía)");
+  const candidatas = (desde, entornos = ["produccion"]) => como(null, async () => (await q(
+    "select huella from public.web_logs_candidatos_tanda($1::timestamptz, $2::text[], 300) order by huella", [desde, entornos])).rows.map((x) => x.huella), "service_role");
+  const hace = (h) => new Date(Date.now() - h * 3_600_000).toISOString();
+  igual((await est(H.extCrit)).linear_estado, "pendiente", "el crítico vuelve a ir al momento al reagrupar");
+  igual(await candidatas(hace(7 * 24)), [H.viejo, H.hoy, H.ext, H.web3].sort(),
+        "desde hace 7 días: los de la web y los externos, también el de hace 40 h; no los que ya tienen ticket (o van al momento), los 404, el tráfico interno, los bots ni los de hace 20 días");
+  igual(await candidatas(hace(24)), [H.hoy, H.ext, H.web3].sort(), "desde ayer: sin el de hace 40 h");
+  igual((await candidatas(hace(30 * 24))).includes(H.mes), true, "desde hace 30 días entra el de hace 20");
+  igual(await candidatas(hace(7 * 24), ["demo"]), [H.demo], "cada entorno con lo suyo");
+  await q("update public.web_logs_config set linear_tickets_externos = false");
+  igual((await candidatas(hace(7 * 24))).includes(H.ext), false, "sin el interruptor de externos, la tanda no los coge");
+  await q("update public.web_logs_config set linear_tickets_externos = true");
+  await q("update public.web_logs_config set excluir_pruebas_tickets = false");
+  await agrupar(); // procesar-logs-web agrupa antes de la tanda: el origen pasa de «bots» a «web»
+  igual((await candidatas(hace(7 * 24))).includes(H.interno), true, "con «contar pruebas», el tráfico interno también entra");
+  await q("update public.web_logs_config set excluir_pruebas_tickets = true");
+  await agrupar();
+  igual((await candidatas(hace(7 * 24))).includes(H.interno), false, "y sin ella, vuelve a quedar fuera");
+  await rechaza(U.SA, "select * from public.web_logs_candidatos_tanda(now() - interval '1 day', array['produccion'], 10)", /permission denied/,
+                "solo la función del servidor (service_role) pide las candidatas");
+
+  // Al publicarse el arreglo: resuelta (sale de «Activas») y su ticket, pendiente de pasar a Done.
+  const resolver = (ids, version) => como(null, async () => (await q("select * from public.web_logs_resolver_por_release($1::text[], $2)", [ids, version])).rows, "service_role");
+  await q("update public.web_incidencias set linear_estado = 'creado', linear_destino = 'prueba', linear_issue_id = 'iss-bb', linear_identificador = 'CAS-91', estado = 'ignorada' where huella = $1", [H.web3]);
+  const r = await resolver(["cas-90", " CAS-91 ", "CAS-999", "basura", "CAS-90"], "1.53.3");
+  igual(r.map((x) => [x.linear_identificador, x.estado_antes]), [["CAS-90", "nueva"]], "solo las que tienen ese ticket y no están ignoradas (y sin repetir)");
+  const tras = (await q("select estado, resuelta_en is not null resuelta_en, linear_cerrar_pendiente, linear_cerrar_motivo from public.web_incidencias where huella = $1", [H.ticket])).rows[0];
+  igual([tras.estado, tras.resuelta_en, tras.linear_cerrar_pendiente], ["resuelta", true, true], "resuelta, con su fecha, y su ticket pendiente de pasar a Done");
+  ok(/^Arreglado en la versión 1\.53\.3, publicada el \d{2}\/\d{2}\/\d{4} a las \d{2}:\d{2}\.$/.test(tras.linear_cerrar_motivo), "el motivo dice la versión y cuándo se publicó");
+  igual(await resolver([], "1.53.3"), [], "sin tickets, no hace nada");
+  await assert.rejects(resolver(["CAS-90"], "1.53"), /Versión no válida/, "la versión tiene que ser X.Y.Z"); comprobaciones++;
+  await assert.rejects(resolver(Array.from({ length: 51 }, (_, i) => `CAS-${i + 1}`), "1.53.3"), /como mucho 50/, "como mucho 50 tickets"); comprobaciones++;
+  await rechaza(U.SA, "select * from public.web_logs_resolver_por_release(array['CAS-90'], '1.53.3')", /permission denied/,
+                "solo la tarea de producción (service_role) puede resolver por release");
+  await q("insert into public.web_linear_prueba (incidencia_id, operacion, linear_uuid) values ($1, 'cerrar', gen_random_uuid())", [await pid(H.ticket)]);
+  comprobaciones++;
+  // Si el fallo vuelve tras publicarse el arreglo, se reabre solo (como siempre).
+  await ingerir([uno(H.ticket)]);
+  await agrupar();
+  igual((await est(H.ticket)).estado, "reabierta", "si vuelve a pasar, se reabre sola");
+
+  await db.exec(ROLLBACK_TODO);
+  await db.exec(ROLLBACK_TODO); // idempotente
+  igual((await q("select count(*)::int n from pg_proc where proname in ('web_logs_candidatos_tanda', 'web_logs_resolver_por_release')")).rows[0].n, 0, "el rollback quita las funciones");
+  igual((await q("select count(*)::int n from information_schema.columns where table_name = 'web_incidencias' and column_name like 'linear_cerrar%'")).rows[0].n, 0,
+        "y las columnas de cierre");
+  const HX = "bc".repeat(16);
+  await q("update public.web_logs_config set linear_tickets_externos = true");
+  await ingerir([0, 1, 2].map(() => mapa(HX)));
+  await agrupar();
+  igual((await est(HX)).linear_estado, "pendiente", "tras el rollback, un externo vuelve a abrir ticket al momento por umbrales (como en 20261218100000)");
+  await q("update public.web_logs_config set linear_tickets_externos = false");
+  await db.exec(TODO);
+  igual((await q("select count(*)::int n from pg_proc where proname = 'web_logs_resolver_por_release'")).rows[0].n, 1, "se puede volver a aplicar");
 }
 
 console.log(`✓ Logs web: ${comprobaciones} comprobaciones`);

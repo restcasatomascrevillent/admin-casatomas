@@ -1,4 +1,5 @@
 import { erroresFactura, facturaSchema, sinDatosFiscales, tituloRecibo, totalesRecibo, euros, type Factura } from "./modelo";
+import { importesDesglose, textoUsos } from "./desgloseIa";
 
 export interface OpcionesPdf {
   /**
@@ -105,6 +106,20 @@ export async function crearPdfFactura(original: Factura, { borrador = false }: O
     derechaTexto(euros(l.precio), 150, y, 30);
     derechaTexto(euros(l.baseAntesGlobal), 192, y, 28);
     y += alto;
+    // Desglose de la IA (25/11/2026): debajo de su línea, en pequeño y sin sumar aparte.
+    const partes = importesDesglose(l.baseAntesGlobal, l.desglose);
+    if (partes.length) {
+      y -= 4;
+      for (const d of partes) {
+        if (y + 4.5 > limite) { pagina(); cabeceraTabla(); }
+        doc.setFont("OficiosSans", "normal"); doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
+        const texto = doc.splitTextToSize("· " + d.concepto + (d.usos ? " (" + textoUsos(d.usos) + ")" : ""), 120)[0] as string;
+        doc.text(texto, 22, y);
+        doc.text(euros(d.importe), 192, y, { align: "right" });
+        y += 4.2;
+      }
+      y += 4;
+    }
     doc.setDrawColor(220,220,220); doc.line(izquierda, y-4, derecha, y-4);
   }
   const altoTotales = 22 + (hayDescuento ? 14 : 0) + ((f.descuentoGlobal??0)>0 ? 14 : 0);

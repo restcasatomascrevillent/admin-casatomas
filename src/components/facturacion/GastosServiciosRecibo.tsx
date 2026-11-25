@@ -7,6 +7,7 @@ import { rutaServicios } from "@/components/servicios/pestanas";
 import type { GastosServiciosMes } from "@/hooks/useGastosServiciosMes";
 import type { GastoServicio } from "./catalogo";
 import { euros, redondear, textoMesRecibo, type LineaFactura } from "./modelo";
+import { importesDesglose, textoUsos } from "./desgloseIa";
 
 const TEXTO_ORIGEN: Record<GastoServicio["origen"], string> = {
   manual: "Metido a mano",
@@ -68,7 +69,7 @@ export function GastosServiciosRecibo({ mes, gastos: q, enRecibo, poner, cambiar
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Gastos de Servicios{textoMes ? ` · ${textoMes}` : ""}</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Lo que se ve en <a className="underline underline-offset-2" href={rutaServicios("costes")}>Servicios › Costes</a> para ese mes. Cambia aquí el precio o el descuento de cada gasto: lo que pone «En el recibo» es lo que se cobra.
+          Lo que se ve en <a className="underline underline-offset-2" href={rutaServicios("costes")}>Servicios › Costes</a> para ese mes, sin Stripe (no lo pagamos nosotros). Cambia aquí el precio o el descuento de cada gasto: lo que pone «En el recibo» es lo que se cobra.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -94,6 +95,16 @@ export function GastosServiciosRecibo({ mes, gastos: q, enRecibo, poner, cambiar
                       {g && <span className={`rounded-full px-2 py-0.5 ${TONO_ORIGEN[g.origen]}`}>{TEXTO_ORIGEN[g.origen]}</span>}
                       {g ? <span>En Servicios: {euros(g.importe)}{distinto ? " (precio cambiado)" : ""}</span> : !q.cargando && q.gastos ? <span>Ya no está en Servicios para ese mes</span> : null}
                     </p>
+                    {!!l.desglose?.length && (
+                      <ul aria-label={`En qué se ha gastado ${nombre}`} className="mt-2 space-y-0.5 border-l-2 pl-2 text-xs text-muted-foreground" data-testid={`desglose-${l.proveedor}`}>
+                        {importesDesglose(importeLinea(l), l.desglose).map((d) => (
+                          <li key={d.concepto} className="flex min-w-0 justify-between gap-3">
+                            <span className="min-w-0 break-words">{d.concepto}{d.usos ? <span className="text-[11px]"> · {textoUsos(d.usos)}</span> : null}</span>
+                            <span className="shrink-0 tabular-nums">{euros(d.importe)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                   <div className="flex min-w-0 flex-wrap items-end gap-2">
                     <label className="block w-28 text-xs text-muted-foreground">Precio (€)

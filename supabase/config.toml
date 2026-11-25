@@ -420,3 +420,9 @@ verify_jwt = true
 # Ver supabase/functions/control-excel/control.ts y docs/CONTROL-EXCEL.md.
 [functions.control-excel]
 verify_jwt = true
+
+# Tarea programada «Informes mensuales» (último jueves, .github/workflows/informes-mensuales.yml): sube a
+# Google Drive (secretos GOOGLE_* de las facturas) los PDF de Super Admin › Informes y el recibo mensual.
+# JWT de usuario + is_super_admin (exigirSuperAdmin). Ver supabase/functions/informes-mensuales/manejador.ts.
+[functions.informes-mensuales]
+verify_jwt = true

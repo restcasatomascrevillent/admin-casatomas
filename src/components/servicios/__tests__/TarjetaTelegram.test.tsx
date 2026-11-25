@@ -31,6 +31,8 @@ const CONFIG = {
   silencio_desde: 23,
   silencio_hasta: 8,
   resumen_ultimo_dia: null,
+  cierre_activo: true,
+  cierre_hora: 22,
 };
 
 beforeEach(() => {
@@ -139,5 +141,17 @@ describe("TarjetaTelegram", () => {
   it("valida el chat_id como la base de datos", () => {
     expect(["-1001234567890", "12345", "@canal_ct"].every(chatIdValido)).toBe(true);
     expect(["", "hola", "@abc", "-100 12", "1; drop"].some(chatIdValido)).toBe(false);
+  });
+  it("cierre del día: activo a las 22:00 por defecto; se puede cambiar la hora o apagarlo", async () => {
+    h.guardar.mockResolvedValue(undefined);
+    render(<TarjetaTelegram />);
+    expect(screen.getByLabelText("Cierre del día a las")).toBeChecked();
+    expect(screen.getByLabelText("Hora del cierre del día")).toHaveValue("22");
+    expect(screen.getByText(/con el enlace al original en Drive/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Hora del cierre del día"), { target: { value: "23" } });
+    fireEvent.click(screen.getByLabelText("Cierre del día a las"));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(h.guardar).toHaveBeenCalledTimes(1));
+    expect(h.guardar.mock.calls[0][0]).toMatchObject({ cierre_activo: false, cierre_hora: 23 });
   });
 });
