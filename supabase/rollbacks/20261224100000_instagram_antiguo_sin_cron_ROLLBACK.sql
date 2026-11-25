@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ============================================================================
--- ROLLBACK de 20261219100000_instagram_antiguo_sin_cron
+-- ROLLBACK de 20261224100000_instagram_antiguo_sin_cron
 -- ----------------------------------------------------------------------------
 -- Vuelve a programar las tres tareas del Instagram antiguo, con la misma llamada
 -- que tenían (20261109100000_instagram_video.sql, 20261106100000_instagram_metricas.sql

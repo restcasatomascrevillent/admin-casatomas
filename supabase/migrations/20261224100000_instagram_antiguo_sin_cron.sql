@@ -15,7 +15,7 @@ set client_encoding = 'UTF8';
 -- (`instagram_programaciones` queda como esté, sin publicarse). Las Edge Functions
 -- `instagram-*` siguen desplegadas; su retirada irá en el PR del borrado, con el
 -- «sí» del dueño. Demo primero; en producción, solo con la release y su «sí».
--- Vuelta atrás: supabase/rollbacks/20261219100000_instagram_antiguo_sin_cron_ROLLBACK.sql
+-- Vuelta atrás: supabase/rollbacks/20261224100000_instagram_antiguo_sin_cron_ROLLBACK.sql
 -- (OJO: al volver, lo que siga programado y vencido se publicaría en 5 minutos).
 -- Tiene que terminar en «instagram_antiguo_sin_cron: aplicado».
 -- ============================================================================

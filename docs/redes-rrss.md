@@ -23,7 +23,7 @@ y archivados en la rama local `archivo/instagram-estudio` (desde `origin/staging
 borrado será otro PR cuando el dueño lo confirme. Sus tres cron (`instagram-programador`,
 `instagram-metricas-diarias` e `instagram-limpieza-bucket`) publicarían lo que ya estuviera programado
 sin pantalla que lo enseñe: este PR los quita con la migración
-`20261219100000_instagram_antiguo_sin_cron.sql` (vuelta atrás en `supabase/rollbacks/`; prueba
+`20261224100000_instagram_antiguo_sin_cron.sql` (vuelta atrás en `supabase/rollbacks/`; prueba
 `npm run test:instagram-sin-cron:db`). Lo programado queda guardado, sin publicarse.
 
 ## Quién entra

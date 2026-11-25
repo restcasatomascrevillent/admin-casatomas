@@ -1,4 +1,4 @@
-// Instagram antiguo sin tareas automáticas (migración 20261219100000) contra un
+// Instagram antiguo sin tareas automáticas (migración 20261224100000) contra un
 // Postgres en memoria (PGlite) con un pg_cron de mentira. Nunca toca Supabase.
 //
 //   npm run test:instagram-sin-cron:db
@@ -10,8 +10,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 
-const MIGRACION = await readFile("supabase/migrations/20261219100000_instagram_antiguo_sin_cron.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261219100000_instagram_antiguo_sin_cron_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261224100000_instagram_antiguo_sin_cron.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261224100000_instagram_antiguo_sin_cron_ROLLBACK.sql", "utf8");
 const ORIGINALES = {
   "instagram-programador": "supabase/migrations/20261109100000_instagram_video.sql",
   "instagram-metricas-diarias": "supabase/migrations/20261106100000_instagram_metricas.sql",
