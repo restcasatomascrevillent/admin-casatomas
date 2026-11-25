@@ -86,7 +86,28 @@ export interface DefinicionPlantilla {
   /** Categoría que se pide a Meta al registrarla (por defecto UTILITY). Meta
    * puede cambiarla; lo que cobra de verdad llega en el webhook. */
   categoria?: "UTILITY" | "MARKETING";
+  /** Plantilla ya aprobada a la que sustituye, con las MISMAS variables y
+   * botones (solo cambia el texto). Editar una plantilla aprobada la devuelve
+   * a revisión y mientras no se puede mandar, así que el texto nuevo va con
+   * otro nombre y, hasta que Meta lo apruebe, se manda esta (ver
+   * plantillaAnterior y enviarConPlantilla en index.ts). */
+  anterior?: string;
 }
+
+/** La plantilla aprobada a la que sustituye `def` (mismo contenido salvo el nombre), o `null`. */
+export function plantillaAnterior(def: DefinicionPlantilla): DefinicionPlantilla | null {
+  if (!def.anterior) return null;
+  const { anterior, ...resto } = def;
+  return { ...resto, nombre: anterior };
+}
+
+/** Nombres en Meta de todas las plantillas, también las que se están sustituyendo. */
+export function nombresPlantillas(defs: readonly DefinicionPlantilla[]): string[] {
+  return defs.flatMap((d) => (d.anterior ? [d.nombre, d.anterior] : [d.nombre]));
+}
+
+/** Aviso al verificar la reserva: 20 min de cortesía (decisión del dueño, 25/11/2026). */
+export const TEXTO_CORTESIA = "Tienes 20 minutos de cortesía sobre la hora de tu reserva; si no has llegado en ese tiempo, tu mesa quedará liberada.";
 
 const MAPA_GOOGLE = "https://www.google.com/maps/search/?api=1&query=";
 
@@ -125,9 +146,13 @@ export function plantillas(web: string): Readonly<Record<TipoAvisoWhatsApp, Defi
     },
     propuesta: {
       tipo: "propuesta",
-      nombre: "reserva_confirmar_asistencia",
+      // Añade los 20 minutos de cortesía. Hasta que Meta la apruebe sale
+      // la anterior (mismas variables y botones, sin esa frase).
+      nombre: "reserva_confirmar_asistencia_cortesia",
+      anterior: "reserva_confirmar_asistencia",
       cuerpo:
         "Hola {{1}}, tu mesa en {{2}} está casi lista:\n\n📅 {{3}}\n🕘 {{4}} h\n👥 {{5}} personas\n\n" +
+        `${TEXTO_CORTESIA}\n\n` +
         "¿Confirmas tu asistencia? Si no confirmas, la mesa puede quedar libre para otros clientes.",
       ejemplo: ["Ana", "Casa Tomás", "sábado 12 de diciembre", "21:30", "4"],
       botones: [

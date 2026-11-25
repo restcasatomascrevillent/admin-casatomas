@@ -24,6 +24,9 @@ import {
   datosOpacos,
   leerDatosOpacos,
   textoRespuestaBoton,
+  plantillaAnterior,
+  nombresPlantillas,
+  TEXTO_CORTESIA,
   type ReservaParaWhatsApp,
 } from "../logica";
 
@@ -87,6 +90,43 @@ describe("plantillas", () => {
   });
 });
 
+describe("20 minutos de cortesía al verificar (plantilla que sustituye a otra)", () => {
+  it("el aviso al verificar lleva la cortesía y la regla de liberar la mesa", () => {
+    expect(P.propuesta.cuerpo).toContain(TEXTO_CORTESIA);
+    expect(TEXTO_CORTESIA).toMatch(/20 minutos de cortesía/);
+    expect(TEXTO_CORTESIA).toMatch(/mesa quedará liberada/);
+    expect(rellenarCuerpo(P.propuesta, variablesParaTipo("propuesta", RESERVA))).toContain("20 minutos de cortesía");
+  });
+
+  it("mientras Meta no la aprueba se manda la anterior: mismo contenido salvo el nombre", () => {
+    const anterior = plantillaAnterior(P.propuesta);
+    expect(anterior).not.toBeNull();
+    expect(anterior!.nombre).toBe("reserva_confirmar_asistencia");
+    expect(anterior!.botones).toEqual(P.propuesta.botones);
+    expect("anterior" in anterior!).toBe(false);
+    const m = mensajePlantilla({
+      para: "34612345678",
+      def: anterior!,
+      variables: variablesParaTipo("propuesta", RESERVA),
+      botones: { payloads: { aceptar: "PA", rechazar: "PR" }, mapa: consultaMapa("casa_tomas") },
+    }) as { template: { name: string; components: unknown[] } };
+    expect(m.template.name).toBe("reserva_confirmar_asistencia");
+    expect(m.template.components).toHaveLength(4);
+  });
+
+  it("las demás no sustituyen a ninguna; /plantillas lista también la anterior", () => {
+    expect(plantillaAnterior(P.confirmada)).toBeNull();
+    const nombres = nombresPlantillas(Object.values(P));
+    expect(nombres).toContain("reserva_confirmar_asistencia_cortesia");
+    expect(nombres).toContain("reserva_confirmar_asistencia");
+    expect(nombres).toContain("reserva_confirmada");
+  });
+
+  it("el nombre nuevo cumple las reglas de Meta", () => {
+    expect(cuerpoCrearPlantilla(P.propuesta)).toMatchObject({ name: "reserva_confirmar_asistencia_cortesia", category: "UTILITY" });
+  });
+});
+
 describe("datos de la reserva", () => {
   it("teléfono: añade +34 a un número español y descarta lo que no es un móvil", () => {
     expect(telefonoParaWhatsApp("612 345 678")).toBe("34612345678");
@@ -119,7 +159,7 @@ describe("datos de la reserva", () => {
       botones: { payloads: { aceptar: "PA", rechazar: "PR" }, mapa: consultaMapa("casa_tomas") },
       datosOpacos: datosOpacos(RESERVA.id, "propuesta"),
     }) as { template: { name: string; components: Record<string, unknown>[] }; biz_opaque_callback_data: string };
-    expect(m.template.name).toBe("reserva_confirmar_asistencia");
+    expect(m.template.name).toBe("reserva_confirmar_asistencia_cortesia");
     expect(m.template.components.slice(1)).toEqual([
       { type: "button", sub_type: "quick_reply", index: "0", parameters: [{ type: "payload", payload: "PA" }] },
       { type: "button", sub_type: "quick_reply", index: "1", parameters: [{ type: "payload", payload: "PR" }] },
