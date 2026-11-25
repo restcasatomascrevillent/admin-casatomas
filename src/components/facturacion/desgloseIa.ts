@@ -145,5 +145,5 @@ export function importesDesglose(
 export function textoUsos(usos: number | undefined): string {
   if (!usos) return "";
   // «always»: en español, Intl no separa los miles de 4 cifras (1858); aquí sí (1.858).
-  return `${new Intl.NumberFormat("es-ES", { useGrouping: "always" } as Intl.NumberFormatOptions).format(usos)} ${usos === 1 ? "uso" : "usos"}`;
+  return `${new Intl.NumberFormat("es-ES", { useGrouping: "always" } as unknown as Intl.NumberFormatOptions).format(usos)} ${usos === 1 ? "uso" : "usos"}`;
 }
