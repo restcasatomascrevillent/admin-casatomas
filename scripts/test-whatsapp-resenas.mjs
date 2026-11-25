@@ -1,4 +1,4 @@
-// WhatsApp: petición de reseña y registro de mensajes (migración 20261222100000),
+// WhatsApp: petición de reseña y registro de mensajes (migración 20261223100000),
 // contra un Postgres en memoria (PGlite). Nunca toca Supabase.
 //
 //   node scripts/test-whatsapp-resenas.mjs
@@ -15,8 +15,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 
-const MIGRACION = await readFile("supabase/migrations/20261222100000_whatsapp_resenas_y_coste.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261222100000_whatsapp_resenas_y_coste_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261223100000_whatsapp_resenas_y_coste.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261223100000_whatsapp_resenas_y_coste_ROLLBACK.sql", "utf8");
 const { casos } = JSON.parse(await readFile("supabase/functions/whatsapp-reservas/__tests__/casos-momento-resena.json", "utf8"));
 
 let comprobaciones = 0;
@@ -144,4 +144,4 @@ igual((await db.query(`select proveedor from public.servicios_uso`)).rows, [{ pr
 await db.exec(ROLLBACK);
 igual((await db.query(`select count(*)::int as n from public.reservas`)).rows[0].n > 0, true, "vuelta atrás idempotente y las reservas siguen");
 
-console.log(`OK WhatsApp reseñas y coste (20261222100000): ${comprobaciones} comprobaciones`);
+console.log(`OK WhatsApp reseñas y coste (20261223100000): ${comprobaciones} comprobaciones`);

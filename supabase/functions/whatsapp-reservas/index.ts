@@ -25,7 +25,7 @@
 //   POST /resenas               -> pide reseña a las reservas que toque (hora
 //                                  de la reserva + 3 h; resenas.ts). La llama
 //                                  pg_cron cada 10 min (whatsapp_resenas_disparar,
-//                                  migración 20261222100000) solo si hay alguna.
+//                                  migración 20261223100000) solo si hay alguna.
 //
 // Cada mensaje que sale se apunta en `whatsapp_mensajes` (tipo, categoría,
 // estado) y el webhook le añade si Meta lo cobra: de ahí sale el coste de

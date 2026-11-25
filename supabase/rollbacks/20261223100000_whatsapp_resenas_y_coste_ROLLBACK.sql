@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- ROLLBACK de 20261222100000_whatsapp_resenas_y_coste.sql: quita el cron de
+-- ROLLBACK de 20261223100000_whatsapp_resenas_y_coste.sql: quita el cron de
 -- reseñas, sus funciones, las dos tablas (¡se pierde el registro de WhatsApp
 -- enviados y de reseñas pedidas!) y la fila de WhatsApp de Servicios (con sus
 -- lecturas guardadas).

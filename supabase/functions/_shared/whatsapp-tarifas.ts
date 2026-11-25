@@ -3,7 +3,7 @@
 // ============================================================================
 // Lógica pura (sin Deno ni red): la usa servicios-uso para poner WhatsApp como
 // un servicio más en Super Admin › Servicios, a partir de los mensajes que
-// whatsapp-reservas registra en `whatsapp_mensajes` (migración 20261222100000).
+// whatsapp-reservas registra en `whatsapp_mensajes` (migración 20261223100000).
 //
 // CÓMO COBRA META (página oficial, actualizada el 18/11/2026):
 //   https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing

@@ -1635,7 +1635,7 @@ export const leerMapbox: Lector = async (ctx) => {
 
 // ─── WhatsApp (API de WhatsApp Cloud de Meta) ──────────────────────────────
 // Sin API de consumo que merezca la pena: whatsapp-reservas apunta cada
-// mensaje que manda en `whatsapp_mensajes` (20261222100000) y el webhook de
+// mensaje que manda en `whatsapp_mensajes` (20261223100000) y el webhook de
 // Meta le añade si se cobra y en qué categoría. Tarifa y reglas en
 // _shared/whatsapp-tarifas.ts.
 
@@ -1647,7 +1647,7 @@ export const leerWhatsapp: Lector = async (ctx) => {
     .gte("creado_en", inicioMesUtc(ctx.ahora).toISOString())
     .limit(20000);
   if (error) {
-    return { metricas: {}, error: "error_api", detalles: { avisos: ["Falta aplicar la migración 20261222100000_whatsapp_resenas_y_coste (registro de los WhatsApp enviados)."] } };
+    return { metricas: {}, error: "error_api", detalles: { avisos: ["Falta aplicar la migración 20261223100000_whatsapp_resenas_y_coste (registro de los WhatsApp enviados)."] } };
   }
   const filas = (Array.isArray(data) ? data : []).filter(esObjeto) as MensajeWhatsAppRegistrado[];
   const r = costeWhatsAppMes(filas, TARIFA_WHATSAPP_ESPANA);

@@ -901,7 +901,7 @@ describe("WhatsApp", () => {
     expect(vacio.coste_variable).toMatchObject({ importe: 0, moneda: "EUR" });
     expect(vacio.detalles?.avisos).toEqual([expect.stringMatching(/no está configurado/)]);
     const sinTabla = await LECTORES.whatsapp(ctxWa(adminCon(null, { message: "relation \"whatsapp_mensajes\" does not exist" }).admin));
-    expect(sinTabla).toMatchObject({ error: "error_api", detalles: { avisos: [expect.stringMatching(/20261222100000/)] } });
+    expect(sinTabla).toMatchObject({ error: "error_api", detalles: { avisos: [expect.stringMatching(/20261223100000/)] } });
   });
 
   it("sin el dato de Meta (webhook) es una estimación", async () => {

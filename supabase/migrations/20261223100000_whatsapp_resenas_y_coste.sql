@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- 20261222100000_whatsapp_resenas_y_coste — WhatsApp: petición de reseña
+-- 20261223100000_whatsapp_resenas_y_coste — WhatsApp: petición de reseña
 -- después de comer y su coste en Super Admin › Servicios (25/11/2026)
 -- ===========================================================================
 -- Dueño: «quiero que en servicios empiece a aparecer este coste y que si han
@@ -39,7 +39,7 @@ set client_encoding = 'UTF8';
 -- APLICAR (una a una, nunca `db push`): demo primero (sfonaclosuafvlhutkon),
 -- producción (haqmmdfdzzatdnrrcgez) solo tras aceptar el PR de la release y
 -- con el «sí» del dueño. Idempotente.
--- Deshacer: supabase/rollbacks/20261222100000_whatsapp_resenas_y_coste_ROLLBACK.sql
+-- Deshacer: supabase/rollbacks/20261223100000_whatsapp_resenas_y_coste_ROLLBACK.sql
 -- Pruebas: node scripts/test-whatsapp-resenas.mjs (PGlite).
 -- ===========================================================================
 
@@ -77,7 +77,7 @@ create table if not exists public.whatsapp_mensajes (
   constraint whatsapp_mensajes_estado_chk check (estado in ('enviando', 'enviado', 'entregado', 'leido', 'fallido', 'error'))
 );
 comment on table public.whatsapp_mensajes is
-  'Un WhatsApp enviado por whatsapp-reservas (avisos, reseñas, respuestas, pruebas). El webhook de Meta añade el estado de entrega y si se cobra. De aquí sale el coste de WhatsApp en Super Admin › Servicios (20261222100000).';
+  'Un WhatsApp enviado por whatsapp-reservas (avisos, reseñas, respuestas, pruebas). El webhook de Meta añade el estado de entrega y si se cobra. De aquí sale el coste de WhatsApp en Super Admin › Servicios (20261223100000).';
 create unique index if not exists whatsapp_mensajes_wamid_uidx on public.whatsapp_mensajes (wamid) where wamid is not null;
 create index if not exists whatsapp_mensajes_creado_idx on public.whatsapp_mensajes (creado_en);
 alter table public.whatsapp_mensajes enable row level security;
@@ -95,7 +95,7 @@ create table if not exists public.whatsapp_resenas (
   constraint whatsapp_resenas_estado_chk check (estado in ('enviando', 'enviada', 'omitida', 'error'))
 );
 comment on table public.whatsapp_resenas is
-  'Reservas a las que ya se ha pedido reseña por WhatsApp (o se ha decidido no pedírsela: omitida + motivo). La clave primaria impide mandarla dos veces (20261222100000).';
+  'Reservas a las que ya se ha pedido reseña por WhatsApp (o se ha decidido no pedírsela: omitida + motivo). La clave primaria impide mandarla dos veces (20261223100000).';
 create index if not exists whatsapp_resenas_wamid_idx on public.whatsapp_resenas (wamid) where wamid is not null;
 alter table public.whatsapp_resenas enable row level security;
 revoke all on public.whatsapp_resenas from public, anon, authenticated;

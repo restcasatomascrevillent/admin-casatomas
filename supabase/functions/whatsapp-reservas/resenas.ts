@@ -5,7 +5,7 @@
 // mensaje para que dejen una reseña». Regla general: HORA DE LA RESERVA + 3 h,
 // sin escribir de noche (si cae después de las 22:00, al día siguiente a las
 // 12:00). Una sola vez por reserva (tabla `whatsapp_resenas`, migración
-// 20261222100000; su función SQL `whatsapp_resena_momento` calcula LO MISMO
+// 20261223100000; su función SQL `whatsapp_resena_momento` calcula LO MISMO
 // que `momentoResena` y lo comprueba scripts/test-whatsapp-resenas.mjs).
 //
 // A quién: reservas 'confirmada' o 'completada' de Casa Tomás con un móvil
