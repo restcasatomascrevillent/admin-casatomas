@@ -1,4 +1,6 @@
+import { Fragment } from "react";
 import { euros, tituloRecibo, totalesRecibo, type Factura } from "./modelo";
+import { importesDesglose, textoUsos } from "./desgloseIa";
 
 /**
  * Vista previa del recibo (17/11/2026): sin membrete (ni logo ni franja de marca) y sin ningún
@@ -30,12 +32,17 @@ export function VistaFactura({ factura: f }: { factura: Factura }) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[430px] text-left text-xs">
             <thead className="bg-[#eeeeee]"><tr>{["Concepto","Ud.","Precio","Importe"].map((h,i) => <th key={h} className={"px-2 py-3 font-semibold " + (i ? "text-right" : "")}>{h}</th>)}</tr></thead>
-            <tbody>{t.lineas.map(l => <tr key={l.id} className="border-b border-[#dddddd] align-top">
+            <tbody>{t.lineas.map(l => <Fragment key={l.id}><tr className={(l.desglose?.length ? "" : "border-b ") + "border-[#dddddd] align-top"}>
               <td className="max-w-[210px] break-words px-2 py-3"><p className="font-medium">{l.concepto || "Concepto pendiente"}</p>
                 {l.descuento > 0 && <p className="mt-1 text-[10px] pointer-coarse:text-xs text-[#666]">Dto. {l.descuento}%</p>}</td>
               <td className="px-2 py-3 text-right">{l.cantidad}</td><td className="whitespace-nowrap px-2 py-3 text-right">{euros(l.precio)}</td>
               <td className="whitespace-nowrap px-2 py-3 text-right">{euros(l.baseAntesGlobal)}</td>
-            </tr>)}</tbody>
+            </tr>
+            {/* Desglose de la IA (25/11/2026): dentro de su línea, no suma aparte. */}
+            {importesDesglose(l.baseAntesGlobal, l.desglose).map((d, i, todas) => <tr key={d.concepto} className={(i === todas.length - 1 ? "border-b " : "") + "border-[#dddddd] text-[11px] text-[#555]"}>
+              <td className="break-words py-0.5 pb-1 pl-5 pr-2" colSpan={3}>{d.concepto}{d.usos ? ` · ${textoUsos(d.usos)}` : ""}</td>
+              <td className="whitespace-nowrap px-2 py-0.5 pb-1 text-right">{euros(d.importe)}</td>
+            </tr>)}</Fragment>)}</tbody>
           </table>
         </div>
         <dl className="ml-auto max-w-sm space-y-2 text-sm">

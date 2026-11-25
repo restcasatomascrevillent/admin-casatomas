@@ -1,4 +1,5 @@
 import { mesDeFecha, nuevaLinea, nuevaFactura, redondear, textoMesRecibo, tipoDeRecibo, type CatalogoFacturacion, type Factura, type LineaFactura, type TipoRecibo } from "./modelo";
+import type { ParteDesglose } from "./desgloseIa";
 import type { FacturaGuardada } from "@/hooks/useFacturacionOficiososia";
 
 /** Servicios disponibles en las rutas del panel. Sus precios se definen en el catálogo. */
@@ -79,6 +80,8 @@ export interface GastoServicio {
   importe: number;
   /** De dónde sale el importe: metido a mano, estimado (cuota + uso leído) o falta meterlo. */
   origen: "manual" | "estimado" | "falta" | "gratis";
+  /** Solo la IA (OpenAI): en qué se ha gastado, como parte del importe (desgloseIa.ts). */
+  desglose?: ParteDesglose[];
 }
 /**
  * Servicios que salen en Servicios › Costes pero no se cobran en el recibo mensual. Stripe lo
@@ -93,7 +96,8 @@ const esLineaVacia = (l: LineaFactura) => !l.concepto.trim() && l.precio === 0;
 /** El concepto del recibo de un gasto de Servicios («OpenAI · Inteligencia artificial», su importe y su descuento). */
 export function lineaDeGasto(g: GastoServicio, descuento = 0): LineaFactura {
   return { ...nuevaLinea("Servicio"), concepto: g.categoria ? `${g.nombre} · ${g.categoria}` : g.nombre,
-    periodicidad: "Mensual", precio: redondear(g.importe), proveedor: g.proveedor, descuento };
+    periodicidad: "Mensual", precio: redondear(g.importe), proveedor: g.proveedor, descuento,
+    ...(g.desglose?.length ? { desglose: g.desglose } : {}) };
 }
 /** Añade al recibo UN gasto de Servicios (al final, con los demás). No hace nada si ya está o cuesta 0 €. */
 export function anadirGastoServicio(f: Factura, g: GastoServicio): Factura {
