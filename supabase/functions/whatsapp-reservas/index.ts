@@ -31,7 +31,9 @@
 // estado) y el webhook le añade si Meta lo cobra: de ahí sale el coste de
 // WhatsApp en Super Admin › Servicios (servicios-uso).
 //
-// Si Meta no deja usar la plantilla (aún sin aprobar, pausada…), /enviar lo
+// Si una plantilla sustituye a otra (`anterior`, p. ej. la del aviso al
+// verificar, con los 20 min de cortesía) y Meta aún no la ha aprobado, se
+// manda con la anterior (enviarConPlantilla). Si tampoco se puede, /enviar lo
 // reintenta SIN plantilla (logica.ts, mensajeSinPlantilla): Meta lo admite
 // dentro de las 24 h siguientes a que el cliente escriba, con los mismos
 // botones de respuesta. Fuera de esa ventana falla igual y va el correo.
@@ -91,6 +93,8 @@ import {
   textoRespuestaBoton,
   textoMensajeLibre,
   negocioDeMarca,
+  plantillaAnterior,
+  nombresPlantillas,
   type DefinicionPlantilla,
   type TipoPlantillaWhatsApp,
   type ReservaParaWhatsApp,
@@ -289,6 +293,22 @@ async function valoresBotones(def: DefinicionPlantilla, r: ReservaParaWhatsApp):
   return valores;
 }
 
+/**
+ * Manda el mensaje con la plantilla; si Meta aún no la tiene aprobada (o la
+ * ha pausado) y sustituye a otra con las mismas variables y botones
+ * (`def.anterior`), lo manda con esa. `plantilla` es el nombre que salió.
+ */
+async function enviarConPlantilla(
+  contenido: Parameters<typeof mensajePlantilla>[0],
+): Promise<{ id: string | null; error: string | null; plantilla: string }> {
+  const r = await enviarMensaje(mensajePlantilla(contenido));
+  const anterior = plantillaAnterior(contenido.def);
+  if (!r.error || !anterior || !errorPlantillaNoDisponible(r.error)) return { ...r, plantilla: contenido.def.nombre };
+  console.warn(`[${FUENTE}] '${contenido.def.nombre}' aún no se puede usar (${r.error}); se manda '${anterior.nombre}'.`);
+  const r2 = await enviarMensaje(mensajePlantilla({ ...contenido, def: anterior }));
+  return { ...r2, plantilla: anterior.nombre };
+}
+
 async function enviarAvisoReserva(
   reservaId: string,
 ): Promise<{ enviado: boolean; motivo?: string; tipo?: TipoAvisoWhatsApp; id?: string; sinPlantilla?: boolean }> {
@@ -311,10 +331,10 @@ async function enviarAvisoReserva(
     botones: await valoresBotones(def, reserva),
     datosOpacos: datosOpacos(reserva.id, tipo),
   };
-  const { id, error } = await enviarMensaje(mensajePlantilla(contenido));
+  const { id, error, plantilla } = await enviarConPlantilla(contenido);
   if (!error) {
-    console.log(`[${FUENTE}] Aviso '${tipo}' de la reserva ${reserva.id} enviado (${id})`);
-    await registrarMensaje({ reservaId: reserva.id, tipo, plantilla: def.nombre, categoria: "utility", wamid: id });
+    console.log(`[${FUENTE}] Aviso '${tipo}' de la reserva ${reserva.id} enviado con '${plantilla}' (${id})`);
+    await registrarMensaje({ reservaId: reserva.id, tipo, plantilla, categoria: "utility", wamid: id });
     return { enviado: true, tipo, id: id ?? undefined };
   }
   console.error(`[${FUENTE}] Meta rechazó la plantilla del aviso '${tipo}' de la reserva ${reserva.id}: ${error}. Se intenta sin plantilla.`);
@@ -322,7 +342,7 @@ async function enviarAvisoReserva(
   const sinPlantilla = await enviarMensaje(mensajeSinPlantilla(contenido));
   if (sinPlantilla.error) {
     console.error(`[${FUENTE}] Tampoco sin plantilla (¿fuera de la ventana de 24 h?): ${sinPlantilla.error}`);
-    await registrarMensaje({ reservaId: reserva.id, tipo, plantilla: def.nombre, categoria: "utility", error: `${error} | ${sinPlantilla.error}` });
+    await registrarMensaje({ reservaId: reserva.id, tipo, plantilla, categoria: "utility", error: `${error} | ${sinPlantilla.error}` });
     return { enviado: false, motivo: `meta: ${error} | sin plantilla: ${sinPlantilla.error}`, tipo };
   }
   // Sin plantilla = mensaje de servicio (texto libre dentro de las 24 h).
@@ -462,7 +482,7 @@ async function todasLasPlantillas(): Promise<DefinicionPlantilla[]> {
 async function estadoPlantillas(): Promise<Response> {
   const r = await llamarGraph(`${WABA_ID}/message_templates?fields=name,status,category,language,rejected_reason&limit=100`, { metodo: "GET" });
   if (!r.ok) return json({ ok: false, error: r.error }, 502);
-  const nuestras = new Set((await todasLasPlantillas()).map((p) => p.nombre));
+  const nuestras = new Set(nombresPlantillas(await todasLasPlantillas()));
   const lista = ((r.datos?.data as Record<string, unknown>[] | undefined) ?? []).filter((p) => nuestras.has(String(p.name)));
   return json({ ok: true, web: WEB, plantillas: lista });
 }
@@ -503,11 +523,11 @@ async function enviarPrueba(req: Request): Promise<Response> {
     fecha: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), hora: "21:30", numero_comensales: 2, marca: "casa_tomas",
   };
   const def = PLANTILLAS[tipo];
-  const { id, error } = await enviarMensaje(
-    mensajePlantilla({ para, def, variables: variablesParaTipo(tipo, ejemplo), botones: await valoresBotones(def, ejemplo) }),
-  );
-  await registrarMensaje({ tipo: "prueba", plantilla: def.nombre, categoria: "utility", wamid: id, error });
-  return json({ ok: !error, tipo, id, error }, error ? 502 : 200);
+  const { id, error, plantilla } = await enviarConPlantilla({
+    para, def, variables: variablesParaTipo(tipo, ejemplo), botones: await valoresBotones(def, ejemplo),
+  });
+  await registrarMensaje({ tipo: "prueba", plantilla, categoria: "utility", wamid: id, error });
+  return json({ ok: !error, tipo, plantilla, id, error }, error ? 502 : 200);
 }
 
 // ----------------------------------------------------------------------------
