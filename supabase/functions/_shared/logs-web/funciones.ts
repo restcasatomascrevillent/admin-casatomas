@@ -159,6 +159,8 @@ export const FUNCIONES: Readonly<Record<string, FuncionServidor>> = {
     "las reseñas nuevas tardan más en aparecer en el panel"),
   "avisos-telegram": panel("Avisos", "los avisos por Telegram", "manda por Telegram los avisos del panel",
     "algún aviso de Telegram puede llegar tarde", "se reintenta sola cada 5 minutos"),
+  "informes-mensuales": panel("Super Admin", "la subida de los informes mensuales a Drive", "guarda en Google Drive los PDF de los informes del mes y el recibo mensual",
+    "puede que algún informe del mes no esté en Drive", null, "basta con volver a lanzar la tarea de informes mensuales desde GitHub"),
 
   // ─── Panel › Super Admin y cuentas ────────────────────────────────────────
   "procesar-logs-web": panel("Logs", "el procesado de errores (este monitor)", "agrupa los errores en incidencias y prepara los tickets",
