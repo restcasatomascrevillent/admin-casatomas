@@ -16,6 +16,11 @@
 //      y lo registrado es tokens × tarifa): se reparte la línea en proporción.
 //  En el recibo se guarda la PARTE de cada grupo (0–1), no euros: así, si se
 //  cambia el precio o el descuento de la línea, el desglose sigue cuadrando.
+//
+//  25/11/2026, decisión del dueño: «Probar modelos de IA» (el botón «Probar» de
+//  Servicios › Modelos) NO se cobra. Ese grupo sale del desglose y la línea baja
+//  en lo que le habría tocado (su parte de la línea, calculada igual que las
+//  demás); el resto de grupos se queda con los mismos euros.
 // ============================================================================
 import type { FilaCostePorUso } from "@/lib/costesServicios";
 
@@ -32,6 +37,8 @@ interface GrupoIa {
   funciones: readonly string[];
   /** Los que pidió el dueño: salen siempre que tengan gasto, aunque sea poco. */
   pedido?: boolean;
+  /** No se cobra en el recibo: se quita del desglose y del importe de la línea. */
+  noSeCobra?: boolean;
 }
 
 /** Grupos en el orden en que salen. Una función que no esté aquí va a «Otros». */
@@ -47,7 +54,7 @@ export const GRUPOS_IA: readonly GrupoIa[] = [
   { concepto: "Ordenar productos de las facturas", funciones: ["clasificar-productos", "embeddings-nombres"] },
   { concepto: "Leer reservas escritas a mano", funciones: ["interpretar-reserva-manuscrita"] },
   { concepto: "Dictado por voz", funciones: ["transcribir-dictado"] },
-  { concepto: "Probar modelos de IA (Servicios)", funciones: ["ia-modelos-openai"] },
+  { concepto: "Probar modelos de IA (Servicios)", funciones: ["ia-modelos-openai"], noSeCobra: true },
   { concepto: "Avisos de la web y peticiones del panel", funciones: ["procesar-logs-web", "resumen-logs-web", "analizar-peticion"] },
 ];
 export const CONCEPTO_OTROS = "Otros";
@@ -57,8 +64,20 @@ const PARTE_MINIMA = 0.03;
 /** «Sin asignar» por debajo de esto (fracción de la línea) es ruido de redondeo: no sale. */
 const SIN_ASIGNAR_MINIMO = 0.005;
 
+export interface NoCobrado {
+  concepto: string;
+  /** € que le habrían tocado de la línea y que ya no se cobran. */
+  importe: number;
+  usos: number;
+}
+
 export interface ResultadoDesgloseIa {
+  /** Partes de la línea YA SIN lo que no se cobra (suman 1; vacío si no queda nada que desglosar). */
   desglose: ParteDesglose[];
+  /** Lo que se cobra en la línea: `importeEur` menos lo que no se cobra. */
+  importeCobradoEur: number;
+  /** Lo que se ha quitado de la línea (Probar modelos de IA). Vacío si no hay nada. */
+  noCobrado: NoCobrado[];
   /** Lo apuntado en el panel (€) para ese mes. */
   registradoEur: number;
   /** true: lo registrado pasaba de la línea y se ha repartido en proporción. */
@@ -66,8 +85,9 @@ export interface ResultadoDesgloseIa {
 }
 
 /**
- * El desglose de una línea de IA de `importeEur` con lo apuntado por función ese mes.
- * null si no hay nada apuntado (la línea sale sola, como antes).
+ * El desglose de una línea de IA de `importeEur` con lo apuntado por función ese mes, y lo que
+ * se cobra de ella (sin los grupos que no se cobran).
+ * null si no hay nada apuntado (la línea sale sola y entera, como antes).
  */
 export function desgloseIa(filas: FilaCostePorUso[], importeEur: number, eurPorUsd: number): ResultadoDesgloseIa | null {
   if (!(importeEur > 0)) return null;
@@ -88,11 +108,17 @@ export function desgloseIa(filas: FilaCostePorUso[], importeEur: number, eurPorU
 
   const filasGrupo: ParteDesglose[] = [];
   const otros = { parte: 0, usos: 0 };
+  const noCobrado: NoCobrado[] = [];
+  let parteNoCobrada = 0;
   GRUPOS_IA.forEach((g, i) => {
     const s = sumas.get(i);
     if (!s) return;
     const parte = s.eur / base;
-    if (g.pedido || parte >= PARTE_MINIMA) filasGrupo.push({ concepto: g.concepto, parte, usos: s.usos });
+    if (g.noSeCobra) {
+      // Lo que le tocaba de la línea: lo suyo si cabe; si no, su parte del reparto proporcional.
+      parteNoCobrada += parte;
+      noCobrado.push({ concepto: g.concepto, importe: importeEur * parte, usos: s.usos });
+    } else if (g.pedido || parte >= PARTE_MINIMA) filasGrupo.push({ concepto: g.concepto, parte, usos: s.usos });
     else {
       otros.parte += parte;
       otros.usos += s.usos;
@@ -112,7 +138,11 @@ export function desgloseIa(filas: FilaCostePorUso[], importeEur: number, eurPorU
   if (otros.parte > 0) desglose.push({ concepto: CONCEPTO_OTROS, parte: otros.parte, usos: otros.usos });
   const sinAsignar = proporcional ? 0 : 1 - registradoEur / importeEur;
   if (sinAsignar >= SIN_ASIGNAR_MINIMO) desglose.push({ concepto: CONCEPTO_SIN_ASIGNAR, parte: sinAsignar });
-  return { desglose: normalizar(desglose), registradoEur, proporcional };
+  // Las partes que quedan son de la línea entera; `normalizar` las pasa a partes de lo que se cobra
+  // (mismos euros). Si solo queda «Sin asignar», no hay nada que contar: la línea sale sola.
+  const queda = desglose.some((d) => d.concepto !== CONCEPTO_SIN_ASIGNAR) ? normalizar(desglose) : [];
+  const importeCobradoEur = Math.max(0, importeEur * (1 - parteNoCobrada));
+  return { desglose: queda, importeCobradoEur, noCobrado, registradoEur, proporcional };
 }
 
 /** Que las partes sumen exactamente 1 (y queden con una precisión razonable para guardarlas). */

@@ -29,6 +29,9 @@ export const PROVEEDOR_IA = "openai";
  * 25/11/2026: la línea de OpenAI lleva su desglose por lo que se ha hecho en el panel (subir facturas,
  * chat, etiquetas de vino…), con lo apuntado en `ia_coste_por_uso` ese mes. Si eso no se puede leer, la
  * línea sale sola, como antes.
+ *
+ * 25/11/2026, decisión del dueño: «Probar modelos de IA» no se cobra. La línea de OpenAI va sin ello
+ * (`importe`) y lo quitado queda en `noCobrado` para enseñarlo en la pantalla del recibo.
  */
 export function useGastosServiciosMes(mes: string | undefined): GastosServiciosMes {
   const activo = !!mes && /^\d{4}-\d{2}$/.test(mes);
@@ -50,7 +53,13 @@ export function useGastosServiciosMes(mes: string | undefined): GastosServiciosM
       .map((f) => {
         const gasto: GastoServicio = { proveedor: f.proveedor, nombre: f.nombre, categoria: TEXTO_CATEGORIA[f.categoria] ?? null, importe: f.totalEur, origen: f.origen };
         const ia = f.proveedor === PROVEEDOR_IA && filasIa ? desgloseIa(filasIa, f.totalEur, eurPorUsd) : null;
-        return ia ? { ...gasto, desglose: ia.desglose } : gasto;
+        if (!ia) return gasto;
+        return {
+          ...gasto,
+          importe: ia.importeCobradoEur,
+          ...(ia.desglose.length ? { desglose: ia.desglose } : {}),
+          ...(ia.noCobrado.length ? { noCobrado: ia.noCobrado } : {}),
+        };
       });
   }, [activo, mes, servicios.data, resumen?.data, eurPorUsd, filasIa]);
 

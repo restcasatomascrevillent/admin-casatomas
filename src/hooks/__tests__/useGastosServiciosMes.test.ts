@@ -39,6 +39,14 @@ describe("useGastosServiciosMes", () => {
     expect(openai?.desglose?.[0]).toMatchObject({ usos: 300 });
     expect(result.current.gastos?.find((g) => g.proveedor === "hostinger")?.desglose).toBeUndefined();
   });
+  it("«Probar modelos de IA» no se cobra: la línea de OpenAI baja en lo suyo y queda apuntado aparte", () => {
+    ia.resultado = { disponible: true, filas: [fila("ocr-trabajo", 20, 300), fila("ia-modelos-openai", 5, 149)] };
+    const { result } = renderHook(() => useGastosServiciosMes("2026-11"));
+    const openai = result.current.gastos?.find((g) => g.proveedor === "openai");
+    expect(openai?.importe).toBeCloseTo(38); // 42,5 € − 5 US$ × 0,9
+    expect(openai?.noCobrado).toEqual([{ concepto: "Probar modelos de IA (Servicios)", importe: expect.closeTo(4.5), usos: 149 }]);
+    expect(openai?.desglose?.map((d) => d.concepto)).toEqual(["Subir y leer facturas", "Sin asignar"]);
+  });
   it("sin lo apuntado por función (falta la RPC o no hay nada) la línea sale sola, como antes", () => {
     ia.resultado = { disponible: false };
     const { result } = renderHook(() => useGastosServiciosMes("2026-11"));

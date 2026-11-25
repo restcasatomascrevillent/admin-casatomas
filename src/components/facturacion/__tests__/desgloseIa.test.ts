@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FilaCostePorUso } from "@/lib/costesServicios";
 import { CONCEPTO_OTROS, CONCEPTO_SIN_ASIGNAR, desgloseIa, importesDesglose, textoUsos } from "../desgloseIa";
-import { lineaDeGasto, aplicarGastosServicios, prepararNuevaFactura } from "../catalogo";
+import { lineaDeGasto, aplicarGastosServicios, importeEnServicios, prepararNuevaFactura } from "../catalogo";
 import { facturaSchema, nuevaFactura, totalesRecibo } from "../modelo";
 
 const fila = (funcion: string, costeUsd: number | null, usos = 1, servidorPropio = false): FilaCostePorUso => ({
@@ -45,6 +45,48 @@ describe("desglose de la IA en el recibo mensual", () => {
     expect(desgloseIa([], 10, 0.9)).toBeNull();
     expect(desgloseIa([fila("ocr-trabajo", null), fila("recortar-foto", 1, 1, true)], 10, 0.9)).toBeNull();
     expect(desgloseIa([fila("ocr-trabajo", 1)], 0, 0.9)).toBeNull();
+  });
+
+  describe("«Probar modelos de IA» no se cobra (dueño, 25/11/2026)", () => {
+    it("sale del desglose y la línea baja en lo suyo; los demás grupos y «Sin asignar» se quedan con sus euros", () => {
+      const r = desgloseIa([fila("ocr-trabajo", 2, 10), fila("chat-facturas", 1, 5), fila("ia-modelos-openai", 4, 149)], 10, 1)!;
+      expect(r.importeCobradoEur).toBeCloseTo(6);
+      expect(r.noCobrado).toEqual([{ concepto: "Probar modelos de IA (Servicios)", importe: 4, usos: 149 }]);
+      expect(r.desglose.map((d) => d.concepto)).not.toContain("Probar modelos de IA (Servicios)");
+      expect(importesDesglose(r.importeCobradoEur, r.desglose)).toEqual([
+        { concepto: "Subir y leer facturas", importe: 2, usos: 10 },
+        { concepto: "Chat (Facturas y web)", importe: 1, usos: 5 },
+        { concepto: CONCEPTO_SIN_ASIGNAR, importe: 3 },
+      ]);
+    });
+
+    it("si lo apuntado pasa de la línea, se quita su parte del reparto proporcional", () => {
+      const r = desgloseIa([fila("ocr-trabajo", 3), fila("ia-modelos-openai", 7)], 5, 1)!;
+      expect(r.proporcional).toBe(true);
+      expect(r.importeCobradoEur).toBeCloseTo(1.5);
+      expect(r.noCobrado[0].importe).toBeCloseTo(3.5);
+      expect(importesDesglose(r.importeCobradoEur, r.desglose)).toEqual([{ concepto: "Subir y leer facturas", importe: 1.5, usos: 1 }]);
+    });
+
+    it("aunque pese poco, no se esconde en «Otros»: se quita igual", () => {
+      const r = desgloseIa([fila("ocr-trabajo", 50), fila("ia-modelos-openai", 1)], 100, 1)!;
+      expect(r.importeCobradoEur).toBeCloseTo(99);
+      expect(r.desglose.map((d) => d.concepto)).toEqual(["Subir y leer facturas", CONCEPTO_SIN_ASIGNAR]);
+    });
+
+    it("si solo se ha probado modelos, la línea baja y sale sin desglose (solo quedaría «Sin asignar»)", () => {
+      const r = desgloseIa([fila("ia-modelos-openai", 4)], 10, 1)!;
+      expect(r.importeCobradoEur).toBeCloseTo(6);
+      expect(r.desglose).toEqual([]);
+    });
+
+    it("en el recibo se cobra la línea sin ello", () => {
+      const r = desgloseIa([fila("ocr-trabajo", 2), fila("ia-modelos-openai", 4)], 10, 1)!;
+      const gasto = { proveedor: "openai", nombre: "OpenAI", categoria: "IA", importe: r.importeCobradoEur, origen: "estimado" as const, desglose: r.desglose, noCobrado: r.noCobrado };
+      expect(importeEnServicios(gasto)).toBeCloseTo(10);
+      const f = aplicarGastosServicios(prepararNuevaFactura(nuevaFactura(), [], "mensual"), [gasto]);
+      expect(f.lineas.find((l) => l.proveedor === "openai")?.precio).toBe(6);
+    });
   });
 
   it("los céntimos cuadran siempre con el importe de la línea", () => {
