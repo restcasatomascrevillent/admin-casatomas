@@ -8,6 +8,8 @@ import type { Bebida } from "@/hooks/useBebidas";
 import type { Coctel } from "@/hooks/useCocteles";
 
 const mutacion = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+// Precio de compra de los vinos (25/11/2026): lo lee con react-query; aquí, ninguno.
+vi.mock("@/components/carta/usePreciosCompraVinos", () => ({ usePreciosCompraVinos: () => new Map() }));
 // Puntuaciones Parker con fuente (08/11/2026): la lista las lee con react-query; aquí, ninguna.
 vi.mock("@/components/carta/parker/usePuntuacionesParker", () => ({
   usePuntuacionesParker: () => ({
