@@ -1,0 +1,116 @@
+# Informes mensuales: el último jueves de cada mes, a las 08:xx de Madrid, saca en PDF
+# todos los informes de Super Admin › Informes (también el recibo mensual de Gestor
+# Gasto), los sube a Google Drive (carpeta del mes) y manda por Telegram los enlaces.
+# Petición del dueño, 25/11/2026. Cómo funciona: scripts/informes-mensuales.mjs.
+#
+# Cron no sabe decir «último jueves» y GitHub programa en UTC: salta todos los jueves
+# a las 06:07 y 07:07 UTC y el primer paso decide si toca (último jueves y el disparo
+# que cae a las 08:xx en Madrid: verano 06:07 UTC, invierno 07:07 UTC). Los demás
+# jueves termina en segundos, sin instalar nada.
+#
+# Secrets del repositorio (Settings → Secrets and variables → Actions):
+#   PANEL_INFORMES_USUARIO      usuario (o email) super admin de servicio del panel
+#   PANEL_INFORMES_CONTRASENA   su contraseña
+#   (opcional) PANEL_INFORMES_USUARIO_DEMO / PANEL_INFORMES_CONTRASENA_DEMO para lanzarlo
+#   a mano contra la demo con otro usuario; si no están, se usan los de arriba.
+# Drive y Telegram NO necesitan secretos aquí: los pone la Edge Function con los suyos
+# (GOOGLE_* y TELEGRAM_BOT_TOKEN de Supabase), llamada con el JWT de ese usuario.
+#
+# Los PDF llevan datos personales (auditoría, votación del vino): NO se suben como
+# artefacto. Solo queda resumen.json (títulos y enlaces de Drive) unos días.
+name: Informes mensuales
+
+on:
+  schedule:
+    - cron: "7 6 * * 4" # jueves 06:07 UTC = 08:07 en Madrid en verano
+    - cron: "7 7 * * 4" # jueves 07:07 UTC = 08:07 en Madrid en invierno
+  workflow_dispatch:
+    inputs:
+      entorno:
+        description: "Panel del que sacar los informes"
+        required: true
+        type: choice
+        options: [produccion, demo]
+        default: produccion
+      mes:
+        description: "Mes (AAAA-MM). Vacío = el mes en curso"
+        required: false
+        type: string
+      drive_y_telegram:
+        description: "Subir a Drive y avisar por Telegram (si no, solo se generan)"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: informes-mensuales
+  cancel-in-progress: false
+
+jobs:
+  informes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ¿Toca hoy?
+        id: toca
+        env:
+          CRON: ${{ github.event.schedule }}
+        run: node scripts/informes-mensuales.mjs --comprobar --cron "$CRON"
+
+      - name: Comprobar secrets
+        if: steps.toca.outputs.ejecutar == 'true'
+        env:
+          USUARIO: ${{ secrets.PANEL_INFORMES_USUARIO }}
+          CONTRASENA: ${{ secrets.PANEL_INFORMES_CONTRASENA }}
+        run: |
+          if [ -z "$USUARIO" ] || [ -z "$CONTRASENA" ]; then
+            echo "::error::Faltan los secrets PANEL_INFORMES_USUARIO y PANEL_INFORMES_CONTRASENA (usuario super admin de servicio del panel). Créalos en Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.toca.outputs.ejecutar == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias y Chromium
+        if: steps.toca.outputs.ejecutar == 'true'
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Sacar los informes, subirlos a Drive y avisar
+        if: steps.toca.outputs.ejecutar == 'true'
+        env:
+          ENTORNO: ${{ inputs.entorno || 'produccion' }}
+          MES: ${{ inputs.mes }}
+          DRIVE_Y_TELEGRAM: ${{ github.event_name == 'schedule' || inputs.drive_y_telegram }}
+          USUARIO_PROD: ${{ secrets.PANEL_INFORMES_USUARIO }}
+          CONTRASENA_PROD: ${{ secrets.PANEL_INFORMES_CONTRASENA }}
+          USUARIO_DEMO: ${{ secrets.PANEL_INFORMES_USUARIO_DEMO }}
+          CONTRASENA_DEMO: ${{ secrets.PANEL_INFORMES_CONTRASENA_DEMO }}
+        run: |
+          if [ "$ENTORNO" = "demo" ]; then
+            panel="https://admin-casatomas-git-staging-casa-tomas.vercel.app"
+            export PANEL_USUARIO="${USUARIO_DEMO:-$USUARIO_PROD}" PANEL_CONTRASENA="${CONTRASENA_DEMO:-$CONTRASENA_PROD}"
+          else
+            panel="https://admin-casatomas.vercel.app"
+            export PANEL_USUARIO="$USUARIO_PROD" PANEL_CONTRASENA="$CONTRASENA_PROD"
+          fi
+          args=(--panel "$panel" --mes "${MES:-${{ steps.toca.outputs.mes }}}" --salida "$RUNNER_TEMP/informes")
+          [ "$DRIVE_Y_TELEGRAM" = "true" ] || args+=(--sin-drive)
+          node scripts/informes-mensuales.mjs "${args[@]}"
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.toca.outputs.ejecutar == 'true'
+        with:
+          name: informes-mensuales-resumen
+          path: ${{ runner.temp }}/informes/resumen.json
+          retention-days: 14
+          if-no-files-found: ignore

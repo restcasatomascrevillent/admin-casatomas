@@ -68,7 +68,7 @@ export function GastosServiciosRecibo({ mes, gastos: q, enRecibo, poner, cambiar
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Gastos de Servicios{textoMes ? ` · ${textoMes}` : ""}</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Lo que se ve en <a className="underline underline-offset-2" href={rutaServicios("costes")}>Servicios › Costes</a> para ese mes. Cambia aquí el precio o el descuento de cada gasto: lo que pone «En el recibo» es lo que se cobra.
+          Lo que se ve en <a className="underline underline-offset-2" href={rutaServicios("costes")}>Servicios › Costes</a> para ese mes, sin Stripe (no lo pagamos nosotros). Cambia aquí el precio o el descuento de cada gasto: lo que pone «En el recibo» es lo que se cobra.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">

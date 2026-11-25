@@ -6,8 +6,9 @@ import { compararTiempoConstante } from "../_shared/tiempo-constante.ts";
 import {
   type Accion, agruparEnMensajes, agruparPasos, agruparPorFactura, aplicarTopes, type Aviso, aTextoPlano, type CartaDeProducto, cartaPorProducto, chatDe,
   type ConfigTelegram, construirCierre, construirResumen, construirSemanal, cuerpoSendMessage, type DatosSemanales, destinos, diaMadrid, diaSemanaMadrid,
-  type Envio, errorSaneado, esAccion, esperarDrive, evaluarPendientes, type FacturaInfo, type FilasCarta, horaMadrid, lineaPasoReserva, mensajeAviso,
-  mensajeFactura, mensajesDistintos, NOMBRE_CANAL, notaTope, type PasoReserva, type ReservaInfo, SIN_CONFIGURAR, silencioAhora, type Sugerencia,
+  type Envio, errorSaneado, esAccion, esperarDrive, evaluarPendientes, type FacturaInfo, type FilasCarta, horaMadrid, leerDatosInformes, lineaPasoReserva,
+  mensajeAviso, mensajeFactura, mensajeInformes, mensajesDistintos, NOMBRE_CANAL, notaTope, type PasoReserva, type ReservaInfo, SIN_CONFIGURAR,
+  silencioAhora, type Sugerencia,
   textoPrueba, tipoRegistro, TOPE_RESERVAS_DIA, TOPE_RESERVAS_HORA, topesDeCanal,
 } from "./logica.ts";
 import { type Contexto, type Fallo, idAlbaran, mensajeFallo } from "./fallos.ts";
@@ -37,6 +38,9 @@ const createClient = clienteConAuditoria(createClientBase, "avisos-telegram");
 //  POST { accion: "fallos" }      fallos internos (fallos.ts): un mensaje por fila pendiente de fallos_internos,
 //       sin silencio nocturno.
 //  POST { accion: "semanal" }     resumen semanal del dueño (lunes por la mañana, configurable).
+//  POST { accion: "informes", mes, carpeta_url, informes: [{ titulo, url }], sin_datos, fallidos }
+//       (25/11/2026) los PDF del mes en Drive, al chat de Resúmenes: lo manda la tarea programada del último
+//       jueves (.github/workflows/informes-mensuales.yml) con el JWT de su usuario super admin. Solo enlaces de Drive.
 //  POST { accion: "probar" }      una prueba a cada chat configurado, diciendo qué llegará ahí (aunque esté
 //       desactivado: sirve para montarlo).
 //  POST { accion: "cierre" }      cierre del día (25/11/2026): facturas subidas hoy y avisos de Facturas y márgenes de
@@ -223,7 +227,7 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
     // sin cuerpo
   }
   const accion: Accion | null = esAccion(body.accion) ? body.accion : null;
-  if (!accion) return json({ ok: false, error: "Acción desconocida (pendientes, resumen, semanal, cierre, fallos o probar)" }, 400);
+  if (!accion) return json({ ok: false, error: "Acción desconocida (pendientes, resumen, semanal, cierre, fallos, informes o probar)" }, 400);
 
   const sb = createClient(URL_SB, SERVICE, { auth: { autoRefreshToken: false, persistSession: false } });
   const { data: cfgFila, error: eCfg } = await sb.from("avisos_telegram_config").select("*").eq("id", true).maybeSingle();
@@ -307,6 +311,17 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
     }
     console.log(`[avisos-telegram] ${quien} · fallos · ${enviados}/${fallos.length}${errores.length ? ` · ${errores[0]}` : ""}`);
     return json({ ok: errores.length === 0, enviados, fallos: fallos.length, error: errores[0] });
+  }
+
+  if (accion === "informes") {
+    const datos = leerDatosInformes(body);
+    if (!datos) return json({ ok: false, error: "Faltan mes (AAAA-MM) e informes [{ titulo, url de Drive }]" }, 400);
+    const chat = chatDe(cfg, "resumenes");
+    if (!chat) return json({ ok: true, enviados: 0, motivo: "sin chat de Resúmenes" });
+    const r = await enviarTelegram(chat, mensajeInformes(datos));
+    await registrar([{ tipo: tipoRegistro(accion), chat, ...resultadoFila(r) }]);
+    console.log(`[avisos-telegram] ${quien} · informes ${datos.mes} · ${datos.informes.length} PDF · ${r.ok ? "ok" : r.error}`);
+    return json(r.ok ? { ok: true, enviados: 1 } : { ok: false, error: r.error });
   }
 
   if (accion === "semanal") {
