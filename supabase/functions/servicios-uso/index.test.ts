@@ -861,6 +861,55 @@ describe("lectores", () => {
   });
 });
 
+describe("WhatsApp", () => {
+  const adminCon = (filas: unknown[] | null, error: { message: string } | null = null) => {
+    const llamadas: Record<string, unknown> = {};
+    const consulta = {
+      select: (c: string) => { llamadas.select = c; return consulta; },
+      gte: (col: string, v: string) => { llamadas.gte = [col, v]; return consulta; },
+      limit: () => Promise.resolve({ data: filas, error }),
+    };
+    return { llamadas, admin: { rpc: async () => ({ data: null, error: null }), from: (t: string) => { llamadas.tabla = t; return consulta; } } };
+  };
+  const ctxWa = (admin: unknown, env: Record<string, string> = {}) => ({
+    env: (n: string) => ({ ...BASE_ENV, ...env })[n], fetch: (() => { throw new Error("no debe salir a Internet"); }) as unknown as typeof fetch,
+    ahora: AHORA, admin: admin as never, refProyecto: "sfonaclosuafvlhutkon",
+  });
+
+  it("cuenta los mensajes del mes registrados y les pone la tarifa de Meta para España", async () => {
+    const { admin, llamadas } = adminCon([
+      { tipo: "confirmada", categoria: "utility", estado: "entregado", facturable: true, categoria_cobrada: "utility" },
+      { tipo: "resena", categoria: "utility", estado: "leido", facturable: true, categoria_cobrada: "utility" },
+      { tipo: "resena", categoria: "utility", estado: "fallido" },
+      { tipo: "respuesta", categoria: "service", estado: "entregado", facturable: false, categoria_cobrada: "service" },
+    ]);
+    const r = await LECTORES.whatsapp(ctxWa(admin, { WHATSAPP_ACCESS_TOKEN: "EAAG-token-de-meta-secreto" }));
+    expect(llamadas.tabla).toBe("whatsapp_mensajes");
+    expect(llamadas.gte).toEqual(["creado_en", "2026-11-01T00:00:00.000Z"]);
+    expect(r.error).toBeUndefined();
+    expect(r.metricas.mensajes_mes).toMatchObject({ valor: 3, unidad: "mensajes" });
+    expect(r.metricas.resenas_mes).toMatchObject({ valor: 1 });
+    expect(r.metricas.mensajes_servicio).toMatchObject({ valor: 1, limite: 1000 });
+    expect(r.metricas.fallidos_mes).toMatchObject({ valor: 1 });
+    expect(r.coste_variable).toMatchObject({ importe: 0.0332, moneda: "EUR", origen: "bd", periodo: "mes en curso" });
+    expect(r.detalles?.avisos).toBeUndefined();
+    expect(r.detalles?.tarifa).toMatchObject({ pais: "España", moneda: "EUR", precios: { utility: 0.0166, marketing: 0.0585 } });
+  });
+
+  it("sin WhatsApp configurado lo dice, a 0 €; sin la migración, qué falta", async () => {
+    const vacio = await LECTORES.whatsapp(ctxWa(adminCon([]).admin));
+    expect(vacio.coste_variable).toMatchObject({ importe: 0, moneda: "EUR" });
+    expect(vacio.detalles?.avisos).toEqual([expect.stringMatching(/no está configurado/)]);
+    const sinTabla = await LECTORES.whatsapp(ctxWa(adminCon(null, { message: "relation \"whatsapp_mensajes\" does not exist" }).admin));
+    expect(sinTabla).toMatchObject({ error: "error_api", detalles: { avisos: [expect.stringMatching(/20261223100000/)] } });
+  });
+
+  it("sin el dato de Meta (webhook) es una estimación", async () => {
+    const r = await LECTORES.whatsapp(ctxWa(adminCon([{ tipo: "resena", categoria: "utility", estado: "enviado" }]).admin));
+    expect(r.coste_variable).toMatchObject({ importe: 0.0166, origen: "estimado" });
+  });
+});
+
 describe("manejo de la base de datos", () => {
   it("base sin 20261103160000 (sin coste_variable): se guarda la lectura sin esa columna", async () => {
     estado.errorInsertColumna = true;

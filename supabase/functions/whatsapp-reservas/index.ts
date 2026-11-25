@@ -21,6 +21,15 @@
 //   POST /suscribir             -> suscribe la app a la cuenta de WhatsApp
 //                                  (para recibir el webhook)
 //   POST /prueba {telefono, tipo?} -> manda una plantilla con datos de ejemplo
+//                                  (tipo 'resena' para la petición de reseña)
+//   POST /resenas               -> pide reseña a las reservas que toque (hora
+//                                  de la reserva + 3 h; resenas.ts). La llama
+//                                  pg_cron cada 10 min (whatsapp_resenas_disparar,
+//                                  migración 20261223100000) solo si hay alguna.
+//
+// Cada mensaje que sale se apunta en `whatsapp_mensajes` (tipo, categoría,
+// estado) y el webhook le añade si Meta lo cobra: de ahí sale el coste de
+// WhatsApp en Super Admin › Servicios (servicios-uso).
 //
 // Si Meta no deja usar la plantilla (aún sin aprobar, pausada…), /enviar lo
 // reintenta SIN plantilla (logica.ts, mensajeSinPlantilla): Meta lo admite
@@ -28,6 +37,8 @@
 // botones de respuesta. Fuera de esa ventana falla igual y va el correo.
 //   Las rutas POST que no son /webhook exigen `x-webhook-secret` ==
 //   WHATSAPP_RESERVAS_SECRET (compararTiempoConstante, FALLA CERRADO).
+//   /resenas, /plantillas y /plantillas/crear aceptan además
+//   WHATSAPP_RESENAS_CRON_SECRET (el del cron, también en Vault).
 //
 // Al pulsar «Sí, confirmo» / «No puedo, cancelar», el botón trae un payload
 // corto firmado (logica.ts). Aquí se comprueba, se firma el token normal de
@@ -45,6 +56,13 @@
 // Opcionales:
 //   WHATSAPP_GRAPH_VERSION  (por defecto v23.0)
 //   WEB_CASA_TOMAS_URL      (enlaces de los botones; por defecto la web pública)
+//   WHATSAPP_RESENAS_ACTIVO=true          (enciende la petición de reseña)
+//   WHATSAPP_RESENAS_CRON_SECRET          (el cron; mismo valor en Vault
+//                                          'whatsapp_resenas_cron_secret')
+//   WHATSAPP_RESENAS_DESTINATARIOS=todos  (por defecto solo quien eligió WhatsApp)
+//   WHATSAPP_RESPUESTA_AUTOMATICA=false   (no contestar «nadie lee este número»:
+//                                          para cuando el número se use también
+//                                          en la app WhatsApp Business)
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
@@ -74,6 +92,7 @@ import {
   textoMensajeLibre,
   negocioDeMarca,
   type DefinicionPlantilla,
+  type TipoPlantillaWhatsApp,
   type ReservaParaWhatsApp,
   type TipoAvisoWhatsApp,
   type PulsacionBoton,
@@ -82,6 +101,20 @@ import {
   type RespuestaEjecutar,
   type ValoresBotones,
 } from "./logica.ts";
+import {
+  PLACE_ID_CASA_TOMAS,
+  placeIdValido,
+  plantillaResena,
+  variablesResena,
+  decidirResena,
+  destinatariosResena,
+  errorPlantillaNoDisponible,
+  diasAMirar,
+  ESTADOS_RESENA,
+  type ReservaParaResena,
+} from "./resenas.ts";
+import { hoyEnMadridIso } from "../emails-reserva/tiempo.ts";
+import type { CategoriaWhatsApp } from "../_shared/whatsapp-tarifas.ts";
 
 const FUENTE = "whatsapp-reservas";
 const createClient = clienteConAuditoria(createClientBase, FUENTE);
@@ -95,6 +128,11 @@ const WABA_ID = env("WHATSAPP_WABA_ID");
 const APP_SECRET = env("WHATSAPP_APP_SECRET");
 const VERIFY_TOKEN = env("WHATSAPP_VERIFY_TOKEN");
 const SECRETO_INTERNO = env("WHATSAPP_RESERVAS_SECRET");
+const SECRETO_CRON = env("WHATSAPP_RESENAS_CRON_SECRET");
+const RESENAS_ACTIVO = env("WHATSAPP_RESENAS_ACTIVO").trim().toLowerCase() === "true";
+const DESTINATARIOS_RESENA = destinatariosResena(env("WHATSAPP_RESENAS_DESTINATARIOS"));
+const RESPUESTA_AUTOMATICA = env("WHATSAPP_RESPUESTA_AUTOMATICA").trim().toLowerCase() !== "false";
+const MAX_RESENAS_POR_PASADA = 30;
 const TOKEN_SECRET = env("EMAILS_RESERVA_TOKEN_SECRET");
 const GRAPH = `https://graph.facebook.com/${env("WHATSAPP_GRAPH_VERSION") || "v23.0"}`;
 const WEB = (env("WEB_CASA_TOMAS_URL") || "https://restaurantecasatomascrevillente.es").replace(/\/+$/, "");
@@ -112,6 +150,13 @@ function json(cuerpo: unknown, status = 200): Response {
 function secretoInternoValido(req: Request): boolean {
   if (!SECRETO_INTERNO) return false;
   return compararTiempoConstante(req.headers.get("x-webhook-secret") ?? "", SECRETO_INTERNO);
+}
+
+/** El secreto del cron solo abre las rutas que usa el cron (nunca /prueba ni /enviar). */
+const RUTAS_CRON = new Set(["resenas", "plantillas", "plantillas/crear"]);
+function secretoCronValido(req: Request): boolean {
+  if (!SECRETO_CRON) return false;
+  return compararTiempoConstante(req.headers.get("x-webhook-secret") ?? "", SECRETO_CRON);
 }
 
 function configurado(): boolean {
@@ -156,6 +201,64 @@ async function enviarMensaje(mensaje: Record<string, unknown>): Promise<{ id: st
   const r = await llamarGraph(`${PHONE_NUMBER_ID}/messages`, { cuerpo: mensaje });
   const id = ((r.datos?.messages as { id?: string }[] | undefined)?.[0]?.id) ?? null;
   return { id, error: r.ok ? null : r.error };
+}
+
+// ----------------------------------------------------------------------------
+// Registro de lo enviado (coste en Servicios)
+// ----------------------------------------------------------------------------
+
+/** Apunta un mensaje en `whatsapp_mensajes`. Si falla, solo se avisa en el log: el mensaje ya salió. */
+async function registrarMensaje(m: {
+  reservaId?: string | null;
+  tipo: TipoPlantillaWhatsApp | "respuesta" | "prueba";
+  plantilla?: string | null;
+  categoria: CategoriaWhatsApp;
+  wamid?: string | null;
+  error?: string | null;
+}): Promise<void> {
+  const { error } = await supabase.from("whatsapp_mensajes").insert({
+    reserva_id: m.reservaId ?? null,
+    tipo: m.tipo,
+    plantilla: m.plantilla ?? null,
+    categoria: m.categoria,
+    wamid: m.wamid ?? null,
+    estado: m.error ? "error" : "enviado",
+    error: m.error ? m.error.slice(0, 500) : null,
+  });
+  if (error) console.warn(`[${FUENTE}] No se pudo apuntar el mensaje (${m.tipo}) en whatsapp_mensajes: ${error.message}`);
+}
+
+const ORDEN_ESTADO: Record<string, number> = { enviando: 0, enviado: 1, entregado: 2, leido: 3 };
+const ESTADO_META: Record<string, string> = { sent: "enviado", delivered: "entregado", read: "leido", failed: "fallido" };
+
+/** Estado de entrega y precio que manda Meta → la fila del mensaje (sin bajar de 'leido' a 'entregado'). */
+async function actualizarMensaje(e: EstadoEntrega): Promise<void> {
+  if (!e.mensajeId) return;
+  const nuevo = ESTADO_META[e.estado];
+  const cambios: Record<string, unknown> = { actualizado_en: new Date().toISOString() };
+  if (e.precio) {
+    cambios.facturable = e.precio.facturable;
+    cambios.categoria_cobrada = e.precio.categoria;
+    cambios.tipo_precio = e.precio.tipo;
+  }
+  if (nuevo === "fallido") {
+    cambios.estado = "fallido";
+    cambios.error = e.errores.map((x) => `${x.codigo ?? "?"} ${x.titulo}`).join("; ").slice(0, 500) || "sin_detalle";
+    const { error } = await supabase.from("whatsapp_mensajes").update(cambios).eq("wamid", e.mensajeId);
+    if (error) console.warn(`[${FUENTE}] whatsapp_mensajes (fallido): ${error.message}`);
+    await supabase.from("whatsapp_resenas").update({ estado: "error", motivo: String(cambios.error), actualizado_en: cambios.actualizado_en }).eq("wamid", e.mensajeId);
+    return;
+  }
+  if (nuevo && nuevo in ORDEN_ESTADO) {
+    const anteriores = Object.keys(ORDEN_ESTADO).filter((k) => ORDEN_ESTADO[k] < ORDEN_ESTADO[nuevo]);
+    const { error } = await supabase.from("whatsapp_mensajes").update({ ...cambios, estado: nuevo }).eq("wamid", e.mensajeId).in("estado", anteriores);
+    if (error) console.warn(`[${FUENTE}] whatsapp_mensajes (${nuevo}): ${error.message}`);
+  }
+  if (e.precio) {
+    // Por si el estado no cambió (llegó tarde) pero sí trae el precio.
+    const { error } = await supabase.from("whatsapp_mensajes").update(cambios).eq("wamid", e.mensajeId);
+    if (error) console.warn(`[${FUENTE}] whatsapp_mensajes (precio): ${error.message}`);
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -211,6 +314,7 @@ async function enviarAvisoReserva(
   const { id, error } = await enviarMensaje(mensajePlantilla(contenido));
   if (!error) {
     console.log(`[${FUENTE}] Aviso '${tipo}' de la reserva ${reserva.id} enviado (${id})`);
+    await registrarMensaje({ reservaId: reserva.id, tipo, plantilla: def.nombre, categoria: "utility", wamid: id });
     return { enviado: true, tipo, id: id ?? undefined };
   }
   console.error(`[${FUENTE}] Meta rechazó la plantilla del aviso '${tipo}' de la reserva ${reserva.id}: ${error}. Se intenta sin plantilla.`);
@@ -218,8 +322,11 @@ async function enviarAvisoReserva(
   const sinPlantilla = await enviarMensaje(mensajeSinPlantilla(contenido));
   if (sinPlantilla.error) {
     console.error(`[${FUENTE}] Tampoco sin plantilla (¿fuera de la ventana de 24 h?): ${sinPlantilla.error}`);
+    await registrarMensaje({ reservaId: reserva.id, tipo, plantilla: def.nombre, categoria: "utility", error: `${error} | ${sinPlantilla.error}` });
     return { enviado: false, motivo: `meta: ${error} | sin plantilla: ${sinPlantilla.error}`, tipo };
   }
+  // Sin plantilla = mensaje de servicio (texto libre dentro de las 24 h).
+  await registrarMensaje({ reservaId: reserva.id, tipo, categoria: "service", wamid: sinPlantilla.id });
   console.log(`[${FUENTE}] Aviso '${tipo}' de la reserva ${reserva.id} enviado SIN plantilla (${sinPlantilla.id})`);
   return { enviado: true, tipo, id: sinPlantilla.id ?? undefined, sinPlantilla: true };
 }
@@ -275,18 +382,24 @@ async function procesarPulsacion(p: PulsacionBoton): Promise<void> {
   } else {
     console.warn(`[${FUENTE}] Botón con payload no válido o caducado (de ${p.de.slice(0, 5)}…)`);
   }
-  const { error } = await enviarMensaje(mensajeTexto(p.de, textoRespuestaBoton(respuesta, boton?.accion ?? null), p.mensajeId));
+  const { id, error } = await enviarMensaje(mensajeTexto(p.de, textoRespuestaBoton(respuesta, boton?.accion ?? null), p.mensajeId));
   if (error) console.error(`[${FUENTE}] No se pudo contestar en el chat tras el botón: ${error}`);
+  else await registrarMensaje({ reservaId: boton?.reservaId ?? null, tipo: "respuesta", categoria: "service", wamid: id });
 }
 
 async function procesarMensajeLibre(m: MensajeLibre): Promise<void> {
+  // Si el número se usa también en la app WhatsApp Business (coexistencia),
+  // lo contesta el personal desde la app: ni se marca leído ni se responde.
+  if (!RESPUESTA_AUTOMATICA) return;
   // Nadie lee este número: se le dice que llame. Una respuesta por mensaje.
   await marcarLeido(m.mensajeId);
-  const { error } = await enviarMensaje(mensajeTexto(m.de, textoMensajeLibre()));
+  const { id, error } = await enviarMensaje(mensajeTexto(m.de, textoMensajeLibre()));
   if (error) console.warn(`[${FUENTE}] No se pudo contestar a un mensaje escrito: ${error}`);
+  else await registrarMensaje({ tipo: "respuesta", categoria: "service", wamid: id });
 }
 
 async function procesarEstado(e: EstadoEntrega): Promise<void> {
+  await actualizarMensaje(e).catch((err) => console.warn(`[${FUENTE}] No se pudo actualizar el mensaje ${e.mensajeId}:`, (err as Error)?.message));
   if (e.estado !== "failed") return;
   const error = e.errores.map((x) => `${x.codigo ?? "?"} ${x.titulo}${x.detalle ? ` (${x.detalle})` : ""}`).join("; ") || "sin_detalle";
   const opacos = leerDatosOpacos(e.datosOpacos);
@@ -334,17 +447,29 @@ async function recibirWebhook(req: Request): Promise<Response> {
 // Rutas internas (plantillas, suscripción, prueba)
 // ----------------------------------------------------------------------------
 
+/** place_id de la ficha de Google (config_google_places, la de sync-google-reviews); si no, el de Casa Tomás. */
+async function placeIdResena(): Promise<string> {
+  const { data, error } = await supabase.from("config_google_places").select("place_id").limit(1).maybeSingle();
+  if (error) console.warn(`[${FUENTE}] config_google_places: ${error.message}`);
+  const id = (data as { place_id?: unknown } | null)?.place_id;
+  return placeIdValido(id) ? id : PLACE_ID_CASA_TOMAS;
+}
+
+async function todasLasPlantillas(): Promise<DefinicionPlantilla[]> {
+  return [...Object.values(PLANTILLAS), plantillaResena(await placeIdResena())];
+}
+
 async function estadoPlantillas(): Promise<Response> {
   const r = await llamarGraph(`${WABA_ID}/message_templates?fields=name,status,category,language,rejected_reason&limit=100`, { metodo: "GET" });
   if (!r.ok) return json({ ok: false, error: r.error }, 502);
-  const nuestras = new Set(Object.values(PLANTILLAS).map((p) => p.nombre));
+  const nuestras = new Set((await todasLasPlantillas()).map((p) => p.nombre));
   const lista = ((r.datos?.data as Record<string, unknown>[] | undefined) ?? []).filter((p) => nuestras.has(String(p.name)));
   return json({ ok: true, web: WEB, plantillas: lista });
 }
 
 async function crearPlantillas(): Promise<Response> {
   const resultados: Record<string, unknown>[] = [];
-  for (const def of Object.values(PLANTILLAS)) {
+  for (const def of await todasLasPlantillas()) {
     const r = await llamarGraph(`${WABA_ID}/message_templates`, { cuerpo: cuerpoCrearPlantilla(def) });
     resultados.push({ nombre: def.nombre, ok: r.ok, estado: r.datos?.status ?? null, categoria: r.datos?.category ?? null, error: r.error });
   }
@@ -360,6 +485,16 @@ async function enviarPrueba(req: Request): Promise<Response> {
   const cuerpo = (await req.json().catch(() => ({}))) as { telefono?: string; tipo?: string };
   const para = telefonoParaWhatsApp(cuerpo.telefono);
   if (!para) return json({ ok: false, error: "telefono_no_valido" }, 400);
+  if (cuerpo.tipo === "resena") {
+    const placeId = await placeIdResena();
+    const def = plantillaResena(placeId);
+    const fecha = hoyEnMadridIso();
+    const r = await enviarMensaje(
+      mensajePlantilla({ para, def, variables: variablesResena({ nombre: "Prueba", fecha, marca: "casa_tomas" }), botones: { placeId } }),
+    );
+    await registrarMensaje({ tipo: "prueba", plantilla: def.nombre, categoria: "utility", wamid: r.id, error: r.error });
+    return json({ ok: !r.error, tipo: "resena", id: r.id, error: r.error }, r.error ? 502 : 200);
+  }
   const tipo: TipoAvisoWhatsApp = esTipoAvisoWhatsApp(cuerpo.tipo) ? cuerpo.tipo : "confirmada";
   // Reserva de mentira: los botones de respuesta llevarán un id que no existe
   // (al pulsarlos, «este botón ya no sirve»), así que no toca ninguna reserva.
@@ -371,7 +506,102 @@ async function enviarPrueba(req: Request): Promise<Response> {
   const { id, error } = await enviarMensaje(
     mensajePlantilla({ para, def, variables: variablesParaTipo(tipo, ejemplo), botones: await valoresBotones(def, ejemplo) }),
   );
+  await registrarMensaje({ tipo: "prueba", plantilla: def.nombre, categoria: "utility", wamid: id, error });
   return json({ ok: !error, tipo, id, error }, error ? 502 : 200);
+}
+
+// ----------------------------------------------------------------------------
+// POST /resenas — petición de reseña (hora de la reserva + 3 h)
+// ----------------------------------------------------------------------------
+
+async function apuntarResena(reservaId: string, estado: "omitida" | "enviando", motivo: string | null): Promise<boolean> {
+  // La clave primaria (reserva_id) es la que impide mandar dos veces: si ya
+  // hay fila (otra pasada a la vez), no se inserta y no se manda.
+  const { data, error } = await supabase
+    .from("whatsapp_resenas")
+    .upsert({ reserva_id: reservaId, estado, motivo }, { onConflict: "reserva_id", ignoreDuplicates: true })
+    .select("reserva_id");
+  if (error) {
+    console.error(`[${FUENTE}] whatsapp_resenas (${reservaId}): ${error.message}`);
+    return false;
+  }
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function pedirResenas(): Promise<Response> {
+  if (!configurado()) return json({ ok: false, error: "whatsapp_no_configurado" }, 503);
+  if (!RESENAS_ACTIVO) return json({ ok: true, activo: false });
+  const ahora = new Date();
+  const { desde, hasta } = diasAMirar(hoyEnMadridIso());
+  const { data, error } = await supabase
+    .from("reservas")
+    .select("id, estado, nombre, telefono, fecha, hora, numero_comensales, marca, canal_avisos")
+    .gte("fecha", desde)
+    .lte("fecha", hasta)
+    .in("estado", ESTADOS_RESENA as string[])
+    .order("fecha")
+    .order("hora")
+    .limit(500);
+  if (error) {
+    console.error(`[${FUENTE}] No se pudieron leer las reservas para las reseñas: ${error.message}`);
+    return json({ ok: false, error: "error_bd" }, 500);
+  }
+  const reservas = (data ?? []) as ReservaParaResena[];
+  const ids = reservas.map((r) => r.id);
+  const hechas = new Set<string>();
+  if (ids.length) {
+    const { data: filas, error: errorHechas } = await supabase.from("whatsapp_resenas").select("reserva_id").in("reserva_id", ids);
+    if (errorHechas) {
+      console.error(`[${FUENTE}] whatsapp_resenas: ${errorHechas.message}`);
+      return json({ ok: false, error: "error_bd" }, 500);
+    }
+    for (const f of filas ?? []) hechas.add(String((f as { reserva_id: string }).reserva_id));
+  }
+
+  const placeId = await placeIdResena();
+  const def = plantillaResena(placeId);
+  const resumen = { enviadas: 0, omitidas: 0, esperando: 0, errores: 0, reintentar: 0, motivos: {} as Record<string, number> };
+  for (const r of reservas) {
+    if (hechas.has(r.id)) continue;
+    const d = decidirResena(r, ahora, { destinatarios: DESTINATARIOS_RESENA });
+    if (d.accion === "esperar") {
+      resumen.esperando++;
+      continue;
+    }
+    if (d.accion === "omitir") {
+      if (await apuntarResena(r.id, "omitida", d.motivo)) {
+        resumen.omitidas++;
+        resumen.motivos[d.motivo] = (resumen.motivos[d.motivo] ?? 0) + 1;
+      }
+      continue;
+    }
+    if (resumen.enviadas + resumen.errores >= MAX_RESENAS_POR_PASADA) break; // el resto, en la siguiente pasada
+    if (!(await apuntarResena(r.id, "enviando", null))) continue;
+    const { id, error: errorEnvio } = await enviarMensaje(
+      mensajePlantilla({ para: d.para, def, variables: variablesResena(r), botones: { placeId }, datosOpacos: datosOpacos(r.id, "resena") }),
+    );
+    if (errorEnvio && errorPlantillaNoDisponible(errorEnvio)) {
+      // Plantilla aún sin aprobar (o pausada): no gasta el único intento de
+      // esta reserva; se vuelve a probar en la siguiente pasada (12 h de margen).
+      await supabase.from("whatsapp_resenas").delete().eq("reserva_id", r.id).eq("estado", "enviando");
+      resumen.reintentar++;
+      console.warn(`[${FUENTE}] Plantilla de reseña no disponible en Meta (${errorEnvio}): se reintentará la reserva ${r.id}`);
+      continue;
+    }
+    await supabase
+      .from("whatsapp_resenas")
+      .update({ estado: errorEnvio ? "error" : "enviada", motivo: errorEnvio ? errorEnvio.slice(0, 500) : null, wamid: id, actualizado_en: new Date().toISOString() })
+      .eq("reserva_id", r.id);
+    await registrarMensaje({ reservaId: r.id, tipo: "resena", plantilla: def.nombre, categoria: "utility", wamid: id, error: errorEnvio });
+    if (errorEnvio) {
+      resumen.errores++;
+      console.error(`[${FUENTE}] Meta no aceptó la petición de reseña de la reserva ${r.id}: ${errorEnvio}`);
+    } else {
+      resumen.enviadas++;
+      console.log(`[${FUENTE}] Petición de reseña de la reserva ${r.id} enviada (${id})`);
+    }
+  }
+  return json({ ok: true, activo: true, destinatarios: DESTINATARIOS_RESENA, ...resumen });
 }
 
 // ----------------------------------------------------------------------------
@@ -389,8 +619,11 @@ serve(conAuditoriaDePeticion(FUENTE, createClientBase, async (req: Request) => {
     if (ruta === "webhook" && req.method === "POST") return await recibirWebhook(req);
 
     if (req.method !== "POST") return json({ ok: false, error: "not_found" }, 404);
-    if (!secretoInternoValido(req)) return json({ ok: false, error: "no_autorizado" }, 401);
+    if (!secretoInternoValido(req) && !(RUTAS_CRON.has(ruta) && secretoCronValido(req))) {
+      return json({ ok: false, error: "no_autorizado" }, 401);
+    }
 
+    if (ruta === "resenas") return await pedirResenas();
     if (ruta === "enviar") {
       const cuerpo = (await req.json().catch(() => ({}))) as { reserva_id?: unknown };
       if (typeof cuerpo.reserva_id !== "string" || !cuerpo.reserva_id) return json({ enviado: false, motivo: "reserva_id_requerido" }, 400);

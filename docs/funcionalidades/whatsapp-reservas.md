@@ -11,7 +11,8 @@ Estado: **solo en la demo**, con el número de prueba de Meta (solo escribe a lo
 3. **Reserva verificada** («confirma tu asistencia»): botones **Sí, confirmo**, **No puedo, cancelar** y **Cómo llegar** (Google Maps). Al pulsar uno, la reserva cambia como con el botón del correo y se le contesta en el mismo chat.
 4. **Reserva confirmada** desde el panel: aviso con **Cómo llegar**.
 5. **Reserva cancelada por el restaurante**: aviso sin botones.
-6. Si escribe a mano al número: respuesta automática con el teléfono del restaurante (nadie lee ese número).
+6. Si escribe a mano al número: respuesta automática con el teléfono del restaurante (nadie lee ese número). Con `WHATSAPP_RESPUESTA_AUTOMATICA=false` no se contesta (para cuando el número se use también en la app WhatsApp Business).
+7. **Después de comer** (dueño, 25/11/2026): a la hora de la reserva + 3 h (la de las 14:00, a las 17:00) le llega «gracias por venir… ¿nos dejas tu opinión en Google?» con el botón **Dejar mi opinión** (abre la ficha de Google para escribir la reseña). Si cae después de las 22:00, al día siguiente a las 12:00. Solo reservas confirmadas o completadas de Casa Tomás, una vez por reserva y, por defecto, solo a quien eligió WhatsApp (Meta exige que el cliente haya aceptado recibir WhatsApp del negocio); con `WHATSAPP_RESENAS_DESTINATARIOS=todos`, a todas las reservas con móvil.
 
 El recordatorio de dos días antes y el aviso de «reserva modificada» siguen yendo por correo (aún no tienen plantilla).
 
@@ -24,6 +25,9 @@ El recordatorio de dos días antes y el aviso de «reserva modificada» siguen y
 | `emails-reserva` | Antes de cada aviso, si el cliente eligió WhatsApp se lo pide a `whatsapp-reservas`; si no sale, manda el correo de siempre. Nuevo enlace «Gestionar mi reserva» (token `gestionar`, vale hasta el día de la reserva) y `via: "whatsapp"` en `/enlace/ejecutar` (el clic de WhatsApp no verifica el email del newsletter ni manda el aviso de después). |
 | `whatsapp-reservas` (función nueva) | Manda las plantillas, recibe el webhook de Meta (pulsaciones y estados de entrega) y registra las plantillas en Meta. Al pulsar un botón llama a `emails-reserva /enlace/ejecutar`: la misma lógica que el botón del correo. |
 | Web (`web-casatomas`) | Selector en el formulario de reserva y modo «Gestionar mi reserva» en `/reserva/respuesta`. |
+| `whatsapp_mensajes` (migración `20261223100000`) | Un registro por WhatsApp enviado (tipo, categoría de Meta, estado). El webhook le añade si Meta lo cobra (`pricing.billable`, `pricing.category`). |
+| `whatsapp_resenas` + cron `whatsapp-resenas` (misma migración) | Reseñas ya pedidas (una por reserva). Cada 10 min, si hay alguna reserva a la que ya le toca (`whatsapp_resena_momento`), el cron llama a `whatsapp-reservas POST /resenas`. Sin el secreto de Vault `whatsapp_resenas_cron_secret` no hace nada. Si Meta aún no ha aprobado la plantilla (o está pausada), no gasta el intento: se reintenta en la siguiente pasada. |
+| `servicios-uso` | WhatsApp como un servicio más en Super Admin › Servicios: mensajes del mes y coste con la tarifa de Meta para España (`_shared/whatsapp-tarifas.ts`). |
 
 Los botones de respuesta llevan un dato oculto corto y firmado (no el token del correo, que es demasiado largo para Meta). Si el restaurante cambia la hora después de mandar el WhatsApp, el botón viejo deja de valer, igual que el enlace del correo.
 
@@ -41,10 +45,18 @@ Si Meta acepta el mensaje pero luego no llega (por ejemplo, el número no tiene 
 | `WHATSAPP_VERIFY_TOKEN` | Dueño (se la inventa) | Verificar el webhook al configurarlo en Meta |
 | `WHATSAPP_RESERVAS_SECRET` | Generada al desplegar | Rutas internas de `whatsapp-reservas` |
 | `WHATSAPP_RESERVAS_ACTIVO=true` | Al activar | Enciende el selector de la web y el desvío de los avisos |
+| `WHATSAPP_RESENAS_ACTIVO=true` | Al activar | Enciende la petición de reseña (plantilla `resena_tras_visita` aprobada antes) |
+| `WHATSAPP_RESENAS_CRON_SECRET` | Generada al desplegar | El cron de reseñas; **el mismo valor** en Vault: `select vault.create_secret('<valor>', 'whatsapp_resenas_cron_secret');` |
+| `WHATSAPP_RESENAS_DESTINATARIOS=todos` | Opcional | Pedir reseña a todas las reservas con móvil (por defecto, solo a quien eligió WhatsApp) |
+| `WHATSAPP_RESPUESTA_AUTOMATICA=false` | Opcional | No contestar a los mensajes escritos (número compartido con la app WhatsApp Business) |
 
 Webhook en Meta: `https://<proyecto>.supabase.co/functions/v1/whatsapp-reservas/webhook`, campo `messages`.
 
-Rutas internas (cabecera `x-webhook-secret`): `POST /plantillas` (estado en Meta), `POST /plantillas/crear`, `POST /suscribir`, `POST /prueba {telefono, tipo}`.
+Rutas internas (cabecera `x-webhook-secret`): `POST /plantillas` (estado en Meta), `POST /plantillas/crear`, `POST /suscribir`, `POST /prueba {telefono, tipo}` (`tipo: "resena"` para la de reseña), `POST /resenas` (la del cron). `/resenas` y `/plantillas*` aceptan también `WHATSAPP_RESENAS_CRON_SECRET`.
+
+## Coste (Super Admin › Servicios)
+
+Meta cobra **por mensaje entregado** (desde el 01/07/2025), según la categoría y el país del móvil. España, en EUR y sin IVA, desde el 01/07/2026: plantilla de **utilidad** (avisos y reseña) **0,0166 €**, **marketing 0,0585 €**. Desde el 01/10/2026 se cobran también los mensajes de servicio (texto libre: respuestas del chat) a partir del 1.001 del mes; los 1.000 primeros, gratis. Fuente: [precios de la plataforma de WhatsApp](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing) (las cifras en EUR son las de su tarjeta de precios). Si Meta clasifica la plantilla de reseña como marketing, la cobra como tal: el webhook lo dice y Servicios lo cuenta. Sin webhook, el coste sale como «estimado».
 
 ## Para pasar a producción
 
@@ -56,5 +68,5 @@ Rutas internas (cabecera `x-webhook-secret`): `POST /plantillas` (estado en Meta
 
 ## Pruebas
 
-- `whatsapp-reservas/__tests__/logica.test.ts`, `emails-reserva/__tests__/whatsapp-y-gestion.integracion.test.ts`, `reservas-web/__tests__/canal-avisos-whatsapp.integracion.test.ts`, `npm run test:canal-avisos:db`.
+- `whatsapp-reservas/__tests__/logica.test.ts`, `whatsapp-reservas/__tests__/resenas.test.ts`, `_shared/__tests__/whatsapp-tarifas.test.ts`, `servicios-uso/index.test.ts` (WhatsApp), `node scripts/test-whatsapp-resenas.mjs` (PGlite), `emails-reserva/__tests__/whatsapp-y-gestion.integracion.test.ts`, `reservas-web/__tests__/canal-avisos-whatsapp.integracion.test.ts`, `npm run test:canal-avisos:db`.
 - Web: `ReservationForm.canal-avisos.test.tsx` y `respuesta-reserva.test.tsx`.

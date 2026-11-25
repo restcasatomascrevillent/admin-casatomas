@@ -1,0 +1,15 @@
+{
+  "_comentario": "Cuándo se pide la reseña: los mismos casos los pasan momentoResena() (resenas.test.ts) y la función SQL whatsapp_resena_momento (scripts/test-whatsapp-resenas.mjs). 'utc' es el instante esperado.",
+  "casos": [
+    { "fecha": "2026-11-25", "hora": "14:00:00", "utc": "2026-11-25T16:00:00.000Z", "por": "comida de las 14:00 en invierno: a las 17:00 de Madrid" },
+    { "fecha": "2026-07-15", "hora": "14:00", "utc": "2026-07-15T15:00:00.000Z", "por": "comida de las 14:00 en verano: a las 17:00 de Madrid" },
+    { "fecha": "2026-11-25", "hora": "13:30", "utc": "2026-11-25T15:30:00.000Z", "por": "13:30 → 16:30" },
+    { "fecha": "2026-11-25", "hora": "15:45", "utc": "2026-11-25T17:45:00.000Z", "por": "15:45 → 18:45" },
+    { "fecha": "2026-11-25", "hora": "19:00", "utc": "2026-11-25T21:00:00.000Z", "por": "19:00 → 22:00 justo (aún vale)" },
+    { "fecha": "2026-11-25", "hora": "19:30", "utc": "2026-11-26T11:00:00.000Z", "por": "19:30 → pasaría de las 22:00: al día siguiente a las 12:00" },
+    { "fecha": "2026-11-25", "hora": "21:30", "utc": "2026-11-26T11:00:00.000Z", "por": "cena de las 21:30 → al día siguiente a las 12:00" },
+    { "fecha": "2026-12-31", "hora": "22:00", "utc": "2027-01-01T11:00:00.000Z", "por": "nochevieja: cambia de año" },
+    { "fecha": "2026-03-28", "hora": "21:00", "utc": "2026-03-29T10:00:00.000Z", "por": "la noche del cambio a horario de verano: 12:00 de Madrid es 10:00 UTC" },
+    { "fecha": "2026-11-25", "hora": "06:00", "utc": "2026-11-25T09:00:00.000Z", "por": "antes de las 10:00 no se escribe: a las 10:00" }
+  ]
+}
