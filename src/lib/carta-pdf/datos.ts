@@ -244,10 +244,12 @@ export function categoriasPlatos(filas: readonly FilaPlato[], carta: CartaImpres
   }));
 }
 
-/** Unidad del precio que merece decirse: «kg», «100 g»… (ni «Unidad» ni «Ración»). */
-export function unidadVisible(unidad: string | null | undefined): string | null {
+/** Unidad del precio que merece decirse: «kg», «100 g», «persona»… (ni «Unidad» ni «Ración»).
+ * «Persona» es una palabra: sale en el idioma de la carta. */
+export function unidadVisible(unidad: string | null | undefined, idioma: IdiomaCarta = "es"): string | null {
   const normalizada = normalizarUnidadPlato(unidad);
   if (normalizada === "Unidad" || normalizada === "Ración") return null;
+  if (normalizada === "Persona") return TEXTOS[idioma].unidades.Persona;
   return normalizada;
 }
 
@@ -291,7 +293,7 @@ export function contenidoPlatos(filas: readonly FilaPlato[], opciones: OpcionesC
           nombre: campoTraducido(plato, "nombre", idioma),
           detalle: campoTraducido(plato, "descripcion", idioma) || null,
           precio: textoPrecio(plato.precio_eur, idioma),
-          unidad: precioConocido(plato.precio_eur) ? unidadVisible(plato.unidad) : null,
+          unidad: precioConocido(plato.precio_eur) ? unidadVisible(plato.unidad, idioma) : null,
           copa: null,
           alergenos: (clavesPorPlato.get(plato.id) ?? [])
             .map((c) => numero.get(c))

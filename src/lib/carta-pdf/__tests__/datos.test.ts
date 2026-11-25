@@ -111,6 +111,13 @@ describe("selección y orden de los platos", () => {
     expect(contenido.secciones.map((s) => s.clave)).toEqual(["NOVEDADES DEL DÍA", "CARNES", "BOCADILLOS"]);
   });
 
+  it("«Persona» sale tras el precio en el idioma de la carta", () => {
+    const filas = [plato({ id: "e", nombre: "Paella", unidad: "por persona", precio_eur: 18 })];
+    const unidad = (idioma: "es" | "en" | "fr") =>
+      contenidoPlatos(filas, { carta: "restaurante", idioma }).secciones[0].grupos[0].elementos[0].unidad;
+    expect([unidad("es"), unidad("en"), unidad("fr")]).toEqual(["persona", "person", "personne"]);
+  });
+
   it("precio con unidad solo si no es «Unidad» ni «Ración»", () => {
     const contenido = contenidoPlatos(
       [

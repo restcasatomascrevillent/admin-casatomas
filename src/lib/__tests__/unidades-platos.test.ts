@@ -26,12 +26,18 @@ describe("unidades canónicas de platos", () => {
         "ración",
         "RACIONES",
       ]),
-    ).toEqual(["Unidad", "Ración", "kg", "gramos"]);
+    ).toEqual(["Unidad", "Ración", "Persona", "kg", "gramos"]);
   });
-  it("ofrece «Ración» aunque ningún plato la use todavía", () => {
-    expect(opcionesUnidadPlato()).toEqual(["Unidad", "Ración", "kg", "gramos"]);
-    expect(opcionesUnidadPlato(["Unidad", "kg"])).toContain("Ración");
+  it("ofrece «Ración» y «Persona» aunque ningún plato las use todavía", () => {
+    expect(opcionesUnidadPlato()).toEqual(["Unidad", "Ración", "Persona", "kg", "gramos"]);
+    expect(opcionesUnidadPlato(["Unidad", "kg"])).toContain("Persona");
   });
+  it.each(["Persona", "persona", "por persona", "Por Persona", "personas", "x persona", "/persona", "pax", "p/p", "pp"])(
+    "guarda %s como «Persona»",
+    (valor) => {
+      expect(guardarUnidadPlato(valor)).toBe("Persona");
+    },
+  );
   it("guarda la ración con su forma canónica", () => {
     expect(guardarUnidadPlato("Ración")).toBe("Ración");
     expect(normalizarUnidadPlato("racion")).toBe("Ración");

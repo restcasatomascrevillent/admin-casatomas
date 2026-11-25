@@ -15,6 +15,7 @@ export function normalizarUnidadPlato(valor?: string | null): string {
   if (gramos && Number(gramos[1].replace(",", ".")) > 0)
     return `${Number(gramos[1].replace(",", "."))} g`;
   if (/^racion(es)?$/.test(clave)) return "Ración";
+  if (/^((por|x|\/) ?)?persona(s)?$|^pax$|^p\/?p$/.test(clave)) return "Persona";
   return texto;
 }
 export function gramosDeUnidad(valor?: string | null): number | null {
@@ -29,10 +30,12 @@ export function descomponerUnidad(valor?: string | null) {
 export function opcionesUnidadPlato(
   valores: readonly (string | null | undefined)[] = [],
 ): string[] {
-  // «Ración» va fija: un plato puede venderse por ración aunque ninguno lo use todavía.
+  // «Ración» y «Persona» van fijas: un plato puede venderse por ración o por
+  // persona (arroces, menús…) aunque ninguno lo use todavía.
   const opciones = [
     "Unidad",
     "Ración",
+    "Persona",
     "kg",
     "gramos",
     ...valores.map((v) => descomponerUnidad(v).unidad),
