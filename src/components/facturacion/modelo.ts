@@ -48,6 +48,16 @@ export const facturaSchema = z.object({
     precio: z.number().finite().min(0).max(1000000),
     descuento: z.number().finite().min(0).max(100),
     iva: z.number().finite().min(0).max(100),
+    /**
+     * Solo en la línea de la IA (OpenAI) de un pago mensual (25/11/2026): en qué se ha gastado,
+     * como PARTE de la línea (0–1), para que siga cuadrando si se cambia el precio o el descuento.
+     * Se pinta debajo de la línea en la pantalla y en el PDF; no cambia el total. Ver desgloseIa.ts.
+     */
+    desglose: z.array(z.object({
+      concepto: z.string().min(1).max(120),
+      parte: z.number().finite().min(0).max(1),
+      usos: z.number().int().min(0).max(100000000).optional(),
+    })).max(20).optional(),
   })).min(1).max(100),
   retencion: porcentajeSchema,
   descuentoGlobal: porcentajeSchema.optional(),
