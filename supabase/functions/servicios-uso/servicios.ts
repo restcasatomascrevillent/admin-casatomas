@@ -6,7 +6,7 @@
 //
 //  Qué hace: para cada proveedor EN USO (`activo`) de `servicios_contratados`
 //  que tenga lector (Vercel, Supabase, GitHub, Resend, Stripe, OpenAI, Vapi,
-//  Hostinger, Google Drive y Mapbox) lee su consumo (por API con su secreto o de nuestra base de
+//  Hostinger, Google Drive, Mapbox y WhatsApp) lee su consumo (por API con su secreto o de nuestra base de
 //  datos), le pone el límite del plan (de `servicios_contratados.limites`),
 //  calcula lo gastado por uso este mes (`coste_variable`) cuando se puede,
 //  guarda una fila en `servicios_uso` y devuelve la última lectura de cada uno.
@@ -38,6 +38,9 @@
 //    SERVICIOS_HOSTINGER_TOKEN (suscripciones y dominios con su caducidad)
 //    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN (ya existen si
 //                            se guardan copias de facturas en Drive: espacio de la cuenta)
+//  WhatsApp: cuenta los mensajes que registra whatsapp-reservas
+//  (`whatsapp_mensajes`) y les pone la tarifa de Meta para España
+//  (_shared/whatsapp-tarifas.ts), sin secreto.
 //  Mapbox no tiene API de consumo: cuenta las cargas del mapa de vinos con la
 //  RPC servicios_cargas_mapa_vinos (contador que suma la web), sin secreto.
 //  Vercel (plan Pro): además del uso, lee la facturación del periodo
@@ -45,6 +48,7 @@
 // ============================================================================
 import { exigirSuperAdmin, respuestaJson, type FabricaCliente } from "../_shared/autorizacion.ts";
 import { ClienteDrive, ErrorDrive, URL_DRIVE } from "../_shared/google-drive.ts";
+import { TARIFA_WHATSAPP_ESPANA, costeWhatsAppMes, precioTexto, type MensajeWhatsAppRegistrado } from "../_shared/whatsapp-tarifas.ts";
 
 export const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -72,6 +76,7 @@ export const SECRETOS = [
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "GOOGLE_REFRESH_TOKEN",
+  "WHATSAPP_ACCESS_TOKEN",
   "SUPABASE_SERVICE_ROLE_KEY",
   "SUPABASE_ANON_KEY",
 ] as const;
@@ -1628,6 +1633,61 @@ export const leerMapbox: Lector = async (ctx) => {
   };
 };
 
+// ─── WhatsApp (API de WhatsApp Cloud de Meta) ──────────────────────────────
+// Sin API de consumo que merezca la pena: whatsapp-reservas apunta cada
+// mensaje que manda en `whatsapp_mensajes` (20261222100000) y el webhook de
+// Meta le añade si se cobra y en qué categoría. Tarifa y reglas en
+// _shared/whatsapp-tarifas.ts.
+
+export const leerWhatsapp: Lector = async (ctx) => {
+  const periodo = "mes en curso";
+  const { data, error } = await ctx.admin
+    .from("whatsapp_mensajes")
+    .select("tipo, categoria, estado, facturable, categoria_cobrada")
+    .gte("creado_en", inicioMesUtc(ctx.ahora).toISOString())
+    .limit(20000);
+  if (error) {
+    return { metricas: {}, error: "error_api", detalles: { avisos: ["Falta aplicar la migración 20261222100000_whatsapp_resenas_y_coste (registro de los WhatsApp enviados)."] } };
+  }
+  const filas = (Array.isArray(data) ? data : []).filter(esObjeto) as MensajeWhatsAppRegistrado[];
+  const r = costeWhatsAppMes(filas, TARIFA_WHATSAPP_ESPANA);
+  const t = TARIFA_WHATSAPP_ESPANA;
+  const nota = "WhatsApp que ha mandado el panel este mes (registro propio). Lo oficial, en WhatsApp Manager › Información.";
+  const metricas: Record<string, Metrica> = {
+    mensajes_mes: { orden: 1, etiqueta: "WhatsApp enviados este mes", valor: r.mensajes, unidad: "mensajes", periodo, nota },
+    plantillas_utility: {
+      orden: 2, etiqueta: "Avisos (plantillas de utilidad)", valor: r.porCategoria.utility, unidad: "mensajes", periodo,
+      nota: `Confirmaciones de reserva, reseñas… ${precioTexto(t.precios.utility)} cada uno.`,
+    },
+    resenas_mes: { orden: 3, etiqueta: "Peticiones de reseña", valor: r.resenas, unidad: "mensajes", periodo, nota: "Las 3 horas después de la reserva." },
+    mensajes_servicio: {
+      orden: 5, etiqueta: "Respuestas en el chat (servicio)", valor: r.porCategoria.service, unidad: "mensajes", limite: t.servicioGratisMes, periodo,
+      nota: `Gratis los ${t.servicioGratisMes.toLocaleString("es-ES")} primeros del mes; después, ${precioTexto(t.precios.service)}.`,
+    },
+  };
+  if (r.porCategoria.marketing > 0) {
+    metricas.plantillas_marketing = {
+      orden: 4, etiqueta: "Plantillas cobradas como marketing", valor: r.porCategoria.marketing, unidad: "mensajes", periodo,
+      nota: `Meta ha cobrado como marketing alguna plantilla: ${precioTexto(t.precios.marketing)} cada una.`,
+    };
+  }
+  if (r.fallidos > 0) {
+    metricas.fallidos_mes = { orden: 6, etiqueta: "No entregados (no se cobran)", valor: r.fallidos, unidad: "mensajes", periodo };
+  }
+  const detalles: Record<string, unknown> = { tarifa: { pais: "España", moneda: t.moneda, precios: t.precios, vigente_desde: t.vigenteDesde, fuente: t.fuente } };
+  if (!secreto(ctx, "WHATSAPP_ACCESS_TOKEN")) detalles.avisos = ["WhatsApp no está configurado en este entorno: no se manda ningún mensaje."];
+  return {
+    metricas,
+    detalles,
+    coste_variable: {
+      importe: redondear(r.importe, 4), moneda: t.moneda, periodo, origen: r.todoConfirmadoPorMeta ? "bd" : "estimado",
+      nota: `Meta cobra por mensaje entregado (España, sin IVA): utility ${precioTexto(t.precios.utility)}, marketing ${precioTexto(t.precios.marketing)}; ` +
+        `los ${t.servicioGratisMes.toLocaleString("es-ES")} primeros de servicio del mes, gratis.` +
+        (r.todoConfirmadoPorMeta ? "" : " Estimado: falta la confirmación de Meta (webhook) de algunos mensajes."),
+    },
+  };
+};
+
 export const LECTORES: Record<string, Lector> = {
   vercel: leerVercel,
   supabase: leerSupabase,
@@ -1639,6 +1699,7 @@ export const LECTORES: Record<string, Lector> = {
   hostinger: leerHostinger,
   google_drive: leerGoogleDrive,
   mapbox: leerMapbox,
+  whatsapp: leerWhatsapp,
 };
 
 // ─── manejador HTTP ─────────────────────────────────────────────────────────
