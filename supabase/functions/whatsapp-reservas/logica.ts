@@ -67,10 +67,13 @@ export const IDIOMA_PLANTILLAS = "es_ES";
  *    enviar (Meta solo deja variable al final de la URL). */
 export type BotonPlantilla =
   | { tipo: "respuesta"; texto: string; accion: AccionBoton }
-  | { tipo: "url"; texto: string; url: string; ejemploSufijo?: string; sufijo?: "gestionar" | "mapa" };
+  | { tipo: "url"; texto: string; url: string; ejemploSufijo?: string; sufijo?: "gestionar" | "mapa" | "resena" };
+
+/** Avisos de reserva más la petición de reseña (resenas.ts). */
+export type TipoPlantillaWhatsApp = TipoAvisoWhatsApp | "resena";
 
 export interface DefinicionPlantilla {
-  tipo: TipoAvisoWhatsApp;
+  tipo: TipoPlantillaWhatsApp;
   /** Nombre en Meta: minúsculas y guiones bajos. */
   nombre: string;
   /** Texto con variables {{1}}, {{2}}… Meta rechaza una plantilla que empiece
@@ -80,6 +83,9 @@ export interface DefinicionPlantilla {
   ejemplo: string[];
   /** Máximo 25 caracteres por texto. Las respuestas rápidas van juntas y primero. */
   botones: BotonPlantilla[];
+  /** Categoría que se pide a Meta al registrarla (por defecto UTILITY). Meta
+   * puede cambiarla; lo que cobra de verdad llega en el webhook. */
+  categoria?: "UTILITY" | "MARKETING";
 }
 
 const MAPA_GOOGLE = "https://www.google.com/maps/search/?api=1&query=";
@@ -168,7 +174,7 @@ export function cuerpoCrearPlantilla(def: DefinicionPlantilla): Record<string, u
       }),
     });
   }
-  return { name: def.nombre, language: IDIOMA_PLANTILLAS, category: "UTILITY", components: componentes };
+  return { name: def.nombre, language: IDIOMA_PLANTILLAS, category: def.categoria ?? "UTILITY", components: componentes };
 }
 
 // ----------------------------------------------------------------------------
@@ -266,6 +272,15 @@ export interface ValoresBotones {
   tokenGestion?: string;
   /** Final de la URL de «Cómo llegar» (consultaMapa). */
   mapa?: string;
+  /** place_id de la ficha de Google (botón «Dejar mi opinión», resenas.ts). */
+  placeId?: string;
+}
+
+/** Lo que va al final de la URL de un botón de enlace con variable. */
+function valorSufijo(b: Extract<BotonPlantilla, { tipo: "url" }>, valores: ValoresBotones): string | undefined {
+  if (b.sufijo === "gestionar") return valores.tokenGestion;
+  if (b.sufijo === "resena") return valores.placeId;
+  return valores.mapa;
 }
 
 /** Cuerpo de POST /{phone-number-id}/messages con una plantilla. */
@@ -287,7 +302,7 @@ export function mensajePlantilla(opciones: {
       if (!payload) throw new Error(`falta_payload_${b.accion}`);
       componentes.push({ type: "button", sub_type: "quick_reply", index: String(i), parameters: [{ type: "payload", payload }] });
     } else if (b.url.includes("{{1}}")) {
-      const valor = b.sufijo === "gestionar" ? botones.tokenGestion : botones.mapa;
+      const valor = valorSufijo(b, botones);
       if (!valor) throw new Error(`falta_url_${b.sufijo ?? i}`);
       componentes.push({ type: "button", sub_type: "url", index: String(i), parameters: [{ type: "text", text: valor }] });
     }
@@ -323,7 +338,8 @@ export function rellenarCuerpo(def: DefinicionPlantilla, variables: string[]): s
 /** URL final de un botón de enlace (con el final que se rellena al enviar). */
 export function urlBoton(b: Extract<BotonPlantilla, { tipo: "url" }>, valores: ValoresBotones): string | null {
   if (!b.url.includes("{{1}}")) return b.url;
-  const valor = b.sufijo === "gestionar" ? (valores.tokenGestion ? encodeURIComponent(valores.tokenGestion) : null) : valores.mapa;
+  const crudo = valorSufijo(b, valores);
+  const valor = crudo && b.sufijo === "gestionar" ? encodeURIComponent(crudo) : crudo;
   return valor ? b.url.replace("{{1}}", valor) : null;
 }
 
@@ -485,6 +501,8 @@ export interface EstadoEntrega {
   destinatario: string;
   datosOpacos: string | null;
   errores: { codigo: number | null; titulo: string; detalle: string }[];
+  /** Objeto `pricing` del aviso: si Meta lo cobra y en qué categoría. */
+  precio: { facturable: boolean | null; categoria: string | null; tipo: string | null } | null;
 }
 
 export interface MensajeLibre {
@@ -530,6 +548,7 @@ export function leerWebhook(cuerpo: unknown): { pulsaciones: PulsacionBoton[]; e
 
       for (const s of lista(valor.statuses)) {
         const estado = obj(s);
+        const precio = obj(estado.pricing);
         estados.push({
           mensajeId: texto(estado.id),
           estado: texto(estado.status),
@@ -543,6 +562,13 @@ export function leerWebhook(cuerpo: unknown): { pulsaciones: PulsacionBoton[]; e
               detalle: texto(obj(error.error_data).details) || texto(error.message),
             };
           }),
+          precio: Object.keys(precio).length === 0
+            ? null
+            : {
+                facturable: typeof precio.billable === "boolean" ? precio.billable : null,
+                categoria: texto(precio.category) || null,
+                tipo: texto(precio.type) || null,
+              },
         });
       }
     }
@@ -551,10 +577,11 @@ export function leerWebhook(cuerpo: unknown): { pulsaciones: PulsacionBoton[]; e
 }
 
 /** Lo que se guarda en `biz_opaque_callback_data` para saber de qué reserva es un estado de entrega. */
-export function datosOpacos(reservaId: string, tipo: TipoAvisoWhatsApp): string {
+export function datosOpacos(reservaId: string, tipo: TipoPlantillaWhatsApp): string {
   return JSON.stringify({ r: reservaId, t: tipo });
 }
 
+/** Solo los avisos de reserva (la reseña no avisa al panel si no llega). */
 export function leerDatosOpacos(valor: string | null): { reservaId: string; tipo: TipoAvisoWhatsApp } | null {
   try {
     const d = obj(JSON.parse(valor ?? ""));

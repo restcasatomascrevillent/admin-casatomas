@@ -30,6 +30,8 @@ import { avisoTarjetaSinOrigen, mensajeFaltaOrigen, origenVinoClaro } from "@/li
 import { ETIQUETA_ORIGEN_POR_CONFIRMAR } from "@/lib/tipos-vino";
 import { usePuntuacionesParker } from "./parker/usePuntuacionesParker";
 import { resumenParker } from "./parker/parker";
+import { usePreciosCompraVinos } from "./usePreciosCompraVinos";
+import { PrecioCompraVino } from "./PrecioCompraVino";
 
 // Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
 const CARTA_CARD_ASPECT_RATIO = 300 / 160;
@@ -69,6 +71,8 @@ export function ListaVinos({ vinos, soloLectura = false }: ListaVinosProps) {
     actualizarVino,
   } = useVinos();
   const parker = usePuntuacionesParker();
+  // Precio de compra (última factura, con IVA): solo para quien edita la carta (25/11/2026).
+  const preciosCompra = usePreciosCompraVinos(!soloLectura);
   const [vinoAEditar, setVinoAEditar] = useState<Vino | null>(null);
   const [vinoAEliminar, setVinoAEliminar] = useState<Vino | null>(null);
   const fotoRapida = useRef<FotoRapidaHandle>(null);
@@ -324,6 +328,9 @@ export function ListaVinos({ vinos, soloLectura = false }: ListaVinosProps) {
                           </Badge>
                         ) : null}
                       </div>
+                    )}
+                    {!soloLectura && preciosCompra.has(vino.id) && (
+                      <PrecioCompraVino precio={preciosCompra.get(vino.id)!} precioCarta={vino.precio_eur} />
                     )}
                   </div>
                 </>

@@ -49,6 +49,7 @@
     "test:avisos-revisado:db": "node scripts/test-avisos-revisado.mjs",
     "test:margenes-ultima-factura:db": "node scripts/test-margenes-ultima-factura.mjs",
     "test:coste-carta-vinos:db": "node scripts/test-coste-carta-vinos.mjs",
+    "test:vinos-precio-compra:db": "node scripts/test-vinos-precio-compra.mjs",
     "test:carta-bebidas-web:db": "node scripts/test-carta-bebidas-web.mjs",
     "test:vinos-copeo-encuesta:db": "node scripts/test-vinos-copeo-encuesta.mjs",
     "test:vinos-parker:db": "node scripts/test-vinos-parker.mjs",
