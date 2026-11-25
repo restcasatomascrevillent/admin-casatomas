@@ -32,7 +32,8 @@ export interface TextosCarta {
   telefono: string;
   /** Nombre de cada tipo de vino (cabecera de su sección). */
   tiposVino: Record<"tinto" | "blanco" | "espumoso" | "rosado" | "otro", string>;
-  unidades: Record<"Unidad" | "Ración", string>;
+  /** «Persona» va en minúscula: se pinta tras el precio, «16,00 € / persona», como «/ kg». */
+  unidades: Record<"Unidad" | "Ración" | "Persona", string>;
 }
 
 export const TEXTOS: Record<IdiomaCarta, TextosCarta> = {
@@ -55,7 +56,7 @@ export const TEXTOS: Record<IdiomaCarta, TextosCarta> = {
       rosado: "Rosados",
       otro: "Otros",
     },
-    unidades: { Unidad: "Unidad", Ración: "Ración" },
+    unidades: { Unidad: "Unidad", Ración: "Ración", Persona: "persona" },
   },
   en: {
     tituloPlatos: "Menu",
@@ -76,7 +77,7 @@ export const TEXTOS: Record<IdiomaCarta, TextosCarta> = {
       rosado: "Rosé wines",
       otro: "Others",
     },
-    unidades: { Unidad: "Unit", Ración: "Portion" },
+    unidades: { Unidad: "Unit", Ración: "Portion", Persona: "person" },
   },
   fr: {
     tituloPlatos: "Carte",
@@ -97,7 +98,7 @@ export const TEXTOS: Record<IdiomaCarta, TextosCarta> = {
       rosado: "Vins rosés",
       otro: "Autres",
     },
-    unidades: { Unidad: "Unité", Ración: "Portion" },
+    unidades: { Unidad: "Unité", Ración: "Portion", Persona: "personne" },
   },
 };
 
