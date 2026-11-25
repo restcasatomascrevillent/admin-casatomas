@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ============================================================================
--- ROLLBACK de 20261219100100_redes_aviso_revocar
+-- ROLLBACK de 20261224100100_redes_aviso_revocar
 -- ----------------------------------------------------------------------------
 -- Quita el aviso inmediato a rrss. Al quitar «Redes», rrss sigue cortando el
 -- acceso por caducidad (~20 minutos). No toca permisos ni usuarios. Idempotente.

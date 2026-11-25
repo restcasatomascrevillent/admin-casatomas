@@ -11,7 +11,7 @@ set client_encoding = 'UTF8';
 -- Necesita en Vault `project_url` (ya existe) y `rrss_embed_revoke_secret` (el
 -- mismo valor que el secreto RRSS_EMBED_REVOKE_SECRET de la función). Sin ellos,
 -- o sin pg_net, no hace nada (no rompe el guardado de permisos).
--- Vuelta atrás: supabase/rollbacks/20261219100100_redes_aviso_revocar_ROLLBACK.sql
+-- Vuelta atrás: supabase/rollbacks/20261224100100_redes_aviso_revocar_ROLLBACK.sql
 -- Tiene que terminar en «redes_aviso_revocar: aplicado».
 -- ============================================================================
 create or replace function public.rrss_redes_avisar_revocacion()

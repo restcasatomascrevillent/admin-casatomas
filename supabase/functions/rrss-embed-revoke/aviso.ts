@@ -8,7 +8,7 @@
  *     { user_id }  → 200 { ok } · 401 sin el secreto · 409 si aún tiene «Redes» · 503 sin configurar
  *
  * La llama la base de datos (disparador de `user_permissions`, migración
- * 20261219100100) con el secreto de Vault `rrss_embed_revoke_secret`, que es el mismo
+ * 20261224100100) con el secreto de Vault `rrss_embed_revoke_secret`, que es el mismo
  * que el secreto de la función RRSS_EMBED_REVOKE_SECRET. Firma con la misma clave que
  * los pases un aviso `{typ: "rrss-revoke", sub, jti, exp}` (60 s, un solo uso) y lo
  * manda a rrss (RRSS_EMBED_REVOKE_URL = `…/functions/v1/embed-session/revoke`).

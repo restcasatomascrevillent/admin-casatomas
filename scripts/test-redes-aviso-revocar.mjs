@@ -1,4 +1,4 @@
-// Aviso inmediato a rrss al quitar «Redes» (migración 20261219100100) contra un
+// Aviso inmediato a rrss al quitar «Redes» (migración 20261224100100) contra un
 // Postgres en memoria (PGlite) con pg_net y Vault de mentira. Nunca toca Supabase.
 //
 //   npm run test:redes-aviso:db
@@ -11,8 +11,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 
-const MIGRACION = await readFile("supabase/migrations/20261219100100_redes_aviso_revocar.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261219100100_redes_aviso_revocar_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261224100100_redes_aviso_revocar.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261224100100_redes_aviso_revocar_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const igual = (a, b, msg) => { assert.deepEqual(a, b, msg); comprobaciones++; };

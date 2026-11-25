@@ -107,7 +107,7 @@ verify_jwt = false
 
 # Redes: aviso a rrss al quitar «Redes». La llama la base de datos
 # (net.http_post desde el disparador de user_permissions, migración
-# 20261219100100), sin usuario ni JWT. Autenticación real: cabecera
+# 20261224100100), sin usuario ni JWT. Autenticación real: cabecera
 # x-rrss-revoke-secret == RRSS_EMBED_REVOKE_SECRET (tiempo constante, falla
 # cerrado: 401 si falta o es corto). El valor sale del secreto de Vault
 # 'rrss_embed_revoke_secret'. Ver supabase/functions/rrss-embed-revoke/aviso.ts.
