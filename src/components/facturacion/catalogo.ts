@@ -1,5 +1,5 @@
 import { mesDeFecha, nuevaLinea, nuevaFactura, redondear, textoMesRecibo, tipoDeRecibo, type CatalogoFacturacion, type Factura, type LineaFactura, type TipoRecibo } from "./modelo";
-import type { ParteDesglose } from "./desgloseIa";
+import type { NoCobrado, ParteDesglose } from "./desgloseIa";
 import type { FacturaGuardada } from "@/hooks/useFacturacionOficiososia";
 
 /** Servicios disponibles en las rutas del panel. Sus precios se definen en el catálogo. */
@@ -82,7 +82,14 @@ export interface GastoServicio {
   origen: "manual" | "estimado" | "falta" | "gratis";
   /** Solo la IA (OpenAI): en qué se ha gastado, como parte del importe (desgloseIa.ts). */
   desglose?: ParteDesglose[];
+  /**
+   * Solo la IA (OpenAI): lo que sale en Servicios › Costes pero no se cobra (Probar modelos de IA).
+   * `importe` ya va sin ello; en Servicios el gasto es `importe` + esto.
+   */
+  noCobrado?: NoCobrado[];
 }
+/** El gasto tal como sale en Servicios › Costes (con lo que no se cobra). */
+export const importeEnServicios = (g: GastoServicio) => g.importe + (g.noCobrado ?? []).reduce((t, n) => t + n.importe, 0);
 /**
  * Servicios que salen en Servicios › Costes pero no se cobran en el recibo mensual. Stripe lo
  * paga el restaurante (son las comisiones de sus cheques regalo), no nosotros (dueño, 25/11/2026:

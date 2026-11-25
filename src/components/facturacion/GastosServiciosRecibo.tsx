@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { rutaServicios } from "@/components/servicios/pestanas";
 import type { GastosServiciosMes } from "@/hooks/useGastosServiciosMes";
-import type { GastoServicio } from "./catalogo";
+import { importeEnServicios, type GastoServicio } from "./catalogo";
 import { euros, redondear, textoMesRecibo, type LineaFactura } from "./modelo";
 import { importesDesglose, textoUsos } from "./desgloseIa";
 
@@ -27,6 +27,23 @@ const importeLinea = (l: LineaFactura) => {
   const bruto = redondear(l.cantidad * l.precio);
   return redondear(bruto - redondear((bruto * l.descuento) / 100));
 };
+
+/**
+ * Lo que sale en Servicios › Costes pero no se cobra (dueño, 25/11/2026: «Probar modelos de IA»
+ * no se cobra). Se enseña para que se entienda por qué la línea es menor que en Servicios.
+ */
+function TextoNoCobrado({ gasto }: { gasto: GastoServicio }) {
+  if (!gasto.noCobrado?.length) return null;
+  return (
+    <>
+      {gasto.noCobrado.map((n) => (
+        <span key={n.concepto} className="mt-1 block text-xs text-muted-foreground" data-testid={`no-cobrado-${gasto.proveedor}`}>
+          No se cobra «{n.concepto}»{n.usos ? ` · ${textoUsos(n.usos)}` : ""}: −{euros(redondear(n.importe))}
+        </span>
+      ))}
+    </>
+  );
+}
 
 /**
  * Pago mensual › paso «Conceptos»: los gastos del mes tal como se ven en Super Admin ›
@@ -54,7 +71,9 @@ export function GastosServiciosRecibo({ mes, gastos: q, enRecibo, poner, cambiar
   const gastos = q.gastos ?? [];
   const porProveedor = new Map(gastos.map((g) => [g.proveedor, g]));
   const conImporte = gastos.filter((g) => g.importe > 0);
+  // Lo que se cobraría de Servicios (sin lo que no se cobra, como Probar modelos de IA).
   const totalServicios = redondear(conImporte.reduce((s, g) => s + g.importe, 0));
+  const hayNoCobrado = gastos.some((g) => g.noCobrado?.length);
   const totalRecibo = redondear(enRecibo.reduce((s, l) => s + importeLinea(l), 0));
   const fuera = gastos.filter((g) => !enRecibo.some((l) => l.proveedor === g.proveedor));
   const faltan = fuera.filter((g) => g.origen === "falta" && g.importe <= 0);
@@ -93,8 +112,9 @@ export function GastosServiciosRecibo({ mes, gastos: q, enRecibo, poner, cambiar
                     <p className="break-words text-sm font-medium">{nombre}{g?.categoria && <span className="text-xs font-normal text-muted-foreground"> · {g.categoria}</span>}</p>
                     <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                       {g && <span className={`rounded-full px-2 py-0.5 ${TONO_ORIGEN[g.origen]}`}>{TEXTO_ORIGEN[g.origen]}</span>}
-                      {g ? <span>En Servicios: {euros(g.importe)}{distinto ? " (precio cambiado)" : ""}</span> : !q.cargando && q.gastos ? <span>Ya no está en Servicios para ese mes</span> : null}
+                      {g ? <span>En Servicios: {euros(importeEnServicios(g))}{distinto ? " (precio cambiado)" : ""}</span> : !q.cargando && q.gastos ? <span>Ya no está en Servicios para ese mes</span> : null}
                     </p>
+                    {g && <TextoNoCobrado gasto={g} />}
                     {!!l.desglose?.length && (
                       <ul aria-label={`En qué se ha gastado ${nombre}`} className="mt-2 space-y-0.5 border-l-2 pl-2 text-xs text-muted-foreground" data-testid={`desglose-${l.proveedor}`}>
                         {importesDesglose(importeLinea(l), l.desglose).map((d) => (
@@ -128,7 +148,7 @@ export function GastosServiciosRecibo({ mes, gastos: q, enRecibo, poner, cambiar
           <ul aria-label="Gastos de Servicios que no están en el recibo" className="divide-y rounded-lg border border-dashed">
             {sinAnadir.map((g) => (
               <li key={g.proveedor} className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 text-sm">
-                <span className="min-w-0 flex-1 break-words text-muted-foreground">{g.nombre}{g.categoria && <span className="text-xs"> · {g.categoria}</span>} · {euros(g.importe)} · no está en el recibo</span>
+                <span className="min-w-0 flex-1 break-words text-muted-foreground">{g.nombre}{g.categoria && <span className="text-xs"> · {g.categoria}</span>} · {euros(g.importe)} · no está en el recibo<TextoNoCobrado gasto={g} /></span>
                 <Button type="button" variant="outline" size="sm" className="h-10 gap-1 pointer-coarse:h-11" aria-label={`Añadir ${g.nombre} al recibo`} onClick={() => anadir(g)}>
                   <Plus className="h-4 w-4" aria-hidden="true" /> Añadir
                 </Button>
@@ -145,7 +165,7 @@ export function GastosServiciosRecibo({ mes, gastos: q, enRecibo, poner, cambiar
           <>
             <p className="text-sm">
               Servicios en el recibo: <strong>{euros(totalRecibo)}</strong>
-              {q.gastos && <span className="text-muted-foreground"> · en Servicios: {euros(totalServicios)}{totalRecibo < totalServicios ? ` · se descuentan ${euros(redondear(totalServicios - totalRecibo))}` : ""}</span>}
+              {q.gastos && <span className="text-muted-foreground"> · en Servicios: {euros(totalServicios)}{hayNoCobrado ? " (sin lo que no se cobra)" : ""}{totalRecibo < totalServicios ? ` · se descuentan ${euros(redondear(totalServicios - totalRecibo))}` : ""}</span>}
             </p>
             <div className="flex flex-wrap items-end gap-3">
               {enRecibo.length > 0 && (
