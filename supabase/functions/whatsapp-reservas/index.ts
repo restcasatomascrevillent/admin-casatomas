@@ -108,6 +108,7 @@ import {
   variablesResena,
   decidirResena,
   destinatariosResena,
+  errorPlantillaNoDisponible,
   diasAMirar,
   ESTADOS_RESENA,
   type ReservaParaResena,
@@ -559,7 +560,7 @@ async function pedirResenas(): Promise<Response> {
 
   const placeId = await placeIdResena();
   const def = plantillaResena(placeId);
-  const resumen = { enviadas: 0, omitidas: 0, esperando: 0, errores: 0, motivos: {} as Record<string, number> };
+  const resumen = { enviadas: 0, omitidas: 0, esperando: 0, errores: 0, reintentar: 0, motivos: {} as Record<string, number> };
   for (const r of reservas) {
     if (hechas.has(r.id)) continue;
     const d = decidirResena(r, ahora, { destinatarios: DESTINATARIOS_RESENA });
@@ -579,6 +580,14 @@ async function pedirResenas(): Promise<Response> {
     const { id, error: errorEnvio } = await enviarMensaje(
       mensajePlantilla({ para: d.para, def, variables: variablesResena(r), botones: { placeId }, datosOpacos: datosOpacos(r.id, "resena") }),
     );
+    if (errorEnvio && errorPlantillaNoDisponible(errorEnvio)) {
+      // Plantilla aún sin aprobar (o pausada): no gasta el único intento de
+      // esta reserva; se vuelve a probar en la siguiente pasada (12 h de margen).
+      await supabase.from("whatsapp_resenas").delete().eq("reserva_id", r.id).eq("estado", "enviando");
+      resumen.reintentar++;
+      console.warn(`[${FUENTE}] Plantilla de reseña no disponible en Meta (${errorEnvio}): se reintentará la reserva ${r.id}`);
+      continue;
+    }
     await supabase
       .from("whatsapp_resenas")
       .update({ estado: errorEnvio ? "error" : "enviada", motivo: errorEnvio ? errorEnvio.slice(0, 500) : null, wamid: id, actualizado_en: new Date().toISOString() })

@@ -11,6 +11,7 @@ import {
   destinatariosResena,
   diasAMirar,
   enlaceResena,
+  errorPlantillaNoDisponible,
   momentoResena,
   momentoResenaLocal,
   placeIdValido,
@@ -82,6 +83,18 @@ describe("decidirResena", () => {
     const cena = { ...RESERVA, hora: "21:30" };
     expect(decidirResena(cena, A_LAS("2026-11-26T00:30:00Z")).accion).toBe("esperar");
     expect(decidirResena(cena, A_LAS("2026-11-26T11:00:00Z")).accion).toBe("enviar");
+  });
+});
+
+describe("errorPlantillaNoDisponible", () => {
+  it("plantilla sin aprobar, pausada o desactivada: se reintenta; el resto, no", () => {
+    expect(errorPlantillaNoDisponible("132001: Template name does not exist in the translation")).toBe(true);
+    expect(errorPlantillaNoDisponible("132015: Template is paused")).toBe(true);
+    expect(errorPlantillaNoDisponible("132016/2494: Template is disabled")).toBe(true);
+    expect(errorPlantillaNoDisponible("131026: Message undeliverable")).toBe(false);
+    expect(errorPlantillaNoDisponible("1320011: otro")).toBe(false);
+    expect(errorPlantillaNoDisponible("timeout")).toBe(false);
+    expect(errorPlantillaNoDisponible(null)).toBe(false);
   });
 });
 

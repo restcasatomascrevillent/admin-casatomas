@@ -166,6 +166,16 @@ export function decidirResena(
   return { accion: "enviar", momento, para };
 }
 
+/**
+ * Meta rechaza la plantilla porque aún no existe aprobada (132001), está
+ * pausada (132015) o desactivada (132016): no es culpa de la reserva, así que
+ * no gasta su único intento (index.ts la vuelve a probar en la siguiente pasada).
+ * `error` es el texto de llamarGraph: «código[/subcódigo]: mensaje».
+ */
+export function errorPlantillaNoDisponible(error: string | null | undefined): boolean {
+  return /^1320(01|15|16)(\/|:|$)/.test((error ?? "").trim());
+}
+
 /** Días de Madrid que hay que mirar: la reserva de anoche puede tocar hoy a las 12:00. */
 export function diasAMirar(hoyMadrid: string): { desde: string; hasta: string } {
   const d = new Date(`${hoyMadrid}T12:00:00Z`);
