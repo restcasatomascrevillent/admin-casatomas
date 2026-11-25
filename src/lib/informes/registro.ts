@@ -32,7 +32,7 @@ import { obtenerInformeCartaFacturas, type TipoCartaFacturas } from "./fuentes/c
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
-export type IdSeccionInforme = "web" | "rrss" | "facturas" | "carta" | "servicios" | "cheques" | "auditoria";
+export type IdSeccionInforme = "web" | "rrss" | "facturas" | "carta" | "servicios" | "gestor-gasto" | "cheques" | "auditoria";
 
 export interface SeccionInforme {
   id: IdSeccionInforme;
@@ -45,6 +45,7 @@ export const SECCIONES_INFORME: SeccionInforme[] = [
   { id: "rrss", titulo: "Redes sociales" },
   { id: "facturas", titulo: "Facturas" },
   { id: "servicios", titulo: "Servicios" },
+  { id: "gestor-gasto", titulo: "Gestor Gasto" },
   { id: "cheques", titulo: "Cheques regalo" },
   { id: "carta", titulo: "Carta" },
   { id: "auditoria", titulo: "Seguridad" },
@@ -208,6 +209,20 @@ export const INFORMES: DefinicionInforme[] = [
     formatos: ["pdf", "csv"],
     origen: { etiqueta: "Servicios › Costes", ruta: "/super-admin/servicios" },
     generador: { tipo: "tabla", obtener: (periodo) => obtenerInformeServicios(periodo) },
+  },
+  {
+    id: "gestor-gasto-recibo-mensual",
+    // 25/11/2026, petición del dueño: que la tarea programada del último jueves saque también «el recibo
+    // mensual de gestor de gasto». Qué recibo sale: src/lib/informes/reciboMensual.ts.
+    titulo: "Recibo mensual (Gestor Gasto)",
+    descripcion:
+      "El PDF del pago mensual del mes: el recibo emitido si lo hay; si no, el borrador guardado o cómo quedaría uno nuevo (cuota y gastos de Servicios), marcado como borrador. No guarda nada.",
+    seccion: "gestor-gasto",
+    permiso: { tipo: "superadmin" },
+    periodo: "mes",
+    formatos: ["pdf"],
+    origen: { etiqueta: "Gestor Gasto", ruta: "/super-admin/gestor-gasto" },
+    generador: { tipo: "componente", cargar: () => import("@/components/informes/generadores/InformeReciboMensualGenerador") },
   },
   {
     id: "auditoria-mensual",

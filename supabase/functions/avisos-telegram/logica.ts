@@ -1023,8 +1023,57 @@ export function cuerpoSendMessage(chatId: string, texto: string, html = true): R
   return { chat_id: chatId, text: recortar(texto, LIMITE_TELEGRAM), ...(html ? { parse_mode: "HTML" } : {}), link_preview_options: { is_disabled: true } };
 }
 
-export type Accion = "pendientes" | "resumen" | "probar" | "fallos" | "semanal";
-export const esAccion = (v: unknown): v is Accion => v === "pendientes" || v === "resumen" || v === "probar" || v === "fallos" || v === "semanal";
+export type Accion = "pendientes" | "resumen" | "probar" | "fallos" | "semanal" | "informes";
+export const esAccion = (v: unknown): v is Accion =>
+  v === "pendientes" || v === "resumen" || v === "probar" || v === "fallos" || v === "semanal" || v === "informes";
 
-/** Tipo de la fila de avisos_telegram_envios de cada acción (el CHECK admite 'fallo', no 'fallos'). */
-export const tipoRegistro = (accion: Accion): string => (accion === "probar" ? "prueba" : accion === "fallos" ? "fallo" : accion);
+/**
+ * Tipo de la fila de avisos_telegram_envios de cada acción (el CHECK admite 'fallo', no 'fallos'). Los informes
+ * mensuales van al chat de Resúmenes y se apuntan como 'resumen' (el CHECK no tiene un tipo propio para ellos).
+ */
+export const tipoRegistro = (accion: Accion): string => (accion === "probar" ? "prueba" : accion === "fallos" ? "fallo" : accion === "informes" ? "resumen" : accion);
+
+// ─── Informes mensuales (tarea programada del último jueves, 25/11/2026) ────
+export interface EnlaceInforme {
+  titulo: string;
+  url: string;
+}
+export interface DatosInformesMensuales {
+  /** «AAAA-MM». */
+  mes: string;
+  carpetaUrl: string | null;
+  informes: EnlaceInforme[];
+  /** Informes que no tienen datos ese mes (no hay PDF). */
+  sinDatos: string[];
+  /** Informes que no se pudieron sacar o subir. */
+  fallidos: string[];
+}
+
+const MESES_TEXTO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+/** Solo enlaces de Google Drive: el mensaje no puede llevar a otro sitio. */
+export const esUrlDrive = (v: unknown): v is string => typeof v === "string" && /^https:\/\/drive\.google\.com\/[A-Za-z0-9/_?=.&-]{1,300}$/.test(v);
+const textoCorto = (v: unknown): string => recortar(limpio(v), 90);
+
+/** Valida el cuerpo de la acción «informes» (lo manda la tarea programada). null si no vale. */
+export function leerDatosInformes(body: Record<string, unknown>): DatosInformesMensuales | null {
+  const mes = typeof body.mes === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(body.mes) ? body.mes : null;
+  if (!mes || !Array.isArray(body.informes)) return null;
+  const informes = (body.informes as unknown[])
+    .slice(0, 40)
+    .map((i) => i as { titulo?: unknown; url?: unknown })
+    .filter((i) => textoCorto(i?.titulo) && esUrlDrive(i?.url))
+    .map((i) => ({ titulo: textoCorto(i.titulo), url: i.url as string }));
+  const lista = (v: unknown) => (Array.isArray(v) ? v.slice(0, 40).map(textoCorto).filter(Boolean) : []);
+  return { mes, carpetaUrl: esUrlDrive(body.carpeta_url) ? body.carpeta_url : null, informes, sinDatos: lista(body.sin_datos), fallidos: lista(body.fallidos) };
+}
+
+/** El mensaje (HTML) con los enlaces a los PDF del mes en Drive. */
+export function mensajeInformes(d: DatosInformesMensuales): string {
+  const [anio, m] = d.mes.split("-");
+  const lineas = [`📊 <b>Informes de ${MESES_TEXTO[Number(m) - 1]} de ${anio}</b>${d.carpetaUrl ? ` · ${enlaceHtml(d.carpetaUrl, "Carpeta en Drive")}` : ""}`];
+  for (const i of d.informes) lineas.push(`• ${enlaceHtml(i.url, i.titulo)}`);
+  if (d.informes.length === 0) lineas.push("No se ha podido subir ningún PDF.");
+  if (d.sinDatos.length) lineas.push(`⚪ Sin datos este mes: ${esc(d.sinDatos.join(", "))}`);
+  if (d.fallidos.length) lineas.push(`⚠️ No se han podido sacar: ${esc(d.fallidos.join(", "))}`);
+  return lineas.join("\n");
+}
