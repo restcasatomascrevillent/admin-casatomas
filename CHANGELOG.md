@@ -2,6 +2,14 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.54.0] - 2026-11-25
+
+Objetivo: Telegram: un mensaje por factura con Drive, precio con el mismo margen y cierre del día
+
+### Añadido
+- Informes: tarea programada del último jueves con los informes en PDF y el recibo mensual ([#364](https://github.com/restcasatomascrevillent/admin-casatomas/pull/364))
+- Telegram: un mensaje por factura con Drive, precio con el mismo margen y cierre del día ([#366](https://github.com/restcasatomascrevillent/admin-casatomas/pull/366))
+
 ## [1.53.6] - 2026-11-24
 
 Objetivo: Revisión diaria de Linear 24/11: CAS-33 y CAS-34

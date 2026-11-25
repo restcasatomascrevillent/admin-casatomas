@@ -49,11 +49,13 @@ const formularioDe = (c: ConfigAvisosTelegram): Formulario => ({
   silencio_activo: c.silencio_activo,
   silencio_desde: c.silencio_desde,
   silencio_hasta: c.silencio_hasta,
+  cierre_activo: c.cierre_activo ?? true,
+  cierre_hora: c.cierre_hora ?? 22,
 });
 
-function SelectHora({ id, valor, onCambio }: { id: string; valor: number; onCambio: (h: number) => void }) {
+function SelectHora({ id, valor, onCambio, etiqueta }: { id: string; valor: number; onCambio: (h: number) => void; etiqueta?: string }) {
   return (
-    <select id={id} className={SELECT_CLASE} value={valor} onChange={(e) => onCambio(Number(e.target.value))}>
+    <select id={id} aria-label={etiqueta} className={SELECT_CLASE} value={valor} onChange={(e) => onCambio(Number(e.target.value))}>
       {HORAS.map((h) => <option key={h} value={h}>{hh(h)}</option>)}
     </select>
   );
@@ -185,9 +187,20 @@ export function TarjetaTelegram() {
           <SelectHora id="tg-hora" valor={form.hora_resumen} onCambio={(h) => set("hora_resumen", h)} />
         </div>
 
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <Switch id="tg-cierre" checked={form.cierre_activo} onCheckedChange={(v) => set("cierre_activo", v)} />
+          <Label htmlFor="tg-cierre">Cierre del día a las</Label>
+          <SelectHora id="tg-cierre-hora" etiqueta="Hora del cierre del día" valor={form.cierre_hora} onCambio={(h) => set("cierre_hora", h)} />
+        </div>
+        <p className="-mt-2 text-xs text-muted-foreground">Facturas subidas ese día (proveedor e importe) y sus avisos, en el chat de Resúmenes.</p>
+
         <fieldset className="flex min-w-0 flex-col gap-2">
           <legend className="mb-1 text-sm font-medium text-foreground">Facturas al momento (el resto, solo en el resumen)</legend>
           <p className="-mt-1 text-xs text-muted-foreground">
+            Los avisos de una misma factura llegan en un mensaje, con el enlace al original en Drive; las subidas de marisco y vino, con el
+            precio de carta que mantiene el margen.
+          </p>
+          <p className="text-xs text-muted-foreground">
             Reservas: siempre al momento, en su chat, con cada paso (petición por aceptar, aceptada, confirmada por el cliente o cancelada).
           </p>
           <div className="grid min-w-0 gap-x-4 gap-y-2 sm:grid-cols-2">
