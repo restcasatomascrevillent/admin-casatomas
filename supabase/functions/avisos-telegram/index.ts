@@ -4,9 +4,11 @@ import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-cl
 import { exigirSuperAdmin } from "../_shared/autorizacion.ts";
 import { compararTiempoConstante } from "../_shared/tiempo-constante.ts";
 import {
-  type Accion, agruparEnMensajes, agruparPasos, aplicarTopes, type Aviso, aTextoPlano, chatDe, type ConfigTelegram, construirResumen, construirSemanal,
-  cuerpoSendMessage, type DatosSemanales, destinos, diaMadrid, diaSemanaMadrid, type Envio, errorSaneado, esAccion, evaluarPendientes, horaMadrid,
-  leerDatosInformes, lineaPasoReserva, mensajeAviso, mensajeInformes, NOMBRE_CANAL, notaTope, type PasoReserva, type ReservaInfo, SIN_CONFIGURAR, silencioAhora, type Sugerencia,
+  type Accion, agruparEnMensajes, agruparPasos, agruparPorFactura, aplicarTopes, type Aviso, aTextoPlano, type CartaDeProducto, cartaPorProducto, chatDe,
+  type ConfigTelegram, construirCierre, construirResumen, construirSemanal, cuerpoSendMessage, type DatosSemanales, destinos, diaMadrid, diaSemanaMadrid,
+  type Envio, errorSaneado, esAccion, esperarDrive, evaluarPendientes, type FacturaInfo, type FilasCarta, horaMadrid, leerDatosInformes, lineaPasoReserva,
+  mensajeAviso, mensajeFactura, mensajeInformes, mensajesDistintos, NOMBRE_CANAL, notaTope, type PasoReserva, type ReservaInfo, SIN_CONFIGURAR,
+  silencioAhora, type Sugerencia,
   textoPrueba, tipoRegistro, TOPE_RESERVAS_DIA, TOPE_RESERVAS_HORA, topesDeCanal,
 } from "./logica.ts";
 import { type Contexto, type Fallo, idAlbaran, mensajeFallo } from "./fallos.ts";
@@ -41,6 +43,11 @@ const createClient = clienteConAuditoria(createClientBase, "avisos-telegram");
 //       jueves (.github/workflows/informes-mensuales.yml) con el JWT de su usuario super admin. Solo enlaces de Drive.
 //  POST { accion: "probar" }      una prueba a cada chat configurado, diciendo qué llegará ahí (aunque esté
 //       desactivado: sirve para montarlo).
+//  POST { accion: "cierre" }      cierre del día (25/11/2026): facturas subidas hoy y avisos de Facturas y márgenes de
+//       hoy, al chat de Resúmenes a partir de cierre_hora (22:00 de Madrid por defecto); guarda cierre_ultimo_dia.
+//  25/11/2026: en «pendientes», los avisos de una misma factura van en UN mensaje (proveedor, nº y fecha, qué ha pasado
+//  y los enlaces al original en Drive y al panel); si la factura acaba de subirse y aún no tiene Drive, espera hasta
+//  20 min. Las subidas de marisco o vino con su vino o plato en la carta llevan el precio con el mismo margen.
 //  Todo queda en avisos_telegram_envios (ok o error, con el chat).
 //
 //  Secretos: TELEGRAM_BOT_TOKEN (sin él no envía nada, responde y registra «Telegram sin configurar»);
@@ -140,6 +147,64 @@ async function datosSemanales(sb: Cliente): Promise<DatosSemanales | null> {
   return datos;
 }
 
+/** Facturas por id (cabecera y Drive), con el nombre del proveedor de la ficha si lo tiene. Vacío si falla. */
+async function cargarFacturas(sb: Cliente, ids: number[]): Promise<Map<number, FacturaInfo>> {
+  const mapa = new Map<number, FacturaInfo>();
+  const unicos = [...new Set(ids)];
+  if (unicos.length === 0) return mapa;
+  const { data, error } = await sb.from("facturas")
+    .select("id, tipo, proveedor, proveedor_id, numero_documento, fecha, total, drive_url, created_at, local").in("id", unicos);
+  if (error) {
+    console.warn("[avisos-telegram] facturas:", error.message);
+    return mapa;
+  }
+  const filas = (data ?? []) as (FacturaInfo & { proveedor_id: number | null })[];
+  const nombres = await nombresProveedor(sb, filas.map((f) => f.proveedor_id));
+  for (const f of filas) mapa.set(f.id, { ...f, proveedor: (f.proveedor_id !== null && nombres.get(f.proveedor_id)) || f.proveedor });
+  return mapa;
+}
+
+async function nombresProveedor(sb: Cliente, ids: (number | null)[]): Promise<Map<number, string>> {
+  const unicos = [...new Set(ids.filter((x): x is number => typeof x === "number"))];
+  if (unicos.length === 0) return new Map();
+  const { data, error } = await sb.from("proveedores").select("id, nombre").in("id", unicos);
+  if (error) console.warn("[avisos-telegram] proveedores:", error.message);
+  return new Map(((data ?? []) as { id: number; nombre: string }[]).map((p) => [p.id, p.nombre]));
+}
+
+/**
+ * Vinos y platos de la carta que venden tal cual cada producto (vino_producto y escandallos de un solo producto),
+ * con la familia del producto (¿marisco?). Si algo falla, sin sugerencias (el aviso sale igual).
+ */
+async function cargarCarta(sb: Cliente, ids: number[]): Promise<Map<number, CartaDeProducto>> {
+  const unicos = [...new Set(ids.filter((x) => Number.isInteger(x) && x > 0))];
+  if (unicos.length === 0) return new Map();
+  try {
+    const leer = async <T>(q: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T[]> => {
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      return (data ?? []) as T[];
+    };
+    const [productos, categorias, vinoProducto, usos] = await Promise.all([
+      leer<FilasCarta["productos"][number]>(sb.from("productos_catalogo").select("id, categoria_id").in("id", unicos)),
+      leer<FilasCarta["categorias"][number]>(sb.from("categorias_producto").select("id, nombre")),
+      leer<FilasCarta["vinoProducto"][number]>(sb.from("vino_producto").select("vino_id, producto_id").in("producto_id", unicos)),
+      leer<{ plato_id: string }>(sb.from("escandallo_platos").select("plato_id").in("producto_id", unicos)),
+    ]);
+    const idsVinos = [...new Set(vinoProducto.map((v) => v.vino_id))];
+    const idsPlatos = [...new Set(usos.map((u) => u.plato_id))];
+    const [vinos, escandallo, platos] = await Promise.all([
+      idsVinos.length ? leer<FilasCarta["vinos"][number]>(sb.from("Vinos").select("id, nombre, precio_eur, precio_copa_eur, activado, restaurante").in("id", idsVinos)) : [],
+      idsPlatos.length ? leer<FilasCarta["escandallo"][number]>(sb.from("escandallo_platos").select("plato_id, producto_id").in("plato_id", idsPlatos)) : [],
+      idsPlatos.length ? leer<FilasCarta["platos"][number]>(sb.from("Platos").select("id, nombre, precio_eur, activado, restaurante").in("id", idsPlatos)) : [],
+    ]);
+    return cartaPorProducto({ productos, categorias, vinoProducto, vinos, escandallo, platos });
+  } catch (e) {
+    console.warn("[avisos-telegram] carta:", (e as Error).message);
+    return new Map();
+  }
+}
+
 serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
@@ -162,7 +227,7 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
     // sin cuerpo
   }
   const accion: Accion | null = esAccion(body.accion) ? body.accion : null;
-  if (!accion) return json({ ok: false, error: "Acción desconocida (pendientes, resumen, semanal, fallos, informes o probar)" }, 400);
+  if (!accion) return json({ ok: false, error: "Acción desconocida (pendientes, resumen, semanal, cierre, fallos, informes o probar)" }, 400);
 
   const sb = createClient(URL_SB, SERVICE, { auth: { autoRefreshToken: false, persistSession: false } });
   const { data: cfgFila, error: eCfg } = await sb.from("avisos_telegram_config").select("*").eq("id", true).maybeSingle();
@@ -281,6 +346,42 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
     return json(r.ok ? { ok: true, secciones: semanal.secciones } : { ok: false, error: r.error });
   }
 
+  if (accion === "cierre") {
+    // Cierre del día (25/11/2026): facturas subidas hoy y avisos de Facturas y márgenes de hoy, un mensaje al día.
+    if (!cfgFila || !("cierre_hora" in cfgFila)) return json({ ok: false, error: "Falta la migración 20261222100000_telegram_facturas" }, 500);
+    if (cfg.cierre_activo === false) return json({ ok: true, enviados: 0, motivo: "cierre apagado" });
+    const chat = chatDe(cfg, "resumenes");
+    if (!chat) return json({ ok: true, enviados: 0, motivo: "sin chat de Resúmenes" });
+    const hoy = diaMadrid(ahora);
+    // Desde hace 26 h (cubre el cambio de hora); construirCierre se queda con lo de hoy en Madrid.
+    const desdeCierre = new Date(ahora.getTime() - 26 * 3600_000).toISOString();
+    const [{ data: filasFac, error: eFac }, { data: avisos, error: eAv }] = await Promise.all([
+      sb.from("facturas").select("id, tipo, proveedor, proveedor_id, numero_documento, fecha, total, drive_url, created_at, local")
+        .gte("created_at", desdeCierre.slice(0, 19)).order("created_at").limit(1000),
+      sb.from("notificaciones_dashboard").select("id, tipo, titulo, mensaje, referencia_tipo, referencia_id, created_at, caduca_en, datos")
+        .gt("created_at", desdeCierre).order("created_at", { ascending: false }).limit(500),
+    ]);
+    if (eFac || eAv) return json({ ok: false, error: (eFac ?? eAv)!.message }, 500);
+    const nombres = await nombresProveedor(sb, ((filasFac ?? []) as { proveedor_id: number | null }[]).map((f) => f.proveedor_id));
+    const facturas = ((filasFac ?? []) as (FacturaInfo & { proveedor_id: number | null })[])
+      .map((f) => ({ ...f, proveedor: (f.proveedor_id !== null && nombres.get(f.proveedor_id)) || f.proveedor }));
+    const cierre = construirCierre(facturas, (avisos ?? []) as Aviso[], ahora, PANEL_URL);
+    const marcar = async () => {
+      const { error } = await sb.from("avisos_telegram_config").update({ cierre_ultimo_dia: hoy }).eq("id", true);
+      if (error) console.error("[avisos-telegram] cierre_ultimo_dia:", error.message);
+    };
+    if (!cierre.texto) {
+      await marcar(); // nada que contar: no se manda y hoy no se vuelve a mirar
+      console.log(`[avisos-telegram] ${quien} · cierre · sin nada que contar: no se envía`);
+      return json({ ok: true, facturas: 0, avisos: 0, omitido: true });
+    }
+    const r = await enviarTelegram(chat, cierre.texto);
+    await registrar([{ tipo: "cierre", chat, ...resultadoFila(r) }]);
+    if (r.ok) await marcar();
+    console.log(`[avisos-telegram] ${quien} · cierre · ${cierre.facturas} facturas, ${cierre.avisos} avisos · ${r.ok ? "ok" : r.error}`);
+    return json(r.ok ? { ok: true, facturas: cierre.facturas, avisos: cierre.avisos } : { ok: false, error: r.error });
+  }
+
   if (accion === "pendientes") {
     if (silencioAhora(cfg, ahora)) return json({ ok: true, enviados: 0, motivo: "silencio" });
     const chatFacturas = chatDe(cfg, "facturas");
@@ -299,6 +400,7 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
     const desdeHora = new Date(ahora.getTime() - 3600_000).toISOString();
 
     // ── 1. Facturas y márgenes: los avisos del panel marcados «al momento» (los de reservas, no) ──
+    //    25/11/2026: los avisos de una misma factura van en UN mensaje, con el enlace al original en Drive.
     const tipos = cfg.tipos_al_momento.filter((x) => !x.startsWith("reserva_"));
     if (chatFacturas && tipos.length) {
       const { data: avisos, error: eAv } = await sb.from("notificaciones_dashboard")
@@ -315,13 +417,20 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
       const ev = evaluarPendientes(lista, envios, cfg, ahora, { canales: new Set(["facturas"]) });
       // Lo que no se va a mandar nunca (unidades dudosas) se da por consumido.
       await registrar(ev.descartar.map((d) => ({ tipo: "aviso", chat: null, aviso_id: d.aviso.id, ok: true, error: d.motivo })));
-      // Tope: lo ya mandado en la última hora y en las últimas 24 h (envíos correctos de avisos).
-      const { data: envsOk } = await sb.from("avisos_telegram_envios").select("enviado_en")
+      // Tope: MENSAJES ya mandados en la última hora y en las últimas 24 h (los avisos de una factura comparten mensaje).
+      const { data: envsOk } = await sb.from("avisos_telegram_envios").select("enviado_en, mensaje_id")
         .eq("tipo", "aviso").eq("ok", true).is("error", null).gte("enviado_en", desde).limit(2000);
-      const usados = { dia: (envsOk ?? []).length, hora: ((envsOk ?? []) as { enviado_en: string }[]).filter((e) => e.enviado_en >= desdeHora).length };
-      const { enviar, resto } = aplicarTopes(ev.enviar, usados, topesDeCanal("facturas", cfg));
+      const filasOk = (envsOk ?? []) as { enviado_en: string; mensaje_id: number | null }[];
+      const usados = { dia: mensajesDistintos(filasOk), hora: mensajesDistintos(filasOk.filter((e) => e.enviado_en >= desdeHora)) };
+      // Un mensaje por factura; la factura recién subida sin Drive espera (hasta ESPERA_DRIVE_MIN) para llevar el enlace.
+      const grupos = agruparPorFactura(ev.enviar);
+      const facturas = await cargarFacturas(sb, grupos.map((g) => g.factura_id).filter((x): x is number => x !== null));
+      const listos = grupos.filter((g) => g.factura_id === null || !esperarDrive(facturas.get(g.factura_id), ahora));
+      const { enviar, resto: restoGrupos } = aplicarTopes(listos, usados, topesDeCanal("facturas", cfg));
       const pendientes = enviar.slice(0, 50);
-      total += pendientes.length;
+      const resto = restoGrupos.flatMap((g) => g.avisos);
+      const avisosPend = pendientes.flatMap((g) => g.avisos);
+      total += avisosPend.length;
       // El resto va en una nota («➕ N avisos más»); si no hay nada más que mandar, como mucho una vez por hora.
       let nota: string | null = null;
       if (resto.length > 0) {
@@ -331,27 +440,38 @@ serve(conAuditoriaDePeticion("avisos-telegram", createClientBase, async (req) =>
       }
       // Margen bajo: el precio sugerido (20261130160000) para «→ súbelo a …» y el enlace «Aplicar precio».
       const sugerencias = new Map<string, Sugerencia | null>();
-      for (const a of pendientes.filter((x) => x.tipo === "facturas_margen_bajo")) {
+      for (const a of avisosPend.filter((x) => x.tipo === "facturas_margen_bajo")) {
         const { data, error } = await sb.rpc("avisos_precio_sugerido", { p_aviso: a.id });
         if (error) console.warn("[avisos-telegram] precio sugerido:", error.message);
         sugerencias.set(a.id, (data as Sugerencia | null) ?? null);
       }
-      const textos = pendientes.map((a) => mensajeAviso(a, PANEL_URL, sugerencias.get(a.id), { ahora }));
+      // Subidas de marisco o vino: su vino o plato de la carta, para el precio con el mismo margen.
+      const carta = await cargarCarta(sb, avisosPend.filter((a) => a.tipo === "facturas_precio_sube").map((a) => Number(a.datos?.producto_id)));
+      // Mensajes: uno por factura y, juntos (como antes), los avisos sueltos y la nota del tope.
+      const unidades: { texto: string; avisos: Aviso[]; nota: boolean }[] = [];
+      for (const g of pendientes) {
+        if (g.factura_id === null) continue;
+        unidades.push({ texto: mensajeFactura(facturas.get(g.factura_id), g.avisos, { panelUrl: PANEL_URL, sugerencias, carta }), avisos: g.avisos, nota: false });
+      }
+      const sueltos = pendientes.filter((g) => g.factura_id === null).map((g) => g.avisos[0]);
+      const textos = sueltos.map((a) => mensajeAviso(a, PANEL_URL, sugerencias.get(a.id), { ahora }));
       const iNota = nota ? textos.length : -1;
-      let notaEnviada = false;
       for (const m of agruparEnMensajes(nota ? [...textos, nota] : textos)) {
+        unidades.push({ texto: m.texto, avisos: m.indices.filter((k) => k !== iNota).map((k) => sueltos[k]), nota: m.indices.includes(iNota) });
+      }
+      let notaEnviada = false;
+      for (const u of unidades) {
         await turno();
-        const r = await enviarTelegram(chatFacturas, m.texto);
+        const r = await enviarTelegram(chatFacturas, u.texto);
         if (!r.ok && r.esperar) {
           // Telegram pide esperar: no se registra como fallo (se reintenta en la próxima vuelta).
           errores.push(`${NOMBRE_CANAL.facturas}: ${r.error}`);
           break;
         }
-        const deAvisos = m.indices.filter((k) => k !== iNota);
-        await registrar(deAvisos.map((k) => ({ tipo: "aviso", chat: chatFacturas, aviso_id: pendientes[k].id, ...resultadoFila(r) })));
+        await registrar(u.avisos.map((a) => ({ tipo: "aviso", chat: chatFacturas, aviso_id: a.id, ...resultadoFila(r) })));
         if (r.ok) {
-          enviados += deAvisos.length;
-          if (m.indices.includes(iNota)) notaEnviada = true;
+          enviados += u.avisos.length;
+          if (u.nota) notaEnviada = true;
         } else errores.push(`${NOMBRE_CANAL.facturas}: ${r.error}`);
       }
       if (nota && notaEnviada) {
