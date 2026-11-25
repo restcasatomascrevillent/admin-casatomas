@@ -1,6 +1,6 @@
 import { describe,it,expect } from "vitest";
 import { nuevaFactura,nuevaLinea } from "../modelo";
-import { catalogoInicial,agregarProductos,recuperarServicios,ultimaFacturaCliente,prepararNuevaFactura,aplicarGastosServicios,anadirConcepto,anadirGastoServicio,cambiarMes,cambiarTipo,descuentoAServicios,lineaCuota,quitarConcepto,siguienteNumero,ID_CUOTA_MENSUAL,type GastoServicio } from "../catalogo";
+import { catalogoInicial,agregarProductos,recuperarServicios,ultimaFacturaCliente,prepararNuevaFactura,aplicarGastosServicios,anadirConcepto,anadirGastoServicio,entraEnRecibo,cambiarMes,cambiarTipo,descuentoAServicios,lineaCuota,quitarConcepto,siguienteNumero,ID_CUOTA_MENSUAL,type GastoServicio } from "../catalogo";
 import { totalesRecibo } from "../modelo";
 import type { FacturaGuardada } from "@/hooks/useFacturacionOficiososia";
 
@@ -93,6 +93,18 @@ describe("pago mensual: cuota fija + gastos de Servicios",()=>{
     // Sin gastos y sin nada más, queda una línea vacía para empezar.
     const vacio=aplicarGastosServicios({...f,lineas:[f.lineas[1]]},[]);
     expect(vacio.lineas).toHaveLength(1);expect(vacio.lineas[0]).toMatchObject({concepto:"",precio:0});
+  });
+  it("Stripe no entra en el recibo mensual (no lo pagamos nosotros) ni suma al total",()=>{
+    const stripe:GastoServicio={proveedor:"stripe",nombre:"Stripe",categoria:"Pagos",importe:3.5,origen:"estimado"};
+    const f=aplicarGastosServicios(mensual(),[...gastos,stripe]);
+    expect(f.lineas.map(l=>l.proveedor)).toEqual([undefined,"openai","vercel"]);
+    expect(totalesRecibo(f).total).toBe(863.83);
+    expect(anadirGastoServicio(f,stripe)).toBe(f);
+    expect(entraEnRecibo("stripe")).toBe(false);expect(entraEnRecibo(" Stripe ")).toBe(false);
+    expect(entraEnRecibo("openai")).toBe(true);
+    // Un recibo guardado con una línea de Stripe la pierde al volver a traer los importes.
+    const viejo={...f,lineas:[...f.lineas,{...nuevaLinea("Servicio"),concepto:"Stripe · Pagos",precio:3.5,proveedor:"stripe"}]};
+    expect(aplicarGastosServicios(viejo,[...gastos,stripe]).lineas.map(l=>l.proveedor)).toEqual([undefined,"openai","vercel"]);
   });
   it("cambiar de mes renombra la cuota (salvo que se le haya cambiado el texto)",()=>{
     const f=cambiarMes(mensual(),"2026-12");

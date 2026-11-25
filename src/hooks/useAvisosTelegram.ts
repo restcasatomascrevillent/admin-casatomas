@@ -15,13 +15,14 @@ export const CLAVE_AVISOS_TELEGRAM = ["super-admin", "avisos-telegram"] as const
 export const CHATS_CANAL = [
   { campo: "chat_reservas", etiqueta: "Reservas", ayuda: "Reservas nuevas y canceladas de hoy y mañana. Vacío: el chat general." },
   { campo: "chat_facturas", etiqueta: "Facturas y márgenes", ayuda: "Precios, márgenes, albaranes y el resto de avisos al momento. Vacío: el chat general." },
-  { campo: "chat_resumenes", etiqueta: "Resúmenes", ayuda: "Resumen diario y semanal. Vacío: el chat general." },
+  { campo: "chat_resumenes", etiqueta: "Resúmenes", ayuda: "Resumen diario, cierre del día y semanal. Vacío: el chat general." },
   { campo: "chat_fallos", etiqueta: "Fallos técnicos", ayuda: "Solo para desarrolladores (llevan emails y preguntas del chatbot). Vacío: no se envían." },
 ] as const;
 export type CampoChat = "chat_id" | (typeof CHATS_CANAL)[number]["campo"];
 
 export const MIGRACION_BASE = "20261126001000_avisos_telegram";
 export const MIGRACION_CANALES = "20261216100000_telegram_canales";
+export const MIGRACION_FACTURAS = "20261222100000_telegram_facturas";
 
 export interface ConfigAvisosTelegram {
   activo: boolean;
@@ -37,6 +38,9 @@ export interface ConfigAvisosTelegram {
   silencio_desde: number;
   silencio_hasta: number;
   resumen_ultimo_dia: string | null;
+  /** 25/11/2026 (20261222100000): cierre del día (facturas subidas y avisos del día) a cierre_hora, en Resúmenes. */
+  cierre_activo: boolean;
+  cierre_hora: number;
 }
 
 export interface EnvioTelegram {
@@ -57,6 +61,7 @@ function migracionQueFalta(e: { code?: string; message?: string } | null): strin
   if (!e) return null;
   const m = e.message ?? "";
   if (e.code === "42P01" || e.code === "PGRST205") return MIGRACION_BASE;
+  if (/cierre_(activo|hora)/.test(m)) return MIGRACION_FACTURAS;
   if (e.code === "42703" || /chat_(reservas|facturas|resumenes|fallos)/.test(m)) return MIGRACION_CANALES;
   if (/avisos_telegram/.test(m) && /does not exist|could not find|schema cache/i.test(m)) return MIGRACION_BASE;
   return null;
@@ -68,7 +73,7 @@ export function useAvisosTelegram() {
     queryFn: async (): Promise<EstadoAvisosTelegram> => {
       const { data, error } = await sb
         .from("avisos_telegram_config")
-        .select("activo, chat_id, chat_reservas, chat_facturas, chat_resumenes, chat_fallos, hora_resumen, tipos_al_momento, silencio_activo, silencio_desde, silencio_hasta, resumen_ultimo_dia")
+        .select("activo, chat_id, chat_reservas, chat_facturas, chat_resumenes, chat_fallos, hora_resumen, tipos_al_momento, silencio_activo, silencio_desde, silencio_hasta, resumen_ultimo_dia, cierre_activo, cierre_hora")
         .eq("id", true)
         .maybeSingle();
       if (error) {
