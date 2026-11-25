@@ -29,8 +29,10 @@ export function descomponerUnidad(valor?: string | null) {
 export function opcionesUnidadPlato(
   valores: readonly (string | null | undefined)[] = [],
 ): string[] {
+  // «Ración» va fija: un plato puede venderse por ración aunque ninguno lo use todavía.
   const opciones = [
     "Unidad",
+    "Ración",
     "kg",
     "gramos",
     ...valores.map((v) => descomponerUnidad(v).unidad),
