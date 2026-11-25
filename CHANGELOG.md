@@ -2,6 +2,13 @@
 
 Publicaciones en producción de admin-casatomas. Cada entrada la escribe `scripts/release.mjs` al preparar la release y recoge solo los cambios incluidos en ella. La numeración 1.x empieza en 1.0.0; las versiones 0.N anteriores están en las Releases de GitHub.
 
+## [1.53.7] - 2026-11-25
+
+Objetivo: Gráfica de precios coherente con los textos y aviso de Telegram sin facturas antiguas
+
+### Cambiado
+- Facturas: gráfica de precio con el último precio y aviso de documentos sin la carga histórica ([#361](https://github.com/restcasatomascrevillent/admin-casatomas/pull/361))
+
 ## [1.53.6] - 2026-11-24
 
 Objetivo: Revisión diaria de Linear 24/11: CAS-33 y CAS-34

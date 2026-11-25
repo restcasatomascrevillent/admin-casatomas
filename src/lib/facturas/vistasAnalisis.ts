@@ -416,6 +416,56 @@ export function geometriaPrecio(serie: PuntoPrecio[], referencia: number | null,
 }
 
 /**
+ * 24/11/2026, captura del dueño (percebe, 130 €/kg el 09/11): la gráfica agrupa por mes y
+ * dibuja la MEDIANA de las compras del mes. En noviembre había tres líneas (50, 90 y 130 €/kg),
+ * la mediana es 90 y el último punto no enseñaba los 130 de la compra que avisa. El mes de
+ * la compra que avisa se dibuja con el precio de ESA compra (el mismo que dicen los textos);
+ * las demás compras del mes siguen en el cuadro del punto. Los meses sin compra siguen vacíos.
+ */
+export function serieConPrecioDeAlerta(serie: PuntoPrecio[], mes: string, precio: number | null): PuntoPrecio[] {
+  if (precio === null || !Number.isFinite(precio) || precio <= 0) return serie;
+  return serie.map((p) => (p.mes === mes ? { ...p, precio } : p));
+}
+
+/**
+ * Cómo se llama la raya de la gráfica, igual que en «Qué decidir hoy». Desde 20261130120000 la
+ * referencia de una subida o bajada es el precio de la factura ANTERIOR (datos.fecha_ref);
+ * el rótulo seguía diciendo «mediana de 90 días» y no coincidía con los textos (90 frente a 100).
+ */
+export function textoReferenciaAlerta(tipo: string, fechaRef: string | null): string {
+  if (tipo === "facturas_precio_pactado") return "precio pactado";
+  const f = ddmm(fechaRef);
+  return f ? `precio de la compra anterior (${f})` : "precio de antes (mediana de 90 días)";
+}
+
+/**
+ * Dónde poner el rótulo de la raya de referencia para que no tape ningún punto: a la derecha o a
+ * la izquierda y encima o debajo de la raya (viewBox ancho × alto). Orden de preferencia: derecha
+ * encima, izquierda encima, derecha debajo, izquierda debajo; si todos chocan, el primero.
+ */
+export function ladoEtiquetaReferencia(
+  g: Pick<GeometriaPrecio, "puntos" | "yReferencia">,
+  ancho = 400,
+  alto = 180,
+): { lado: "derecha" | "izquierda"; debajo: boolean } {
+  const y = g.yReferencia;
+  if (y === null) return { lado: "derecha", debajo: false };
+  const hAlto = alto * 0.11; // rótulo de ~11 px sobre ~160 de gráfica
+  const zonaX = (lado: "derecha" | "izquierda") => (p: { x: number }) => (lado === "derecha" ? p.x >= ancho * 0.6 : p.x <= ancho * 0.4);
+  const choca = (lado: "derecha" | "izquierda", debajo: boolean) =>
+    g.puntos.some((p) => zonaX(lado)(p) && (debajo ? p.y >= y - 6 && p.y <= y + hAlto + 6 : p.y <= y + 6 && p.y >= y - hAlto - 6));
+  const opciones: { lado: "derecha" | "izquierda"; debajo: boolean }[] = [
+    { lado: "derecha", debajo: false },
+    { lado: "izquierda", debajo: false },
+    { lado: "derecha", debajo: true },
+    { lado: "izquierda", debajo: true },
+  ];
+  // Si la raya está pegada al borde de arriba, encima no cabe.
+  const cabe = (o: { debajo: boolean }) => (o.debajo ? y + hAlto <= alto : y - hAlto >= 0);
+  return opciones.find((o) => cabe(o) && !choca(o.lado, o.debajo)) ?? opciones[0];
+}
+
+/**
  * Eje Y de la gráfica de precio (15/11/2026, «no se sabe cuánto vale cada
  * punto»): valores redondos (1, 2, 2,5 o 5 × 10ⁿ) entre `min` y `max` de la
  * geometría, con su `y` en el mismo viewBox (alto × margen de geometriaPrecio).
