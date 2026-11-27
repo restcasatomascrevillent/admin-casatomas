@@ -45,9 +45,11 @@ tapas** y la antigua (render en `/api/instagram-render` + `instagram-programador
    (`components/redes/PreparadorRedes.tsx`, mismo pase que la página Redes) para que la monte, la
    exporte y la deje en su calendario. Si no puede (o quien guarda no tiene «Redes»), la prepara rrss
    la próxima vez que alguien con edición abra Redes.
-5. En rrss la pieza queda **aprobada y programada** solo si la integración tiene
-   `menu_auto_approve = true` (lo pone la plataforma); si no, queda en el calendario pendiente de que
-   la apruebe la agencia. Sin cuenta de Instagram conectada en rrss, queda en espera.
+5. En rrss la pieza queda **en el calendario pendiente de aprobar**: la aprueba alguien con
+   aprobación en la marca (la agencia). No hay aprobación automática (revisión de seguridad del
+   26/11/2026: lo que dibuja un navegador no se puede comprobar en el servidor). Sin cuenta de
+   Instagram conectada en rrss, queda en espera. Si se cancela en el calendario, no se vuelve a
+   programar; si su hora pasa sin prepararse más de 12 horas, caduca.
 
 Las fotos de cada tapa salen de la biblioteca de rrss de la marca: la que se llame como la tapa
 (nombre del archivo) o la lleve como etiqueta. Sin foto, la tapa va sin foto.
