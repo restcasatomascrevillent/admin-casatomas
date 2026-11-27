@@ -36,7 +36,7 @@ describe("catálogo completo: cada ruta de App.tsx está en un módulo o fuera c
   it("lee las rutas de App.tsx (si cambia la forma de escribirlas, hay que cambiar esta prueba)", () => {
     expect(App).toBeTypeOf("function");
     expect(rutasApp.length).toBeGreaterThan(20);
-    expect(paginasEquipo).toEqual(expect.arrayContaining(["/reservas", "/rrss", "/albaranes", "/peticiones", "/instagram/rapido"]));
+    expect(paginasEquipo).toEqual(expect.arrayContaining(["/reservas", "/redes", "/albaranes", "/peticiones"]));
   });
 
   it.each(rutasApp)("%s", (ruta) => {
@@ -97,8 +97,10 @@ describe("forma del catálogo", () => {
     expect(moduloPorClave("marketing")?.nombre).toBe("Newsletter");
   });
 
-  it("RRSS y Subir albaranes tienen interruptor propio, heredado de Newsletter y Facturas", () => {
-    expect(moduloPorClave("rrss")).toMatchObject({ desactivable: true, heredaDe: "marketing", rutas: ["/rrss", "/instagram/rapido"] });
+  it("Redes (clave «rrss») tiene interruptor propio; Subir albaranes, heredado de Facturas", () => {
+    // Redes (23/11/2026) sustituye a RRSS: su permiso es «redes» y ya no depende de Newsletter.
+    expect(moduloPorClave("rrss")).toMatchObject({ desactivable: true, nombre: "Redes", rutas: ["/redes"], secciones: ["redes"] });
+    expect(moduloPorClave("rrss")?.heredaDe).toBeUndefined();
     expect(moduloPorClave("albaranes")).toMatchObject({ desactivable: true, heredaDe: "facturas", rutas: ["/albaranes"] });
   });
 
@@ -108,7 +110,7 @@ describe("forma del catálogo", () => {
 
   it("el menú lateral, en el orden de siempre", () => {
     expect(MODULOS_MENU.map((m) => m.nombre)).toEqual([
-      "Dashboard", "Reservas", "Gestor Web", "Newsletter", "RRSS", "Cheques", "Tienda", "Facturas",
+      "Dashboard", "Reservas", "Gestor Web", "Newsletter", "Redes", "Cheques", "Tienda", "Facturas",
       "Subir albaranes", "Usuarios", "Nueva petición", "Ayuda",
     ]);
   });
@@ -135,8 +137,7 @@ describe("moduloDeRuta", () => {
     ["/reservas", "reservas"],
     ["/reservas/", "reservas"],
     ["/aplicar-precio/7f1c", "gestion_web"],
-    ["/rrss", "rrss"],
-    ["/instagram/rapido", "rrss"],
+    ["/redes", "rrss"],
     ["/facturas/ia", "facturas"],
     ["/albaranes", "albaranes"],
     ["/peticiones", "peticiones"],
@@ -146,7 +147,7 @@ describe("moduloDeRuta", () => {
   });
 
   it("lo que no es del equipo, ninguno", () => {
-    for (const ruta of ["/super-admin", "/super-admin/espacios", "/auth", "/no-existe", "/facturas/otra"]) {
+    for (const ruta of ["/super-admin", "/super-admin/espacios", "/auth", "/no-existe", "/facturas/otra", "/rrss", "/instagram/rapido"]) {
       expect(moduloDeRuta(ruta), ruta).toBeUndefined();
     }
   });
@@ -160,10 +161,9 @@ describe("valorInterruptor (sin fila = activado; RRSS y Subir albaranes heredan)
     expect(valorInterruptor("clave_desconocida", [])).toBe(true);
   });
 
-  it("RRSS sin fila vale lo que Newsletter (si estaba apagado, sigue oculto); con fila propia, va por libre", () => {
-    expect(valorInterruptor("rrss", [{ section_key: "marketing", enabled: false }])).toBe(false);
-    expect(valorInterruptor("rrss", [{ section_key: "marketing", enabled: true }])).toBe(true);
-    expect(valorInterruptor("rrss", [{ section_key: "marketing", enabled: false }, { section_key: "rrss", enabled: true }])).toBe(true);
+  it("Redes no hereda de Newsletter; Subir albaranes sin fila vale lo que Facturas", () => {
+    expect(valorInterruptor("rrss", [{ section_key: "marketing", enabled: false }])).toBe(true);
+    expect(valorInterruptor("rrss", [{ section_key: "rrss", enabled: false }])).toBe(false);
     expect(valorInterruptor("albaranes", [{ section_key: "facturas", enabled: false }])).toBe(false);
     expect(valorInterruptor("albaranes", [{ section_key: "facturas", enabled: false }, { section_key: "albaranes", enabled: true }])).toBe(true);
   });
@@ -183,7 +183,8 @@ describe("permisos y destino al rechazar", () => {
 
   it("tienePermisoModulo: sin secciones lo ve todo el mundo; el super admin todo salvo «solo con permiso»", () => {
     expect(tienePermisoModulo(moduloPorClave("peticiones")!, [], false)).toBe(true);
-    expect(tienePermisoModulo(moduloPorClave("rrss")!, ver("instagram_agencia"), false)).toBe(true);
+    expect(tienePermisoModulo(moduloPorClave("rrss")!, ver("redes"), false)).toBe(true);
+    expect(tienePermisoModulo(moduloPorClave("rrss")!, ver("marketing", "instagram_agencia"), false)).toBe(false);
     expect(tienePermisoModulo(moduloPorClave("rrss")!, [], true)).toBe(true);
     expect(tienePermisoModulo(moduloPorClave("albaranes")!, [], true)).toBe(false);
     expect(tienePermisoModulo(moduloPorClave("albaranes")!, ver("facturas_albaranes"), true)).toBe(true);
@@ -193,8 +194,8 @@ describe("permisos y destino al rechazar", () => {
     expect(destinoPermitido(ver("dashboard", "reservas"), todoActivo, "/rrss")).toBe("/dashboard");
     expect(destinoPermitido(ver("reservas", "facturas"), todoActivo, "/rrss")).toBe("/reservas");
     expect(destinoPermitido(ver("reservas", "facturas"), apagados("reservas"), "/rrss")).toBe("/facturas");
-    // La agencia, con Newsletter apagado no cuenta: va a RRSS.
-    expect(destinoPermitido(ver("marketing"), apagados("marketing"), "/dashboard")).toBe("/rrss");
+    // Con Newsletter apagado no cuenta: va a Redes.
+    expect(destinoPermitido(ver("marketing", "redes"), apagados("marketing"), "/dashboard")).toBe("/redes");
   });
 
   it("no manda al módulo de la ruta actual ni a uno apagado (sin bucles): si no queda nada, Ayuda", () => {

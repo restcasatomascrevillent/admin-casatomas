@@ -60,6 +60,7 @@ import {
 } from "@/lib/menu-dia";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
 import { useCanAccessSection } from "@/hooks/useUserRole";
+import { tapasPorRedes } from "@/lib/redes";
 
 // Story de Instagram del jueves de tapas (12/11/2026): se descarga solo al abrirla.
 const DialogoCrearStoryTapas = lazy(() =>
@@ -257,6 +258,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   const [vistaPreviaAbierta, setVistaPreviaAbierta] = useState(false);
   const [storyAbierta, setStoryAbierta] = useState(false);
   const { canAccess: veMarketing } = useCanAccessSection("marketing");
+  const { canAccess: editaRedes } = useCanAccessSection("redes", "edit");
   const formRef = useRef<HTMLDivElement>(null);
 
   // La carta solo hace falta en el editor de menú (para elegir platos y para
@@ -532,9 +534,17 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         editandoFecha || choqueFecha ? "Cambios guardados" : "Guardado",
       );
 
-      // Story automática del jueves de tapas (12/11/2026): sin esperar; avisa ella con un toast.
-      // Solo si se ve Marketing (sin permiso no se puede generar ni programar).
-      if (!esMenu && veMarketing) {
+      // Historia del jueves de tapas: con Redes configurada (26/11/2026), la monta y la programa
+      // rrss con su plantilla (solo con «Redes» › «Puede editar»); la antigua ya no se crea, para
+      // no publicar dos veces. Sin Redes, la story automática de siempre (12/11/2026), con Marketing.
+      // Sin esperar en los dos casos: avisan ellas con un toast.
+      if (!esMenu && tapasPorRedes()) {
+        if (editaRedes) {
+          void import("@/lib/redesTapas")
+            .then((m) => m.enviarTapasARedes(fecha))
+            .catch((e) => console.error("Tapas a Redes:", e));
+        }
+      } else if (!esMenu && veMarketing) {
         void import("@/components/instagram/tapas/automatico")
           .then((m) => m.storyTapasAlGuardar(fecha, tapas))
           .catch((e) => console.error("Story de tapas:", e));
@@ -867,7 +877,8 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                     placeholder={"Ensaladilla rusa\nCroquetas de jamón\nPulpo a feira"}
                     className="min-h-40 text-base md:text-base"
                   />
-                  {veMarketing && (
+                  {/* Con Redes, la historia la hace rrss al guardar: sin el botón de la antigua. */}
+                  {veMarketing && !tapasPorRedes() && (
                     <Button
                       type="button"
                       variant="outline"

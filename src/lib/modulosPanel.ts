@@ -137,18 +137,19 @@ export const MODULOS_PANEL: readonly ModuloPanel[] = [
     enMenu: true,
   },
   {
-    // Interruptor propio desde el 14/11/2026 (antes, el de Newsletter).
+    // Redes (23/11/2026): rrss embebido. Conserva la clave «rrss» (el interruptor de Control del
+    // Panel sigue siendo el mismo). La sección antigua RRSS/Instagram (/rrss, /instagram,
+    // /instagram/rapido) ya no se abre: redirige aquí; su código está archivado en la rama
+    // `archivo/instagram-estudio` (docs/redes-rrss.md).
     clave: "rrss",
-    nombre: "RRSS",
-    descripcion: "Instagram, Facebook y el editor IA de fotos y vídeos (y los encargos de la agencia).",
-    rutas: ["/rrss", "/instagram/rapido"],
+    nombre: "Redes",
+    descripcion: "rrss dentro del panel: fotos y vídeos, piezas, calendario y publicación en redes.",
+    rutas: ["/redes"],
     icono: Share2,
     grupo: "web",
-    // La agencia (Oficiosos) también entra, solo a «Encargos» (docs/instagram-encargos.md).
-    secciones: ["marketing", "instagram_agencia"],
+    secciones: ["redes"],
     desactivable: true,
     enMenu: true,
-    heredaDe: "marketing",
   },
   {
     clave: "cheques",
@@ -266,7 +267,9 @@ export const RUTAS_FUERA_DEL_CATALOGO: Readonly<Record<string, string>> = {
   "/trabajadores": "Sección «Personal» retirada (23/09/2026): solo redirige a la portada.",
   "/gestor-carta": "Redirección antigua a Gestor Web › Carta: la protege su destino.",
   "/analisis": "Redirección antigua a Facturas › Márgenes: la protege su destino.",
-  "/instagram": "Redirección antigua a RRSS › Instagram: la protege su destino.",
+  "/instagram": "Redirección antigua (sección Instagram retirada) a Redes: la protege su destino.",
+  "/rrss": "Redirección antigua (sección RRSS retirada el 23/11/2026) a Redes: la protege su destino.",
+  "/instagram/rapido": "Redirección antigua (Instagram rápido, retirado) a Redes: la protege su destino.",
   "/gestion-bot": "Redirección antigua a Super Admin › Bot Web.",
 };
 

@@ -49,7 +49,7 @@ export const OPCIONES_INICIO: readonly OpcionInicio[] = [
   { clave: "reservas", titulo: "Reservas", ruta: "/reservas", secciones: ["reservas"] },
   { clave: "gestion_web", titulo: "Gestor Web", ruta: "/gestion-web", secciones: SECCIONES_GESTOR_WEB },
   { clave: "newsletter", titulo: "Newsletter", ruta: "/marketing", secciones: ["marketing"] },
-  { clave: "rrss", titulo: "RRSS", ruta: "/rrss", secciones: ["marketing", "instagram_agencia"] },
+  { clave: "rrss", titulo: "Redes", ruta: "/redes", secciones: ["redes"] },
   { clave: "cheques", titulo: "Cheques", ruta: "/cheques", secciones: ["cheques"] },
   { clave: "tienda", titulo: "Tienda", ruta: "/tienda", secciones: ["tienda"] },
   { clave: "facturas", titulo: "Facturas", ruta: "/facturas", secciones: ["facturas", "facturas_subida"] },

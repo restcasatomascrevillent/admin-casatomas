@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useConfiguracionWeb, type BotonMenuTapas } from "@/hooks/useConfiguracionWeb";
+import { tapasPorRedes } from "@/lib/redes";
 import {
   DIAS_SEMANA,
   HORARIO_POR_DEFECTO,
@@ -54,7 +55,13 @@ export function InterruptorMenuTapas({ boton }: { boton: BotonMenuTapas }) {
                   // Encender «Tapas» deja el menú de tapas activo: la story automática del jueves (12/11/2026).
                   // Sin permiso de Marketing no hace nada (no puede leer sus ajustes) y no avisa.
                   onSuccess: () => {
-                    if (boton === "tapas" && mostrar) {
+                    if (boton === "tapas" && mostrar && tapasPorRedes()) {
+                      // Con Redes (26/11/2026), la historia la hace rrss; la antigua ya no.
+                      // Sin «Redes» › «Puede editar», el servidor no la manda (y no avisa).
+                      void import("@/lib/redesTapas")
+                        .then((m) => m.enviarTapasARedesAlActivar())
+                        .catch((e) => console.error("Tapas a Redes:", e));
+                    } else if (boton === "tapas" && mostrar) {
                       void import("@/components/instagram/tapas/automatico")
                         .then((m) => m.storyTapasAlActivar())
                         .catch((e) => console.error("Story de tapas:", e));

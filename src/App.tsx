@@ -1,13 +1,14 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense, type ReactNode } from "react";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { SuperAdminRoute } from "./components/SuperAdminRoute";
 import { RouteErrorBoundary } from "./components/ErrorBoundary";
 import { AuthProvider } from "@/hooks/useAuth";
 import { UserRoleProvider } from "@/hooks/useUserRole";
+import { PreparadorRedes } from "@/components/redes/PreparadorRedes";
 import type { SectionKey } from "@/hooks/useUserRole";
 import { SuperAdminProvider } from "@/hooks/useSuperAdmin";
 import { GestorRecortes } from "@/components/carta/recorte/GestorRecortes";
@@ -28,8 +29,10 @@ const Ecommerce = lazy(() => import("./pages/Ecommerce"));
 const GestionWeb = lazy(CARGADORES_SECCION["/gestion-web"]);
 const AsistenteTelefonico = lazy(() => import("./pages/AsistenteTelefonico"));
 const Marketing = lazy(CARGADORES_SECCION["/marketing"]);
-const RRSS = lazy(CARGADORES_SECCION["/rrss"]);
-const InstagramRapido = lazy(() => import("./pages/InstagramRapido"));
+// Redes (23/11/2026): rrss embebido. La sección antigua RRSS/Instagram (pages/RRSS.tsx,
+// pages/InstagramRapido.tsx) ya no tiene ruta; su código sigue en el repo y archivado en la
+// rama `archivo/instagram-estudio` hasta que el dueño confirme borrarlo.
+const Redes = lazy(CARGADORES_SECCION["/redes"]);
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Cheques = lazy(CARGADORES_SECCION["/cheques"]);
 const Tienda = lazy(CARGADORES_SECCION["/tienda"]);
@@ -121,13 +124,6 @@ const pagina = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[
   </RouteErrorBoundary>
 );
 
-/** Página protegida SIN el marco del panel (pantalla completa, p. ej. /instagram/rapido). */
-const paginaSinMarco = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[]) => (
-  <RouteErrorBoundary>
-    <ProtectedRoute requiredSection={requiredSection}>{bajoDemanda(contenido)}</ProtectedRoute>
-  </RouteErrorBoundary>
-);
-
 /**
  * Marco del panel (07/11/2026): menú lateral y cabecera montados UNA vez para todas las secciones; al navegar
  * solo cambia el contenido. `requiredSection={[]}` = solo sesión (cargando a pantalla completa y, sin usuario,
@@ -151,14 +147,6 @@ const paginaSuperAdmin = (contenido: ReactNode) => (
   </RouteErrorBoundary>
 );
 
-/** /instagram (sección antigua) → /rrss?red=instagram conservando tab, encargo, pieza… */
-function RedirigirInstagram() {
-  const { search } = useLocation();
-  const p = new URLSearchParams(search);
-  p.set("red", "instagram");
-  return <Navigate to={`/rrss?${p.toString()}`} replace />;
-}
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <VisualViewportVars />
@@ -178,6 +166,8 @@ const App = () => (
                   06/11/2026 a petición del dueño, igual que el de las fotos pendientes de recortar. */}
               {/* Recorte de fotos del móvil tras guardar: pestaña muerta a medias y refresco de la carta. */}
               <GestorRecortes />
+              {/* Redes: iframe oculto que prepara en rrss la historia de tapas tras guardarlas (26/11/2026). */}
+              <PreparadorRedes />
               {/* Barrera de nivel app: último recurso para que nunca quede la pantalla en blanco. */}
               <RouteErrorBoundary
                 pantallaCompleta
@@ -193,9 +183,8 @@ const App = () => (
                     <Route path="/reservas" element={pagina(<Reservas />)} />
                     <Route path="/gestion-web" element={pagina(<GestionWeb />)} />
                     <Route path="/marketing" element={pagina(<Marketing />)} />
-                    {/* RRSS (08/11/2026): Instagram, Facebook y el editor IA. Antes «Instagram» (sección propia desde el
-                        05/11/2026). Sección de permisos «marketing» (la agencia, solo Instagram › Encargos). */}
-                    <Route path="/rrss" element={pagina(<RRSS />)} />
+                    {/* Redes (23/11/2026): rrss embebido (sección de permisos «redes»). */}
+                    <Route path="/redes" element={pagina(<Redes />)} />
                     <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
                     <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />
                     <Route path="/facturas" element={pagina(<Facturas />)} />
@@ -223,12 +212,11 @@ const App = () => (
                   {/* «Análisis general» (sección propia del 07/11/2026) es desde el 10/11/2026 la pestaña «Márgenes»
                       de Facturas (petición del dueño). Los marcadores y enlaces antiguos llegan a ella. */}
                   <Route path="/analisis" element={<Navigate to="/facturas?tab=margenes" replace />} />
-                  {/* /instagram?tab=…&encargo=… (marcadores, avisos push, notificar-video) → RRSS › Instagram con los mismos parámetros. */}
-                  <Route path="/instagram" element={<RedirigirInstagram />} />
+                  {/* Sección antigua RRSS/Instagram (retirada el 23/11/2026): marcadores, avisos y enlaces van a Redes. */}
+                  <Route path="/rrss" element={<Navigate to="/redes" replace />} />
+                  <Route path="/instagram" element={<Navigate to="/redes" replace />} />
+                  <Route path="/instagram/rapido" element={<Navigate to="/redes" replace />} />
                   <Route path="/gestion-bot" element={<Navigate to="/super-admin/bot-web" replace />} />
-                  {/* Sin menú, a pantalla completa (fuera del marco): */}
-                  {/* Acceso directo para la pantalla de inicio del móvil: asistente rápido a pantalla completa (docs/instagram-movil.md). */}
-                  <Route path="/instagram/rapido" element={paginaSinMarco(<InstagramRapido />, "marketing")} />
                   <Route path="/super-admin/login" element={bajoDemanda(<SuperAdminLogin />)} />
                   <Route path="/super-admin" element={paginaSuperAdmin(<SuperAdminPanel />)} />
                   <Route path="/super-admin/ecommerce" element={paginaSuperAdmin(<Ecommerce />)} />

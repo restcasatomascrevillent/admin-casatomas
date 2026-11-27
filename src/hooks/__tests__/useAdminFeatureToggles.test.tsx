@@ -42,14 +42,14 @@ beforeEach(() => {
 });
 
 describe("useAdminFeatureToggles", () => {
-  it("sin fila, activado; RRSS sin fila vale lo que Newsletter (apagado aquí: sigue oculto)", async () => {
+  it("sin fila, activado; Redes (clave «rrss») ya no hereda de Newsletter (23/11/2026)", async () => {
     const { result } = renderHook(() => useAdminFeatureToggles());
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.isEnabled("reservas")).toBe(true);
     expect(result.current.isEnabled("peticiones")).toBe(true);
     expect(result.current.isEnabled("marketing")).toBe(false);
-    expect(result.current.isEnabled("rrss")).toBe(false);
+    expect(result.current.isEnabled("rrss")).toBe(true);
     expect(result.current.isEnabled("albaranes")).toBe(true);
   });
 
@@ -70,28 +70,34 @@ describe("useAdminFeatureToggles", () => {
     expect(ruta.result.current.isEnabled("reservas")).toBe(false);
   });
 
-  it("al cambiar Newsletter, RRSS (sin fila) guarda antes su valor de ahora para no cambiar con él", async () => {
+  it("al cambiar Facturas, Subir albaranes (sin fila) guarda antes su valor de ahora para no cambiar con él", async () => {
     const { result } = renderHook(() => useAdminFeatureToggles());
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => {
-      await result.current.setEnabled("marketing", "Newsletter", true);
+      await result.current.setEnabled("facturas", "Facturas", false);
     });
     expect(h.upsert).toHaveBeenCalledWith(
       [
-        expect.objectContaining({ section_key: "marketing", enabled: true }),
-        expect.objectContaining({ section_key: "rrss", label: "RRSS", enabled: false, updated_at: null }),
+        expect.objectContaining({ section_key: "facturas", enabled: false }),
+        expect.objectContaining({ section_key: "albaranes", enabled: true, updated_at: null }),
       ],
       { onConflict: "section_key" },
     );
-    expect(result.current.isEnabled("marketing")).toBe(true);
-    expect(result.current.isEnabled("rrss")).toBe(false);
+    expect(result.current.isEnabled("facturas")).toBe(false);
+    expect(result.current.isEnabled("albaranes")).toBe(true);
 
-    // Con fila propia, cambiar Newsletter ya no toca RRSS.
+    // Con fila propia, cambiar Facturas ya no toca Subir albaranes; Newsletter nunca toca Redes.
     h.upsert.mockClear();
     await act(async () => {
-      await result.current.setEnabled("marketing", "Newsletter", false);
+      await result.current.setEnabled("facturas", "Facturas", true);
     });
     expect(h.upsert.mock.calls[0][0]).toHaveLength(1);
+    h.upsert.mockClear();
+    await act(async () => {
+      await result.current.setEnabled("marketing", "Newsletter", true);
+    });
+    expect(h.upsert.mock.calls[0][0]).toHaveLength(1);
+    expect(result.current.isEnabled("rrss")).toBe(true);
   });
 
   it("igual con Facturas y Subir albaranes", async () => {

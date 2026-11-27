@@ -50,6 +50,10 @@ export const SECTIONS = [
   { key: "gestor_carta", label: "Gestor Web · Carta" },
   { key: "gestion_web", label: "Gestor Web · Novedades, menús y tapas" },
   { key: "marketing", label: "Newsletter y RRSS" },
+  // Redes (23/11/2026): rrss embebido en el panel. «Ver» entra y mira; «Puede editar» sube
+  // fotos y vídeos, crea piezas y publica. Lo que puede cada nivel lo decide rrss (su
+  // integración); el panel solo dice el nivel. Ver docs/redes-rrss.md.
+  { key: "redes", label: "Redes" },
   // Usuarios de la agencia (Oficiosos) en los encargos de Instagram, 10/11/2026:
   // aceptan, entregan versiones y comentan (pestaña Instagram › Encargos). Ver
   // docs/instagram-encargos.md. Con «Marketing» se es el restaurante.
