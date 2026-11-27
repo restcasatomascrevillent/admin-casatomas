@@ -8,6 +8,7 @@ import { SuperAdminRoute } from "./components/SuperAdminRoute";
 import { RouteErrorBoundary } from "./components/ErrorBoundary";
 import { AuthProvider } from "@/hooks/useAuth";
 import { UserRoleProvider } from "@/hooks/useUserRole";
+import { PreparadorRedes } from "@/components/redes/PreparadorRedes";
 import type { SectionKey } from "@/hooks/useUserRole";
 import { SuperAdminProvider } from "@/hooks/useSuperAdmin";
 import { GestorRecortes } from "@/components/carta/recorte/GestorRecortes";
@@ -165,6 +166,8 @@ const App = () => (
                   06/11/2026 a petición del dueño, igual que el de las fotos pendientes de recortar. */}
               {/* Recorte de fotos del móvil tras guardar: pestaña muerta a medias y refresco de la carta. */}
               <GestorRecortes />
+              {/* Redes: iframe oculto que prepara en rrss la historia de tapas tras guardarlas (26/11/2026). */}
+              <PreparadorRedes />
               {/* Barrera de nivel app: último recurso para que nunca quede la pantalla en blanco. */}
               <RouteErrorBoundary
                 pantallaCompleta

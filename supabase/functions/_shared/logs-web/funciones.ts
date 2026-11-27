@@ -149,6 +149,8 @@ export const FUNCIONES: Readonly<Record<string, FuncionServidor>> = {
     "la sección Redes no se abre o se cierra sola"),
   "rrss-embed-revoke": panel("Redes", "el aviso a rrss al quitar el permiso de Redes", "avisa a rrss para que quite al momento el acceso a quien ya no tiene Redes",
     "quien perdió el permiso sigue en rrss hasta que caduca su acceso (unos 20 minutos)"),
+  "rrss-menu": panel("Redes", "el envío de las tapas a Redes", "manda a rrss las tapas guardadas para que monte y programe la historia del jueves",
+    "la historia de tapas no se ha creado en Redes"),
   "enviar-newsletter": panel("Newsletter", "el envío de la newsletter", "manda la newsletter a los suscriptores",
     "la newsletter puede no haber salido, o solo a una parte de los suscriptores", null, "hay que revisarla en Newsletter y volver a enviarla"),
   "newsletter-ia": panel("Newsletter", "la redacción de la newsletter con IA", "propone con IA el texto y el diseño de la newsletter",

@@ -13,32 +13,17 @@
  * Sustituye a la sección antigua RRSS/Instagram (`pages/RRSS.tsx`, archivada en la
  * rama `archivo/instagram-estudio`). Diseño y amenazas: docs/redes-rrss.md.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { RefreshCw, Share2 } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { esHuella, origenRrss, urlEmbebida } from "@/lib/redes";
+import { useEntregaPaseRedes } from "@/hooks/useEntregaPaseRedes";
+import { origenRrss, urlEmbebida } from "@/lib/redes";
 
 const ALTURA_MINIMA = 420;
-/** Pases que se dan por minuto a este iframe: evita bucles si algo falla. */
-const PASES_POR_MINUTO = 6;
 
 type Estado = { tipo: "listo"; src: string } | { tipo: "error"; mensaje: string };
-
-async function pedirPase(cnf: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke("rrss-embed-pass", { method: "POST", body: { cnf } });
-  if (error) {
-    const contexto = (error as { context?: unknown }).context;
-    const cuerpo =
-      contexto instanceof Response ? ((await contexto.clone().json().catch(() => null)) as { error?: unknown } | null) : null;
-    throw new Error(typeof cuerpo?.error === "string" ? cuerpo.error : "No se ha podido abrir Redes.");
-  }
-  const pase = (data as { pase?: unknown } | null)?.pase;
-  if (typeof pase !== "string" || !pase) throw new Error("No se ha podido abrir Redes.");
-  return pase;
-}
 
 export default function Redes() {
   const origen = origenRrss();
@@ -51,40 +36,14 @@ export default function Redes() {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA);
   const iframe = useRef<HTMLIFrameElement | null>(null);
-  const pases = useRef<number[]>([]);
+  const reiniciar = useEntregaPaseRedes(iframe, origen, (mensaje) => setEstado({ tipo: "error", mensaje }));
 
   const abrir = useCallback(() => {
     if (!origen) return;
-    pases.current = [];
+    reiniciar();
     setEstado({ tipo: "listo", src: urlEmbebida(origen) });
     setVersion((v) => v + 1);
-  }, [origen]);
-
-  // rrss pide un pase con la huella de su secreto; se le da, solo a él.
-  useEffect(() => {
-    if (!origen) return;
-    const alRecibir = (evento: MessageEvent) => {
-      const ventana = iframe.current?.contentWindow;
-      if (!ventana || evento.source !== ventana || evento.origin !== origen) return;
-      const datos = evento.data as { type?: unknown; cnf?: unknown } | null;
-      if (datos?.type !== "rrss:hello" || !esHuella(datos.cnf)) return;
-      const cnf = datos.cnf;
-      const ahora = Date.now();
-      pases.current = pases.current.filter((t) => ahora - t < 60_000);
-      if (pases.current.length >= PASES_POR_MINUTO) {
-        setEstado({ tipo: "error", mensaje: "Redes se ha reiniciado demasiadas veces. Pulsa «Volver a abrir»." });
-        return;
-      }
-      pases.current.push(ahora);
-      void pedirPase(cnf)
-        .then((pase) => ventana.postMessage({ type: "rrss:pass", pass: pase, cnf }, origen))
-        .catch((e: unknown) =>
-          setEstado({ tipo: "error", mensaje: e instanceof Error ? e.message : "No se ha podido abrir Redes." }),
-        );
-    };
-    window.addEventListener("message", alRecibir);
-    return () => window.removeEventListener("message", alRecibir);
-  }, [origen]);
+  }, [origen, reiniciar]);
 
   return (
     <DashboardLayout>

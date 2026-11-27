@@ -26,6 +26,32 @@ sin pantalla que lo enseñe: este PR los quita con la migración
 `20261224100000_instagram_antiguo_sin_cron.sql` (vuelta atrás en `supabase/rollbacks/`; prueba
 `npm run test:instagram-sin-cron:db`). Lo programado queda guardado, sin publicarse.
 
+## Historia del jueves de tapas (26/11/2026)
+
+Con Redes configurada (`VITE_RRSS_URL`), la historia de tapas la hace **rrss con su plantilla de
+tapas** y la antigua (render en `/api/instagram-render` + `instagram-programador`) ya no se crea:
+
+1. Al guardar las tapas en Gestión web › Tapas (o al encender «Tapas» en la web), el panel llama a
+   la función **`rrss-menu`** con el día. Exige «Redes» con «Puede editar» (o super admin).
+2. `rrss-menu` **lee las tapas guardadas** de la base de datos (no las que manda el navegador),
+   respeta el interruptor «historia automática» y «Mostrar Tapas en la web», calcula la hora (la de
+   los ajustes, 12:00 por defecto; si ya pasó, en 15 minutos) y manda a rrss un **pedido firmado**
+   (misma clave que los pases, `typ: "rrss-menu"`, 60 s, un solo uso) con nombre y precio de cada
+   tapa (`Nombre | 2,50 €`, `Nombre · 2,50 €` o `Nombre 2,50 €`), «Jueves de tapas», la fecha y
+   los turnos. Un pedido por semana: si cambian las tapas, rrss rehace la misma pieza.
+3. Si rrss lo acepta, se **cancela la historia antigua** de esa semana si estaba programada; si la
+   antigua ya salió, no se manda nada (409). Así nunca salen dos.
+4. Como rrss dibuja la pieza en el navegador, el panel abre rrss un momento en un **iframe oculto**
+   (`components/redes/PreparadorRedes.tsx`, mismo pase que la página Redes) para que la monte, la
+   exporte y la deje en su calendario. Si no puede (o quien guarda no tiene «Redes»), la prepara rrss
+   la próxima vez que alguien con edición abra Redes.
+5. En rrss la pieza queda **aprobada y programada** solo si la integración tiene
+   `menu_auto_approve = true` (lo pone la plataforma); si no, queda en el calendario pendiente de que
+   la apruebe la agencia. Sin cuenta de Instagram conectada en rrss, queda en espera.
+
+Las fotos de cada tapa salen de la biblioteca de rrss de la marca: la que se llame como la tapa
+(nombre del archivo) o la lleve como etiqueta. Sin foto, la tapa va sin foto.
+
 ## Quién entra
 
 Permiso nuevo **«Redes»** (`redes`) en Usuarios › Permisos. No cuenta para el rol (admin/manager/staff).
@@ -47,6 +73,8 @@ El interruptor del módulo en Control del Panel sigue siendo la clave `rrss` (ah
   vuelve a pedir pase si rrss avisa `rrss:expired`, como mucho 3 veces por minuto).
 - `src/lib/redes.ts`: origen de rrss (`VITE_RRSS_URL`) y la dirección `…/embed#pass=…`.
 - `supabase/functions/rrss-embed-pass/`: la función que firma el pase (`pase.ts`, 30 s) y sus pruebas.
+- `supabase/functions/rrss-menu/`: el pedido de la historia de tapas (`menu.ts`) y sus pruebas; `lib/redesTapas.ts` y
+  `components/redes/PreparadorRedes.tsx` en el panel.
 - `supabase/functions/rrss-embed-revoke/`: el aviso de revocación (`aviso.ts`) y sus pruebas; el
   disparador, en `20261224100100_redes_aviso_revocar.sql` (prueba `npm run test:redes-aviso:db`).
 - `vercel.json`: `frame-src` admite `https://rrss-omega.vercel.app` (rrss de staging). Si rrss cambia
@@ -65,6 +93,7 @@ Secretos de la función en el Supabase **demo** (`sfonaclosuafvlhutkon`):
 | `RRSS_EMBED_PANEL_ORIGINS` | `https://admin-casatomas-git-staging-casa-tomas.vercel.app` (y `http://localhost:8080` para probar en local) |
 | `RRSS_EMBED_AUDIENCE` | Opcional; por defecto `rrss` |
 | `RRSS_EMBED_REVOKE_SECRET` | Secreto aleatorio (32 caracteres o más) para el aviso de revocación; el mismo valor en Vault como `rrss_embed_revoke_secret` |
+| `RRSS_EMBED_MENU_URL` | `https://zzkdrfhqmjfvrdsoguio.supabase.co/functions/v1/embed-session/menu` (pedidos de tapas a rrss de staging) |
 | `RRSS_EMBED_REVOKE_URL` | `https://zzkdrfhqmjfvrdsoguio.supabase.co/functions/v1/embed-session/revoke` (rrss de staging) |
 
 Variable de Vercel (Preview): `VITE_RRSS_URL=https://rrss-omega.vercel.app`.

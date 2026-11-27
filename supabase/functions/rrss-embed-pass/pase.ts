@@ -138,7 +138,7 @@ async function nombreVisible(userId: string, deps: DependenciasPase): Promise<st
 }
 
 /** Nivel del usuario en Redes, con la clave de servicio (has_section_permission ya cuenta a los super admins). */
-async function nivelRedes(userId: string, deps: DependenciasPase): Promise<NivelRedes | null> {
+export async function nivelRedes(userId: string, deps: DependenciasPase): Promise<NivelRedes | null> {
   const env = deps.env ?? envDeDeno;
   const servicio = deps.crearCliente(env("SUPABASE_URL") ?? "", env("SUPABASE_SERVICE_ROLE_KEY") ?? "", {
     auth: { persistSession: false, autoRefreshToken: false },

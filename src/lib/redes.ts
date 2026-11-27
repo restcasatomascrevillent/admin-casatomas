@@ -27,3 +27,11 @@ export function urlEmbebida(origen: string): string {
 export function esHuella(valor: unknown): valor is string {
   return typeof valor === "string" && /^[A-Za-z0-9_-]{43}$/.test(valor);
 }
+
+/**
+ * ¿La historia del jueves de tapas la hace Redes (rrss) y no la story antigua? Sí en cuanto
+ * Redes está configurada en este entorno: así nunca salen las dos (lib/redesTapas.ts).
+ */
+export function tapasPorRedes(valor: unknown = import.meta.env.VITE_RRSS_URL): boolean {
+  return origenRrss(valor) !== null;
+}

@@ -30,6 +30,7 @@ vi.mock("@/components/PanelLayout", async () => {
 vi.mock("@/components/ui/sonner", () => ({ Toaster: () => null }));
 vi.mock("@/components/carta/potente/AvisoTrabajosVideo", () => ({ AvisoTrabajosVideo: () => null }));
 vi.mock("@/components/carta/recorte/GestorRecortes", () => ({ GestorRecortes: () => null }));
+vi.mock("@/components/redes/PreparadorRedes", () => ({ PreparadorRedes: () => null }));
 vi.mock("@/hooks/useVisualViewportVars", () => ({ useVisualViewportVars: () => {} }));
 vi.mock("@/components/facturas/ColaSubidaProvider", () => ({ ColaSubidaProvider: pasa }));
 vi.mock("@/components/carta/video/ColaVideosProvider", () => ({ ColaVideosProvider: pasa }));
